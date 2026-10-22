@@ -1,0 +1,7 @@
+/target/
+/.local/
+**/build/
+/.gradle/
+local.properties
+*.jks
+*.keystore
