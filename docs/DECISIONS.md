@@ -1,5 +1,53 @@
 # Architectural decisions
 
+## 2026-10-22 — Android native packaging
+Pin NDK r30 **30.0.16248370**, the current official LTS, and install Rust
+`aarch64-linux-android` / `x86_64-linux-android` standard libraries for the
+existing stable toolchain. Package only arm64-v8a and x86_64 initially, for a
+64-bit device and emulator respectively. The API level stays 29. Primary evidence:
+- https://developer.android.com/ndk/downloads (r30 version and LTS status).
+- https://doc.rust-lang.org/rustc/platform-support/android.html (Android targets
+  and the supported LTS NDK policy).
+- https://developer.android.com/ndk/guides/other_build_systems (ABI triples,
+  API-suffixed Clang and Linux toolchain layout).
+- https://developer.android.com/guide/practices/page-sizes (16 KB ELF/ZIP alignment).
+- Published BoltFFI CLI 0.30.1 `src/config/targets/kotlin.rs`,
+  `src/toolchain/android.rs`, `src/pack/android/{mod,link}.rs`.
+
+Use the pinned BoltFFI `pack android` command to build Rust static archives,
+generate Kotlin/C and link one `libyomoku_jni.so` per ABI. Keep all generated
+sources, headers and libraries under ignored target directories. Gradle preBuild
+runs the checked-in offline script, tracks Rust sources/manifests and generated
+outputs, and packages those libraries and Kotlin codecs. Tool installation remains
+an explicit workstation setup step. The script verifies the selected NDK revision
+because BoltFFI otherwise falls back to another installed NDK if the pin is absent.
+Do not run bridge generation/build commands concurrently against shared output.
+This development step uses Rust's debug profile; release optimization is deferred
+to the planned release tooling.
+
+AGP 9 built-in Kotlin uses `android.sourceSets.main.kotlin.directories`; adding
+Kotlin files only to the Java directories does not compile them. Register only
+the generated `app` and `com` source folders: Crux also emits a standalone
+`build.gradle.kts`, which must not be compiled as an Android Kotlin source.
+Reference: https://developer.android.com/build/migrate-to-built-in-kotlin and
+the AGP 9.0 `AndroidSourceSet` API documentation.
+
+`CoreSession` owns one native handle on Android's main thread and exposes only a
+Compose render snapshot from Crux. It dispatches generated typed events, handles
+Render requests and closes the handle with the Activity. It queues future native
+callbacks onto the main thread and ignores callbacks after close. Async errors
+currently fail visibly via the typed exception; add recoverable error UI alongside
+the first real async effect. No new domain state, SQL or platform I/O enters core.
+Activity recreation currently creates a fresh core; retain the core across
+configuration changes when adding interactive navigation.
+
+Pin AndroidX test runner **1.7.0** and JUnit extension **1.3.0**, verified at
+https://developer.android.com/jetpack/androidx/releases/test and
+https://developer.android.com/training/testing/instrumented-tests/androidx-test-libraries/runner.
+The instrumentation test exercises command → JNI → core → render snapshot,
+independent sessions and handle closure. Building its APK does not establish
+Android execution; a connected device/emulator is required to check off that task.
+
 ## 2026-10-22 — First independently testable implementation
 The repository contained only the handoff and no commits. Start a dependency-free
 Cargo workspace with `yomoku-core` domain value types/policies. This is the first

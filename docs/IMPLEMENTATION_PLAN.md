@@ -27,7 +27,8 @@ position/encounter history. Keep incremental builds green.
 - [x] Install matching BoltFFI CLI and Kotlin tooling; generate bindings and compile/test Kotlin event/request/view serialization, errors and lifecycle across actual JNI, including listener release and calls after close. Repeat generation with identical output.
 - [ ] Test asynchronous callback delivery across JNI when the first real async effect is added (navigation is synchronous).
 - [x] Add Gradle wrapper and Kotlin Compose app under `android/`, min SDK 29; CLI assembleDebug and strict lint succeed with pinned compatible JDK/SDK/plugin versions. NDK selection belongs to native packaging below.
-- [ ] Verify/pin/install a compatible NDK and package native library for emulator and arm64 device; demonstrate command → core → view state in Android instrumentation test.
+- [x] Verify/pin/install a compatible NDK, generate/package Kotlin/JNI and native libraries for x86_64 emulator and arm64 device, and wire a Rust-backed shell; assemble app/instrumentation APKs, pass strict lint and verify both packaged ELF architectures/exports plus 16 KB ELF/ZIP alignment. NDK r30/API 29; Android execution remains below.
+- [ ] Demonstrate command → core → view state on Android by running `CoreSessionTest` on a device/emulator. Test source and APK compile; no device/emulator is currently available.
 - [ ] Add Library-default navigation, Nostr/Statistics/Vocabulary placeholders and toolbar Settings; verify phone bottom bar/tablet rail and hide navigation in reader.
 - [ ] Add `crates/yomoku-storage` SQLite initialization and numbered migration; test empty DB creation and repeat opens.
 - [ ] Exercise document CRUD through runtime/FFI on device; verify reopen persistence and failures.

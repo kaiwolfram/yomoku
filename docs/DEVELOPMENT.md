@@ -40,8 +40,9 @@ Generation and this comparison PASS. Standalone Kotlin 2.4.21 and BoltFFI CLI
 
 ## Android Compose shell
 The CLI-generated project lives in `android/`; normal builds need no Android
-Studio. Its current UI is a Library heading with system light/dark theme and
-window insets. Rust JNI packaging, navigation, and persistence are separate steps.
+Studio. Its current UI is a Rust-backed Library heading with system light/dark theme and
+window insets. Native packaging is integrated; interactive navigation and
+persistence are separate steps.
 Namespace/application ID `app.yomoku` is provisional, not a publishing commitment.
 Automatic cloud backup and device transfer are excluded; the product requires
 manual encrypted backups.
@@ -49,8 +50,7 @@ manual encrypted backups.
 Pinned versions: Gradle **9.1.0** (wrapper distribution SHA-256 checked),
 AGP **9.0.1**, Kotlin/Compose compiler **2.4.21**, Compose BOM **2026.03.01**,
 Activity Compose **1.13.0**, JDK **17**, compile/target SDK **36**, build tools
-**36.0.0**, minimum SDK **29**. No NDK is needed or selected for this Kotlin-only
-slice; pin/install it with the native ABI packaging step. AGP uses built-in Kotlin;
+**36.0.0**, minimum SDK **29**, NDK r30 **30.0.16248370**. AGP uses built-in Kotlin;
 do not also apply `org.jetbrains.kotlin.android`.
 
 On Fedora install `java-17-openjdk-devel` and point `JAVA_HOME` at the full JDK.
@@ -85,8 +85,8 @@ Build products, SDK paths, Gradle caches and keys are ignored. Kotlin compiler
 warnings and Android lint warnings fail the build; dependency-update reminders
 are reviewed separately from lint. The generated example data repository,
 Kotlin navigation state and template tests were removed: application state belongs
-in Rust. No Android unit/instrumentation behavior tests exist for the initial
-heading. The native command → view instrumentation test is the next slice.
+in Rust. The new CoreSession instrumentation test exercises the packaged bridge;
+see the native Android section below for its build and execution commands.
 There is no `/dev/kvm` in this sandbox; device/emulator execution is unverified.
 
 Verified 2026-10-22: debug APK build and strict lint PASS; repeat after the
@@ -98,7 +98,7 @@ The first SDK scan printed an XML version 4 compatibility warning and left the
 AndroidX graphics native library unstripped; neither prevented the build/lint.
 Gradle requires sandbox escalation even with `--offline` because its daemon and
 file-lock service need local sockets (otherwise "Could not determine a usable
-wildcard IP"). Fresh-cache network access is also required. No NDK is installed.
+wildcard IP"). Fresh-cache network access is also required.
 
 ## Kotlin formatting
 Use standalone **ktfmt 0.64** (Apache-2.0), with Kotlin language style, for Android
@@ -112,6 +112,71 @@ bash -n tools/format-kotlin.sh
 The script uses `JAVA_HOME/bin/java` when set, otherwise `java`; `JAVA_BIN` and
 `KTFMT_JAR` override those defaults. This does not reformat the standalone
 Kotlin bridge test yet. Android lint runs through the Gradle command above.
+
+## Native Android build and test
+
+Install the pinned NDK and matching Rust targets once (no Studio required):
+```sh
+android sdk install 'ndk;30.0.16248370'
+rustup target add aarch64-linux-android x86_64-linux-android
+```
+The NDK was installed through the Android CLI into the SDK above; Rust target
+components match the existing stable 1.99.1 compiler. Configure PATH/JAVA_HOME/
+GRADLE_USER_HOME/ANDROID_HOME as above. Install BoltFFI CLI as described below.
+Fetch Rust dependencies and allow Gradle network access once on a fresh cache.
+
+```sh
+./android/gradlew -p android :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug --offline --console=plain
+# Or generate/package native artifacts without Gradle:
+tools/build-android-native.sh
+```
+
+Gradle preBuild invokes the same script with its SDK path and tracks Rust inputs
+and generated outputs. It generates Crux codecs and uses BoltFFI 0.30.1 to build
+and combine Rust static archives with generated JNI C. Outputs stay under
+`target/generated/{kotlin,native,android}`; BoltFFI also places temporary linker
+files under `crates/yomoku-ffi/target/`. All are ignored. Both development ABIs
+(`arm64-v8a`, `x86_64`) are always packaged. The Rust profile is currently debug;
+optimized release tooling remains a later task. `BOLTFFI_BIN` overrides the local
+CLI path; `ANDROID_NDK_HOME` can select an installation of the exact pinned NDK.
+The script fails early for another NDK or missing targets and uses locked/offline
+Cargo. Do not run native generation/build/test scripts concurrently.
+
+`CoreSession` dispatches generated events and projects Render requests into a
+Compose view, owning/closing a native handle with the Activity. Interactive
+navigation still needs configuration-change retention. Instrumentation source is
+`android/app/src/androidTest/java/app/yomoku/CoreSessionTest.kt`; its APK is
+`android/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk`.
+Run on a connected API 29+ arm64 device or x86_64 emulator:
+```sh
+"$ANDROID_HOME/platform-tools/adb" devices -l
+./android/gradlew -p android :app:connectedDebugAndroidTest --offline --console=plain
+./android/gradlew -p android :app:installDebug --offline --console=plain
+"$ANDROID_HOME/platform-tools/adb" shell am start -n app.yomoku/.MainActivity
+```
+No device is currently connected; no emulator/system image or `/dev/kvm` is
+available here. Instrumentation execution and app launch remain unverified.
+Install/configure an emulator on a workstation with virtualization, or connect a
+device with USB debugging, before claiming Android behavior passes.
+
+Check APK packaging with the pinned CLI tools:
+```sh
+unzip -l android/app/build/outputs/apk/debug/app-debug.apk
+"$ANDROID_HOME/build-tools/36.0.0/zipalign" -c -P 16 -v 4 android/app/build/outputs/apk/debug/app-debug.apk
+"$ANDROID_HOME/ndk/30.0.16248370/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf" -l target/generated/android/jniLibs/arm64-v8a/libyomoku_jni.so
+"$ANDROID_HOME/ndk/30.0.16248370/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf" -l target/generated/android/jniLibs/x86_64/libyomoku_jni.so
+```
+
+Verified 2026-10-22: app and instrumentation APK assembly plus strict lint PASS
+offline. Both APK-packaged bridge libraries have the correct ELF architecture,
+JNI/Rust exports and 16 KB LOAD alignment; APK ZIP alignment PASS. The bridge is
+combined into a single library per ABI, with no separate Rust .so or host-libc
+dependency. Stripped bridge sizes: 956,888 bytes arm64 and 978,128 bytes x86_64.
+Host Kotlin/JNI suite, 15 Rust integration tests, fmt/clippy, Kotlin formatting
+and shell syntax PASS. Instrumentation execution/app launch were **not run**.
+First offline test dependency resolution failed; the approved online build
+populated the cache. Initial source registration attempts failed until using
+AGP's Kotlin directories and excluding Crux's standalone generated .kts file.
 
 ## Native bridge host build
 `cargo build --workspace --offline` emits `target/debug/libyomoku_ffi.so` and
@@ -165,8 +230,7 @@ generator's private registry; review the test when upgrading BoltFFI. No synthet
 async product event is added; async callbacks await the first real async effect.
 
 The script compiles generated C and Kotlin with warnings treated as errors.
-`bash -n tools/test-kotlin-bridge.sh` checks script syntax. Dedicated Kotlin lint
-and formatting tools have not yet been established; add them with the Gradle app.
+`bash -n tools/test-kotlin-bridge.sh` checks script syntax. Android lint and ktfmt check the handwritten Android Kotlin (see above).
 
 `crates/yomoku-ffi/boltffi.toml` selects native package
 `app.yomoku.nativebridge`, library `yomoku_jni`, system loading and min SDK 29.

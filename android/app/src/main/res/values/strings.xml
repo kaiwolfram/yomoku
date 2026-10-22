@@ -1,4 +1,7 @@
 <resources>
     <string name="app_name">Yomoku</string>
     <string name="library_title">Library</string>
+    <string name="nostr_title">Nostr</string>
+    <string name="statistics_title">Statistics</string>
+    <string name="vocabulary_title">Vocabulary</string>
 </resources>

@@ -124,3 +124,24 @@
 - No Android unit/instrumentation/device tests run. No NDK/emulator installed by
   this step; no /dev/kvm. Next: native ABI packaging and command → view device test,
   responsive navigation, then migration-safe storage. No new product blocker.
+
+## 2026-10-22 — Android native packaging and shell connection
+- Started clean. Verified official NDK/Rust/AGP/test APIs; installed pinned NDK
+  r30 30.0.16248370 and both Rust Android targets. Added offline native-build
+  script and Gradle preBuild integration for generated Kotlin/codecs and combined
+  Rust/JNI arm64-v8a/x86_64 libraries. Generated linker files stay ignored too.
+- Added CoreSession main-thread render projection/handle lifecycle and connected
+  the Library heading to Rust. Added Android command → core → view/isolation/
+  close instrumentation test; compiled its APK. No persistence/navigation UI yet.
+- App/test APK assembly and strict Android lint PASS offline. Packaged native
+  ELF architectures/exports, 16 KB LOAD alignment and APK ZIP alignment PASS.
+  Host JNI suite, workspace build, 15 Rust tests, fmt/clippy, Kotlin formatting,
+  shell syntax and git whitespace checks PASS.
+- Fixed AGP 9 source registration (use main.kotlin.directories, only generated
+  app/com folders, excluding Crux's standalone .kts). Initial offline test
+  dependency resolution failed; approved online retry populated caches.
+- ADB socket access required escalation; device listing succeeded but was empty.
+  No emulator/system image or /dev/kvm. Android test execution/app launch remain
+  unverified and unchecked. Native build uses debug Rust; release tooling later.
+- Next: run instrumentation on available Android, responsive navigation with
+  configuration-change retention, then SQLite migrations/reopen tests.

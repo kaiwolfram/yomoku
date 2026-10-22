@@ -4,6 +4,9 @@ crate = "yomoku_ffi"
 
 [targets.android]
 min_sdk = 29
+ndk_version = "30.0.16248370"
+architectures = ["arm64", "x86_64"]
+output = "../../target/generated/android"
 
 [targets.android.kotlin]
 package = "app.yomoku.nativebridge"

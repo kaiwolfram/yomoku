@@ -32,8 +32,16 @@ until a real asynchronous effect exists. Native wrappers require explicit close.
 `android/` contains a CLI-generated Kotlin/Compose application, minimum SDK 29,
 with Gradle wrapper and a JDK 17 toolchain. Its initial shell displays a Library
 heading, respects system light/dark mode and window insets, and excludes automatic
-Android backup/transfer. It does not yet load the native bridge or own application
-state. No platform I/O or persisted state exists yet.
+Android backup/transfer. Gradle's preBuild runs `tools/build-android-native.sh`
+to generate Crux/BoltFFI Kotlin and package a combined Rust/JNI library for
+arm64-v8a and x86_64, using pinned NDK r30/API 29. `CoreSession` owns the native
+handle, dispatches typed events, and projects Rust Render requests into Compose
+state on the main thread. The Activity reads its Library heading from that view
+and closes the session on destruction. Recreation currently creates a fresh core;
+interactive navigation must add retention across configuration changes.
+The Android instrumentation test covers command → core → view, isolation and
+explicit handle close; its execution still needs a connected device/emulator.
+No platform I/O or persisted state exists yet.
 
 ## Required boundaries (not yet implemented)
 Kotlin Compose shell handles UI and Android APIs through a narrow typed FFI to the
@@ -46,6 +54,6 @@ Remaining planned crates: `yomoku-storage`,
 `yomoku-analysis`, `yomoku-import`. Create these when implementing behavior,
 not as empty placeholders. Android project path: `android/`.
 
-Next architectural checkpoint: Android app/ABI packaging,
+Next architectural checkpoint: Android bridge execution, responsive navigation,
 then migration-safe storage and text offsets. Do not freeze FFI or schema based
 on assumptions about dependency APIs.

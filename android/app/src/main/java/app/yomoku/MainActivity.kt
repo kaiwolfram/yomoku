@@ -13,29 +13,47 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import app.yomoku.shared.Destination
+import app.yomoku.shared.Event
 import app.yomoku.theme.YomokuTheme
 
 class MainActivity : ComponentActivity() {
+    private lateinit var core: CoreSession
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        setContent { YomokuTheme { YomokuApp() } }
+        core = CoreSession()
+        core.dispatch(Event.SelectDestination(core.view.destination))
+        setContent { YomokuTheme { YomokuApp(core.view.destination) } }
+    }
+
+    override fun onDestroy() {
+        core.close()
+        super.onDestroy()
     }
 }
 
-// Initial shell only. Destination state will come from the Rust bridge.
 @Composable
-private fun YomokuApp() {
+private fun YomokuApp(destination: Destination) {
     Scaffold(modifier = Modifier.fillMaxSize()) { insets ->
         Text(
-            text = stringResource(R.string.library_title),
+            text = stringResource(destination.titleResource()),
             modifier = Modifier.padding(insets).padding(16.dp),
         )
     }
 }
 
+private fun Destination.titleResource(): Int =
+    when (this) {
+        Destination.LIBRARY -> R.string.library_title
+        Destination.NOSTR -> R.string.nostr_title
+        Destination.STATISTICS -> R.string.statistics_title
+        Destination.VOCABULARY -> R.string.vocabulary_title
+    }
+
 @Preview
 @Composable
 private fun YomokuPreview() {
-    YomokuTheme { YomokuApp() }
+    YomokuTheme { YomokuApp(Destination.LIBRARY) }
 }
