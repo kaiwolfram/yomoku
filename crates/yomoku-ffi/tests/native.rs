@@ -26,9 +26,13 @@ fn bridge() -> (NativeBridge, Weak<()>) {
     let lifetime = Arc::new(());
     let weak = Arc::downgrade(&lifetime);
     (
-        NativeBridge::new(Box::new(Listener {
-            _lifetime: lifetime,
-        })),
+        NativeBridge::new(
+            ":memory:".into(),
+            Box::new(Listener {
+                _lifetime: lifetime,
+            }),
+        )
+        .unwrap(),
         weak,
     )
 }

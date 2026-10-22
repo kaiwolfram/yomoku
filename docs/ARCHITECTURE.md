@@ -1,81 +1,69 @@
 # Architecture
 
 ## Implemented
-Root Cargo workspace → `crates/yomoku-core`: pure Crux 0.20.0 application plus
-surface identity, five vocabulary statuses, registration and completion policies.
-`document` adds typed document/source/chapter identities, chapter text snapshots,
-UTF-8 byte ranges/anchors and checked UTF-16 index conversion. These pure values
-are generated into Kotlin alongside shell payloads. Rust/Kotlin fixture exchange
-verifies Unicode and numeric boundaries without adding diagnostic app events or
-native methods. Pure `PasteText` validates paste input and first-line titles;
-`PastedDocument` carries a detached snapshot. Storage enforces allocation and
-offers create/load operations without a content-edit operation.
-`app::Yomoku` implements `App`; `Model` holds a transient destination (Library
-default) and Settings visibility. Typed SelectDestination/OpenSettings/CloseSettings
-commands update them, and a render command asks the host to read `ViewModel`.
-Closing Settings returns to the selected destination; a fresh core starts in
-Library. The typed effect currently contains only Render.
-`yomoku-runtime` maps core effects exhaustively into a separate `ShellEffect`
-through Crux middleware (`EffectRouter`). Only Render exists today; future Rust
-I/O handlers must run below this mapping. `yomoku-ffi::YomokuBridge` wraps that
-stack using Crux's Bincode bridge, exposing update/resolve/view and typed error
-categories. A supplied callback preserves the path for future async effects.
-The optional `facet_typegen` feature and `generate-kotlin` CLI generate event,
-view, shell effect and request types plus Bincode codecs in `app.yomoku.shared`.
-Generation registers the runtime shell effects explicitly; core-only effects stay
-private. Generated Kotlin codecs are compiled and exercised through host JNI.
-`native::NativeBridge` exposes update/resolve/view through BoltFFI 0.30.1.
-Its owned `EffectsListener` has separate success/error callbacks, retaining typed
-errors without passing internal strings. Hosts must dispatch callbacks to the UI
-thread. Native handles own independent bridge instances; no global app singleton.
-Twenty-three host integration tests cover domain rules, navigation, payloads, native
-facade isolation, cross-thread access and listener release. Shared/static libraries
-build with exported constructor/method/callback/release symbols. The pinned
-BoltFFI configuration generates Kotlin in `app.yomoku.nativebridge` and JNI C.
-`tools/test-kotlin-bridge.sh` compiles that generated C against the Rust shared
-library and compiles both generated Kotlin packages with a standalone compiler.
-The JVM test verifies navigation, payload round trips, categorized exceptions,
-instance isolation, 100 close cycles, listener registry cleanup and rejection of
-calls after close, using `-Xcheck:jni`. Asynchronous callbacks remain untested
-until a real asynchronous effect exists. Native wrappers require explicit close.
-`android/` contains a CLI-generated Kotlin/Compose application, minimum SDK 29,
-with Gradle wrapper and a JDK 17 toolchain. Its shell renders four destination
-placeholders and a toolbar Settings flow, respects system light/dark mode and
-window insets, and excludes automatic Android backup/transfer. Gradle's preBuild runs `tools/build-android-native.sh`
-to generate Crux/BoltFFI Kotlin and package a combined Rust/JNI library for
-arm64-v8a and x86_64, using pinned NDK r30/API 29. `CoreSession` owns the native
-handle, dispatches typed events, and projects Rust Render requests into Compose
-state on the main thread. Activity-scoped CoreSessionOwner (AndroidX ViewModel)
-retains the same session across configuration changes and closes it onCleared.
-Kotlin holds no independent route/domain state; a new process starts in Library.
-Compose chooses a bottom bar below 600dp available width and a scrollable rail
-from 600dp. Settings has toolbar/system Back and hides the main navigation.
-Reader-specific hiding remains pending the real reader route.
-Three Android instrumentation tests cover command → core → view, isolation, tabs,
-Settings return, configuration recreation and handle close on API 36 x86_64.
-This verifies the packaged JNI path on Android; arm64 device execution and real
-asynchronous effects remain unverified.
-`yomoku-storage` separately owns SQLite I/O through rusqlite 0.40.2 with bundled
-SQLite. `Storage::open` configures each connection, validates numbered migration
-history and applies pending migrations under one immediate transaction. Its
-connection remains private; no SQL or database handle enters core or FFI. Migration
-0002 separates source/chapter provenance, Library entries and canonical paste
-text. `create_paste` commits them atomically; `load_paste` reads a consistent
-snapshot. Twenty-one on-disk host tests cover migrations, exact Unicode/reopen,
-per-insert/commit rollback, concurrent opens/writes, ID nonreuse/exhaustion and
-failure preservation. This crate depends on core's pure domain values and is
-not wired to runtime/Android yet; the APK still has only transient state.
+`yomoku-core` is a pure Crux 0.20.0 application. It owns Library-default
+navigation, Settings visibility, storage busy/error state, Library summaries and
+an optional loaded paste snapshot. SelectDestination/OpenSettings/CloseSettings
+remain synchronous. RefreshLibrary/CreatePaste/LoadPaste emit StorageOperation;
+only one storage command is accepted at a time, while navigation stays available.
+StorageFinished is internal: both Serde and Facet skip it, so hosts cannot inject
+storage results. No SQL, paths, threads or platform I/O enter core.
 
-## Required boundaries (not yet implemented)
-Kotlin Compose shell handles UI and Android APIs through a narrow typed FFI to the
-Rust application. Crux owns commands/state/domain invariants. A separate Rust
-EffectRouter runs storage, analysis/dictionaries and networking effects; SQLite
-SQL and platform I/O must stay outside the core. Sudachi Full defaults to Mode B;
-JMdict English and JMnedict are offline data. Nostr uses Rust nostr-sdk.
+Pure document values define positive i64 identities, immutable chapter snapshots,
+UTF-8 byte anchors, checked UTF-16 conversions and literal first-line paste titles.
+Vocabulary values define exact-surface identity, five statuses, registration and
+New-only completion policy; tokenization/persistence remains future work.
 
-Remaining planned crates: `yomoku-analysis`, `yomoku-import`. Create these when
-implementing behavior, not as empty placeholders. Android project path: `android/`.
+`yomoku-runtime` composes Core → HandleEffectLayer<StorageEffects> → MapEffectLayer.
+A named FIFO worker owns one lazily opened SQLite connection per bridge. Opening,
+migration and create/load/list execute on that worker. Failed opens can retry;
+database failures become typed DocumentError view state without internal strings.
+Only Render reaches ShellEffect. Dropping the bridge closes the work channel;
+submitted work finishes atomically and the worker exits without joining on the UI
+thread. Crux discards results when the session has gone away. There is no new
+async executor or dependency version.
 
-Next architectural checkpoint: wire document storage effects/runtime/FFI and the
-private Android database off the UI thread, then the reader route/navigation. Do not
-freeze FFI or schema based on assumptions about dependency APIs.
+`yomoku-storage` owns rusqlite 0.40.2/bundled SQLite, migration history and SQL.
+Migration 0002 separates source/chapter provenance, Library documents and canonical
+text. create_paste commits all four inserts atomically; load_paste reads a
+consistent snapshot; list_documents returns IDs/titles in allocation order until
+Library sorting is added. No edit/rename/delete API exists. Twenty-one storage
+tests cover migrations, reopen, rollback, Unicode, concurrency and ID allocation.
+
+`yomoku-ffi::YomokuBridge` wraps the router in Crux's Bincode bridge.
+BoltFFI 0.30.1 NativeBridge takes a database path and owned EffectsListener,
+exposes update/resolve/view and reports worker creation failure as WorkerUnavailable.
+Callbacks carry asynchronous Render batches; document errors are view values.
+Core-only effects stay private. Facet generates Event/ViewModel/Requests and
+document codecs in app.yomoku.shared; BoltFFI generates the native package and JNI C.
+Native wrappers require explicit close; no global singleton exists.
+
+Forty-nine Rust tests cover domain, storage and bridge behavior, including an
+actual SQLite write lock proving dispatch/view/navigation remain responsive.
+The host Kotlin runner uses real JNI with -Xcheck:jni to verify navigation,
+Unicode, async worker callbacks, typed failures, reopen persistence, isolation,
+listener cleanup, 100 normal lifecycles and closing during I/O. Seven additional
+bidirectional Rust/Kotlin fixtures exercise Unicode anchors and full-width IDs.
+
+`android/` is a Kotlin/Compose shell (min SDK 29) built with Gradle CLI/JDK 17.
+Gradle preBuild generates payloads/JNI and packages combined libraries for
+arm64-v8a/x86_64 using NDK r30/API 29. CoreSession projects Render snapshots on
+Android's main thread and ignores callbacks after close. CoreSessionOwner is an
+Activity-scoped AndroidViewModel: it supplies Application.filesDir/yomoku.sqlite3,
+retains the native session across recreation, and closes it onCleared. It retains
+no Activity or independent domain state. Each new session requests Library data;
+the database is first opened on the Rust worker. A fresh process starts Library.
+
+Compose currently shows four placeholders and toolbar Settings with system theme
+and insets. Navigation uses a bottom bar below 600dp and a scrollable rail above;
+Settings hides it. Four tests pass on API 36 x86_64: JNI/navigation, Settings/Back,
+recreation/cleanup, private-file persistence/failure recovery. Arm64 execution is
+unverified. Automatic Android backup/transfer is excluded.
+
+## Required boundaries and next work
+Paste creation is repository/runtime plumbing, not the complete product import
+pipeline or an exposed UI flow. Deduplication, vocabulary registration, progress,
+pagination, paste UI/Library rendering and the reader route remain unchecked.
+Hide navigation when the real reader route is added. Add analysis/import crates
+only with actual behavior; Sudachi Full defaults to B, JMdict/JMnedict remain
+offline data, and future Nostr I/O stays in Rust. Configuration is empty.

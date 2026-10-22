@@ -21,6 +21,7 @@ pub enum FfiError {
     InvalidResponse,
     RequestEncoding,
     ViewEncoding,
+    WorkerUnavailable,
 }
 
 impl From<BridgeError<BincodeFfiFormat>> for FfiError {
@@ -42,10 +43,15 @@ pub struct YomokuBridge {
 impl YomokuBridge {
     /// The callback delivers effects produced after an asynchronous Rust
     /// operation completes. Hosts must dispatch it onto their UI thread.
-    pub fn new(on_effects: impl Fn(Result<Vec<u8>, FfiError>) + Send + Sync + 'static) -> Self {
-        Self {
-            bridge: effect_router().bridge(move |result| on_effects(result.map_err(Into::into))),
-        }
+    pub fn new(
+        database_path: std::path::PathBuf,
+        on_effects: impl Fn(Result<Vec<u8>, FfiError>) + Send + Sync + 'static,
+    ) -> Result<Self, FfiError> {
+        Ok(Self {
+            bridge: effect_router(database_path)
+                .map_err(|_| FfiError::WorkerUnavailable)?
+                .bridge(move |result| on_effects(result.map_err(Into::into))),
+        })
     }
 
     pub fn update(&self, event: &[u8]) -> Result<Vec<u8>, FfiError> {

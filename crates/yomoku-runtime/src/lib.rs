@@ -2,11 +2,14 @@
 
 use crux_core::{
     macros::effect,
-    middleware::{Layer, MapEffectLayer},
+    middleware::{HandleEffectLayer, Layer, MapEffectLayer},
     render::RenderOperation,
     Core,
 };
 use yomoku_core::app::{Effect, Yomoku};
+
+mod storage;
+use storage::StorageEffects;
 
 /// Only operations owned by the platform shell belong in this enum.
 #[effect(facet_typegen)]
@@ -20,14 +23,17 @@ impl From<Effect> for ShellEffect {
         // its owner here. Rust I/O must be handled below this mapping layer.
         match effect {
             Effect::Render(request) => Self::Render(request),
+            Effect::Storage(_) => unreachable!("storage effects are consumed by Rust middleware"),
         }
     }
 }
 
-/// Current routing stack. Add Rust I/O handlers before the shell mapping when
-/// storage/analysis/network operations are introduced.
-pub type EffectRouter = MapEffectLayer<Core<Yomoku>, ShellEffect>;
+/// SQLite effects are consumed before the shell mapping; only Render crosses FFI.
+pub type EffectRouter =
+    MapEffectLayer<HandleEffectLayer<Core<Yomoku>, StorageEffects>, ShellEffect>;
 
-pub fn effect_router() -> EffectRouter {
-    Core::<Yomoku>::new().map_effect()
+pub fn effect_router(database_path: std::path::PathBuf) -> std::io::Result<EffectRouter> {
+    Ok(Core::<Yomoku>::new()
+        .handle_effects_using(StorageEffects::new(database_path)?)
+        .map_effect())
 }

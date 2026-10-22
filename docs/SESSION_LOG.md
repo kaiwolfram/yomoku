@@ -249,3 +249,25 @@
   Android private DB wiring remain pending; current APK creates no database.
 - Next: off-main-thread storage effects/events/FFI and real async JNI/device
   persistence/failure checks; logical pages/reflow; CI. No local-reader blocker.
+
+## 2026-10-22 — Runtime storage effects and Android persistence
+- Added pure create/load/list effects, Library summaries and busy/error snapshots;
+  internal storage results cannot be injected over FFI. A FIFO runtime worker
+  owns lazy SQLite open/migrations/commands. Only Render crosses back to Kotlin.
+- Native constructor now accepts a DB path and reports worker creation failure;
+  Android supplies Application.filesDir/yomoku.sqlite3 and posts async renders on
+  main. Retained lifecycle/close behavior remains verified. UI is still placeholder.
+- PASS: 49 Rust tests, workspace build, fmt/clippy, actual Kotlin/JNI async
+  callbacks/errors/Unicode/reopen/close-during-I/O plus seven Unicode exchanges,
+  Android APK/test assembly, strict lint, four API 36 x86_64 device tests, Kotlin
+  formatting and whitespace. SQLite write-lock fixture proves dispatch and
+  navigation remain responsive. Both packaged Android ABIs compile.
+- Initial Kotlin assertions expected underscored enum names; corrected to generated
+  EMPTYPASTE/NOTFOUND. Resolved Clippy receiver-type complexity with a type alias.
+  Crux logs discarded weak-reference callbacks during intentional early close;
+  JNI/lifetime checks pass. No remaining failure or local-reader blocker.
+- Updated checklist, architecture/data model, decisions, development and handoff.
+  No new dependency version or migration. No rename/delete, complete import,
+  paste UI, reader, tokenizer, progress or Nostr behavior is claimed.
+- Next: pure logical pages/chapter boundaries/reflow; Android paste/Library/reader
+  slice; CI for verified commands.

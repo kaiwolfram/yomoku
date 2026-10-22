@@ -9,6 +9,10 @@ fn starts_in_library() {
         ViewModel {
             destination: Destination::Library,
             settings_open: false,
+            documents: vec![],
+            loaded_document: None,
+            storage_busy: false,
+            document_error: None,
         }
     );
 }
@@ -65,7 +69,7 @@ fn settings_returns_to_each_selected_destination_and_is_not_restored() {
             Event::CloseSettings,
             Event::CloseSettings,
         ] {
-            let effects = core.process_event(event);
+            let effects = core.process_event(event.clone());
             assert!(matches!(effects.as_slice(), [Effect::Render(_)]));
             assert_eq!(core.view().destination, destination);
             assert_eq!(
@@ -78,4 +82,31 @@ fn settings_returns_to_each_selected_destination_and_is_not_restored() {
     assert!(!Core::<Yomoku>::new().view().settings_open);
     let _ = core.process_event(Event::SelectDestination(Destination::Library));
     assert!(!core.view().settings_open);
+}
+
+#[test]
+fn storage_commands_are_serialized_while_navigation_remains_available() {
+    use yomoku_core::storage::{DocumentError, StorageOperation, StorageResult};
+    let core = Core::<Yomoku>::new();
+    let mut effects = core.process_event(Event::RefreshLibrary);
+    assert!(core.view().storage_busy);
+    assert!(core
+        .process_event(Event::CreatePaste("duplicate".into()))
+        .is_empty());
+    let _ = core.process_event(Event::SelectDestination(Destination::Vocabulary));
+    assert_eq!(core.view().destination, Destination::Vocabulary);
+    let request = effects
+        .iter_mut()
+        .find_map(|effect| match effect {
+            Effect::Storage(request) => Some(request),
+            Effect::Render(_) => None,
+        })
+        .unwrap();
+    assert_eq!(request.operation, StorageOperation::List);
+    core.resolve(request, StorageResult::Failed(DocumentError::Unavailable))
+        .unwrap();
+    assert!(!core.view().storage_busy);
+    assert_eq!(core.view().document_error, Some(DocumentError::Unavailable));
+    assert!(!core.process_event(Event::RefreshLibrary).is_empty());
+    assert!(core.view().document_error.is_none());
 }

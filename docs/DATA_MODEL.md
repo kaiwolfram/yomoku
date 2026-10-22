@@ -57,7 +57,7 @@ values and strings as UTF-8. Seven Rust → generated Kotlin → Rust fixture
 exchanges verify exact text/ID/range preservation, Kotlin-created suffix anchors,
 empty text, supplementary kanji/emoji, combining/ZWJ sequences, CRLF, NUL and
 IDs above 2^53 through i64::MAX. These test the generated FFI payload codecs;
-live document commands/JNI storage callbacks are still pending. This same-build
+live document commands and async JNI storage callbacks now use these types. This same-build
 wire encoding is not the future backup format.
 
 ## SQLite initialization
@@ -73,7 +73,7 @@ Opening creates an empty database in an existing caller-selected directory,
 enables foreign keys per connection and waits up to five seconds for lock
 contention. Newer versions, inconsistent history, nonempty databases without a
 journal, invalid files and SQLite I/O failures return errors without resetting or
-repairing data. Storage is not yet connected to runtime/FFI or Android's private
+repairing data. Runtime opens/migrates on its FIFO worker using Android's private
 files path. Vocabulary/history tables await their domain commands.
 
 ## Paste repository (migration 0002)
@@ -81,7 +81,7 @@ files path. Vocabulary/history tables await their domain commands.
 title is the literal first LF/CRLF-delimited line, without trimming/truncation or
 a fallback for an empty first line. `PastedDocument` is a detached snapshot of a
 document ID, live title and one `ChapterText`; mutating a snapshot does not edit
-persisted content. These new values are not yet shell/FFI payloads.
+persisted content. PastedDocument is now a generated shell/FFI payload.
 
 - `sources`: positive autoincrement ID, `kind = 'paste'`, original title.
 - `chapters`: positive autoincrement ID, source FK, nonnegative chapter index,
@@ -98,9 +98,9 @@ returns only after commit. No content-edit API exists. `load_paste` uses one rea
 transaction for a consistent snapshot, returns None only for an absent document
 and reports missing/invalid content for an existing document as InvalidDocument.
 SQL values are bound parameters, including titles/text containing NUL or quotes.
-Both calls are synchronous I/O to be run off the UI thread by future effects.
+Both calls are synchronous I/O executed off the UI thread by runtime effects.
 This repository is the persistence part of import; SHA-256 duplicate detection,
-vocabulary registration, import timestamps, reader progress and app commands
+vocabulary registration, import timestamps and reader progress
 remain separate unchecked tasks. No reading encounters are created here.
 
 ## Transient application state
@@ -116,8 +116,19 @@ same-build schemas, not a persisted format or version-stable public protocol.
 The optional Facet metadata now generates Kotlin payloads and Bincode codecs.
 Kotlin event/request/view serialization compatibility is verified across host JNI
 for the current navigation schema. Text/Unicode payload codecs are verified by
-the fixture exchange above; asynchronous effect responses remain untested.
+the fixture exchange above and live async JNI create/list/load/reopen tests.
 A fresh core starts at Library.
+
+RefreshLibrary/CreatePaste/LoadPaste use the pure StorageOperation protocol.
+StorageFinished is skipped by Serde and Facet, so it cannot be dispatched over
+FFI. Model/ViewModel add LibraryDocument (ID/title), an optional loaded snapshot,
+storage_busy and typed document_error. Concurrent storage submissions are ignored
+while busy; navigation remains available. A successful create adds its summary
+without opening a reader; loading reads exact content without changing progress.
+Listing is allocation order until the planned Library sorting task. Failed opens
+can retry. No path or SQLite diagnostic string is exposed in application state.
+The bridge constructor takes the path separately; Android uses filesDir/yomoku.sqlite3.
+Submitted writes finish even if the session closes; shutdown does not block UI.
 
 ## Required future schema constraints
 - Repositories must implement the identity/immutable-text contract above and

@@ -140,5 +140,7 @@ private fun Destination.iconResource(): Int =
 @Preview
 @Composable
 private fun YomokuPreview() {
-    YomokuTheme { YomokuApp(ViewModel(Destination.LIBRARY, false)) {} }
+    YomokuTheme {
+        YomokuApp(ViewModel(Destination.LIBRARY, false, emptyList(), null, false, null)) {}
+    }
 }

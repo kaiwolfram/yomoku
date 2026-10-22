@@ -18,8 +18,8 @@ with functioning rustup can omit the PATH workaround. Do not assume this compile
 is the project's minimum supported version; establish that with dependencies.
 Cargo.lock is retained for reproducible application development.
 Crux 0.20.0 declares Rust 1.90 minimum; the full locked graph has only been tested
-with 1.99.1. Current host baseline: 44 tests (five app, six document, five vocabulary,
-five bridge, two native facade and twenty-one storage tests).
+with 1.99.1. Current host baseline: 49 tests (six app, six document, five vocabulary,
+five bridge, four async document, two native facade and 21 storage tests).
 
 ## Kotlin payload generation
 ```sh
@@ -169,7 +169,7 @@ Verified 2026-10-22: `CoreSessionTest` passes on the configured API 36 x86_64
 `android/app/build/reports/androidTests/connected/debug/index.html`.
 Initial offline execution lacked AGP's UTP host-test dependencies; an online run
 populated them, then the offline test passed. This does not verify arm64 device
-execution, asynchronous effects or document storage on Android.
+execution. Four tests now also verify async document storage on Android.
 Debug APK installation and `am start -W -n app.yomoku/.MainActivity` also pass;
 the captured screen displays the Rust-backed Library heading. The ignored
 screenshot is `.local/emulator-captures/yomoku-library.png`.
@@ -204,8 +204,7 @@ Constructor, update/resolve/view, callback creation/registration and release are
 present. Host facade tests verify isolation, errors, thread sharing and listener
 release. The additional Kotlin/JNI test below verifies the generated ABI, Kotlin
 exceptions and foreign handle/listener cleanup. Navigation emits only synchronous
-effects; asynchronous delivery must be exercised once an actual asynchronous
-runtime operation is introduced.
+effects; real storage worker callbacks now verify asynchronous delivery.
 
 ## Kotlin/JNI host verification
 
@@ -241,8 +240,9 @@ PASS: all destinations/reselection, event/request/view codecs through actual JNI
 typed InvalidEvent/InvalidResponse exceptions, recovery after errors, independent
 instances, repeated close, calls after close and 100 lifecycles releasing their
 Kotlin listener registry entries. Listener cleanup inspection depends on the pinned
-generator's private registry; review the test when upgrading BoltFFI. No synthetic
-async product event is added; async callbacks await the first real async effect.
+generator's private registry; review the test when upgrading BoltFFI. Storage tests
+now also cover worker-thread callbacks, exact Unicode create/list/load/reopen, typed
+failures/retry, and 20 close-during-I/O cycles with eventual listener release.
 
 The script compiles generated C and Kotlin with warnings treated as errors.
 `bash -n tools/test-kotlin-bridge.sh` checks script syntax. Android lint and ktfmt check the handwritten Android Kotlin (see above).
@@ -272,7 +272,7 @@ breaks, NUL, empty text and full signed 64-bit IDs. Kotlin independently derives
 byte ranges from UTF-16 substring indices and sends suffix anchors back to Rust;
 Rust validates those and rejects invalid Kotlin-encoded IDs/offsets. The codecs
 are the production-generated Crux Bincode codecs. This fixture exchange does not
-exercise a live document JNI event or asynchronous effect; those await storage.
+exercise live commands themselves; those are now covered by the async storage tests.
 
 Verified 2026-10-22: workspace build, 32 Rust tests, fmt/clippy, host Kotlin/JNI
 including the seven Unicode fixture exchanges, Kotlin formatting and shell syntax
@@ -290,8 +290,9 @@ exact Unicode/NUL/CRLF, reopen/anchors, per-insert and deferred-commit rollback,
 concurrent writes, committed-ID nonreuse/full-width allocation/exhaustion, and
 real migration-failure preservation. Rename/deletion use test-only SQL to verify
 schema separation; production commands remain unimplemented. Initialization and
-paste storage do not yet run in the Android app; runtime/FFI wiring is next.
-No document database is created by the current APK.
+paste storage now run through runtime/FFI and Android's private database. The
+Android paste UI and complete import pipeline remain pending.
+The app now creates filesDir/yomoku.sqlite3 on its Rust worker at session startup.
 
 Compile the storage crate for both Android ABIs with the same pinned NDK/API:
 ```sh
@@ -389,3 +390,26 @@ lint run offline. Generated Rust unit event variants are Kotlin data objects
 must await Compose idle after clicking Settings so BackHandler is registered.
 UTP removes the app after testing; installDebug (or adb install -r the debug APK)
 is required for a later manual launch/screenshot.
+
+
+## Async document storage verification
+NativeBridge now requires a database path before its listener. Host isolation
+checks use :memory:; disk tests use temporary paths. Android's retained owner
+supplies Application.filesDir/yomoku.sqlite3, and CoreSession requests Library
+once at construction. Rust opens/migrates and performs all SQL on its FIFO worker.
+No database/path/SQL handle is exposed to core or Compose. Closing the session
+allows submitted I/O to finish and drops late results; it does not join on UI.
+
+PASS: 49 Rust tests, real async Kotlin/JNI callbacks/reopen/errors, Android app
+and test assembly, strict lint and all four API 36 x86_64 instrumentation tests.
+DocumentSessionTest uses temporary private files, verifies exact Unicode and
+first-line titles across new sessions, and retries a missing-directory failure.
+A host SQLite lock fixture verifies write waiting does not block dispatch or
+navigation. Arm64 builds pass; arm64 execution remains untested.
+
+Crux 0.20.0 middleware prints `Inner can't be upgraded after resolving effect`
+when a deliberately closed session discards a worker result. This is upstream
+weak-reference shutdown logging; JNI checks and listener-release tests still pass.
+Initial Kotlin error enum assertions used underscores; generated names are
+EMPTYPASTE/NOTFOUND. Corrected and rerun successfully. Clippy's test type-complexity
+finding was resolved with a callback receiver alias. No outstanding check failure.

@@ -2,7 +2,7 @@
 
 use crate::{FfiError, YomokuBridge};
 
-/// Future asynchronous effects arrive on a Rust worker thread. The host must
+/// Asynchronous storage effects arrive on a Rust worker thread. The host must
 /// dispatch UI work to its UI thread and keep callback methods nonblocking.
 #[boltffi::export]
 pub trait EffectsListener: Send + Sync {
@@ -17,13 +17,16 @@ pub struct NativeBridge {
 
 #[boltffi::export]
 impl NativeBridge {
-    pub fn new(listener: Box<dyn EffectsListener>) -> Self {
-        Self {
-            bridge: YomokuBridge::new(move |result| match result {
+    pub fn new(
+        database_path: String,
+        listener: Box<dyn EffectsListener>,
+    ) -> Result<Self, FfiError> {
+        Ok(Self {
+            bridge: YomokuBridge::new(database_path.into(), move |result| match result {
                 Ok(requests) => listener.on_effects(requests),
                 Err(error) => listener.on_error(error),
-            }),
-        }
+            })?,
+        })
     }
 
     pub fn update(&self, event: &[u8]) -> Result<Vec<u8>, FfiError> {

@@ -89,7 +89,8 @@ impl PasteText {
 }
 
 /// A persisted paste snapshot, with a title separate from its immutable text.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
 pub struct PastedDocument {
     pub document_id: DocumentId,
     pub title: String,
@@ -201,4 +202,12 @@ impl TextAnchor {
         }
         self.range.slice(&chapter.text)
     }
+}
+
+/// Minimal Library projection; progress is added with reader persistence.
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
+pub struct LibraryDocument {
+    pub document_id: DocumentId,
+    pub title: String,
 }

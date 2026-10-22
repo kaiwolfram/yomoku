@@ -15,8 +15,8 @@ class CoreSessionTest {
     @Test
     fun commandsRenderRustStateAndSessionsOwnTheirHandles() {
         InstrumentationRegistry.getInstrumentation().runOnMainSync {
-            CoreSession().use { core ->
-                CoreSession().use { independent ->
+            CoreSession(":memory:").use { core ->
+                CoreSession(":memory:").use { independent ->
                     assertEquals(Destination.LIBRARY, core.view.destination)
                     for (destination in Destination.entries + Destination.LIBRARY) {
                         core.dispatch(Event.SelectDestination(destination))
@@ -29,7 +29,7 @@ class CoreSessionTest {
             }
 
             repeat(10) {
-                val core = CoreSession()
+                val core = CoreSession(":memory:")
                 assertEquals(Destination.LIBRARY, core.view.destination)
                 core.close()
                 core.close()

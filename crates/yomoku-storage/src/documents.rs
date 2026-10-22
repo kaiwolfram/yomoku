@@ -1,11 +1,29 @@
 use rusqlite::{OptionalExtension, TransactionBehavior};
 use yomoku_core::document::{
-    ChapterId, ChapterText, DocumentId, PasteText, PastedDocument, SourceId,
+    ChapterId, ChapterText, DocumentId, LibraryDocument, PasteText, PastedDocument, SourceId,
 };
 
 use crate::{Storage, StorageError};
 
 impl Storage {
+    /// Stable allocation order until Library sorting is implemented.
+    pub fn list_documents(&self) -> Result<Vec<LibraryDocument>, StorageError> {
+        let mut statement = self
+            .connection
+            .prepare("SELECT id, title FROM documents ORDER BY id")?;
+        let rows = statement.query_map([], |row| {
+            Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?))
+        })?;
+        rows.map(|row| {
+            let (id, title) = row?;
+            Ok(LibraryDocument {
+                document_id: DocumentId::try_from(id).map_err(|_| StorageError::InvalidDocument)?,
+                title,
+            })
+        })
+        .collect()
+    }
+
     /// Persist one paste atomically. This does not tokenize/register vocabulary,
     /// deduplicate imports or start reading; the runtime import pipeline adds those.
     /// There is deliberately no content-edit operation.

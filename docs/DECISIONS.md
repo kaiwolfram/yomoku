@@ -443,3 +443,37 @@ i64::MAX, committed-ID nonreuse after deletion/reopen, and safe ID exhaustion.
 The existing migration-history corruption fixture needed updates scoped to one
 row after adding a second migration; the full suite then passed. No change to
 migration 0001 or the reject-without-repair policy.
+
+## 2026-10-22 — Real storage effects and private Android database
+Use Crux 0.20.0's existing EffectMiddleware/EffectResolver/HandleEffectLayer for
+StorageOperation before the exhaustive ShellEffect mapping. Verify APIs against
+the pinned published crate's src/middleware/{mod,effect_handling}.rs and
+src/command/mod.rs (primary source); upstream documents the same layer at
+https://docs.rs/crux_core/0.20.0/crux_core/middleware/trait.EffectMiddleware.html .
+Resolution must happen asynchronously; a std::thread FIFO channel worker owns a
+lazy Storage connection. This needs no async executor or new dependency version.
+Add the existing pinned rusqlite as an FFI test dependency solely for a real
+write-lock fixture proving dispatch/view/navigation stay responsive.
+
+NativeBridge requires a database path and starts the worker without opening a
+file. Thread creation failure is WorkerUnavailable; SQL/open failures become
+DocumentError view values without paths/SQL/error strings. Failed opens remain
+retryable and never reset data. Android's Activity-scoped owner uses the existing
+AndroidViewModel Application factory to supply filesDir/yomoku.sqlite3, retains
+no Activity, and requests Library once per session. All database work is Rust
+worker I/O; callback Render requests are posted onto Android's main thread.
+
+Accept one storage command per session at a time; expose busy/error state for
+future UI controls and ignore overlapping storage submissions. Navigation stays
+available. Internal StorageFinished is skipped by Serde/Facet; forged completion
+payloads fail before mutation. List minimal ID/title summaries in allocation order
+until Library sort/progress tasks exist. A successful create adds the summary;
+load returns immutable text without opening a reader or adding reading history.
+
+Closing a native session stops accepting work, lets submitted atomic operations
+finish and drops late results. Do not join a potentially locked SQLite worker on
+the UI thread. Host JNI verifies eventual callback registry release even when
+closing during I/O. Crux's weak-reference shutdown diagnostic is benign here.
+Paste UI, import dedup/registration, reader progress, pagination and rename/delete
+remain separate tasks. No migration, product deletion semantics, Nostr config or
+dependency version changed.

@@ -4,7 +4,10 @@ use yomoku_ffi::{FfiError, YomokuBridge};
 use yomoku_runtime::ShellEffectFfi;
 
 fn bridge() -> YomokuBridge {
-    YomokuBridge::new(|_| panic!("navigation must produce synchronous effects"))
+    YomokuBridge::new(":memory:".into(), |_| {
+        panic!("navigation must produce synchronous effects")
+    })
+    .unwrap()
 }
 
 fn select(bridge: &YomokuBridge, destination: Destination) -> Requests<ShellEffectFfi> {

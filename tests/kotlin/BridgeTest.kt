@@ -37,11 +37,14 @@ private inline fun <reified T : Throwable> expectFailure(block: () -> Unit) {
 
 fun main(args: Array<String>) {
     verifyTextBoundaries(args.single())
+    verifyDocumentBridge()
+    val deadline = System.nanoTime() + 10_000_000_000L
+    while (listenerCount() != 0 && System.nanoTime() < deadline) Thread.sleep(5)
     check(listenerCount() == 0)
     val listener = Listener()
-    NativeBridge(listener).use { bridge ->
+    NativeBridge(":memory:", listener).use { bridge ->
         check(listenerCount() == 1)
-        NativeBridge(Listener()).use { independent ->
+        NativeBridge(":memory:", Listener()).use { independent ->
             check(listenerCount() == 2)
             check(ViewModel.bincodeDeserialize(bridge.view()).destination == Destination.LIBRARY)
             for (destination in Destination.entries + Destination.LIBRARY) {
@@ -75,14 +78,14 @@ fun main(args: Array<String>) {
                 check(view.destination == Destination.LIBRARY)
             }
             expectFailure<FfiError.InvalidResponse> { bridge.resolve(UInt.MAX_VALUE, byteArrayOf()) }
-            check(listener.calls == 0) // Navigation is synchronous; async delivery is a later test.
+            check(listener.calls == 0) // Navigation remains synchronous.
         }
         check(listenerCount() == 1)
     }
     check(listenerCount() == 0)
 
     repeat(100) {
-        val bridge = NativeBridge(Listener())
+        val bridge = NativeBridge(":memory:", Listener())
         check(ViewModel.bincodeDeserialize(bridge.view()).destination == Destination.LIBRARY)
         bridge.close()
         bridge.close()

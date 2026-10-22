@@ -14,7 +14,7 @@ import app.yomoku.shared.ShellEffect
 import app.yomoku.shared.ViewModel
 
 /** Owns a native handle and a render snapshot; application state stays in Rust. */
-internal class CoreSession : AutoCloseable {
+internal class CoreSession(databasePath: String) : AutoCloseable {
     private val mainHandler = Handler(Looper.getMainLooper())
     private var closed = false
 
@@ -24,6 +24,7 @@ internal class CoreSession : AutoCloseable {
 
     private val bridge =
         NativeBridge(
+            databasePath,
             object : EffectsListener {
                 override fun onEffects(requests: ByteArray) {
                     mainHandler.post { if (!closed) render(requests) }
@@ -32,11 +33,15 @@ internal class CoreSession : AutoCloseable {
                 override fun onError(error: FfiError) {
                     mainHandler.post { if (!closed) throw error }
                 }
-            }
+            },
         )
 
     var view: ViewModel by mutableStateOf(ViewModel.bincodeDeserialize(bridge.view()))
         private set
+
+    init {
+        dispatch(Event.RefreshLibrary)
+    }
 
     fun dispatch(event: Event) {
         requireMainThread()
