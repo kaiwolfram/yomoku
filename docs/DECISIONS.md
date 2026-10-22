@@ -179,3 +179,49 @@ tasks and the twelve retained cross-feature acceptance cases. NEXT_SESSION.md
 owns current progress and commands; architecture/data-model docs describe actual
 implementation. Routine technical decisions here do not override confirmed
 product requirements. Update active references to the new specification.
+
+## 2026-10-22 — Android Compose build foundation
+Generate `android/` using the installed Android CLI 1.0.16625370 and its
+empty-activity template bundle 0.1.1. Retain Gradle 9.1.0 with the template's
+SHA-256-pinned distribution, AGP 9.0.1, SDK/target 36, min SDK 29, Compose BOM
+2026.03.01 and Activity Compose 1.13.0. Pin build tools to 36.0.0. Use JDK 17
+for both the Gradle JVM and compiler toolchain; the sandbox has a verified local
+Temurin 17.0.21+9 archive because its system Java installation is runtime-only.
+Normal Fedora development can use `java-17-openjdk-devel`. Do not require Studio
+or automatic JDK resolver plugins. Native code is not part of this slice; select
+and verify an NDK when adding Android ABIs rather than installing unused tooling.
+
+Use Kotlin/Compose compiler 2.4.21, already verified for the host codecs and in
+Kotlin's supported Gradle 9.1/AGP 9.0 compatibility range. AGP's built-in Kotlin
+remains enabled; applying the Compose compiler plugin supplies the matching Kotlin
+version without a second Android Kotlin plugin. The template's Kotlin 2.3.20
+compatibility table only explicitly lists AGP through 9.0.0.
+
+Remove template data repository, Kotlin navigation/ViewModel state, serialization
+plugin, unused dependencies and sample greeting tests. They do not implement
+Yomoku behavior and would duplicate the planned Rust application boundary. The
+initial Kotlin shell shows only a Library heading with system theme/window insets;
+Rust-backed navigation/ABI packaging and device tests remain separate steps.
+`app.yomoku` is a provisional development namespace/application ID. Disable
+Android automatic backup and exclude all backup/transfer domains to honor the
+manual encrypted backup requirement before adding persisted data.
+
+Use ktfmt 0.64 CLI (Apache-2.0) in Kotlin language style for Android source and
+Gradle scripts via `tools/format-kotlin.sh`; Android lint and Kotlin warnings fail
+on warnings. Suppress only lint's dependency-upgrade reminders since these pinned
+versions are reviewed explicitly. Downloaded tools and build products stay ignored.
+
+Primary evidence reviewed before adoption:
+- https://developer.android.com/build/releases/agp-9-0-0-release-notes
+  (Gradle 9.1, build tools 36.0.0, JDK 17 and built-in Kotlin).
+- https://kotlinlang.org/docs/gradle-configure-project.html
+  (2.4.21 compatibility table).
+- https://developer.android.com/develop/ui/compose/setup-compose-dependencies-and-compiler
+  (Compose compiler version must match Kotlin; Compose BOM dependencies).
+- https://developer.android.com/develop/ui/compose/bom/bom-mapping
+- https://developer.android.com/jetpack/androidx/releases/activity#1.13.0
+  (browser fetch timed out; official release HTML retrieved with curl).
+- https://adoptium.net/installation/archives and official Adoptium release API
+  metadata (JDK archive SHA-256 verified before extraction).
+- https://github.com/Kotlin/ktfmt and published Maven Central 0.64 CLI help
+  (JDK 11+, Kotlin style, dry-run and failure-on-change options).

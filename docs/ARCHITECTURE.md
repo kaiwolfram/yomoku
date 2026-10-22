@@ -29,7 +29,11 @@ The JVM test verifies navigation, payload round trips, categorized exceptions,
 instance isolation, 100 close cycles, listener registry cleanup and rejection of
 calls after close, using `-Xcheck:jni`. Asynchronous callbacks remain untested
 until a real asynchronous effect exists. Native wrappers require explicit close.
-No platform I/O, persisted state or Android app yet.
+`android/` contains a CLI-generated Kotlin/Compose application, minimum SDK 29,
+with Gradle wrapper and a JDK 17 toolchain. Its initial shell displays a Library
+heading, respects system light/dark mode and window insets, and excludes automatic
+Android backup/transfer. It does not yet load the native bridge or own application
+state. No platform I/O or persisted state exists yet.
 
 ## Required boundaries (not yet implemented)
 Kotlin Compose shell handles UI and Android APIs through a narrow typed FFI to the
@@ -40,7 +44,7 @@ JMdict English and JMnedict are offline data. Nostr uses Rust nostr-sdk.
 
 Remaining planned crates: `yomoku-storage`,
 `yomoku-analysis`, `yomoku-import`. Create these when implementing behavior,
-not as empty placeholders. Android project target path: `android/`.
+not as empty placeholders. Android project path: `android/`.
 
 Next architectural checkpoint: Android app/ABI packaging,
 then migration-safe storage and text offsets. Do not freeze FFI or schema based

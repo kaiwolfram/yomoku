@@ -26,8 +26,8 @@ position/encounter history. Keep incremental builds green.
 - [x] Verify/pin BoltFFI and build native bridge exports with typed errors and callback ownership; pass host facade tests and inspect shared-library exports.
 - [x] Install matching BoltFFI CLI and Kotlin tooling; generate bindings and compile/test Kotlin event/request/view serialization, errors and lifecycle across actual JNI, including listener release and calls after close. Repeat generation with identical output.
 - [ ] Test asynchronous callback delivery across JNI when the first real async effect is added (navigation is synchronous).
-- [ ] Add Gradle wrapper and Kotlin Compose app under `android/`, min SDK 29; CLI assembleDebug succeeds with pinned compatible JDK/SDK/NDK/plugin versions.
-- [ ] Package native library for emulator and arm64 device; demonstrate command → core → view state in Android instrumentation test.
+- [x] Add Gradle wrapper and Kotlin Compose app under `android/`, min SDK 29; CLI assembleDebug and strict lint succeed with pinned compatible JDK/SDK/plugin versions. NDK selection belongs to native packaging below.
+- [ ] Verify/pin/install a compatible NDK and package native library for emulator and arm64 device; demonstrate command → core → view state in Android instrumentation test.
 - [ ] Add Library-default navigation, Nostr/Statistics/Vocabulary placeholders and toolbar Settings; verify phone bottom bar/tablet rail and hide navigation in reader.
 - [ ] Add `crates/yomoku-storage` SQLite initialization and numbered migration; test empty DB creation and repeat opens.
 - [ ] Exercise document CRUD through runtime/FFI on device; verify reopen persistence and failures.

@@ -101,3 +101,26 @@
   documentation-only change; prior successful checks remain recorded.
 - Next implementation tasks remain Android Compose/Gradle setup, native ABI
   packaging and responsive navigation. No new blockers or product decisions.
+
+## 2026-10-22 — Android Compose build foundation
+- Started clean. Generated `android/` with installed CLI/template; added pinned
+  Gradle wrapper, Compose app/min SDK 29, full local JDK 17 and SDK/build tools.
+  Verified dependency/toolchain APIs against primary documentation and official
+  release metadata. Downloads and keys stay ignored; JDK archive SHA-256 checked.
+- Removed template repository/navigation/ViewModel/example tests. Initial shell
+  shows Library with system theme/insets; Rust remains the application owner.
+  Disabled automatic backup/transfer per product spec. No persistence added.
+- Added ktfmt 0.64 runner for Android Kotlin/Gradle scripts. Updated plan, resume,
+  architecture, development and decisions. NDK pin/install is explicitly retained
+  with native packaging, since this Kotlin-only step does not need an NDK.
+- Debug APK build and strict lint PASS offline after fixing template icon folder
+  `mipmap-anydpi-v26` → `mipmap-anydpi`. APK min/target/compile metadata checked.
+  Kotlin formatting, shell syntax and git diff whitespace PASS. Rust build,
+  all-feature tests (15), fmt, clippy and Kotlin/JNI suite PASS.
+- Initial downloads failed sandbox networking; approved retries succeeded.
+  Offline Gradle also needs escalation for local sockets. SDK XML v4 and unstripped
+  AndroidX native graphics notices did not block build/lint. Java 25 ktfmt warns
+  about upstream Unsafe usage; JDK 17 formatting is clean.
+- No Android unit/instrumentation/device tests run. No NDK/emulator installed by
+  this step; no /dev/kvm. Next: native ABI packaging and command → view device test,
+  responsive navigation, then migration-safe storage. No new product blocker.

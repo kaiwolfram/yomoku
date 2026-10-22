@@ -36,34 +36,82 @@ diff -r target/generated/kotlin target/generated/kotlin-repeat
 ```
 Generation and this comparison PASS. Standalone Kotlin 2.4.21 and BoltFFI CLI
 0.30.1 are installed under ignored `.local/`; host Kotlin/JNI execution passes
-(see below). Gradle is not installed and no Android build configuration is adopted.
+(see below). The Android Gradle wrapper and its pinned toolchain are described below.
 
-## Android environment and next setup
-`android` is installed at `/home/kai/.local/bin/android`. It needs write access to
-`~/.android/cli/bundles/lock`; in the agent sandbox this requires escalation.
-The user approved the `android` command prefix. Verified commands:
+## Android Compose shell
+The CLI-generated project lives in `android/`; normal builds need no Android
+Studio. Its current UI is a Library heading with system light/dark theme and
+window insets. Rust JNI packaging, navigation, and persistence are separate steps.
+Namespace/application ID `app.yomoku` is provisional, not a publishing commitment.
+Automatic cloud backup and device transfer are excluded; the product requires
+manual encrypted backups.
 
+Pinned versions: Gradle **9.1.0** (wrapper distribution SHA-256 checked),
+AGP **9.0.1**, Kotlin/Compose compiler **2.4.21**, Compose BOM **2026.03.01**,
+Activity Compose **1.13.0**, JDK **17**, compile/target SDK **36**, build tools
+**36.0.0**, minimum SDK **29**. No NDK is needed or selected for this Kotlin-only
+slice; pin/install it with the native ABI packaging step. AGP uses built-in Kotlin;
+do not also apply `org.jetbrains.kotlin.android`.
+
+On Fedora install `java-17-openjdk-devel` and point `JAVA_HOME` at the full JDK.
+This sandbox instead uses the official Temurin **17.0.21+9** Linux x64 archive,
+verified against the SHA-256 in Adoptium's release API metadata and extracted
+under ignored `.local/jdk-17/jdk-17.0.21+9`. It leaves system Java unchanged.
+Archive URL:
+`https://github.com/adoptium/temurin17-binaries/releases/download/jdk-17.0.21.9/OpenJDK17U-jdk_x64_linux_hotspot_17.0.21_9.tar.gz`
+SHA-256: `8b9b611d917e3dfd8419d3566b5949226f69b052fed7e109c1368add1dfe8711`.
+
+Installed Android CLI **1.0.16625370**, template bundle **0.1.1**, SDK at
+`/home/kai/Android/Sdk`. Generation installed platform 36 (revision 2). The first Gradle build also
+installed platform-tools **37.0.1** (`adb` 1.0.41), available at
+`$ANDROID_HOME/platform-tools/adb`. Generation/setup commands:
 ```sh
-android --help
-android info
-android create --help
-android create --list
-android sdk list
+# Already generated: do not rerun over the existing android/ project.
+android create empty-activity --name=Yomoku --namespace=app.yomoku --application-id=app.yomoku --min-sdk=29 --output=android
+android sdk install 'build-tools;36.0.0'
 ```
+On a fresh workstation also use `android sdk install 'platforms;android-36'`.
+The CLI needs sandbox escalation for its bundle lock and SDK writes; Gradle needs
+network access for the first wrapper/dependency downloads. In this sandbox use:
+```sh
+export JAVA_HOME="$PWD/.local/jdk-17/jdk-17.0.21+9"
+export GRADLE_USER_HOME="$PWD/.local/gradle"
+export ANDROID_HOME=/home/kai/Android/Sdk
+./android/gradlew -p android --version
+./android/gradlew -p android :app:assembleDebug :app:lintDebug --console=plain
+```
+Debug APK: `android/app/build/outputs/apk/debug/app-debug.apk`.
+Build products, SDK paths, Gradle caches and keys are ignored. Kotlin compiler
+warnings and Android lint warnings fail the build; dependency-update reminders
+are reviewed separately from lint. The generated example data repository,
+Kotlin navigation state and template tests were removed: application state belongs
+in Rust. No Android unit/instrumentation behavior tests exist for the initial
+heading. The native command → view instrumentation test is the next slice.
+There is no `/dev/kvm` in this sandbox; device/emulator execution is unverified.
 
-Reported CLI version: 1.0.16625370, launcher 1.0.16500706.
-SDK location: `/home/kai/Android/Sdk`. Installed packages: only
-`build/templates` 0.1.1. Available template: `empty-activity` (Compose, AGP 9).
-`adb`, `sdkmanager`, `emulator` and `gradle` were not on PATH during inspection.
-Java reports OpenJDK 25.0.4.1; the Java 21 directory contains no observed JDK binary.
-Android builds have NOT been run; no Gradle project exists yet.
+Verified 2026-10-22: debug APK build and strict lint PASS; repeat after the
+launcher-resource fix with `--offline` PASS. `aapt dump badging` confirms min SDK
+29, target/compile SDK 36 and app ID/version. Android unit/instrumentation tests
+were not run. Initial lint rejected the template's unnecessary `mipmap-anydpi-v26`
+folder; moving its icons to `mipmap-anydpi` fixed it without suppression.
+The first SDK scan printed an XML version 4 compatibility warning and left the
+AndroidX graphics native library unstripped; neither prevented the build/lint.
+Gradle requires sandbox escalation even with `--offline` because its daemon and
+file-lock service need local sockets (otherwise "Could not determine a usable
+wildcard IP"). Fresh-cache network access is also required. No NDK is installed.
 
-Next setup can use `android create` into `android/` with `--name=Yomoku` and
-`--min-sdk=29`, after selecting a provisional namespace and inspecting template
-versions. Use `android sdk --help` for package installation. Validate JDK/Gradle/
-AGP/NDK compatibility against primary documentation, then record exact Gradle,
-native packaging, emulator and adb commands here after running them. Do not
-present guessed future build commands as a successful baseline.
+## Kotlin formatting
+Use standalone **ktfmt 0.64** (Apache-2.0), with Kotlin language style, for Android
+Kotlin and Gradle Kotlin scripts. Generated bindings stay excluded. Install once:
+```sh
+curl -fL https://repo.maven.apache.org/maven2/com/facebook/ktfmt/0.64/ktfmt-0.64-with-dependencies.jar -o .local/ktfmt-0.64.jar
+tools/format-kotlin.sh
+tools/format-kotlin.sh --check
+bash -n tools/format-kotlin.sh
+```
+The script uses `JAVA_HOME/bin/java` when set, otherwise `java`; `JAVA_BIN` and
+`KTFMT_JAR` override those defaults. This does not reformat the standalone
+Kotlin bridge test yet. Android lint runs through the Gradle command above.
 
 ## Native bridge host build
 `cargo build --workspace --offline` emits `target/debug/libyomoku_ffi.so` and
