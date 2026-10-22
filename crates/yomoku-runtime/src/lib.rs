@@ -9,7 +9,7 @@ use crux_core::{
 use yomoku_core::app::{Effect, Yomoku};
 
 /// Only operations owned by the platform shell belong in this enum.
-#[effect(typegen)]
+#[effect(facet_typegen)]
 pub enum ShellEffect {
     Render(RenderOperation),
 }

@@ -16,7 +16,8 @@ small pure-domain task explicitly pulled forward from phase 3.
 - [x] Verify current Crux APIs/version and supported Kotlin bridge approach; record versions and evidence in DECISIONS.md before adding dependencies.
 - [x] Add Crux model, typed event and view model to `crates/yomoku-core`; test one command and render effect on host.
 - [x] Add `crates/yomoku-runtime` EffectRouter and `crates/yomoku-ffi`; host-test typed event/request/view serialization and boundary errors. Native exports remain below.
-- [ ] Verify/pin BoltFFI and Crux Kotlin generation; expose native bridge and test generated Kotlin event/request/view serialization and typed errors across actual FFI.
+- [x] Add reproducible Crux Kotlin payload generation from shell event/request/view schemas; run generator twice with identical output and pass all-feature host checks. Kotlin compilation/round trips remain below.
+- [ ] Verify/pin BoltFFI; expose native bridge and compile/test generated Kotlin event/request/view serialization and typed errors across actual FFI.
 - [ ] Add Gradle wrapper and Kotlin Compose app under `android/`, min SDK 29; CLI assembleDebug succeeds with pinned compatible JDK/SDK/NDK/plugin versions.
 - [ ] Package native library for emulator and arm64 device; demonstrate command → core → view state in Android instrumentation test.
 - [ ] Add Library-default navigation, Nostr/Statistics/Vocabulary placeholders and toolbar Settings; verify phone bottom bar/tablet rail and hide navigation in reader.

@@ -8,9 +8,9 @@ The agent sandbox required escalation for downloads into the Cargo cache.
 # Current sandbox: bypass rustup launcher self-maintenance in a read-only home.
 export PATH=/home/kai/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin:$PATH
 cargo build --workspace --offline
-cargo test --workspace --offline
+cargo test --workspace --all-features --offline
 cargo fmt --all -- --check
-cargo clippy --workspace --all-targets --offline -- -D warnings
+cargo clippy --workspace --all-targets --all-features --offline -- -D warnings
 ```
 
 Verified 2026-10-22 using rustc 1.99.1 and cargo 1.99.1. A normal workstation
@@ -19,8 +19,25 @@ is the project's minimum supported version; establish that with dependencies.
 Cargo.lock is retained for reproducible application development.
 Crux 0.20.0 declares Rust 1.90 minimum; the full locked graph has only been tested
 with 1.99.1. Current host baseline: thirteen integration tests (four app, five domain, four bridge).
-Also verified `cargo check -p yomoku-runtime --features typegen --offline`.
-This checks generator feature compilation, not generated Kotlin or native exports.
+
+## Kotlin payload generation
+```sh
+cargo run -p yomoku-ffi --bin generate-kotlin --features facet_typegen --offline -- target/generated/kotlin
+```
+Uses Crux 0.20.0, Facet 0.46.5 and locked facet_generate 0.19.1. The old
+`typegen` feature was replaced with `facet_typegen`: Crux's Serde generator
+has no Kotlin backend. Generated artifacts stay under ignored `target/`.
+Use a dedicated generated output directory: upstream replaces its package folder.
+Provisional internal package is `app.yomoku.shared`, not a finalized Android ID.
+Output includes `app/yomoku/shared/Shared.kt` and `com/novi` Bincode/Serde runtime.
+Generate again into `target/generated/kotlin-repeat`, then verify reproducibility:
+```sh
+diff -r target/generated/kotlin target/generated/kotlin-repeat
+```
+Generation and this comparison PASS. Kotlin compiler/Gradle are not on PATH;
+Kotlin compilation and native FFI execution have NOT been run. The generated
+Gradle template is not an adopted Android build configuration. BoltFFI remains
+uninstalled/unpinned; complete native error/callback bindings next.
 
 ## Android environment and next setup
 `android` is installed at `/home/kai/.local/bin/android`. It needs write access to

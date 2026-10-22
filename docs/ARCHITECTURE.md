@@ -11,6 +11,10 @@ through Crux middleware (`EffectRouter`). Only Render exists today; future Rust
 I/O handlers must run below this mapping. `yomoku-ffi::YomokuBridge` wraps that
 stack using Crux's Bincode bridge, exposing update/resolve/view and typed error
 categories. A supplied callback preserves the path for future async effects.
+The optional `facet_typegen` feature and `generate-kotlin` CLI generate event,
+view, shell effect and request types plus Bincode codecs in `app.yomoku.shared`.
+Generation registers the runtime shell effects explicitly; core-only effects stay
+private. Generated Kotlin has not yet been compiled or executed.
 Thirteen host integration tests cover domain rules, core navigation and serialized
 bridge behavior. No native exports, platform I/O, persisted state or Android app yet.
 

@@ -9,6 +9,8 @@ use serde::{Deserialize, Serialize};
 
 /// The four top-level destinations; Settings is a separate toolbar flow.
 #[derive(Clone, Copy, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+#[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
+#[repr(C)]
 pub enum Destination {
     #[default]
     Library,
@@ -23,11 +25,14 @@ pub struct Model {
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
+#[repr(C)]
 pub enum Event {
     SelectDestination(Destination),
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
 pub struct ViewModel {
     pub destination: Destination,
 }

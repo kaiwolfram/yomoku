@@ -21,6 +21,7 @@ destination and view derive Serde serialization. The host bridge now uses Crux
 Render is fire-and-forget: resolving its ID returns InvalidResponse. Malformed
 or unknown event variants return InvalidEvent before mutation. These are internal
 same-build schemas, not a persisted format or version-stable public protocol.
+The optional Facet metadata now generates Kotlin payloads and Bincode codecs.
 Kotlin serialization compatibility remains unverified. A fresh core starts at Library.
 
 ## Required future schema constraints

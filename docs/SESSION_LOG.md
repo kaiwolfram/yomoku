@@ -34,3 +34,16 @@
   succeeded. No native/Kotlin/Android checks run.
 - Next: verified BoltFFI/native exports and generated Kotlin tests, then Android
   scaffold and ABI packaging. No new product blockers; Q188 remains deferred.
+
+## 2026-10-22 — Kotlin payload generation
+- Started clean. Added FFI generate-kotlin binary, optional Facet metadata on core
+  payloads and shell effects, feature wiring/manifests and refreshed Cargo.lock.
+  Updated plan, resume, development, decisions, architecture and data model.
+- Crux Serde generator lacks Kotlin; switched optional generation to Facet after
+  published API inspection. Missing offline generator dependencies were fetched
+  successfully with approved cargo fetch.
+- Default workspace build, all-feature tests (13), fmt and all-target/all-feature
+  clippy PASS. Kotlin generation twice and recursive output diff PASS.
+- Kotlin compiler/Gradle/BoltFFI not installed on PATH; no Kotlin compilation,
+  native round trip or Android build run. Native bridge checklist remains open.
+- Next: BoltFFI bindings and generated Kotlin tests, Android scaffold, ABIs.

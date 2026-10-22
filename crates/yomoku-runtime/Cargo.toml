@@ -5,9 +5,10 @@ edition.workspace = true
 license.workspace = true
 
 [features]
-typegen = ["crux_core/typegen"]
+facet_typegen = ["crux_core/facet_typegen", "yomoku-core/facet_typegen", "dep:facet"]
 
 [dependencies]
+facet = { version = "=0.46.5", optional = true }
 crux_core = "=0.20.0"
 yomoku-core = { path = "../yomoku-core" }
 serde = { version = "=1.0.228", features = ["derive"] }

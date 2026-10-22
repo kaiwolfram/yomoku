@@ -85,3 +85,28 @@ without payload/error-string leakage. Tests verify invalid IDs return errors
 rather than panic (the registry source is more current than some bridge comments).
 No custom codec, unsafe native exports or pretend cross-language test is added.
 Bincode's upstream trailing-byte acceptance is retained for generated-code parity.
+
+## 2026-10-22 — Kotlin payload generator
+Inspected published Crux 0.20.0 `src/type_generation/{serde,facet}.rs`, effect
+macro implementation, and the current upstream Android guide:
+- https://docs.rs/crux_core/0.20.0/crux_core/type_generation/facet/index.html
+- https://redbadger.github.io/crux/part-1/shell/android/index.html
+- https://www.boltffi.dev/docs/getting-started
+
+Correction to the previous slice: the Serde type generator supports Java but not
+Kotlin. Use the existing Crux Facet backend, with Facet exactly 0.46.5 (matching
+Crux) and facet_generate 0.19.1 locked in Cargo.lock. Optional `facet_typegen`
+replaces the unused Serde `typegen` feature. Serde still handles runtime Bincode;
+Facet describes the same types for code generation. Enum repr(C) supplies Facet
+layout metadata, not an exported C ABI or a persisted encoding contract.
+
+The explicit generator registers ShellEffect's exported requests plus Event and
+ViewModel, rather than the core's effect enum, so future Rust I/O does not become
+shell work accidentally. Generated files go into a dedicated ignored output
+folder; sources and lockfile are authoritative. `app.yomoku.shared` is a routine
+internal namespace choice, not a publishing/application-ID decision.
+
+Generation and deterministic output comparison passed; host bridge tests also
+pass with Facet enabled. This does not establish Kotlin serialization compatibility
+or a native ABI. BoltFFI errors/callbacks and compiler setup are a separate next
+slice; no BoltFFI version has been adopted based on untested docs examples.
