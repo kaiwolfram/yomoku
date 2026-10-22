@@ -1,6 +1,37 @@
 use yomoku_core::document::{
-    ChapterId, ChapterText, DocumentId, SourceId, TextAnchor, TextOffset, TextRange,
+    ChapterId, ChapterText, DocumentId, PasteText, SourceId, TextAnchor, TextOffset, TextRange,
 };
+
+#[test]
+fn paste_title_uses_the_literal_first_line_and_preserves_canonical_text() {
+    for (text, title) in [
+        ("  日本語𠮷📖  \r\nか\u{3099}\n👩‍👩‍👧‍👦\0", "  日本語𠮷📖  "),
+        ("第一章\n\n次の行", "第一章"),
+        ("\n本文", ""),
+        ("\r\n本文", ""),
+        ("文\r", "文\r"),
+        ("一行", "一行"),
+        (
+            "title\0'\"; DROP TABLE documents;--\n本文",
+            "title\0'\"; DROP TABLE documents;--",
+        ),
+    ] {
+        let paste = PasteText::new(text.to_owned()).unwrap();
+        assert_eq!(paste.initial_title(), title);
+        assert_eq!(paste.as_str(), text);
+    }
+}
+
+#[test]
+fn empty_and_whitespace_only_pastes_are_rejected_without_trimming_valid_text() {
+    for text in ["", " ", "\t\r\n", "\u{3000}\u{a0}"] {
+        assert!(PasteText::new(text.to_owned()).is_err());
+    }
+    assert_eq!(
+        PasteText::new(" 本文 \n".into()).unwrap().as_str(),
+        " 本文 \n"
+    );
+}
 
 #[test]
 fn identities_are_positive_sqlite_integers_without_floating_point_loss() {

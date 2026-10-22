@@ -55,6 +55,47 @@ identity!(
     "An immutable canonical text unit, independent of logical pages."
 );
 
+/// Validated paste input. Keep the exact text so durable anchors remain valid.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct PasteText(String);
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct EmptyPaste;
+
+impl std::fmt::Display for EmptyPaste {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("paste text must contain non-whitespace content")
+    }
+}
+
+impl std::error::Error for EmptyPaste {}
+
+impl PasteText {
+    pub fn new(text: String) -> Result<Self, EmptyPaste> {
+        if text.trim().is_empty() {
+            return Err(EmptyPaste);
+        }
+        Ok(Self(text))
+    }
+
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+
+    /// The literal first line, excluding LF/CRLF; no trim, fallback or truncation.
+    pub fn initial_title(&self) -> &str {
+        self.0.lines().next().unwrap_or_default()
+    }
+}
+
+/// A persisted paste snapshot, with a title separate from its immutable text.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct PastedDocument {
+    pub document_id: DocumentId,
+    pub title: String,
+    pub chapter: ChapterText,
+}
+
 /// Nonnegative UTF-8 byte offset within one canonical chapter, including EOF.
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize, Deserialize)]
 #[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]

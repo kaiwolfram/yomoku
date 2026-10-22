@@ -38,7 +38,7 @@ position/encounter history. Keep incremental builds green.
 
 ## 2 — Paste-to-reader slice
 - [x] Define stable document/source/chapter IDs and text offset encoding in DATA_MODEL.md; test Unicode round trips at FFI boundaries. Positive i64 IDs, chapter-local UTF-8 byte anchors and checked UTF-16 conversion; seven Rust/generated-Kotlin/Rust payload exchanges pass. Live document JNI awaits storage commands.
-- [ ] Add immutable pasted-text document command/storage with first-line title; test transaction rollback and reopen.
+- [x] Add immutable pasted-text document command/storage with first-line title; typed PasteText and repository create/load commands pass exact Unicode/reopen, per-insert/commit rollback, concurrent-write and committed-ID nonreuse/exhaustion tests. Crux events/runtime/FFI remain the phase-1 document wiring task.
 - [ ] Implement logical pages in `crates/yomoku-core`: presets 250/500/750/1000/1500 (default 500), paragraph splits and long-paragraph following-sentence fallback; test exact threshold, short text, mixed scripts and long paragraph.
 - [ ] Enforce EPUB chapter boundaries and no inferred TXT chapters; test boundary fixtures before import wiring.
 - [ ] Reflow pages preserving underlying text offset; test all presets with Japanese and supplementary Unicode.

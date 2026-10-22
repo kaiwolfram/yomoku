@@ -1,7 +1,8 @@
 //! SQLite I/O owned by the Rust runtime, never by the pure application core.
 //!
-//! This first slice initializes storage only. Document repositories and runtime
-//! effect handling will be added with their domain commands.
+//! Paste repositories use pure domain values. Runtime effect handling is separate.
+
+mod documents;
 
 use std::{error::Error, fmt, path::Path, time::Duration};
 
@@ -13,11 +14,18 @@ struct Migration {
     sql: &'static str,
 }
 
-const MIGRATIONS: &[Migration] = &[Migration {
-    version: 1,
-    name: "0001_migration_history",
-    sql: include_str!("../migrations/0001_migration_history.sql"),
-}];
+const MIGRATIONS: &[Migration] = &[
+    Migration {
+        version: 1,
+        name: "0001_migration_history",
+        sql: include_str!("../migrations/0001_migration_history.sql"),
+    },
+    Migration {
+        version: 2,
+        name: "0002_paste_documents",
+        sql: include_str!("../migrations/0002_paste_documents.sql"),
+    },
+];
 
 /// Failures are returned to the runtime; opening never resets a database.
 #[derive(Debug)]
@@ -26,6 +34,7 @@ pub enum StorageError {
     UnsupportedSchemaVersion { found: i64, supported: i64 },
     InvalidMigrationHistory,
     UnrecognizedDatabase,
+    InvalidDocument,
 }
 
 impl fmt::Display for StorageError {
@@ -42,6 +51,7 @@ impl fmt::Display for StorageError {
             Self::UnrecognizedDatabase => {
                 f.write_str("database has no recognized migration history")
             }
+            Self::InvalidDocument => f.write_str("stored document is inconsistent"),
         }
     }
 }

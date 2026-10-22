@@ -18,8 +18,8 @@ with functioning rustup can omit the PATH workaround. Do not assume this compile
 is the project's minimum supported version; establish that with dependencies.
 Cargo.lock is retained for reproducible application development.
 Crux 0.20.0 declares Rust 1.90 minimum; the full locked graph has only been tested
-with 1.99.1. Current host baseline: 26 tests (four app, five domain, four bridge,
-two native facade and eleven storage tests).
+with 1.99.1. Current host baseline: 44 tests (five app, six document, five vocabulary,
+five bridge, two native facade and twenty-one storage tests).
 
 ## Kotlin payload generation
 ```sh
@@ -284,9 +284,14 @@ codec slice; the previous three device tests remain the navigation baseline.
 `yomoku-storage` uses pinned rusqlite with bundled SQLite; no Fedora SQLite
 development package is required. A C compiler is required (the NDK supplies it
 for Android). `cargo test --workspace --all-features --locked --offline` includes
-11 storage tests using private temporary disk databases with automatic cleanup.
-Initialization does not yet run in the Android app; runtime/FFI wiring awaits
-document commands and IDs. No document database is created by the current APK.
+21 storage tests using private temporary disk databases with automatic cleanup.
+Migration 0002 and typed create/load paste commands cover literal first-line titles,
+exact Unicode/NUL/CRLF, reopen/anchors, per-insert and deferred-commit rollback,
+concurrent writes, committed-ID nonreuse/full-width allocation/exhaustion, and
+real migration-failure preservation. Rename/deletion use test-only SQL to verify
+schema separation; production commands remain unimplemented. Initialization and
+paste storage do not yet run in the Android app; runtime/FFI wiring is next.
+No document database is created by the current APK.
 
 Compile the storage crate for both Android ABIs with the same pinned NDK/API:
 ```sh

@@ -7,8 +7,9 @@ surface identity, five vocabulary statuses, registration and completion policies
 UTF-8 byte ranges/anchors and checked UTF-16 index conversion. These pure values
 are generated into Kotlin alongside shell payloads. Rust/Kotlin fixture exchange
 verifies Unicode and numeric boundaries without adding diagnostic app events or
-native methods. The repository must enforce allocation and immutable content;
-these types do not yet create or persist documents.
+native methods. Pure `PasteText` validates paste input and first-line titles;
+`PastedDocument` carries a detached snapshot. Storage enforces allocation and
+offers create/load operations without a content-edit operation.
 `app::Yomoku` implements `App`; `Model` holds a transient destination (Library
 default) and Settings visibility. Typed SelectDestination/OpenSettings/CloseSettings
 commands update them, and a render command asks the host to read `ViewModel`.
@@ -27,7 +28,7 @@ private. Generated Kotlin codecs are compiled and exercised through host JNI.
 Its owned `EffectsListener` has separate success/error callbacks, retaining typed
 errors without passing internal strings. Hosts must dispatch callbacks to the UI
 thread. Native handles own independent bridge instances; no global app singleton.
-Twenty-one host integration tests cover domain rules, navigation, payloads, native
+Twenty-three host integration tests cover domain rules, navigation, payloads, native
 facade isolation, cross-thread access and listener release. Shared/static libraries
 build with exported constructor/method/callback/release symbols. The pinned
 BoltFFI configuration generates Kotlin in `app.yomoku.nativebridge` and JNI C.
@@ -57,10 +58,13 @@ asynchronous effects remain unverified.
 `yomoku-storage` separately owns SQLite I/O through rusqlite 0.40.2 with bundled
 SQLite. `Storage::open` configures each connection, validates numbered migration
 history and applies pending migrations under one immediate transaction. Its
-connection remains private; no SQL or database handle enters core or FFI. Eleven
-on-disk host tests cover initialization/reopen, upgrades, rollback, concurrent
-opens and failure preservation. This crate is not wired to runtime/Android yet;
-the app still has only transient state and no document persistence.
+connection remains private; no SQL or database handle enters core or FFI. Migration
+0002 separates source/chapter provenance, Library entries and canonical paste
+text. `create_paste` commits them atomically; `load_paste` reads a consistent
+snapshot. Twenty-one on-disk host tests cover migrations, exact Unicode/reopen,
+per-insert/commit rollback, concurrent opens/writes, ID nonreuse/exhaustion and
+failure preservation. This crate depends on core's pure domain values and is
+not wired to runtime/Android yet; the APK still has only transient state.
 
 ## Required boundaries (not yet implemented)
 Kotlin Compose shell handles UI and Android APIs through a narrow typed FFI to the
@@ -72,6 +76,6 @@ JMdict English and JMnedict are offline data. Nostr uses Rust nostr-sdk.
 Remaining planned crates: `yomoku-analysis`, `yomoku-import`. Create these when
 implementing behavior, not as empty placeholders. Android project path: `android/`.
 
-Next architectural checkpoint: implement document repositories/storage effects
-using the defined IDs/text offsets, followed by the reader route/navigation. Do not
+Next architectural checkpoint: wire document storage effects/runtime/FFI and the
+private Android database off the UI thread, then the reader route/navigation. Do not
 freeze FFI or schema based on assumptions about dependency APIs.

@@ -227,3 +227,25 @@
   checklist and handoff. No new dependency versions, SQL migration or Nostr data.
 - Next: immutable paste repositories/first-line titles, transaction rollback and
   ID nonreuse/reopen tests; runtime/FFI/private Android DB with async checks; CI.
+
+## 2026-10-22 — Immutable paste persistence
+- Added pure PasteText validation/literal first-line titles and PastedDocument
+  snapshots. Canonical Unicode, hard breaks, spaces and NUL remain exact.
+- Appended migration 0002: separate source/chapter provenance, live documents
+  and chapter text with positive AUTOINCREMENT IDs. Typed create/load repository
+  commands commit atomically and distinguish absent from inconsistent documents.
+  SQL remains outside core; no content-edit, production rename or deletion API.
+- PASS: locked/offline workspace build, 44 Rust tests (21 storage), fmt/clippy,
+  host Kotlin/JNI + seven Unicode payload exchanges, Kotlin formatting and
+  storage builds for aarch64/x86_64 Android. No APK/lint/device rerun this slice;
+  existing navigation/device results remain the baseline.
+- Ten new storage tests cover exact text/anchors/reopen, per-insert and deferred
+  commit rollback, concurrent writes, full-width IDs/nonreuse/exhaustion, real
+  migration failure preservation and title/provenance separation. Two new core
+  tests cover titles and blank validation. Initial old corruption fixture failed
+  on multi-row UNIQUE constraints; scoped updates to version 1, full rerun PASS.
+- Updated plan/data model/architecture/decisions/development/handoff. No new
+  dependency versions, Nostr data or product deletion semantics. Runtime/FFI and
+  Android private DB wiring remain pending; current APK creates no database.
+- Next: off-main-thread storage effects/events/FFI and real async JNI/device
+  persistence/failure checks; logical pages/reflow; CI. No local-reader blocker.

@@ -26,13 +26,13 @@ chapter order, page numbers, file paths or content hashes.
   uses its source chapters; paste/TXT/SRT use one text unit without inferred
   chapters. Chapter IDs and source ownership do not change on page reflow.
 
-The next storage migration must allocate IDs with `INTEGER PRIMARY KEY
-AUTOINCREMENT` (plus positive-value checks) and never manually reuse committed
-IDs. Rollback may reuse unpublished IDs. Retain source/chapter provenance needed
-by history while deleting document content/progress. Full replacement backups
-must preserve IDs and allocation high-water marks; cross-database merging is not
-supported. Allocation/deletion/restore are contracts for future repositories,
-not implemented database behavior yet.
+Migration 0002 allocates IDs with `INTEGER PRIMARY KEY AUTOINCREMENT` and
+positive-value checks. Committed IDs are never manually reused; rollback may
+reuse unpublished IDs. Tests verify nonreuse across deletion/reopen, independent
+full-width allocation and atomic failure on exhaustion. Source/chapter provenance
+is separate from live document content. Full replacement backups must preserve
+IDs and allocation high-water marks; cross-database merging is not supported.
+Production document deletion and restore remain future repository commands.
 
 `ChapterText` carries source/chapter IDs and an exact canonical Unicode string.
 `TextOffset` is a nonnegative signed 64-bit **UTF-8 byte offset within a chapter**;
@@ -73,9 +73,35 @@ Opening creates an empty database in an existing caller-selected directory,
 enables foreign keys per connection and waits up to five seconds for lock
 contention. Newer versions, inconsistent history, nonempty databases without a
 journal, invalid files and SQLite I/O failures return errors without resetting or
-repairing data. The initial journal has no document/vocabulary/history tables;
-document IDs/offsets are defined above; event schemas await domain commands.
-Storage is not yet connected to runtime/FFI or Android's private files path.
+repairing data. Storage is not yet connected to runtime/FFI or Android's private
+files path. Vocabulary/history tables await their domain commands.
+
+## Paste repository (migration 0002)
+`PasteText` validates non-whitespace content without changing the text. Its initial
+title is the literal first LF/CRLF-delimited line, without trimming/truncation or
+a fallback for an empty first line. `PastedDocument` is a detached snapshot of a
+document ID, live title and one `ChapterText`; mutating a snapshot does not edit
+persisted content. These new values are not yet shell/FFI payloads.
+
+- `sources`: positive autoincrement ID, `kind = 'paste'`, original title.
+- `chapters`: positive autoincrement ID, source FK, nonnegative chapter index,
+  unique `(source_id, chapter_index)`. A paste has exactly one text unit at index 0;
+  headings and hard breaks never infer chapters.
+- `documents`: positive autoincrement ID, unique source FK, live title separate
+  from historical original title and canonical text.
+- `chapter_texts`: chapter ID PK/FK and exact canonical text. Source/chapter
+  metadata can remain when future document deletion removes this text and the
+  Library entry. No delete API or automatic cascading deletion is added yet.
+
+`Storage::create_paste` inserts all four rows in one immediate transaction and
+returns only after commit. No content-edit API exists. `load_paste` uses one read
+transaction for a consistent snapshot, returns None only for an absent document
+and reports missing/invalid content for an existing document as InvalidDocument.
+SQL values are bound parameters, including titles/text containing NUL or quotes.
+Both calls are synchronous I/O to be run off the UI thread by future effects.
+This repository is the persistence part of import; SHA-256 duplicate detection,
+vocabulary registration, import timestamps, reader progress and app commands
+remain separate unchecked tasks. No reading encounters are created here.
 
 ## Transient application state
 `app::Destination` is Library (default), Nostr, Statistics or Vocabulary.

@@ -411,3 +411,35 @@ Primary references reviewed:
 - https://doc.rust-lang.org/std/primitive.str.html#method.encode_utf16
 - https://kotlinlang.org/docs/characters.html
 - https://www.sqlite.org/autoinc.html
+
+## 2026-10-22 — Immutable paste repository
+Implement the next host-testable persistence slice with the existing pinned
+rusqlite/core dependencies; no dependency versions or application architecture
+change. Storage depends on core's pure document values, never the reverse.
+`PasteText` rejects whitespace-only input without trimming valid content. The
+literal first LF/CRLF-delimited line supplies the title, preserving spaces and
+allowing an empty first line rather than inventing a fallback. Canonical text
+retains line endings, NUL and Unicode exactly; no normalization or truncation.
+
+Append migration 0002 with separate sources (kind/original title), chapter
+identities/order, Library documents (live title) and canonical chapter text.
+Use positive AUTOINCREMENT identities and bound parameters. Paste is one text
+unit at index zero; a heading never creates inferred chapters. The provenance
+tables are separate so future deletion can remove live content while retaining
+historical anchors. Do not expose rename/deletion or change deletion semantics
+in this step; raw SQL fixtures test separation and nonreuse only.
+
+`Storage::create_paste` performs all inserts under one immediate transaction and
+returns a snapshot only after commit. `load_paste` uses a read transaction and
+distinguishes absent documents from inconsistent stored content. Neither method
+edits canonical text. Both are synchronous Rust I/O for future worker effects;
+they are not yet Crux events, FFI exports or Android import UI. Keep duplicate
+detection, atomic vocabulary registration, timestamps and reader progress with
+their planned tasks rather than claiming a complete product import pipeline.
+
+Verified insert/commit/migration failure rollback, exact Unicode and reopen,
+concurrent writes, independent i64 allocations including values above 2^53 and
+i64::MAX, committed-ID nonreuse after deletion/reopen, and safe ID exhaustion.
+The existing migration-history corruption fixture needed updates scoped to one
+row after adding a second migration; the full suite then passed. No change to
+migration 0001 or the reject-without-repair policy.
