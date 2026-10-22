@@ -53,3 +53,16 @@
 - Kotlin compiler/Gradle/BoltFFI not installed on PATH; no Kotlin compilation,
   native round trip or Android build run. Native bridge checklist remains open.
 - Next: BoltFFI bindings and generated Kotlin tests, Android scaffold, ABIs.
+
+## 2026-10-22 — Native bridge exports
+- Started clean. Added pinned BoltFFI 0.30.1, native facade and EffectsListener,
+  typed error export and static/shared crate types; refreshed Cargo.lock.
+- Added two host tests for payload/error forwarding, independent instances,
+  cross-thread use and owned listener release. Updated plan, resume, architecture,
+  development and decisions docs; no persisted data model changed.
+- Workspace build, all-feature tests (15), fmt check and all-target/all-feature
+  clippy PASS. Kotlin payload generation twice and diff PASS. Shared-library
+  constructor/method/callback/release symbols verified with nm.
+- No Kotlin/JNI execution or Android build run. CLI/compiler setup and actual
+  cross-language tests remain next; asynchronous callback delivery needs a real
+  asynchronous effect. No new product blockers.

@@ -18,7 +18,7 @@ with functioning rustup can omit the PATH workaround. Do not assume this compile
 is the project's minimum supported version; establish that with dependencies.
 Cargo.lock is retained for reproducible application development.
 Crux 0.20.0 declares Rust 1.90 minimum; the full locked graph has only been tested
-with 1.99.1. Current host baseline: thirteen integration tests (four app, five domain, four bridge).
+with 1.99.1. Current host baseline: fifteen integration tests (four app, five domain, four bridge, two native facade).
 
 ## Kotlin payload generation
 ```sh
@@ -36,8 +36,8 @@ diff -r target/generated/kotlin target/generated/kotlin-repeat
 ```
 Generation and this comparison PASS. Kotlin compiler/Gradle are not on PATH;
 Kotlin compilation and native FFI execution have NOT been run. The generated
-Gradle template is not an adopted Android build configuration. BoltFFI remains
-uninstalled/unpinned; complete native error/callback bindings next.
+Gradle template is not an adopted Android build configuration. BoltFFI library is pinned to 0.30.1; its CLI is not installed.
+Install the matching CLI and generate native Kotlin/JNI bindings next.
 
 ## Android environment and next setup
 `android` is installed at `/home/kai/.local/bin/android`. It needs write access to
@@ -65,3 +65,16 @@ versions. Use `android sdk --help` for package installation. Validate JDK/Gradle
 AGP/NDK compatibility against primary documentation, then record exact Gradle,
 native packaging, emulator and adb commands here after running them. Do not
 present guessed future build commands as a successful baseline.
+
+## Native bridge host build
+`cargo build --workspace --offline` emits `target/debug/libyomoku_ffi.so` and
+`libyomoku_ffi.a` alongside the Rust library. BoltFFI 0.30.1 generates the native
+exports; no hand-written unsafe ABI is maintained. Verified exported symbols:
+```sh
+nm -D --defined-only target/debug/libyomoku_ffi.so | rg 'boltffi_.*(native_bridge|effects_listener)'
+```
+Constructor, update/resolve/view, callback creation/registration and release are
+present. Host facade tests verify isolation, errors, thread sharing and listener
+release. They do not test the generated ABI, JNI, Kotlin exceptions or native
+handle cleanup. Navigation emits only synchronous effects; asynchronous delivery
+must be exercised once an actual asynchronous runtime operation is introduced.

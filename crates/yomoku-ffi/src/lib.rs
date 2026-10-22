@@ -1,4 +1,4 @@
-//! Serialized host boundary; native Kotlin exports are a subsequent slice.
+//! Serialized host boundary and native exports.
 //!
 //! Payloads use Crux's Bincode format and typed event/request/view schemas.
 //! Each instance owns an independent core. No global singleton or platform I/O.
@@ -9,8 +9,11 @@ use crux_core::{
 };
 use yomoku_runtime::{effect_router, EffectRouter};
 
-/// Stable error categories for the future native binding; payloads and internal
+pub mod native;
+
+/// Error categories for the native binding; payloads and internal
 /// error strings are intentionally not included.
+#[boltffi::error]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum FfiError {
     InvalidEvent,

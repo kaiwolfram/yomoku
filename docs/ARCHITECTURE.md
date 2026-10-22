@@ -15,8 +15,15 @@ The optional `facet_typegen` feature and `generate-kotlin` CLI generate event,
 view, shell effect and request types plus Bincode codecs in `app.yomoku.shared`.
 Generation registers the runtime shell effects explicitly; core-only effects stay
 private. Generated Kotlin has not yet been compiled or executed.
-Thirteen host integration tests cover domain rules, core navigation and serialized
-bridge behavior. No native exports, platform I/O, persisted state or Android app yet.
+`native::NativeBridge` exposes update/resolve/view through BoltFFI 0.30.1.
+Its owned `EffectsListener` has separate success/error callbacks, retaining typed
+errors without passing internal strings. Hosts must dispatch callbacks to the UI
+thread. Native handles own independent bridge instances; no global app singleton.
+Fifteen host integration tests cover domain rules, navigation, payloads, native
+facade isolation, cross-thread access and listener release. Shared/static libraries
+build with exported constructor/method/callback/release symbols. Generated JNI
+bindings and native handle lifecycle have not yet been executed from Kotlin.
+No platform I/O, persisted state or Android app yet.
 
 ## Required boundaries (not yet implemented)
 Kotlin Compose shell handles UI and Android APIs through a narrow typed FFI to the

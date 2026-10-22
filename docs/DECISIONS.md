@@ -110,3 +110,24 @@ Generation and deterministic output comparison passed; host bridge tests also
 pass with Facet enabled. This does not establish Kotlin serialization compatibility
 or a native ABI. BoltFFI errors/callbacks and compiler setup are a separate next
 slice; no BoltFFI version has been adopted based on untested docs examples.
+
+## 2026-10-22 — BoltFFI native facade
+Pin BoltFFI to 0.30.1, a published release whose APIs were inspected, rather than
+adopting a newer release solely from the registry's availability notice. Cargo.lock
+also pins its companion crates to 0.30.1. Matching CLI installation remains next.
+Primary API evidence:
+- https://docs.rs/crate/boltffi/0.30.1
+- https://www.boltffi.dev/docs/classes
+- https://www.boltffi.dev/docs/errors
+- https://www.boltffi.dev/docs/callbacks
+
+Use an exported impl on NativeBridge, an error attribute on FfiError and an exported
+Send + Sync listener trait. Keep the existing host facade usable from Rust without
+requiring a foreign callback. Separate listener success/error methods avoid a
+Result-valued callback argument; synchronous methods retain Result errors.
+Build rlib for tests and staticlib/cdylib for native packaging. The wrapper adds
+no state, lock or I/O beyond the existing Crux bridge. Owned callback lifetime is
+tested on host; generated foreign handle lifetime still requires Kotlin tests.
+Do not add a synthetic product event just to trigger asynchronous callbacks.
+The original broad bridge checklist item is split into verified host exports and
+remaining Kotlin/JNI work, without claiming a cross-language round trip.
