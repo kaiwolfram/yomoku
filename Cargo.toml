@@ -1,5 +1,5 @@
 [workspace]
-members = ["crates/yomoku-core"]
+members = ["crates/yomoku-core", "crates/yomoku-runtime", "crates/yomoku-ffi"]
 resolver = "2"
 
 [workspace.package]

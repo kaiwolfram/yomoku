@@ -22,3 +22,15 @@
   Offline build initially lacked bincode; dependency fetch resolved it.
 - Next: Rust EffectRouter/FFI error round trip, pinned Kotlin codegen, Android.
   No Android or cross-language checks run; no new product blockers.
+
+## 2026-10-22 — Runtime router and Rust bridge facade
+- Started clean; preserved core/domain implementation. Added runtime shell effect
+  mapping and FFI facade with update/resolve/view, async callback plumbing and
+  typed errors. Added four host bridge integration tests; updated workspace/lock
+  and plan, resume, architecture, data model, decisions and development docs.
+- Build/test/fmt/clippy PASS offline; thirteen tests. Optional typegen feature
+  compilation PASS. Initial compile lacked effect(typegen); corrected after macro
+  source inspection. Offline optional dependency resolution failed; approved fetch
+  succeeded. No native/Kotlin/Android checks run.
+- Next: verified BoltFFI/native exports and generated Kotlin tests, then Android
+  scaffold and ABI packaging. No new product blockers; Q188 remains deferred.

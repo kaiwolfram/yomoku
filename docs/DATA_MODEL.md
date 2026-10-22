@@ -15,8 +15,13 @@ No database exists yet. These enums have no persisted/FFI encoding contract.
 `app::Destination` is Library (default), Nostr, Statistics or Vocabulary.
 `Model` owns the selected destination; `ViewModel` projects it for the shell.
 `Event::SelectDestination` selects a destination and requests a render. Event,
-destination and view derive Serde serialization, but no stable wire format or
-persisted discriminants are established. A fresh core always starts at Library.
+destination and view derive Serde serialization. The host bridge now uses Crux
+0.20.0 BincodeFfiFormat (fixed integers; upstream permits trailing bytes), with
+`Requests<ShellEffectFfi>` for effect batches and Crux EffectId (u32) for responses.
+Render is fire-and-forget: resolving its ID returns InvalidResponse. Malformed
+or unknown event variants return InvalidEvent before mutation. These are internal
+same-build schemas, not a persisted format or version-stable public protocol.
+Kotlin serialization compatibility remains unverified. A fresh core starts at Library.
 
 ## Required future schema constraints
 - Stable document/source/chapter IDs; immutable content with explicit offset

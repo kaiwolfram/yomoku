@@ -60,3 +60,28 @@ already specified in the handoff. Every selection requests a render, including
 reselection, so a shell can request its initial view. This is transient state;
 it does not imply persistence or Nostr fetching. Settings/reader navigation will
 be added with their actual flows, not guessed here.
+
+## 2026-10-22 — Rust routing and serialized host boundary
+Inspected published Crux 0.20.0 source in the Cargo registry: middleware Layer,
+MapEffectLayer and Bridge, BincodeFfiFormat, ResolveRegistry, and crux_macros
+0.10.1 effect implementation. Primary references:
+- https://docs.rs/crux_core/0.20.0/crux_core/middleware/trait.Layer.html
+- https://docs.rs/crux_core/0.20.0/crux_core/middleware/struct.Bridge.html
+- https://docs.rs/crux_core/0.20.0/crux_core/bridge/struct.BincodeFfiFormat.html
+- https://docs.rs/crux_macros/0.10.1/crux_macros/attr.effect.html
+The web source fetch failed; local published source supplied the API evidence.
+
+Use the upstream middleware bridge and serialization, with a separate shell effect
+enum and exhaustive mapping. No hypothetical I/O operations are added just to test
+routing. Future storage/network handlers belong below the shell mapping; their
+async callbacks must be tested when introduced. The current callback cannot fire
+from navigation alone. Use effect(typegen) to generate the Serde FFI enum; optional
+runtime typegen forwards to Crux's generator feature (compilation verified).
+Generator dependencies were fetched and locked; Kotlin generation/BoltFFI remain
+next-session work. This choice does not preclude the newer facet generator.
+
+Keep the host API to update/resolve/view, per-instance state, and categorized errors
+without payload/error-string leakage. Tests verify invalid IDs return errors
+rather than panic (the registry source is more current than some bridge comments).
+No custom codec, unsafe native exports or pretend cross-language test is added.
+Bincode's upstream trailing-byte acceptance is retained for generated-code parity.

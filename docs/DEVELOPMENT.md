@@ -18,7 +18,9 @@ with functioning rustup can omit the PATH workaround. Do not assume this compile
 is the project's minimum supported version; establish that with dependencies.
 Cargo.lock is retained for reproducible application development.
 Crux 0.20.0 declares Rust 1.90 minimum; the full locked graph has only been tested
-with 1.99.1. Current host baseline: nine integration tests (four app, five domain).
+with 1.99.1. Current host baseline: thirteen integration tests (four app, five domain, four bridge).
+Also verified `cargo check -p yomoku-runtime --features typegen --offline`.
+This checks generator feature compilation, not generated Kotlin or native exports.
 
 ## Android environment and next setup
 `android` is installed at `/home/kai/.local/bin/android`. It needs write access to

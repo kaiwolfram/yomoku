@@ -6,18 +6,19 @@ was pulled forward. Read AGENTS.md, plan phase 1 and handoff section 3 next.
 ## Working
 - Clean starting tree; existing vocabulary implementation preserved.
 - Pure `yomoku-core` now implements Crux 0.20.0 App with typed navigation event,
-  model, view and render effect; Library default. Nine host integration tests.
+  model, view and render effect; Library default. Thirteen host integration tests across core and bridge.
 - Exact surface identities, five statuses, non-overwriting registration policy,
   New-only completion transition remain tested.
-- No Android app, persistence, tokenizer, runtime or FFI yet.
+- Runtime EffectRouter maps Render to shell effects; Rust FFI facade uses Crux
+  Bincode update/resolve/view with typed errors and independent instances.
+- No native exports, Kotlin bindings, Android app, persistence or tokenizer yet.
 
 ## Next tasks (ordered)
-1. Add runtime EffectRouter and narrow FFI typed round-trip/error test. Inspect
-   Crux 0.20.0 published bridge/middleware APIs; keep Rust I/O effects in Rust.
-2. Verify/pin BoltFFI and Crux Kotlin type generation (current upstream Android
-   approach); test generated types/serialization rather than hand-writing codecs.
-3. Generate Android Compose project with installed `android` CLI, min SDK 29;
+1. Verify/pin BoltFFI and Crux Kotlin generation; add native exports around
+   YomokuBridge and test generated event/request/view/error round trips.
+2. Generate Android Compose project with installed `android` CLI, min SDK 29;
    inspect template versions, install compatible SDK/JDK/NDK and build wrapper.
+3. Package native emulator/arm64 libraries and test command → view on Android.
 
 ## Last successful checks
 Run from repository root:
@@ -27,16 +28,18 @@ cargo build --workspace --offline
 cargo test --workspace --offline
 cargo fmt --all -- --check
 cargo clippy --workspace --all-targets --offline -- -D warnings
+cargo check -p yomoku-runtime --features typegen --offline
 ```
-All PASS; nine integration tests. Compiler/cargo 1.99.1.
-Initial fmt check flagged one assertion; formatted and reran successfully.
+All PASS; thirteen integration tests. Compiler/cargo 1.99.1.
+Initial bridge compile needed effect(typegen); fixed. Optional generator deps
+were absent offline; approved cargo fetch resolved this.
 Fresh caches require `cargo fetch --locked` with network access first.
 
 ## Environment/blockers
 - Plain cargo/rustc via rustup fails trying to remove read-only rustup-init;
   direct toolchain PATH above works without modifying the user's installation.
-- Sandbox crates.io DNS failed; escalated cargo info/fetch succeeded. Crux and
-  locked dependencies now cached. Offline initial build lacked bincode; resolved.
+- Crux and locked dependencies, including optional Serde generator, now cached.
+  Browser docs fetch failed; verified published local crate source instead.
 - Android CLI 1.0.16625370, SDK `/home/kai/Android/Sdk`, build/templates 0.1.1;
   empty-activity supports Compose/AGP 9. CLI requires approved escalation.
 - No Gradle build yet; JDK 25 available, compatible build JDK to verify.

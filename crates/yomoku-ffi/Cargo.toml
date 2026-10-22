@@ -1,0 +1,12 @@
+[package]
+name = "yomoku-ffi"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+crux_core = "=0.20.0"
+yomoku-runtime = { path = "../yomoku-runtime" }
+
+[dev-dependencies]
+yomoku-core = { path = "../yomoku-core" }
