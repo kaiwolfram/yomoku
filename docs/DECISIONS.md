@@ -340,3 +340,43 @@ worked for this prompt. No auth token/key or generated tooling enters Git. A
 subsequent launcher cold boot preserved authorization. One CoreSession Android
 test passes offline after fetching AGP's UTP dependencies once; APK installation,
 Activity cold launch and the visible Rust-backed Library heading also pass.
+
+## 2026-10-22 — Rust-owned navigation and retained Android session
+Keep the four top-level destinations in Rust and add typed OpenSettings /
+CloseSettings commands plus a view flag. Settings preserves the selected tab;
+Back closes Settings, and selecting a destination closes Settings. These are
+transient routes: a fresh process starts in Library. Settings and the four
+screens remain empty placeholders until their respective vertical slices.
+No Nostr starter configuration or settings values are invented.
+
+Use the already resolved AndroidX Lifecycle **2.9.4** ViewModel as an explicit
+app dependency. CoreSessionOwner retains only the native CoreSession and closes
+it from onCleared; it holds no independent navigation/domain state, Activity or
+Context. Activity recreation obtains the same owner without re-dispatching an
+initial destination. This preserves the Rust model across rotation but does not
+serialize navigation for process death. Rust remains the application state owner.
+
+Use existing Material 3 NavigationBar / NavigationRail and TopAppBar. Choose a
+rail at available Compose width >=600dp, otherwise a bottom bar; resize and
+multi-window use actual available width rather than a device/tablet flag. The
+rail scrolls on short windows and consumes Scaffold insets. Settings is a toolbar
+flow with Back and no main navigation. Reader navigation hiding will be wired
+when a real reader route exists; no synthetic reader command is introduced.
+Navigation icons are small original vector resources with adjacent text labels.
+
+Add only Compose ui-test-junit4 to instrumentation, using the existing Compose
+BOM **2026.03.01** (resolves **1.10.6**); createAndroidComposeRule uses MainActivity,
+so no test-manifest dependency is necessary. Verify actual JNI-backed tab /
+Settings rendering, system Back, Activity recreation and final session closure.
+
+Primary API/version evidence reviewed:
+- https://developer.android.com/topic/libraries/architecture/viewmodel
+  (Activity-scoped retention and onCleared cleanup).
+- https://developer.android.com/jetpack/androidx/releases/lifecycle#2.9.4
+  (retain the version already resolved by Activity, without upgrading the stack).
+- https://developer.android.com/develop/ui/compose/layouts/adaptive/use-window-size-classes
+  (600dp compact/medium boundary, dynamic available window width).
+- https://developer.android.com/develop/ui/compose/components/navigation-bar
+- https://developer.android.com/develop/ui/compose/components/navigation-rail
+- https://developer.android.com/develop/ui/compose/testing
+  (ui-test-junit4, createAndroidComposeRule and semantics assertions).

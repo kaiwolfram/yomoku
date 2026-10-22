@@ -41,9 +41,9 @@ Generation and this comparison PASS. Standalone Kotlin 2.4.21 and BoltFFI CLI
 
 ## Android Compose shell
 The CLI-generated project lives in `android/`; normal builds need no Android
-Studio. Its current UI is a Rust-backed Library heading with system light/dark theme and
-window insets. Native packaging is integrated; interactive navigation and
-persistence are separate steps.
+Studio. Its current UI is a Rust-backed four-tab shell with toolbar Settings,
+system light/dark theme and window insets. Native packaging and configuration-change retention are integrated;
+document persistence is a separate step.
 Namespace/application ID `app.yomoku` is provisional, not a publishing commitment.
 Automatic cloud backup and device transfer are excluded; the product requires
 manual encrypted backups.
@@ -146,9 +146,12 @@ The script fails early for another NDK or missing targets and uses locked/offlin
 Cargo. Do not run native generation/build/test scripts concurrently.
 
 `CoreSession` dispatches generated events and projects Render requests into a
-Compose view, owning/closing a native handle with the Activity. Interactive
-navigation still needs configuration-change retention. Instrumentation source is
-`android/app/src/androidTest/java/app/yomoku/CoreSessionTest.kt`; its APK is
+Compose view. An Activity-scoped `CoreSessionOwner` retains its native handle
+across configuration changes and closes it when the Activity finishes.
+`YomokuApp` uses bottom navigation below 600dp available width and a rail at
+600dp or wider. Settings is a Rust-owned toolbar flow with toolbar/system Back.
+Instrumentation sources are `CoreSessionTest.kt` and `NavigationTest.kt` under
+`android/app/src/androidTest/java/app/yomoku/`; the test APK is
 `android/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk`.
 Run on a connected API 29+ arm64 device or x86_64 emulator:
 ```sh
@@ -330,3 +333,33 @@ session isolation and native-handle closure. Stop the AVD with:
 ```sh
 android emulator stop emulator-5554
 ```
+
+## Responsive navigation verification
+
+The three instrumentation tests pass on API 36 x86_64 medium_phone at its default
+1080x2400 / 420dpi (411dp width), 1600x2560 / 240dpi tablet portrait and
+2560x1600 / 240dpi landscape.
+Tests assert the bottom bar versus rail, selected tabs, Settings/toolbar/system
+Back, the identical CoreSession after ActivityScenario.recreate(), and a closed
+native handle after finishing. The layout adapts to available width; no tablet
+hardware flag or Android navigation library owns domain state.
+
+Repeat viewport checks with the same connected-test command above. These are
+emulator-only display overrides, not changes to the AVD configuration:
+```sh
+"$ANDROID_HOME/platform-tools/adb" shell wm size 1600x2560
+"$ANDROID_HOME/platform-tools/adb" shell wm density 240
+./android/gradlew -p android :app:connectedDebugAndroidTest --offline --console=plain
+"$ANDROID_HOME/platform-tools/adb" shell wm size 2560x1600
+./android/gradlew -p android :app:connectedDebugAndroidTest --offline --console=plain
+# Always restore the original viewport afterward:
+"$ANDROID_HOME/platform-tools/adb" shell wm size reset
+"$ANDROID_HOME/platform-tools/adb" shell wm density reset
+```
+The first build needed online resolution of BOM-managed Compose ui-test-junit4
+1.10.6 and its transitive dependencies. Subsequent APK assembly, tests and strict
+lint run offline. Generated Rust unit event variants are Kotlin data objects
+(OpenSettings / CloseSettings), not constructor calls. System Back test injection
+must await Compose idle after clicking Settings so BackHandler is registered.
+UTP removes the app after testing; installDebug (or adb install -r the debug APK)
+is required for a later manual launch/screenshot.

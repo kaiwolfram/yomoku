@@ -22,6 +22,7 @@ pub enum Destination {
 #[derive(Default)]
 pub struct Model {
     destination: Destination,
+    settings_open: bool,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -29,12 +30,15 @@ pub struct Model {
 #[repr(C)]
 pub enum Event {
     SelectDestination(Destination),
+    OpenSettings,
+    CloseSettings,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
 pub struct ViewModel {
     pub destination: Destination,
+    pub settings_open: bool,
 }
 
 #[effect]
@@ -53,7 +57,12 @@ impl App for Yomoku {
 
     fn update(&self, event: Event, model: &mut Model) -> Command<Effect, Event> {
         match event {
-            Event::SelectDestination(destination) => model.destination = destination,
+            Event::SelectDestination(destination) => {
+                model.destination = destination;
+                model.settings_open = false;
+            }
+            Event::OpenSettings => model.settings_open = true,
+            Event::CloseSettings => model.settings_open = false,
         }
         render::render()
     }
@@ -61,6 +70,7 @@ impl App for Yomoku {
     fn view(&self, model: &Model) -> ViewModel {
         ViewModel {
             destination: model.destination,
+            settings_open: model.settings_open,
         }
     }
 }

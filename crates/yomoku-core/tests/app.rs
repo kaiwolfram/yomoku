@@ -8,6 +8,7 @@ fn starts_in_library() {
         core.view(),
         ViewModel {
             destination: Destination::Library,
+            settings_open: false,
         }
     );
 }
@@ -46,4 +47,35 @@ fn new_core_does_not_restore_transient_navigation() {
         Destination::Library
     );
     assert_eq!(core.view().destination, Destination::Vocabulary);
+}
+
+#[test]
+fn settings_returns_to_each_selected_destination_and_is_not_restored() {
+    let core = Core::<Yomoku>::new();
+    for destination in [
+        Destination::Library,
+        Destination::Nostr,
+        Destination::Statistics,
+        Destination::Vocabulary,
+    ] {
+        let _ = core.process_event(Event::SelectDestination(destination));
+        for event in [
+            Event::OpenSettings,
+            Event::OpenSettings,
+            Event::CloseSettings,
+            Event::CloseSettings,
+        ] {
+            let effects = core.process_event(event);
+            assert!(matches!(effects.as_slice(), [Effect::Render(_)]));
+            assert_eq!(core.view().destination, destination);
+            assert_eq!(
+                core.view().settings_open,
+                matches!(event, Event::OpenSettings)
+            );
+        }
+    }
+    let _ = core.process_event(Event::OpenSettings);
+    assert!(!Core::<Yomoku>::new().view().settings_open);
+    let _ = core.process_event(Event::SelectDestination(Destination::Library));
+    assert!(!core.view().settings_open);
 }

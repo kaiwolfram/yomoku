@@ -64,6 +64,15 @@ fun main() {
                 expectFailure<FfiError.InvalidEvent> { bridge.update(badEvent) }
                 check(ViewModel.bincodeDeserialize(bridge.view()).destination == Destination.LIBRARY)
             }
+            for (event in listOf(Event.OpenSettings, Event.CloseSettings)) {
+                val bytes = event.bincodeSerialize()
+                check(Event.bincodeDeserialize(bytes) == event)
+                val requests = Requests.bincodeDeserialize(bridge.update(bytes))
+                check(requests.value.single().effect is ShellEffect.Render)
+                val view = ViewModel.bincodeDeserialize(bridge.view())
+                check(view.settingsOpen == (event is Event.OpenSettings))
+                check(view.destination == Destination.LIBRARY)
+            }
             expectFailure<FfiError.InvalidResponse> { bridge.resolve(UInt.MAX_VALUE, byteArrayOf()) }
             check(listener.calls == 0) // Navigation is synchronous; async delivery is a later test.
         }

@@ -4,8 +4,10 @@
 Root Cargo workspace → `crates/yomoku-core`: pure Crux 0.20.0 application plus
 surface identity, five vocabulary statuses, registration and completion policies.
 `app::Yomoku` implements `App`; `Model` holds a transient destination (Library
-default), `Event::SelectDestination` updates it, and a render command asks the
-host to read `ViewModel`. The typed effect currently contains only Render.
+default) and Settings visibility. Typed SelectDestination/OpenSettings/CloseSettings
+commands update them, and a render command asks the host to read `ViewModel`.
+Closing Settings returns to the selected destination; a fresh core starts in
+Library. The typed effect currently contains only Render.
 `yomoku-runtime` maps core effects exhaustively into a separate `ShellEffect`
 through Crux middleware (`EffectRouter`). Only Render exists today; future Rust
 I/O handlers must run below this mapping. `yomoku-ffi::YomokuBridge` wraps that
@@ -19,7 +21,7 @@ private. Generated Kotlin codecs are compiled and exercised through host JNI.
 Its owned `EffectsListener` has separate success/error callbacks, retaining typed
 errors without passing internal strings. Hosts must dispatch callbacks to the UI
 thread. Native handles own independent bridge instances; no global app singleton.
-Fifteen host integration tests cover domain rules, navigation, payloads, native
+Sixteen host integration tests cover domain rules, navigation, payloads, native
 facade isolation, cross-thread access and listener release. Shared/static libraries
 build with exported constructor/method/callback/release symbols. The pinned
 BoltFFI configuration generates Kotlin in `app.yomoku.nativebridge` and JNI C.
@@ -30,17 +32,20 @@ instance isolation, 100 close cycles, listener registry cleanup and rejection of
 calls after close, using `-Xcheck:jni`. Asynchronous callbacks remain untested
 until a real asynchronous effect exists. Native wrappers require explicit close.
 `android/` contains a CLI-generated Kotlin/Compose application, minimum SDK 29,
-with Gradle wrapper and a JDK 17 toolchain. Its initial shell displays a Library
-heading, respects system light/dark mode and window insets, and excludes automatic
-Android backup/transfer. Gradle's preBuild runs `tools/build-android-native.sh`
+with Gradle wrapper and a JDK 17 toolchain. Its shell renders four destination
+placeholders and a toolbar Settings flow, respects system light/dark mode and
+window insets, and excludes automatic Android backup/transfer. Gradle's preBuild runs `tools/build-android-native.sh`
 to generate Crux/BoltFFI Kotlin and package a combined Rust/JNI library for
 arm64-v8a and x86_64, using pinned NDK r30/API 29. `CoreSession` owns the native
 handle, dispatches typed events, and projects Rust Render requests into Compose
-state on the main thread. The Activity reads its Library heading from that view
-and closes the session on destruction. Recreation currently creates a fresh core;
-interactive navigation must add retention across configuration changes.
-The Android instrumentation test covers command → core → view, isolation and
-explicit handle close; it passes on the API 36 x86_64 `medium_phone` emulator.
+state on the main thread. Activity-scoped CoreSessionOwner (AndroidX ViewModel)
+retains the same session across configuration changes and closes it onCleared.
+Kotlin holds no independent route/domain state; a new process starts in Library.
+Compose chooses a bottom bar below 600dp available width and a scrollable rail
+from 600dp. Settings has toolbar/system Back and hides the main navigation.
+Reader-specific hiding remains pending the real reader route.
+Three Android instrumentation tests cover command → core → view, isolation, tabs,
+Settings return, configuration recreation and handle close on API 36 x86_64.
 This verifies the packaged JNI path on Android; arm64 device execution and real
 asynchronous effects remain unverified.
 `yomoku-storage` separately owns SQLite I/O through rusqlite 0.40.2 with bundled
@@ -61,6 +66,6 @@ JMdict English and JMnedict are offline data. Nostr uses Rust nostr-sdk.
 Remaining planned crates: `yomoku-analysis`, `yomoku-import`. Create these when
 implementing behavior, not as empty placeholders. Android project path: `android/`.
 
-Next architectural checkpoint: Android bridge execution, responsive navigation,
-then document IDs/text offsets and storage effects. Do not freeze FFI or schema
-based on assumptions about dependency APIs.
+Next architectural checkpoint: stable document IDs/text offsets and storage
+effects, followed by the first reader route and its navigation visibility. Do not
+freeze FFI or schema based on assumptions about dependency APIs.

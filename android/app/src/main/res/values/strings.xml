@@ -4,4 +4,11 @@
     <string name="nostr_title">Nostr</string>
     <string name="statistics_title">Statistics</string>
     <string name="vocabulary_title">Vocabulary</string>
+    <string name="settings_title">Settings</string>
+    <string name="back">Back</string>
+    <string name="library_empty">No documents yet.</string>
+    <string name="nostr_empty">Nostr is not configured.</string>
+    <string name="statistics_empty">No reading history yet.</string>
+    <string name="vocabulary_empty">No vocabulary yet.</string>
+    <string name="settings_empty">No settings available yet.</string>
 </resources>

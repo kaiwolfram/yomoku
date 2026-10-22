@@ -29,7 +29,8 @@ position/encounter history. Keep incremental builds green.
 - [x] Add Gradle wrapper and Kotlin Compose app under `android/`, min SDK 29; CLI assembleDebug and strict lint succeed with pinned compatible JDK/SDK/plugin versions. NDK selection belongs to native packaging below.
 - [x] Verify/pin/install a compatible NDK, generate/package Kotlin/JNI and native libraries for x86_64 emulator and arm64 device, and wire a Rust-backed shell; assemble app/instrumentation APKs, pass strict lint and verify both packaged ELF architectures/exports plus 16 KB ELF/ZIP alignment. NDK r30/API 29; Android execution remains below.
 - [x] Demonstrate command → core → view state on Android by running `CoreSessionTest` on a device/emulator. One instrumentation test passes on API 36 x86_64 medium_phone, covering generated JNI/codecs, Rust render state, independent sessions and handle closure.
-- [ ] Add Library-default navigation, Nostr/Statistics/Vocabulary placeholders and toolbar Settings; verify phone bottom bar/tablet rail and hide navigation in reader.
+- [x] Add Library-default navigation, Nostr/Statistics/Vocabulary placeholders and toolbar Settings using Rust state; verify phone bottom bar/tablet rail, Settings Back, retained session across Activity recreation and final native-handle cleanup on API 36 x86_64.
+- [ ] Hide main navigation in the active reader when the phase-2 reader route is implemented; no reader route exists yet.
 - [x] Add `crates/yomoku-storage` SQLite initialization and numbered migration; empty DB creation/reopens, ordered upgrades, rollback, concurrent opens and failure preservation pass in 11 host tests; bundled SQLite compiles for both Android ABIs. Runtime/FFI document wiring remains below.
 - [ ] Exercise document CRUD through runtime/FFI on device; verify reopen persistence and failures.
 - [ ] Add `.github/workflows/ci.yml` host Rust checks, Kotlin lint/tests and unsigned Android build; verify each command locally where available.

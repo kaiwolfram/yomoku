@@ -185,3 +185,26 @@
   JNI and document storage effects remain unverified; default CLI boot uses fallback.
 - Next: responsive navigation/session retention, stable IDs/Unicode offsets and
   storage repositories/effects, then CI.
+
+## 2026-10-22 — Responsive navigation and retained Rust session
+- Added Rust-owned Settings open/close state alongside four destinations; Back
+  returns to the chosen tab. Fresh core starts Library; Settings is a placeholder.
+- Added Material bottom bar / >=600dp rail, toolbar Settings/Back, empty screens,
+  original vector icons and inset handling. Activity-scoped CoreSessionOwner
+  retains the native handle across recreation and closes it on final destruction.
+- New Rust navigation policy test and host JNI Settings codec checks PASS.
+  Workspace build, 27 Rust tests, fmt/clippy, Kotlin formatting, host JNI and
+  git whitespace PASS. App/test APK assembly and strict Android lint PASS.
+- Three Android tests PASS at default phone and tablet portrait/landscape viewport
+  overrides on API 36 x86_64. Verified native-session identity across recreation,
+  final closure, tabs and toolbar/system Back. Restored emulator size/density;
+  reinstalled/launched debug APK and visually checked phone bottom bar/tablet rail.
+- Initial offline build lacked ui-test-junit4 1.10.6; fetched approved dependencies.
+  Fixed generated Kotlin object syntax/import assumptions and a system Back test
+  recomposition race. No remaining verification failures. UTP uninstalls app after
+  tests; reinstall before manual launch. Screenshots stay ignored under .local/.
+- Updated plan/architecture/decisions/development/resume. Split reader navigation
+  hiding into an unchecked item pending a real reader route. No persistent schema,
+  Nostr configuration or document CRUD behavior changed.
+- Next: stable IDs/Unicode offsets, paste document storage/effects/FFI with real
+  async JNI checks, then CI. No blocker for local reader development.
