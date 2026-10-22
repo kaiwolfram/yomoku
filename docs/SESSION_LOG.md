@@ -87,3 +87,17 @@
   Gradle setup. No Android or asynchronous callback checks run.
 - Next: Android Compose/Gradle setup, native ABI packaging and device/emulator
   command → view test. No new product blockers.
+
+## 2026-10-22 — Product specification consolidation
+- Started clean. Consolidated the original handoff into docs/PRODUCT_SPEC.md and
+  removed the superseded root document. All eight product/architecture sections
+  and unresolved inputs are preserved verbatim apart from heading numbers.
+- Removed obsolete startup instructions and duplicate roadmap; retained all
+  twelve cross-feature acceptance cases in IMPLEMENTATION_PLAN.md and clarified
+  the session workflow in AGENTS.md. Updated active references, decisions and
+  resume notes; no product behavior or implementation task status changed.
+- Requirement-preservation comparison, local documentation-link/reference checks
+  and git diff --check PASS. Application tests/build/lint were not rerun for this
+  documentation-only change; prior successful checks remain recorded.
+- Next implementation tasks remain Android Compose/Gradle setup, native ABI
+  packaging and responsive navigation. No new blockers or product decisions.

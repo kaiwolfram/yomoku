@@ -1,15 +1,21 @@
 # Implementation checklist
 
-Source: `../YOMOKU_CODING_AGENT_HANDOFF.md`. Check an item only when its stated
+Source: [Product specification](PRODUCT_SPEC.md). Check an item only when its stated
 verification passes. Paths below are implementation targets, not claims that the
 modules already exist. Each phase builds on preceding foundations except the
 small pure-domain task explicitly pulled forward from phase 3.
+
+Implementation strategy: prefer a working vertical slice before adding every
+import format or external integration. The first reader milestone is paste text
+→ segment → display pages → tap word → set status → advance page → persist
+position/encounter history. Keep incremental builds green.
 
 ## 0 — Repository and continuity
 - [x] Inspect repository, git history/status and available CLI toolchains; preserve handoff. Result: no existing source or commits; see DEVELOPMENT.md.
 - [x] Create AGENTS.md and persistent plan, resume, decisions, architecture and data-model documents; inspect files for consistency.
 - [x] Establish a passing host Rust baseline with exact commands and document Android/toolchain limitations.
 - [x] Record missing curated Nostr data and Q188 without blocking local work.
+- [x] Consolidate the product source of truth in `docs/PRODUCT_SPEC.md`, retain acceptance coverage and update references; verify requirements against the original and check local documentation links.
 
 ## 1 — Minimal Android/Rust bridge
 - [x] Create root Cargo workspace and pure `crates/yomoku-core`; verify offline build, test, fmt and clippy.
@@ -100,3 +106,18 @@ small pure-domain task explicitly pulled forward from phase 3.
 - [ ] Review privacy, secrets, third-party redistribution/attribution, errors and asset/APK size.
 - [ ] Complete CI and document signed APK/ABI/release commands with secrets excluded; test unsigned release build.
 - [ ] Prepare GitHub Releases/Zapstore artifacts and instructions; obtain manual approval before signed publishing.
+
+## Cross-feature acceptance matrix
+
+- [ ] Short Japanese text, long paragraph, ruby, mixed Japanese/Latin, punctuation and kanji-only proper noun.
+- [ ] Exactly 500-char boundaries; end of paragraph; end of EPUB chapter; setting changes preserve reading text position.
+- [ ] Page left swipe completion vs previous/right swipe; replay reread counts again; accidental double callbacks only count once.
+- [ ] Page scroll always resets on navigation/app reopen; current document position updates in both directions.
+- [ ] Import registers New surfaces but does not add reading occurrences; popup opens without status change.
+- [ ] Every same surface spelling shares one global status even across documents; inflected spellings remain distinct.
+- [ ] Completed page New→Known only; Learning/Familiar/Ignored untouched; global history updated correctly.
+- [ ] Repeat occurrences and rereads reflected in cumulative chart; per-timeframe y-axis remains lifetime cumulative.
+- [ ] Import duplicate handling; one failed file does not block batch; cancel leaves no partial document; killed process doesn't resume.
+- [ ] Document deletion preserves historical graphs; vocabulary deletion removes that entry's event history and recalculates.
+- [ ] Mixed JP/non-JP Nostr counting, Next vs Skip vs Previous, relays partially offline, newest-first curated authors only.
+- [ ] Failed backups/bad passwords do not harm existing data; restored identity remains usable.

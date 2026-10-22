@@ -16,7 +16,8 @@ implemented yet. No database schema or serialized enum discriminants are fixed.
 Surface preserves the exact supplied Unicode spelling without trimming or
 normalization; blank values are rejected. Analyzer output is responsible for
 Japanese-token eligibility. Reading and lemma are not identity fields, as required
-by the handoff. Text offset encoding remains undecided until FFI/anchor design.
+by [the product specification](PRODUCT_SPEC.md). Text offset encoding remains
+undecided until FFI/anchor design.
 
 ## 2026-10-22 — CLI environment
 Use the installed stable toolchain binaries directly in this sandbox because the
@@ -56,8 +57,9 @@ examples must not be copied. Rust EffectRouter must consume Rust I/O effects
 before they reach Android; only render/platform operations belong in Kotlin.
 
 First application behavior is top-level destination selection (Library default),
-already specified in the handoff. Every selection requests a render, including
-reselection, so a shell can request its initial view. This is transient state;
+already specified in [the product specification](PRODUCT_SPEC.md). Every selection
+requests a render, including reselection, so a shell can request its initial view.
+This is transient state;
 it does not imply persistence or Nostr fetching. Settings/reader navigation will
 be added with their actual flows, not guessed here.
 
@@ -163,3 +165,17 @@ the native bridge exports after metadata expansion. Rebuild the native library
 after generation. The checked-in runner enforces this order; sharing the target
 directory with concurrent generation/build is unsupported. Both generators
 produce identical repeated output. Tool binaries/generated files stay ignored.
+
+## 2026-10-22 — Product specification consolidation
+Move the original handoff's product scope, architecture, behavior, exclusions,
+UX details and unresolved inputs into [PRODUCT_SPEC.md](PRODUCT_SPEC.md), now
+the authoritative requirements document. Preserve all eight requirement sections
+verbatim apart from heading numbers, including Q188 and empty starter-data policy.
+The original document remains available in Git history.
+
+Retire its outdated first-session instructions and duplicate implementation
+roadmap. AGENTS.md owns the session workflow; IMPLEMENTATION_PLAN.md owns ordered
+tasks and the twelve retained cross-feature acceptance cases. NEXT_SESSION.md
+owns current progress and commands; architecture/data-model docs describe actual
+implementation. Routine technical decisions here do not override confirmed
+product requirements. Update active references to the new specification.

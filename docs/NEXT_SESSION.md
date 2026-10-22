@@ -1,7 +1,7 @@
 # Resume here
 
 Updated: 2026-10-22. Current phase: 1, Android project setup next.
-Read AGENTS.md, plan phase 1 and handoff section 3 next.
+Read AGENTS.md, plan phase 1 and PRODUCT_SPEC.md section 2 next.
 After each completed, verified step, update progress docs and commit it
 automatically; report the commit hash. No separate user request is needed.
 
@@ -13,6 +13,8 @@ automatically; report the commit hash. No separate user request is needed.
 - Real host JNI tests pass: navigation/codecs, typed errors, independent state,
   100 handle lifecycles, listener release and calls after close; JVM JNI checks on.
 - No Android app, persistence or tokenizer yet. Async callbacks need a real effect.
+- Product requirements are consolidated in PRODUCT_SPEC.md; the original handoff
+  is retired. Agent workflow and acceptance coverage live in AGENTS.md and the plan.
 
 ## Next tasks (ordered)
 1. Generate Android Compose project with installed `android` CLI, min SDK 29;
@@ -34,6 +36,8 @@ bash -n tools/test-kotlin-bridge.sh
 git diff --check
 ```
 All PASS; 15 Rust integration tests plus Kotlin/JNI suite. Compiler/cargo 1.99.1.
+Latest documentation-only change: requirement preservation, local links and
+`git diff --check` verified; application checks above were not rerun.
 Crux and BoltFFI output each generated twice and diffed identically.
 Fresh caches require `cargo fetch --locked` with network access first.
 See DEVELOPMENT.md for exact tool setup and repeat-generation commands.
