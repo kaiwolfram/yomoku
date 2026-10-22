@@ -1,6 +1,6 @@
 # Resume here
 
-Updated: 2026-10-22. Phase 1: responsive navigation/session retention verified.
+Updated: 2026-10-22. Phase 2: stable IDs/Unicode text anchors verified.
 Read AGENTS.md, plan phases 1–2 and PRODUCT_SPEC.md section 3 next.
 After each completed, verified step, update progress docs and commit it;
 report the commit hash without waiting for another request.
@@ -8,7 +8,7 @@ report the commit hash without waiting for another request.
 ## Working
 - Pure Crux 0.20.0 core: Library-default/four destination commands, toolbar
   Settings open/close/return state and vocabulary rules. No SQL/platform I/O.
-- Separate EffectRouter/typed FFI; 16 Rust integration tests and host Kotlin/JNI
+- Separate EffectRouter/typed FFI; 21 Rust integration tests and host Kotlin/JNI
   codecs/errors/isolation/listener release/100 lifecycle checks pass.
 - Compose bottom bar below 600dp available width, scrollable rail from 600dp;
   four empty screens and Settings placeholder. Toolbar/system Back returns to tab.
@@ -24,12 +24,16 @@ report the commit hash without waiting for another request.
 - Separate yomoku-storage: rusqlite 0.40.2/bundled SQLite, migration 0001 journal,
   atomic upgrades, 11 reopen/rollback/failure/concurrent-open tests; both ABIs
   compile. No runtime/FFI document persistence/tokenizer yet. Nostr config empty.
+- Pure document/source/chapter positive i64 IDs; chapter-local UTF-8 byte anchors,
+  validated ranges/ownership and checked UTF-16 conversions. Seven Rust/generated
+  Kotlin/Rust codec fixtures pass (supplementary/combining/ZWJ Unicode, full i64).
+  DATA_MODEL.md defines allocation/provenance contracts for future repositories.
 
 ## Next tasks (ordered)
-1. Define stable document/source/chapter IDs and Unicode offsets (phase 2);
-   verify Unicode round trips at FFI boundaries and update DATA_MODEL.md.
-2. Add immutable paste document repositories/effects/FFI on SQLite; verify atomic
-   failure and reopen on device. Test real async JNI callbacks/errors here.
+1. Add immutable paste documents/first-line titles and numbered SQLite migration
+   using document.rs IDs/anchors; verify transaction rollback, ID nonreuse/reopen.
+2. Wire document effects/runtime/FFI and Android private DB path off the UI thread;
+   verify persistence/failures on device and real async JNI callbacks/errors.
 3. Add CI for verified host Rust/Kotlin checks and unsigned Android build.
 Hide main navigation when the real phase-2 reader route is added (unchecked).
 
@@ -50,8 +54,11 @@ export ANDROID_HOME=/home/kai/Android/Sdk
 ./android/gradlew -p android :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug --offline --console=plain
 ./android/gradlew -p android :app:connectedDebugAndroidTest --offline --console=plain
 ```
-All PASS: 27 Rust tests (11 storage), host JNI, fmt/clippy/Kotlin formatting,
-app/test APK assembly, strict Android lint and 3 Android tests at each viewport.
+Current slice PASS: 32 Rust tests (11 storage), host JNI + 7 Unicode payload
+exchanges, fmt/clippy/Kotlin formatting, app/test APK assembly, strict Android lint.
+No device test rerun this slice; previous 3 tests passed at each viewport.
+New fixture formatting: java -jar .local/ktfmt-0.64.jar --kotlinlang-style
+--dry-run --set-exit-if-changed tests/kotlin/TextBoundaryTest.kt (one command).
 See DEVELOPMENT.md for viewport commands, setup and report paths. UTP removes
 app after tests; debug APK reinstalled/launched for visual checks and left open.
 
@@ -60,9 +67,7 @@ app after tests; debug APK reinstalled/launched for visual checks and left open.
   BoltFFI .local/bin/boltffi 0.30.1; Kotlin .local/kotlin-2.4.21/kotlinc/bin/kotlinc;
   ktfmt 0.64 in .local/. Full Temurin JDK 17 avoids runtime-only system Java 25.
 - Gradle/ADB need escalation for local sockets even offline; dependencies cached.
-  First UI-test build fetched BOM-managed ui-test-junit4 1.10.6 online. Initial
-  compilation used constructor syntax for generated Kotlin data objects; fixed.
-  Initial Back test raced recomposition; waitForIdle before injection fixes it.
+  Back tests must wait for Compose idle before injection (BackHandler registration).
 - Android CLI 1.0.16625370, SDK /home/kai/Android/Sdk, API 36 Play x86_64 r7 AVD
   medium_phone, Emulator 37.2.12. Host KVM works; sandbox hides /dev/kvm.
   Default CLI/SwiftShader startup crashes; use tools/start-android-emulator.sh

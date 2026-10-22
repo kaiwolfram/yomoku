@@ -208,3 +208,22 @@
   Nostr configuration or document CRUD behavior changed.
 - Next: stable IDs/Unicode offsets, paste document storage/effects/FFI with real
   async JNI checks, then CI. No blocker for local reader development.
+
+## 2026-10-22 — Stable document IDs and Unicode offsets
+- Added pure positive i64 document/source/chapter IDs, exact chapter text snapshots,
+  UTF-8 byte ranges/anchors and checked UTF-16 conversion. Invalid numeric IDs,
+  split UTF-8/surrogate positions, reversed ranges and wrong ownership are rejected.
+- Extended generated Kotlin payload types and host runner with seven bidirectional
+  Rust/Kotlin Unicode fixtures, including supplementary kanji/emoji, combining/ZWJ
+  sequences, empty text, CRLF/NUL and IDs above 2^53 through i64::MAX. Kotlin-created
+  suffix anchors validate in Rust. Production native methods/events stay unchanged;
+  real document JNI/async callbacks remain pending storage effects.
+- PASS: locked/offline workspace build, 32 Rust tests (11 storage), fmt/clippy,
+  host Kotlin/JNI + seven payload exchanges, Kotlin formatting, shell syntax and
+  whitespace. Repeated Kotlin payload generation matches byte-for-byte. Android
+  app/test APK assembly and strict lint PASS offline. Device tests not rerun;
+  prior navigation/lifecycle tests remain the baseline. No new verification failure.
+- Updated data model/allocation contracts, architecture, decisions, development,
+  checklist and handoff. No new dependency versions, SQL migration or Nostr data.
+- Next: immutable paste repositories/first-line titles, transaction rollback and
+  ID nonreuse/reopen tests; runtime/FFI/private Android DB with async checks; CI.

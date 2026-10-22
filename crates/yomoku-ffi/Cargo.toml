@@ -19,3 +19,6 @@ boltffi = "=0.30.1"
 yomoku-core = { path = "../yomoku-core" }
 crux_core = "=0.20.0"
 yomoku-runtime = { path = "../yomoku-runtime" }
+
+[dev-dependencies]
+serde = "=1.0.228"

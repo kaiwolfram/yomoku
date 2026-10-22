@@ -2,4 +2,5 @@
 //!
 //! Persistence, tokenization, and platform effects belong outside this crate.
 pub mod app;
+pub mod document;
 pub mod vocabulary;

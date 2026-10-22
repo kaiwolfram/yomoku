@@ -35,7 +35,8 @@ private inline fun <reified T : Throwable> expectFailure(block: () -> Unit) {
     error("Expected ${T::class}")
 }
 
-fun main() {
+fun main(args: Array<String>) {
+    verifyTextBoundaries(args.single())
     check(listenerCount() == 0)
     val listener = Listener()
     NativeBridge(listener).use { bridge ->

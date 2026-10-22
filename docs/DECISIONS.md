@@ -380,3 +380,34 @@ Primary API/version evidence reviewed:
 - https://developer.android.com/develop/ui/compose/components/navigation-rail
 - https://developer.android.com/develop/ui/compose/testing
   (ui-test-junit4, createAndroidComposeRule and semantics assertions).
+
+## 2026-10-22 — Stable identities and Unicode text anchors
+Use distinct positive signed 64-bit DocumentId/SourceId/ChapterId values. They
+fit SQLite INTEGER and Kotlin Long exactly without new ID dependencies. Scope
+them to one database (backup is replacement, not merge). Future repositories
+must use AUTOINCREMENT and preserve high-water marks so deleted committed IDs
+cannot be reassigned; allocation itself remains unimplemented. Source identity
+is historical provenance, separate from the live document and duplicate hash.
+Chapter identity survives page-length changes; non-EPUB text has one text unit.
+
+Use chapter-local UTF-8 byte offsets into immutable canonical extracted text,
+with half-open ranges. Check numeric bounds at Rust construction/deserialization;
+check ownership, ordering and scalar boundaries against actual text at use.
+Do not normalize text or use page numbers/UTF-16 indices as durable anchors.
+Provide pure explicit UTF-16 conversions for Kotlin/Compose; reject surrogate
+interiors. Grapheme selection and Japanese page-character counting are separate
+future reader concerns. ChapterText is a snapshot, not an editing command.
+
+Register these types with the existing Facet generator. Use a test-only Cargo
+example plus Kotlin fixtures to exchange real Crux Bincode payloads in both
+directions, including independently computed Kotlin anchors, supplementary
+Unicode and IDs above 2^53. This verifies the payload boundary without adding
+synthetic production events or native methods. Live document JNI and async
+callbacks stay unchecked until document effects exist. Reuse pinned Serde as a
+dev dependency for the example; no dependency versions were added or upgraded.
+
+Primary references reviewed:
+- https://doc.rust-lang.org/std/primitive.str.html#method.is_char_boundary
+- https://doc.rust-lang.org/std/primitive.str.html#method.encode_utf16
+- https://kotlinlang.org/docs/characters.html
+- https://www.sqlite.org/autoinc.html

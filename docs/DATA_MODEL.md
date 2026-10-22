@@ -11,6 +11,55 @@
 
 These enums have no persisted/FFI encoding contract.
 
+## Document identities and text anchors
+`document.rs` defines distinct `DocumentId`, `SourceId` and `ChapterId` newtypes.
+Each is an integer in `1..=i64::MAX`; Rust constructors and Serde decoding reject
+zero/negative values. Generated Kotlin represents each as a separate class with
+a `Long` value. These identities are database-local, never derived from titles,
+chapter order, page numbers, file paths or content hashes.
+
+- Document identifies one live Library instance and its mutable progress/title.
+  Deletion/reimport must allocate a fresh identity with fresh progress/checkmark.
+- Source identifies retained historical provenance for that import. It survives
+  document deletion; exact-duplicate detection is a separate future SHA-256 key.
+- Chapter identifies one immutable canonical text unit owned by a source. EPUB
+  uses its source chapters; paste/TXT/SRT use one text unit without inferred
+  chapters. Chapter IDs and source ownership do not change on page reflow.
+
+The next storage migration must allocate IDs with `INTEGER PRIMARY KEY
+AUTOINCREMENT` (plus positive-value checks) and never manually reuse committed
+IDs. Rollback may reuse unpublished IDs. Retain source/chapter provenance needed
+by history while deleting document content/progress. Full replacement backups
+must preserve IDs and allocation high-water marks; cross-database merging is not
+supported. Allocation/deletion/restore are contracts for future repositories,
+not implemented database behavior yet.
+
+`ChapterText` carries source/chapter IDs and an exact canonical Unicode string.
+`TextOffset` is a nonnegative signed 64-bit **UTF-8 byte offset within a chapter**;
+0 and end-of-text are valid. `TextRange` is half-open `[start, end)`. Every use
+must check ordered/in-bounds Unicode scalar boundaries against the exact chapter
+text. `TextAnchor` includes source/chapter identity and a range; `slice` checks
+both ownership and boundaries. It has no dependency on a live document or page.
+Numeric decoding alone cannot validate range ordering, chapter ownership or text
+boundaries. Generated Kotlin constructors do not enforce Rust validation.
+
+Canonical text is not Unicode-normalized, trimmed or silently line-ending
+normalized by these types. Importers define canonical extraction before anchors
+are created. Source ruby/formatting/images must later refer to that same text;
+image-only positions and import extraction rules remain future work. Offsets
+are not a Japanese-character page-length metric or a progress percentage policy.
+Combining sequences/ZWJ emoji may contain multiple scalar boundaries; these
+helpers do not snap positions to graphemes. `TextOffset::from_utf16`/`to_utf16`
+convert Kotlin/Compose indices explicitly and reject split surrogate pairs.
+
+Crux Bincode payloads encode the numeric newtypes as fixed-width signed i64
+values and strings as UTF-8. Seven Rust → generated Kotlin → Rust fixture
+exchanges verify exact text/ID/range preservation, Kotlin-created suffix anchors,
+empty text, supplementary kanji/emoji, combining/ZWJ sequences, CRLF, NUL and
+IDs above 2^53 through i64::MAX. These test the generated FFI payload codecs;
+live document commands/JNI storage callbacks are still pending. This same-build
+wire encoding is not the future backup format.
+
 ## SQLite initialization
 `yomoku-storage` owns the database connection. Migration
 `0001_migration_history.sql` creates `schema_migrations(version INTEGER PRIMARY
@@ -25,7 +74,7 @@ enables foreign keys per connection and waits up to five seconds for lock
 contention. Newer versions, inconsistent history, nonempty databases without a
 journal, invalid files and SQLite I/O failures return errors without resetting or
 repairing data. The initial journal has no document/vocabulary/history tables;
-their IDs, offsets and event schemas remain to be defined with domain commands.
+document IDs/offsets are defined above; event schemas await domain commands.
 Storage is not yet connected to runtime/FFI or Android's private files path.
 
 ## Transient application state
@@ -40,12 +89,13 @@ or unknown event variants return InvalidEvent before mutation. These are interna
 same-build schemas, not a persisted format or version-stable public protocol.
 The optional Facet metadata now generates Kotlin payloads and Bincode codecs.
 Kotlin event/request/view serialization compatibility is verified across host JNI
-for the current navigation schema. This does not yet verify future text/Unicode
-anchors or asynchronous effect responses. A fresh core starts at Library.
+for the current navigation schema. Text/Unicode payload codecs are verified by
+the fixture exchange above; asynchronous effect responses remain untested.
+A fresh core starts at Library.
 
 ## Required future schema constraints
-- Stable document/source/chapter IDs; immutable content with explicit offset
-  encoding tested across Rust/Kotlin. Encoding/anchor design is still open.
+- Repositories must implement the identity/immutable-text contract above and
+  persist current chapter ID plus byte offset separately from logical pages.
 - Unique active surface entry, linked analyzer dictionary form (nullable), dated
   registration and immutable status history. Reading never participates in identity.
 - Completed-reading events with unique command IDs, occurrence rows preserving

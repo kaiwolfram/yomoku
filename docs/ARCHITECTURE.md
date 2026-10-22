@@ -3,6 +3,12 @@
 ## Implemented
 Root Cargo workspace → `crates/yomoku-core`: pure Crux 0.20.0 application plus
 surface identity, five vocabulary statuses, registration and completion policies.
+`document` adds typed document/source/chapter identities, chapter text snapshots,
+UTF-8 byte ranges/anchors and checked UTF-16 index conversion. These pure values
+are generated into Kotlin alongside shell payloads. Rust/Kotlin fixture exchange
+verifies Unicode and numeric boundaries without adding diagnostic app events or
+native methods. The repository must enforce allocation and immutable content;
+these types do not yet create or persist documents.
 `app::Yomoku` implements `App`; `Model` holds a transient destination (Library
 default) and Settings visibility. Typed SelectDestination/OpenSettings/CloseSettings
 commands update them, and a render command asks the host to read `ViewModel`.
@@ -21,7 +27,7 @@ private. Generated Kotlin codecs are compiled and exercised through host JNI.
 Its owned `EffectsListener` has separate success/error callbacks, retaining typed
 errors without passing internal strings. Hosts must dispatch callbacks to the UI
 thread. Native handles own independent bridge instances; no global app singleton.
-Sixteen host integration tests cover domain rules, navigation, payloads, native
+Twenty-one host integration tests cover domain rules, navigation, payloads, native
 facade isolation, cross-thread access and listener release. Shared/static libraries
 build with exported constructor/method/callback/release symbols. The pinned
 BoltFFI configuration generates Kotlin in `app.yomoku.nativebridge` and JNI C.
@@ -66,6 +72,6 @@ JMdict English and JMnedict are offline data. Nostr uses Rust nostr-sdk.
 Remaining planned crates: `yomoku-analysis`, `yomoku-import`. Create these when
 implementing behavior, not as empty placeholders. Android project path: `android/`.
 
-Next architectural checkpoint: stable document IDs/text offsets and storage
-effects, followed by the first reader route and its navigation visibility. Do not
+Next architectural checkpoint: implement document repositories/storage effects
+using the defined IDs/text offsets, followed by the reader route/navigation. Do not
 freeze FFI or schema based on assumptions about dependency APIs.

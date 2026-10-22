@@ -29,13 +29,15 @@ cargo run -p yomoku-ffi --bin generate-kotlin --features facet_typegen --locked 
 # BoltFFI's metadata expansion replaces the host library artifact. Rebuild its
 # native exports after generation before linking JNI against it.
 cargo build --workspace --locked --offline
+cargo run -p yomoku-ffi --example unicode-fixtures --locked --offline -- write target/unicode-fixtures
 "${CC:-cc}" -std=c11 -shared -fPIC -O2 -Wall -Wextra -Werror \
     -I"$jni_include_dir" -I"$jni_include_dir/linux" \
     -Itarget/generated/native/jni target/generated/native/jni/jni_glue.c \
     -Ltarget/debug -lyomoku_ffi '-Wl,-rpath,$ORIGIN/debug' -Wl,-z,defs \
     -o target/libyomoku_jni.so
 "$kotlinc_bin" target/generated/kotlin/app target/generated/kotlin/com \
-    target/generated/native/app tests/kotlin/BridgeTest.kt \
+    target/generated/native/app tests/kotlin \
     -jvm-target 17 -Werror -include-runtime -d target/bridge-tests.jar
 "$java_bin" --enable-native-access=ALL-UNNAMED -Xcheck:jni \
-    -Djava.library.path=target -jar target/bridge-tests.jar
+    -Djava.library.path=target -jar target/bridge-tests.jar target/unicode-fixtures
+cargo run -p yomoku-ffi --example unicode-fixtures --locked --offline -- verify target/unicode-fixtures

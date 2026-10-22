@@ -114,7 +114,11 @@ bash -n tools/format-kotlin.sh
 ```
 The script uses `JAVA_HOME/bin/java` when set, otherwise `java`; `JAVA_BIN` and
 `KTFMT_JAR` override those defaults. This does not reformat the standalone
-Kotlin bridge test yet. Android lint runs through the Gradle command above.
+Kotlin bridge tests yet. Check the new Unicode fixture test separately:
+```sh
+java -jar .local/ktfmt-0.64.jar --kotlinlang-style --dry-run --set-exit-if-changed tests/kotlin/TextBoundaryTest.kt
+```
+Android lint runs through the Gradle command above.
 
 ## Native Android build and test
 
@@ -258,6 +262,23 @@ successfully. To repeat native generation manually:
 diff -r target/generated/native target/generated/native-repeat
 cargo build --workspace --locked --offline
 ```
+
+## Unicode payload checks
+`tools/test-kotlin-bridge.sh` also runs the test-only `unicode-fixtures` Cargo
+example before/after Kotlin to exchange ChapterText, TextAnchor and DocumentId
+payloads under ignored `target/unicode-fixtures/`. Seven fixtures cover exact
+Unicode text/ranges, supplementary characters, combining/ZWJ sequences, line
+breaks, NUL, empty text and full signed 64-bit IDs. Kotlin independently derives
+byte ranges from UTF-16 substring indices and sends suffix anchors back to Rust;
+Rust validates those and rejects invalid Kotlin-encoded IDs/offsets. The codecs
+are the production-generated Crux Bincode codecs. This fixture exchange does not
+exercise a live document JNI event or asynchronous effect; those await storage.
+
+Verified 2026-10-22: workspace build, 32 Rust tests, fmt/clippy, host Kotlin/JNI
+including the seven Unicode fixture exchanges, Kotlin formatting and shell syntax
+PASS. Android app/test APK assembly and strict lint PASS offline with the expanded
+generated payload schema. No Android instrumentation rerun for this pure-domain/
+codec slice; the previous three device tests remain the navigation baseline.
 
 ## SQLite storage checks
 `yomoku-storage` uses pinned rusqlite with bundled SQLite; no Fedora SQLite

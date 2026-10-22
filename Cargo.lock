@@ -1361,6 +1361,7 @@ version = "0.1.0"
 dependencies = [
  "boltffi",
  "crux_core",
+ "serde",
  "yomoku-core",
  "yomoku-runtime",
 ]

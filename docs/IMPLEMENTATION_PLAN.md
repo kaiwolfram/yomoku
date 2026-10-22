@@ -37,7 +37,7 @@ position/encounter history. Keep incremental builds green.
 - [x] Document SDK/emulator/adb setup, native ABIs and build/install/run commands; API 36 x86_64 AVD installed with Android CLI, KVM checked on host, launcher restart/ADB authorization/instrumentation and debug APK install/Library launch verified. Default CLI startup graphics failure and swangle fallback documented; arm64 runtime testing remains future work.
 
 ## 2 — Paste-to-reader slice
-- [ ] Define stable document/source/chapter IDs and text offset encoding in DATA_MODEL.md; test Unicode round trips at FFI boundaries.
+- [x] Define stable document/source/chapter IDs and text offset encoding in DATA_MODEL.md; test Unicode round trips at FFI boundaries. Positive i64 IDs, chapter-local UTF-8 byte anchors and checked UTF-16 conversion; seven Rust/generated-Kotlin/Rust payload exchanges pass. Live document JNI awaits storage commands.
 - [ ] Add immutable pasted-text document command/storage with first-line title; test transaction rollback and reopen.
 - [ ] Implement logical pages in `crates/yomoku-core`: presets 250/500/750/1000/1500 (default 500), paragraph splits and long-paragraph following-sentence fallback; test exact threshold, short text, mixed scripts and long paragraph.
 - [ ] Enforce EPUB chapter boundaries and no inferred TXT chapters; test boundary fixtures before import wiring.
