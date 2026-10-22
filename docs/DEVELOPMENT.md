@@ -18,8 +18,16 @@ with functioning rustup can omit the PATH workaround. Do not assume this compile
 is the project's minimum supported version; establish that with dependencies.
 Cargo.lock is retained for reproducible application development.
 Crux 0.20.0 declares Rust 1.90 minimum; the full locked graph has only been tested
-with 1.99.1. Current host baseline: 49 tests (six app, six document, five vocabulary,
-five bridge, four async document, two native facade and 21 storage tests).
+with 1.99.1. Current host baseline: 63 tests (six app, six document, 14 pagination,
+five vocabulary, five bridge, four async document, two native facade and 21 storage tests).
+
+## Pure logical pagination checks
+`cargo test -p yomoku-core --test pagination --all-features --locked --offline`
+runs the chapter/page/reflow fixtures without Android or SQL. All five presets
+and 25 reflow pairs cover exact thresholds, LF/CRLF, mixed scripts, supplementary
+Unicode, combining marks, sentence fallback/quotes, EOF and invalid ownership.
+Workspace build/test/fmt/clippy pass after adding this module. Android UI/events,
+persisted progress and page settings integration remain separate work.
 
 ## Kotlin payload generation
 ```sh

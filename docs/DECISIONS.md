@@ -477,3 +477,38 @@ closing during I/O. Crux's weak-reference shutdown diagnostic is benign here.
 Paste UI, import dedup/registration, reader progress, pagination and rename/delete
 remain separate tasks. No migration, product deletion semantics, Nostr config or
 dependency version changed.
+
+## 2026-10-22 — Pure logical pages and exact-offset reflow
+Implement the next three phase-2 pure-domain tasks together, without adding
+dependencies, SQL, app routes or FFI types. The user explicitly clarified that
+all non-whitespace Unicode characters count toward the five page presets,
+including punctuation and Latin text. Count Rust Unicode scalars: supplementary
+kanji/emoji count once; combining marks remain separate scalars. Keep the exact
+canonical text, including whitespace and line endings, in the page ranges.
+
+Routine boundary choices: each LF-delimited hard line ends a paragraph (CRLF is
+preserved). Prefer the first paragraph end at/after the threshold. Define an
+extremely long continuation as a paragraph end exceeding twice the preset from
+the page start; scan that paragraph for the first following sentence at/after
+the threshold, then repeat for the remaining text. Japanese 。！？ and ASCII !?
+end sentences; ASCII periods need whitespace, EOF or a punctuation/closing-quote
+tail, avoiding decimal splits. Keep adjacent closing quotes/brackets and terminal
+punctuation with the sentence. These are lightweight boundary heuristics, not a
+linguistic parser. If no sentence break exists, retain the long text through the
+paragraph end; never invent a mid-sentence hard cut. Trailing whitespace extends
+the last page rather than producing an extra blank page.
+
+Ordered chapter snapshots are the only source of chapter boundaries. Reject
+mixed-source/duplicate chapter identities; never infer chapters from headings.
+An empty chapter keeps one empty range for a stable EOF position, while no
+chapters yields no pages. Image-only extraction/rendering remains future work.
+LogicalPages borrows immutable snapshots and exposes derived TextAnchor ranges.
+ReadingPosition retains source/chapter/exact byte offset independently. Reflow
+returns that same position plus its new containing page, without snapping to
+page start. Boundary offsets select the following page, except chapter EOF
+selects that chapter's last page. Reject invalid ownership and scalar offsets.
+
+Fourteen tests verify thresholds/long-paragraph policy, exact text coverage,
+LF/CRLF, mixed scripts, supplementary/combining Unicode, all 25 reflow preset
+pairs, chapter boundaries, EOF and invalid positions. This is a host-domain slice;
+reader commands, global settings, progress persistence and Android remain next.

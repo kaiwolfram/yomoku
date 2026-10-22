@@ -271,3 +271,24 @@
   paste UI, reader, tokenizer, progress or Nostr behavior is claimed.
 - Next: pure logical pages/chapter boundaries/reflow; Android paste/Library/reader
   slice; CI for verified commands.
+
+## 2026-10-22 — Logical pages and exact-offset reflow
+- Added pure core pagination with five presets/default 500, paragraph boundaries,
+  long-paragraph following-sentence fallback and explicit chapter isolation.
+  TXT headings never infer chapters; ranges cover canonical text exactly.
+- User clarified mixed text counts all non-whitespace Unicode characters,
+  including punctuation/Latin. Recorded scalar counting and routine paragraph,
+  sentence, empty-chapter and EOF choices; updated the product source of truth.
+- ReadingPosition retains source/chapter/exact UTF-8 offset through reflow,
+  separate from the new page index. Invalid ownership, partial scalars and
+  out-of-range offsets fail without changing the original layout.
+- PASS: locked/offline workspace build and 63 Rust tests (14 new pagination),
+  fmt/clippy, real Kotlin/JNI storage/lifecycle regression and seven Unicode
+  exchanges, Kotlin formatting and whitespace. Removed an initial unused
+  assignment warning. Existing intentional-close Crux diagnostics remain benign.
+- Android APK/lint/device checks not rerun for this pure-domain slice; previous
+  four device tests remain the baseline. No dependencies, migration or FFI schema
+  changed. Reader app/Settings/Android wiring and progress persistence remain next.
+- Updated plan, architecture/data model, decisions, development and handoff.
+  No blocker. Next: Android paste/Library/reader opening and navigation hiding;
+  page controls/current position persistence; CI.

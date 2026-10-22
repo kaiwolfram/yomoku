@@ -14,6 +14,14 @@ UTF-8 byte anchors, checked UTF-16 conversions and literal first-line paste titl
 Vocabulary values define exact-surface identity, five statuses, registration and
 New-only completion policy; tokenization/persistence remains future work.
 
+Pure `pagination` derives chapter-local TextAnchor pages from ordered immutable
+ChapterText snapshots. Five presets count non-whitespace Unicode scalars; LF/CRLF
+paragraph boundaries and following-sentence fallback are independent of display
+size. Supplied chapters force boundaries; headings never infer chapters. A separate
+ReadingPosition retains the exact UTF-8 offset through reflow, with ownership,
+scalar-boundary and EOF validation. This module is not yet an app event, persisted
+reader state or a shell/FFI payload; UI and storage integration remain next.
+
 `yomoku-runtime` composes Core → HandleEffectLayer<StorageEffects> → MapEffectLayer.
 A named FIFO worker owns one lazily opened SQLite connection per bridge. Opening,
 migration and create/load/list execute on that worker. Failed opens can retry;
@@ -38,7 +46,7 @@ Core-only effects stay private. Facet generates Event/ViewModel/Requests and
 document codecs in app.yomoku.shared; BoltFFI generates the native package and JNI C.
 Native wrappers require explicit close; no global singleton exists.
 
-Forty-nine Rust tests cover domain, storage and bridge behavior, including an
+Sixty-three Rust tests cover domain, storage and bridge behavior, including an
 actual SQLite write lock proving dispatch/view/navigation remain responsive.
 The host Kotlin runner uses real JNI with -Xcheck:jni to verify navigation,
 Unicode, async worker callbacks, typed failures, reopen persistence, isolation,
@@ -63,7 +71,7 @@ unverified. Automatic Android backup/transfer is excluded.
 ## Required boundaries and next work
 Paste creation is repository/runtime plumbing, not the complete product import
 pipeline or an exposed UI flow. Deduplication, vocabulary registration, progress,
-pagination, paste UI/Library rendering and the reader route remain unchecked.
+pagination integration, paste UI/Library rendering and the reader route remain unchecked.
 Hide navigation when the real reader route is added. Add analysis/import crates
 only with actual behavior; Sudachi Full defaults to B, JMdict/JMnedict remain
 offline data, and future Nostr I/O stays in Rust. Configuration is empty.

@@ -47,7 +47,7 @@ Canonical text is not Unicode-normalized, trimmed or silently line-ending
 normalized by these types. Importers define canonical extraction before anchors
 are created. Source ruby/formatting/images must later refer to that same text;
 image-only positions and import extraction rules remain future work. Offsets
-are not a Japanese-character page-length metric or a progress percentage policy.
+are not a page-length metric or a progress percentage policy.
 Combining sequences/ZWJ emoji may contain multiple scalar boundaries; these
 helpers do not snap positions to graphemes. `TextOffset::from_utf16`/`to_utf16`
 convert Kotlin/Compose indices explicitly and reject split surrogate pairs.
@@ -59,6 +59,23 @@ empty text, supplementary kanji/emoji, combining/ZWJ sequences, CRLF, NUL and
 IDs above 2^53 through i64::MAX. These test the generated FFI payload codecs;
 live document commands and async JNI storage callbacks now use these types. This same-build
 wire encoding is not the future backup format.
+
+## Derived logical pages and reading position
+`pagination::PageLength` has only 250/500/750/1000/1500, default 500. The user
+clarified that all non-whitespace Unicode scalars count, including punctuation
+and Latin text; UTF-8 bytes and UTF-16 units do not. No normalization is applied.
+LogicalPages borrows ordered canonical chapters and derives TextAnchor ranges
+that cover every byte exactly once. No range crosses a supplied chapter; headings
+never infer one. Chapter IDs must be unique and belong to one source. Empty or
+whitespace-only chapters have one page; an empty chapter list has none.
+
+ReadingPosition contains source ID, chapter ID and exact byte offset, separately
+from a page number or page start. Reflow returns the unchanged position and its
+new page index. A position at an internal page boundary selects the next page;
+chapter EOF selects that chapter's final page. Unknown ownership, out-of-range
+offsets and split scalars are rejected. Nothing here persists reading position,
+vertical scroll, encounters or settings; storage/app/FFI wiring remains future work.
+Paragraph/sentence heuristics are recorded in DECISIONS.md.
 
 ## SQLite initialization
 `yomoku-storage` owns the database connection. Migration

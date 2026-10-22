@@ -39,9 +39,9 @@ position/encounter history. Keep incremental builds green.
 ## 2 — Paste-to-reader slice
 - [x] Define stable document/source/chapter IDs and text offset encoding in DATA_MODEL.md; test Unicode round trips at FFI boundaries. Positive i64 IDs, chapter-local UTF-8 byte anchors and checked UTF-16 conversion; seven Rust/generated-Kotlin/Rust payload exchanges pass. Live document JNI awaits storage commands.
 - [x] Add immutable pasted-text document command/storage with first-line title; typed PasteText and repository create/load commands pass exact Unicode/reopen, per-insert/commit rollback, concurrent-write and committed-ID nonreuse/exhaustion tests. Crux events/runtime/FFI are verified by the phase-1 document wiring task; Android paste UI/full import semantics remain below.
-- [ ] Implement logical pages in `crates/yomoku-core`: presets 250/500/750/1000/1500 (default 500), paragraph splits and long-paragraph following-sentence fallback; test exact threshold, short text, mixed scripts and long paragraph.
-- [ ] Enforce EPUB chapter boundaries and no inferred TXT chapters; test boundary fixtures before import wiring.
-- [ ] Reflow pages preserving underlying text offset; test all presets with Japanese and supplementary Unicode.
+- [x] Implement logical pages in `crates/yomoku-core`: presets 250/500/750/1000/1500 (default 500), paragraph splits and long-paragraph following-sentence fallback; exact threshold, short text, mixed scripts and long paragraph pass. User clarified all non-whitespace Unicode characters count; routine boundary rules are in DECISIONS.md.
+- [x] Enforce EPUB chapter boundaries and no inferred TXT chapters; explicit ordered chapter/heading fixtures pass before import wiring. EPUB/TXT importers remain phase 4.
+- [x] Reflow pages preserving underlying text offset; all 25 preset pairs pass with Japanese, supplementary Unicode, chapter EOF and invalid anchors. Fourteen pagination tests total.
 - [ ] Add Android paste flow returning to Library, list title/current progress and reader opening; test first import/open.
 - [ ] Render centered single-column pages, Next/Previous/swipes and content-bottom counter; test both directions update current position and reset scroll on navigation/reopen.
 - [ ] Implement completion command IDs and atomic persistence; test double callbacks count once, rereading counts again, Previous does not complete.
@@ -112,7 +112,7 @@ position/encounter history. Keep incremental builds green.
 ## Cross-feature acceptance matrix
 
 - [ ] Short Japanese text, long paragraph, ruby, mixed Japanese/Latin, punctuation and kanji-only proper noun.
-- [ ] Exactly 500-char boundaries; end of paragraph; end of EPUB chapter; setting changes preserve reading text position.
+- [ ] Exactly 500-char boundaries; end of paragraph; end of EPUB chapter; setting changes preserve reading text position. Pure pagination/reflow fixtures pass; reader Settings/import/UI wiring remains.
 - [ ] Page left swipe completion vs previous/right swipe; replay reread counts again; accidental double callbacks only count once.
 - [ ] Page scroll always resets on navigation/app reopen; current document position updates in both directions.
 - [ ] Import registers New surfaces but does not add reading occurrences; popup opens without status change.
