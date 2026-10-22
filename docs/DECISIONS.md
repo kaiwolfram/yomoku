@@ -131,3 +131,35 @@ tested on host; generated foreign handle lifetime still requires Kotlin tests.
 Do not add a synthetic product event just to trigger asynchronous callbacks.
 The original broad bridge checklist item is split into verified host exports and
 remaining Kotlin/JNI work, without claiming a cross-language round trip.
+
+## 2026-10-22 — Executed Kotlin/JNI boundary
+Install the matching BoltFFI CLI 0.30.1 under ignored `.local/`, using its locked
+published dependency graph. Adopt standalone Kotlin compiler 2.4.21 for the host
+test, targeting JVM 17 bytecode and running on available OpenJDK 25.0.4.1. This
+does not select Android Gradle/Compose/JDK versions. Primary evidence:
+- https://www.boltffi.dev/docs/getting-started
+- https://kotlinlang.org/docs/command-line.html
+- https://github.com/JetBrains/kotlin/releases/tag/v2.4.21
+- Published `boltffi_cli-0.30.1/src/config/targets/kotlin.rs` and
+  `src/commands/generate/bindings.rs` in the Cargo registry.
+- Official OpenJDK `jdk-25+36` JNI headers, downloaded unmodified into ignored
+  `.local/jni-25/` because the installed Java runtime has no development headers.
+
+Keep native bindings in `app.yomoku.nativebridge`, separate from Crux's
+`app.yomoku.shared` payloads; load `yomoku_jni` through the system library path.
+Generate JNI C rather than maintaining a handwritten JNI bridge. Host verification
+links generated C against the Rust shared library with relative runtime lookup.
+Generated C/Kotlin must compile without warnings; the JVM runs with JNI checks.
+
+Native bindings require explicit close. Verify listener release by inspecting the
+pinned generator's callback registry, avoiding nondeterministic GC assertions or
+test-only product exports. Revisit that inspection when upgrading the generator.
+The tests cover real payloads/errors/lifecycles; asynchronous delivery remains
+pending a real async effect. InvalidEffectOutput is not reachable with Render-only
+effects, so no artificial effect is introduced to force that error.
+
+Observed and reproduced: `boltffi generate kotlin` leaves a host library without
+the native bridge exports after metadata expansion. Rebuild the native library
+after generation. The checked-in runner enforces this order; sharing the target
+directory with concurrent generation/build is unsupported. Both generators
+produce identical repeated output. Tool binaries/generated files stay ignored.

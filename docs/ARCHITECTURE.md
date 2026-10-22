@@ -14,15 +14,21 @@ categories. A supplied callback preserves the path for future async effects.
 The optional `facet_typegen` feature and `generate-kotlin` CLI generate event,
 view, shell effect and request types plus Bincode codecs in `app.yomoku.shared`.
 Generation registers the runtime shell effects explicitly; core-only effects stay
-private. Generated Kotlin has not yet been compiled or executed.
+private. Generated Kotlin codecs are compiled and exercised through host JNI.
 `native::NativeBridge` exposes update/resolve/view through BoltFFI 0.30.1.
 Its owned `EffectsListener` has separate success/error callbacks, retaining typed
 errors without passing internal strings. Hosts must dispatch callbacks to the UI
 thread. Native handles own independent bridge instances; no global app singleton.
 Fifteen host integration tests cover domain rules, navigation, payloads, native
 facade isolation, cross-thread access and listener release. Shared/static libraries
-build with exported constructor/method/callback/release symbols. Generated JNI
-bindings and native handle lifecycle have not yet been executed from Kotlin.
+build with exported constructor/method/callback/release symbols. The pinned
+BoltFFI configuration generates Kotlin in `app.yomoku.nativebridge` and JNI C.
+`tools/test-kotlin-bridge.sh` compiles that generated C against the Rust shared
+library and compiles both generated Kotlin packages with a standalone compiler.
+The JVM test verifies navigation, payload round trips, categorized exceptions,
+instance isolation, 100 close cycles, listener registry cleanup and rejection of
+calls after close, using `-Xcheck:jni`. Asynchronous callbacks remain untested
+until a real asynchronous effect exists. Native wrappers require explicit close.
 No platform I/O, persisted state or Android app yet.
 
 ## Required boundaries (not yet implemented)
@@ -36,6 +42,6 @@ Remaining planned crates: `yomoku-storage`,
 `yomoku-analysis`, `yomoku-import`. Create these when implementing behavior,
 not as empty placeholders. Android project target path: `android/`.
 
-Next architectural checkpoint: generated Kotlin/native FFI round trip,
+Next architectural checkpoint: Android app/ABI packaging,
 then migration-safe storage and text offsets. Do not freeze FFI or schema based
 on assumptions about dependency APIs.

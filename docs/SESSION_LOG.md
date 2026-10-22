@@ -66,3 +66,24 @@
 - No Kotlin/JNI execution or Android build run. CLI/compiler setup and actual
   cross-language tests remain next; asynchronous callback delivery needs a real
   asynchronous effect. No new product blockers.
+
+## 2026-10-22 — Kotlin/JNI execution
+- Started clean. Installed matching BoltFFI CLI 0.30.1 and official Kotlin 2.4.21
+  compiler locally; downloaded official OpenJDK 25 JNI headers because the host
+  has only the runtime. Tools/downloads remain ignored; no system changes.
+- Added native generation config, Kotlin bridge integration tests and reusable
+  offline runner. Updated plan, resume, architecture, data model, development
+  and decisions docs. Native code remains generated; no product behavior added.
+- Kotlin/JNI tests PASS with strict C/Kotlin compilation and JVM JNI checks:
+  navigation, codec round trips, typed errors, instance isolation, calls after
+  close and 100 lifecycles with listener registry cleanup.
+- Initial offline CLI install lacked the package; approved download/install
+  succeeded. Kotlin download initially failed sandbox DNS; approved retry worked.
+  Initial runner link failed because BoltFFI metadata expansion replaces native
+  exports; reproduced and fixed by rebuilding Rust after generation.
+- Rust workspace build, all-feature tests (15), fmt and all-target/all-feature
+  clippy PASS. Both generators repeated with identical output; shell syntax and
+  git whitespace checks PASS. Dedicated Kotlin lint/format tooling remains for
+  Gradle setup. No Android or asynchronous callback checks run.
+- Next: Android Compose/Gradle setup, native ABI packaging and device/emulator
+  command → view test. No new product blockers.
