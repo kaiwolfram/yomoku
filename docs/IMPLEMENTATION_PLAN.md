@@ -30,7 +30,7 @@ position/encounter history. Keep incremental builds green.
 - [x] Verify/pin/install a compatible NDK, generate/package Kotlin/JNI and native libraries for x86_64 emulator and arm64 device, and wire a Rust-backed shell; assemble app/instrumentation APKs, pass strict lint and verify both packaged ELF architectures/exports plus 16 KB ELF/ZIP alignment. NDK r30/API 29; Android execution remains below.
 - [x] Demonstrate command → core → view state on Android by running `CoreSessionTest` on a device/emulator. One instrumentation test passes on API 36 x86_64 medium_phone, covering generated JNI/codecs, Rust render state, independent sessions and handle closure.
 - [x] Add Library-default navigation, Nostr/Statistics/Vocabulary placeholders and toolbar Settings using Rust state; verify phone bottom bar/tablet rail, Settings Back, retained session across Activity recreation and final native-handle cleanup on API 36 x86_64.
-- [ ] Hide main navigation in the active reader when the phase-2 reader route is implemented; no reader route exists yet.
+- [x] Hide main navigation in the active reader when the phase-2 reader route is implemented; phone/tablet landscape first-page opening/Settings/Back verified by Compose instrumentation.
 - [x] Add `crates/yomoku-storage` SQLite initialization and numbered migration; empty DB creation/reopens, ordered upgrades, rollback, concurrent opens and failure preservation pass in 11 host tests; bundled SQLite compiles for both Android ABIs. Runtime/FFI document wiring remains below.
 - [x] Exercise document create/read/list through runtime/FFI on device; private Android DB, worker I/O, exact Unicode/reopen and failure/retry pass on API 36 x86_64. Rename/delete CRUD remains in phase 4 with its specified semantics.
 - [ ] Add `.github/workflows/ci.yml` host Rust checks, Kotlin lint/tests and unsigned Android build; verify each command locally where available.
@@ -42,7 +42,8 @@ position/encounter history. Keep incremental builds green.
 - [x] Implement logical pages in `crates/yomoku-core`: presets 250/500/750/1000/1500 (default 500), paragraph splits and long-paragraph following-sentence fallback; exact threshold, short text, mixed scripts and long paragraph pass. User clarified all non-whitespace Unicode characters count; routine boundary rules are in DECISIONS.md.
 - [x] Enforce EPUB chapter boundaries and no inferred TXT chapters; explicit ordered chapter/heading fixtures pass before import wiring. EPUB/TXT importers remain phase 4.
 - [x] Reflow pages preserving underlying text offset; all 25 preset pairs pass with Japanese, supplementary Unicode, chapter EOF and invalid anchors. Fourteen pagination tests total.
-- [ ] Add Android paste flow returning to Library, list title/current progress and reader opening; test first import/open.
+- [x] Add Android paste flow returning to Library, list titles and first-page reader opening; test first import/open, draft/error retention, recreation and Back. Rust owns routes and default-500 first-page projection; current progress is the separate task below.
+- [ ] Add Library current progress with persisted reader position; test forward/backward percentage changes and reopen.
 - [ ] Render centered single-column pages, Next/Previous/swipes and content-bottom counter; test both directions update current position and reset scroll on navigation/reopen.
 - [ ] Implement completion command IDs and atomic persistence; test double callbacks count once, rereading counts again, Previous does not complete.
 - [ ] Implement hidden active-time accumulator with five-minute idle timeout; fake-clock tests cover interactions, dictionary popup, background, close/reboot and pending time committed only on completion.

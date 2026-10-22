@@ -74,8 +74,17 @@ from a page number or page start. Reflow returns the unchanged position and its
 new page index. A position at an internal page boundary selects the next page;
 chapter EOF selects that chapter's final page. Unknown ownership, out-of-range
 offsets and split scalars are rejected. Nothing here persists reading position,
-vertical scroll, encounters or settings; storage/app/FFI wiring remains future work.
+vertical scroll, encounters or settings. ReadingPosition now has generated
+Serde/Facet codecs; persisted progress and reader reflow events remain future work.
 Paragraph/sentence heuristics are recorded in DECISIONS.md.
+
+ReaderPage is a transient typed projection of the first logical page of a paste
+at the default 500 preset: document ID/title, exact page text, TextAnchor,
+ReadingPosition, and one-based page number/total. Position starts at byte 0 and
+is separate from the displayed range. No page number or vertical scroll is stored.
+Opening currently always begins at page 1; saved position and progress await
+their migration/repository commands. Kotlin renders this projection without
+calculating boundaries or slicing Unicode text.
 
 ## SQLite initialization
 `yomoku-storage` owns the database connection. Migration
@@ -136,12 +145,22 @@ for the current navigation schema. Text/Unicode payload codecs are verified by
 the fixture exchange above and live async JNI create/list/load/reopen tests.
 A fresh core starts at Library.
 
+ContentRoute (Main/Paste/Reader) overlays top-level navigation; Settings overlays
+that route. OpenPaste opens the form; OpenReader loads on the existing Rust worker
+and opens only if its requested document is still pending. CloseDocument or a
+destination change clears that pending request, so late load results cannot
+reopen the reader. LoadPaste remains a snapshot-only repository command.
+Create success returns to Library and adds its title without opening a reader;
+failure leaves the form/draft for retry. The unsaved text draft is Compose form
+state, retained through Settings/recreation and cleared when leaving the form.
+
 RefreshLibrary/CreatePaste/LoadPaste use the pure StorageOperation protocol.
 StorageFinished is skipped by Serde and Facet, so it cannot be dispatched over
 FFI. Model/ViewModel add LibraryDocument (ID/title), an optional loaded snapshot,
 storage_busy and typed document_error. Concurrent storage submissions are ignored
 while busy; navigation remains available. A successful create adds its summary
-without opening a reader; loading reads exact content without changing progress.
+without opening a reader; LoadPaste reads exact content without changing progress,
+while OpenReader adds the first-page projection described above.
 Listing is allocation order until the planned Library sorting task. Failed opens
 can retry. No path or SQLite diagnostic string is exposed in application state.
 The bridge constructor takes the path separately; Android uses filesDir/yomoku.sqlite3.

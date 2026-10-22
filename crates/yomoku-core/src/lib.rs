@@ -4,5 +4,6 @@
 pub mod app;
 pub mod document;
 pub mod pagination;
+pub mod reader;
 pub mod storage;
 pub mod vocabulary;

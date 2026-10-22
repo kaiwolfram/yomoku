@@ -13,6 +13,8 @@ fn starts_in_library() {
             loaded_document: None,
             storage_busy: false,
             document_error: None,
+            content_route: yomoku_core::app::ContentRoute::Main,
+            reader: None,
         }
     );
 }

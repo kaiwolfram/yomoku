@@ -11,4 +11,15 @@
     <string name="statistics_empty">No reading history yet.</string>
     <string name="vocabulary_empty">No vocabulary yet.</string>
     <string name="settings_empty">No settings available yet.</string>
+    <string name="paste_title">Paste text</string>
+    <string name="paste_label">Text to import</string>
+    <string name="save_to_library">Save to Library</string>
+    <string name="reader_title">Reader</string>
+    <string name="retry">Retry</string>
+    <string name="page_counter">%1$d / %2$d</string>
+    <string name="error_empty_paste">Enter some text to import.</string>
+    <string name="error_storage_unavailable">Storage is unavailable. Please try again.</string>
+    <string name="error_incompatible_database">This database version cannot be opened.</string>
+    <string name="error_invalid_document">This document could not be read.</string>
+    <string name="error_document_not_found">This document was not found.</string>
 </resources>

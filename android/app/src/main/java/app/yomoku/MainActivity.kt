@@ -6,6 +6,7 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.lifecycle.ViewModelProvider
+import app.yomoku.shared.ContentRoute
 import app.yomoku.shared.Event
 import app.yomoku.theme.YomokuTheme
 
@@ -16,8 +17,12 @@ class MainActivity : ComponentActivity() {
         val core = ViewModelProvider(this)[CoreSessionOwner::class.java].session
         setContent {
             YomokuTheme {
-                BackHandler(enabled = core.view.settingsOpen) {
-                    core.dispatch(Event.CloseSettings)
+                BackHandler(
+                    enabled = core.view.settingsOpen || core.view.contentRoute != ContentRoute.MAIN
+                ) {
+                    core.dispatch(
+                        if (core.view.settingsOpen) Event.CloseSettings else Event.CloseDocument
+                    )
                 }
                 YomokuApp(core.view, core::dispatch)
             }

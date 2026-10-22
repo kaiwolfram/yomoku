@@ -292,3 +292,24 @@
 - Updated plan, architecture/data model, decisions, development and handoff.
   No blocker. Next: Android paste/Library/reader opening and navigation hiding;
   page controls/current position persistence; CI.
+
+## 2026-10-22 — Android paste and first-page reader opening
+- Added Rust-owned Main/Paste/Reader routes and typed ReaderPage/ReadingPosition
+  payloads; OpenReader derives the exact first default-500 page and counter.
+  Leaving the route prevents late successful loads reopening the reader.
+- Android now has a multiline paste form, exact-title Library list and centered
+  scrollable first-page reader. Save returns to Library; opening is explicit.
+  Busy/errors/retry and toolbar/system Back use core state. Main navigation hides
+  while reading; unsaved drafts survive Settings, recreation and storage errors.
+- PASS: 67 Rust tests (four new reader-flow tests), workspace build, fmt/clippy,
+  real host Kotlin/JNI/Unicode/lifecycle, Kotlin formatting, Android app/test APK
+  assembly, strict lint and all five API 36 x86_64 instrumentation tests on phone
+  and tablet landscape. Restored emulator size/density after the second run.
+- Corrected initial test constructor/offset API assumptions and the private-event
+  rejection ordinal after public event additions. All reruns pass; existing
+  intentional-close Crux and formatter warnings remain benign. No blocker.
+- Updated plan, architecture/data model, decisions, development and handoff.
+  Split current-progress work from the completed paste/open task; it stays
+  unchecked. Page movement/swipes, durable position/percentage, page Settings,
+  completion/history, dedup and vocabulary registration remain future work.
+  No dependencies, migrations, Nostr configuration or destructive APIs changed.

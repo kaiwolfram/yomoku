@@ -1,5 +1,6 @@
 package app.yomoku
 
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.consumeWindowInsets
@@ -19,12 +20,19 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import app.yomoku.shared.ContentRoute
 import app.yomoku.shared.Destination
 import app.yomoku.shared.Event
 import app.yomoku.shared.ViewModel
@@ -33,6 +41,12 @@ import app.yomoku.theme.YomokuTheme
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun YomokuApp(view: ViewModel, dispatch: (Event) -> Unit) {
+    var pasteText by rememberSaveable { mutableStateOf("") }
+    LaunchedEffect(view.contentRoute) {
+        if (view.contentRoute != ContentRoute.PASTE) pasteText = ""
+    }
+    val mainContent = view.contentRoute == ContentRoute.MAIN
+    val showNavigation = !view.settingsOpen && mainContent
     BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
         val useRail = maxWidth >= 600.dp
         Scaffold(
@@ -40,16 +54,27 @@ internal fun YomokuApp(view: ViewModel, dispatch: (Event) -> Unit) {
                 TopAppBar(
                     title = {
                         Text(
-                            stringResource(
-                                if (view.settingsOpen) R.string.settings_title
-                                else view.destination.titleResource()
-                            ),
+                            when {
+                                view.settingsOpen -> stringResource(R.string.settings_title)
+                                view.contentRoute == ContentRoute.PASTE ->
+                                    stringResource(R.string.paste_title)
+                                view.contentRoute == ContentRoute.READER ->
+                                    view.reader?.title ?: stringResource(R.string.reader_title)
+                                else -> stringResource(view.destination.titleResource())
+                            },
                             modifier = Modifier.testTag("screen_title"),
                         )
                     },
                     navigationIcon = {
-                        if (view.settingsOpen) {
-                            TextButton(onClick = { dispatch(Event.CloseSettings) }) {
+                        if (view.settingsOpen || !mainContent) {
+                            TextButton(
+                                onClick = {
+                                    dispatch(
+                                        if (view.settingsOpen) Event.CloseSettings
+                                        else Event.CloseDocument
+                                    )
+                                }
+                            ) {
                                 Text(stringResource(R.string.back))
                             }
                         }
@@ -64,7 +89,7 @@ internal fun YomokuApp(view: ViewModel, dispatch: (Event) -> Unit) {
                 )
             },
             bottomBar = {
-                if (!view.settingsOpen && !useRail) {
+                if (showNavigation && !useRail) {
                     NavigationBar(modifier = Modifier.testTag("bottom_navigation")) {
                         for (destination in Destination.entries) {
                             NavigationBarItem(
@@ -79,7 +104,7 @@ internal fun YomokuApp(view: ViewModel, dispatch: (Event) -> Unit) {
             },
         ) { insets ->
             Row(modifier = Modifier.fillMaxSize().padding(insets).consumeWindowInsets(insets)) {
-                if (!view.settingsOpen && useRail) {
+                if (showNavigation && useRail) {
                     NavigationRail(
                         modifier =
                             Modifier.testTag("navigation_rail")
@@ -96,13 +121,24 @@ internal fun YomokuApp(view: ViewModel, dispatch: (Event) -> Unit) {
                         }
                     }
                 }
-                Text(
-                    stringResource(
-                        if (view.settingsOpen) R.string.settings_empty
-                        else view.destination.emptyResource()
-                    ),
-                    modifier = Modifier.padding(16.dp).verticalScroll(rememberScrollState()),
-                )
+                Box(
+                    modifier = Modifier.weight(1f).fillMaxHeight(),
+                    contentAlignment = Alignment.TopCenter,
+                ) {
+                    when {
+                        view.settingsOpen ->
+                            Text(stringResource(R.string.settings_empty), Modifier.padding(16.dp))
+                        view.contentRoute == ContentRoute.PASTE ->
+                            PasteScreen(view, pasteText, { pasteText = it }, dispatch)
+                        view.contentRoute == ContentRoute.READER -> ReaderScreen(view)
+                        view.destination == Destination.LIBRARY -> LibraryScreen(view, dispatch)
+                        else ->
+                            Text(
+                                stringResource(view.destination.emptyResource()),
+                                Modifier.padding(16.dp),
+                            )
+                    }
+                }
             }
         }
     }
@@ -141,6 +177,17 @@ private fun Destination.iconResource(): Int =
 @Composable
 private fun YomokuPreview() {
     YomokuTheme {
-        YomokuApp(ViewModel(Destination.LIBRARY, false, emptyList(), null, false, null)) {}
+        YomokuApp(
+            ViewModel(
+                Destination.LIBRARY,
+                false,
+                emptyList(),
+                null,
+                false,
+                null,
+                ContentRoute.MAIN,
+                null,
+            )
+        ) {}
     }
 }

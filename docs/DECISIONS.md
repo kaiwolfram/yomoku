@@ -512,3 +512,28 @@ Fourteen tests verify thresholds/long-paragraph policy, exact text coverage,
 LF/CRLF, mixed scripts, supplementary/combining Unicode, all 25 reflow preset
 pairs, chapter boundaries, EOF and invalid positions. This is a host-domain slice;
 reader commands, global settings, progress persistence and Android remain next.
+
+## 2026-10-22 — Paste UI and first-page reader route
+Continue phase 2 with an independently testable Android slice: paste → committed
+Library title → explicit first-page reader opening. Split Library current progress
+from the paste/open checklist item so progress stays unchecked until its durable
+position command exists. Page controls, swipes, reflow Settings and completion
+remain the following slice; opening currently starts at page 1.
+
+Core owns ContentRoute (Main/Paste/Reader), Settings overlay and OpenReader's
+pending document identity. LoadPaste remains a snapshot command for repository
+clients. OpenReader uses the same FIFO storage load, then derives ReaderPage from
+pure LogicalPages at the default 500 preset. Typed page text, source anchor,
+separate ReadingPosition and counter cross generated FFI; Compose performs no
+pagination or Unicode slicing. Leaving the reader clears the pending identity,
+so late successful loads cannot reopen it. Storage failures remain typed/retryable.
+
+A successful create returns to Library without opening the reader. The existing
+per-session busy guard and disabled controls prevent overlapping submissions;
+this does not replace future exact-content deduplication/import registration.
+Keep unsaved draft text in Compose rememberSaveable through Settings/recreation;
+clear it on leaving the form. Library rows show exact persisted titles; percentage
+awaits durable progress. Reader uses one centered, vertically scrollable column
+with a 720dp maximum width and content-bottom page counter. Main navigation hides
+for paste/reader/Settings; toolbar and system Back use Rust events. No dependencies,
+migrations, data-destructive semantics or Nostr configuration changed.

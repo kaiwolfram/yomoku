@@ -12,7 +12,7 @@ use crux_core::bridge::{BincodeFfiFormat, FfiFormat, Requests};
 use yomoku_core::{
     app::{Destination, Event, ViewModel},
     document::DocumentId,
-    storage::DocumentError,
+    storage::{DocumentError, StorageResult},
 };
 use yomoku_ffi::{
     native::{EffectsListener, NativeBridge},
@@ -174,8 +174,10 @@ fn async_open_failure_is_typed_retryable_and_preserves_invalid_files() {
 fn internal_storage_results_cannot_be_injected_over_ffi() {
     let (native, _, _) = bridge(":memory:");
     // StorageFinished is skipped by Serde and by Facet generation.
+    let forged = Event::StorageFinished(StorageResult::Failed(DocumentError::Unavailable));
+    assert!(BincodeFfiFormat::serialize(&mut vec![], &forged).is_err());
     assert_eq!(
-        native.update(&6_u32.to_le_bytes()),
+        native.update(&9_u32.to_le_bytes()),
         Err(FfiError::InvalidEvent)
     );
     assert!(view(&native).documents.is_empty());

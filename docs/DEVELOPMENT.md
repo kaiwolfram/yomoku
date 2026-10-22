@@ -18,7 +18,7 @@ with functioning rustup can omit the PATH workaround. Do not assume this compile
 is the project's minimum supported version; establish that with dependencies.
 Cargo.lock is retained for reproducible application development.
 Crux 0.20.0 declares Rust 1.90 minimum; the full locked graph has only been tested
-with 1.99.1. Current host baseline: 63 tests (six app, six document, 14 pagination,
+with 1.99.1. Current host baseline: 67 tests (six app, four reader flow, six document, 14 pagination,
 five vocabulary, five bridge, four async document, two native facade and 21 storage tests).
 
 ## Pure logical pagination checks
@@ -26,8 +26,8 @@ five vocabulary, five bridge, four async document, two native facade and 21 stor
 runs the chapter/page/reflow fixtures without Android or SQL. All five presets
 and 25 reflow pairs cover exact thresholds, LF/CRLF, mixed scripts, supplementary
 Unicode, combining marks, sentence fallback/quotes, EOF and invalid ownership.
-Workspace build/test/fmt/clippy pass after adding this module. Android UI/events,
-persisted progress and page settings integration remain separate work.
+Workspace build/test/fmt/clippy pass after adding this module. Android now renders
+its first-page projection; persisted progress, movement and page settings remain next.
 
 ## Kotlin payload generation
 ```sh
@@ -49,9 +49,10 @@ Generation and this comparison PASS. Standalone Kotlin 2.4.21 and BoltFFI CLI
 
 ## Android Compose shell
 The CLI-generated project lives in `android/`; normal builds need no Android
-Studio. Its current UI is a Rust-backed four-tab shell with toolbar Settings,
-system light/dark theme and window insets. Native packaging and configuration-change retention are integrated;
-document persistence is a separate step.
+Studio. Its current UI has a Rust-backed Library list, paste form and first-page
+reader, three tab placeholders and toolbar Settings, system theme/window insets.
+Native packaging, private-file document persistence and recreation retention are
+integrated. Page controls/current progress/completion remain next.
 Namespace/application ID `app.yomoku` is provisional, not a publishing commitment.
 Automatic cloud backup and device transfer are excluded; the product requires
 manual encrypted backups.
@@ -299,7 +300,7 @@ concurrent writes, committed-ID nonreuse/full-width allocation/exhaustion, and
 real migration-failure preservation. Rename/deletion use test-only SQL to verify
 schema separation; production commands remain unimplemented. Initialization and
 paste storage now run through runtime/FFI and Android's private database. The
-Android paste UI and complete import pipeline remain pending.
+Android paste UI is implemented; the complete import pipeline remains pending.
 The app now creates filesDir/yomoku.sqlite3 on its Rust worker at session startup.
 
 Compile the storage crate for both Android ABIs with the same pinned NDK/API:
@@ -421,3 +422,24 @@ weak-reference shutdown logging; JNI checks and listener-release tests still pas
 Initial Kotlin error enum assertions used underscores; generated names are
 EMPTYPASTE/NOTFOUND. Corrected and rerun successfully. Clippy's test type-complexity
 finding was resolved with a callback receiver alias. No outstanding check failure.
+
+## Paste and first-page reader verification
+PASS 2026-10-22: 67 Rust tests, workspace build, fmt/clippy, host Kotlin/JNI
+reader payloads/storage/reopen/lifecycle and seven Unicode fixture exchanges,
+Kotlin formatting, Android app/test APK assembly and strict lint. No dependency
+or migration was added. Commands are the same as above with --locked for Cargo.
+
+All five instrumentation tests PASS on API 36 x86_64 medium_phone at default
+1080x2400/420dpi and tablet landscape 2560x1600/240dpi. Use the connected-test
+command above after applying the documented wm size/density overrides, then
+restore both. PasteReaderTest exercises the actual paste form, disabled empty
+submission, draft retention through Settings/recreation, typed failure/retry,
+return to Library without auto-opening, exact first logical page/counter, hidden
+main navigation, retained reader on recreation and toolbar/system Back/reopen.
+Private-file storage tests continue to cover fresh-session reopen persistence.
+The emulator was restarted using the documented swangle flags and its phone
+viewport restored after testing. Arm64 native packaging builds; execution remains
+untested. Initial new Rust test API assumptions and the FFI test's private-event
+ordinal were corrected before the complete passing rerun. Intentional-close Crux
+logs and ktfmt/JDK warnings remain benign. Page controls, saved current position,
+Library percentage, completion/history and reader Settings remain future slices.

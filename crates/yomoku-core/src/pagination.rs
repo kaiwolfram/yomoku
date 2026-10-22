@@ -2,6 +2,8 @@
 
 use std::collections::HashSet;
 
+use serde::{Deserialize, Serialize};
+
 use crate::document::{
     ChapterId, ChapterText, InvalidTextValue, SourceId, TextAnchor, TextOffset, TextRange,
 };
@@ -38,7 +40,8 @@ impl PageLength {
 }
 
 /// Durable reading location; reflow must not replace it with a page's start.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
 pub struct ReadingPosition {
     pub source_id: SourceId,
     pub chapter_id: ChapterId,
