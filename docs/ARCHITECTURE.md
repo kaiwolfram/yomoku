@@ -40,7 +40,9 @@ state on the main thread. The Activity reads its Library heading from that view
 and closes the session on destruction. Recreation currently creates a fresh core;
 interactive navigation must add retention across configuration changes.
 The Android instrumentation test covers command → core → view, isolation and
-explicit handle close; its execution still needs a connected device/emulator.
+explicit handle close; it passes on the API 36 x86_64 `medium_phone` emulator.
+This verifies the packaged JNI path on Android; arm64 device execution and real
+asynchronous effects remain unverified.
 `yomoku-storage` separately owns SQLite I/O through rusqlite 0.40.2 with bundled
 SQLite. `Storage::open` configures each connection, validates numbered migration
 history and applies pending migrations under one immediate transaction. Its

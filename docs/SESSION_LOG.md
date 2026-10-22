@@ -163,3 +163,25 @@
   async JNI execution remain unimplemented and unchecked.
 - Next: available-device instrumentation, responsive navigation/session retention,
   stable document IDs/Unicode offsets followed by storage effects/repositories.
+
+## 2026-10-22 — Android CLI emulator installation and Android execution
+- User requested emulator installation through Android CLI. Created medium_phone;
+  CLI downloaded Emulator 37.2.12 and API 36 Google Play x86_64 image revision 7.
+  Host KVM is usable; earlier sandbox-only /dev/kvm checks hid the host device.
+- Default startup crashed in SwiftShader GLES RenderThread (GDB confirmed).
+  Explicit swangle/headless/no-audio/no-camera/KVM flags boot successfully;
+  persisted AVD settings alone did not fix CLI startup. Added the tested foreground
+  tools/start-android-emulator.sh launcher; SDK/AVD files stay outside Git.
+- Accepted first-boot host debugging prompt through the authenticated emulator
+  control API. Temporary gRPC tools/generated proto/screenshots remain ignored.
+  Launcher cold restart PASS, persisted ADB authorization PASS, boot_completed=1.
+- connectedDebugAndroidTest PASS offline: one CoreSession JNI/core/view/isolation/
+  handle-close test. Initial offline run lacked AGP UTP dependencies; online run
+  fetched them but found no online device, then authorized offline execution passed.
+  Debug APK install, Activity cold launch and visible Library screenshot PASS.
+- Launcher bash syntax and git whitespace PASS. Updated plan/resume/development/
+  architecture/decisions; no application code changed or Rust/lint checks rerun.
+  Emulator left running headlessly with Yomoku open. Arm64 execution, real async
+  JNI and document storage effects remain unverified; default CLI boot uses fallback.
+- Next: responsive navigation/session retention, stable IDs/Unicode offsets and
+  storage repositories/effects, then CI.

@@ -309,3 +309,34 @@ Eleven on-disk host tests cover initialization/reopen, ordered upgrade fixtures,
 Unicode content/path persistence, failed fresh/existing migrations, newer and
 inconsistent journals, unrelated/invalid files, foreign keys and concurrent opens.
 These do not claim document CRUD, Android persistence or async JNI execution.
+
+## 2026-10-22 — Android CLI emulator and executed bridge test
+Use installed Android CLI `emulator create medium_phone` to download Emulator
+37.2.12 and API 36 Google Play x86_64 image revision 7 and create the AVD. No
+Android Studio or separate avdmanager installation is needed. Verified commands
+against CLI help and official Android emulator/acceleration documentation:
+- https://developer.android.com/tools/avdmanager
+- https://developer.android.com/studio/run/emulator-commandline
+- https://developer.android.com/studio/run/emulator-acceleration
+
+Correct the environment diagnosis: `/dev/kvm` is hidden in the sandbox but exists
+on the host; escalated `emulator -accel-check` reports KVM usable. SDK, AVD, ADB
+and socket access require escalation here. Do not install virtualization packages
+based solely on a sandbox-only device check.
+
+Default startup segfaults in RenderThread/SwiftShader `libGLESv2.so`, captured
+with GDB. Explicit `-gpu swangle`, no audio/cameras/snapshots, KVM and two cores
+boot successfully. Persisting similar AVD settings did not make CLI headless
+startup reliable; retain `tools/start-android-emulator.sh` with the verified flags.
+It runs in the foreground, does not wipe data and accepts an optional AVD name.
+Android CLI still creates/manages the AVD; the SDK executable supplies startup
+flags the current CLI does not expose. Further default-renderer debugging is not
+required for local development.
+
+The image displayed a host-debugging consent prompt. Accepted persistent trust
+through the emulator's authenticated control API using the SDK's installed proto
+and temporary Python gRPC tooling under ignored `.local/`. Only keyboard input
+worked for this prompt. No auth token/key or generated tooling enters Git. A
+subsequent launcher cold boot preserved authorization. One CoreSession Android
+test passes offline after fetching AGP's UTP dependencies once; APK installation,
+Activity cold launch and the visible Rust-backed Library heading also pass.

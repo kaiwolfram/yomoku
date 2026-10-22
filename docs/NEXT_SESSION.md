@@ -1,6 +1,6 @@
 # Resume here
 
-Updated: 2026-10-22. Current phase: 1, SQLite initialization verified.
+Updated: 2026-10-22. Current phase: 1, Android emulator bridge test verified.
 Read AGENTS.md, plan phase 1 and PRODUCT_SPEC.md section 2 next.
 After each completed, verified step, update progress docs and commit it
 without waiting for another request; report the commit hash.
@@ -13,8 +13,8 @@ without waiting for another request; report the commit hash.
   for arm64-v8a and x86_64. NDK r30 30.0.16248370/API 29; Rust targets installed.
 - Compose Library heading now reads CoreSession's Rust render snapshot; no domain
   state in Kotlin. Activity closes native handle; recreation starts a fresh core.
-- CoreSessionTest commands/core/view/isolation/close test APK compiles. Android
-  execution is NOT verified. Async JNI callbacks await a real async effect.
+- CoreSessionTest PASS on medium_phone, Android 16/API 36 x86_64: typed JNI/core
+  render, isolation and handle close. Async JNI callbacks await a real async effect.
 - Gradle 9.1.0, AGP 9.0.1, Kotlin/Compose compiler 2.4.21, Compose BOM 2026.03.01,
   Activity 1.13.0, JDK 17, SDK 36/build tools 36.0.0, min SDK 29 pinned.
 - Separate yomoku-storage: rusqlite 0.40.2/bundled SQLite, migration 0001 journal,
@@ -23,15 +23,14 @@ without waiting for another request; report the commit hash.
   Nostr configuration stays empty.
 
 ## Next tasks (ordered)
-1. Connect API 29+ arm64 device/x86_64 emulator; run :app:connectedDebugAndroidTest
-   and launch app. No device attached, emulator installed or /dev/kvm here.
-2. Add responsive four-tab navigation/toolbar Settings using Rust state; retain
+1. Add responsive four-tab navigation/toolbar Settings using Rust state; retain
    CoreSession across configuration changes; verify phone bottom bar/tablet rail.
-3. Define stable document/source/chapter IDs and Unicode offsets (phase 2), then
+2. Define stable document/source/chapter IDs and Unicode offsets (phase 2), then
    add document repositories/effects/FFI on the SQLite foundation; verify reopen.
+3. Add CI using the verified host Rust/Kotlin checks and unsigned Android build.
 Test async JNI delivery/error handling when the first real async effect is added.
 
-## Checks passed this storage session
+## Last verified checks
 From repository root, with installed tools/caches:
 ```sh
 export PATH=/home/kai/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin:$PATH
@@ -45,7 +44,10 @@ git diff --check
 All PASS: 26 Rust tests (11 storage), host JNI, Rust build/fmt/clippy.
 Storage Android cross-builds PASS; exact NDK C compiler commands in DEVELOPMENT.md.
 Previous session: app/test APK assembly, Android lint/Kotlin formatting, packaged
-ELF/ZIP alignment PASS. Not rerun for isolated storage; Android execution unverified.
+ELF/ZIP alignment PASS. Current emulator session: connectedDebugAndroidTest PASS
+(one test). See DEVELOPMENT.md for JDK/SDK/Gradle environment and report paths.
+Launcher cold restart, retained ADB authorization, APK install/Library launch,
+launcher bash syntax and git whitespace checks PASS. Emulator left headless/online.
 
 ## Environment/blockers
 - Rust compiler/cargo 1.99.1; rustup launcher attempts read-only maintenance.
@@ -56,8 +58,13 @@ ELF/ZIP alignment PASS. Not rerun for isolated storage; Android execution unveri
   NDK/Rust targets installed with approved escalation; SDK artifacts stay external.
 - Gradle needs escalation even offline for local daemon/file-lock sockets
   (sandbox error: "Could not determine a usable wildcard IP"). ADB also needs
-  local sockets; approved `adb devices -l` succeeded with no attached devices.
+  local sockets. Host /dev/kvm exists/usable; sandbox-only checks hide it.
+- Android CLI created medium_phone with Emulator 37.2.12/API 36 Play x86_64 r7.
+  Default renderer/CLI startup crashes; use tools/start-android-emulator.sh
+  (foreground, headless, swangle, KVM). Accept host debugging prompt once.
+  Stop with android emulator stop emulator-5554. See DEVELOPMENT.md for setup.
 - First build downloads test runner 1.7.0/JUnit extension 1.3.0; caches now populated.
+  Connected tests additionally need AGP UTP dependencies; cached after online run.
   AGP 9 needs main.kotlin.directories; register generated app/com folders, never
   Crux's generated standalone build.gradle.kts. SDK XML v4 notice is benign.
 - tools/build-android-native.sh builds debug Rust only, locked/offline. Native

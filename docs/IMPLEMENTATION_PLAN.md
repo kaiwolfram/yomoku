@@ -28,12 +28,12 @@ position/encounter history. Keep incremental builds green.
 - [ ] Test asynchronous callback delivery across JNI when the first real async effect is added (navigation is synchronous).
 - [x] Add Gradle wrapper and Kotlin Compose app under `android/`, min SDK 29; CLI assembleDebug and strict lint succeed with pinned compatible JDK/SDK/plugin versions. NDK selection belongs to native packaging below.
 - [x] Verify/pin/install a compatible NDK, generate/package Kotlin/JNI and native libraries for x86_64 emulator and arm64 device, and wire a Rust-backed shell; assemble app/instrumentation APKs, pass strict lint and verify both packaged ELF architectures/exports plus 16 KB ELF/ZIP alignment. NDK r30/API 29; Android execution remains below.
-- [ ] Demonstrate command → core → view state on Android by running `CoreSessionTest` on a device/emulator. Test source and APK compile; no device/emulator is currently available.
+- [x] Demonstrate command → core → view state on Android by running `CoreSessionTest` on a device/emulator. One instrumentation test passes on API 36 x86_64 medium_phone, covering generated JNI/codecs, Rust render state, independent sessions and handle closure.
 - [ ] Add Library-default navigation, Nostr/Statistics/Vocabulary placeholders and toolbar Settings; verify phone bottom bar/tablet rail and hide navigation in reader.
 - [x] Add `crates/yomoku-storage` SQLite initialization and numbered migration; empty DB creation/reopens, ordered upgrades, rollback, concurrent opens and failure preservation pass in 11 host tests; bundled SQLite compiles for both Android ABIs. Runtime/FFI document wiring remains below.
 - [ ] Exercise document CRUD through runtime/FFI on device; verify reopen persistence and failures.
 - [ ] Add `.github/workflows/ci.yml` host Rust checks, Kotlin lint/tests and unsigned Android build; verify each command locally where available.
-- [ ] Document SDK/emulator/adb setup, native ABIs and build/install/run commands; execute on an available emulator/device.
+- [x] Document SDK/emulator/adb setup, native ABIs and build/install/run commands; API 36 x86_64 AVD installed with Android CLI, KVM checked on host, launcher restart/ADB authorization/instrumentation and debug APK install/Library launch verified. Default CLI startup graphics failure and swangle fallback documented; arm64 runtime testing remains future work.
 
 ## 2 — Paste-to-reader slice
 - [ ] Define stable document/source/chapter IDs and text offset encoding in DATA_MODEL.md; test Unicode round trips at FFI boundaries.

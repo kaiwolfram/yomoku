@@ -18,7 +18,8 @@ with functioning rustup can omit the PATH workaround. Do not assume this compile
 is the project's minimum supported version; establish that with dependencies.
 Cargo.lock is retained for reproducible application development.
 Crux 0.20.0 declares Rust 1.90 minimum; the full locked graph has only been tested
-with 1.99.1. Current host baseline: fifteen integration tests (four app, five domain, four bridge, two native facade).
+with 1.99.1. Current host baseline: 26 tests (four app, five domain, four bridge,
+two native facade and eleven storage tests).
 
 ## Kotlin payload generation
 ```sh
@@ -87,13 +88,15 @@ are reviewed separately from lint. The generated example data repository,
 Kotlin navigation state and template tests were removed: application state belongs
 in Rust. The new CoreSession instrumentation test exercises the packaged bridge;
 see the native Android section below for its build and execution commands.
-There is no `/dev/kvm` in this sandbox; device/emulator execution is unverified.
+The sandbox hides `/dev/kvm`; the host has usable KVM when running with escalation.
+The emulator section below records verified Android execution.
 
 Verified 2026-10-22: debug APK build and strict lint PASS; repeat after the
 launcher-resource fix with `--offline` PASS. `aapt dump badging` confirms min SDK
-29, target/compile SDK 36 and app ID/version. Android unit/instrumentation tests
-were not run. Initial lint rejected the template's unnecessary `mipmap-anydpi-v26`
-folder; moving its icons to `mipmap-anydpi` fixed it without suppression.
+29, target/compile SDK 36 and app ID/version. This initial build did not run
+instrumentation; the later emulator check below does. Initial lint rejected the
+template's unnecessary `mipmap-anydpi-v26` folder; moving its icons to
+`mipmap-anydpi` fixed it without suppression.
 The first SDK scan printed an XML version 4 compatibility warning and left the
 AndroidX graphics native library unstripped; neither prevented the build/lint.
 Gradle requires sandbox escalation even with `--offline` because its daemon and
@@ -154,10 +157,15 @@ Run on a connected API 29+ arm64 device or x86_64 emulator:
 ./android/gradlew -p android :app:installDebug --offline --console=plain
 "$ANDROID_HOME/platform-tools/adb" shell am start -n app.yomoku/.MainActivity
 ```
-No device is currently connected; no emulator/system image or `/dev/kvm` is
-available here. Instrumentation execution and app launch remain unverified.
-Install/configure an emulator on a workstation with virtualization, or connect a
-device with USB debugging, before claiming Android behavior passes.
+Verified 2026-10-22: `CoreSessionTest` passes on the configured API 36 x86_64
+`medium_phone` AVD. The HTML report is
+`android/app/build/reports/androidTests/connected/debug/index.html`.
+Initial offline execution lacked AGP's UTP host-test dependencies; an online run
+populated them, then the offline test passed. This does not verify arm64 device
+execution, asynchronous effects or document storage on Android.
+Debug APK installation and `am start -W -n app.yomoku/.MainActivity` also pass;
+the captured screen displays the Rust-backed Library heading. The ignored
+screenshot is `.local/emulator-captures/yomoku-library.png`.
 
 Check APK packaging with the pinned CLI tools:
 ```sh
@@ -268,3 +276,57 @@ cargo build -p yomoku-storage --target x86_64-linux-android --locked --offline
 ```
 This compiles the Rust storage library and bundled SQLite; it does not execute
 SQLite on Android or package it into the APK before runtime wiring exists.
+
+## Android CLI emulator setup
+Installed through Android CLI 1.0.16625370, without Android Studio:
+```sh
+android emulator create --list-profiles
+android emulator create medium_phone
+```
+Creation automatically downloads the emulator and the profile's system image.
+Verified installation: Emulator **37.2.12**, profile/AVD **medium_phone**,
+`system-images;android-36;google_apis_playstore;x86_64` **revision 7**.
+SDK packages live in `/home/kai/Android/Sdk`; AVD data/configuration lives in
+`~/.android/avd/medium_phone.avd/`. None is tracked in Git.
+
+The sandbox does not expose `/dev/kvm`, but the host has it. Run emulator/ADB/CLI
+with escalation in this environment; the host acceleration check passes:
+```sh
+"$ANDROID_HOME/emulator/emulator" -accel-check
+```
+Do not infer that KVM is absent on the host from a sandbox-only device check.
+
+The default SwiftShader GLES backend crashes this host's emulator RenderThread
+(SIGSEGV, confirmed in GDB inside `gles_swiftshader/libGLESv2.so`). ANGLE software
+graphics (`swangle`) boots and executes the test. This is a host graphics issue,
+identified before Yomoku launches. The verified foreground headless launch is:
+```sh
+"$ANDROID_HOME/emulator/emulator" -avd medium_phone -no-window -no-audio -no-snapshot -gpu swangle -camera-back none -camera-front none -accel on -cores 2
+```
+`tools/start-android-emulator.sh` runs these flags (optional first argument: AVD
+name). It stays in the foreground; Ctrl-C stops it. `ANDROID_HOME` or
+`ANDROID_SDK_ROOT` selects the SDK, defaulting to `$HOME/Android/Sdk`.
+The AVD config saves `hw.gpu.mode=swangle`, `hw.cpu.ncore=2`,
+`hw.camera.back=none`, `hw.camera.front=none`, `hw.audioInput=no` and
+`hw.audioOutput=no`. No AVD data reset is needed. A cold restart through
+`android emulator start medium_phone --headless --cold` still exited early on
+this host despite these settings; use the explicit launcher above. Android CLI
+still manages package installation, AVD creation/listing and stopping.
+
+First boot may show **Allow USB debugging?**. Accept **Always allow from this
+computer** for the development host before running tests. This session used the
+emulator's authenticated local control API/installed `emulator_controller.proto`
+to navigate the prompt headlessly; old console touch events had no effect.
+Temporary Python gRPC tooling/screenshots stay in ignored `.local/`; control
+tokens, ADB keys and signing keys are never committed. A windowed first boot can
+accept the same prompt manually.
+The checked-in launcher was cold-booted after authorization; ADB remained
+authorized and `sys.boot_completed` returned `1` before the app launch check.
+
+After boot, run `:app:connectedDebugAndroidTest` using the environment above.
+The first execution needs network access for AGP's UTP dependencies; subsequent
+offline execution passes. The one test checks Android JNI/core render state,
+session isolation and native-handle closure. Stop the AVD with:
+```sh
+android emulator stop emulator-5554
+```
