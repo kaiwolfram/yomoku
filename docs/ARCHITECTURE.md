@@ -41,7 +41,13 @@ and closes the session on destruction. Recreation currently creates a fresh core
 interactive navigation must add retention across configuration changes.
 The Android instrumentation test covers command → core → view, isolation and
 explicit handle close; its execution still needs a connected device/emulator.
-No platform I/O or persisted state exists yet.
+`yomoku-storage` separately owns SQLite I/O through rusqlite 0.40.2 with bundled
+SQLite. `Storage::open` configures each connection, validates numbered migration
+history and applies pending migrations under one immediate transaction. Its
+connection remains private; no SQL or database handle enters core or FFI. Eleven
+on-disk host tests cover initialization/reopen, upgrades, rollback, concurrent
+opens and failure preservation. This crate is not wired to runtime/Android yet;
+the app still has only transient state and no document persistence.
 
 ## Required boundaries (not yet implemented)
 Kotlin Compose shell handles UI and Android APIs through a narrow typed FFI to the
@@ -50,10 +56,9 @@ EffectRouter runs storage, analysis/dictionaries and networking effects; SQLite
 SQL and platform I/O must stay outside the core. Sudachi Full defaults to Mode B;
 JMdict English and JMnedict are offline data. Nostr uses Rust nostr-sdk.
 
-Remaining planned crates: `yomoku-storage`,
-`yomoku-analysis`, `yomoku-import`. Create these when implementing behavior,
-not as empty placeholders. Android project path: `android/`.
+Remaining planned crates: `yomoku-analysis`, `yomoku-import`. Create these when
+implementing behavior, not as empty placeholders. Android project path: `android/`.
 
 Next architectural checkpoint: Android bridge execution, responsive navigation,
-then migration-safe storage and text offsets. Do not freeze FFI or schema based
-on assumptions about dependency APIs.
+then document IDs/text offsets and storage effects. Do not freeze FFI or schema
+based on assumptions about dependency APIs.

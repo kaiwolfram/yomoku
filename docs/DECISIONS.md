@@ -273,3 +273,39 @@ Primary evidence reviewed before adoption:
   metadata (JDK archive SHA-256 verified before extraction).
 - https://github.com/Kotlin/ktfmt and published Maven Central 0.64 CLI help
   (JDK 11+, Kotlin style, dry-run and failure-on-change options).
+
+## 2026-10-22 — SQLite initialization and migration boundary
+Take the independent phase-1 storage step while Android execution is blocked;
+persistence has priority over navigation styling. Pin **rusqlite 0.40.2** (MIT),
+with default features disabled and only `bundled`. Cargo.lock pins
+libsqlite3-sys 0.38.2, whose published amalgamation is SQLite 3.53.2. Bundling
+keeps SQLite consistent across host and Android without a system SQLite package
+or runtime dependency on Android's private SQLite libraries. No async framework
+is needed for initialization; the future EffectRouter must run this synchronous
+I/O off Android's main thread. Do not add a storage dependency to core or expose
+connections/SQL through FFI.
+
+Use an ordered migration journal (version and name) as the sole version source,
+avoiding a second version in `PRAGMA user_version`. The first numbered migration
+creates that journal; domain tables wait for stable IDs/text offsets and actual
+commands. Keep applied SQL immutable and append new migrations. Validate journal
+prefixes and acquire an immediate transaction before reading history, applying
+all pending SQL and journal rows atomically. Reject newer/inconsistent/unknown
+databases; never silently recreate or downgrade. Keep SQLite's default rollback
+journal/durability settings for now; enable foreign keys on every connection and
+set a five-second busy timeout. WAL/concurrency policy belongs with real effects.
+
+Primary evidence checked before adoption:
+- https://docs.rs/rusqlite/0.40.2/rusqlite/struct.Connection.html
+  (`open`, `busy_timeout`, `pragma_update`, `transaction_with_behavior`).
+- https://docs.rs/rusqlite/0.40.2/rusqlite/struct.Transaction.html
+  (explicit commit; rollback on drop).
+- https://github.com/rusqlite/rusqlite (bundled SQLite build).
+- https://www.sqlite.org/lang_transaction.html (immediate write locking).
+- Published rusqlite 0.40.2 Cargo.toml/source and libsqlite3-sys 0.38.2
+  Cargo.toml/sqlite3.h in Cargo's registry cache (features, versions, licenses).
+
+Eleven on-disk host tests cover initialization/reopen, ordered upgrade fixtures,
+Unicode content/path persistence, failed fresh/existing migrations, newer and
+inconsistent journals, unrelated/invalid files, foreign keys and concurrent opens.
+These do not claim document CRUD, Android persistence or async JNI execution.

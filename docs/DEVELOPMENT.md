@@ -247,3 +247,24 @@ successfully. To repeat native generation manually:
 diff -r target/generated/native target/generated/native-repeat
 cargo build --workspace --locked --offline
 ```
+
+## SQLite storage checks
+`yomoku-storage` uses pinned rusqlite with bundled SQLite; no Fedora SQLite
+development package is required. A C compiler is required (the NDK supplies it
+for Android). `cargo test --workspace --all-features --locked --offline` includes
+11 storage tests using private temporary disk databases with automatic cleanup.
+Initialization does not yet run in the Android app; runtime/FFI wiring awaits
+document commands and IDs. No document database is created by the current APK.
+
+Compile the storage crate for both Android ABIs with the same pinned NDK/API:
+```sh
+export PATH=/home/kai/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin:$PATH
+export CC_aarch64_linux_android="$ANDROID_HOME/ndk/30.0.16248370/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android29-clang"
+export AR_aarch64_linux_android="$ANDROID_HOME/ndk/30.0.16248370/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-ar"
+export CC_x86_64_linux_android="$ANDROID_HOME/ndk/30.0.16248370/toolchains/llvm/prebuilt/linux-x86_64/bin/x86_64-linux-android29-clang"
+export AR_x86_64_linux_android="$ANDROID_HOME/ndk/30.0.16248370/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-ar"
+cargo build -p yomoku-storage --target aarch64-linux-android --locked --offline
+cargo build -p yomoku-storage --target x86_64-linux-android --locked --offline
+```
+This compiles the Rust storage library and bundled SQLite; it does not execute
+SQLite on Android or package it into the APK before runtime wiring exists.

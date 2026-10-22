@@ -145,3 +145,21 @@
   unverified and unchecked. Native build uses debug Rust; release tooling later.
 - Next: run instrumentation on available Android, responsive navigation with
   configuration-change retention, then SQLite migrations/reopen tests.
+
+## 2026-10-22 — SQLite initialization and numbered migrations
+- Started clean. Device/emulator execution remains unavailable; took the independent
+  phase-1 storage task, prioritizing persistence. Added yomoku-storage, pinned
+  rusqlite 0.40.2/bundled SQLite after primary API/source verification, and refreshed
+  workspace/lockfile. No core, runtime, FFI or Android behavior changed.
+- Added private connection ownership, per-open foreign keys, bounded lock wait,
+  numbered journal initialization and atomic migration validation/application.
+  Reject newer/inconsistent/unrecognized databases without data reset or repair.
+  Updated plan, resume, architecture, data model, decisions and development docs.
+- Workspace build, 26 Rust tests (11 storage), fmt/clippy and host Kotlin/JNI PASS.
+  NDK r30/API 29 storage cross-builds PASS for arm64 and x86_64, including SQLite.
+  Initial crate metadata lookup failed sandbox DNS; approved retrieval succeeded.
+- Android APK assembly/lint/device tests were not rerun for this isolated storage
+  crate; no device/emulator or /dev/kvm. Document CRUD/persistence in the app and
+  async JNI execution remain unimplemented and unchecked.
+- Next: available-device instrumentation, responsive navigation/session retention,
+  stable document IDs/Unicode offsets followed by storage effects/repositories.

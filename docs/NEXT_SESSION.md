@@ -1,6 +1,6 @@
 # Resume here
 
-Updated: 2026-10-22. Current phase: 1, native Android bridge packaged.
+Updated: 2026-10-22. Current phase: 1, SQLite initialization verified.
 Read AGENTS.md, plan phase 1 and PRODUCT_SPEC.md section 2 next.
 After each completed, verified step, update progress docs and commit it
 without waiting for another request; report the commit hash.
@@ -17,17 +17,21 @@ without waiting for another request; report the commit hash.
   execution is NOT verified. Async JNI callbacks await a real async effect.
 - Gradle 9.1.0, AGP 9.0.1, Kotlin/Compose compiler 2.4.21, Compose BOM 2026.03.01,
   Activity 1.13.0, JDK 17, SDK 36/build tools 36.0.0, min SDK 29 pinned.
-- No persistence/tokenizer yet. Nostr configuration stays empty.
+- Separate yomoku-storage: rusqlite 0.40.2/bundled SQLite, migration 0001 journal,
+  atomic upgrades, reopen/rollback/failure preservation/concurrent-open tests.
+  Builds for both Android ABIs. No runtime/FFI document persistence/tokenizer yet.
+  Nostr configuration stays empty.
 
 ## Next tasks (ordered)
 1. Connect API 29+ arm64 device/x86_64 emulator; run :app:connectedDebugAndroidTest
    and launch app. No device attached, emulator installed or /dev/kvm here.
 2. Add responsive four-tab navigation/toolbar Settings using Rust state; retain
    CoreSession across configuration changes; verify phone bottom bar/tablet rail.
-3. Add separate Rust SQLite storage with numbered migrations and reopen tests.
+3. Define stable document/source/chapter IDs and Unicode offsets (phase 2), then
+   add document repositories/effects/FFI on the SQLite foundation; verify reopen.
 Test async JNI delivery/error handling when the first real async effect is added.
 
-## Last successful checks
+## Checks passed this storage session
 From repository root, with installed tools/caches:
 ```sh
 export PATH=/home/kai/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin:$PATH
@@ -36,17 +40,12 @@ cargo test --workspace --all-features --locked --offline
 cargo fmt --all -- --check
 cargo clippy --workspace --all-targets --all-features --locked --offline -- -D warnings
 tools/test-kotlin-bridge.sh
-export JAVA_HOME="$PWD/.local/jdk-17/jdk-17.0.21+9"
-export GRADLE_USER_HOME="$PWD/.local/gradle"
-export ANDROID_HOME=/home/kai/Android/Sdk
-./android/gradlew -p android :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug --offline --console=plain
-tools/format-kotlin.sh --check
-bash -n android/gradlew tools/format-kotlin.sh tools/test-kotlin-bridge.sh tools/build-android-native.sh
 git diff --check
 ```
-All PASS: 15 Rust tests, host JNI, debug app/test APK assembly, strict Android lint.
-Packaged arm64/x86_64 ELF architectures, JNI/Rust exports, 16 KB LOAD alignment
-and APK ZIP alignment PASS; see DEVELOPMENT.md. No Android tests/app launch run.
+All PASS: 26 Rust tests (11 storage), host JNI, Rust build/fmt/clippy.
+Storage Android cross-builds PASS; exact NDK C compiler commands in DEVELOPMENT.md.
+Previous session: app/test APK assembly, Android lint/Kotlin formatting, packaged
+ELF/ZIP alignment PASS. Not rerun for isolated storage; Android execution unverified.
 
 ## Environment/blockers
 - Rust compiler/cargo 1.99.1; rustup launcher attempts read-only maintenance.
@@ -65,5 +64,7 @@ and APK ZIP alignment PASS; see DEVELOPMENT.md. No Android tests/app launch run.
   generation/build/tests share target output: NEVER run them concurrently.
   BoltFFI metadata expansion replaces host exports; host test rebuilds afterward.
 - No curated Nostr data; ask Q188 only before Citrine forwarding.
+- SQLite stays outside core. Storage has no runtime/FFI dependency yet; add real
+  async effect execution and Android private-path selection with document commands.
 
 See DEVELOPMENT.md/DECISIONS.md for setup, API evidence and resolved failures.

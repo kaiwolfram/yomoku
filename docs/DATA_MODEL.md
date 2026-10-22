@@ -9,7 +9,24 @@
   otherwise. New registration never implies a completed-reading encounter.
 - Completion status policy: only New changes to Known.
 
-No database exists yet. These enums have no persisted/FFI encoding contract.
+These enums have no persisted/FFI encoding contract.
+
+## SQLite initialization
+`yomoku-storage` owns the database connection. Migration
+`0001_migration_history.sql` creates `schema_migrations(version INTEGER PRIMARY
+KEY CHECK (version > 0), name TEXT NOT NULL UNIQUE)`. This journal is the sole
+schema-version authority; SQLite `user_version` is unused. Applied rows must match
+the ordered prefix of compiled migrations by number and name. Migration SQL and
+its journal insertion commit together, with all pending migrations in one
+transaction. Published migrations must remain immutable; append numbered files.
+
+Opening creates an empty database in an existing caller-selected directory,
+enables foreign keys per connection and waits up to five seconds for lock
+contention. Newer versions, inconsistent history, nonempty databases without a
+journal, invalid files and SQLite I/O failures return errors without resetting or
+repairing data. The initial journal has no document/vocabulary/history tables;
+their IDs, offsets and event schemas remain to be defined with domain commands.
+Storage is not yet connected to runtime/FFI or Android's private files path.
 
 ## Transient application state
 `app::Destination` is Library (default), Nostr, Statistics or Vocabulary.
@@ -39,8 +56,8 @@ anchors or asynchronous effect responses. A fresh core starts at Library.
   encounters and global vocabulary. Reimport creates fresh document progress.
 - Vocabulary deletion removes its encounter/status history, recalculates statistics
   and does not trigger rescans. Future registration starts New.
-- Versioned SQLite migrations from first storage implementation; complete page
-  events, counters and New→Known changes committed in one transaction.
+- Complete page events, counters and New→Known changes committed in one transaction
+  using the numbered SQLite migration foundation above.
 
 Refine schema with executable migration/transaction tests before claiming storage
 or accurate historical statistics are complete.

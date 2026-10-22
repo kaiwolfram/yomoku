@@ -30,7 +30,7 @@ position/encounter history. Keep incremental builds green.
 - [x] Verify/pin/install a compatible NDK, generate/package Kotlin/JNI and native libraries for x86_64 emulator and arm64 device, and wire a Rust-backed shell; assemble app/instrumentation APKs, pass strict lint and verify both packaged ELF architectures/exports plus 16 KB ELF/ZIP alignment. NDK r30/API 29; Android execution remains below.
 - [ ] Demonstrate command → core → view state on Android by running `CoreSessionTest` on a device/emulator. Test source and APK compile; no device/emulator is currently available.
 - [ ] Add Library-default navigation, Nostr/Statistics/Vocabulary placeholders and toolbar Settings; verify phone bottom bar/tablet rail and hide navigation in reader.
-- [ ] Add `crates/yomoku-storage` SQLite initialization and numbered migration; test empty DB creation and repeat opens.
+- [x] Add `crates/yomoku-storage` SQLite initialization and numbered migration; empty DB creation/reopens, ordered upgrades, rollback, concurrent opens and failure preservation pass in 11 host tests; bundled SQLite compiles for both Android ABIs. Runtime/FFI document wiring remains below.
 - [ ] Exercise document CRUD through runtime/FFI on device; verify reopen persistence and failures.
 - [ ] Add `.github/workflows/ci.yml` host Rust checks, Kotlin lint/tests and unsigned Android build; verify each command locally where available.
 - [ ] Document SDK/emulator/adb setup, native ABIs and build/install/run commands; execute on an available emulator/device.
