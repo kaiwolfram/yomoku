@@ -1,5 +1,11 @@
 # Session log
 
+## 2026-10-22 — Automatic step commits
+- User authorized automatic local commits after each completed, verified step.
+  Recorded the workflow in AGENTS.md and NEXT_SESSION.md, including progress
+  docs, preserving unrelated work, and reporting the commit hash or blocker.
+- Documentation-only change; verified with `git diff --check`.
+
 ## 2026-10-22 — Foundation
 - Inspected blank repository; preserved original handoff. Added AGENTS.md,
   planning/resume/decision/architecture/data/development docs, Cargo workspace,

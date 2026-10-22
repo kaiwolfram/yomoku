@@ -18,6 +18,11 @@ requirements governing the slice. It is the product source of truth.
 - At session end, check off only completed, verified tasks; update
   `docs/NEXT_SESSION.md` with next 1–3 tasks, commands, failures and blockers.
   Keep architecture/data docs current and append a brief session log.
+- After each completed, verified implementation step, update its progress docs
+  and commit the step automatically with a descriptive message. The user has
+  authorized these local commits; do not wait for a separate commit request.
+  Include only changes belonging to the step, preserve unrelated work, and
+  report the commit hash. If verification or committing is blocked, report why.
 - Report implemented tasks, changed files, test results, next steps and blockers.
 - Never commit credentials/signing keys. Publishing signed releases requires approval.
 

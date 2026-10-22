@@ -2,6 +2,8 @@
 
 Updated: 2026-10-22. Current phase: 1, Rust foundation and Kotlin generation.
 Read AGENTS.md, plan phase 1 and handoff section 3 next.
+After each completed, verified step, update progress docs and commit it
+automatically; report the commit hash. No separate user request is needed.
 
 ## Working
 - Clean starting tree; existing app/domain/bridge behavior preserved.
