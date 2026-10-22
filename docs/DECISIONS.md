@@ -31,3 +31,32 @@ No Android Studio dependency is introduced.
 - Curated Nostr npubs/relay URLs: not supplied; empty configuration is permitted.
 - Q188: user must choose queued retry or best effort before Citrine forwarding.
 - Neither question blocks local reader work. Reaction retry is already required.
+
+## 2026-10-22 — Crux application API and bridge direction
+Verified crates.io with `cargo info crux_core` and inspected published 0.20.0
+source (`src/lib.rs`, `src/core/mod.rs`, `Cargo.toml`). Pin `crux_core = 0.20.0`
+(Apache-2.0, declared Rust minimum 1.90); use `App::update` returning `Command`,
+`Core::process_event`, and the built-in render operation. Serde 1.0.228 with
+derive supplies typed event/view serialization; its published local source is
+available for API inspection. Cargo.lock pins transitive dependencies.
+
+Primary references:
+- https://docs.rs/crate/crux_core/0.20.0/source/src/lib.rs
+- https://docs.rs/crate/crux_core/0.20.0/source/Cargo.toml
+- https://redbadger.github.io/crux/part-1/shell/android/index.html
+- https://docs.rs/serde/1.0.228/serde/
+
+The current upstream Android guide uses BoltFFI for native Kotlin bindings and
+Crux-generated typed data. Prefer that supported approach for the next bridge
+slice; verify/pin the generator version and run a Kotlin round trip then. UniFFI
+compatibility remains available in Crux but is not selected. Neither binding
+generator is added in this slice. The serialized Crux bridge uses `update`,
+`resolve`, and `view` with output buffers; old tutorial `process_event` bridge
+examples must not be copied. Rust EffectRouter must consume Rust I/O effects
+before they reach Android; only render/platform operations belong in Kotlin.
+
+First application behavior is top-level destination selection (Library default),
+already specified in the handoff. Every selection requests a render, including
+reselection, so a shell can request its initial view. This is transient state;
+it does not imply persistence or Nostr fetching. Settings/reader navigation will
+be added with their actual flows, not guessed here.

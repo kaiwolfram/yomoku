@@ -1,10 +1,13 @@
 # Architecture
 
 ## Implemented
-Root Cargo workspace → `crates/yomoku-core`: pure Rust surface identity,
-five vocabulary statuses, registration decision and completion status policy.
-No I/O, external dependencies, persisted state, Crux application or Android app yet.
-Integration tests under `crates/yomoku-core/tests` verify these domain rules.
+Root Cargo workspace → `crates/yomoku-core`: pure Crux 0.20.0 application plus
+surface identity, five vocabulary statuses, registration and completion policies.
+`app::Yomoku` implements `App`; `Model` holds a transient destination (Library
+default), `Event::SelectDestination` updates it, and a render command asks the
+host to read `ViewModel`. The typed effect currently contains only Render.
+Nine integration tests exercise the application through `Core` and domain rules.
+No platform I/O, persisted state or Android app yet.
 
 ## Required boundaries (not yet implemented)
 Kotlin Compose shell handles UI and Android APIs through a narrow typed FFI to the
@@ -17,6 +20,6 @@ Planned crates: `yomoku-runtime`, `yomoku-ffi`, `yomoku-storage`,
 `yomoku-analysis`, `yomoku-import`. Create these when implementing behavior,
 not as empty placeholders. Android project target path: `android/`.
 
-Next architectural checkpoint: actual Crux effect/bridge APIs and typed round trip,
+Next architectural checkpoint: runtime routing and typed FFI round trip,
 then migration-safe storage and text offsets. Do not freeze FFI or schema based
 on assumptions about dependency APIs.

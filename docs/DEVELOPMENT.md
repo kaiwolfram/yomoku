@@ -1,6 +1,8 @@
 # CLI development
 
-Run from the repository root. The initial crate has no external dependencies.
+Run from the repository root. Dependencies are pinned by Cargo.lock; on a fresh
+workstation run `cargo fetch --locked` with network access before offline checks.
+The agent sandbox required escalation for downloads into the Cargo cache.
 
 ```sh
 # Current sandbox: bypass rustup launcher self-maintenance in a read-only home.
@@ -15,6 +17,8 @@ Verified 2026-10-22 using rustc 1.99.1 and cargo 1.99.1. A normal workstation
 with functioning rustup can omit the PATH workaround. Do not assume this compiler
 is the project's minimum supported version; establish that with dependencies.
 Cargo.lock is retained for reproducible application development.
+Crux 0.20.0 declares Rust 1.90 minimum; the full locked graph has only been tested
+with 1.99.1. Current host baseline: nine integration tests (four app, five domain).
 
 ## Android environment and next setup
 `android` is installed at `/home/kai/.local/bin/android`. It needs write access to

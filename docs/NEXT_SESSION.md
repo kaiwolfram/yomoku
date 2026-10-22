@@ -1,22 +1,23 @@
 # Resume here
 
 Updated: 2026-10-22. Current phase: 1, Rust foundation; one pure phase-3 rule slice
-was pulled forward. Read AGENTS.md, plan phase 1 and handoff sections 3/4.2 next.
+was pulled forward. Read AGENTS.md, plan phase 1 and handoff section 3 next.
 
 ## Working
-- Initial repository contained only untracked handoff; preserved unchanged.
-- Cargo workspace with dependency-free `yomoku-core`.
+- Clean starting tree; existing vocabulary implementation preserved.
+- Pure `yomoku-core` now implements Crux 0.20.0 App with typed navigation event,
+  model, view and render effect; Library default. Nine host integration tests.
 - Exact surface identities, five statuses, non-overwriting registration policy,
-  New-only completion transition; five passing integration tests.
-- Continuity/architecture/data model/decision docs exist.
-- No Android app, Crux app, persistence, tokenizer, FFI or UI yet.
+  New-only completion transition remain tested.
+- No Android app, persistence, tokenizer, runtime or FFI yet.
 
 ## Next tasks (ordered)
-1. Verify current Crux APIs and Kotlin bridge options; record selected versions
-   and evidence, then add typed event/model/view and host command/effect test.
-2. Add runtime EffectRouter and FFI typed round-trip/error test using that API.
+1. Add runtime EffectRouter and narrow FFI typed round-trip/error test. Inspect
+   Crux 0.20.0 published bridge/middleware APIs; keep Rust I/O effects in Rust.
+2. Verify/pin BoltFFI and Crux Kotlin type generation (current upstream Android
+   approach); test generated types/serialization rather than hand-writing codecs.
 3. Generate Android Compose project with installed `android` CLI, min SDK 29;
-   inspect template versions, install compatible SDK/JDK/NDK and build with wrapper.
+   inspect template versions, install compatible SDK/JDK/NDK and build wrapper.
 
 ## Last successful checks
 Run from repository root:
@@ -27,18 +28,19 @@ cargo test --workspace --offline
 cargo fmt --all -- --check
 cargo clippy --workspace --all-targets --offline -- -D warnings
 ```
-All PASS; five integration tests. Compiler/cargo 1.99.1.
-`android --help`, `android info`, `android create --help`,
-`android create --list`, `android sdk list` also PASS with sandbox escalation.
+All PASS; nine integration tests. Compiler/cargo 1.99.1.
+Initial fmt check flagged one assertion; formatted and reran successfully.
+Fresh caches require `cargo fetch --locked` with network access first.
 
 ## Environment/blockers
 - Plain cargo/rustc via rustup fails trying to remove read-only rustup-init;
   direct toolchain PATH above works without modifying the user's installation.
-- Android CLI IS installed (1.0.16625370), SDK `/home/kai/Android/Sdk`.
-  Only build/templates 0.1.1 installed; empty-activity supports Compose/AGP 9.
-- Android CLI needs its home lock writable; `android` escalation prefix approved.
-- No Gradle project/build yet; JDK 25 available, compatible build JDK to verify.
+- Sandbox crates.io DNS failed; escalated cargo info/fetch succeeded. Crux and
+  locked dependencies now cached. Offline initial build lacked bincode; resolved.
+- Android CLI 1.0.16625370, SDK `/home/kai/Android/Sdk`, build/templates 0.1.1;
+  empty-activity supports Compose/AGP 9. CLI requires approved escalation.
+- No Gradle build yet; JDK 25 available, compatible build JDK to verify.
 - No curated Nostr starter data; keep empty configuration. Ask Q188 only when
   implementing Citrine forwarding. Neither blocks local work.
 
-See DEVELOPMENT.md for environment detail; DECISIONS.md for scope decisions.
+See DEVELOPMENT.md for environment detail; DECISIONS.md for API evidence.

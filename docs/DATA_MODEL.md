@@ -11,6 +11,13 @@
 
 No database exists yet. These enums have no persisted/FFI encoding contract.
 
+## Transient application state
+`app::Destination` is Library (default), Nostr, Statistics or Vocabulary.
+`Model` owns the selected destination; `ViewModel` projects it for the shell.
+`Event::SelectDestination` selects a destination and requests a render. Event,
+destination and view derive Serde serialization, but no stable wire format or
+persisted discriminants are established. A fresh core always starts at Library.
+
 ## Required future schema constraints
 - Stable document/source/chapter IDs; immutable content with explicit offset
   encoding tested across Rust/Kotlin. Encoding/anchor design is still open.

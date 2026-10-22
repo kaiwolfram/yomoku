@@ -13,8 +13,8 @@ small pure-domain task explicitly pulled forward from phase 3.
 
 ## 1 — Minimal Android/Rust bridge
 - [x] Create root Cargo workspace and pure `crates/yomoku-core`; verify offline build, test, fmt and clippy.
-- [ ] Verify current Crux APIs/version and supported Kotlin bridge approach; record versions and evidence in DECISIONS.md before adding dependencies.
-- [ ] Add Crux model, typed event and view model to `crates/yomoku-core`; test one command and render effect on host.
+- [x] Verify current Crux APIs/version and supported Kotlin bridge approach; record versions and evidence in DECISIONS.md before adding dependencies.
+- [x] Add Crux model, typed event and view model to `crates/yomoku-core`; test one command and render effect on host.
 - [ ] Add `crates/yomoku-runtime` EffectRouter and `crates/yomoku-ffi`; test typed command/response serialization and errors across the boundary.
 - [ ] Add Gradle wrapper and Kotlin Compose app under `android/`, min SDK 29; CLI assembleDebug succeeds with pinned compatible JDK/SDK/NDK/plugin versions.
 - [ ] Package native library for emulator and arm64 device; demonstrate command → core → view state in Android instrumentation test.

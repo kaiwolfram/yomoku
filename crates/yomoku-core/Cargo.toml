@@ -5,3 +5,5 @@ edition.workspace = true
 license.workspace = true
 
 [dependencies]
+crux_core = "=0.20.0"
+serde = { version = "=1.0.228", features = ["derive"] }
