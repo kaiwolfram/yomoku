@@ -56,7 +56,7 @@ position/encounter history. Keep incremental builds green.
 - [ ] Verify Sudachi.rs API, Full dictionary packaging/license and version; add `crates/yomoku-analysis` with default B and A/C fixtures, including inflections, proper nouns and mixed scripts.
 - [ ] Record surface/token/source anchors and override schema before large imports; test Unicode anchors and reversible merge/split.
 - [ ] Bundle Full dictionary and measure initialization/tokenization on device, including offline operation.
-- [ ] Add vocabulary registration/status-change migrations and repositories; test identical spellings across documents, distinct inflections and preserved existing statuses.
+- [x] Add vocabulary registration/status-change migrations and repositories; test identical spellings across documents, distinct inflections and preserved existing statuses. Migration 0006 and 11 repository tests verify exact identity, dated registration/manual events, all statuses, concurrent deduplication, reopen and rollback. Analyzer/import/completion and UI wiring remain separate tasks.
 - [ ] Register every unique surface atomically at document import, without encounters; test repeated tokens and rollback.
 - [ ] Persist every Japanese occurrence at completion and New→Known changes in one transaction; test repetition, reread, duplicate command and unchanged Learning/Familiar/Ignored.
 - [ ] Add tappable tokens, five direct status choices and N>0 toast; verify opening lookup never changes status.

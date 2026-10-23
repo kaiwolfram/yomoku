@@ -9,7 +9,42 @@
   otherwise. New registration never implies a completed-reading encounter.
 - Completion status policy: only New changes to Known.
 
-These enums have no persisted/FFI encoding contract.
+Vocabulary has no application/FFI command yet. Persisted status strings are
+defined explicitly below, independently of Rust enum ordinals.
+
+## Global vocabulary and status history (migration 0006)
+`VocabularyId` is a distinct positive i64 newtype. `VocabularyEntry` carries ID,
+exact Surface, status and registration Unix milliseconds. SQLite allocates entry
+and event IDs with AUTOINCREMENT; later registration after deletion gets a fresh
+entry ID. No reading or dictionary form participates in surface identity.
+
+`vocabulary.surface` has BINARY uniqueness, without normalization or trimming;
+inflections and composed/decomposed spellings remain distinct, while the same
+written spelling across documents/readings shares an entry. Persist statuses as
+`new`, `learning`, `familiar`, `known`, `ignored`, with constrained nonnegative
+registration timestamps. Analyzer dictionary-form links remain future work.
+
+`vocabulary_status_events` stores an allocated ID, semantics version 1, vocabulary
+ID, nullable old status, new status, cause and nonnegative Unix milliseconds.
+Registration has NULL→New and cause `registration`; actual manual changes have
+different non-NULL old/new statuses and cause `manual`. Date/ID and entry/ID indexes
+support future aggregation. Events are immutable through repository APIs; there
+is no history-edit API. Their vocabulary FK uses ON DELETE CASCADE as required
+for future confirmed vocabulary deletion. No document FK exists, so document
+deletion preserves global entries and history. No production delete API exists.
+
+`register_vocabulary` commits a supplied batch and its registration events together;
+duplicate surfaces preserve their original date/status and emit no extra events.
+`vocabulary_entry` is read-only. `set_vocabulary_status` commits current state and
+dated old/new event together, returns None for absent IDs and emits nothing on an
+unchanged selection. Transactions serialize concurrent writes; failure preserves
+prior entries/history. Invalid timestamps/stored values error without repair.
+
+These APIs are repository prerequisites, not analyzer/import or reading-completion
+integration. Document creation and registration must share a future import
+transaction. Completion-driven New→Known events need completion provenance and
+must share the occurrences/time/position transaction, not call manual selection.
+Existing document imports are not rescanned by this migration or by lookup.
 
 ## Document identities and text anchors
 `document.rs` defines distinct `DocumentId`, `SourceId` and `ChapterId` newtypes.
@@ -250,8 +285,9 @@ Submitted writes finish even if the session closes; shutdown does not block UI.
 ## Required future schema constraints
 - Future import repositories must extend the identity/immutable-text and durable
   chapter/byte-offset contract above to multiple chapters.
-- Unique active surface entry, linked analyzer dictionary form (nullable), dated
-  registration and immutable status history. Reading never participates in identity.
+- Add analyzer dictionary-form links (nullable) to global vocabulary and wire
+  registration/status repositories into typed application/import effects.
+  Reading never participates in identity.
 - Extend migration-0005 completion events with occurrence rows preserving repeated
   tokens and active time in the same transaction; reread uses a new command ID.
 - Pending page time and current text offset separate from completed events;

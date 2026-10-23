@@ -385,7 +385,7 @@ fn upgrades_version_four_without_changing_existing_text_settings_or_position() {
     old.save_page_length(PageLength::Characters750).unwrap();
     drop(old);
     let mut storage = Storage::open(database.path()).unwrap();
-    assert_eq!(storage.schema_version().unwrap(), 5);
+    assert_eq!(storage.schema_version().unwrap(), 6);
     assert_eq!(storage.page_length().unwrap(), PageLength::Characters750);
     assert_eq!(storage.load_paste(document.document_id).unwrap(), expected);
     assert_eq!(count(&storage), 0);
@@ -421,7 +421,7 @@ fn failed_completion_migration_preserves_version_four_and_can_retry() {
     drop(connection);
     let mut storage = Storage::open(database.path()).unwrap();
     assert_eq!(storage.load_paste(document.document_id).unwrap(), expected);
-    assert_eq!(storage.schema_version().unwrap(), 5);
+    assert_eq!(storage.schema_version().unwrap(), 6);
     assert_eq!(count(&storage), 0);
 }
 

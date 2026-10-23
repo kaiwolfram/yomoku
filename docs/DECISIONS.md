@@ -613,3 +613,31 @@ the same transaction. Final-page EOF storage does not claim finished-book behavi
 Ten new repository tests cover idempotency, concurrency, rereads, Previous-only
 saves, rollback/retry, Unicode/ownership/staleness, migration upgrades/failure,
 deletion provenance, reopen and command-ID exhaustion.
+
+## 2026-10-23 — Global vocabulary repositories and dated status history
+Complete the independent phase-3 persistence prerequisite before adopting the
+analyzer/dictionary. Append migration 0006 with existing dependencies. Store exact
+surface strings under SQLite BINARY uniqueness, positive nonreused VocabularyId
+values and explicit status strings, never Rust enum ordinals. Registration time
+is a caller-supplied nonnegative Unix millisecond value; core reads no clock.
+
+Register a batch under one immediate transaction, emitting one version-1 New
+registration event per newly created surface. Preserve every existing status and
+registration date. Read-only lookup does not register missing entries. Manual
+selection commits the current status and dated old/new event together; selecting
+the current status emits no event. An absent ID returns None instead of recreating
+it. Statement or deferred-commit failures roll back both state and history.
+
+Keep the methods repository-only until actual analysis and typed application
+effects exist. Standalone registration is not an atomic document import: future
+import must compose registration with content/anchors in the same transaction.
+Dictionary-form links await analyzer output; reading occurrences, completion-driven
+New→Known events and active time still must join completion atomically. These
+repositories must not be used to approximate those operations with separate commits.
+
+Vocabulary events reference their entry with ON DELETE CASCADE, implementing the
+specified history-erasure schema for future confirmed vocabulary deletion. There
+is no document FK or delete API. Test-only deletes verify document independence,
+entry history cleanup and fresh registration IDs without introducing destructive
+user actions. Eleven new tests cover identity/inflections/Unicode, all statuses,
+lookup/no-ops, explicit history, concurrency, migrations, reopen and rollback.

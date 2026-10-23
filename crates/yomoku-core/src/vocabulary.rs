@@ -1,5 +1,16 @@
 //! Exact written surfaces are identities: never normalize or substitute lemmas.
 
+use crate::document::VocabularyId;
+
+/// Persisted global entry. Registration time is distinct from reading encounters.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct VocabularyEntry {
+    pub id: VocabularyId,
+    pub surface: Surface,
+    pub status: VocabularyStatus,
+    pub registered_at_unix_ms: i64,
+}
+
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum VocabularyStatus {
     #[default]

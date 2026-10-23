@@ -16,8 +16,9 @@ storage results. No SQL, paths, threads or platform I/O enter core.
 
 Pure document values define positive i64 identities, immutable chapter snapshots,
 UTF-8 byte anchors, checked UTF-16 conversions and literal first-line paste titles.
-Vocabulary values define exact-surface identity, five statuses, registration and
-New-only completion policy; tokenization/persistence remains future work.
+Vocabulary values define exact-surface identity, five statuses, registration,
+persisted entry snapshots with stable IDs and New-only completion policy.
+Tokenization and application vocabulary commands remain future work.
 
 Pure `pagination` derives chapter-local TextAnchor pages from ordered immutable
 ChapterText snapshots. Five presets count non-whitespace Unicode scalars; LF/CRLF
@@ -58,8 +59,15 @@ never rewrite progress, including after reflow/reopen/deletion. Rereads allocate
 fresh ID; position-only saves never add history. These repository methods have no
 app event/runtime/FFI entry point yet: real encounters, New→Known events and active
 time must join the transaction before forward controls are exposed.
-No edit/rename/delete API exists. Forty storage tests cover migrations, reopen,
-rollback, Unicode, concurrency, ID allocation, settings and completion history.
+Migration 0006 adds global exact-surface entries and versioned, dated registration/
+manual-status events. Registration preserves existing statuses; lookup and unchanged
+selections write no history. Immediate transactions commit registration batches or
+status/event pairs together. These repository APIs accept analyzer-supplied surfaces
+and explicit timestamps; no SQL or clock enters core. Vocabulary-history FKs cascade
+only on vocabulary deletion; document deletion preserves entries/history. Import,
+analyzer, completion and UI integration remain pending. No edit/rename/delete API
+exists. Fifty-one storage tests cover migrations, reopen, rollback, Unicode,
+concurrency, ID allocation, settings, vocabulary and completion history.
 
 `yomoku-ffi::YomokuBridge` wraps the router in Crux's Bincode bridge.
 BoltFFI 0.30.1 NativeBridge takes a database path and owned EffectsListener,
@@ -69,7 +77,7 @@ Core-only effects stay private. Facet generates Event/ViewModel/Requests and
 document codecs in app.yomoku.shared; BoltFFI generates the native package and JNI C.
 Native wrappers require explicit close; no global singleton exists.
 
-Ninety-one Rust tests cover domain, storage and bridge behavior, including an
+One hundred and two Rust tests cover domain, storage and bridge behavior, including an
 actual SQLite write lock proving dispatch/view/navigation remain responsive.
 The host Kotlin runner uses real JNI with -Xcheck:jni to verify navigation,
 Unicode, async worker callbacks, typed failures, reopen persistence, isolation,

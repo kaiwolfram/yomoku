@@ -58,6 +58,10 @@ identity!(
     CompletionCommandId,
     "A database-issued completion intent; retries reuse it, rereads allocate another."
 );
+identity!(
+    VocabularyId,
+    "A global surface entry; deletion and later registration receive a fresh identity."
+);
 
 /// Validated paste input. Keep the exact text so durable anchors remain valid.
 #[derive(Clone, Debug, Eq, PartialEq)]

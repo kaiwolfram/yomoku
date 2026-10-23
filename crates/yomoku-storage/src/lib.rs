@@ -5,6 +5,7 @@
 mod completions;
 mod documents;
 mod settings;
+mod vocabulary;
 
 use std::{error::Error, fmt, path::Path, time::Duration};
 
@@ -42,6 +43,11 @@ const MIGRATIONS: &[Migration] = &[
         name: "0005_page_completions",
         sql: include_str!("../migrations/0005_page_completions.sql"),
     },
+    Migration {
+        version: 6,
+        name: "0006_vocabulary",
+        sql: include_str!("../migrations/0006_vocabulary.sql"),
+    },
 ];
 
 /// Failures are returned to the runtime; opening never resets a database.
@@ -54,6 +60,7 @@ pub enum StorageError {
     InvalidDocument,
     InvalidSettings,
     InvalidCompletion,
+    InvalidVocabulary,
 }
 
 impl fmt::Display for StorageError {
@@ -73,6 +80,7 @@ impl fmt::Display for StorageError {
             Self::InvalidDocument => f.write_str("stored document is inconsistent"),
             Self::InvalidSettings => f.write_str("stored settings are inconsistent"),
             Self::InvalidCompletion => f.write_str("invalid or conflicting page completion"),
+            Self::InvalidVocabulary => f.write_str("invalid vocabulary value or stored entry"),
         }
     }
 }

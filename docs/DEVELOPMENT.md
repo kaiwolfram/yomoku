@@ -18,8 +18,8 @@ with functioning rustup can omit the PATH workaround. Do not assume this compile
 is the project's minimum supported version; establish that with dependencies.
 Cargo.lock is retained for reproducible application development.
 Crux 0.20.0 declares Rust 1.90 minimum; the full locked graph has only been tested
-with 1.99.1. Current host baseline: 91 tests (six app, nine reader flow, six document, 14 pagination,
-five vocabulary, five bridge, four async document, two native facade and 40 storage tests).
+with 1.99.1. Current host baseline: 102 tests (six app, nine reader flow, six document, 14 pagination,
+five vocabulary, five bridge, four async document, two native facade and 51 storage tests).
 
 ## Pure logical pagination checks
 `cargo test -p yomoku-core --test pagination --all-features --locked --offline`
@@ -498,3 +498,22 @@ point, so their behavior is verified on host; device tests cover existing flows
 with migration 0005. Initial clippy vec_init_then_push finding in the new fixture
 was fixed with vec! and rerun successfully. Intentional-close Crux and ktfmt/JDK
 warnings remain benign. No outstanding failure or blocker.
+
+## Vocabulary repository foundation verification
+PASS 2026-10-23: 102 Rust tests (51 storage), locked/offline workspace build,
+fmt/clippy, host Kotlin/JNI, seven Unicode exchanges, Kotlin formatting and
+whitespace. Existing commands above apply. Migration 0006 and 11 new storage tests
+cover exact global surface identity, inflections/Unicode/NUL, all five statuses,
+dated registration/manual history, no-op lookup/selection, concurrency, reopen,
+statement/deferred-commit rollback/retry, version-5 upgrade/failure preservation
+and document/vocabulary deletion schema independence. No dependencies changed.
+
+App/test APK assembly and strict lint PASS with both native ABIs. All seven
+existing Android tests PASS on API 36 x86_64 medium_phone; the emulator was left
+running and no viewport overrides were made. No tablet rerun for this repository
+slice; arm64 execution remains untested. New vocabulary methods are repository-only
+and tested on host; existing device flows exercise migration 0006. Analyzer/import,
+completion New→Known/occurrences/time and vocabulary UI remain unimplemented.
+Initial migration test referenced a nonexistent pagination function; corrected to
+LogicalPages and the full rerun passed. Existing intentional-close Crux logging
+and ktfmt/JDK warnings remain benign. No outstanding failure or blocker.

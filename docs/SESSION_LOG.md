@@ -374,3 +374,27 @@
   real Japanese analysis/surface anchors/vocabulary prerequisites, then extend
   completion atomically and wire controls; CI remains independent follow-up.
   No Nostr data or production destructive APIs changed.
+
+## 2026-10-23 — Global vocabulary repositories and status history
+- Started clean. Completed the independent phase-3 persistence prerequisite with
+  migration 0006, positive nonreused VocabularyIds, exact global spelling identity
+  and versioned, dated registration/manual-status events. No dependencies added.
+- Registration batches commit atomically, preserving every existing status/date.
+  Lookup and unchanged selections add no events. Status/current-state and history
+  updates commit together; statement and deferred-commit failures roll back.
+  Concurrent registration/identical status selections record once. Document
+  deletion preserves global vocabulary; test-only vocabulary deletes cascade
+  only that entry's status history and later registration gets a fresh ID.
+- PASS: 102 Rust tests (11 new; 51 storage), workspace build/fmt/clippy, host JNI,
+  seven Unicode exchanges, Kotlin formatting, app/test APK builds, strict lint and
+  all seven API 36 x86_64 medium_phone tests. No viewport changes; emulator left
+  running. No tablet rerun; arm64 packaging passes, execution remains untested.
+- Fixed the new migration test's initial nonexistent pagination API reference;
+  full rerun PASS. Existing shutdown/formatter warnings remain benign. No blocker.
+- Updated plan, architecture/data model, decisions, development and handoff.
+  Repository methods have no application/FFI/UI entry point. Atomic document-import
+  registration and analyzer dictionary-form links remain unchecked; completion
+  still needs analyzed occurrences/New→Known/time before exposing forward controls.
+  Next: verify Sudachi Full, token/source anchors/reversible override schema and
+  atomic import registration, then completion wiring; CI remains independent.
+  No Nostr data, production deletion or data-destructive semantics changed.
