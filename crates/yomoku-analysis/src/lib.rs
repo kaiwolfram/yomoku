@@ -18,7 +18,7 @@ use yomoku_core::{
 };
 
 pub const ENGINE_REVISION: &str =
-    "sudachi.rs@5de0410b6edfd428fc510cc9763440772e9619d5;yomoku-adapter-v1;embedded-defaults";
+    "sudachi.rs@5de0410b6edfd428fc510cc9763440772e9619d5+android-loader-v1;yomoku-adapter-v1;embedded-defaults";
 pub const DICTIONARY_SHA256: &str =
     "7c797531dea76f06b629fad39cb3a5bdb3a9e54c67ef3d9a869e61418426a7d1";
 pub const DICTIONARY_REVISION: &str =

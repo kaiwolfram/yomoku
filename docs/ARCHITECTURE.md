@@ -43,9 +43,14 @@ they run with tools/test-sudachi.sh, separately from ordinary data-free checks.
 Dictionary preparation verifies the archive, data and complete notices under
 ignored .local/sudachi. This crate has no runtime/FFI/Android entry point yet;
 Android bundling, attribution display and device memory/startup/offline measurements
-remain unchecked. Cross-target cargo check fails in upstream plugin/loader.rs:
-make_system_specific_name has no Android cfg implementation. Resolve with a pinned
-upstream fix or documented source patch before linking the adapter into Android.
+remain unchecked. Unpatched upstream cross-target checking failed in plugin/loader.rs:
+make_system_specific_name originally had no Android cfg implementation. The root
+Cargo patch now selects a dependency-only vendored snapshot at that exact commit,
+with Android added to the existing Linux/FreeBSD `.so` cfg. The complete patch and
+all original file hashes live under third_party/sudachi; tools/verify-sudachi-source.py
+reverses the patch in a temporary copy and verifies every original byte. Both
+Android targets compile. The profile includes +android-loader-v1; segmentation
+and embedded configuration are unchanged. App integration remains pending.
 Owned dictionary storage requires about 315 MiB before engine structures; device
 measurements must inform integration.
 

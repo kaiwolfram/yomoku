@@ -1,0 +1,64 @@
+--- a/Cargo.toml
++++ b/Cargo.toml
+@@ -1,15 +1,7 @@
++# Yomoku patch: dependency-only workspace; see ../patches/android-loader.patch.
+ [workspace]
+ resolver = "2"
+-members = [
+-    "sudachi",
+-    "sudachi-cli",
+-    "sudachi-fuzz",
+-    "plugin/input_text/*",
+-    "plugin/oov/*",
+-    "plugin/path_rewrite/*",
+-    "python",
+-]
+-default-members = ["sudachi", "sudachi-cli"]
++members = ["sudachi"]
+ 
+ [workspace.package]
+ version = "0.7.0"
+--- a/sudachi/Cargo.toml
++++ b/sudachi/Cargo.toml
+@@ -1,3 +1,4 @@
++# Yomoku patch: omit upstream dev/bench targets; see ../../patches/android-loader.patch.
+ [package]
+ name = "sudachi"
+ version.workspace = true
+@@ -29,20 +30,5 @@
+ unicode-normalization = "0.1" # MIT/Apache 2.0
+ yada = "0.5" # MIT/Apache 2.0
+ 
+-[dev-dependencies]
+-claim = "0.5" # MIT/Apache 2.0
+-criterion = "0.5" # MIT/Apache 2.0
+-tempfile = "3" # MIT/Apache 2.0
+-
+-# Plugins for tests
+-default_input_text = { path = "../plugin/input_text/default_input_text" }
+-simple_oov = { path = "../plugin/oov/simple_oov" }
+-join_numeric = { path = "../plugin/path_rewrite/join_numeric" }
+-join_katakana_oov = { path = "../plugin/path_rewrite/join_katakana_oov" }
+-
+ [lib]
+ crate-type = ["rlib"]
+-
+-[[bench]]
+-name = "sentence_detector"
+-harness = false
+--- a/sudachi/src/plugin/loader.rs
++++ b/sudachi/src/plugin/loader.rs
+@@ -52,7 +52,12 @@
+     plugins: Vec<<T as PluginCategory>::BoxType>,
+ }
+ 
+-#[cfg(any(target_os = "linux", target_os = "freebsd"))]
++// Yomoku patch: Android uses the same shared-library suffix as Linux.
++#[cfg(any(
++    target_os = "linux",
++    target_os = "freebsd",
++    target_os = "android"
++))]
+ fn make_system_specific_name(s: &str) -> Option<String> {
+     Some(format!("lib{}.so", s))
+ }

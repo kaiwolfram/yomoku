@@ -1,0 +1,4 @@
+# Preserve exact pinned upstream bytes and unified-patch context. The Sudachi
+# source verifier checks these files; whitespace cleanup would break provenance.
+third_party/sudachi/engine/** -text -whitespace
+third_party/sudachi/patches/*.patch -text -whitespace

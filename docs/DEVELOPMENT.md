@@ -18,8 +18,8 @@ with functioning rustup can omit the PATH workaround. Do not assume this compile
 is the project's minimum supported version; establish that with dependencies.
 Cargo.lock is retained for reproducible application development.
 Crux 0.20.0 declares Rust 1.90 minimum; the full locked graph has only been tested
-with 1.99.1. Current host baseline: 102 tests (six app, nine reader flow, six document, 14 pagination,
-five vocabulary, five bridge, four async document, two native facade and 51 storage tests).
+with 1.99.1. Current host baseline: 119 data-free Rust tests. Nine real Full-data
+fixtures run separately with tools/test-sudachi.sh (see below).
 
 ## Pure logical pagination checks
 `cargo test -p yomoku-core --test pagination --all-features --locked --offline`
@@ -569,7 +569,7 @@ Android app/test APKs and strict lint also pass with both native ABIs; no Androi
 instrumentation rerun for this host-only slice. No app or bridge entry point uses
 the analyzer yet. Existing intentional-close/JDK formatter warnings remain benign.
 
-FAILED (upstream, before integration):
+Previously FAILED (unpatched upstream, resolved by the source patch below):
 ```sh
 cargo check -p yomoku-analysis --lib --target aarch64-linux-android --target x86_64-linux-android --locked --offline
 ```
@@ -578,3 +578,32 @@ Android. Its Linux/FreeBSD .so cfg omits Android. Resolve with a pinned upstream
 fix or documented source patch before app linking; do not fake target cfgs or
 modify the shared Cargo cache. Device startup/memory/offline measurements and
 bundling remain unchecked; host constructor uses verified owned dictionary bytes.
+
+## Sudachi Android compile unblock
+
+Verified 2026-10-23: root Cargo source patch selects a dependency-only vendored
+v0.7.0 snapshot at the same upstream commit. The complete patch/original file
+hashes and licenses are under third_party/sudachi. Only the loader's Android cfg
+and dependency-only manifests differ; no dependency versions changed. The engine
+profile now includes +android-loader-v1. The source verifier requires Python
+3.11+ and Git, uses a temporary copy, and works offline:
+
+```sh
+python3 tools/verify-sudachi-source.py
+cargo check -p yomoku-analysis --lib --target aarch64-linux-android --target x86_64-linux-android --locked --offline
+cargo build -p yomoku-analysis --lib --target aarch64-linux-android --target x86_64-linux-android --locked --offline
+```
+
+Both target checks and library builds PASS, using installed Rust Android targets;
+these library-only commands do not link an APK or need the NDK C compiler.
+Source verification PASS for all 138 files after reversing the complete patch;
+isolated altered/missing/extra source and divergent-patch checks correctly fail.
+Workspace build, 119 data-free tests, nine real Full fixtures, fmt/clippy and
+host Kotlin/JNI including seven Unicode exchanges PASS. Python/shell syntax and
+Kotlin formatting PASS. Do not run upstream test targets in the dependency-only
+snapshot; their external fixtures/dev dependencies are intentionally omitted.
+
+No Android APK, instrumentation or device measurement rerun for this compile-only
+slice. The analyzer remains outside runtime/FFI dependencies. Bundling Full with
+app-accessible notices and measuring initialization/memory/tokenization/offline
+operation remain unchecked, including whether owned dictionary storage is viable.

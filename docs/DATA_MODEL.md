@@ -60,7 +60,9 @@ spans, wrong ownership, split scalars, normalized/substituted surfaces, blank
 metadata and omitted non-whitespace text. Whitespace gaps and empty analyses of
 empty/whitespace text are allowed. The pure core module does not tokenize or
 classify text. The separate `yomoku-analysis` adapter supplies real Sudachi output. Its profile pins engine
-commit + adapter-v1/embedded-defaults and Full 20261015 + dictionary SHA-256.
+commit + android-loader-v1 source patch + adapter-v1/embedded-defaults and
+Full 20261015 + dictionary SHA-256. The loader patch does not change tokenization;
+its explicit profile identity keeps patched snapshots distinguishable.
 Classification uses original Japanese script and analyzer POS, including OOV rare
 kanji. OOV readings/dictionary forms are absent; original surfaces never become
 normalized identity. Normalization-generated empty original spans are omitted,

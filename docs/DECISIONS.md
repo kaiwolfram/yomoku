@@ -754,3 +754,31 @@ Android support. Keep this crate outside runtime/FFI dependencies until a pinned
 upstream fix or documented source patch is available. Existing app builds remain
 independent; host integration is verified. This does not change the required
 Sudachi architecture or adopt an alternate engine.
+
+## 2026-10-23 — Pinned Sudachi Android loader source patch
+The [upstream loader](https://github.com/WorksApplications/sudachi.rs/blob/5de0410b6edfd428fc510cc9763440772e9619d5/sudachi/src/plugin/loader.rs)
+omits Android from make_system_specific_name. The inspected upstream develop
+loader still omits it. Preserve v0.7.0 and all dependency versions rather than
+changing engine APIs. Apply a root Cargo source patch to a checked-in,
+dependency-only copy of this exact commit. Add Android to the existing
+Linux/FreeBSD `.so` cfg; Yomoku's embedded-only configuration remains unchanged.
+No analysis code, segmentation defaults, plugin selection or dictionary changes.
+
+Keep all crate src files and upstream embedded resources/README/LICENSE with
+their original Apache-2.0 notices. Reduce the nested workspace to this library
+and omit upstream dev/bench targets/dependencies and their external fixtures.
+The application tests exercise the dependency; the snapshot is not a standalone
+upstream test checkout. Mark each modified file. Retain a complete three-file
+patch plus original upstream SHA-256 hashes for every included file.
+tools/verify-sudachi-source.py reverses the patch in a temporary copy and verifies
+both exact file membership and every upstream hash. tools/test-sudachi.sh runs
+that verification before its real-data fixtures. No shared cache mutation,
+build-time network download or target cfg impersonation is needed.
+
+Include +android-loader-v1 in the engine profile so persisted snapshots identify
+the patched build without reusing the old profile key. Existing immutable
+snapshots stay valid; no migration or rescan is performed. Both Android target
+checks/library builds and the host Full-data fixtures pass. This removes the
+compile blocker, not the device performance/bundling gate. Runtime, FFI and UI
+still have no analyzer entry point; Full's owned-byte memory cost remains to be
+measured on device before app integration.

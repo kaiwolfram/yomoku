@@ -1,0 +1,15 @@
+# Yomoku patch: dependency-only workspace; see ../patches/android-loader.patch.
+[workspace]
+resolver = "2"
+members = ["sudachi"]
+
+[workspace.package]
+version = "0.7.0"
+authors = ["Works Applications <sudachi@worksap.co.jp>"]
+edition = "2021"
+rust-version = "1.74.1"
+description = "Rust version of Sudachi, the Japanese Morphological Analyzer"
+readme = "README.md"
+homepage = "https://github.com/WorksApplications/sudachi.rs"
+repository = "https://github.com/WorksApplications/sudachi.rs"
+license = "Apache-2.0"

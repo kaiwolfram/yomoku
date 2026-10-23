@@ -1,7 +1,12 @@
 [workspace]
 members = ["crates/yomoku-core", "crates/yomoku-runtime", "crates/yomoku-ffi", "crates/yomoku-storage", "crates/yomoku-analysis"]
 resolver = "2"
+exclude = ["third_party/sudachi/engine"]
 
 [workspace.package]
 edition = "2021"
 license = "MIT"
+
+# Exact v0.7.0 source plus the documented Android loader cfg patch.
+[patch."https://github.com/WorksApplications/sudachi.rs"]
+sudachi = { path = "third_party/sudachi/engine/sudachi" }

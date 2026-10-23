@@ -454,3 +454,26 @@
 - Updated checklist, architecture/data model, decisions, development and handoff.
   Bundling, automatic conjugation/override application, import/completion/UI stay
   unchecked. Nostr configuration and destructive semantics remain unchanged.
+
+## 2026-10-23 — Sudachi Android compile unblock
+
+- Started clean. Preserved the exact v0.7.0 engine commit and all dependency
+  versions. Root Cargo source patch now selects a dependency-only vendored copy
+  with Android added to the existing `.so` loader cfg. No runtime/FFI/UI changes.
+- Retained upstream resources/source/license/README, complete three-file patch
+  and every original file hash. Added offline source verification by reversing
+  the patch in a temporary copy; explicit Full tests run it automatically.
+  Engine profile includes +android-loader-v1; no migration or rescan.
+- PASS: both Android target checks and library builds; workspace build and 119
+  data-free Rust tests; nine real Full fixtures; fmt/clippy; host Kotlin/JNI and
+  seven Unicode exchanges; Kotlin formatting; Python/shell syntax; all 138
+  source hashes and rejection of altered/missing/extra files/divergent patch.
+- No APK, instrumentation or device measurement rerun; analyzer still has no app
+  entry point. Existing intentional-close Crux logs/JDK formatter warnings remain
+  benign. No outstanding check failure or new blocker; emulator untouched.
+- Initial staged checks found upstream trailing spaces and the general build-dir
+  ignore hiding dic/build source. Scoped attributes preserve original bytes; a
+  narrow ignore exception includes all 138 files, verified against staged bytes.
+- Next: bundle Full with app-accessible complete notices and measure device
+  startup/memory/tokenization/offline use; atomic analyzed import/registration;
+  real completion occurrences/status/time before reader Next/Previous/swipes.
