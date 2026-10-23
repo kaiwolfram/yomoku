@@ -2,6 +2,7 @@
 //!
 //! Paste repositories use pure domain values. Runtime effect handling is separate.
 
+mod completions;
 mod documents;
 mod settings;
 
@@ -36,6 +37,11 @@ const MIGRATIONS: &[Migration] = &[
         name: "0004_reader_settings",
         sql: include_str!("../migrations/0004_reader_settings.sql"),
     },
+    Migration {
+        version: 5,
+        name: "0005_page_completions",
+        sql: include_str!("../migrations/0005_page_completions.sql"),
+    },
 ];
 
 /// Failures are returned to the runtime; opening never resets a database.
@@ -47,6 +53,7 @@ pub enum StorageError {
     UnrecognizedDatabase,
     InvalidDocument,
     InvalidSettings,
+    InvalidCompletion,
 }
 
 impl fmt::Display for StorageError {
@@ -65,6 +72,7 @@ impl fmt::Display for StorageError {
             }
             Self::InvalidDocument => f.write_str("stored document is inconsistent"),
             Self::InvalidSettings => f.write_str("stored settings are inconsistent"),
+            Self::InvalidCompletion => f.write_str("invalid or conflicting page completion"),
         }
     }
 }

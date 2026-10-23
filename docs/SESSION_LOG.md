@@ -352,3 +352,25 @@
 - Updated plan, architecture/data model, decisions, development and handoff.
   No new dependencies, Nostr data or destructive APIs. Next: completion IDs/history,
   real Japanese analysis/vocabulary prerequisites for navigation, and CI.
+
+## 2026-10-23 — Repository completion IDs and atomic page history
+- Started clean. Added migration 0005 with database-issued command IDs and dated,
+  versioned page anchors retaining source/chapter provenance after live deletion.
+  Pure core validates the exact departing page/position; SQLite records history
+  and advances current position in one transaction. No dependencies were added.
+- Identical retries count once and never move progress, including after reopen,
+  backward movement, reflow or deletion. Conflicting/stale payloads error. Rereads
+  allocate fresh IDs; position-only saves add no history. Event/position/commit
+  failures roll back together and permit retry with the same command.
+- PASS: 91 Rust tests (ten new; 40 storage), workspace build/fmt/clippy, host JNI,
+  seven Unicode exchanges, Kotlin formatting, app/test APK builds, strict lint and
+  all seven API 36 x86_64 phone tests. Viewport stayed 1080x2400/420dpi; emulator
+  left running. No tablet rerun; arm64 builds pass but execution is untested.
+- Fixed clippy's initial test-vector initialization finding; rerun PASS. Existing
+  intentional-close Crux and formatter/JDK warnings remain benign. No blocker.
+- Updated checklist, architecture/data model, decisions, development and handoff.
+  Completed only the repository foundation; core/runtime/FFI navigation wiring,
+  encounters/New→Known/time and finished-book behavior remain unchecked. Next:
+  real Japanese analysis/surface anchors/vocabulary prerequisites, then extend
+  completion atomically and wire controls; CI remains independent follow-up.
+  No Nostr data or production destructive APIs changed.

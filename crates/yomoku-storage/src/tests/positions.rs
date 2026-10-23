@@ -5,7 +5,7 @@ use yomoku_core::{
 
 use super::*;
 
-fn position(document: &PastedDocument, byte: usize) -> ReadingPosition {
+pub(super) fn position(document: &PastedDocument, byte: usize) -> ReadingPosition {
     ReadingPosition {
         source_id: document.chapter.source_id,
         chapter_id: document.chapter.chapter_id,

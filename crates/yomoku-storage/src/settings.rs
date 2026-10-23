@@ -23,7 +23,9 @@ impl Storage {
     }
 }
 
-fn read_page_length(connection: &rusqlite::Connection) -> Result<PageLength, StorageError> {
+pub(crate) fn read_page_length(
+    connection: &rusqlite::Connection,
+) -> Result<PageLength, StorageError> {
     let value: Option<i64> = connection
         .query_row(
             "SELECT page_length FROM reader_settings WHERE id = 1",

@@ -587,3 +587,29 @@ cannot use another document's text. Reproject its exact current ReadingPosition;
 never replace it with the new page's start or write progress during reflow.
 Returning from Settings remounts the transient reader scroll at the top. Late
 commits after leaving update the global value without reopening any route.
+
+## 2026-10-23 — Repository completion IDs and atomic history foundation
+Append migration 0005 using existing pinned dependencies. Allocate positive i64
+command IDs in SQLite before submission, rather than introducing random IDs or
+process-local counters. An unused allocation is not a completion and is not resumed
+automatically. Freeze the command's page, exact departing position, page preset and
+timestamp; retries reuse that payload/ID, while rereads obtain a fresh ID.
+
+Pure core validates the logical page and derives its destination; SQLite checks
+the current preset and performs history insert plus position upsert under one
+immediate transaction. Check replay before live-document validation so duplicate
+callbacks remain harmless after reflow, progress changes and future deletion.
+Replay must never upsert position: a late callback could otherwise undo Previous.
+Reject payload conflicts and stale positions instead of silently accepting them.
+
+Store dated, versioned page anchors with retained source/chapter provenance and
+a historical document ID without a live-document FK. No data-destructive API,
+dependency version or Nostr configuration changes. Command timestamps are explicit
+Unix milliseconds supplied by the future I/O caller; core reads no clock.
+
+Keep this foundation repository-only. Do not route forward navigation through it
+until actual analyzed occurrences, New→Known/status history and active time join
+the same transaction. Final-page EOF storage does not claim finished-book behavior.
+Ten new repository tests cover idempotency, concurrency, rereads, Previous-only
+saves, rollback/retry, Unicode/ownership/staleness, migration upgrades/failure,
+deletion provenance, reopen and command-ID exhaustion.

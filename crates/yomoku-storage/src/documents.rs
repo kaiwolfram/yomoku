@@ -117,18 +117,27 @@ impl Storage {
         position
             .validate(&document.chapter)
             .map_err(|_| StorageError::InvalidDocument)?;
-        transaction.execute(
-            "INSERT INTO reading_positions (document_id, chapter_id, byte_offset) VALUES (?1, ?2, ?3)
-             ON CONFLICT(document_id) DO UPDATE SET chapter_id = excluded.chapter_id, byte_offset = excluded.byte_offset",
-            (i64::from(document_id), i64::from(position.chapter_id), i64::from(position.offset)),
-        )?;
+        write_position_in(&transaction, document_id, position)?;
         transaction.commit()?;
         document.reading_position = Some(position);
         Ok(Some(document))
     }
 }
 
-fn load_paste_in(
+pub(crate) fn write_position_in(
+    connection: &Connection,
+    document_id: DocumentId,
+    position: ReadingPosition,
+) -> Result<(), StorageError> {
+    connection.execute(
+        "INSERT INTO reading_positions (document_id, chapter_id, byte_offset) VALUES (?1, ?2, ?3)
+         ON CONFLICT(document_id) DO UPDATE SET chapter_id = excluded.chapter_id, byte_offset = excluded.byte_offset",
+        (i64::from(document_id), i64::from(position.chapter_id), i64::from(position.offset)),
+    )?;
+    Ok(())
+}
+
+pub(crate) fn load_paste_in(
     connection: &Connection,
     document_id: DocumentId,
 ) -> Result<Option<PastedDocument>, StorageError> {

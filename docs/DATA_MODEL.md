@@ -175,6 +175,40 @@ then reprojects using the reader's exact ReadingPosition. Reflow never writes
 current position, Library progress, encounters or completion. Late settings saves
 update the global preset without reopening closed reader/Settings routes.
 
+## Page completion repository foundation (migration 0005)
+`CompletionCommandId` is another positive i64 identity. `completion_commands`
+issues it with AUTOINCREMENT before a forward intent is submitted. Repeated
+callbacks/retries must reuse one ID and its frozen payload (including timestamp);
+a deliberate reread uses a fresh ID. Issued but unused IDs are not reading events
+and are never automatically replayed. IDs survive reopen and cannot be reused.
+
+Pure `PageCompletion` carries the document, exact completed TextAnchor, page-length
+snapshot, exact departing ReadingPosition and nonnegative Unix milliseconds.
+`next_position` validates ownership/scalar boundaries, the current exact position
+and equality with the derived logical page. For the implemented single-unit paste,
+the destination is the page's end (the next page start or final EOF).
+
+`reading_completions` stores one row per command ID: semantics version 1,
+historical document ID, retained source/chapter FKs, start/end/departing byte
+offsets, page-length character count and completion timestamp. Its date/ID index
+supports future history queries. Document ID deliberately has no live-document FK;
+test-only deletion of content/documents preserves events and provenance. No
+production deletion API or change to deletion semantics is introduced.
+
+`record_page_completion` uses an immediate transaction. An existing ID must match
+every payload field and returns AlreadyRecorded **without writing position**,
+even after reflow, backward movement or deletion. A conflicting payload errors.
+For new events it requires an issued ID, the current preset and a valid departing
+page/position, then inserts history and updates current position in one commit.
+Statement/commit failure rolls both back; retry reuses the same intent. Position-only
+saves never insert history. Concurrent duplicate submissions record once.
+
+This is repository-only infrastructure, with no app event/runtime/FFI/Android
+forward action yet. Before exposing it, extend the same transaction with actual
+Japanese occurrences, New→Known/status events and accumulated active time. Do not
+use absent occurrence/time data as completed-reading statistics. Final EOF alone
+does not implement finished-at-least-once, Finish Book or reopen-at-page-1 behavior.
+
 ## Transient application state
 `app::Destination` is Library (default), Nostr, Statistics or Vocabulary.
 `Model` owns the selected destination; `ViewModel` projects it for the shell.
@@ -218,8 +252,8 @@ Submitted writes finish even if the session closes; shutdown does not block UI.
   chapter/byte-offset contract above to multiple chapters.
 - Unique active surface entry, linked analyzer dictionary form (nullable), dated
   registration and immutable status history. Reading never participates in identity.
-- Completed-reading events with unique command IDs, occurrence rows preserving
-  repeated tokens, provenance and active time; reread uses a new command identity.
+- Extend migration-0005 completion events with occurrence rows preserving repeated
+  tokens and active time in the same transaction; reread uses a new command ID.
 - Pending page time and current text offset separate from completed events;
   permanent finished-at-least-once separate from current percentage.
 - Document deletion removes content/progress but preserves historical provenance,

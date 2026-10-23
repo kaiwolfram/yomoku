@@ -18,8 +18,8 @@ with functioning rustup can omit the PATH workaround. Do not assume this compile
 is the project's minimum supported version; establish that with dependencies.
 Cargo.lock is retained for reproducible application development.
 Crux 0.20.0 declares Rust 1.90 minimum; the full locked graph has only been tested
-with 1.99.1. Current host baseline: 81 tests (six app, nine reader flow, six document, 14 pagination,
-five vocabulary, five bridge, four async document, two native facade and 30 storage tests).
+with 1.99.1. Current host baseline: 91 tests (six app, nine reader flow, six document, 14 pagination,
+five vocabulary, five bridge, four async document, two native facade and 40 storage tests).
 
 ## Pure logical pagination checks
 `cargo test -p yomoku-core --test pagination --all-features --locked --offline`
@@ -481,3 +481,20 @@ Initial lint flagged the numeric character label as PluralsCandidate; changed to
 a plural resource and reran successfully. A server restart interrupted the first
 build observation; inspected reports/state and resumed. Emulator was restarted
 with the documented swangle/KVM command. No remaining failures or blockers.
+
+## Completion repository foundation verification
+PASS 2026-10-23: 91 Rust tests (40 storage), locked/offline workspace build,
+fmt/clippy, host Kotlin/JNI, seven Unicode exchanges, Kotlin formatting and
+whitespace. The existing commands above are unchanged. Ten new repository tests
+cover completion duplicate/reopen/concurrency, reread versus Previous, event/
+position/commit rollback and retry, stale/conflicting/invalid inputs, Unicode EOF,
+version-4 upgrade/migration failure, historical provenance and ID exhaustion.
+
+App/test APK assembly and strict lint PASS with both native ABIs. All seven
+existing Android tests PASS on API 36 x86_64 medium_phone at 1080x2400/420dpi;
+viewport unchanged. Tablet tests were not rerun for this repository-only slice;
+arm64 execution remains untested. New completion operations have no app/FFI entry
+point, so their behavior is verified on host; device tests cover existing flows
+with migration 0005. Initial clippy vec_init_then_push finding in the new fixture
+was fixed with vec! and rerun successfully. Intentional-close Crux and ktfmt/JDK
+warnings remain benign. No outstanding failure or blocker.

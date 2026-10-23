@@ -2,6 +2,7 @@
 //!
 //! Persistence, tokenization, and platform effects belong outside this crate.
 pub mod app;
+pub mod completion;
 pub mod document;
 pub mod pagination;
 pub mod reader;

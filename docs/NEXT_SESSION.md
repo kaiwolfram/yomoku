@@ -1,7 +1,7 @@
 # Resume here
 
-Updated: 2026-10-23. Persisted page-length Settings/reflow verified.
-Read AGENTS.md, plan phases 2–3 and PRODUCT_SPEC.md section 3 next.
+Updated: 2026-10-23. Repository completion IDs/history foundation verified.
+Read AGENTS.md, plan phases 2–3 and PRODUCT_SPEC.md sections 3–4 next.
 After each completed, verified step, update docs and commit it automatically.
 
 ## Working
@@ -26,6 +26,10 @@ After each completed, verified step, update docs and commit it automatically.
 - Reader column centers/caps at 720dp with bottom counter. Transient scroll resets
   on page changes/reopen/recreation/return from Settings. Main nav hides.
   NO Next/Previous/swipes yet; forward navigation needs atomic completion.
+- Migration 0005 issues completion IDs and atomically records dated page anchors/
+  current position. Duplicate payloads never move progress; conflicts/stale inputs
+  error. Rereads use a fresh ID. Repository-only: no app/runtime/FFI forward hook;
+  encounters/New→Known/time must join this transaction before exposing controls.
 - Pure pagination covers all presets, paragraph/sentence fallback, explicit chapter
   boundaries and exact-offset reflow. No inferred TXT chapters.
 - Storage 0001–0002 retain exact immutable text, first-line titles, provenance and
@@ -35,11 +39,11 @@ After each completed, verified step, update docs and commit it automatically.
   NDK r30/API 29; arm64-v8a and x86_64 build.
 
 ## Next tasks (ordered)
-1. Add completion command IDs/history with atomic repository tests; forward
-   navigation must never use position-only saves as completion.
-2. Verify Sudachi.rs/Full dictionary API/license and add analysis/surface anchors,
-   vocabulary registration and atomic encounter/New→Known prerequisites; then
-   wire Next/Previous/swipes with real completion semantics.
+1. Verify Sudachi.rs/Full dictionary API/license; add analysis/surface anchors,
+   vocabulary registration and atomic encounter/New→Known prerequisites.
+2. Extend the completion transaction with occurrences/status/time; wire frozen
+   IDs through core/runtime/FFI and Next/Previous/swipes. Never use position-only
+   saves as forward completion. Active timer/finished-book tasks stay unchecked.
 3. Add CI for verified host Rust/Kotlin checks and unsigned Android build.
 
 ## Last verified checks
@@ -54,10 +58,11 @@ tools/test-kotlin-bridge.sh
 tools/format-kotlin.sh --check
 git diff --check
 ```
-PASS: 81 Rust tests (30 storage), all 25 app reflow pairs, host JNI presets/reopen/
-errors/lifecycle and seven Unicode exchanges. Android app/test APKs, strict lint
-and all seven API 36 x86_64 tests PASS on phone/tablet landscape. Viewport restored.
-Arm64 execution untested. Initial plural-label lint fixed; rerun PASS.
+PASS: 91 Rust tests (40 storage), including ten completion repository tests,
+all 25 app reflow pairs, host JNI and seven Unicode exchanges. Android app/test
+APKs, strict lint and all seven API 36 x86_64 phone tests PASS. Viewport unchanged;
+tablet tests were not rerun for this repository-only slice.
+Arm64 execution untested. Initial test-vector clippy finding fixed; rerun PASS.
 
 ## Environment/blockers
 - Direct Rust PATH avoids rustup read-only maintenance. Local tool overrides in
@@ -68,4 +73,4 @@ Arm64 execution untested. Initial plural-label lint fixed; rerun PASS.
   installDebug to launch. Stop: android emulator stop emulator-5554.
 - Intentional-close Crux logs and ktfmt/JDK/SDK warnings remain benign.
 - No local-reader blocker. Nostr config stays empty; ask Q188 before forwarding.
-  No production edit/rename/delete, repair, completion or history yet.
+  No production edit/rename/delete, repair or exposed completion/history yet.

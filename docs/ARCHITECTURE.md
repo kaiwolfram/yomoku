@@ -51,8 +51,15 @@ projects titles/current percentage in allocation order using canonical BLOB leng
 without reading all text. Migration 0004 stores the global page-length preset
 in a constrained singleton. Immediate settings transactions validate existing
 values and preserve them on failure; missing/corrupt rows return typed errors.
-No edit/rename/delete API exists. Thirty storage tests cover migrations, reopen,
-rollback, Unicode, concurrency, ID allocation and settings.
+Migration 0005 adds durable completion command IDs and dated page history. Pure
+PageCompletion validates the exact departing page/position; storage records history
+and destination position atomically. Duplicate IDs require identical payloads and
+never rewrite progress, including after reflow/reopen/deletion. Rereads allocate a
+fresh ID; position-only saves never add history. These repository methods have no
+app event/runtime/FFI entry point yet: real encounters, New→Known events and active
+time must join the transaction before forward controls are exposed.
+No edit/rename/delete API exists. Forty storage tests cover migrations, reopen,
+rollback, Unicode, concurrency, ID allocation, settings and completion history.
 
 `yomoku-ffi::YomokuBridge` wraps the router in Crux's Bincode bridge.
 BoltFFI 0.30.1 NativeBridge takes a database path and owned EffectsListener,
@@ -62,7 +69,7 @@ Core-only effects stay private. Facet generates Event/ViewModel/Requests and
 document codecs in app.yomoku.shared; BoltFFI generates the native package and JNI C.
 Native wrappers require explicit close; no global singleton exists.
 
-Eighty-one Rust tests cover domain, storage and bridge behavior, including an
+Ninety-one Rust tests cover domain, storage and bridge behavior, including an
 actual SQLite write lock proving dispatch/view/navigation remain responsive.
 The host Kotlin runner uses real JNI with -Xcheck:jni to verify navigation,
 Unicode, async worker callbacks, typed failures, reopen persistence, isolation,

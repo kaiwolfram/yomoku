@@ -54,6 +54,10 @@ identity!(
     ChapterId,
     "An immutable canonical text unit, independent of logical pages."
 );
+identity!(
+    CompletionCommandId,
+    "A database-issued completion intent; retries reuse it, rereads allocate another."
+);
 
 /// Validated paste input. Keep the exact text so durable anchors remain valid.
 #[derive(Clone, Debug, Eq, PartialEq)]

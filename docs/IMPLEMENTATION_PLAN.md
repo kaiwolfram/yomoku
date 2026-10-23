@@ -46,7 +46,8 @@ position/encounter history. Keep incremental builds green.
 - [x] Add Android paste flow returning to Library, list titles and first-page reader opening; test first import/open, draft/error retention, recreation and Back. Rust owns routes and default-500 first-page projection; current progress is the separate task below.
 - [x] Add Library current progress with persisted reader position; test forward/backward percentage changes and reopen. Migration 0003 and typed position-only saves validate ownership/UTF-8 boundaries, retain exact offsets, survive reopen and roll back failures; Rust/JNI/Android tests pass. Page controls/forward completion remain below; no seek UI is added.
 - [ ] Render centered single-column pages, Next/Previous/swipes and content-bottom counter; test both directions update current position and reset scroll on navigation/reopen.
-- [ ] Implement completion command IDs and atomic persistence; test double callbacks count once, rereading counts again, Previous does not complete.
+- [x] Add repository completion command IDs/history and atomic position persistence; test duplicate callbacks count once (also concurrently/after reopen), rereading with a fresh ID counts again, position-only Previous adds no history, failures roll back, and provenance survives deletion. Migration 0005; ten new repository tests pass.
+- [ ] Wire completion intents through core/runtime/FFI with encounters/New→Known/time in the same transaction, then connect Next/Previous/swipes; verify duplicate UI callbacks and rereads end to end. The repository foundation above is not exposed as a forward action yet.
 - [ ] Implement hidden active-time accumulator with five-minute idle timeout; fake-clock tests cover interactions, dictionary popup, background, close/reboot and pending time committed only on completion.
 - [ ] Persist finished-at-least-once independently of position; test each finish, reopen at page 1, Finish Book return and completion animation.
 
