@@ -621,3 +621,30 @@
   unchanged, emulator left running. Next: pressure/process-death/arm64 gate,
   atomic analyzed import/registration, real completion before reader movement.
   Nostr remains empty; ask Q188 before forwarding.
+
+## 2026-10-23 — Full app process-death recovery
+
+- Started clean. Added a debug-only ADB Activity protected by system DUMP and an
+  external Python driver; no new dependency, production startup/runtime/FFI or
+  schema changes. MainActivity/Compose/CoreSession share the probe process.
+- Two API-36 x86_64 force-stop/restart pairs kill a live verified Full mapping
+  without graceful close. New PIDs reverify the same published inode/mtime/
+  size/read-only mode and pass A/B/C/Unicode/page/72 KB analysis. Cached recovery
+  takes 2.704–3.012 s; PSS remains about 419 MiB after checksum/validation. Exact
+  results/limits are in SUDACHI_MEASUREMENTS.md. Pressure/LMKD and arm64 remain open.
+- Cleanup confirms every app process exits before deleting only its unique probe
+  directory; user data and viewport/radios stay unchanged, ordinary Library
+  reopened. Failure diagnostics/report preservation and bounded waits included.
+- PASS: two death/recovery pairs, all eighteen Android tests, strict lint,
+  debug/test and unsigned release APK builds, manifest/DEX/native-library probe
+  exclusion from release, Kotlin formatting, Python syntax and whitespace.
+  Reports: .local/test-reports/sudachi-process-death/{20261023T194512308957Z.json,full-suite/}.
+  No Rust/host JNI/host Full fixtures/standalone/tablet rerun for this platform
+  measurement slice. Initial ADB sandbox failure resolved with escalation. A
+  post-suite driver rerun found instrumentation had uninstalled the app; added
+  early prerequisite diagnostics and reinstalled debug before final verification.
+  Both final driver pairs pass: report 20261023T194946330811Z.json in that directory.
+- Checked only the verified process-death subtask; broader Full gate stays open.
+  Next: actual pressure/reclamation and production lifecycle decision, physical
+  arm64, then atomic analyzed imports and completion semantics before navigation.
+  Nostr stays empty; ask Q188 before forwarding.

@@ -249,7 +249,48 @@ The first connected Gradle command hit sandbox socket restrictions; escalation
 resolved them. Test-owned dictionary files were removed; no live published inode
 was rewritten/truncated. No tablet/host-JNI/standalone-probe rerun for this slice.
 
-Remaining gate: actual memory-pressure/reclamation and process-death recovery,
-production worker ownership/reuse, physical arm64 measurements and a loading
+At that baseline the remaining gate was actual memory-pressure/reclamation and
+process-death recovery, production worker ownership/reuse, arm64 measurements and a loading
 decision based on those results. No production analyzer/import/reader wiring is
 enabled by this baseline. The broader loading/memory gate stays unchecked.
+
+## App process-death and cached Full recovery
+
+Measured 2026-10-23 on the same API-36 x86_64 emulator/debug Compose app and
+release-optimized native probe. `tools/test-sudachi-process-death.py` launches the
+ordinary MainActivity plus a debug-only ADB Activity in the same app process.
+The Activity uses a unique no-backup directory per pair, opens the real compressed
+Full asset through the private publisher, passes that exact descriptor to JNI,
+closes its Kotlin handles and validates A/B/C, mixed/OOV/normalization/Unicode/NUL,
+510-scalar pages and 72 KB unbroken input. A completed JSON report confirms the
+mapping remains present. The driver checks that PID is still alive, uses
+`am force-stop`, and confirms all app processes exit before relaunch or cleanup.
+An onDestroy/nativeClose marker must be absent: this exercises actual process
+death rather than graceful worker closure. A new PID then repeats analysis using
+the cached file; the inode, mtime, size and read-only mode must be unchanged.
+Both publisher and mapped native constructor reverify bytes on every open.
+
+| Metric | Pair 1 | Pair 2 |
+| --- | --- | --- |
+| Initial PID → recovery PID | 5700 → 5778 | 5860 → 5934 |
+| Extraction + verification/map/init (ms) | 3854.586 | 3531.609 |
+| Cached verification/map/init after death (ms) | 2704.057 | 3011.926 |
+| Initial PSS after validation (KiB) | 428590 | 429326 |
+| Recovery PSS after validation (KiB) | 428809 | 429693 |
+| Published inode before/after | 131097 / 131097 | 131079 / 131079 |
+
+All four processes pass and are force-stopped while mapped, including both
+recovered processes. Test directories are removed only after confirmed exit, then
+ordinary Library is launched. User data, viewport and radios are unchanged.
+Report: `.local/test-reports/sudachi-process-death/20261023T194512308957Z.json`.
+Both pairs also pass with the final driver/preflight; its report is
+`20261023T194946330811Z.json` in the same directory (not included in this table).
+Timings include Kotlin publication verification, JNI and native mapping/checksum;
+PSS includes Compose/CoreSession/debug overhead. No filesystem-cache flush,
+pressure injection, LMKD kill, mid-extraction kill, power loss or arm64 execution.
+Android documents `am start`/`force-stop` in its
+[ADB command reference](https://developer.android.com/tools/adb#am).
+
+Process-death recovery is now verified for this measurement harness. Actual
+memory-pressure/reclamation, production worker lifecycle and physical arm64
+measurements remain open; the broader loading/memory gate remains unchecked.

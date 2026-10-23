@@ -932,3 +932,27 @@ API evidence: [JNI naming, native arguments and primitive mappings](https://docs
 and Rust 1.99.1 [BorrowedFd lifetime and exact-description duplication](https://doc.rust-lang.org/std/os/fd/struct.BorrowedFd.html).
 The boundary never dereferences its unused JNI pointers. Production event/view
 payloads continue to use the existing generated, typed BoltFFI bridge.
+
+## 2026-10-23 — External Full process-death recovery probe
+
+Use a separate debug-only Activity and Python/ADB driver to terminate an app with
+a live mapped analyzer. Instrumentation cannot kill its own process and continue
+asserting recovery, so an external driver launches both MainActivity and the probe
+in the same process, waits for validated/mapped state and force-stops the package.
+Confirm all package processes exit before restart or removal of test-private files.
+The recovered process must have a different PID, reverify through both publisher
+and native mapping, pass the real fixtures and preserve publication inode/mtime/
+size/read-only permissions. A normal onDestroy queues nativeClose and publishes
+a marker; this marker must be absent in the killed-process experiment.
+
+Protect the exported debug entry point with the system DUMP permission (ADB shell
+can launch it); accept only fixed phases and a 32-hex run token, never arbitrary
+paths or native input. Production startup/runtime/FFI remain independent. The
+Activity and manifest entry live only in the debug source set alongside the
+existing measurement JNI facade; release APKs must exclude them.
+
+This measures force-stop recovery with a complete publication, not LMKD pressure,
+interrupted extraction, power failure or physical-device viability. Leave the
+broader loading/lifecycle gate unchecked. No library/version changes.
+API evidence: Android's [ADB activity-manager commands](https://developer.android.com/tools/adb#am)
+and [DUMP permission](https://developer.android.com/reference/android/Manifest.permission#DUMP).

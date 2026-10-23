@@ -814,3 +814,46 @@ First connected Gradle command needed socket escalation; the initial map asserti
 used an absolute Context path while /proc can use another private-directory alias.
 The unique test-directory suffix check passes in both final processes. No open
 check failure; actual pressure/process-death/physical-arm64 gates remain.
+
+## App Full process-death recovery
+
+Build the current debug APK with the usual Android environment above, then:
+
+```sh
+/home/kai/Android/Sdk/platform-tools/adb -s emulator-5554 install -r android/app/build/outputs/apk/debug/app-debug.apk
+python3 tools/test-sudachi-process-death.py --serial emulator-5554
+```
+
+The driver requires an installed debug APK; it never builds/downloads/installs
+implicitly. Connected instrumentation uninstalls the app, so reinstall debug before
+running the driver afterward; preflight rejects a missing/non-debuggable package.
+It force-stops app.yomoku (retaining user data), launches MainActivity
+and an ADB-only debug Activity in the same process, waits for real Full validation
+with a live mapping, kills the process, and validates cached recovery in a new
+PID. Two pairs run by default (`--runs N`). The debug manifest protects the
+exported probe with the system DUMP permission. It accepts fixed phases and a
+32-hex run token only. Neither the Activity nor its manifest entry is in release.
+
+Each run owns no_backup/process-probe-<token>. JSON reports include PID, actual
+verified-FD inode/mtime/size/permissions, timing and PSS; normal onDestroy would
+write a native-close marker, which must be absent after force-stop. Every process
+must exit before that directory is removed. A failed check retains the host
+report; cleanup still confirms exit first. No app data clear, radio/viewport
+changes, memory-pressure simulation or filesystem-cache flushing. The driver
+finishes by opening ordinary Library. Do not run it alongside instrumentation.
+ADB sockets can require escalation in the sandbox; command failures include
+captured stdout/stderr.
+
+PASS 2026-10-23: two API-36 x86_64 death/recovery pairs (four real Full processes),
+all eighteen Android tests, strict lint, both-ABI debug/test and unsigned release
+APK assembly, Kotlin formatting, Python syntax and whitespace. APK manifest/DEX/
+ZIP inspection confirms the probe Activity/facade/library are debug-only. Reports:
+.local/test-reports/sudachi-process-death/20261023T194512308957Z.json and full-suite/.
+Initial driver command hit sandbox ADB restrictions; escalation passed. A later
+rerun found instrumentation had uninstalled the app; explicit reinstall resolves
+it, and the new preflight reports that prerequisite before any process/file work.
+Final driver repeats both pairs successfully; report 20261023T194946330811Z.json
+in the same directory. Rust/host JNI/host Full fixtures/standalone probes/tablet
+were not rerun for this debug-only
+Kotlin/driver slice. Pressure/LMKD, mid-extraction death, power loss and physical
+arm64 remain unverified; production loading/lifecycle remains gated.

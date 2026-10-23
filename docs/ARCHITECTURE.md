@@ -102,8 +102,15 @@ by a test ViewModel. It verifies reuse over Activity recreation/stop/resume,
 close/unmapping on that worker, and fresh-worker reopen. Test files are removed
 only after all worker mappings drop. This measures Compose/JVM/native PSS/RSS
 together; the test owner/executor is not a production analyzer architecture.
-Low-memory reclamation/process death and physical arm64 remain separate gates;
-see SUDACHI_MEASUREMENTS.md. Release APKs exclude the JNI facade/library.
+An ADB-only debug Activity (protected by the system DUMP permission) adds an
+external process-death experiment. Its driver force-stops the app while Full is
+mapped, confirms all app processes exit without graceful close, and launches a
+new process against the same test-private publication. Two x86_64 pairs preserve
+the inode/mtime/read-only permissions and pass real analysis after re-verification.
+Cleanup runs only after confirmed process exit. This is force-stop recovery,
+not an OS low-memory-killer or interrupted-extraction simulation. Low-memory
+reclamation and physical arm64 remain gates; see SUDACHI_MEASUREMENTS.md.
+Release APKs exclude the probe Activity/facades and the probe library.
 
 Pure `pagination` derives chapter-local TextAnchor pages from ordered immutable
 ChapterText snapshots. Five presets count non-whitespace Unicode scalars; LF/CRLF
