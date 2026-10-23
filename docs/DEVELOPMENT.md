@@ -724,3 +724,43 @@ No low-memory reclamation/app-viability claim. Physical arm64, private asset
 extraction and combined app/lifecycle measurements remain pending. No APK/Compose
 instrumentation, Android lint or host Kotlin/JNI rerun for this adapter/tooling
 slice; the analyzer remains outside app/runtime/FFI dependencies.
+
+## On-demand private Full extraction
+
+The Android platform helper in `SudachiDictionaryFiles.kt` has no startup or
+production analyzer caller yet. A worker can open the pinned Full asset into
+noBackupFilesDir/sudachi on demand. It returns a verified read-only descriptor,
+not an unchecked path. Always close the handle; do not introduce writers to the
+published inode. Repair uses a new inode/atomic rename so held readers/mappings
+keep their original bytes. First extraction needs about 315 MiB private disk in
+addition to the compressed APK; cache verification still reads the whole file.
+
+Use the existing Android environment above. Build/check both packaged ABIs and
+run all tests, or select just the eight new extraction tests:
+
+```sh
+./android/gradlew -p android :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug --offline --console=plain
+./android/gradlew -p android :app:connectedDebugAndroidTest :app:lintDebug --offline --console=plain
+./android/gradlew -p android :app:connectedDebugAndroidTest :app:lintDebug -Pandroid.testInstrumentationRunnerArguments.class=app.yomoku.SudachiDictionaryFilesTest --offline --console=plain
+tools/format-kotlin.sh --check
+git diff --check
+```
+
+PASS: app/test APK assembly, strict lint, Kotlin formatting and all seventeen
+API-36 x86_64 phone tests. Eight new tests cover lazy/worker-only access,
+size/checksum failures/retry, corrupt/writable cache, abandoned staging,
+failed rename/cleanup retry, read-only handles, held reader/mapping preservation,
+concurrent requests and real APK Full extraction/cache verification. Test data
+uses unique private directories and is removed; production user files and device
+viewport/radios remain unchanged. Reports: .local/test-reports/sudachi-extraction/.
+Timing/method/limits: SUDACHI_MEASUREMENTS.md. Physical arm64, actual power loss,
+ENOSPC and cross-process lock contention are untested. App analyzer memory/reuse/
+lifecycle remains gated; no runtime/FFI entry point or dependencies changed.
+
+Initial compile used non-public O_DIRECTORY; removed after inspecting the API-36
+android.jar and verified directory fsync on device. An interrupted-stream fixture
+was tightened to keep failing after the first read exception; all eight final
+focused tests and lint pass after restarting a disconnected emulator with swangle.
+A sandbox Gradle socket failure was rerun with escalation. No separate Rust tests,
+host JNI or standalone probes rerun for this Kotlin/platform slice; native
+packaging uses the existing bridge.

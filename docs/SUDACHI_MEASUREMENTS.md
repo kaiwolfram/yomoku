@@ -72,7 +72,7 @@ verify before publication, and never replace bytes while an analyzer uses them.
 Keep a single reusable analyzer per worker rather than loading per page or eagerly
 on Library startup. These are integration constraints, not implemented app behavior.
 
-APK decompression/private-file extraction, reclamation under memory pressure, combined
+At this baseline, APK decompression/private-file extraction, reclamation under memory pressure, combined
 JVM/Compose memory, app lifecycle/low-memory behavior, physical arm64 execution and
 large-book imports remain unmeasured. Both Android probe ABIs link, but only x86_64
 has executed. This baseline does not establish production memory viability or
@@ -132,9 +132,49 @@ Reports under `.local/test-reports/sudachi-android/`:
 `20261023T190838226632Z-x86_64-release-both.txt` and
 `20261023T191034834502Z-x86_64-debug-both.txt`.
 
-Remaining gate: implement/measure on-demand private extraction with verified
-immutable publication and failure recovery; measure combined app memory and
+Private extraction/failure recovery is now measured separately below.
+Remaining gate: consume the verified descriptor in an in-app analyzer harness,
+measure combined app memory and
 lifecycle/low-memory behavior; execute on physical arm64. Production must never
 truncate or rewrite a live backing file. Keep one reusable worker-owned analyzer,
 and retain safe owned loading for uncontrolled paths. The overall storage-viability
 task remains incomplete until these checks are resolved.
+
+## Private APK extraction and verified reopen
+
+Measured 2026-10-23 by `SudachiDictionaryFilesTest` in the installed debug APK on
+the same API-36 x86_64 emulator. The production platform helper reads the normal
+compressed APK asset into a unique test-private no-backup directory. It uses
+64 KiB buffers, checks the pinned length and the complete on-disk SHA-256, syncs
+data/permissions, publishes mode-400 bytes by atomic rename and syncs the directory.
+The test gets a read-only descriptor at offset zero, then constructs a new helper
+and verifies that reopening reuses the same inode after rehashing all bytes.
+Both handles close before test-private files are deleted. Production user files
+are untouched; viewport/radios are unchanged. The app has no network permission.
+
+| Metric | Full-suite process (ms) | Final focused process (ms) |
+| --- | --- | --- |
+| Compressed Full extraction, verification and publication | 3272.655 | 2272.742 |
+| Verified private-file reopen (no APK decompression) | 631.694 | 689.301 |
+
+These are end-to-end elapsed-realtime readings, not separate decompression/hash/
+sync timings. The emulator restarted between the full suite and the final focused
+rerun (which verifies a tightened interrupted-input fixture). No caches were
+flushed; these are two samples, not a distribution or a cold-storage/physical-arm64
+measurement. No analyzer is initialized in this
+test; combined JVM/Compose/Sudachi peak/PSS, worker reuse and reclamation/lifecycle
+remain unmeasured. The compressed APK still needs approximately 315 MiB extra
+private disk space; repair temporarily needs a separate staging copy too.
+
+All seventeen phone instrumentation tests pass, including eight new extraction
+tests; the final eight focused tests and lint also pass after the fixture change.
+Synthetic fixtures exercise missing/interrupted/short/oversized/wrong-hash
+assets, abandoned staging, corrupt/writable cached files, held readers/mappings,
+concurrent requests, and actual rename denial by removing directory write access.
+Failed publication preserves the prior inode, and retry removes abandoned staging.
+This simulates interrupted-process artifacts; it does not inject a power failure,
+kill a writer mid-copy, or test cross-process contention/ENOSPC on physical storage.
+
+Reports/logs: `.local/test-reports/sudachi-extraction/{phone,final-focused}/`. Build/test commands
+and the focused test selector are in DEVELOPMENT.md. The broader loading/memory
+gate stays unchecked until in-app analyzer and lifecycle measurements are complete.

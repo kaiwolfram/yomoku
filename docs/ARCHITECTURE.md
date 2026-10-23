@@ -51,7 +51,18 @@ ignored .local/sudachi. Gradle's bundleSudachi task verifies already prepared da
 and stages the dictionary plus complete LEGAL/LICENSE under generated Android
 assets; it never downloads data. Settings reads and displays both full notices
 off the main thread in a selectable, scrollable dialog. The dictionary remains
-compressed in the APK; no private-file copy or eager analyzer load occurs.
+compressed in the APK; no private-file copy or eager analyzer load occurs at startup.
+An on-demand Kotlin platform helper can extract to noBackupFilesDir/sudachi, using
+the pinned size/SHA-256 and a bounded streaming buffer. It rejects main-thread
+opens and serializes publication across threads/processes. It fsyncs, verifies,
+makes staging bytes read-only, atomically renames and syncs the directory before
+returning the same verified descriptor at offset zero. Published inodes are never
+opened for writes/truncation; repair preserves held readers/mappings. Cache hits
+rehash bytes without APK decompression; abandoned staging/failures can retry.
+The helper has no startup/runtime/FFI caller yet. Eight extraction instrumentation
+tests pass, including real compressed Full and failed-rename recovery; two API-36
+x86_64 runs take 2.273–3.273 s to extract/verify, 0.632–0.689 s to reverify. No analyzer
+or combined-memory/lifecycle claim follows. See SUDACHI_MEASUREMENTS.md.
 This crate has no app/runtime/FFI entry point yet. A standalone native example
 and CLI driver measure the actual adapter on Android without installing the app:
 three debug and three release processes pass offline A/B/C/Unicode/long-input
@@ -60,7 +71,8 @@ validation on API 36 x86_64. Release initialization takes 1.03–1.20 s, with ab
 See SUDACHI_MEASUREMENTS.md for exact methodology and limitations. The driver
 verifies pinned source/data, temporarily disables radios, restores their original
 settings and removes its own device files. Both probe ABIs link; physical arm64,
-private asset extraction and combined app/lifecycle memory remain unmeasured.
+combined app/lifecycle memory remain unmeasured. Private extraction is measured
+separately below the standalone results in SUDACHI_MEASUREMENTS.md.
 The owned/mapped comparison reduces release initialized anonymous memory from
 about 318 MiB to 2.5 MiB; total RSS remains similar after the complete checksum
 read. File-backed residency alone does not demonstrate reclamation under pressure.
@@ -74,8 +86,8 @@ reverses the patch in a temporary copy and verifies every original byte. Both
 Android targets compile. The profile includes +android-loader-v1; segmentation
 and embedded configuration are unchanged. App integration remains pending.
 Owned dictionary bytes alone require about 315 MiB. Mapped storage avoids that
-anonymous copy, but production must first enforce immutable private publication
-and measure extraction/combined app memory. Keep one on-demand worker-owned
+anonymous copy. The private extraction helper enforces immutable publication;
+production must still measure combined app memory. Keep one on-demand worker-owned
 analyzer and avoid eager Library initialization or per-page reloads.
 
 Pure `pagination` derives chapter-local TextAnchor pages from ordered immutable
@@ -171,8 +183,9 @@ Rust; the unsaved form draft and notice dialog visibility use rememberSaveable.
 The draft is retained through Settings/recreation.
 Navigation uses a bottom bar below 600dp and a scrollable rail above; Settings,
 paste and reader routes hide it. Toolbar/system Back return through Rust routes.
-Nine instrumentation tests pass on API 36 x86_64 phone; the two new asset/notices
-tests also pass on tablet landscape, both runs in airplane mode. The seven prior
+Seventeen instrumentation tests pass on API 36 x86_64 phone (including eight
+private-extraction tests). The two asset/notices tests previously passed on phone
+and tablet landscape in airplane mode. The seven prior
 tests previously passed on phone and tablet landscape,
 including paste/draft/errors, recreation/Back, saved offsets, bidirectional
 percentages, scroll resets, Settings reflow and persisted preset reopening.

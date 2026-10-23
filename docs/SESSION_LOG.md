@@ -559,3 +559,32 @@
   combined app/lifecycle memory before runtime integration; atomic analyzed import/
   unique registration; completion occurrences/status/time before reader movement.
   Nostr/Q188 remain unchanged.
+
+## 2026-10-23 — On-demand private Full extraction and recovery
+
+- Started clean. Added a Kotlin platform helper for worker-only, lazy extraction
+  from the compressed APK to SHA-256-named no-backup private files. Streams with
+  bounded buffers; verifies pinned size/on-disk bytes, syncs, publishes read-only
+  bytes by atomic rename and returns the same verified descriptor at offset zero.
+  JVM/process publication locks serialize callers. Repair/cleanup never writes
+  or truncates a published inode, preserving existing readers/mappings.
+- Eight new Android tests verify real Full extraction/cache reuse, concurrent
+  requests, worker-only access, interrupted/corrupt assets, abandoned staging,
+  failed rename/retry, descriptor permissions and held-reader/mapping preservation.
+  Two instrumented x86_64 processes: extraction+verification 2.273–3.273 s;
+  verified reopen 0.632–0.689 s. Exact results/limits in SUDACHI_MEASUREMENTS.md.
+- PASS: both-ABI app/test APK assembly, strict Android lint, all seventeen phone
+  tests, final eight focused tests after tightening the interrupted-stream
+  fixture, Kotlin formatting and whitespace. Reports retained under ignored
+  .local/test-reports/sudachi-extraction/. No tablet, Rust/host JNI or native probe
+  rerun for this platform-only slice. No dependencies, schemas or FFI changes.
+- Initial compile used non-public O_DIRECTORY; checked installed SDK signatures,
+  switched to public O_RDONLY and verified directory sync on device. Final focused
+  run first hit sandbox sockets, then a disconnected emulator; escalation and
+  documented swangle restart resolved both. No remaining check failure.
+- Test-private files removed; viewport/radios unchanged, emulator left running.
+  No runtime/startup/analyzer caller yet. Combined app memory, analyzer worker
+  reuse/lifecycle/low-memory and physical arm64 remain gated. No actual power-loss,
+  ENOSPC or cross-process contention claim. Next: in-app descriptor/analyzer
+  measurement harness; atomic analyzed import/registration; real completion.
+  Nostr stays empty; Q188 remains before forwarding.

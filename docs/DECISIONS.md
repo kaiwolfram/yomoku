@@ -864,3 +864,39 @@ anonymous allocation in Android measurements, but checksum verification touches
 all mapped pages, so initial total RSS remains similar. See SUDACHI_MEASUREMENTS.md;
 do not equate file-backed residency with demonstrated low-memory behavior or
 finished app viability. Keep on-demand worker reuse as an integration requirement.
+
+## 2026-10-23 — On-demand verified private dictionary publication
+
+Implement the private-file part of the loading gate independently of analyzer
+integration. Kotlin owns APK asset extraction/platform file operations; core,
+SQLite, runtime and FFI remain unchanged. The helper has no startup caller and
+rejects main-thread opens. Use `Context.noBackupFilesDir/sudachi`, a SHA-256-named
+Full file, a 64 KiB streaming buffer and the existing pinned size/checksum. No new
+dependencies or versions. Storage demand is approximately 315 MiB in addition to
+the compressed APK, with another staging copy needed when repairing an old file.
+
+Serialize publication with a JVM monitor plus a persistent file-channel lock
+across processes; JVM file locks alone throw on overlapping same-process locks.
+Under that lock, discard only this helper's abandoned staging files, verify an
+existing descriptor/permissions or extract to a separate temporary inode. Sync
+the complete file, verify its on-disk bytes, mark it mode 400, sync again, rename
+atomically and sync the directory. Return that same verified read-only descriptor
+at offset zero, with explicit caller ownership. Cache reuse still hashes every
+byte but does not decompress the APK again. Failures propagate and can retry.
+
+Never open a published inode for writing/truncation, even during corruption
+recovery. Replacement changes the directory entry while existing descriptors and
+mappings keep their original inode. A failed copy/rename preserves the prior
+publication; an unclean process exit may leave only disposable staging bytes or
+a complete publication that the next open rechecks. Read-only permissions do not
+stop a future same-UID writer: all future cleanup/update code must honor this
+directory's ownership and immutable-inode rule. Native integration must consume
+the verified descriptor and retain the mapped constructor's own checksum check.
+No production mapping, analyzer reuse, lifecycle/low-memory or physical-arm64
+claim follows from this helper alone.
+
+API evidence: Android's [Os reference](https://developer.android.com/reference/android/system/Os)
+for fstat/fchmod/fsync/rename/open, [private no-backup directory](https://developer.android.com/reference/android/content/Context#getNoBackupFilesDir()),
+and Java 17 [FileChannel locks](https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/nio/channels/FileChannel.html#lock()).
+Checked the installed API-36 android.jar signatures too; Android's public
+OsConstants lacks O_DIRECTORY, so directory sync uses an O_RDONLY handle.
