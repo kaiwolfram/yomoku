@@ -76,11 +76,11 @@ new page index. A position at an internal page boundary selects the next page;
 chapter EOF selects that chapter's final page. Unknown ownership, out-of-range
 offsets and split scalars are rejected. ReadingPosition has generated Serde/Facet
 codecs and is persisted by migration 0003 below. Vertical scroll, encounters and
-settings are not stored here; reader reflow events remain future work.
+settings are not stored here; reader reflow uses migration 0004 below.
 Paragraph/sentence heuristics are recorded in DECISIONS.md.
 
 ReaderPage is a transient projection of the logical page containing the saved
-ReadingPosition, at the default 500 preset: document ID/title, exact page text,
+ReadingPosition, at the persisted global preset (default 500): document ID/title, exact page text,
 TextAnchor, unchanged ReadingPosition, and one-based page number/total. Unopened
 documents start at byte 0. No page number or vertical scroll is stored. Kotlin
 renders this projection without calculating boundaries or slicing Unicode text.
@@ -153,6 +153,28 @@ previous snapshot. Leaving during a save does not cancel the write or reopen the
 reader when its callback arrives. Next/Previous/swipes and atomic forward
 completion must be wired in their own implementation step.
 
+## Reader settings repository (migration 0004)
+`reader_settings` is a STRICT singleton table (`id = 1`) with `page_length`
+constrained to 250/500/750/1000/1500. Migration seeds 500 and leaves canonical
+text/current positions untouched. Store the character count, never a Rust enum
+ordinal. PageLength has same-build Serde/Facet codecs for the typed FFI.
+
+`page_length` validates the stored value; `save_page_length` reads/validates the
+existing row and updates inside an immediate transaction, returning after commit.
+Missing/invalid rows return InvalidSettings without repair; write/commit failures
+leave the prior setting intact. Runtime maps this to a typed error. No page number,
+range or document-specific setting is persisted.
+
+Library and document loads include the stored preset. Core exposes an optional
+page_length until a successful load, so Settings cannot submit an assumed default
+after a failed startup. SetPageLength requires loaded settings and the Settings
+route; unchanged selections and submissions while busy are ignored. The selected
+preset and reader stay at their committed values until success. Core retains the
+active immutable reader snapshot independently of the public LoadPaste snapshot,
+then reprojects using the reader's exact ReadingPosition. Reflow never writes
+current position, Library progress, encounters or completion. Late settings saves
+update the global preset without reopening closed reader/Settings routes.
+
 ## Transient application state
 `app::Destination` is Library (default), Nostr, Statistics or Vocabulary.
 `Model` owns the selected destination; `ViewModel` projects it for the shell.
@@ -178,7 +200,7 @@ Create success returns to Library and adds its title without opening a reader;
 failure leaves the form/draft for retry. The unsaved text draft is Compose form
 state, retained through Settings/recreation and cleared when leaving the form.
 
-RefreshLibrary/CreatePaste/LoadPaste/SaveReadingPosition use the pure
+RefreshLibrary/CreatePaste/LoadPaste/SaveReadingPosition/SetPageLength use the pure
 StorageOperation protocol.
 StorageFinished is skipped by Serde and Facet, so it cannot be dispatched over
 FFI. Model/ViewModel add LibraryDocument (ID/title/current percentage), an optional loaded snapshot,

@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     document::{DocumentId, LibraryDocument, PastedDocument},
-    pagination::ReadingPosition,
+    pagination::{PageLength, ReadingPosition},
     reader::ReaderPage,
     storage::{DocumentError, StorageOperation, StorageResult},
 };
@@ -48,6 +48,8 @@ pub struct Model {
     content_route: ContentRoute,
     reader: Option<ReaderPage>,
     pending_reader: Option<DocumentId>,
+    reader_document: Option<PastedDocument>,
+    page_length: Option<PageLength>,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -65,6 +67,7 @@ pub enum Event {
     CloseDocument,
     /// Position-only persistence hook; page completion uses a separate command.
     SaveReadingPosition(ReadingPosition),
+    SetPageLength(PageLength),
     #[serde(skip)]
     #[cfg_attr(feature = "facet_typegen", facet(skip))]
     StorageFinished(StorageResult),
@@ -81,6 +84,8 @@ pub struct ViewModel {
     pub document_error: Option<DocumentError>,
     pub content_route: ContentRoute,
     pub reader: Option<ReaderPage>,
+    /// None until persisted settings have been loaded successfully.
+    pub page_length: Option<PageLength>,
 }
 
 #[effect]
@@ -103,6 +108,15 @@ impl App for Yomoku {
             Event::RefreshLibrary => Some(StorageOperation::List),
             Event::CreatePaste(text) => Some(StorageOperation::CreatePaste(text.clone())),
             Event::LoadPaste(id) | Event::OpenReader(id) => Some(StorageOperation::LoadPaste(*id)),
+            Event::SetPageLength(length) => {
+                if !model.settings_open
+                    || model.page_length.is_none()
+                    || model.page_length == Some(*length)
+                {
+                    return Command::done();
+                }
+                Some(StorageOperation::SavePageLength(*length))
+            }
             Event::SaveReadingPosition(position) => {
                 let Some(reader) = model
                     .reader
@@ -126,7 +140,10 @@ impl App for Yomoku {
             }
             model.storage_busy = true;
             model.document_error = None;
-            if !matches!(event, Event::SaveReadingPosition(_)) {
+            if matches!(
+                event,
+                Event::CreatePaste(_) | Event::LoadPaste(_) | Event::OpenReader(_)
+            ) {
                 model.loaded_document = None;
             }
             if let Event::OpenReader(id) = event {
@@ -135,6 +152,7 @@ impl App for Yomoku {
                 model.content_route = ContentRoute::Reader;
                 model.pending_reader = Some(id);
                 model.reader = None;
+                model.reader_document = None;
             }
             return render::render()
                 .and(Command::request_from_shell(operation).then_send(Event::StorageFinished));
@@ -145,6 +163,7 @@ impl App for Yomoku {
                 model.settings_open = false;
                 model.content_route = ContentRoute::Main;
                 model.reader = None;
+                model.reader_document = None;
                 model.pending_reader = None;
             }
             Event::OpenPaste => {
@@ -152,12 +171,14 @@ impl App for Yomoku {
                 model.settings_open = false;
                 model.content_route = ContentRoute::Paste;
                 model.reader = None;
+                model.reader_document = None;
                 model.pending_reader = None;
                 model.document_error = None;
             }
             Event::CloseDocument => {
                 model.content_route = ContentRoute::Main;
                 model.reader = None;
+                model.reader_document = None;
                 model.pending_reader = None;
                 model.document_error = None;
             }
@@ -167,7 +188,11 @@ impl App for Yomoku {
                 model.storage_busy = false;
                 let pending_reader = model.pending_reader.take();
                 match result {
-                    StorageResult::Listed(documents) => model.documents = documents,
+                    StorageResult::Listed(documents, length) => {
+                        model.documents = documents;
+                        model.apply_page_length(length);
+                    }
+                    StorageResult::PageLengthSaved(length) => model.apply_page_length(length),
                     StorageResult::Created(document) => {
                         match document.library_summary() {
                             Ok(summary) => model.documents.push(summary),
@@ -177,13 +202,18 @@ impl App for Yomoku {
                         model.settings_open = false;
                         model.content_route = ContentRoute::Main;
                         model.reader = None;
+                        model.reader_document = None;
                     }
-                    StorageResult::Loaded(document) => {
+                    StorageResult::Loaded(document, length) => {
+                        model.apply_page_length(length);
                         if pending_reader == Some(document.document_id)
                             && model.content_route == ContentRoute::Reader
                         {
-                            match ReaderPage::open(&document) {
-                                Ok(reader) => model.reader = Some(reader),
+                            match ReaderPage::open(&document, length) {
+                                Ok(reader) => {
+                                    model.reader = Some(reader);
+                                    model.reader_document = Some(document.clone());
+                                }
                                 Err(_) => {
                                     model.document_error = Some(DocumentError::InvalidDocument)
                                 }
@@ -210,9 +240,11 @@ impl App for Yomoku {
                                 .as_ref()
                                 .is_some_and(|reader| reader.document_id == document.document_id)
                         {
-                            match ReaderPage::open(&document) {
+                            match ReaderPage::open(&document, model.page_length.unwrap_or_default())
+                            {
                                 Ok(reader) => {
                                     model.reader = Some(reader);
+                                    model.reader_document = Some(document.clone());
                                     model.loaded_document = Some(document);
                                 }
                                 Err(_) => {
@@ -228,6 +260,7 @@ impl App for Yomoku {
             | Event::CreatePaste(_)
             | Event::LoadPaste(_)
             | Event::OpenReader(_)
+            | Event::SetPageLength(_)
             | Event::SaveReadingPosition(_) => unreachable!(),
         }
         render::render()
@@ -243,6 +276,19 @@ impl App for Yomoku {
             document_error: model.document_error,
             content_route: model.content_route,
             reader: model.reader.clone(),
+            page_length: model.page_length,
+        }
+    }
+}
+
+impl Model {
+    fn apply_page_length(&mut self, length: PageLength) {
+        self.page_length = Some(length);
+        if let (Some(reader), Some(document)) = (&self.reader, &self.reader_document) {
+            match ReaderPage::at(document, reader.position, length) {
+                Ok(page) => self.reader = Some(page),
+                Err(_) => self.document_error = Some(DocumentError::InvalidDocument),
+            }
         }
     }
 }

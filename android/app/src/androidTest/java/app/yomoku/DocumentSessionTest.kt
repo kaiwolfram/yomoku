@@ -4,6 +4,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import app.yomoku.shared.DocumentError
 import app.yomoku.shared.Event
+import app.yomoku.shared.PageLength
 import app.yomoku.shared.TextOffset
 import app.yomoku.shared.ViewModel
 import java.io.File
@@ -66,6 +67,12 @@ class DocumentSessionTest {
             assertNull(saved.documentError)
             assertEquals(position, saved.reader!!.position)
             document = saved.loadedDocument!!
+            dispatch(core, Event.OpenSettings)
+            assertEquals(
+                PageLength.CHARACTERS750,
+                dispatch(core, Event.SetPageLength(PageLength.CHARACTERS750)).pageLength,
+            )
+            dispatch(core, Event.CloseSettings)
             val summaries = saved.documents
             assertEquals(
                 DocumentError.EMPTYPASTE,
@@ -76,7 +83,9 @@ class DocumentSessionTest {
             active = null
             instrumentation.runOnMainSync { core = CoreSession(database.absolutePath) }
             active = core
-            assertEquals(summaries, awaitIdle(core).documents)
+            val initial = awaitIdle(core)
+            assertEquals(summaries, initial.documents)
+            assertEquals(PageLength.CHARACTERS750, initial.pageLength)
             assertEquals(
                 document,
                 dispatch(core, Event.LoadPaste(document.documentId)).loadedDocument,

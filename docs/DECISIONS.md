@@ -568,3 +568,22 @@ Use transient Compose remember { ScrollState(0) }, keyed by document/page anchor
 instead of rememberScrollState's saved instance state. Page changes, route reopen
 and Activity recreation start at the top. No vertical offset enters Rust/SQLite.
 No dependencies, Nostr configuration or product completion behavior change.
+
+## 2026-10-23 — Persisted global page length and reader reflow
+Continue the independent Settings task while forward navigation awaits atomic
+completion/history and real analysis/vocabulary repositories. Append migration
+0004 with a constrained singleton, default 500, storing character counts rather
+than enum ordinals. No new dependencies, destructive semantics or Nostr changes.
+Missing/corrupt settings are errors, never repaired by selecting a new value.
+Use the existing FIFO worker, immediate transactions and commit-before-render
+policy; failure leaves the selected preset/page unchanged and permits retry.
+
+Library/document loads carry the stored preset, including on fresh processes and
+direct reader opens. Core exposes no selected preset until a successful load;
+Compose disables unknown/busy settings and can retry initial loading. A typed
+SetPageLength event handles only the five presets. The active immutable reader
+snapshot is retained independently of repository LoadPaste snapshots so reflow
+cannot use another document's text. Reproject its exact current ReadingPosition;
+never replace it with the new page's start or write progress during reflow.
+Returning from Settings remounts the transient reader scroll at the top. Late
+commits after leaving update the global value without reopening any route.

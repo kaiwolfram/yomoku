@@ -22,7 +22,7 @@ pub struct ReaderPage {
 }
 
 impl ReaderPage {
-    pub fn open(document: &PastedDocument) -> Result<Self, InvalidTextValue> {
+    pub fn open(document: &PastedDocument, length: PageLength) -> Result<Self, InvalidTextValue> {
         Self::at(
             document,
             document.reading_position.unwrap_or(ReadingPosition {
@@ -30,17 +30,16 @@ impl ReaderPage {
                 chapter_id: document.chapter.chapter_id,
                 offset: TextOffset::START,
             }),
+            length,
         )
     }
 
     pub fn at(
         document: &PastedDocument,
         position: ReadingPosition,
+        length: PageLength,
     ) -> Result<Self, InvalidTextValue> {
-        let pages = LogicalPages::new(
-            std::slice::from_ref(&document.chapter),
-            PageLength::default(),
-        )?;
+        let pages = LogicalPages::new(std::slice::from_ref(&document.chapter), length)?;
         let page_index = pages.page_at(position)?;
         let anchor = pages.pages()[page_index];
         Ok(Self {

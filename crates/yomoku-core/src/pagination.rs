@@ -9,7 +9,9 @@ use crate::document::{
 };
 
 /// Counts non-whitespace Unicode scalars, including punctuation and Latin text.
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+#[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
+#[repr(C)]
 pub enum PageLength {
     Characters250,
     #[default]

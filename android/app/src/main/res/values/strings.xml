@@ -10,7 +10,12 @@
     <string name="nostr_empty">Nostr is not configured.</string>
     <string name="statistics_empty">No reading history yet.</string>
     <string name="vocabulary_empty">No vocabulary yet.</string>
-    <string name="settings_empty">No settings available yet.</string>
+    <string name="page_length_title">Page length</string>
+    <plurals name="page_length_preset">
+        <item quantity="one">%1$d character</item>
+        <item quantity="other">%1$d characters</item>
+    </plurals>
+    <string name="page_length_description">Logical pages count non-whitespace characters. Changing the length keeps your reading position.</string>
     <string name="paste_title">Paste text</string>
     <string name="paste_label">Text to import</string>
     <string name="save_to_library">Save to Library</string>
@@ -23,4 +28,5 @@
     <string name="error_incompatible_database">This database version cannot be opened.</string>
     <string name="error_invalid_document">This document could not be read.</string>
     <string name="error_document_not_found">This document was not found.</string>
+    <string name="error_invalid_settings">Saved settings could not be read.</string>
 </resources>

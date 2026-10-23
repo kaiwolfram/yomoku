@@ -126,8 +126,7 @@ internal fun YomokuApp(view: ViewModel, dispatch: (Event) -> Unit) {
                     contentAlignment = Alignment.TopCenter,
                 ) {
                     when {
-                        view.settingsOpen ->
-                            Text(stringResource(R.string.settings_empty), Modifier.padding(16.dp))
+                        view.settingsOpen -> SettingsScreen(view, dispatch)
                         view.contentRoute == ContentRoute.PASTE ->
                             PasteScreen(view, pasteText, { pasteText = it }, dispatch)
                         view.contentRoute == ContentRoute.READER -> ReaderScreen(view)
@@ -186,6 +185,7 @@ private fun YomokuPreview() {
                 false,
                 null,
                 ContentRoute.MAIN,
+                null,
                 null,
             )
         ) {}

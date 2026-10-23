@@ -65,19 +65,25 @@ fn execute(
     }
     let storage = storage.as_mut().expect("opened storage");
     match operation {
-        StorageOperation::List => storage
-            .list_documents()
-            .map(StorageResult::Listed)
-            .map_err(map_error),
+        StorageOperation::List => Ok(StorageResult::Listed(
+            storage.list_documents().map_err(map_error)?,
+            storage.page_length().map_err(map_error)?,
+        )),
         StorageOperation::CreatePaste(_) => storage
             .create_paste(&paste.expect("validated paste"))
             .map(StorageResult::Created)
             .map_err(map_error),
-        StorageOperation::LoadPaste(id) => storage
-            .load_paste(id)
-            .map_err(map_error)?
-            .map(StorageResult::Loaded)
-            .ok_or(DocumentError::NotFound),
+        StorageOperation::LoadPaste(id) => Ok(StorageResult::Loaded(
+            storage
+                .load_paste(id)
+                .map_err(map_error)?
+                .ok_or(DocumentError::NotFound)?,
+            storage.page_length().map_err(map_error)?,
+        )),
+        StorageOperation::SavePageLength(length) => storage
+            .save_page_length(length)
+            .map(StorageResult::PageLengthSaved)
+            .map_err(map_error),
         StorageOperation::SaveReadingPosition {
             document_id,
             position,
@@ -93,6 +99,7 @@ fn map_error(error: StorageError) -> DocumentError {
     match error {
         StorageError::Sqlite(_) => DocumentError::Unavailable,
         StorageError::InvalidDocument => DocumentError::InvalidDocument,
+        StorageError::InvalidSettings => DocumentError::InvalidSettings,
         StorageError::UnsupportedSchemaVersion { .. }
         | StorageError::InvalidMigrationHistory
         | StorageError::UnrecognizedDatabase => DocumentError::IncompatibleDatabase,

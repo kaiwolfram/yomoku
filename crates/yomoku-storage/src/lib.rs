@@ -3,6 +3,7 @@
 //! Paste repositories use pure domain values. Runtime effect handling is separate.
 
 mod documents;
+mod settings;
 
 use std::{error::Error, fmt, path::Path, time::Duration};
 
@@ -30,6 +31,11 @@ const MIGRATIONS: &[Migration] = &[
         name: "0003_reading_positions",
         sql: include_str!("../migrations/0003_reading_positions.sql"),
     },
+    Migration {
+        version: 4,
+        name: "0004_reader_settings",
+        sql: include_str!("../migrations/0004_reader_settings.sql"),
+    },
 ];
 
 /// Failures are returned to the runtime; opening never resets a database.
@@ -40,6 +46,7 @@ pub enum StorageError {
     InvalidMigrationHistory,
     UnrecognizedDatabase,
     InvalidDocument,
+    InvalidSettings,
 }
 
 impl fmt::Display for StorageError {
@@ -57,6 +64,7 @@ impl fmt::Display for StorageError {
                 f.write_str("database has no recognized migration history")
             }
             Self::InvalidDocument => f.write_str("stored document is inconsistent"),
+            Self::InvalidSettings => f.write_str("stored settings are inconsistent"),
         }
     }
 }

@@ -18,16 +18,17 @@ with functioning rustup can omit the PATH workaround. Do not assume this compile
 is the project's minimum supported version; establish that with dependencies.
 Cargo.lock is retained for reproducible application development.
 Crux 0.20.0 declares Rust 1.90 minimum; the full locked graph has only been tested
-with 1.99.1. Current host baseline: 67 tests (six app, four reader flow, six document, 14 pagination,
-five vocabulary, five bridge, four async document, two native facade and 21 storage tests).
+with 1.99.1. Current host baseline: 81 tests (six app, nine reader flow, six document, 14 pagination,
+five vocabulary, five bridge, four async document, two native facade and 30 storage tests).
 
 ## Pure logical pagination checks
 `cargo test -p yomoku-core --test pagination --all-features --locked --offline`
 runs the chapter/page/reflow fixtures without Android or SQL. All five presets
 and 25 reflow pairs cover exact thresholds, LF/CRLF, mixed scripts, supplementary
 Unicode, combining marks, sentence fallback/quotes, EOF and invalid ownership.
-Workspace build/test/fmt/clippy pass after adding this module. Android now renders
-its first-page projection; persisted progress, movement and page settings remain next.
+Workspace build/test/fmt/clippy pass after adding this module. Android renders
+the containing page at the persisted exact offset and global page-length preset.
+Page movement/completion remains next.
 
 ## Kotlin payload generation
 ```sh
@@ -49,10 +50,10 @@ Generation and this comparison PASS. Standalone Kotlin 2.4.21 and BoltFFI CLI
 
 ## Android Compose shell
 The CLI-generated project lives in `android/`; normal builds need no Android
-Studio. Its current UI has a Rust-backed Library list, paste form and first-page
-reader, three tab placeholders and toolbar Settings, system theme/window insets.
+Studio. Its current UI has a Rust-backed Library list, paste form and saved-position
+reader, three tab placeholders and persisted page-length Settings, system theme/window insets.
 Native packaging, private-file document persistence and recreation retention are
-integrated. Page controls/current progress/completion remain next.
+integrated, including Library current percentage. Page controls/completion remain next.
 Namespace/application ID `app.yomoku` is provisional, not a publishing commitment.
 Automatic cloud backup and device transfer are excluded; the product requires
 manual encrypted backups.
@@ -461,3 +462,22 @@ page change/reopen/recreation, and long scrollable content. The UI still has no
 Next/Previous/swipes; forward completion/history is separate work. The first host
 JNI fixture used byte 4 inside a Japanese title character; corrected to boundary
 5, with byte 3 as the intentionally invalid fixture, and the full rerun passed.
+
+## Persisted page-length Settings verification
+PASS 2026-10-23: 81 Rust tests (30 storage), locked/offline workspace build,
+fmt/clippy, real host Kotlin/JNI (all five settings presets/reopen plus Unicode,
+errors and lifecycle), seven Unicode fixture exchanges, Kotlin formatting and
+whitespace. Migration 0004 upgrades version 3 without changing text/positions;
+write/commit rollback, corrupt/missing settings and all 25 app reflow pairs pass.
+No dependency/toolchain versions changed. Existing commands above apply.
+
+App/test APK assembly and strict lint PASS. All seven API 36 x86_64 tests PASS
+at phone 1080x2400/420dpi and tablet landscape 2560x1600/240dpi; overrides restored.
+PasteReaderTest now selects presets through Settings, checks exact offset and
+Library percentage preservation, expected page text/counter, recreation, reopen
+and scroll reset. DocumentSessionTest verifies the global preset across new
+native sessions. Arm64 builds pass; arm64 execution remains untested.
+Initial lint flagged the numeric character label as PluralsCandidate; changed to
+a plural resource and reran successfully. A server restart interrupted the first
+build observation; inspected reports/state and resumed. Emulator was restarted
+with the documented swangle/KVM command. No remaining failures or blockers.

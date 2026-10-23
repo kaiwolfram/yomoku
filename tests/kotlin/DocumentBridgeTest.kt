@@ -6,6 +6,7 @@ import app.yomoku.nativebridge.NativeBridge
 import app.yomoku.shared.DocumentError
 import app.yomoku.shared.ContentRoute
 import app.yomoku.shared.DocumentId
+import app.yomoku.shared.PageLength
 import app.yomoku.shared.Event
 import app.yomoku.shared.Requests
 import app.yomoku.shared.ShellEffect
@@ -75,6 +76,15 @@ internal fun verifyDocumentBridge() {
             val rejected = listener.dispatch(bridge, Event.SaveReadingPosition(invalid))
             check(rejected.documentError == DocumentError.INVALIDDOCUMENT)
             check(rejected.loadedDocument == saved)
+            bridge.update(Event.OpenSettings.bincodeSerialize())
+            for (length in PageLength.entries) {
+                if (ViewModel.bincodeDeserialize(bridge.view()).pageLength == length) continue
+                val changed = listener.dispatch(bridge, Event.SetPageLength(length))
+                check(changed.pageLength == length)
+                check(changed.reader?.position == saved.readingPosition)
+                check(changed.loadedDocument == saved)
+            }
+            bridge.update(Event.CloseSettings.bincodeSerialize())
             bridge.update(Event.CloseDocument.bincodeSerialize())
             check(ViewModel.bincodeDeserialize(bridge.view()).contentRoute == ContentRoute.MAIN)
             check(listener.dispatch(bridge, Event.CreatePaste(" \n")).documentError == DocumentError.EMPTYPASTE)
@@ -84,14 +94,18 @@ internal fun verifyDocumentBridge() {
         }
         val reopened = DocumentListener()
         NativeBridge(database.path, reopened).use { bridge ->
-            check(reopened.dispatch(bridge, Event.RefreshLibrary).documents.single().documentId == document.documentId)
+            val initial = reopened.dispatch(bridge, Event.RefreshLibrary)
+            check(initial.documents.single().documentId == document.documentId)
+            check(initial.pageLength == PageLength.CHARACTERS1500)
             check(reopened.dispatch(bridge, Event.LoadPaste(document.documentId)).loadedDocument == document)
             check(reopened.dispatch(bridge, Event.OpenReader(document.documentId)).reader?.text == text)
             check(ViewModel.bincodeDeserialize(bridge.view()).reader?.position == document.readingPosition)
         }
         val failure = DocumentListener()
         NativeBridge(directory.resolve("missing/db.sqlite3").path, failure).use { bridge ->
-            check(failure.dispatch(bridge, Event.RefreshLibrary).documentError == DocumentError.UNAVAILABLE)
+            val unavailable = failure.dispatch(bridge, Event.RefreshLibrary)
+            check(unavailable.documentError == DocumentError.UNAVAILABLE)
+            check(unavailable.pageLength == null)
             check(directory.resolve("missing").mkdir())
             check(failure.dispatch(bridge, Event.RefreshLibrary).documentError == null)
         }

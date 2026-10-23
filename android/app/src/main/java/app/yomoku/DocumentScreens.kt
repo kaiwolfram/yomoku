@@ -128,7 +128,7 @@ internal fun ReaderScreen(view: ViewModel) {
 }
 
 @Composable
-private fun StorageStatus(view: ViewModel) {
+internal fun StorageStatus(view: ViewModel) {
     if (view.storageBusy)
         LinearProgressIndicator(modifier = Modifier.fillMaxWidth().testTag("storage_busy"))
     view.documentError?.let { error ->
@@ -140,6 +140,7 @@ private fun StorageStatus(view: ViewModel) {
                     DocumentError.INCOMPATIBLEDATABASE -> R.string.error_incompatible_database
                     DocumentError.INVALIDDOCUMENT -> R.string.error_invalid_document
                     DocumentError.NOTFOUND -> R.string.error_document_not_found
+                    DocumentError.INVALIDSETTINGS -> R.string.error_invalid_settings
                 }
             ),
             color = MaterialTheme.colorScheme.error,

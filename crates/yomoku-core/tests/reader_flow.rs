@@ -2,7 +2,7 @@ use crux_core::Core;
 use yomoku_core::{
     app::{ContentRoute, Destination, Effect, Event, Yomoku},
     document::{ChapterId, ChapterText, DocumentId, PastedDocument, SourceId, TextOffset},
-    pagination::ReadingPosition,
+    pagination::{PageLength, ReadingPosition},
     reader::{progress_percent, ReaderPage},
     storage::{DocumentError, StorageOperation, StorageResult},
 };
@@ -31,7 +31,7 @@ fn reopening_uses_containing_page_but_keeps_exact_saved_offset_including_eof() {
             offset: TextOffset::at(&document.chapter.text, byte).unwrap(),
         };
         document.reading_position = Some(position);
-        let page = ReaderPage::open(&document).unwrap();
+        let page = ReaderPage::open(&document, PageLength::default()).unwrap();
         assert_eq!(page.page_number, 2);
         assert_eq!(page.text, "次の段落。");
         assert_eq!(page.position, position);
@@ -58,7 +58,11 @@ fn position_save_keeps_committed_view_until_success_and_late_results_only_update
             StorageResult::Created(document.clone()),
         );
         let mut effects = core.process_event(Event::OpenReader(document.document_id));
-        finish(&core, &mut effects, StorageResult::Loaded(document.clone()));
+        finish(
+            &core,
+            &mut effects,
+            StorageResult::Loaded(document.clone(), PageLength::default()),
+        );
         let previous = core.view().reader.unwrap();
         let position = ReadingPosition {
             offset: previous.anchor.range.end,
@@ -177,7 +181,11 @@ fn reader_opens_exact_first_logical_page_with_unicode_anchor_and_counter() {
     assert!(core.view().reader.is_none());
     assert!(effects.iter().any(|effect| matches!(effect,
         Effect::Storage(request) if request.operation == StorageOperation::LoadPaste(document.document_id))));
-    finish(&core, &mut effects, StorageResult::Loaded(document.clone()));
+    finish(
+        &core,
+        &mut effects,
+        StorageResult::Loaded(document.clone(), PageLength::default()),
+    );
     let page = core.view().reader.unwrap();
     assert_eq!(page.text, first);
     assert_eq!(page.anchor.slice(&document.chapter).unwrap(), first);
@@ -205,7 +213,11 @@ fn cancelled_reader_loads_never_reopen_after_back_tab_or_paste_navigation() {
         let mut effects = core.process_event(Event::OpenReader(document.document_id));
         core.process_event(cancel);
         let route = core.view().content_route;
-        finish(&core, &mut effects, StorageResult::Loaded(document));
+        finish(
+            &core,
+            &mut effects,
+            StorageResult::Loaded(document, PageLength::default()),
+        );
         assert_eq!(core.view().content_route, route);
         assert!(core.view().reader.is_none());
         assert!(!core.view().storage_busy);
@@ -228,10 +240,111 @@ fn failed_reader_can_return_to_library_and_retry_while_plain_load_never_opens_it
     core.process_event(Event::CloseDocument);
     assert!(core.view().document_error.is_none());
     let mut effects = core.process_event(Event::LoadPaste(document.document_id));
-    finish(&core, &mut effects, StorageResult::Loaded(document.clone()));
+    finish(
+        &core,
+        &mut effects,
+        StorageResult::Loaded(document.clone(), PageLength::default()),
+    );
     assert_eq!(core.view().content_route, ContentRoute::Main);
     assert!(core.view().reader.is_none());
     let mut effects = core.process_event(Event::OpenReader(document.document_id));
-    finish(&core, &mut effects, StorageResult::Loaded(document));
+    finish(
+        &core,
+        &mut effects,
+        StorageResult::Loaded(document, PageLength::default()),
+    );
     assert_eq!(core.view().reader.unwrap().total_pages, 1);
+}
+
+#[test]
+fn settings_reflow_preserves_exact_position_for_all_presets_and_leaves_progress_unchanged() {
+    let text = format!("{}終。", "𠮷abc。\r\n".repeat(700));
+    for old in PageLength::ALL {
+        for new in PageLength::ALL {
+            let core = Core::<Yomoku>::new();
+            let mut document = document(&text);
+            let position = ReadingPosition {
+                source_id: document.chapter.source_id,
+                chapter_id: document.chapter.chapter_id,
+                offset: TextOffset::at(&text, 1217).unwrap(), // inside a page, after a supplementary scalar
+            };
+            document.reading_position = Some(position);
+            let mut effects = core.process_event(Event::RefreshLibrary);
+            finish(
+                &core,
+                &mut effects,
+                StorageResult::Listed(vec![document.library_summary().unwrap()], old),
+            );
+            let mut effects = core.process_event(Event::OpenReader(document.document_id));
+            finish(
+                &core,
+                &mut effects,
+                StorageResult::Loaded(document.clone(), old),
+            );
+            let previous = core.view().reader.unwrap();
+            let progress = core.view().documents;
+            core.process_event(Event::OpenSettings);
+            let mut effects = core.process_event(Event::SetPageLength(new));
+            if old == new {
+                assert!(effects.is_empty());
+            } else {
+                assert_eq!(core.view().reader, Some(previous));
+                assert_eq!(core.view().page_length, Some(old));
+                assert!(core.process_event(Event::SetPageLength(old)).is_empty());
+                finish(&core, &mut effects, StorageResult::PageLengthSaved(new));
+            }
+            assert_eq!(core.view().page_length, Some(new));
+            assert_eq!(
+                core.view().reader,
+                Some(ReaderPage::at(&document, position, new).unwrap())
+            );
+            assert_eq!(core.view().reader.unwrap().position, position);
+            assert_eq!(core.view().documents, progress);
+            core.process_event(Event::CloseSettings);
+            assert_eq!(core.view().content_route, ContentRoute::Reader);
+        }
+    }
+}
+
+#[test]
+fn settings_failures_keep_committed_page_and_late_saves_do_not_reopen_routes() {
+    let core = Core::<Yomoku>::new();
+    core.process_event(Event::OpenSettings);
+    assert!(core
+        .process_event(Event::SetPageLength(PageLength::Characters250))
+        .is_empty());
+    assert_eq!(core.view().page_length, None);
+    let document = document(&"字。\n".repeat(1000));
+    let mut effects = core.process_event(Event::OpenReader(document.document_id));
+    finish(
+        &core,
+        &mut effects,
+        StorageResult::Loaded(document, PageLength::default()),
+    );
+    assert!(core
+        .process_event(Event::SetPageLength(PageLength::Characters250))
+        .is_empty());
+    core.process_event(Event::OpenSettings);
+    let previous = core.view().reader;
+    let mut effects = core.process_event(Event::SetPageLength(PageLength::Characters250));
+    finish(
+        &core,
+        &mut effects,
+        StorageResult::Failed(DocumentError::Unavailable),
+    );
+    assert_eq!(core.view().page_length, Some(PageLength::default()));
+    assert_eq!(core.view().reader, previous);
+    let mut effects = core.process_event(Event::SetPageLength(PageLength::Characters250));
+    assert!(core.view().document_error.is_none());
+    core.process_event(Event::CloseSettings);
+    core.process_event(Event::CloseDocument);
+    finish(
+        &core,
+        &mut effects,
+        StorageResult::PageLengthSaved(PageLength::Characters250),
+    );
+    assert_eq!(core.view().page_length, Some(PageLength::Characters250));
+    assert_eq!(core.view().content_route, ContentRoute::Main);
+    assert!(!core.view().settings_open);
+    assert!(core.view().reader.is_none());
 }

@@ -333,3 +333,22 @@
   No dependencies, Nostr data or production deletion APIs changed. No blocker.
   Next: atomic completion/analysis/vocabulary prerequisites and page controls,
   Settings/reflow persistence, CI.
+
+## 2026-10-23 — Persisted page-length Settings and exact-position reflow
+- Started clean. Completed the independent Settings slice while forward navigation
+  awaits atomic completion/analysis/vocabulary prerequisites. Migration 0004 stores
+  the five global presets/default 500 without changing canonical text or positions.
+- Added typed core/runtime settings saves and commit-driven reflow of the active
+  reader at its exact UTF-8 offset. Unknown/busy selections are disabled; failed
+  writes retain the prior preset/page and allow retry. Late results do not reopen
+  routes. Android Settings has accessible radio choices and storage errors/retry.
+- PASS: 81 Rust tests (six new; 30 storage), build/fmt/clippy, host Kotlin/JNI with
+  settings/reopen, seven Unicode exchanges, Kotlin formatting, app/test APK builds,
+  strict lint and all seven Android tests on API 36 x86_64 phone/tablet landscape.
+  Restored viewport; emulator left running. Arm64 execution remains untested.
+- Fixed initial PluralsCandidate lint error with plural resources; rerun PASS.
+  Resumed after a server restart by inspecting saved work/build reports. Existing
+  intentional-close Crux and toolchain warnings remain benign. No blocker.
+- Updated plan, architecture/data model, decisions, development and handoff.
+  No new dependencies, Nostr data or destructive APIs. Next: completion IDs/history,
+  real Japanese analysis/vocabulary prerequisites for navigation, and CI.

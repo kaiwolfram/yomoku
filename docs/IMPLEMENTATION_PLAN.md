@@ -42,6 +42,7 @@ position/encounter history. Keep incremental builds green.
 - [x] Implement logical pages in `crates/yomoku-core`: presets 250/500/750/1000/1500 (default 500), paragraph splits and long-paragraph following-sentence fallback; exact threshold, short text, mixed scripts and long paragraph pass. User clarified all non-whitespace Unicode characters count; routine boundary rules are in DECISIONS.md.
 - [x] Enforce EPUB chapter boundaries and no inferred TXT chapters; explicit ordered chapter/heading fixtures pass before import wiring. EPUB/TXT importers remain phase 4.
 - [x] Reflow pages preserving underlying text offset; all 25 preset pairs pass with Japanese, supplementary Unicode, chapter EOF and invalid anchors. Fourteen pagination tests total.
+- [x] Integrate/persist the five page-length Settings presets and reflow the active reader without changing its exact saved offset or Library percentage; migration/rollback, all 25 preset pairs, fresh-session reopen, JNI and Android Settings/recreation pass on phone/tablet landscape.
 - [x] Add Android paste flow returning to Library, list titles and first-page reader opening; test first import/open, draft/error retention, recreation and Back. Rust owns routes and default-500 first-page projection; current progress is the separate task below.
 - [x] Add Library current progress with persisted reader position; test forward/backward percentage changes and reopen. Migration 0003 and typed position-only saves validate ownership/UTF-8 boundaries, retain exact offsets, survive reopen and roll back failures; Rust/JNI/Android tests pass. Page controls/forward completion remain below; no seek UI is added.
 - [ ] Render centered single-column pages, Next/Previous/swipes and content-bottom counter; test both directions update current position and reset scroll on navigation/reopen.
@@ -113,7 +114,7 @@ position/encounter history. Keep incremental builds green.
 ## Cross-feature acceptance matrix
 
 - [ ] Short Japanese text, long paragraph, ruby, mixed Japanese/Latin, punctuation and kanji-only proper noun.
-- [ ] Exactly 500-char boundaries; end of paragraph; end of EPUB chapter; setting changes preserve reading text position. Pure pagination/reflow fixtures pass; reader Settings/import/UI wiring remains.
+- [ ] Exactly 500-char boundaries; end of paragraph; end of EPUB chapter; setting changes preserve reading text position. Pure pagination/reflow and persisted Android Settings pass; EPUB import/rendering remains.
 - [ ] Page left swipe completion vs previous/right swipe; replay reread counts again; accidental double callbacks only count once.
 - [ ] Page scroll always resets on navigation/app reopen; current document position updates in both directions.
 - [ ] Import registers New surfaces but does not add reading occurrences; popup opens without status change.
