@@ -10,4 +10,9 @@ if [[ ! -f "$dictionary" ]]; then
     exit 1
 fi
 export YOMOKU_SUDACHI_DICTIONARY="$dictionary"
-cargo test -p yomoku-analysis --test full_dictionary --locked --offline -- --ignored
+# Keep the prepared dictionary immutable until both processes exit. Never run
+# preparation or replace/truncate these bytes concurrently with mapped tests.
+for storage in owned mapped; do
+    echo "Testing Full storage: $storage"
+    YOMOKU_SUDACHI_STORAGE="$storage" cargo test -p yomoku-analysis --test full_dictionary --locked --offline -- --ignored
+done

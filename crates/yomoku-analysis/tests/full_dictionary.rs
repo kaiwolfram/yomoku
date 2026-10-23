@@ -17,7 +17,17 @@ fn analyzer() -> &'static Analyzer {
                 PathBuf::from(env!("CARGO_MANIFEST_DIR"))
                     .join("../../.local/sudachi/full-20261015/system_full.dic")
             });
-        Analyzer::open_full(path).expect("prepare the pinned Full dictionary first")
+        match std::env::var("YOMOKU_SUDACHI_STORAGE").as_deref() {
+            Ok("mapped") => {
+                let file = std::fs::File::open(path).unwrap();
+                // SAFETY: the explicit test runner requires an immutable prepared
+                // dictionary throughout this process. No fixture modifies it.
+                unsafe { Analyzer::open_full_mapped(&file) }
+            }
+            Ok("owned") | Err(_) => Analyzer::open_full(path),
+            Ok(other) => panic!("unknown YOMOKU_SUDACHI_STORAGE: {other}"),
+        }
+        .expect("prepare the pinned Full dictionary first")
     })
 }
 
@@ -48,6 +58,40 @@ fn surfaces(result: &ChapterAnalysis) -> Vec<&str> {
         .iter()
         .map(|token| token.surface.as_str())
         .collect()
+}
+
+#[test]
+#[ignore = "requires pinned Sudachi Full; run tools/test-sudachi.sh"]
+fn mapped_and_owned_outputs_are_identical_including_profiles_and_anchors() {
+    let path = std::env::var_os("YOMOKU_SUDACHI_DICTIONARY")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| {
+            PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .join("../../.local/sudachi/full-20261015/system_full.dic")
+        });
+    let owned = Analyzer::open_full(&path).unwrap();
+    let file = std::fs::File::open(path).unwrap();
+    // SAFETY: the explicit test runner keeps the prepared file immutable for
+    // this process. Closing the read handle below does not unmap its storage.
+    let mapped = unsafe { Analyzer::open_full_mapped(&file) }.unwrap();
+    drop(file);
+    for text in [
+        "国家公務員。東京都と夏目漱石。食べる。食べた。".into(),
+        "English 123 📖 日本語。𰻞".into(),
+        "ｶﾞｯﾂﾎﾟｰｽﾞ ＡＢＣと㍿ か\u{3099}くせい e\u{301}と𠮷📖\0猫".into(),
+        "\r\n猫。\r\n　犬。\tモーニング娘。が好き。".into(),
+        "".into(),
+        "猫と犬".repeat(8000),
+    ] {
+        let input = chapter(&text);
+        for mode in [SplitMode::A, SplitMode::B, SplitMode::C] {
+            let expected = owned.analyze_mode(&input, mode).unwrap();
+            let actual = mapped.analyze_mode(&input, mode).unwrap();
+            expected.validate(&input).unwrap();
+            actual.validate(&input).unwrap();
+            assert_eq!(actual, expected);
+        }
+    }
 }
 
 #[test]

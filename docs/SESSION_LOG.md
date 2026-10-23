@@ -531,3 +531,31 @@
   combined app memory before runtime integration; atomic analyzed import/unique
   registration; real completion occurrences/status/time before reader movement.
   Nostr/Q188 remain unchanged.
+
+## 2026-10-23 — Verified mapped Full loader and Android comparison
+
+- Started clean. Added explicit unsafe mapped loader with the same checksum and
+  profile as safe owned loading. Verifies the mapping actually held by Sudachi;
+  callers must prevent backing-file changes through drop. Pins already locked
+  memmap2 0.9.12 directly; no dependency graph versions change.
+- All ten real Full fixtures pass with each loader, including complete A/B/C
+  output parity/readings/anchors/long input after closing the mapped file handle.
+  The data-free corrupt-input fixture rejects unpinned bytes with both loaders.
+- Extended probe/driver with storage selection and fresh owned/mapped pairs,
+  isolated read-only published files and labelled reports. Twelve offline API 36
+  x86_64 processes pass (three pairs each in debug/release). Release mapped init
+  0.932–0.944 s; anonymous RSS ~2.5 MiB versus ~318 MiB owned. Initial total RSS/
+  peak stay similar after checksum reads all mapped pages. Exact per-run tables
+  and limits in SUDACHI_MEASUREMENTS.md; no reclamation/app-viability claim.
+- PASS: 119 data-free Rust tests, workspace build, source integrity, all twenty
+  Full fixture executions, fmt/strict Clippy, Python/shell syntax, whitespace and
+  both release Android probe links. No APK/Compose instrumentation, Android lint
+  or host Kotlin/JNI rerun; no app/runtime/FFI/schema changes.
+- First measurement stopped before analysis on asynchronous mobile-data state;
+  bounded polling now verifies offline settings/restoration. Both complete reruns
+  pass; original radios restored/verified, temporary device files removed. Emulator
+  viewport/app data untouched; physical arm64 execution remains untested.
+- Next: on-demand verified immutable private asset extraction/failure recovery,
+  combined app/lifecycle memory before runtime integration; atomic analyzed import/
+  unique registration; completion occurrences/status/time before reader movement.
+  Nostr/Q188 remain unchanged.

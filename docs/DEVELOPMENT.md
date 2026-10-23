@@ -18,8 +18,8 @@ with functioning rustup can omit the PATH workaround. Do not assume this compile
 is the project's minimum supported version; establish that with dependencies.
 Cargo.lock is retained for reproducible application development.
 Crux 0.20.0 declares Rust 1.90 minimum; the full locked graph has only been tested
-with 1.99.1. Current host baseline: 119 data-free Rust tests. Nine real Full-data
-fixtures run separately with tools/test-sudachi.sh (see below).
+with 1.99.1. Current host baseline: 119 data-free Rust tests. Ten real Full-data
+fixtures run separately with each loader via tools/test-sudachi.sh (see below).
 
 ## Pure logical pagination checks
 `cargo test -p yomoku-core --test pagination --all-features --locked --offline`
@@ -555,10 +555,13 @@ tools/test-sudachi.sh
 # Optional local data path; its dictionary checksum must still match:
 YOMOKU_SUDACHI_DICTIONARY=/path/to/system_full.dic tools/test-sudachi.sh
 ```
-PASS: all nine actual Full-data tests (A/B/C, inflections, proper nouns,
+PASS: all ten actual Full-data tests per owned/mapped loader (A/B/C, inflections, proper nouns,
 normalization, Unicode/OOV, 72 KB input, SQLite snapshots/reopen). Ordinary
-workspace tests explicitly report these nine as ignored; run the script to
+workspace tests explicitly report these ten as ignored; run the script to
 exercise them. Prepared dictionary size is 330,506,339 bytes (about 315 MiB).
+Keep the dictionary immutable until the mapped test process exits; do not run
+preparation/replacement concurrently. The parity fixture also compares complete
+outputs across storage modes after closing the original mapped file handle.
 Preparation/repeated verification, corrupt-archive rejection without replacement,
 Python syntax and shell syntax pass. Data remains ignored; complete notices are
 retained both in Git and beside prepared data.
@@ -684,3 +687,40 @@ Full methodology, exact results and limitations are in
 motivates a measured mapped-storage comparison before app integration. No APK
 decompression/JVM/Compose/lifecycle performance claim. No APK/instrumentation,
 Android lint or host JNI rerun for this standalone Rust/tooling slice.
+
+## Verified mapped Full storage comparison
+
+The safe owned loader remains the baseline. `Analyzer::open_full_mapped(&File)`
+is explicitly unsafe: callers must keep backing bytes immutable until analyzer
+drop. It hashes the actual mapping and passes the same storage to Sudachi; a
+checksum/read-only descriptor alone cannot enforce the lifetime contract.
+The direct memmap2 dependency pins the already locked 0.9.12; no graph versions
+or engine/analysis profile identities change. App/runtime/FFI stay independent.
+
+```sh
+python3 tools/measure-sudachi-android.py --serial emulator-5554 --storage both
+python3 tools/measure-sudachi-android.py --serial emulator-5554 --storage both --profile debug
+```
+
+`--storage owned` remains the default; `mapped` selects only that loader and
+`both` alternates fresh owned/mapped processes for each of three runs. The driver
+owns a unique private directory, makes the published file read-only, and never
+rewrites/removes it during any probe. Never modify prepared files during mapped
+host tests or manual probe invocations. Radio settings are verified with bounded
+polling because Android applies `svc` changes asynchronously, including restoration.
+
+PASS: 119 data-free Rust tests, ten Full fixtures per loader (including complete
+A/B/C output parity/closed file handle), pinned source integrity, workspace build,
+fmt, strict all-target/all-feature Clippy, Python/shell syntax and whitespace.
+Both Android release probe ABIs link; all twelve offline API 36 x86_64 processes
+pass (three owned/mapped pairs per debug/release profile). Reports/results are in
+SUDACHI_MEASUREMENTS.md. Initial mobile-data verification raced Android state and
+stopped before analysis; bounded polling fixed it, and both complete reruns pass.
+Temporary device files removed and original radios restored/verified.
+
+Release mapped init 0.932–0.944 s, ~2.5 MiB anonymous RSS versus ~318 MiB owned;
+initial total RSS and peak remain similar after verification touches all pages.
+No low-memory reclamation/app-viability claim. Physical arm64, private asset
+extraction and combined app/lifecycle measurements remain pending. No APK/Compose
+instrumentation, Android lint or host Kotlin/JNI rerun for this adapter/tooling
+slice; the analyzer remains outside app/runtime/FFI dependencies.

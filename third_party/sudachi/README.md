@@ -21,16 +21,21 @@ python3 tools/prepare-sudachi.py --archive .local/sudachi/sudachi-dictionary-202
 tools/test-sudachi.sh
 ```
 
-`Analyzer::open_full` independently verifies the dictionary bytes before parsing;
+Both `Analyzer::open_full` and the unsafe `Analyzer::open_full_mapped`
+independently verify the exact dictionary storage before parsing;
 an arbitrary compatible dictionary cannot silently acquire this artifact identity.
-Host fixtures use the actual Full artifact. Android builds require prepared data:
+Mapped callers must prevent backing-file mutation until analyzer drop. Host
+fixtures run against both loaders using the actual Full artifact; never prepare
+or replace/truncate the dictionary during those runs. Android builds require prepared data:
 Gradle runs `python3 tools/prepare-sudachi.py --android-assets` to verify and stage
 all three files under ignored `target/generated/sudachi-assets/sudachi/`, then
 includes them as APK assets. No build downloads data. Settings → Sudachi licenses
 and notices displays the complete LEGAL and Apache-2.0 license offline.
 The dictionary is APK-compressed; no analyzer or private-file copy is loaded at
-app startup. Device analyzer memory/startup/tokenization and offline analysis
-measurements remain unchecked. Do not substitute Core/Small or a moving latest release.
+app startup. Standalone Android owned/mapped memory/startup/tokenization and
+offline results are in [SUDACHI_MEASUREMENTS.md](../../docs/SUDACHI_MEASUREMENTS.md).
+Private extraction, combined app/lifecycle and physical arm64 measurements remain
+pending. Do not substitute Core/Small or a moving latest release.
 
 ## Dependency-only engine snapshot and Android patch
 

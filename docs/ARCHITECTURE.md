@@ -27,7 +27,11 @@ Application vocabulary commands remain future work.
 
 `yomoku-analysis` is a separate Rust I/O adapter using Sudachi.rs v0.7.0 at
 `5de0410b6edfd428fc510cc9763440772e9619d5` and Full 20261015 (V1). Its constructor
-checks the exact dictionary SHA-256 before giving owned immutable bytes to Sudachi.
+checks the exact dictionary SHA-256 before giving owned immutable bytes or a
+read-only file mapping to Sudachi. The mapped constructor is explicitly unsafe:
+callers must prevent backing-file mutation/truncation through analyzer drop.
+It hashes the mapping itself and transfers that same storage into the dictionary;
+the original file handle can close. The safe owned constructor remains available.
 Pinned upstream embedded defaults supply normalization/OOV plugins and resources;
 no external config or dynamic plugins are accepted. Default B and explicit A/C
 produce validated ChapterAnalysis values, with original surfaces/byte spans and
@@ -38,8 +42,10 @@ remain absent. Punctuation, Latin, numbers and emoji stay anchored without being
 vocabulary. SentenceDetector boundaries (including negative provisional limits)
 keep long chapters below the engine input limit without changing canonical text.
 The adapter does not merge conjugations, apply overrides, register vocabulary or
-write SQLite. Nine explicit Full-data fixtures include A/B/C SQLite round trips;
-they run with tools/test-sudachi.sh, separately from ordinary data-free checks.
+write SQLite. Ten explicit Full-data fixtures include A/B/C SQLite round trips
+and full owned/mapped output parity; tools/test-sudachi.sh runs all fixtures
+with each loader, separately from ordinary data-free checks. Do not rewrite the
+prepared dictionary while mapped fixtures are running.
 Dictionary preparation verifies the archive, data and complete notices under
 ignored .local/sudachi. Gradle's bundleSudachi task verifies already prepared data
 and stages the dictionary plus complete LEGAL/LICENSE under generated Android
@@ -54,8 +60,11 @@ validation on API 36 x86_64. Release initialization takes 1.03–1.20 s, with ab
 See SUDACHI_MEASUREMENTS.md for exact methodology and limitations. The driver
 verifies pinned source/data, temporarily disables radios, restores their original
 settings and removes its own device files. Both probe ABIs link; physical arm64,
-private asset extraction, mapped storage and combined app/lifecycle memory remain
-unmeasured. These measurements do not settle production storage viability.
+private asset extraction and combined app/lifecycle memory remain unmeasured.
+The owned/mapped comparison reduces release initialized anonymous memory from
+about 318 MiB to 2.5 MiB; total RSS remains similar after the complete checksum
+read. File-backed residency alone does not demonstrate reclamation under pressure.
+These measurements do not settle production storage viability.
 Unpatched upstream cross-target checking failed in plugin/loader.rs:
 make_system_specific_name originally had no Android cfg implementation. The root
 Cargo patch now selects a dependency-only vendored snapshot at that exact commit,
@@ -64,9 +73,10 @@ all original file hashes live under third_party/sudachi; tools/verify-sudachi-so
 reverses the patch in a temporary copy and verifies every original byte. Both
 Android targets compile. The profile includes +android-loader-v1; segmentation
 and embedded configuration are unchanged. App integration remains pending.
-Owned dictionary storage alone requires about 315 MiB. Compare verified immutable
-mapped storage before integration; keep one on-demand worker-owned analyzer and
-avoid eager Library initialization or per-page reloads.
+Owned dictionary bytes alone require about 315 MiB. Mapped storage avoids that
+anonymous copy, but production must first enforce immutable private publication
+and measure extraction/combined app memory. Keep one on-demand worker-owned
+analyzer and avoid eager Library initialization or per-page reloads.
 
 Pure `pagination` derives chapter-local TextAnchor pages from ordered immutable
 ChapterText snapshots. Five presets count non-whitespace Unicode scalars; LF/CRLF

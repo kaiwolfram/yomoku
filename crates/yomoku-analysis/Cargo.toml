@@ -9,6 +9,7 @@ yomoku-core = { path = "../yomoku-core" }
 sudachi = { git = "https://github.com/WorksApplications/sudachi.rs", rev = "5de0410b6edfd428fc510cc9763440772e9619d5" }
 regex = "=1.12.4"
 sha2 = "=0.11.1"
+memmap2 = "=0.9.12"
 
 [dev-dependencies]
 yomoku-storage = { path = "../yomoku-storage" }

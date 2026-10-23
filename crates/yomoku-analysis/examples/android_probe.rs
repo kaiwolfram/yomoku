@@ -28,19 +28,33 @@ fn chapter(text: String) -> ChapterText {
 
 fn main() -> Result<(), Box<dyn Error>> {
     let mut args = std::env::args_os().skip(1);
-    let dictionary = args.next().ok_or("usage: android_probe DICTIONARY")?;
+    let usage = "usage: android_probe DICTIONARY [owned|mapped]";
+    let dictionary = args.next().ok_or(usage)?;
+    let storage = args.next().unwrap_or_else(|| "owned".into());
+    let storage = storage.to_str().ok_or(usage)?;
+    if !matches!(storage, "owned" | "mapped") {
+        return Err(usage.into());
+    }
     if args.next().is_some() {
-        return Err("usage: android_probe DICTIONARY".into());
+        return Err(usage.into());
     }
     println!(
-        "probe_version=1 arch={} debug_assertions={}",
+        "probe_version=2 arch={} debug_assertions={} storage={storage}",
         std::env::consts::ARCH,
         cfg!(debug_assertions)
     );
     println!("engine={ENGINE_REVISION}\ndictionary={DICTIONARY_REVISION}");
     memory("baseline")?;
     let started = Instant::now();
-    let analyzer = Analyzer::open_full(dictionary)?;
+    let analyzer = if storage == "mapped" {
+        let file = fs::File::open(dictionary)?;
+        // SAFETY: the measurement driver owns an isolated directory, publishes
+        // read-only bytes before starting, and never writes/removes them until
+        // all probe processes exit. Manual invocations must obey the same rule.
+        unsafe { Analyzer::open_full_mapped(&file)? }
+    } else {
+        Analyzer::open_full(dictionary)?
+    };
     println!(
         "initialization_ms={:.3}",
         started.elapsed().as_secs_f64() * 1000.0

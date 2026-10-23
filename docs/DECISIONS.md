@@ -828,3 +828,39 @@ files without mutating bytes held by a live analyzer. Load on demand off the mai
 thread and reuse one worker-owned analyzer, rather than reloading on every page
 or eagerly when Library starts. Do not skip dictionary integrity checks to make
 the unoptimized debug initialization appear faster.
+
+## 2026-10-23 — Verified mapped Full comparison with an explicit lifetime contract
+
+Keep `Analyzer::open_full` as the safe owned-byte baseline. Add an explicitly
+unsafe `open_full_mapped(&File)` for controlled immutable files. Hash the mapping
+itself before passing that same storage to Sudachi; never verify one path and
+reopen another, or skip the pinned checksum. Sudachi owns the mapping until the
+analyzer drops, even after the original file handle closes. Loading strategy does
+not change analysis/profile identity or any persisted token semantics.
+
+Use the already locked transitive memmap2 **0.9.12** directly, pinned exactly;
+no graph versions change. Verified its `Mmap::map` and lifetime/safety API in the
+local registry source at this exact version, alongside Sudachi's pinned
+`dic/storage.rs` and `dic/dictionary.rs`. The
+[primary API documentation](https://docs.rs/memmap2/0.9.12/memmap2/struct.Mmap.html)
+requires callers to prevent all backing-file mutation/truncation while mapped.
+A read-only descriptor, checksum or chmod alone is not that guarantee. Keep this
+precondition visible in the unsafe API; arbitrary source paths use owned loading.
+Production private-file publication/lifecycle enforcement remains a separate task.
+
+The measurement driver owns a unique private directory, finishes copying before
+making the dictionary read-only, never rewrites it during execution, and removes
+it only after all probes exit. `--storage both` runs three fresh owned/mapped
+pairs by default, in that order, without flushing filesystem caches. Preserve
+raw storage-labelled results and fail on missing validation/storage markers.
+Android radio changes are asynchronous: poll verified settings for at most ten
+seconds before measuring and after restoring them, rather than accepting a race
+or proceeding online. Every run still restores original settings in `finally`.
+
+Host tests run every Full fixture with each loader and compare complete A/B/C
+outputs, including profiles/readings/anchors and 72 KB input. Source verification,
+engine/data pins and runtime/FFI boundaries stay unchanged. Mapping reduces the
+anonymous allocation in Android measurements, but checksum verification touches
+all mapped pages, so initial total RSS remains similar. See SUDACHI_MEASUREMENTS.md;
+do not equate file-backed residency with demonstrated low-memory behavior or
+finished app viability. Keep on-demand worker reuse as an integration requirement.

@@ -5,6 +5,8 @@ Requires the pinned NDK, installed Rust target, prepared Full data and one ADB
 device. Uses locked/offline Cargo, never installs or changes the app. Temporarily
 disables radios, restores their prior settings, and removes its own device files.
 Results exclude APK extraction, JVM/Compose overhead and app lifecycle behavior.
+Mapped runs require the backing file to remain immutable until every probe exits;
+the driver owns its unique directory and never rewrites the published dictionary.
 """
 
 import argparse
@@ -15,6 +17,7 @@ from pathlib import Path
 import shlex
 import subprocess
 import sys
+import time
 import uuid
 
 
@@ -37,6 +40,10 @@ def main():
     parser.add_argument("--serial", default=os.environ.get("ANDROID_SERIAL"))
     parser.add_argument("--profile", choices=["debug", "release"], default="release")
     parser.add_argument(
+        "--storage", choices=["owned", "mapped", "both"], default="owned",
+        help="both alternates fresh owned/mapped processes for each run",
+    )
+    parser.add_argument(
         "--runs", type=int, default=3, help="fresh processes; OS caches stay warm"
     )
     args = parser.parse_args()
@@ -56,6 +63,18 @@ def main():
         return run(
             [adb, "-s", args.serial, "shell", shlex.join(command)], capture_output=True
         ).stdout.strip()
+
+    def await_radios(expected):
+        # Android applies svc changes asynchronously. Check actual settings with
+        # a bounded wait before analysis and after restoring the original values.
+        deadline = time.monotonic() + 10
+        while True:
+            actual = {key: device("settings", "get", "global", key) for key in expected}
+            if actual == expected:
+                return actual
+            if time.monotonic() >= deadline:
+                raise RuntimeError(f"radio settings did not settle: {actual}; expected={expected}")
+            time.sleep(0.2)
 
     abi = device("getprop", "ro.product.cpu.abi")
     if abi not in TARGETS:
@@ -87,7 +106,7 @@ def main():
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
     reports = REPO / ".local/test-reports/sudachi-android"
     reports.mkdir(parents=True, exist_ok=True)
-    report = reports / f"{timestamp}-{abi}-{args.profile}.txt"
+    report = reports / f"{timestamp}-{abi}-{args.profile}-{args.storage}.txt"
     print(f"Report: {report}", flush=True)
     remote = f"/data/local/tmp/yomoku-sudachi-{uuid.uuid4().hex}"
     original = {
@@ -98,17 +117,18 @@ def main():
         raise ValueError(f"cannot restore unsupported radio settings: {original}")
     try:
         device("mkdir", remote)
+        device("chmod", "700", remote)
         run([adb, "-s", args.serial, "push", str(binary), f"{remote}/probe"])
         run([adb, "-s", args.serial, "push", str(dictionary), f"{remote}/system_full.dic"])
         device("chmod", "700", f"{remote}/probe")
+        device("chmod", "400", f"{remote}/system_full.dic")
         device("cmd", "connectivity", "airplane-mode", "enable")
         device("svc", "wifi", "disable")
         device("svc", "data", "disable")
-        offline = {key: device("settings", "get", "global", key) for key in original}
-        if offline != {"airplane_mode_on": "1", "wifi_on": "0", "mobile_data": "0"}:
-            raise ValueError(f"offline precondition failed: {offline}")
+        offline = await_radios({"airplane_mode_on": "1", "wifi_on": "0", "mobile_data": "0"})
         with report.open("x") as output:
             output.write(f"UTC={timestamp}\nserial={args.serial}\nprofile={args.profile}\n")
+            output.write(f"storage={args.storage}\n")
             output.write(f"offline={offline}\noriginal_radios={original}\n")
             output.write(
                 "Standalone native process; no APK extraction/JVM/UI overhead.\n"
@@ -122,22 +142,31 @@ def main():
             output.write(device("uname", "-a") + "\n")
             output.write(device("cat", "/proc/meminfo") + "\n")
             output.flush()
-            for index in range(args.runs):
+            storage_modes = ["owned", "mapped"] if args.storage == "both" else [args.storage]
+            processes = [
+                (index, storage)
+                for index in range(args.runs)
+                for storage in storage_modes
+            ]
+            for index, storage in processes:
                 print(
-                    f"Measuring process {index + 1}/{args.runs} ({args.profile})",
+                    f"Measuring run {index + 1}/{args.runs} ({args.profile}, {storage})",
                     flush=True,
                 )
                 result = subprocess.run(
                     [adb, "-s", args.serial, "shell", shlex.join([
-                        f"{remote}/probe", f"{remote}/system_full.dic",
+                        f"{remote}/probe", f"{remote}/system_full.dic", storage,
                     ])],
                     capture_output=True,
                     text=True,
                 )
-                output.write(f"\nprocess={index + 1}\n{result.stdout}{result.stderr}")
+                output.write(f"\nrun={index + 1} storage={storage}\n{result.stdout}{result.stderr}")
                 output.flush()
                 result.check_returncode()
-                if "validation=PASS" not in result.stdout:
+                if (
+                    "validation=PASS" not in result.stdout
+                    or f"storage={storage}" not in result.stdout
+                ):
                     raise ValueError("probe did not complete validation")
     finally:
         # Attempt every restoration even if another one fails.
@@ -159,11 +188,7 @@ def main():
             raise RuntimeError(
                 f"device restoration failed: {failures}; original={original}"
             )
-        restored = {key: device("settings", "get", "global", key) for key in original}
-        if restored != original:
-            raise RuntimeError(
-                f"device radio restoration mismatch: {restored}; original={original}"
-            )
+        await_radios(original)
     print(f"PASS: measurements saved; radio settings restored. Report: {report}")
 
 

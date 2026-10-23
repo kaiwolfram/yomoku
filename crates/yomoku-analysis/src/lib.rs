@@ -61,9 +61,8 @@ impl From<SudachiError> for AnalysisError {
     }
 }
 
-/// Load once on an I/O worker and reuse. The verified owned bytes stay immutable
-/// for the dictionary's lifetime; no unsafe mapping or subsequent file read is used.
-/// Device memory/startup measurements are required before Android integration.
+/// Load once on an I/O worker and reuse. Both loaders verify the exact storage
+/// passed to Sudachi. App extraction/lifecycle measurements remain an integration gate.
 pub struct Analyzer {
     dictionary: JapaneseDictionary,
 }
@@ -71,7 +70,28 @@ pub struct Analyzer {
 impl Analyzer {
     pub fn open_full(path: impl AsRef<Path>) -> Result<Self, AnalysisError> {
         let bytes = fs::read(path).map_err(AnalysisError::Io)?;
-        let checksum: String = Sha256::digest(&bytes)
+        Self::from_storage(Storage::Owned(bytes))
+    }
+
+    /// Map a pinned Full file without retaining an owned copy of its bytes.
+    /// The mapping is held by Sudachi until this analyzer is dropped. The file
+    /// handle may be closed after this call; verification reads the mapping itself.
+    ///
+    /// # Safety
+    /// The caller must ensure the underlying file is never modified or truncated,
+    /// in this or any other process, from this call until the analyzer is dropped.
+    /// A read-only handle or successful checksum alone does not ensure this.
+    /// Use only with controlled, immutable files; keep the safe owned loader for
+    /// arbitrary paths. Production private-file publication is not implemented yet.
+    pub unsafe fn open_full_mapped(file: &fs::File) -> Result<Self, AnalysisError> {
+        // SAFETY: the caller guarantees immutable backing bytes for the entire
+        // mapping lifetime, including checksum verification and dictionary parsing.
+        let mapping = unsafe { memmap2::Mmap::map(file) }.map_err(AnalysisError::Io)?;
+        Self::from_storage(Storage::File(mapping))
+    }
+
+    fn from_storage(storage: Storage) -> Result<Self, AnalysisError> {
+        let checksum: String = Sha256::digest(storage.as_ref())
             .iter()
             .map(|byte| format!("{byte:02x}"))
             .collect();
@@ -79,10 +99,8 @@ impl Analyzer {
             return Err(AnalysisError::DictionaryMismatch);
         }
         let config = Config::new_embedded().map_err(SudachiError::from)?;
-        let dictionary = JapaneseDictionary::from_cfg_storage(
-            &config,
-            SudachiDicData::new(Storage::Owned(bytes)),
-        )?;
+        let dictionary =
+            JapaneseDictionary::from_cfg_storage(&config, SudachiDicData::new(storage))?;
         Ok(Self { dictionary })
     }
 
@@ -219,6 +237,14 @@ mod tests {
             Analyzer::open_full(&path),
             Err(AnalysisError::DictionaryMismatch)
         ));
+        let file = fs::File::open(&path).unwrap();
+        // SAFETY: this test exclusively owns the file and removes it only after
+        // the rejected mapping is dropped; no writers exist during the call.
+        assert!(matches!(
+            unsafe { Analyzer::open_full_mapped(&file) },
+            Err(AnalysisError::DictionaryMismatch)
+        ));
+        drop(file);
         fs::remove_file(path).unwrap();
     }
 }
