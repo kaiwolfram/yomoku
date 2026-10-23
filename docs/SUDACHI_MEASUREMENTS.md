@@ -178,3 +178,78 @@ kill a writer mid-copy, or test cross-process contention/ENOSPC on physical stor
 Reports/logs: `.local/test-reports/sudachi-extraction/{phone,final-focused}/`. Build/test commands
 and the focused test selector are in DEVELOPMENT.md. The broader loading/memory
 gate stays unchecked until in-app analyzer and lifecycle measurements are complete.
+
+## Debug-app descriptor, worker reuse and lifecycle baseline
+
+Measured 2026-10-23 using `SudachiAppProbeTest` and the `android_app_probe`
+cdylib example in the installed **debug** Compose app. The native analyzer is
+**release-optimized**, with the same pinned engine/data/NDK and API-36 x86_64
+emulator as above. This includes the existing Rust CoreSession, Compose/JVM and
+Android instrumentation overhead in the same process. It is not a release-app
+or hardware viability result. The debug-only facade/library have no production
+startup caller; the production runtime/FFI dependency graph is unchanged.
+
+The test owns a unique no-backup directory and lazily opens the real compressed
+APK asset through the verified private publisher. JNI duplicates that exact
+descriptor, never reopens a pathname, and the native constructor verifies the
+mapped bytes again. Both Kotlin descriptors close before A/B/C or other analysis
+runs. Fixed golden modes, OOV/non-Japanese classification, normalization,
+supplementary/combining Unicode, NUL, 510-scalar pages and 72 KB unbroken input
+pass. Test-private bytes stay immutable until every mapping/worker closes.
+The app has no Internet permission; radio/viewport settings were unchanged.
+
+One test ViewModel retains a single lazy executor/analyzer through real Activity
+recreation and stop/resume. Its positive generation stays identical and its
+initialization count is one throughout; a fresh worker after close gets a new
+generation and re-verifies the cached publication. Invalid dictionary load can
+retry; second open, invalid fixture, stale generation and foreign-worker calls
+are rejected without disturbing the active analyzer. Finishing the Activity
+clears the owner and closes native state on its executor. `/proc/self/maps`
+confirms the dictionary mapping exists while active and disappears on close;
+directory cleanup waits for executor termination. This is a test owner, not the
+production EffectRouter/analyzer lifecycle decision.
+
+Two successful processes using the final mapping assertion are reported below:
+focused test first, then the complete eighteen-test suite. The second process
+has exercised other app flows before the probe; baseline/HWM therefore include
+that earlier work. No filesystem caches were flushed or memory pressure injected.
+PSS/private-dirty are Android Debug.MemoryInfo snapshots; kernel RSS/HWM and
+anonymous/file/swap values are logged separately. PSS is not peak memory.
+
+| Metric | Focused process | Full-suite process |
+| --- | --- | --- |
+| Extraction + Kotlin verification + native map/verification/init (ms) | 3295.362 | 2964.842 |
+| Cached verification + native map/verification/init on fresh worker (ms) | 3305.998 | 1974.219 |
+| Page upper median, 20 calls (ms) | 0.516 | 0.501 |
+| Long unbroken median, 3 calls (ms) | 23.326 | 25.747 |
+| Compose baseline PSS (KiB) | 89573 | 94255 |
+| Initialized mapped PSS (KiB) | 412321 | 419105 |
+| PSS after page/long analysis (KiB) | 428467 | 435305 |
+| PSS after Activity recreation (KiB) | 416400 | 436609 |
+| PSS while stopped (KiB) | 412229 | 435481 |
+| PSS after resume (KiB) | 412878 | 421307 |
+| PSS after first analyzer close (KiB) | 91570 | 99865 |
+| Kernel resident HWM at first close (KiB) | 556992 | 574148 |
+
+Timing includes the Kotlin executor/JNI round trip and validation. Full asset
+extraction/verification is not separated into individual stages here. Swap is
+already present at baseline (22660/22156 KiB) and remains approximately that size;
+this is not the zero-swap standalone environment. Closing removes about 315 MiB
+of file-backed residency and returns PSS near baseline. Ordinary stop/resume does
+not demonstrate kernel reclaim under pressure. Mapping and checksum verification
+still touch the complete Full dictionary and produce substantial initial PSS.
+
+Both Android ABIs link/package; only x86_64 executes. Exact API commands are in
+DEVELOPMENT.md; preserved XML/logcat reports are under ignored
+`.local/test-reports/sudachi-app/{focused-1,full-suite}/`. An initial focused
+baseline also passed; a subsequent full run found the new mapping assertion
+assumed Context and `/proc` used identical private-directory aliases. Matching
+the unique test-directory suffix fixes the assertion; both final runs above pass.
+The first connected Gradle command hit sandbox socket restrictions; escalation
+resolved them. Test-owned dictionary files were removed; no live published inode
+was rewritten/truncated. No tablet/host-JNI/standalone-probe rerun for this slice.
+
+Remaining gate: actual memory-pressure/reclamation and process-death recovery,
+production worker ownership/reuse, physical arm64 measurements and a loading
+decision based on those results. No production analyzer/import/reader wiring is
+enabled by this baseline. The broader loading/memory gate stays unchecked.

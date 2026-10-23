@@ -588,3 +588,36 @@
   ENOSPC or cross-process contention claim. Next: in-app descriptor/analyzer
   measurement harness; atomic analyzed import/registration; real completion.
   Nostr stays empty; Q188 remains before forwarding.
+
+## 2026-10-23 — Debug-app Full descriptor, reuse and lifecycle measurements
+
+- Started clean. Added a separate measurement-only JNI cdylib example and debug
+  facade/build task for both ABIs, with release-optimized Rust and no new
+  dependencies/versions. The existing runtime/BoltFFI/core and schemas stay
+  unchanged. Unsigned release APK inspection excludes the facade and library.
+- The probe duplicates the verified private descriptor directly, rehashes the
+  mapping and keeps one thread-local analyzer. Positive generations reject stale/
+  foreign-worker calls; load/validation/panic failures stay inside the boundary.
+  Instrumentation validates actual Full A/B/C, mixed/OOV/normalization/Unicode/
+  NUL, repeated pages and 72 KB input after Kotlin descriptors close.
+- A test-only ViewModel retains a lazy worker across real Activity recreation/
+  stop/resume with one initialization, closes on clearance and confirms actual
+  mapping removal before cleanup. Fresh-worker reopen and invalid-load retry pass.
+  Production analyzer lifecycle/reuse remains a decision after the loading gate.
+- Two final API-36 x86_64 processes measure extraction+map/init 2.965–3.295 s and
+  cached verify+map/init 1.974–3.306 s. Combined app PSS ~403–409 MiB initialized,
+  ~89–98 MiB after close. Exact tables/method/limits in SUDACHI_MEASUREMENTS.md;
+  no kernel memory-pressure/process-death/cold-storage/physical-arm64 claim.
+- PASS: focused probe and all eighteen Android phone tests, strict lint, both-ABI
+  debug/test and unsigned release APK builds, probe exclusion from release,
+  16 KB ELF/ZIP alignment, pinned source integrity, workspace build/119 Rust
+  tests, fmt/strict Clippy, Python syntax, Kotlin formatting and whitespace.
+  No host JNI, host Full-fixture, tablet or standalone-probe rerun. Reports:
+  .local/test-reports/sudachi-app/{focused-1,full-suite}/.
+- First connected Gradle run needed socket escalation. Added map assertion first
+  assumed Context and /proc used identical private-directory paths; unique test
+  suffix matching fixes it and both final processes pass. No open check failure.
+  All test mappings/workers close before private-file cleanup; viewport/radios
+  unchanged, emulator left running. Next: pressure/process-death/arm64 gate,
+  atomic analyzed import/registration, real completion before reader movement.
+  Nostr remains empty; ask Q188 before forwarding.

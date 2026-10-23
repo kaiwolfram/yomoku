@@ -44,6 +44,22 @@ val buildRustBridge by
         )
     }
 
+val buildSudachiAppProbe by
+    tasks.registering(Exec::class) {
+        group = "verification"
+        description = "Build the measurement-only Sudachi JNI library for debug APKs"
+        dependsOn(buildRustBridge) // Native builds share Cargo output; keep them sequential.
+        workingDir(repoDirectory)
+        commandLine("python3", repoDirectory.file("tools/build-sudachi-app-probe.py").asFile)
+        environment("ANDROID_HOME", androidComponents.sdkComponents.sdkDirectory.get().asFile)
+        inputs.files(repoDirectory.file("Cargo.toml"), repoDirectory.file("Cargo.lock"))
+        inputs.files(fileTree(repoDirectory.dir("crates")) { include("**/*.rs", "**/*.toml") })
+        inputs.dir(repoDirectory.dir("third_party/sudachi"))
+        inputs.file(repoDirectory.file("tools/build-sudachi-app-probe.py"))
+        inputs.file(repoDirectory.file("tools/verify-sudachi-source.py"))
+        outputs.dir(nativeOutput.dir("sudachi-probe/jniLibs"))
+    }
+
 android {
     namespace = "app.yomoku"
     compileSdk = 36
@@ -71,6 +87,9 @@ android {
             )
         jniLibs.directories += nativeOutput.dir("android/jniLibs").asFile.absolutePath
     }
+    sourceSets.named("debug") {
+        jniLibs.directories += nativeOutput.dir("sudachi-probe/jniLibs").asFile.absolutePath
+    }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
@@ -91,6 +110,8 @@ android {
 }
 
 tasks.named("preBuild") { dependsOn(buildRustBridge, bundleSudachi) }
+
+tasks.matching { it.name == "preDebugBuild" }.configureEach { dependsOn(buildSudachiAppProbe) }
 
 kotlin {
     jvmToolchain(17)

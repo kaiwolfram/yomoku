@@ -59,20 +59,20 @@ makes staging bytes read-only, atomically renames and syncs the directory before
 returning the same verified descriptor at offset zero. Published inodes are never
 opened for writes/truncation; repair preserves held readers/mappings. Cache hits
 rehash bytes without APK decompression; abandoned staging/failures can retry.
-The helper has no startup/runtime/FFI caller yet. Eight extraction instrumentation
-tests pass, including real compressed Full and failed-rename recovery; two API-36
+The helper has no startup or production runtime/FFI caller yet. Eight extraction
+instrumentation tests pass, including compressed Full and failed-rename recovery; two API-36
 x86_64 runs take 2.273–3.273 s to extract/verify, 0.632–0.689 s to reverify. No analyzer
 or combined-memory/lifecycle claim follows. See SUDACHI_MEASUREMENTS.md.
-This crate has no app/runtime/FFI entry point yet. A standalone native example
-and CLI driver measure the actual adapter on Android without installing the app:
+This crate has no production app/runtime/FFI entry point yet. A standalone native
+example and CLI driver measure the adapter on Android without installing the app:
 three debug and three release processes pass offline A/B/C/Unicode/long-input
 validation on API 36 x86_64. Release initialization takes 1.03–1.20 s, with about
 318 MiB anonymous resident memory after initialization and 334 MiB peak RSS.
 See SUDACHI_MEASUREMENTS.md for exact methodology and limitations. The driver
 verifies pinned source/data, temporarily disables radios, restores their original
-settings and removes its own device files. Both probe ABIs link; physical arm64,
-combined app/lifecycle memory remain unmeasured. Private extraction is measured
-separately below the standalone results in SUDACHI_MEASUREMENTS.md.
+settings and removes its own device files. Both probe ABIs link; physical arm64
+remains unmeasured. Private extraction is measured separately below the standalone
+results in SUDACHI_MEASUREMENTS.md.
 The owned/mapped comparison reduces release initialized anonymous memory from
 about 318 MiB to 2.5 MiB; total RSS remains similar after the complete checksum
 read. File-backed residency alone does not demonstrate reclamation under pressure.
@@ -87,8 +87,23 @@ Android targets compile. The profile includes +android-loader-v1; segmentation
 and embedded configuration are unchanged. App integration remains pending.
 Owned dictionary bytes alone require about 315 MiB. Mapped storage avoids that
 anonymous copy. The private extraction helper enforces immutable publication;
-production must still measure combined app memory. Keep one on-demand worker-owned
-analyzer and avoid eager Library initialization or per-page reloads.
+production still requires pressure/physical-arm64 validation. Keep one on-demand
+worker-owned analyzer and avoid eager Library initialization or per-page reloads.
+
+The separate `android_app_probe` cdylib example is packaged only in debug APKs.
+Its primitive JNI boundary duplicates the verified descriptor directly, rehashes
+the mapping through the real adapter, and keeps one analyzer in thread-local
+storage. Positive generation IDs reject stale/foreign-worker calls; errors stay
+numeric and panics cannot unwind into Java. No Java object, Activity or JNI
+interface pointer is retained. A/B/C and fixed Unicode/page/long-input fixtures
+are the only analysis requests; no application/import effects are exposed.
+Instrumentation owns an isolated no-backup directory and a lazy executor retained
+by a test ViewModel. It verifies reuse over Activity recreation/stop/resume,
+close/unmapping on that worker, and fresh-worker reopen. Test files are removed
+only after all worker mappings drop. This measures Compose/JVM/native PSS/RSS
+together; the test owner/executor is not a production analyzer architecture.
+Low-memory reclamation/process death and physical arm64 remain separate gates;
+see SUDACHI_MEASUREMENTS.md. Release APKs exclude the JNI facade/library.
 
 Pure `pagination` derives chapter-local TextAnchor pages from ordered immutable
 ChapterText snapshots. Five presets count non-whitespace Unicode scalars; LF/CRLF
@@ -183,9 +198,10 @@ Rust; the unsaved form draft and notice dialog visibility use rememberSaveable.
 The draft is retained through Settings/recreation.
 Navigation uses a bottom bar below 600dp and a scrollable rail above; Settings,
 paste and reader routes hide it. Toolbar/system Back return through Rust routes.
-Seventeen instrumentation tests pass on API 36 x86_64 phone (including eight
-private-extraction tests). The two asset/notices tests previously passed on phone
-and tablet landscape in airplane mode. The seven prior
+Eighteen instrumentation tests pass on API 36 x86_64 phone (including eight
+private-extraction tests and the debug-only in-app analyzer probe). The two
+asset/notices tests previously passed on phone and tablet landscape in airplane
+mode. The seven prior
 tests previously passed on phone and tablet landscape,
 including paste/draft/errors, recreation/Back, saved offsets, bidirectional
 percentages, scroll resets, Settings reflow and persisted preset reopening.

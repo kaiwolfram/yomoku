@@ -900,3 +900,35 @@ for fstat/fchmod/fsync/rename/open, [private no-backup directory](https://develo
 and Java 17 [FileChannel locks](https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/nio/channels/FileChannel.html#lock()).
 Checked the installed API-36 android.jar signatures too; Android's public
 OsConstants lacks O_DIRECTORY, so directory sync uses an O_RDONLY handle.
+
+## 2026-10-23 — Debug-only in-app Full descriptor/reuse measurement
+
+Extend the loading gate with a separate `yomoku-analysis` cdylib example and a
+debug-source-set JNI facade, leaving the production BoltFFI/runtime dependency
+graph unchanged. No new dependencies, versions, schemas or reader behavior.
+Build the probe with release Rust even in the debug Compose APK, using existing
+NDK r30/API 29 and sequential native tasks. The release app excludes the probe.
+
+Use JNI primitives only for descriptor, generation, fixture code and error/token
+count. Fixed A/B/C/Unicode/page/long-input fixtures avoid introducing a parallel
+application API. Duplicate the verified open descriptor with BorrowedFd into an
+owned File, never reopen its pathname; retain the mapped constructor's checksum.
+Kotlin holds its descriptor open until nativeOpen returns. The test-private
+publisher owns immutable inodes until analyzer drop. Thread-local Rust state
+enforces worker affinity without moving Sudachi between threads or retaining
+Java references. Generation IDs distinguish reopened analyzers and reject
+stale or foreign-worker calls; catch panics before returning to Java.
+
+A test-only ViewModel retains a lazy single executor across real Activity
+recreation/stop/resume, then closes native state on that executor when cleared.
+No production Activity starts or owns this worker. Instrumentation records
+Debug.MemoryInfo PSS/private-dirty and /proc/self/status RSS/HWM/anonymous/file/
+swap; /proc/self/maps checks actual mapping removal before test-directory cleanup.
+Timed validation calls include the executor/JNI round trip. Do not equate these
+instrumented debug-app measurements with release app/physical-device viability,
+kernel memory pressure, cold-storage behavior or production worker integration.
+
+API evidence: [JNI naming, native arguments and primitive mappings](https://docs.oracle.com/en/java/javase/17/docs/specs/jni/design.html),
+and Rust 1.99.1 [BorrowedFd lifetime and exact-description duplication](https://doc.rust-lang.org/std/os/fd/struct.BorrowedFd.html).
+The boundary never dereferences its unused JNI pointers. Production event/view
+payloads continue to use the existing generated, typed BoltFFI bridge.

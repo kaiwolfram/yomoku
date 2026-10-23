@@ -4,6 +4,10 @@ version = "0.1.0"
 edition.workspace = true
 license.workspace = true
 
+[[example]]
+name = "android_app_probe"
+crate-type = ["cdylib"]
+
 [dependencies]
 yomoku-core = { path = "../yomoku-core" }
 sudachi = { git = "https://github.com/WorksApplications/sudachi.rs", rev = "5de0410b6edfd428fc510cc9763440772e9619d5" }

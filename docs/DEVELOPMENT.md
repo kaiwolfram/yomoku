@@ -764,3 +764,53 @@ focused tests and lint pass after restarting a disconnected emulator with swangl
 A sandbox Gradle socket failure was rerun with escalation. No separate Rust tests,
 host JNI or standalone probes rerun for this Kotlin/platform slice; native
 packaging uses the existing bridge.
+
+## Debug-only in-app Sudachi descriptor/reuse probe
+
+The debug source set bundles a separate release-optimized Rust cdylib example
+for both ABIs; release apps exclude its library and Kotlin facade. Gradle builds
+it sequentially after the existing bridge, verifies pinned engine source, and
+uses NDK r30/API 29 with locked/offline Cargo. No extra setup/dependency is needed
+after the existing Full preparation. There is no startup or production caller.
+
+With the usual PATH/JAVA_HOME/GRADLE_USER_HOME/ANDROID_HOME above:
+
+```sh
+./android/gradlew -p android :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug --offline --console=plain
+./android/gradlew -p android :app:connectedDebugAndroidTest :app:lintDebug -Pandroid.testInstrumentationRunnerArguments.class=app.yomoku.SudachiAppProbeTest --offline --console=plain
+# Run all reader/platform tests:
+./android/gradlew -p android :app:connectedDebugAndroidTest :app:lintDebug --offline --console=plain
+# Unsigned release build to check that the probe is excluded:
+./android/gradlew -p android :app:assembleRelease --offline --console=plain
+```
+
+`SudachiAppProbeTest` extracts real compressed Full into its unique no-backup
+directory, supplies the verified descriptor through JNI, closes the Kotlin
+handles, and validates A/B/C, OOV/normalization/Unicode/NUL, repeated pages and
+72 KB unbroken input on one native worker. It checks failed-load retry, bad/stale/
+foreign-worker calls, one initialization across Activity recreation/stop/resume,
+close on ViewModel clearance, actual unmapping, and fresh-worker cache reopen.
+The test owner/executor is measurement scaffolding, not production integration.
+Cleanup waits for native close/thread termination before removing owned files.
+
+Per-stage PSS/private-dirty and kernel RSS/HWM/anonymous/file/swap plus timings
+are in Logcat tag `SudachiAppProbe` and Gradle's per-test logcat files under
+`android/app/build/outputs/androidTest-results/connected/debug/`. Preserve that
+directory before another run overwrites it. Test-owned directories are removed;
+device viewport/radios and production dictionary files are untouched. Test timing
+includes JNI/executor overhead; the app is a debug Compose/instrumentation build
+with release Rust. No cold-storage/pressure/process-death/physical-arm64 claim.
+Exact results, local report paths and unresolved gate: SUDACHI_MEASUREMENTS.md.
+
+Verified 2026-10-23: debug app/test APKs, strict lint, the focused test and all
+eighteen phone tests pass. Unsigned release APK assembly passes; ZIP/DEX inspection
+confirms both probe ABIs/facade are present only in debug. Both probe ELF LOAD
+segments and both APKs have 16 KB alignment. Debug APK: 190,468,605 bytes;
+unsigned release: 165,940,973 bytes. Pinned source verification, workspace build,
+119 data-free Rust tests, fmt/strict Clippy, Python syntax, Kotlin formatting and
+whitespace pass. No host JNI, host Full fixtures, standalone probe or tablet rerun.
+Final reports: .local/test-reports/sudachi-app/{focused-1,full-suite}/.
+First connected Gradle command needed socket escalation; the initial map assertion
+used an absolute Context path while /proc can use another private-directory alias.
+The unique test-directory suffix check passes in both final processes. No open
+check failure; actual pressure/process-death/physical-arm64 gates remain.
