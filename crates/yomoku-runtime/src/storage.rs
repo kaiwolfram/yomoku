@@ -78,6 +78,14 @@ fn execute(
             .map_err(map_error)?
             .map(StorageResult::Loaded)
             .ok_or(DocumentError::NotFound),
+        StorageOperation::SaveReadingPosition {
+            document_id,
+            position,
+        } => storage
+            .save_reading_position(document_id, position)
+            .map_err(map_error)?
+            .map(StorageResult::PositionSaved)
+            .ok_or(DocumentError::NotFound),
     }
 }
 

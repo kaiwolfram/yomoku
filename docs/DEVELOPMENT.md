@@ -443,3 +443,21 @@ untested. Initial new Rust test API assumptions and the FFI test's private-event
 ordinal were corrected before the complete passing rerun. Intentional-close Crux
 logs and ktfmt/JDK warnings remain benign. Page controls, saved current position,
 Library percentage, completion/history and reader Settings remain future slices.
+
+## Durable current-position verification
+PASS 2026-10-23: 75 Rust tests, workspace build, fmt/clippy, host Kotlin/JNI with
+exact position saves/reopen/typed invalid-offset failures, seven Unicode exchanges,
+Kotlin formatting, Android app/test APK assembly and strict lint. Existing locked/
+offline commands above are unchanged. Migration 0003 is appended; versions of
+dependencies and toolchains are unchanged.
+
+All six instrumentation tests PASS on API 36 x86_64 at the default phone viewport
+and tablet landscape 2560x1600/240dpi. Size/density overrides were restored.
+DocumentSessionTest
+also saves/loads an exact position across fresh native sessions. PasteReaderTest
+adds position-only hook coverage across three logical pages: current percentage
+in both directions, exact offset within a page on reopen, top-of-page reset on
+page change/reopen/recreation, and long scrollable content. The UI still has no
+Next/Previous/swipes; forward completion/history is separate work. The first host
+JNI fixture used byte 4 inside a Japanese title character; corrected to boundary
+5, with byte 3 as the intentionally invalid fixture, and the full rerun passed.

@@ -177,7 +177,7 @@ fn internal_storage_results_cannot_be_injected_over_ffi() {
     let forged = Event::StorageFinished(StorageResult::Failed(DocumentError::Unavailable));
     assert!(BincodeFfiFormat::serialize(&mut vec![], &forged).is_err());
     assert_eq!(
-        native.update(&9_u32.to_le_bytes()),
+        native.update(&10_u32.to_le_bytes()),
         Err(FfiError::InvalidEvent)
     );
     assert!(view(&native).documents.is_empty());

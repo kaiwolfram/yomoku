@@ -95,6 +95,7 @@ pub struct PastedDocument {
     pub document_id: DocumentId,
     pub title: String,
     pub chapter: ChapterText,
+    pub reading_position: Option<crate::pagination::ReadingPosition>,
 }
 
 /// Nonnegative UTF-8 byte offset within one canonical chapter, including EOF.
@@ -204,10 +205,11 @@ impl TextAnchor {
     }
 }
 
-/// Minimal Library projection; progress is added with reader persistence.
+/// Current position, independent of completion history or a permanent checkmark.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
 pub struct LibraryDocument {
     pub document_id: DocumentId,
     pub title: String,
+    pub progress_percent: u64,
 }

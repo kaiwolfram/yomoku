@@ -1,7 +1,9 @@
 use crux_core::Core;
 use yomoku_core::{
     app::{ContentRoute, Destination, Effect, Event, Yomoku},
-    document::{ChapterId, ChapterText, DocumentId, PastedDocument, SourceId},
+    document::{ChapterId, ChapterText, DocumentId, PastedDocument, SourceId, TextOffset},
+    pagination::ReadingPosition,
+    reader::{progress_percent, ReaderPage},
     storage::{DocumentError, StorageOperation, StorageResult},
 };
 
@@ -9,11 +11,114 @@ fn document(text: &str) -> PastedDocument {
     PastedDocument {
         document_id: DocumentId::try_from(1).unwrap(),
         title: "題𠮷".into(),
+        reading_position: None,
         chapter: ChapterText {
             source_id: SourceId::try_from(2).unwrap(),
             chapter_id: ChapterId::try_from(3).unwrap(),
             text: text.into(),
         },
+    }
+}
+
+#[test]
+fn reopening_uses_containing_page_but_keeps_exact_saved_offset_including_eof() {
+    let first = format!("{}\n", "𠮷".repeat(500));
+    let mut document = document(&format!("{first}次の段落。"));
+    for byte in [first.len(), first.len() + 3, document.chapter.text.len()] {
+        let position = ReadingPosition {
+            source_id: document.chapter.source_id,
+            chapter_id: document.chapter.chapter_id,
+            offset: TextOffset::at(&document.chapter.text, byte).unwrap(),
+        };
+        document.reading_position = Some(position);
+        let page = ReaderPage::open(&document).unwrap();
+        assert_eq!(page.page_number, 2);
+        assert_eq!(page.text, "次の段落。");
+        assert_eq!(page.position, position);
+        assert_eq!(i64::from(page.anchor.range.start), first.len() as i64);
+    }
+}
+
+#[test]
+fn position_save_keeps_committed_view_until_success_and_late_results_only_update_library() {
+    for close in [false, true] {
+        let core = Core::<Yomoku>::new();
+        assert!(core
+            .process_event(Event::SaveReadingPosition(ReadingPosition {
+                source_id: SourceId::try_from(2).unwrap(),
+                chapter_id: ChapterId::try_from(3).unwrap(),
+                offset: TextOffset::START,
+            }))
+            .is_empty());
+        let mut document = document(&format!("{}\n次の段落。", "𠮷".repeat(500)));
+        let mut effects = core.process_event(Event::CreatePaste(document.chapter.text.clone()));
+        finish(
+            &core,
+            &mut effects,
+            StorageResult::Created(document.clone()),
+        );
+        let mut effects = core.process_event(Event::OpenReader(document.document_id));
+        finish(&core, &mut effects, StorageResult::Loaded(document.clone()));
+        let previous = core.view().reader.unwrap();
+        let position = ReadingPosition {
+            offset: previous.anchor.range.end,
+            ..previous.position
+        };
+        let mut effects = core.process_event(Event::SaveReadingPosition(position));
+        assert_eq!(core.view().reader, Some(previous.clone()));
+        assert!(core
+            .process_event(Event::SaveReadingPosition(position))
+            .is_empty());
+        finish(
+            &core,
+            &mut effects,
+            StorageResult::Failed(DocumentError::Unavailable),
+        );
+        assert_eq!(core.view().reader, Some(previous.clone()));
+        assert_eq!(core.view().documents[0].progress_percent, 0);
+        let mut effects = core.process_event(Event::SaveReadingPosition(position));
+        assert!(core.view().document_error.is_none());
+        if close {
+            core.process_event(Event::CloseDocument);
+        }
+        document.reading_position = Some(position);
+        finish(
+            &core,
+            &mut effects,
+            StorageResult::PositionSaved(document.clone()),
+        );
+        assert_eq!(
+            core.view().documents[0],
+            document.library_summary().unwrap()
+        );
+        if close {
+            assert!(core.view().reader.is_none());
+            assert_eq!(core.view().content_route, ContentRoute::Main);
+        } else {
+            assert_eq!(core.view().reader.unwrap().position, position);
+            let mut effects = core.process_event(Event::SaveReadingPosition(previous.position));
+            document.reading_position = Some(previous.position);
+            finish(&core, &mut effects, StorageResult::PositionSaved(document));
+            assert_eq!(core.view().documents[0].progress_percent, 0);
+            assert_eq!(core.view().reader.unwrap().page_number, 1);
+        }
+    }
+}
+
+#[test]
+fn current_progress_has_checked_bounds_and_no_overflow_or_finished_flag() {
+    for (offset, total, expected) in [
+        (0, 0, 0),
+        (0, 7, 0),
+        (1, 3, 33),
+        (7, 7, 100),
+        (i64::MAX - 1, i64::MAX, 99),
+        (i64::MAX, i64::MAX, 100),
+    ] {
+        assert_eq!(progress_percent(offset, total).unwrap(), expected);
+    }
+    for (offset, total) in [(-1, 1), (0, -1), (2, 1), (1, 0)] {
+        assert!(progress_percent(offset, total).is_err());
     }
 }
 

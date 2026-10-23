@@ -43,7 +43,7 @@ position/encounter history. Keep incremental builds green.
 - [x] Enforce EPUB chapter boundaries and no inferred TXT chapters; explicit ordered chapter/heading fixtures pass before import wiring. EPUB/TXT importers remain phase 4.
 - [x] Reflow pages preserving underlying text offset; all 25 preset pairs pass with Japanese, supplementary Unicode, chapter EOF and invalid anchors. Fourteen pagination tests total.
 - [x] Add Android paste flow returning to Library, list titles and first-page reader opening; test first import/open, draft/error retention, recreation and Back. Rust owns routes and default-500 first-page projection; current progress is the separate task below.
-- [ ] Add Library current progress with persisted reader position; test forward/backward percentage changes and reopen.
+- [x] Add Library current progress with persisted reader position; test forward/backward percentage changes and reopen. Migration 0003 and typed position-only saves validate ownership/UTF-8 boundaries, retain exact offsets, survive reopen and roll back failures; Rust/JNI/Android tests pass. Page controls/forward completion remain below; no seek UI is added.
 - [ ] Render centered single-column pages, Next/Previous/swipes and content-bottom counter; test both directions update current position and reset scroll on navigation/reopen.
 - [ ] Implement completion command IDs and atomic persistence; test double callbacks count once, rereading counts again, Previous does not complete.
 - [ ] Implement hidden active-time accumulator with five-minute idle timeout; fake-clock tests cover interactions, dictionary popup, background, close/reboot and pending time committed only on completion.

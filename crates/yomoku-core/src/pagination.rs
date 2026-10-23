@@ -48,6 +48,16 @@ pub struct ReadingPosition {
     pub offset: TextOffset,
 }
 
+impl ReadingPosition {
+    pub fn validate(self, chapter: &ChapterText) -> Result<(), InvalidTextValue> {
+        if self.source_id != chapter.source_id || self.chapter_id != chapter.chapter_id {
+            return Err(InvalidTextValue);
+        }
+        self.offset.byte_index(&chapter.text)?;
+        Ok(())
+    }
+}
+
 /// Derived ranges only. Canonical text and the reading offset remain separate.
 #[derive(Debug)]
 pub struct LogicalPages<'a> {

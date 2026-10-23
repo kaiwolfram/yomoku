@@ -313,3 +313,23 @@
   unchecked. Page movement/swipes, durable position/percentage, page Settings,
   completion/history, dedup and vocabulary registration remain future work.
   No dependencies, migrations, Nostr configuration or destructive APIs changed.
+
+## 2026-10-23 — Durable current reader position and Library percentage
+- Started clean. Added migration 0003 and atomic position save/load with source/
+  chapter ownership, UTF-8 scalar/EOF validation and insert/update/commit rollback.
+  Existing version-2 text upgrades unchanged; invalid stored positions are rejected.
+- Added typed core/runtime save hook; committed snapshots drive Library percentage
+  and reader page projection while retaining the exact offset separately. Late
+  saves update Library without reopening a closed route. No seek UI or forward
+  completion is implemented; Next/Previous/swipes remain unchecked.
+- Android shows current percentage and uses transient page-keyed vertical scroll.
+  PASS: 75 Rust tests (eight new), build/fmt/clippy, host JNI save/reopen/errors/
+  lifecycle, seven Unicode exchanges, Kotlin formatting, app/test APK assembly,
+  strict lint and all six Android tests on API 36 x86_64 phone/tablet landscape.
+  Restored viewport; emulator left running. Arm64 execution remains untested.
+- Corrected initial JNI fixture offset inside a Japanese title scalar; complete
+  rerun PASS. Existing intentional-close/formatter warnings remain benign.
+- Updated checklist, architecture/data model, decisions, development and handoff.
+  No dependencies, Nostr data or production deletion APIs changed. No blocker.
+  Next: atomic completion/analysis/vocabulary prerequisites and page controls,
+  Settings/reflow persistence, CI.

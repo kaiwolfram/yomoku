@@ -4,6 +4,7 @@ use crux_core::capability::Operation;
 use serde::{Deserialize, Serialize};
 
 use crate::document::{DocumentId, LibraryDocument, PastedDocument};
+use crate::pagination::ReadingPosition;
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
@@ -12,6 +13,10 @@ pub enum StorageOperation {
     List,
     CreatePaste(String),
     LoadPaste(DocumentId),
+    SaveReadingPosition {
+        document_id: DocumentId,
+        position: ReadingPosition,
+    },
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -32,6 +37,7 @@ pub enum StorageResult {
     Listed(Vec<LibraryDocument>),
     Created(PastedDocument),
     Loaded(PastedDocument),
+    PositionSaved(PastedDocument),
     Failed(DocumentError),
 }
 

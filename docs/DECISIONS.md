@@ -537,3 +537,34 @@ awaits durable progress. Reader uses one centered, vertically scrollable column
 with a 720dp maximum width and content-bottom page counter. Main navigation hides
 for paste/reader/Settings; toolbar and system Back use Rust events. No dependencies,
 migrations, data-destructive semantics or Nostr configuration changed.
+
+## 2026-10-23 — Durable current position before page completion
+Implement the independently testable persistence foundation of the next reader
+slice using existing dependencies. Append migration 0003 rather than altering
+published schemas. Keep one optional document/chapter/UTF-8 offset row; source
+ownership derives from documents and is validated along with scalar boundaries
+on save/load. Use an immediate transaction for validation/upsert and return only
+after commit. Failed or corrupt positions never trigger repair or position reset.
+The document FK cascades only progress, matching specified future deletion;
+source/chapter provenance remains. No production delete command is introduced.
+
+Use current UTF-8 byte offset / canonical UTF-8 byte length for paste percentage,
+floored to whole percent. This matches the durable offset unit, includes original
+whitespace/NUL, never counts UTF-16 units and uses u128 arithmetic to avoid
+overflow. Library SQL obtains BLOB lengths without fetching all book text; core
+owns the checked percentage calculation. Full scalar validation occurs on load
+and save; listing checks ownership and numeric bounds. Future chapter importers
+must sum preceding canonical chapter lengths rather than use page numbers.
+
+Expose a typed SaveReadingPosition hook scoped to the active reader, using the
+existing busy guard/FIFO worker. Keep the last committed page and summary visible
+until success, and allow writes to finish after leaving without reopening the
+route. This is position-only infrastructure, with no user-facing seek UI and no
+completion/status/encounter side effects. Do not map Next/swipes to it alone:
+forward navigation still needs atomic completion IDs/history and vocabulary work.
+Reopen projects the containing page while preserving its exact saved offset.
+
+Use transient Compose remember { ScrollState(0) }, keyed by document/page anchor,
+instead of rememberScrollState's saved instance state. Page changes, route reopen
+and Activity recreation start at the top. No vertical offset enters Rust/SQLite.
+No dependencies, Nostr configuration or product completion behavior change.

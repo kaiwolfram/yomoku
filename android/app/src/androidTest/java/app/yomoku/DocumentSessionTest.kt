@@ -4,6 +4,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import app.yomoku.shared.DocumentError
 import app.yomoku.shared.Event
+import app.yomoku.shared.TextOffset
 import app.yomoku.shared.ViewModel
 import java.io.File
 import org.junit.Assert.assertEquals
@@ -54,11 +55,18 @@ class DocumentSessionTest {
             assertNull(created.documentError)
             assertEquals("  題𠮷📖  ", created.documents.single().title)
             assertNull(created.loadedDocument)
-            val document =
+            var document =
                 dispatch(core, Event.LoadPaste(created.documents.single().documentId))
                     .loadedDocument
             assertNotNull(document)
             assertEquals(text, document!!.chapter.text)
+            val opened = dispatch(core, Event.OpenReader(document.documentId)).reader!!
+            val position = opened.position.copy(offset = TextOffset(5))
+            val saved = dispatch(core, Event.SaveReadingPosition(position))
+            assertNull(saved.documentError)
+            assertEquals(position, saved.reader!!.position)
+            document = saved.loadedDocument!!
+            val summaries = saved.documents
             assertEquals(
                 DocumentError.EMPTYPASTE,
                 dispatch(core, Event.CreatePaste(" \n")).documentError,
@@ -68,10 +76,14 @@ class DocumentSessionTest {
             active = null
             instrumentation.runOnMainSync { core = CoreSession(database.absolutePath) }
             active = core
-            assertEquals(created.documents, awaitIdle(core).documents)
+            assertEquals(summaries, awaitIdle(core).documents)
             assertEquals(
                 document,
                 dispatch(core, Event.LoadPaste(document.documentId)).loadedDocument,
+            )
+            assertEquals(
+                position,
+                dispatch(core, Event.OpenReader(document.documentId)).reader!!.position,
             )
             instrumentation.runOnMainSync { core.close() }
             active = null

@@ -17,6 +17,7 @@
     <string name="reader_title">Reader</string>
     <string name="retry">Retry</string>
     <string name="page_counter">%1$d / %2$d</string>
+    <string name="reading_progress">%1$d%%</string>
     <string name="error_empty_paste">Enter some text to import.</string>
     <string name="error_storage_unavailable">Storage is unavailable. Please try again.</string>
     <string name="error_incompatible_database">This database version cannot be opened.</string>

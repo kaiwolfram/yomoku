@@ -25,6 +25,11 @@ const MIGRATIONS: &[Migration] = &[
         name: "0002_paste_documents",
         sql: include_str!("../migrations/0002_paste_documents.sql"),
     },
+    Migration {
+        version: 3,
+        name: "0003_reading_positions",
+        sql: include_str!("../migrations/0003_reading_positions.sql"),
+    },
 ];
 
 /// Failures are returned to the runtime; opening never resets a database.

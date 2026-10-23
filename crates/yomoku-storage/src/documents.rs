@@ -1,24 +1,46 @@
-use rusqlite::{OptionalExtension, TransactionBehavior};
+use rusqlite::{Connection, OptionalExtension, TransactionBehavior};
 use yomoku_core::document::{
     ChapterId, ChapterText, DocumentId, LibraryDocument, PasteText, PastedDocument, SourceId,
+    TextOffset,
 };
+use yomoku_core::{pagination::ReadingPosition, reader::progress_percent};
 
 use crate::{Storage, StorageError};
 
 impl Storage {
     /// Stable allocation order until Library sorting is implemented.
     pub fn list_documents(&self) -> Result<Vec<LibraryDocument>, StorageError> {
-        let mut statement = self
-            .connection
-            .prepare("SELECT id, title FROM documents ORDER BY id")?;
+        let mut statement = self.connection.prepare(
+            "SELECT d.id, d.title, length(CAST(t.text AS BLOB)),
+                             p.chapter_id, p.byte_offset, c.id
+                      FROM documents d
+                      LEFT JOIN chapters c ON c.source_id = d.source_id AND c.chapter_index = 0
+                      LEFT JOIN chapter_texts t ON t.chapter_id = c.id
+                      LEFT JOIN reading_positions p ON p.document_id = d.id
+                      ORDER BY d.id",
+        )?;
         let rows = statement.query_map([], |row| {
-            Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?))
+            Ok((
+                row.get::<_, i64>(0)?,
+                row.get::<_, String>(1)?,
+                row.get::<_, Option<i64>>(2)?,
+                row.get::<_, Option<i64>>(3)?,
+                row.get::<_, Option<i64>>(4)?,
+                row.get::<_, Option<i64>>(5)?,
+            ))
         })?;
         rows.map(|row| {
-            let (id, title) = row?;
+            let (id, title, total_bytes, position_chapter, offset, chapter) = row?;
+            let total_bytes = total_bytes.ok_or(StorageError::InvalidDocument)?;
+            let chapter = chapter.ok_or(StorageError::InvalidDocument)?;
+            if position_chapter.is_some_and(|id| id != chapter) {
+                return Err(StorageError::InvalidDocument);
+            }
             Ok(LibraryDocument {
                 document_id: DocumentId::try_from(id).map_err(|_| StorageError::InvalidDocument)?,
                 title,
+                progress_percent: progress_percent(offset.unwrap_or(0), total_bytes)
+                    .map_err(|_| StorageError::InvalidDocument)?,
             })
         })
         .collect()
@@ -58,6 +80,7 @@ impl Storage {
         Ok(PastedDocument {
             document_id,
             title: title.to_owned(),
+            reading_position: None,
             chapter: ChapterText {
                 source_id,
                 chapter_id,
@@ -73,42 +96,98 @@ impl Storage {
         document_id: DocumentId,
     ) -> Result<Option<PastedDocument>, StorageError> {
         let transaction = self.connection.transaction()?;
-        let document = transaction
-            .query_row(
-                "SELECT source_id, title FROM documents WHERE id = ?1",
-                [i64::from(document_id)],
-                |row| Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?)),
-            )
-            .optional()?;
-        let Some((source_id, title)) = document else {
-            transaction.commit()?;
+        let document = load_paste_in(&transaction, document_id)?;
+        transaction.commit()?;
+        Ok(document)
+    }
+
+    /// Save only current position. No completion/history/status changes occur.
+    /// Validate ownership and scalar boundaries before replacing the previous row.
+    pub fn save_reading_position(
+        &mut self,
+        document_id: DocumentId,
+        position: ReadingPosition,
+    ) -> Result<Option<PastedDocument>, StorageError> {
+        let transaction = self
+            .connection
+            .transaction_with_behavior(TransactionBehavior::Immediate)?;
+        let Some(mut document) = load_paste_in(&transaction, document_id)? else {
             return Ok(None);
         };
-        let source_id = SourceId::try_from(source_id).map_err(|_| StorageError::InvalidDocument)?;
-        let chapter = transaction
-            .query_row(
-                "SELECT chapters.id, chapter_texts.text
+        position
+            .validate(&document.chapter)
+            .map_err(|_| StorageError::InvalidDocument)?;
+        transaction.execute(
+            "INSERT INTO reading_positions (document_id, chapter_id, byte_offset) VALUES (?1, ?2, ?3)
+             ON CONFLICT(document_id) DO UPDATE SET chapter_id = excluded.chapter_id, byte_offset = excluded.byte_offset",
+            (i64::from(document_id), i64::from(position.chapter_id), i64::from(position.offset)),
+        )?;
+        transaction.commit()?;
+        document.reading_position = Some(position);
+        Ok(Some(document))
+    }
+}
+
+fn load_paste_in(
+    connection: &Connection,
+    document_id: DocumentId,
+) -> Result<Option<PastedDocument>, StorageError> {
+    let document = connection
+        .query_row(
+            "SELECT source_id, title FROM documents WHERE id = ?1",
+            [i64::from(document_id)],
+            |row| Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?)),
+        )
+        .optional()?;
+    let Some((source_id, title)) = document else {
+        return Ok(None);
+    };
+    let source_id = SourceId::try_from(source_id).map_err(|_| StorageError::InvalidDocument)?;
+    let chapter = connection
+        .query_row(
+            "SELECT chapters.id, chapter_texts.text
                  FROM sources
                  JOIN chapters ON chapters.source_id = sources.id
                  JOIN chapter_texts ON chapter_texts.chapter_id = chapters.id
                  WHERE sources.id = ?1 AND sources.kind = 'paste' AND chapters.chapter_index = 0",
-                [i64::from(source_id)],
-                |row| Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?)),
-            )
-            .optional()?
-            .ok_or(StorageError::InvalidDocument)?;
-        let chapter_id =
-            ChapterId::try_from(chapter.0).map_err(|_| StorageError::InvalidDocument)?;
-        let text = PasteText::new(chapter.1).map_err(|_| StorageError::InvalidDocument)?;
-        transaction.commit()?;
-        Ok(Some(PastedDocument {
-            document_id,
-            title,
-            chapter: ChapterText {
+            [i64::from(source_id)],
+            |row| Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?)),
+        )
+        .optional()?
+        .ok_or(StorageError::InvalidDocument)?;
+    let chapter_id = ChapterId::try_from(chapter.0).map_err(|_| StorageError::InvalidDocument)?;
+    let text = PasteText::new(chapter.1).map_err(|_| StorageError::InvalidDocument)?;
+    let stored_position = connection
+        .query_row(
+            "SELECT chapter_id, byte_offset FROM reading_positions WHERE document_id = ?1",
+            [i64::from(document_id)],
+            |row| Ok((row.get::<_, i64>(0)?, row.get::<_, i64>(1)?)),
+        )
+        .optional()?;
+    let reading_position = stored_position
+        .map(|(chapter, offset)| {
+            Ok::<_, StorageError>(ReadingPosition {
                 source_id,
-                chapter_id,
-                text: text.as_str().to_owned(),
-            },
-        }))
+                chapter_id: ChapterId::try_from(chapter)
+                    .map_err(|_| StorageError::InvalidDocument)?,
+                offset: TextOffset::try_from(offset).map_err(|_| StorageError::InvalidDocument)?,
+            })
+        })
+        .transpose()?;
+    let document = PastedDocument {
+        document_id,
+        title,
+        reading_position,
+        chapter: ChapterText {
+            source_id,
+            chapter_id,
+            text: text.as_str().to_owned(),
+        },
+    };
+    if let Some(position) = reading_position {
+        position
+            .validate(&document.chapter)
+            .map_err(|_| StorageError::InvalidDocument)?;
     }
+    Ok(Some(document))
 }

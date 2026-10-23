@@ -47,7 +47,8 @@ Canonical text is not Unicode-normalized, trimmed or silently line-ending
 normalized by these types. Importers define canonical extraction before anchors
 are created. Source ruby/formatting/images must later refer to that same text;
 image-only positions and import extraction rules remain future work. Offsets
-are not a page-length metric or a progress percentage policy.
+are not a page-length metric. Current paste progress uses the byte-offset ratio
+described below.
 Combining sequences/ZWJ emoji may contain multiple scalar boundaries; these
 helpers do not snap positions to graphemes. `TextOffset::from_utf16`/`to_utf16`
 convert Kotlin/Compose indices explicitly and reject split surrogate pairs.
@@ -73,18 +74,16 @@ ReadingPosition contains source ID, chapter ID and exact byte offset, separately
 from a page number or page start. Reflow returns the unchanged position and its
 new page index. A position at an internal page boundary selects the next page;
 chapter EOF selects that chapter's final page. Unknown ownership, out-of-range
-offsets and split scalars are rejected. Nothing here persists reading position,
-vertical scroll, encounters or settings. ReadingPosition now has generated
-Serde/Facet codecs; persisted progress and reader reflow events remain future work.
+offsets and split scalars are rejected. ReadingPosition has generated Serde/Facet
+codecs and is persisted by migration 0003 below. Vertical scroll, encounters and
+settings are not stored here; reader reflow events remain future work.
 Paragraph/sentence heuristics are recorded in DECISIONS.md.
 
-ReaderPage is a transient typed projection of the first logical page of a paste
-at the default 500 preset: document ID/title, exact page text, TextAnchor,
-ReadingPosition, and one-based page number/total. Position starts at byte 0 and
-is separate from the displayed range. No page number or vertical scroll is stored.
-Opening currently always begins at page 1; saved position and progress await
-their migration/repository commands. Kotlin renders this projection without
-calculating boundaries or slicing Unicode text.
+ReaderPage is a transient projection of the logical page containing the saved
+ReadingPosition, at the default 500 preset: document ID/title, exact page text,
+TextAnchor, unchanged ReadingPosition, and one-based page number/total. Unopened
+documents start at byte 0. No page number or vertical scroll is stored. Kotlin
+renders this projection without calculating boundaries or slicing Unicode text.
 
 ## SQLite initialization
 `yomoku-storage` owns the database connection. Migration
@@ -106,7 +105,8 @@ files path. Vocabulary/history tables await their domain commands.
 `PasteText` validates non-whitespace content without changing the text. Its initial
 title is the literal first LF/CRLF-delimited line, without trimming/truncation or
 a fallback for an empty first line. `PastedDocument` is a detached snapshot of a
-document ID, live title and one `ChapterText`; mutating a snapshot does not edit
+document ID, live title, one `ChapterText` and optional `reading_position`;
+mutating a snapshot does not edit
 persisted content. PastedDocument is now a generated shell/FFI payload.
 
 - `sources`: positive autoincrement ID, `kind = 'paste'`, original title.
@@ -126,8 +126,32 @@ and reports missing/invalid content for an existing document as InvalidDocument.
 SQL values are bound parameters, including titles/text containing NUL or quotes.
 Both calls are synchronous I/O executed off the UI thread by runtime effects.
 This repository is the persistence part of import; SHA-256 duplicate detection,
-vocabulary registration, import timestamps and reader progress
-remain separate unchecked tasks. No reading encounters are created here.
+vocabulary registration and import timestamps remain separate unchecked tasks. No reading encounters are created here.
+
+## Current position repository (migration 0003)
+`reading_positions` has document ID as PK/FK (cascade only this document's progress
+on deletion), chapter ID FK and a nonnegative UTF-8 byte offset. No row means
+unopened, projected as 0%. Source ownership derives from the live document.
+`save_reading_position` validates supplied source/chapter ownership, scalar
+boundaries and EOF inside an immediate transaction before upsert. It returns the
+new snapshot only after commit. Invalid input and insert/update/commit failure
+preserve the previous row; missing documents return None. Load validates stored
+positions without repair. No completion/history/time/status mutation occurs.
+
+LibraryDocument adds whole `progress_percent`: floor(offset * 100 / total canonical
+UTF-8 bytes), checked for bounds with overflow-safe u128 arithmetic. Listing uses
+SQLite BLOB lengths (including text after NUL), without fetching every document's
+text or paginating the Library. It checks chapter ownership and offset bounds;
+full scalar-boundary validation happens when loading/saving a document. Current
+progress can decrease and is independent of the future finished checkmark.
+Only paste's single text unit is implemented; multi-chapter totals await imports.
+
+SaveReadingPosition is a typed position-only protocol hook for an active reader;
+there is no user-facing seek control. It uses the existing busy guard/FIFO worker.
+The displayed page and Library summary update after commit; failures keep the
+previous snapshot. Leaving during a save does not cancel the write or reopen the
+reader when its callback arrives. Next/Previous/swipes and atomic forward
+completion must be wired in their own implementation step.
 
 ## Transient application state
 `app::Destination` is Library (default), Nostr, Statistics or Vocabulary.
@@ -154,21 +178,22 @@ Create success returns to Library and adds its title without opening a reader;
 failure leaves the form/draft for retry. The unsaved text draft is Compose form
 state, retained through Settings/recreation and cleared when leaving the form.
 
-RefreshLibrary/CreatePaste/LoadPaste use the pure StorageOperation protocol.
+RefreshLibrary/CreatePaste/LoadPaste/SaveReadingPosition use the pure
+StorageOperation protocol.
 StorageFinished is skipped by Serde and Facet, so it cannot be dispatched over
-FFI. Model/ViewModel add LibraryDocument (ID/title), an optional loaded snapshot,
+FFI. Model/ViewModel add LibraryDocument (ID/title/current percentage), an optional loaded snapshot,
 storage_busy and typed document_error. Concurrent storage submissions are ignored
 while busy; navigation remains available. A successful create adds its summary
 without opening a reader; LoadPaste reads exact content without changing progress,
-while OpenReader adds the first-page projection described above.
+while OpenReader adds the saved-position page projection described above.
 Listing is allocation order until the planned Library sorting task. Failed opens
 can retry. No path or SQLite diagnostic string is exposed in application state.
 The bridge constructor takes the path separately; Android uses filesDir/yomoku.sqlite3.
 Submitted writes finish even if the session closes; shutdown does not block UI.
 
 ## Required future schema constraints
-- Repositories must implement the identity/immutable-text contract above and
-  persist current chapter ID plus byte offset separately from logical pages.
+- Future import repositories must extend the identity/immutable-text and durable
+  chapter/byte-offset contract above to multiple chapters.
 - Unique active surface entry, linked analyzer dictionary form (nullable), dated
   registration and immutable status history. Reading never participates in identity.
 - Completed-reading events with unique command IDs, occurrence rows preserving

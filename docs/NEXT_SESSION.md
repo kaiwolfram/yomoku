@@ -1,43 +1,41 @@
 # Resume here
 
-Updated: 2026-10-22. Android paste/Library/first-page reader opening verified.
-Read AGENTS.md, plan phase 2 and PRODUCT_SPEC.md section 3 next.
+Updated: 2026-10-23. Durable current position/Library percentage verified.
+Read AGENTS.md, plan phases 2–3 and PRODUCT_SPEC.md section 3 next.
 After each completed, verified step, update docs and commit it automatically.
 
 ## Working
-- Pure Crux 0.20.0 core owns top-level navigation, Main/Paste/Reader routes,
-  Settings overlay, Library summaries, busy/errors and typed storage effects.
-  StorageFinished is skipped by Serde/Facet; only Render reaches Kotlin.
-- EffectRouter executes lazy SQLite open/migrations/create/list/load on one FIFO
-  worker per bridge. Failed opens retry; submitted writes finish on close without
-  blocking UI. NativeBridge has typed errors and async JNI render callbacks.
-- Android CoreSessionOwner uses filesDir/yomoku.sqlite3, loads Library once,
-  retains across recreation and closes onCleared. Fresh sessions start Library.
-- Paste form retains draft through Settings/recreation/error, saves to Library
-  without auto-opening. Library shows exact titles and explicitly opens reader.
-  Rust ReaderPage projects exact default-500 first page, anchor, separate reading
-  offset and counter. Late loads cannot reopen a cancelled reader route.
-- Reader column centers/caps at 720dp and scrolls; content-bottom counter present.
-  Toolbar/system Back and Settings return work; main navigation hides in reader.
-  Reader currently starts at page 1; controls/swipes/progress/completion pending.
-- Storage 0001–0002: immutable exact text, first-line titles, separate provenance,
-  positive i64 IDs/nonreuse/exhaustion. Dedup/registration/timestamps remain next
-  import tasks; paste creation adds no reading encounters.
-- Typed chapter-local UTF-8 anchors/checked UTF-16; seven Rust/Kotlin exchanges.
-  Pure pagination covers all five presets, paragraph/sentence fallback, supplied
-  chapters and exact-offset reflow (14 tests). All non-whitespace Unicode scalars
-  count, including punctuation/Latin. App Settings/reflow persistence remain next.
-- Pinned toolchain unchanged: Rust 1.99.1, Crux 0.20.0, BoltFFI 0.30.1,
+- Pure Crux core owns top-level/Main/Paste/Reader routes, Settings, Library,
+  busy/errors and typed effects. StorageFinished is private; only Render reaches UI.
+- FIFO EffectRouter worker owns lazy SQLite open/migrations/create/list/load/save.
+  Failed opens retry. Submitted writes finish on close without blocking Android.
+- Android owner uses filesDir/yomoku.sqlite3, loads Library once and retains the
+  native session through recreation. Fresh processes start Library.
+- Paste preserves draft through Settings/recreation/errors; saves return to Library
+  without opening. Reader opens explicitly at the saved position (default page 500).
+- Migration 0003 stores document/chapter/UTF-8 byte offset. SaveReadingPosition is
+  a typed position-only hook scoped to an active reader, with no seek UI.
+  Validate source/chapter/scalar boundaries; failed writes preserve prior snapshot.
+  Update reader/Library only after commit; late saves cannot reopen a closed reader.
+- Library shows floor(current byte offset * 100 / canonical UTF-8 byte length),
+  including NUL/whitespace. Can decrease. Listing avoids fetching all book text.
+  Reopen retains exact offset separately from containing page start; EOF is valid.
+- Reader column centers/caps at 720dp with bottom counter. Transient ScrollState
+  keyed by document/page resets on position-page changes, reopen and recreation.
+  Main nav hides; toolbar/system Back/Settings work. NO Next/Previous/swipes yet.
+- Storage 0001–0002 retain immutable exact text, first-line titles, provenance and
+  positive nonreused i64 IDs. Dedup/registration/timestamps remain import tasks.
+- Pure pagination covers all five presets, paragraph/sentence fallback, supplied
+  chapters and exact-offset reflow. App Settings/reflow persistence remains next.
+- Toolchain unchanged: Rust 1.99.1, Crux 0.20.0, BoltFFI 0.30.1,
   rusqlite 0.40.2/bundled, Kotlin 2.4.21, Gradle 9.1/AGP 9.0.1, JDK 17,
   BOM 2026.03.01, SDK 36/min 29, NDK r30/API 29, arm64-v8a/x86_64 builds.
 
 ## Next tasks (ordered)
-1. Add Rust-owned page controls/swipes and persist current chapter/byte offset in
-   both directions; expose Library percentage. Keep exact offset separate from
-   derived page start through reflow. Reset vertical scroll on navigation/reopen.
-2. Add atomic completion command IDs/history and New→Known encounters after
-   analysis/vocabulary repositories are ready; retain reread/Previous semantics.
-   Settings page presets still need app/persistence integration.
+1. Add atomic completion command IDs/history and the analysis/vocabulary
+   repositories needed for real encounters/New→Known; then wire Next/Previous/
+   swipes. Forward navigation must not use position-only saves as completion.
+2. Integrate/persist page-length Settings and reflow, preserving exact saved offset.
 3. Add CI for verified host Rust/Kotlin checks and unsigned Android build.
 
 ## Last verified checks
@@ -52,22 +50,20 @@ tools/test-kotlin-bridge.sh
 tools/format-kotlin.sh --check
 git diff --check
 ```
-PASS: 67 Rust tests, build/fmt/clippy, real host Kotlin/JNI reader/storage/lifecycle
-and seven Unicode exchanges, Kotlin formatting/whitespace. Android app/test APKs,
-strict lint and all five API 36 x86_64 tests PASS on phone and tablet landscape
-(2560x1600/240dpi). Emulator viewport restored. Arm64 execution untested.
+PASS: 75 Rust tests (26 storage), build/fmt/clippy, real host Kotlin/JNI position
+save/reopen/error/lifecycle and seven Unicode exchanges, Kotlin formatting.
+Android app/test APKs, strict lint and all six API 36 x86_64 tests PASS on phone
+and tablet landscape (2560x1600/240dpi). Viewport restored. Arm64 execution untested.
 
 ## Environment/blockers
 - Use direct Rust PATH; rustup launcher attempts read-only maintenance.
   Local BoltFFI/Kotlin/ktfmt/JDK paths and overrides are in DEVELOPMENT.md.
 - Gradle/ADB need escalation for sockets; dependencies cached. Never run native
   generation/build/tests concurrently (shared target; BoltFFI replaces exports).
-- medium_phone API 36 x86_64 emulator running via swangle/KVM. Startup fallback:
-  tools/start-android-emulator.sh. Default SwiftShader crashes. Stop with:
+- medium_phone API 36 x86_64 emulator restarted with swangle/KVM and left running.
+  Startup: tools/start-android-emulator.sh. Default SwiftShader crashes. Stop:
   android emulator stop emulator-5554. UTP removes app; installDebug to launch.
-- Crux logs discarded weak-reference effects after intentional close; JNI/registry
-  cleanup passes. SDK/ktfmt warnings benign. Wait for Compose idle before Back.
-- Initial new-test constructor/offset API mistakes and stale private-event ordinal
-  corrected; all reruns pass. No dependency/migration changes or local blocker.
-- Nostr configuration stays empty; ask Q188 only before implementing forwarding.
-  No production edit/rename/delete or destructive repair.
+- Crux intentional-close weak-reference logs and ktfmt/JDK warnings remain benign.
+  Initial JNI fixture used a split scalar; corrected boundaries and rerun PASS.
+- No local-reader blocker. Nostr configuration stays empty; ask Q188 before
+  forwarding. No production edit/rename/delete, repair, completion or history yet.

@@ -9,6 +9,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     document::{DocumentId, LibraryDocument, PastedDocument},
+    pagination::ReadingPosition,
     reader::ReaderPage,
     storage::{DocumentError, StorageOperation, StorageResult},
 };
@@ -62,6 +63,8 @@ pub enum Event {
     OpenPaste,
     OpenReader(DocumentId),
     CloseDocument,
+    /// Position-only persistence hook; page completion uses a separate command.
+    SaveReadingPosition(ReadingPosition),
     #[serde(skip)]
     #[cfg_attr(feature = "facet_typegen", facet(skip))]
     StorageFinished(StorageResult),
@@ -100,6 +103,19 @@ impl App for Yomoku {
             Event::RefreshLibrary => Some(StorageOperation::List),
             Event::CreatePaste(text) => Some(StorageOperation::CreatePaste(text.clone())),
             Event::LoadPaste(id) | Event::OpenReader(id) => Some(StorageOperation::LoadPaste(*id)),
+            Event::SaveReadingPosition(position) => {
+                let Some(reader) = model
+                    .reader
+                    .as_ref()
+                    .filter(|_| model.content_route == ContentRoute::Reader)
+                else {
+                    return Command::done();
+                };
+                Some(StorageOperation::SaveReadingPosition {
+                    document_id: reader.document_id,
+                    position: *position,
+                })
+            }
             _ => None,
         };
         if let Some(operation) = operation {
@@ -110,7 +126,9 @@ impl App for Yomoku {
             }
             model.storage_busy = true;
             model.document_error = None;
-            model.loaded_document = None;
+            if !matches!(event, Event::SaveReadingPosition(_)) {
+                model.loaded_document = None;
+            }
             if let Event::OpenReader(id) = event {
                 model.destination = Destination::Library;
                 model.settings_open = false;
@@ -151,10 +169,10 @@ impl App for Yomoku {
                 match result {
                     StorageResult::Listed(documents) => model.documents = documents,
                     StorageResult::Created(document) => {
-                        model.documents.push(LibraryDocument {
-                            document_id: document.document_id,
-                            title: document.title,
-                        });
+                        match document.library_summary() {
+                            Ok(summary) => model.documents.push(summary),
+                            Err(_) => model.document_error = Some(DocumentError::InvalidDocument),
+                        }
                         model.destination = Destination::Library;
                         model.settings_open = false;
                         model.content_route = ContentRoute::Main;
@@ -173,13 +191,44 @@ impl App for Yomoku {
                         }
                         model.loaded_document = Some(document);
                     }
+                    StorageResult::PositionSaved(document) => {
+                        match document.library_summary() {
+                            Ok(summary) => {
+                                if let Some(entry) = model
+                                    .documents
+                                    .iter_mut()
+                                    .find(|entry| entry.document_id == document.document_id)
+                                {
+                                    *entry = summary;
+                                }
+                            }
+                            Err(_) => model.document_error = Some(DocumentError::InvalidDocument),
+                        }
+                        if model.content_route == ContentRoute::Reader
+                            && model
+                                .reader
+                                .as_ref()
+                                .is_some_and(|reader| reader.document_id == document.document_id)
+                        {
+                            match ReaderPage::open(&document) {
+                                Ok(reader) => {
+                                    model.reader = Some(reader);
+                                    model.loaded_document = Some(document);
+                                }
+                                Err(_) => {
+                                    model.document_error = Some(DocumentError::InvalidDocument)
+                                }
+                            }
+                        }
+                    }
                     StorageResult::Failed(error) => model.document_error = Some(error),
                 }
             }
             Event::RefreshLibrary
             | Event::CreatePaste(_)
             | Event::LoadPaste(_)
-            | Event::OpenReader(_) => unreachable!(),
+            | Event::OpenReader(_)
+            | Event::SaveReadingPosition(_) => unreachable!(),
         }
         render::render()
     }

@@ -1,5 +1,6 @@
 package app.yomoku
 
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -10,7 +11,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.LinearProgressIndicator
@@ -19,6 +19,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -44,17 +45,24 @@ internal fun LibraryScreen(view: ViewModel, dispatch: (Event) -> Unit) {
         }
         LazyColumn(modifier = Modifier.weight(1f).testTag("library_documents")) {
             items(view.documents, key = { it.documentId.value }) { document ->
-                Text(
-                    document.title,
-                    style = MaterialTheme.typography.titleMedium,
+                Column(
                     modifier =
                         Modifier.fillMaxWidth()
                             .clickable(enabled = !view.storageBusy) {
                                 dispatch(Event.OpenReader(document.documentId))
                             }
                             .padding(vertical = 20.dp)
-                            .testTag("document_${document.documentId.value}"),
-                )
+                            .testTag("document_${document.documentId.value}")
+                ) {
+                    Text(document.title, style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        stringResource(
+                            R.string.reading_progress,
+                            document.progressPercent.toLong(),
+                        ),
+                        modifier = Modifier.testTag("progress_${document.documentId.value}"),
+                    )
+                }
             }
         }
     }
@@ -90,11 +98,13 @@ internal fun PasteScreen(
 
 @Composable
 internal fun ReaderScreen(view: ViewModel) {
+    val scroll = remember(view.reader?.documentId, view.reader?.anchor) { ScrollState(0) }
     Column(
         modifier =
             Modifier.widthIn(max = 720.dp)
                 .fillMaxSize()
-                .verticalScroll(rememberScrollState())
+                .verticalScroll(scroll)
+                .testTag("reader_scroll")
                 .padding(24.dp),
         verticalArrangement = Arrangement.spacedBy(24.dp),
     ) {
