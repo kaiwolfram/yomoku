@@ -504,3 +504,30 @@
   memory, tokenization and offline analysis still require device measurement
   before runtime integration, then atomic analyzed import/registration and real
   completion occurrences/status/time. Nostr/Q188 remain unchanged.
+
+## 2026-10-23 — Standalone Android Full analyzer measurements
+
+- Started clean. Added a Rust probe and Python CLI using the real pinned adapter
+  outside app/runtime/FFI. Driver verifies source/data, links with NDK r30/API 29,
+  records fresh-process timing/kernel memory and offline fixtures, restores and
+  verifies prior radio settings, and removes its unique device directory.
+- Three release + three debug API 36 x86_64 processes PASS: A/B/C golden results,
+  mixed-script/OOV/normalization/Unicode/NUL anchors and 72 KB unbroken input.
+  Release init 1.03–1.20 s; debug 12.31–12.69 s. Approximately 318 MiB anonymous
+  RSS after init, 334–336 MiB peak RSS through long analysis. Exact per-run table,
+  method and limitations are versioned in SUDACHI_MEASUREMENTS.md; raw reports
+  under ignored .local/test-reports/sudachi-android/. No cold-storage/app claim.
+- PASS: both Android release probe links, 119 data-free Rust tests, nine real Full
+  host fixtures, 138-file source integrity, fmt, strict all-target/all-feature
+  Clippy, Python syntax and final one-process auto-device/source-verification
+  smoke. No Android APK/instrumentation/lint or host Kotlin/JNI rerun: no app,
+  bridge, schema, dependency or product behavior changes. Physical arm64 untested.
+- Initial sandbox ADB failure reran with escalation. Fixed missing target C
+  compiler/archiver and probe-only assumption about a rare-kanji token adjacent
+  to NUL; switched to existing verified host fixtures. All later checks pass.
+  Failed local reports retained. Emulator phone viewport/radios restored and
+  verified; app data untouched. No outstanding check failure.
+- Next: compare verified immutable mapped storage/private asset extraction and
+  combined app memory before runtime integration; atomic analyzed import/unique
+  registration; real completion occurrences/status/time before reader movement.
+  Nostr/Q188 remain unchanged.

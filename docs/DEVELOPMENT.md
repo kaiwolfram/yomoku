@@ -651,6 +651,36 @@ This session's initial tablet commands hit the documented sandbox socket
 restrictions for ADB/Gradle; rerunning with escalation passed. No outstanding
 check failure. No viewport configuration files were changed.
 
-Device analyzer initialization, memory, tokenization and offline analysis remain
-unmeasured. Bundled assets and offline notices do not establish analyzer memory
-viability. Keep that measurement gate before runtime/FFI integration.
+Analyzer measurements are now recorded below; bundled assets/notices alone did
+not establish memory viability. The production loading strategy remains gated.
+
+## Standalone Android Sudachi measurements
+
+Use the existing direct Rust PATH and ANDROID_HOME environment. The new driver
+verifies all 138 pinned engine files and prepared Full bytes, builds a standalone
+native example using NDK r30/API 29, and runs three fresh processes on the selected
+device. Cargo stays locked/offline; the app/runtime/FFI remain untouched.
+
+```sh
+python3 tools/measure-sudachi-android.py --serial emulator-5554
+python3 tools/measure-sudachi-android.py --serial emulator-5554 --profile debug
+# For a physical arm64 device, select its serial; target selection is automatic.
+```
+
+ADB socket access requires sandbox escalation. The tool temporarily enables
+airplane mode and disables Wi-Fi/mobile data, checks those values, and restores
+and verifies the original radio settings in finally. It removes only its unique
+device directory. Raw output, device metadata and per-stage RSS/HWM/anonymous/
+file/swap fields go to `.local/test-reports/sudachi-android/`. Partial failed
+reports are retained; probe errors are never treated as successful measurements.
+Unknown initial radio values cause failure before changing the device.
+
+PASS on API 36 x86_64: three release and three debug offline processes, A/B/C
+golden results, mixed-script/OOV/normalization/Unicode anchors and 72 KB unbroken
+input. Both Android probe ABIs link; physical arm64 execution remains untested.
+Full methodology, exact results and limitations are in
+[SUDACHI_MEASUREMENTS.md](SUDACHI_MEASUREMENTS.md). Release initialization was
+1.03–1.20 s versus debug 12.31–12.69 s; approximately 318 MiB anonymous memory
+motivates a measured mapped-storage comparison before app integration. No APK
+decompression/JVM/Compose/lifecycle performance claim. No APK/instrumentation,
+Android lint or host JNI rerun for this standalone Rust/tooling slice.

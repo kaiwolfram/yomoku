@@ -801,3 +801,30 @@ Settings offers a scrollable, selectable dialog with attribution and both entire
 notice files, loaded on Dispatchers.IO. Its open state survives recreation; this
 local presentation state does not enter Crux. Installed-asset checks use streaming
 hashes to avoid retaining the full dictionary in the test/app Java heap.
+
+## 2026-10-23 — Standalone Android Full measurements before app integration
+
+Keep the measurement harness outside runtime/FFI/APKs. A Rust example executes the
+real pinned adapter with owned bytes; a Python CLI verifies source/data, links
+with the existing pinned NDK and runs fresh Android processes. It records actual
+initialization/analysis times and kernel RSS/HWM/anonymous/file/swap snapshots.
+No new library, version, schema or product behavior is introduced. The driver uses
+unique temporary device paths, preserves failed output, checks offline radio
+settings, and restores/verifies the originals even after probe failure.
+
+Three release and three debug API 36 x86_64 runs pass the real A/B/C and Unicode
+fixtures offline. Both Android probe targets link; only x86_64 executes. Do not
+call fresh processes cold-storage tests: the filesystem cache is not flushed.
+APK decompression, app memory/lifecycle and physical arm64 remain unmeasured.
+Exact per-run results and methodology live in SUDACHI_MEASUREMENTS.md.
+
+Release initialization is 1.03–1.20 s, versus debug 12.31–12.69 s. Owned storage
+holds about 318 MiB anonymous memory after initialization, with roughly 334 MiB
+release peak RSS through long analysis. That measured anonymous allocation
+justifies comparing Sudachi's existing file-backed storage before app integration;
+the final production storage strategy remains unchecked. Keep owned loading as a
+correctness baseline. Future extraction must publish verified versioned private
+files without mutating bytes held by a live analyzer. Load on demand off the main
+thread and reuse one worker-owned analyzer, rather than reloading on every page
+or eagerly when Library starts. Do not skip dictionary integrity checks to make
+the unoptimized debug initialization appear faster.

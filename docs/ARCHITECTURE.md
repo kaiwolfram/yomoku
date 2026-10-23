@@ -46,8 +46,16 @@ and stages the dictionary plus complete LEGAL/LICENSE under generated Android
 assets; it never downloads data. Settings reads and displays both full notices
 off the main thread in a selectable, scrollable dialog. The dictionary remains
 compressed in the APK; no private-file copy or eager analyzer load occurs.
-This crate has no runtime/FFI/Android entry point yet; device analyzer memory,
-startup, tokenization and offline analysis measurements remain unchecked.
+This crate has no app/runtime/FFI entry point yet. A standalone native example
+and CLI driver measure the actual adapter on Android without installing the app:
+three debug and three release processes pass offline A/B/C/Unicode/long-input
+validation on API 36 x86_64. Release initialization takes 1.03–1.20 s, with about
+318 MiB anonymous resident memory after initialization and 334 MiB peak RSS.
+See SUDACHI_MEASUREMENTS.md for exact methodology and limitations. The driver
+verifies pinned source/data, temporarily disables radios, restores their original
+settings and removes its own device files. Both probe ABIs link; physical arm64,
+private asset extraction, mapped storage and combined app/lifecycle memory remain
+unmeasured. These measurements do not settle production storage viability.
 Unpatched upstream cross-target checking failed in plugin/loader.rs:
 make_system_specific_name originally had no Android cfg implementation. The root
 Cargo patch now selects a dependency-only vendored snapshot at that exact commit,
@@ -56,8 +64,9 @@ all original file hashes live under third_party/sudachi; tools/verify-sudachi-so
 reverses the patch in a temporary copy and verifies every original byte. Both
 Android targets compile. The profile includes +android-loader-v1; segmentation
 and embedded configuration are unchanged. App integration remains pending.
-Owned dictionary storage requires about 315 MiB before engine structures; device
-measurements must inform integration.
+Owned dictionary storage alone requires about 315 MiB. Compare verified immutable
+mapped storage before integration; keep one on-demand worker-owned analyzer and
+avoid eager Library initialization or per-page reloads.
 
 Pure `pagination` derives chapter-local TextAnchor pages from ordered immutable
 ChapterText snapshots. Five presets count non-whitespace Unicode scalars; LF/CRLF
