@@ -477,3 +477,30 @@
 - Next: bundle Full with app-accessible complete notices and measure device
   startup/memory/tokenization/offline use; atomic analyzed import/registration;
   real completion occurrences/status/time before reader Next/Previous/swipes.
+
+## 2026-10-23 — Android Full dictionary bundling and offline notices
+
+- Started clean. Split the next packaging/measurement task into independently
+  verifiable steps. Android Gradle now requires prepared pinned Full data and
+  calls the Python tool's offline-only --android-assets mode. It verifies all
+  inputs, stages/reverifies the dictionary and both complete notices, then
+  packages generated assets. Missing/corrupt inputs preserve prior outputs.
+- Settings displays attribution, complete LEGAL and Apache-2.0 license in a
+  selectable, scrollable dialog, reading off the main thread and retaining its
+  open state on Activity recreation. No analyzer/runtime/FFI entry point, eager
+  dictionary loading, private-file copy, schema or dependency changes.
+- PASS: app/test APK assembly, strict lint, APK entry SHA-256 and 16 KB ZIP
+  alignment, Kotlin formatting, Python syntax, offline/repeated preparation and
+  bundling, negative missing/corrupt-input checks, 119 data-free Rust tests,
+  fmt/clippy, source integrity and nine real Full-data fixtures. Host JNI not
+  rerun. Debug APK 184,525,421 bytes; dictionary entry compresses to 146,067,671.
+- PASS: all nine API 36 x86_64 phone tests and the two new tests on tablet
+  landscape in airplane mode, covering installed bytes and complete notices/
+  recreation/dismissal. Restored phone 1080x2400/420dpi and airplane mode off;
+  emulator left running. XML copied under ignored .local/test-reports/
+  sudachi-bundling. Both native ABIs package; no arm64 execution.
+- Tablet commands initially hit sandbox ADB/Gradle socket restrictions; reran
+  with escalation successfully. No outstanding failures. Analyzer initialization,
+  memory, tokenization and offline analysis still require device measurement
+  before runtime integration, then atomic analyzed import/registration and real
+  completion occurrences/status/time. Nostr/Q188 remain unchanged.

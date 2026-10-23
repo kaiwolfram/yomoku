@@ -5,6 +5,22 @@ plugins {
 
 val repoDirectory = rootProject.layout.projectDirectory.dir("..")
 val nativeOutput = repoDirectory.dir("target/generated")
+val sudachiAssets = nativeOutput.dir("sudachi-assets")
+val bundleSudachi by
+    tasks.registering(Exec::class) {
+        group = "build"
+        description =
+            "Verify and bundle the explicitly prepared Sudachi Full dictionary and notices"
+        workingDir(repoDirectory)
+        commandLine(
+            "python3",
+            repoDirectory.file("tools/prepare-sudachi.py").asFile,
+            "--android-assets",
+        )
+        inputs.file(repoDirectory.file("tools/prepare-sudachi.py"))
+        inputs.dir(repoDirectory.dir(".local/sudachi/full-20261015"))
+        outputs.dir(sudachiAssets)
+    }
 val buildRustBridge by
     tasks.registering(Exec::class) {
         group = "build"
@@ -46,6 +62,7 @@ android {
     }
 
     sourceSets.named("main") {
+        assets.directories += sudachiAssets.asFile.absolutePath
         kotlin.directories +=
             listOf(
                 nativeOutput.dir("kotlin/app").asFile.absolutePath,
@@ -73,7 +90,7 @@ android {
     }
 }
 
-tasks.named("preBuild") { dependsOn(buildRustBridge) }
+tasks.named("preBuild") { dependsOn(buildRustBridge, bundleSudachi) }
 
 kotlin {
     jvmToolchain(17)

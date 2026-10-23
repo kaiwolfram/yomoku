@@ -16,6 +16,10 @@ import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
@@ -29,6 +33,10 @@ import app.yomoku.shared.ViewModel
 
 @Composable
 internal fun SettingsScreen(view: ViewModel, dispatch: (Event) -> Unit) {
+    var showNotices by rememberSaveable { mutableStateOf(false) }
+    if (showNotices) {
+        SudachiNotices(onDismiss = { showNotices = false })
+    }
     Column(
         modifier =
             Modifier.widthIn(max = 720.dp)
@@ -77,6 +85,9 @@ internal fun SettingsScreen(view: ViewModel, dispatch: (Event) -> Unit) {
             TextButton(onClick = { dispatch(Event.RefreshLibrary) }) {
                 Text(stringResource(R.string.retry))
             }
+        }
+        TextButton(onClick = { showNotices = true }) {
+            Text(stringResource(R.string.sudachi_notices_title))
         }
     }
 }

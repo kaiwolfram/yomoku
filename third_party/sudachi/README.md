@@ -23,10 +23,14 @@ tools/test-sudachi.sh
 
 `Analyzer::open_full` independently verifies the dictionary bytes before parsing;
 an arbitrary compatible dictionary cannot silently acquire this artifact identity.
-Host fixtures use the actual Full artifact. Android packaging, attribution display
-and offline/device memory/startup/tokenization measurements remain unchecked.
-When packaging, distribute the complete notices with the dictionary and include
-app-accessible attribution. Do not substitute Core/Small or a moving latest release.
+Host fixtures use the actual Full artifact. Android builds require prepared data:
+Gradle runs `python3 tools/prepare-sudachi.py --android-assets` to verify and stage
+all three files under ignored `target/generated/sudachi-assets/sudachi/`, then
+includes them as APK assets. No build downloads data. Settings → Sudachi licenses
+and notices displays the complete LEGAL and Apache-2.0 license offline.
+The dictionary is APK-compressed; no analyzer or private-file copy is loaded at
+app startup. Device analyzer memory/startup/tokenization and offline analysis
+measurements remain unchecked. Do not substitute Core/Small or a moving latest release.
 
 ## Dependency-only engine snapshot and Android patch
 

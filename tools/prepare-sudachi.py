@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Prepare one exact Full dictionary, with its complete redistribution notices.
 
-No Cargo build downloads data. --archive supports fully offline preparation.
-Writes only ignored .local/sudachi; checksum failures never replace usable data.
+No build downloads data. --archive supports fully offline preparation.
+--android-assets only bundles already prepared, verified data for Gradle.
+Writes only ignored local/generated paths; checksum failures preserve usable data.
 """
 
 import argparse
@@ -26,6 +27,7 @@ FILES = {
     "LEGAL": "725a8776b38e058b185e905594bc9a2437dbf3787df022fffeefedb9a84e4665",
     "LICENSE-2.0.txt": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
 }
+ANDROID_ASSETS = REPO / "target/generated/sudachi-assets"
 
 
 def verify(path, expected):
@@ -35,10 +37,40 @@ def verify(path, expected):
         raise ValueError(f"SHA-256 mismatch: {path.name}")
 
 
+def bundle_android():
+    source = DATA / "full-20261015"
+    if not source.is_dir():
+        raise ValueError(
+            "Prepare pinned Full data first: python3 tools/prepare-sudachi.py "
+            "[--archive /path/to/pinned.zip]. Android builds never download it."
+        )
+    # Verify the entire input set before touching previous build outputs.
+    for name, checksum in FILES.items():
+        verify(source / name, checksum)
+    ANDROID_ASSETS.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix="bundle-", dir=ANDROID_ASSETS.parent) as temporary:
+        staged = Path(temporary)
+        for name, checksum in FILES.items():
+            shutil.copyfile(source / name, staged / name)
+            verify(staged / name, checksum)
+        destination = ANDROID_ASSETS / "sudachi"
+        destination.mkdir(exist_ok=True)
+        for name in FILES:
+            (staged / name).replace(destination / name)
+    print(f"Bundled verified Full 20261015 + complete notices: {ANDROID_ASSETS}")
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--archive", type=Path, help="use an existing ZIP; no network")
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument("--archive", type=Path, help="use an existing ZIP; no network")
+    mode.add_argument(
+        "--android-assets", action="store_true", help="bundle prepared data; no network"
+    )
     args = parser.parse_args()
+    if args.android_assets:
+        bundle_android()
+        return
     DATA.mkdir(parents=True, exist_ok=True)
     destination = DATA / "full-20261015"
     with tempfile.TemporaryDirectory(prefix="prepare-", dir=DATA) as temporary:

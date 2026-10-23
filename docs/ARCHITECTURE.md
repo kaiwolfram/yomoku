@@ -41,9 +41,14 @@ The adapter does not merge conjugations, apply overrides, register vocabulary or
 write SQLite. Nine explicit Full-data fixtures include A/B/C SQLite round trips;
 they run with tools/test-sudachi.sh, separately from ordinary data-free checks.
 Dictionary preparation verifies the archive, data and complete notices under
-ignored .local/sudachi. This crate has no runtime/FFI/Android entry point yet;
-Android bundling, attribution display and device memory/startup/offline measurements
-remain unchecked. Unpatched upstream cross-target checking failed in plugin/loader.rs:
+ignored .local/sudachi. Gradle's bundleSudachi task verifies already prepared data
+and stages the dictionary plus complete LEGAL/LICENSE under generated Android
+assets; it never downloads data. Settings reads and displays both full notices
+off the main thread in a selectable, scrollable dialog. The dictionary remains
+compressed in the APK; no private-file copy or eager analyzer load occurs.
+This crate has no runtime/FFI/Android entry point yet; device analyzer memory,
+startup, tokenization and offline analysis measurements remain unchecked.
+Unpatched upstream cross-target checking failed in plugin/loader.rs:
 make_system_specific_name originally had no Android cfg implementation. The root
 Cargo patch now selects a dependency-only vendored snapshot at that exact commit,
 with Android added to the existing Linux/FreeBSD `.so` cfg. The complete patch and
@@ -140,12 +145,16 @@ process starts Library.
 Compose shows Library titles/current percentage, a multiline paste form and a
 centered, scrollable reader column capped at 720dp. Its ScrollState is transient
 and keyed by document/page anchor, resetting on page changes/reopen/recreation.
-Settings exposes five radio choices, disabled while unknown/busy.
+Settings exposes five radio choices, disabled while unknown/busy, and offline
+Sudachi licenses/notices. Dialog visibility survives Activity recreation.
 Nostr/Statistics/Vocabulary remain placeholders. Busy/error/retry state comes from
-Rust; only the unsaved form draft lives in rememberSaveable (retained through Settings/recreation).
+Rust; the unsaved form draft and notice dialog visibility use rememberSaveable.
+The draft is retained through Settings/recreation.
 Navigation uses a bottom bar below 600dp and a scrollable rail above; Settings,
 paste and reader routes hide it. Toolbar/system Back return through Rust routes.
-Seven instrumentation tests pass on API 36 x86_64 phone and tablet landscape,
+Nine instrumentation tests pass on API 36 x86_64 phone; the two new asset/notices
+tests also pass on tablet landscape, both runs in airplane mode. The seven prior
+tests previously passed on phone and tablet landscape,
 including paste/draft/errors, recreation/Back, saved offsets, bidirectional
 percentages, scroll resets, Settings reflow and persisted preset reopening.
 Automatic Android backup/transfer is excluded. Arm64 execution is unverified.

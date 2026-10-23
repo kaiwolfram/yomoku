@@ -607,3 +607,50 @@ No Android APK, instrumentation or device measurement rerun for this compile-onl
 slice. The analyzer remains outside runtime/FFI dependencies. Bundling Full with
 app-accessible notices and measuring initialization/memory/tokenization/offline
 operation remain unchecked, including whether owned dictionary storage is viable.
+
+## Android Sudachi Full assets and notices
+
+Android builds now require the already pinned/prepared Full data. Prepare once
+explicitly (or use the offline --archive command above); Gradle never downloads
+it. The existing APK assembly/lint commands then run bundleSudachi, verifying
+all three files before staging generated assets. Gradle tracks the source
+directory/script and skips unchanged bundles. To stage/verify manually:
+
+```sh
+python3 tools/prepare-sudachi.py --android-assets
+```
+
+Settings → Sudachi licenses and notices shows the complete LEGAL and Apache-2.0
+license, with selectable/scrollable text loaded off the main thread. Both files
+and the 330,506,339-byte dictionary are packaged as assets, with streaming
+checksum tests against the installed APK. The app does not initialize Sudachi
+or extract/copy the dictionary at startup. No dependency versions changed.
+
+The debug APK is 184,525,421 bytes; the dictionary's compressed APK entry is
+146,067,671 bytes. All three APK SHA-256 values match the pinned inputs; ZIP
+16 KB alignment passes. Missing/corrupt bundle inputs fail without replacing
+previous outputs; repeated/offline preparation and bundling pass. Python syntax,
+Kotlin formatting, app/test APK assembly and strict lint pass, along with 119
+data-free Rust tests, fmt/clippy and nine real Full-data fixtures. Host JNI was
+not rerun for this packaging/UI slice.
+
+PASS: all nine API 36 x86_64 phone instrumentation tests, plus the two new
+SudachiAssetsTest tests at tablet landscape 2560x1600/240dpi. Both runs used
+airplane mode. Tests verify all installed bytes, complete displayed notices,
+recreation and dismissal. Original 1080x2400/420dpi and airplane mode off were
+restored; emulator left running. Copied XML results are ignored under
+.local/test-reports/sudachi-bundling/{phone,tablet-landscape}/. Arm64 libraries
+build/package; arm64 execution remains untested. The usual connected-test
+command runs all nine; add this Gradle property for just the new tests:
+
+```sh
+-Pandroid.testInstrumentationRunnerArguments.class=app.yomoku.SudachiAssetsTest
+```
+
+This session's initial tablet commands hit the documented sandbox socket
+restrictions for ADB/Gradle; rerunning with escalation passed. No outstanding
+check failure. No viewport configuration files were changed.
+
+Device analyzer initialization, memory, tokenization and offline analysis remain
+unmeasured. Bundled assets and offline notices do not establish analyzer memory
+viability. Keep that measurement gate before runtime/FFI integration.

@@ -782,3 +782,22 @@ checks/library builds and the host Full-data fixtures pass. This removes the
 compile blocker, not the device performance/bundling gate. Runtime, FFI and UI
 still have no analyzer entry point; Full's owned-byte memory cost remains to be
 measured on device before app integration.
+
+## 2026-10-23 — Explicit Android Full assets and complete notices
+
+Split packaging/attribution from the device analyzer measurements so each is
+independently verifiable. Keep the pinned dictionary outside Git; Android builds
+now require explicitly prepared Full data. Gradle's bundleSudachi task calls the
+existing preparation tool in a separate --android-assets mode that never enters
+the download path. Verify all source SHA-256 values before touching existing
+outputs, stage/copy/reverify all three files, then publish generated assets.
+Missing/corrupt inputs fail; no silent fallback or dictionary substitution.
+No dependencies, engine versions or storage semantics change.
+
+Use normal APK asset compression for this packaging step. The app does not copy
+or load the 330,506,339-byte dictionary at startup. Evaluate the actual analyzer
+loading/storage strategy with device measurements before runtime integration.
+Settings offers a scrollable, selectable dialog with attribution and both entire
+notice files, loaded on Dispatchers.IO. Its open state survives recreation; this
+local presentation state does not enter Crux. Installed-asset checks use streaming
+hashes to avoid retaining the full dictionary in the test/app Java heap.

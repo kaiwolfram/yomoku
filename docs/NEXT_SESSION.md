@@ -1,76 +1,69 @@
 # Resume here
 
-Updated: 2026-10-23. Sudachi Android cfg fixed; both target library builds pass.
+Updated: 2026-10-23. Android Full assets and complete offline notices verified.
 Read AGENTS.md, plan phases 2–3 and PRODUCT_SPEC.md sections 3–4 next.
-After each completed, verified step, update docs and commit it automatically.
+After each completed, verified step, update docs and commit automatically.
 
 ## Working
-- Pure Crux core owns routes/Settings/Library, busy/errors and typed effects.
-  FIFO worker owns SQLite I/O; only Render reaches UI. Failed opens retry;
-  submitted writes finish on close without blocking UI.
-- Android private DB/retained session, Paste→Library and explicit reader opening
-  work. Draft survives Settings/recreation/errors. Fresh processes start Library.
-- Exact chapter-local UTF-8 position persists independently of page start/scroll.
-  Library percentage is floor(offset * 100 / canonical UTF-8 length), can decrease.
-  Five presets reflow after commit without moving offset. Reader caps at 720dp;
-  transient scroll resets. NO Next/Previous/swipes until atomic real completion.
-- Migration 0005 freezes completion IDs/page anchors/position atomically.
-  Identical duplicates never move progress; conflicting/stale inputs error.
-  Rereads need fresh IDs. No forward app/runtime/FFI hook yet.
-- Migration 0006 stores exact global surfaces, nonreused IDs, five statuses and
-  dated registration/manual events. Registration preserves existing status/date;
-  lookup/unchanged choices add no history. Document deletion preserves vocabulary.
-- Migration 0007 stores immutable versioned A/B/C token snapshots, exact source
-  surfaces/UTF-8 anchors and optional readings/dictionary forms. Separate reversible
-  global/local edits retain provenance; no overlap resolution/rule application/UI.
-- yomoku-analysis uses Sudachi.rs v0.7.0 at its pinned commit + android-loader-v1
-  source patch. Root Cargo patch selects third_party/sudachi/engine; only Android
-  .so cfg and dependency-only manifests differ. Source verifier reverses the patch
-  and checks all 138 original files/hashes; never alter the shared Cargo cache.
-- Full 20261015 V1 stays pinned by archive/data SHA-256; complete notices retained.
-  tools/prepare-sudachi.py explicitly prepares ignored data; tools/test-sudachi.sh
-  verifies engine source then runs nine real-data fixtures. Host A/B/C, Unicode,
-  normalization, inflections/names, long input and SQLite reopen pass. Raw Sudachi
-  inflections stay split; overrides are separate. No runtime/FFI/UI integration.
+- Pure Crux core owns navigation/Library/Settings, busy/errors and typed effects.
+  FIFO worker owns SQLite; only Render reaches UI. Android retained sessions,
+  private DB, Paste→Library and explicit reader opening work; fresh start Library.
+- Exact chapter-local UTF-8 position and current Library percentage persist;
+  five presets reflow without moving the offset. Scroll resets on reopen/move.
+  Reader caps at 720dp. NO Next/Previous/swipes until atomic real completion.
+- Migration 0005 freezes completion IDs/page anchors/position atomically;
+  duplicate commands never move progress, rereads need fresh IDs. No forward hook.
+- Migration 0006 stores global exact surfaces, five statuses and dated history.
+  Registration preserves statuses/dates; lookup/no-op changes add no history.
+- Migration 0007 stores immutable versioned A/B/C analysis/token/source anchors
+  and separate reversible global/local edits. No override application or UI yet.
+- Sudachi.rs v0.7.0 remains pinned with android-loader-v1 source patch. The source
+  verifier reverses the patch and checks 138 files; never alter shared Cargo cache.
+  Both Android library targets compile; nine actual Full-data host fixtures pass.
+- Full 20261015 remains checksum-pinned, prepared explicitly outside Git.
+  Gradle bundleSudachi verifies/stages Full + complete LEGAL/LICENSE as APK assets
+  without downloads. Settings displays both entire notices offline/recreation.
+  Dictionary is APK-compressed; app does not copy/load it at startup. No analyzer
+  runtime/FFI/UI entry point. Current owned constructor needs ~315 MiB for bytes
+  before engine structures; actual device analyzer measurements remain next.
 - Paste text/IDs/provenance immutable; no inferred TXT chapters. Dedup and atomic
-  analyzed import/registration remain. Versions/commands in DEVELOPMENT.md.
+  analyzed import/registration remain. Document deletion preserves vocabulary.
 
 ## Next tasks (ordered)
-1. Bundle Full + complete, app-accessible notices; measure device startup, memory,
-   tokenization and offline use before runtime integration. Android cfg blocker is
-   resolved. Current safe constructor owns about 315 MiB before engine structures.
+1. Measure Full initialization, memory, tokenization and offline analysis on
+   Android before runtime integration; decide loading/storage from measurements.
+   Bundling/notices are done. Debug APK is 184,525,421 bytes; compressed dictionary
+   entry 146,067,671 bytes. Arm64 execution still untested.
 2. Compose analysis + all unique Japanese surface registration + document import
    atomically (no encounters); preserve existing statuses, test failures/rollback.
-3. Extend completion with analyzed occurrences/New→Known/active time, then wire
-   frozen IDs through core/runtime/FFI and Next/Previous/swipes. Finish-book and
-   CI remain unchecked; do not approximate completion.
+3. Extend completion with occurrences/New→Known/active time, then wire frozen IDs
+   through core/runtime/FFI and Next/Previous/swipes. Finish-book and CI remain.
 
 ## Last verified checks
 Use direct Rust PATH; exact Android env/commands/reports in DEVELOPMENT.md:
 ```sh
-cargo build --workspace --locked --offline
 cargo test --workspace --all-features --locked --offline
 cargo fmt --all -- --check
 cargo clippy --workspace --all-targets --all-features --locked --offline -- -D warnings
-python3 tools/verify-sudachi-source.py
-cargo check -p yomoku-analysis --lib --target aarch64-linux-android --target x86_64-linux-android --locked --offline
-cargo build -p yomoku-analysis --lib --target aarch64-linux-android --target x86_64-linux-android --locked --offline
+python3 tools/prepare-sudachi.py --archive .local/sudachi/sudachi-dictionary-20261015-full.zip
+python3 tools/prepare-sudachi.py --android-assets
 tools/test-sudachi.sh
-tools/test-kotlin-bridge.sh
 tools/format-kotlin.sh --check
 git diff --check
 ```
-PASS: 119 data-free Rust tests + nine real Full fixtures; both Android target
-checks/library builds; source integrity and four negative checks; Python/shell
-syntax; host JNI/seven Unicode exchanges; Kotlin formatting. No outstanding
-failure. No APK/instrumentation/device measurements rerun for this compile-only
-slice. Previous both-ABI APKs/strict lint and seven API 36 phone tests passed;
-no tablet rerun or arm64 execution. No emulator/viewport changes this session.
+PASS: 119 data-free Rust tests + nine real Full fixtures/source integrity;
+Python syntax, missing/corrupt bundle preservation, offline/repeated preparation;
+Kotlin formatting; both-ABI app/test APK assembly + strict lint; installed/APK
+SHA-256 and ZIP 16 KB alignment. All nine API 36 x86_64 phone tests + two new
+asset/notices tests in tablet landscape PASS in airplane mode. XML copied to
+.local/test-reports/sudachi-bundling/{phone,tablet-landscape}/. Host JNI not rerun.
+No device analyzer/performance claims. No outstanding failure.
 
 ## Environment/blockers
 - Direct Rust PATH bypasses rustup read-only maintenance (see DEVELOPMENT.md).
-  Never run native generation/build/tests concurrently.
-- Gradle/ADB need escalation for sockets. medium_phone API 36 uses swangle/KVM;
-  tools/start-android-emulator.sh; default SwiftShader crashes.
-- Device memory/performance remains unmeasured. Nostr stays empty; ask Q188 before
-  forwarding. No production edit/rename/delete. No new dependency versions.
+  Never run native generation/build/tests concurrently. Prepare Full before APKs.
+- Gradle/ADB need escalation for sockets; initial tablet commands failed without
+  it, then passed with escalation. medium_phone API 36 uses swangle/KVM;
+  tools/start-android-emulator.sh. Default SwiftShader crashes.
+- Emulator left running; original 1080x2400/420dpi and airplane mode off restored.
+- Nostr stays empty; ask Q188 before forwarding. No production edit/rename/delete.

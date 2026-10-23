@@ -29,4 +29,9 @@
     <string name="error_invalid_document">This document could not be read.</string>
     <string name="error_document_not_found">This document was not found.</string>
     <string name="error_invalid_settings">Saved settings could not be read.</string>
+    <string name="sudachi_notices_title">Sudachi licenses and notices</string>
+    <string name="sudachi_attribution">Sudachi.rs v0.7.0 (Android loader patch) and Sudachi Full 20261015. The complete dictionary notices and Apache License 2.0 follow.</string>
+    <string name="notices_loading">Loading notices…</string>
+    <string name="notices_unavailable">Notices could not be loaded. Close and try again.</string>
+    <string name="close">Close</string>
 </resources>
