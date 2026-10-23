@@ -695,3 +695,62 @@ completion occurrence snapshots remain separate unchecked work. Fifteen new core
 storage tests use explicitly synthetic adapter fixtures; they verify anchors,
 reversal, immutable output, concurrency, migrations, corruption and rollback,
 and do not claim verified Sudachi segmentation.
+
+
+## 2026-10-23 — Pinned real Sudachi adapter and Full host fixtures
+Adopt the specified Sudachi.rs engine at stable v0.7.0, exact commit
+`5de0410b6edfd428fc510cc9763440772e9619d5`, with Full 20261015 (V1).
+Verified primary source at that commit: [manifest](https://github.com/WorksApplications/sudachi.rs/blob/5de0410b6edfd428fc510cc9763440772e9619d5/sudachi/Cargo.toml),
+[configuration](https://github.com/WorksApplications/sudachi.rs/blob/5de0410b6edfd428fc510cc9763440772e9619d5/sudachi/src/config.rs),
+[morpheme API](https://github.com/WorksApplications/sudachi.rs/blob/5de0410b6edfd428fc510cc9763440772e9619d5/sudachi/src/analysis/morpheme.rs)
+and [sentence detector](https://github.com/WorksApplications/sudachi.rs/blob/5de0410b6edfd428fc510cc9763440772e9619d5/sudachi/src/sentence_detector.rs).
+Use StatefulTokenizer/MorphemeList and Config::new_embedded; no external plugins,
+user dictionaries or filesystem configuration overrides enter this adapter.
+Use SentenceDetector's signed boundaries directly: negative values identify
+provisional splits, needed for long chapters exceeding the engine's u16 input
+limit. Preserve chapter-global byte coordinates across these analysis chunks;
+these boundaries do not become reader pages or inferred chapters.
+
+[Official Full release](https://github.com/WorksApplications/SudachiDict/releases/tag/v20261015)
+metadata reports archive SHA-256
+`b38318ca26a444cd713a5a377a353308ef38c733c64cc0be905122527516c793`;
+downloaded bytes match. The 330,506,339-byte system_full.dic hashes to
+`7c797531dea76f06b629fad39cb3a5bdb3a9e54c67ef3d9a869e61418426a7d1`.
+Keep the large data outside Git. Explicit Python preparation verifies archive,
+data and both complete notice files, writes only named ZIP members to a temporary
+directory, then publishes the prepared directory. Existing resources are verified,
+never overwritten. Complete unmodified archive LEGAL/LICENSE are also retained in
+third_party/sudachi. Offline preparation and invalid-archive preservation pass.
+Android packaging/attribution UI remain unchecked.
+
+Constructor verification uses RustCrypto [sha2 0.11.1](https://docs.rs/sha2/0.11.1/sha2/)
+(Digest/Sha256 API, MIT/Apache-2.0). The verified owned Vec moves into Sudachi
+Storage::Owned, so hashing and parsing use exactly the same immutable bytes without
+unsafe file mapping. This is a host-tested foundation, not an Android memory
+claim; it holds roughly 315 MiB before engine structures. Measure/revisit storage
+before device integration. Pin regex 1.12.4, already in the lock graph; its
+[Unicode script API](https://docs.rs/regex/1.12.4/regex/#unicode) supports source
+Hiragana/Katakana/Han detection. Combine that with analyzer POS to exclude known
+symbols, and permit OOV Japanese script because the fallback OOV plugin labels
+rare supplementary kanji as symbols. Never fabricate OOV readings/lemmas.
+
+Keep analyzer surfaces separate from normalized/dictionary forms. Skip empty
+original spans generated during normalization and whitespace-only tokens; require
+full core coverage/nonoverlap validation before returning any analysis. Default B,
+A/C alternatives and exact immutable profile identities are explicit. Retain raw
+Sudachi inflection boundaries (e.g. 食べ + た); manual conjugation merges and override
+application remain separate work. No import/status/completion behavior changes.
+Nine real Full tests cover these contracts, proper names including kanji-only
+names, punctuation-ending names, normalization, NUL/emoji/rare kanji, whitespace,
+72 KB unbroken input and persistent A/B/C SQLite snapshots after reopen. These
+large-data tests are explicitly ignored in ordinary workspace runs; run them via
+tools/test-sudachi.sh, which fails if data is absent rather than silently skipping.
+
+Cross-target checking exposed an upstream blocker at this exact engine revision:
+plugin/loader.rs defines make_system_specific_name for Linux/FreeBSD/Windows/macOS/
+Apple embedded targets, but not Android (E0425). Both Android target checks fail.
+Do not introduce fake target cfg flags, modify the shared Cargo cache or claim
+Android support. Keep this crate outside runtime/FFI dependencies until a pinned
+upstream fix or documented source patch is available. Existing app builds remain
+independent; host integration is verified. This does not change the required
+Sudachi architecture or adopt an alternate engine.

@@ -23,7 +23,31 @@ engine/dictionary revisions, A/B/C mode (default B), ordered nonoverlapping UTF-
 anchors, original surfaces and optional analyzer reading/dictionary form. Only
 whitespace may be omitted between tokens. Separate global/local boundary edits
 partition a selected exact span; they cannot edit lemmas or source text.
-Tokenization and application vocabulary commands remain future work.
+Application vocabulary commands remain future work.
+
+`yomoku-analysis` is a separate Rust I/O adapter using Sudachi.rs v0.7.0 at
+`5de0410b6edfd428fc510cc9763440772e9619d5` and Full 20261015 (V1). Its constructor
+checks the exact dictionary SHA-256 before giving owned immutable bytes to Sudachi.
+Pinned upstream embedded defaults supply normalization/OOV plugins and resources;
+no external config or dynamic plugins are accepted. Default B and explicit A/C
+produce validated ChapterAnalysis values, with original surfaces/byte spans and
+resolved reading/dictionary forms kept separate. Japanese classification combines
+original Hiragana/Katakana/Han script with Sudachi POS; OOV rare kanji remain
+Japanese even when the fallback plugin labels them symbols. OOV forms/readings
+remain absent. Punctuation, Latin, numbers and emoji stay anchored without being
+vocabulary. SentenceDetector boundaries (including negative provisional limits)
+keep long chapters below the engine input limit without changing canonical text.
+The adapter does not merge conjugations, apply overrides, register vocabulary or
+write SQLite. Nine explicit Full-data fixtures include A/B/C SQLite round trips;
+they run with tools/test-sudachi.sh, separately from ordinary data-free checks.
+Dictionary preparation verifies the archive, data and complete notices under
+ignored .local/sudachi. This crate has no runtime/FFI/Android entry point yet;
+Android bundling, attribution display and device memory/startup/offline measurements
+remain unchecked. Cross-target cargo check fails in upstream plugin/loader.rs:
+make_system_specific_name has no Android cfg implementation. Resolve with a pinned
+upstream fix or documented source patch before linking the adapter into Android.
+Owned dictionary storage requires about 315 MiB before engine structures; device
+measurements must inform integration.
 
 Pure `pagination` derives chapter-local TextAnchor pages from ordered immutable
 ChapterText snapshots. Five presets count non-whitespace Unicode scalars; LF/CRLF
@@ -90,8 +114,9 @@ Core-only effects stay private. Facet generates Event/ViewModel/Requests and
 document codecs in app.yomoku.shared; BoltFFI generates the native package and JNI C.
 Native wrappers require explicit close; no global singleton exists.
 
-One hundred and seventeen Rust tests cover domain, storage and bridge behavior, including an
-actual SQLite write lock proving dispatch/view/navigation remain responsive.
+One hundred and nineteen data-free Rust tests cover analysis classification/
+checksum, domain, storage and bridge behavior, including an actual SQLite write
+lock proving dispatch/view/navigation remain responsive.
 The host Kotlin runner uses real JNI with -Xcheck:jni to verify navigation,
 Unicode, async worker callbacks, typed failures, reopen persistence, isolation,
 listener cleanup, 100 normal lifecycles and closing during I/O. Seven additional

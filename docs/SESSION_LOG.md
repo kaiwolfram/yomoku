@@ -425,3 +425,32 @@
   Sudachi integration and atomic import registration remain next, followed by
   occurrences/New→Known/time completion and controls. CI remains independent.
   No Nostr data, production destructive APIs or outstanding blocker.
+
+
+## 2026-10-23 — Pinned Sudachi Full host adapter
+- Started clean. Added separate yomoku-analysis using Sudachi.rs v0.7.0 pinned by
+  commit and Full 20261015 V1 pinned by official archive SHA-256 and data hash.
+  Explicit Python preparation retains complete LEGAL/Apache notices, verifies
+  all bytes and never replaces existing resources. Large data remains ignored.
+- Default B and explicit A/C produce validated exact original surfaces/UTF-8
+  anchors with optional resolved readings/lemmas. Japanese script/POS filtering
+  excludes non-Japanese/punctuation; OOV rare kanji remain Japanese without
+  fabricated dictionary forms. Provisional sentence boundaries handle long
+  chapters. No core SQL/I/O, schema, runtime/FFI/UI or import behavior changed.
+- PASS: 119 data-free Rust tests plus nine separately invoked actual Full tests,
+  locked/offline workspace build/fmt/clippy, host JNI/seven Unicode exchanges,
+  Kotlin formatting, both-ABI existing app/test APK builds and strict lint.
+  Offline/repeated preparation, corrupt-archive preservation and Python/shell
+  syntax pass. No instrumentation/device measurement rerun; no emulator changes.
+- Initial compile corrected sha2-0.11 hex formatting and surface dereferencing.
+  Initial data fixtures corrected input byte length/expected Tokyo segmentation;
+  rare-kanji fixture exposed fallback OOV symbol classification and is now fixed.
+- BLOCKER: both analyzer Android target checks fail upstream plugin/loader.rs:92
+  (E0425 make_system_specific_name undefined; platform cfg omits Android).
+  Existing app remains buildable because it does not link the adapter. Do not
+  claim analyzer device support. Next resolve with pinned fix/documented patch,
+  bundle/measure Full (currently owned 315 MiB bytes before engine structures),
+  then compose atomic analyzed import/registration and complete reading events.
+- Updated checklist, architecture/data model, decisions, development and handoff.
+  Bundling, automatic conjugation/override application, import/completion/UI stay
+  unchecked. Nostr configuration and destructive semantics remain unchanged.

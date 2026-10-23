@@ -58,7 +58,15 @@ reading/dictionary form. Dictionary forms never replace the surface identity;
 unresolved forms stay absent. Validation rejects empty/overlapping/out-of-order
 spans, wrong ownership, split scalars, normalized/substituted surfaces, blank
 metadata and omitted non-whitespace text. Whitespace gaps and empty analyses of
-empty/whitespace text are allowed. This module does not tokenize or classify text.
+empty/whitespace text are allowed. The pure core module does not tokenize or
+classify text. The separate `yomoku-analysis` adapter supplies real Sudachi output. Its profile pins engine
+commit + adapter-v1/embedded-defaults and Full 20261015 + dictionary SHA-256.
+Classification uses original Japanese script and analyzer POS, including OOV rare
+kanji. OOV readings/dictionary forms are absent; original surfaces never become
+normalized identity. Normalization-generated empty original spans are omitted,
+and the complete result must still pass canonical coverage/nonoverlap validation.
+Real A/B/C output survives repository saves and reopen without a schema change.
+Import/registration composition and production analysis persistence remain pending.
 
 `chapter_analyses` stores semantics version 1, chapter ownership, engine/dictionary
 revision and explicit `a`/`b`/`c` mode. Its unique chapter/revisions/mode key identifies

@@ -540,3 +540,41 @@ left running; viewport unchanged. No tablet rerun; arm64 execution remains untes
 New repository methods are host-tested and have no UI/FFI exposure; existing device
 flows exercise migration 0007. Intentional-close Crux and ktfmt/JDK warnings remain
 benign. No outstanding failure or blocker.
+
+
+## Pinned Sudachi Full adapter (host)
+Verified 2026-10-23: Sudachi.rs v0.7.0 at
+`5de0410b6edfd428fc510cc9763440772e9619d5`, Full 20261015 V1.
+Exact artifact/checksums/notices: third_party/sudachi/README.md. Python 3.11+ and
+standard library only; no dictionary download is triggered by a Cargo build.
+```sh
+python3 tools/prepare-sudachi.py
+# Offline preparation from the official pinned ZIP:
+python3 tools/prepare-sudachi.py --archive .local/sudachi/sudachi-dictionary-20261015-full.zip
+tools/test-sudachi.sh
+# Optional local data path; its dictionary checksum must still match:
+YOMOKU_SUDACHI_DICTIONARY=/path/to/system_full.dic tools/test-sudachi.sh
+```
+PASS: all nine actual Full-data tests (A/B/C, inflections, proper nouns,
+normalization, Unicode/OOV, 72 KB input, SQLite snapshots/reopen). Ordinary
+workspace tests explicitly report these nine as ignored; run the script to
+exercise them. Prepared dictionary size is 330,506,339 bytes (about 315 MiB).
+Preparation/repeated verification, corrupt-archive rejection without replacement,
+Python syntax and shell syntax pass. Data remains ignored; complete notices are
+retained both in Git and beside prepared data.
+
+PASS: workspace locked/offline build and 119 data-free tests, fmt/clippy, host
+Kotlin/JNI including seven Unicode exchanges, and Kotlin formatting. Existing
+Android app/test APKs and strict lint also pass with both native ABIs; no Android
+instrumentation rerun for this host-only slice. No app or bridge entry point uses
+the analyzer yet. Existing intentional-close/JDK formatter warnings remain benign.
+
+FAILED (upstream, before integration):
+```sh
+cargo check -p yomoku-analysis --lib --target aarch64-linux-android --target x86_64-linux-android --locked --offline
+```
+Sudachi src/plugin/loader.rs:92, E0425: make_system_specific_name is undefined for
+Android. Its Linux/FreeBSD .so cfg omits Android. Resolve with a pinned upstream
+fix or documented source patch before app linking; do not fake target cfgs or
+modify the shared Cargo cache. Device startup/memory/offline measurements and
+bundling remain unchecked; host constructor uses verified owned dictionary bytes.
