@@ -2,6 +2,7 @@
 //!
 //! Paste repositories use pure domain values. Runtime effect handling is separate.
 
+mod analysis;
 mod completions;
 mod documents;
 mod settings;
@@ -48,6 +49,11 @@ const MIGRATIONS: &[Migration] = &[
         name: "0006_vocabulary",
         sql: include_str!("../migrations/0006_vocabulary.sql"),
     },
+    Migration {
+        version: 7,
+        name: "0007_analysis_anchors",
+        sql: include_str!("../migrations/0007_analysis_anchors.sql"),
+    },
 ];
 
 /// Failures are returned to the runtime; opening never resets a database.
@@ -61,6 +67,7 @@ pub enum StorageError {
     InvalidSettings,
     InvalidCompletion,
     InvalidVocabulary,
+    InvalidAnalysis,
 }
 
 impl fmt::Display for StorageError {
@@ -81,6 +88,7 @@ impl fmt::Display for StorageError {
             Self::InvalidSettings => f.write_str("stored settings are inconsistent"),
             Self::InvalidCompletion => f.write_str("invalid or conflicting page completion"),
             Self::InvalidVocabulary => f.write_str("invalid vocabulary value or stored entry"),
+            Self::InvalidAnalysis => f.write_str("invalid analysis or segmentation override"),
         }
     }
 }

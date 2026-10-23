@@ -105,6 +105,7 @@ fn map_error(error: StorageError) -> DocumentError {
         StorageError::UnsupportedSchemaVersion { .. }
         | StorageError::InvalidMigrationHistory
         | StorageError::InvalidVocabulary
+        | StorageError::InvalidAnalysis
         | StorageError::UnrecognizedDatabase => DocumentError::IncompatibleDatabase,
     }
 }

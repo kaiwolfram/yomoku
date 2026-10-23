@@ -641,3 +641,57 @@ is no document FK or delete API. Test-only deletes verify document independence,
 entry history cleanup and fresh registration IDs without introducing destructive
 user actions. Eleven new tests cover identity/inflections/Unicode, all statuses,
 lookup/no-ops, explicit history, concurrency, migrations, reopen and rollback.
+
+## 2026-10-23 — Source-anchored analysis and reversible boundary schema
+Complete the independent anchor/schema prerequisite before adopting an analyzer
+revision or populating imports. Keep `analysis` in pure core for validation only;
+actual tokenization will live in `yomoku-analysis`. No dependency/version was added.
+
+Upstream evidence inspected on 2026-10-23:
+- [Morpheme API](https://worksapplications.github.io/sudachi.rs/rust/sudachi/analysis/morpheme/struct.Morpheme.html):
+  begin/end use original-text byte offsets and surface uses original text, separately
+  from dictionary/normalized form and reading. This fits existing UTF-8 anchors.
+- [Tokenizer API](https://worksapplications.github.io/sudachi.rs/rust/sudachi/analysis/stateful_tokenizer/struct.StatefulTokenizer.html)
+  exposes explicit Mode, reset/do_tokenize and result extraction.
+  [Dictionary API](https://worksapplications.github.io/sudachi.rs/rust/sudachi/dic/dictionary/struct.JapaneseDictionary.html)
+  exposes configuration/storage construction. Hosted pages report mixed engine
+  versions; verify/test source at an exact pinned revision before adoption.
+- [Sudachi manifest](https://github.com/WorksApplications/sudachi.rs/blob/develop/Cargo.toml)
+  currently reports develop version 0.7.1-a1/Apache-2.0.
+  [Upstream README](https://github.com/WorksApplications/sudachi.rs/blob/develop/README.md)
+  warns that 0.7 patch APIs may change and crates.io registration remains unchecked.
+- [SudachiDict format notes](https://github.com/WorksApplications/SudachiDict/blob/develop/README.md)
+  distinguish Full (including proper nouns) and require V1 for engine 0.7, V0 for
+  0.6; release assets switch to V1 from v202610. An exact compatible engine/Full
+  artifact, checksum, offline packaging and device measurements remain unselected.
+- [Dictionary LEGAL](https://github.com/WorksApplications/SudachiDict/blob/develop/LEGAL)
+  specifies Apache-2.0 plus UniDic and NEologd notices. Preserve the chosen artifact's
+  complete license/legal notices when bundling. No dictionary is bundled yet.
+
+Store exact engine/adapter/configuration and dictionary artifact revisions per
+immutable analysis snapshot, with explicit A/B/C mode (default B). Do not substitute
+normalized forms for source surfaces. Validate exact source ownership, scalar byte
+boundaries, ordered nonoverlap and coverage of every non-whitespace byte. Permit
+whitespace gaps so adapters need not manufacture whitespace morphemes. Persist
+optional analyzer readings/dictionary forms per token without introducing manual
+lemma corrections or making vocabulary IDs part of source-token identity.
+
+Migration 0007 adds base snapshots/tokens and separate reversible boundary edits.
+A selected exact span is partitioned into one (merge) or multiple (split) surfaces;
+its parts must reproduce every source byte. Global scope defaults to AllOccurrences,
+keyed by exact surface; local scope uses source/chapter/range. Replacing an exact
+active key deactivates the old edit and allocates a fresh ID in one transaction.
+Identical saves reuse the active ID. Reversing disables only that ID and leaves
+superseded edits inactive, base analysis unchanged and past encounters untouched.
+Keep source metadata/original selected bytes so global edits survive deletion of
+their originating document. Live analysis cascades with chapter text, independently
+of vocabulary deletion. No production document deletion behavior changes.
+
+These are repository primitives, not an override application policy or UI. Do not
+choose overlap precedence or arbitrary substring matching here: cross-occurrence
+matching must be tested with the real analyzer before exposing segmentation edits.
+Existing imports are not rescanned. Atomic import/vocabulary composition and real
+completion occurrence snapshots remain separate unchecked work. Fifteen new core/
+storage tests use explicitly synthetic adapter fixtures; they verify anchors,
+reversal, immutable output, concurrency, migrations, corruption and rollback,
+and do not claim verified Sudachi segmentation.

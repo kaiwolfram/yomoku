@@ -46,6 +46,56 @@ transaction. Completion-driven New→Known events need completion provenance and
 must share the occurrences/time/position transaction, not call manual selection.
 Existing document imports are not rescanned by this migration or by lookup.
 
+## Analysis anchors and reversible boundaries (migration 0007)
+`AnalysisId` and `OverrideId` are distinct positive i64 identities, allocated by
+AUTOINCREMENT. No analysis token refers to a vocabulary ID: vocabulary deletion
+must not erase source analysis or cause lookup to recreate a deleted entry.
+
+`ChapterAnalysis` carries exact engine/dictionary revision identifiers, A/B/C mode
+(default B), and ordered `AnalyzedToken`s. Each token has a source/chapter UTF-8
+anchor, exact original surface, analyzer-supplied Japanese classification and optional
+reading/dictionary form. Dictionary forms never replace the surface identity;
+unresolved forms stay absent. Validation rejects empty/overlapping/out-of-order
+spans, wrong ownership, split scalars, normalized/substituted surfaces, blank
+metadata and omitted non-whitespace text. Whitespace gaps and empty analyses of
+empty/whitespace text are allowed. This module does not tokenize or classify text.
+
+`chapter_analyses` stores semantics version 1, chapter ownership, engine/dictionary
+revision and explicit `a`/`b`/`c` mode. Its unique chapter/revisions/mode key identifies
+one immutable output: identical retries return its ID; changed output under the
+same key errors. The revision identity must include the adapter/configuration and
+exact dictionary artifact when the real analyzer is integrated. `analyzed_tokens`
+stores contiguous token indices, byte spans, exact surfaces, Japanese flags and
+nullable readings/dictionary forms. Load revalidates indices and canonical anchors.
+Analysis references live chapter text with cascading deletion of snapshots/tokens;
+historical completion occurrences must retain their own anchors and vocabulary IDs.
+
+`SegmentationOverride` stores a selected exact Surface/TextAnchor and a nonempty
+ordered partition into exact Surface parts. One part is a merge; multiple parts
+are a split. Concatenation must equal the selected original bytes. The pure helper
+projects checked replacement anchors for the selected occurrence. No user-supplied
+reading/lemma is accepted; manual edits do not alter analyzer metadata or history.
+
+`segmentation_overrides` and ordered `segmentation_override_parts` store semantics
+version 1, retained source/chapter provenance, the original span/surface, scope and
+active flag. Scope defaults to AllOccurrences (`all`), keyed by exact BINARY surface;
+ThisOccurrence (`this`) is keyed by source/chapter/start/end. Partial unique indexes
+permit one active edit per exact key. Saving the same partition is a no-op (a global
+rule retains its original provenance even when saved from another source). A changed
+partition atomically deactivates the prior edit and inserts a fresh ID/parts.
+Reversal disables only the supplied active ID, never resurrecting a superseded edit.
+Missing/already inactive IDs are no-ops. Statements and commit failure roll back
+replacement/reversal together. No override API edits text, statuses or past events.
+
+Original selected bytes and source/chapter metadata survive content deletion, so
+global edits remain inspectable/reversible. Load validates their shape/ownership
+and, while canonical text exists, their exact source span. No production deletion
+API is introduced. Existing documents are not analyzed/rescanned by migration.
+These methods are repository prerequisites only: real analyzer output, atomic
+import registration, matching rules across occurrences, overlapping rule precedence,
+and segmentation UI/application remain unimplemented. No override is applied to
+the current reader or treated as a completed-reading occurrence.
+
 ## Document identities and text anchors
 `document.rs` defines distinct `DocumentId`, `SourceId` and `ChapterId` newtypes.
 Each is an integer in `1..=i64::MAX`; Rust constructors and Serde decoding reject

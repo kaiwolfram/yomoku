@@ -517,3 +517,26 @@ completion New→Known/occurrences/time and vocabulary UI remain unimplemented.
 Initial migration test referenced a nonexistent pagination function; corrected to
 LogicalPages and the full rerun passed. Existing intentional-close Crux logging
 and ktfmt/JDK warnings remain benign. No outstanding failure or blocker.
+
+## Analysis anchor and reversible override verification
+PASS 2026-10-23: 117 Rust tests (61 storage), locked/offline workspace build,
+fmt/clippy, host Kotlin/JNI, seven Unicode exchanges, Kotlin formatting and
+whitespace. Commands above remain unchanged. Migration 0007 and fifteen new core/
+storage tests verify exact original Unicode/UTF-8 anchors, versioned immutable
+A/B/C snapshots, separate reversible global/local split/merge partitions,
+concurrent retries, reopen, corruption rejection and statement/commit rollback.
+Version-6 upgrade does not rescan existing documents; a failed migration preserves
+the prior schema/content. Deleting canonical content removes live analyses but
+retains global override provenance/reversibility. These use synthetic adapter
+output; Sudachi segmentation/performance and actual rule application are untested.
+
+App/test APK assembly and strict lint PASS with both native ABIs. No dependency
+or exported payload was changed. The first workspace run found an old migration
+test still expecting schema version 6; fixed to 7 and the complete rerun passed.
+All seven existing Android tests PASS on API 36 x86_64 medium_phone at its standard
+1080x2400/420dpi viewport. Initial connected-test execution found no device; started
+the documented swangle/KVM emulator, confirmed boot and reran successfully. Emulator
+left running; viewport unchanged. No tablet rerun; arm64 execution remains untested.
+New repository methods are host-tested and have no UI/FFI exposure; existing device
+flows exercise migration 0007. Intentional-close Crux and ktfmt/JDK warnings remain
+benign. No outstanding failure or blocker.

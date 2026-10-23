@@ -1,5 +1,6 @@
 use yomoku_core::document::{
-    ChapterId, ChapterText, DocumentId, PasteText, SourceId, TextAnchor, TextOffset, TextRange,
+    AnalysisId, ChapterId, ChapterText, DocumentId, OverrideId, PasteText, SourceId, TextAnchor,
+    TextOffset, TextRange,
 };
 
 #[test]
@@ -39,11 +40,15 @@ fn identities_are_positive_sqlite_integers_without_floating_point_loss() {
         assert_eq!(i64::from(DocumentId::try_from(value).unwrap()), value);
         assert_eq!(i64::from(SourceId::try_from(value).unwrap()), value);
         assert_eq!(i64::from(ChapterId::try_from(value).unwrap()), value);
+        assert_eq!(i64::from(AnalysisId::try_from(value).unwrap()), value);
+        assert_eq!(i64::from(OverrideId::try_from(value).unwrap()), value);
     }
     for value in [i64::MIN, -1, 0] {
         assert!(DocumentId::try_from(value).is_err());
         assert!(SourceId::try_from(value).is_err());
         assert!(ChapterId::try_from(value).is_err());
+        assert!(AnalysisId::try_from(value).is_err());
+        assert!(OverrideId::try_from(value).is_err());
     }
 }
 

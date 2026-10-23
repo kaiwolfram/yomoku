@@ -398,3 +398,30 @@
   Next: verify Sudachi Full, token/source anchors/reversible override schema and
   atomic import registration, then completion wiring; CI remains independent.
   No Nostr data, production deletion or data-destructive semantics changed.
+
+## 2026-10-23 — Analysis anchors and reversible boundary schema
+- Started clean. Completed phase-3's independent anchor/schema prerequisite:
+  pure core validates exact original token surfaces, source/chapter UTF-8 spans,
+  optional analyzer readings/dictionary forms and versioned A/B/C snapshots
+  (default B). Gaps may omit whitespace only. No tokenizer or dependency added.
+- Migration 0007/repositories preserve immutable base snapshots and separate
+  global/local split/merge partitions. Identical retries reuse IDs; replacement
+  and reversal commit atomically without editing base output, text, vocabulary
+  status or history. Reversal never resurrects superseded edits. Global rules
+  retain provenance/reversibility after originating-content deletion.
+- Inspected upstream Sudachi API/license/Full-format evidence; documented mixed
+  hosted API versions and 0.7/V1 compatibility. An exact engine/Full artifact,
+  checksum/notices, real tokenization fixtures and device measurement remain
+  unchecked. New tests deliberately use synthetic adapter output.
+- PASS: 117 Rust tests (15 new; 61 storage), workspace build/fmt/clippy, host JNI,
+  seven Unicode exchanges, Kotlin formatting, both-ABI app/test builds, strict
+  lint and all seven API 36 x86_64 phone tests. No tablet rerun; arm64 execution
+  remains untested. No viewport changes; emulator left running.
+- Fixed one old migration expectation from 6 to 7; full Rust rerun PASS. First
+  connected-test attempt had no device; started the documented swangle/KVM AVD
+  and reran successfully. Existing shutdown/formatter warnings remain benign.
+- Updated plan, architecture/data model, decisions, development and handoff.
+  No new app/FFI/UI hook. Cross-occurrence matching/overlap resolution, actual
+  Sudachi integration and atomic import registration remain next, followed by
+  occurrences/New→Known/time completion and controls. CI remains independent.
+  No Nostr data, production destructive APIs or outstanding blocker.
