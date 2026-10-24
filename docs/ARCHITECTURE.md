@@ -27,6 +27,20 @@ whitespace may be omitted between tokens. Separate global/local boundary edits
 partition a selected exact span; they cannot edit lemmas or source text.
 Application vocabulary commands remain future work.
 
+Pure `reader_tokens_on_page` projects Japanese Mode B occurrences intersecting a
+nonempty page span. Tokens retain full chapter anchors, exact surfaces, readings,
+dictionary forms and original indices; a separate page-local UTF-8 display range
+clips crossing tokens for rendering. Display overlap does not change completion's
+start-based occurrence ownership. `ReaderTokenSnapshot` echoes document/page/base
+analysis identity for future asynchronous result validation. Its optional
+`ReaderVocabulary` carries the current global ID and one of five statuses.
+The separate `load_reader_tokens` repository reads original Mode B plus current
+exact-surface statuses in one read transaction, using one visible-token status
+join. It reuses full stored-analysis validation; no analyzer, override application,
+registration, history, position or finish-marker mutation occurs. Legacy analysis
+absence is explicit; deleted/unregistered vocabulary stays absent. This foundation
+is not yet connected to Crux effects, generated Kotlin or reader taps.
+
 Pure `active_time` accounts pending reading milliseconds using caller-supplied
 monotonic timestamps. Resume/interaction arms a five-minute idle window; dictionary
 interactions count, while background/reader-close pause. Checkpoints neither reset

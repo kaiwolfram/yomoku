@@ -3,11 +3,13 @@
 use serde::{Deserialize, Serialize};
 
 use crate::{
+    analysis::{ChapterAnalysis, InvalidAnalysis, SplitMode},
     document::{
-        AnalysisId, DocumentId, InvalidTextValue, LibraryDocument, PastedDocument, TextAnchor,
-        TextOffset,
+        AnalysisId, ChapterText, DocumentId, InvalidTextValue, LibraryDocument, PastedDocument,
+        TextAnchor, TextOffset, TextRange, VocabularyId,
     },
     pagination::{LogicalPages, PageLength, ReadingPosition},
+    vocabulary::VocabularyStatus,
 };
 
 /// The original stored Mode B base snapshot, independent of the installed engine.
@@ -27,6 +29,87 @@ pub struct ReaderSnapshot {
     pub document: PastedDocument,
     pub page_length: PageLength,
     pub analysis: ReaderAnalysis,
+}
+
+/// One read-only page lookup. Echoed identities let a future asynchronous caller
+/// discard results for a departed page or a different base analysis.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
+pub struct ReaderTokenSnapshot {
+    pub document_id: DocumentId,
+    pub page: TextAnchor,
+    pub analysis: ReaderAnalysis,
+    pub tokens: Vec<ReaderToken>,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
+pub struct ReaderVocabulary {
+    pub id: VocabularyId,
+    pub status: VocabularyStatus,
+}
+
+/// A selectable Japanese occurrence, retaining its whole original surface even
+/// when only part is visible. display_range counts UTF-8 bytes in the page text;
+/// anchor counts UTF-8 bytes in the chapter. Neither uses Compose UTF-16 indices.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
+pub struct ReaderToken {
+    pub token_index: u64,
+    pub anchor: TextAnchor,
+    pub display_range: TextRange,
+    pub surface: String,
+    pub reading: Option<String>,
+    pub dictionary_form: Option<String>,
+    /// Missing/deleted entries stay absent; lookup must never register them.
+    pub vocabulary: Option<ReaderVocabulary>,
+}
+
+/// Project visible Japanese spans without changing analysis or vocabulary.
+/// Storage attaches current global entries in the same read transaction.
+/// Unlike completion's start-based ownership, visibility includes a crossing
+/// token on both pages. Selecting either fragment identifies the same full token.
+pub fn reader_tokens_on_page(
+    chapter: &ChapterText,
+    analysis: &ChapterAnalysis,
+    page: TextAnchor,
+) -> Result<Vec<ReaderToken>, InvalidAnalysis> {
+    analysis.validate(chapter)?;
+    if analysis.mode != SplitMode::B || page.slice(chapter).map_err(|_| InvalidAnalysis)?.is_empty()
+    {
+        return Err(InvalidAnalysis);
+    }
+    analysis
+        .tokens
+        .iter()
+        .enumerate()
+        .filter(|(_, token)| {
+            token.is_japanese
+                && token.anchor.range.start < page.range.end
+                && token.anchor.range.end > page.range.start
+        })
+        .map(|(index, token)| {
+            let start = token.anchor.range.start.max(page.range.start);
+            let end = token.anchor.range.end.min(page.range.end);
+            Ok(ReaderToken {
+                token_index: u64::try_from(index).map_err(|_| InvalidAnalysis)?,
+                anchor: token.anchor,
+                display_range: TextRange {
+                    start: TextOffset::try_from(i64::from(start) - i64::from(page.range.start))
+                        .map_err(|_| InvalidAnalysis)?,
+                    end: TextOffset::try_from(i64::from(end) - i64::from(page.range.start))
+                        .map_err(|_| InvalidAnalysis)?,
+                },
+                surface: token.surface.clone(),
+                reading: token.reading.clone(),
+                dictionary_form: token
+                    .dictionary_form
+                    .as_ref()
+                    .map(|s| s.as_str().to_owned()),
+                vocabulary: None,
+            })
+        })
+        .collect()
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]

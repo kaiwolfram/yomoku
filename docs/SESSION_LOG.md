@@ -1110,3 +1110,25 @@
   typed reader token/status projection and word taps; offline dictionary data/index.
   No full Android suite, standalone Full suite, release, process/reboot, tablet or
   physical-arm64 rerun. Nostr empty; Q188 still required before forwarding.
+
+## 2026-10-24 — Read-only reader token/status foundation
+
+- Started clean. Added pure Mode B page-token projection and separate SQLite
+  load_reader_tokens snapshot with current exact-surface global ID/status. Retains
+  original token indices/full anchors/surfaces/readings/forms; clipped page-local
+  UTF-8 display spans allow crossing fragments without changing completion counts.
+  Original B stays pinned; Missing/deleted vocabulary stays absent. No lookup writes,
+  rescans, implicit New, override application, progress reset or history changes.
+- PASS: workspace build, 229 data-free Rust tests (117 storage), strict Clippy/fmt/
+  diff, 138-file Sudachi source verification and all 11 real-Full analysis fixtures
+  plus one runtime fixture per owned/mapped loader. Four new pure + six repository
+  tests cover Unicode/reflow/repetition/all statuses/global refresh/deletion/corrupt
+  state; query-only SQLite + unchanged DB bytes verify read-only behavior. Extended
+  real-Full import/completion fixture checks stored token metadata and current
+  statuses before/after completion, preserving finished EOF position on lookup.
+- Updated plan, handoff, architecture/data model, decisions, development and README.
+  No schema/dependency/event/view codec change; no failure/local blocker. Foundation
+  is not wired to runtime/FFI/Compose yet: next add typed effects/manual status
+  changes and page-keyed stale-result rejection, then taps/five direct choices.
+  Android/JNI/lint, process/reboot, release/tablet/physical-arm64 not rerun this slice.
+  Nostr stays empty; ask Q188 before forwarding.

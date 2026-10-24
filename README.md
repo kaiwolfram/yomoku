@@ -27,7 +27,9 @@ Yomoku is under active development. The working app supports:
 - Forward completion records repeated Japanese encounters, promotes New words to
   Known and shows a positive-count toast; deliberate rereads count again.
 
-Word lookup and vocabulary controls are still pending. The Rust repository
+Word lookup UI and vocabulary controls are still pending. A read-only Rust
+projection now exposes stored Mode B tokens, exact display spans and current
+global statuses without changing vocabulary or history. The Rust repository
 atomically saves completion encounters, New→Known
 transitions, active time and position. Core/worker/FFI pending-time checkpoints
 support exact retries, coalesced saves before reader movement/exit and reopen.

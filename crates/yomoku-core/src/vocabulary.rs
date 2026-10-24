@@ -1,5 +1,7 @@
 //! Exact written surfaces are identities: never normalize or substitute lemmas.
 
+use serde::{Deserialize, Serialize};
+
 use crate::document::VocabularyId;
 
 /// Persisted global entry. Registration time is distinct from reading encounters.
@@ -11,7 +13,9 @@ pub struct VocabularyEntry {
     pub registered_at_unix_ms: i64,
 }
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, Deserialize, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
+#[repr(C)]
 pub enum VocabularyStatus {
     #[default]
     New,

@@ -98,20 +98,24 @@ fn validate_entry(
     (id, surface, status, timestamp): EntryColumns,
 ) -> Result<VocabularyEntry, StorageError> {
     validate_timestamp(timestamp)?;
-    let status = match status.as_str() {
-        "new" => VocabularyStatus::New,
-        "learning" => VocabularyStatus::Learning,
-        "familiar" => VocabularyStatus::Familiar,
-        "known" => VocabularyStatus::Known,
-        "ignored" => VocabularyStatus::Ignored,
-        _ => return Err(StorageError::InvalidVocabulary),
-    };
+    let status = decode_status(&status)?;
     Ok(VocabularyEntry {
         id: VocabularyId::try_from(id).map_err(|_| StorageError::InvalidVocabulary)?,
         surface: Surface::new(surface).map_err(|_| StorageError::InvalidVocabulary)?,
         status,
         registered_at_unix_ms: timestamp,
     })
+}
+
+pub(crate) fn decode_status(status: &str) -> Result<VocabularyStatus, StorageError> {
+    match status {
+        "new" => Ok(VocabularyStatus::New),
+        "learning" => Ok(VocabularyStatus::Learning),
+        "familiar" => Ok(VocabularyStatus::Familiar),
+        "known" => Ok(VocabularyStatus::Known),
+        "ignored" => Ok(VocabularyStatus::Ignored),
+        _ => Err(StorageError::InvalidVocabulary),
+    }
 }
 
 pub(crate) fn read_entry_by_surface(

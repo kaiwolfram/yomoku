@@ -284,6 +284,7 @@ fn real_mode_b_import_and_completion_preserve_surfaces_and_duplicate_identity() 
         completion::{AnalyzedCompletionOutcome, PageCompletion},
         document::PasteText,
         pagination::{LogicalPages, PageLength, ReadingPosition},
+        reader::ReaderAnalysis,
         vocabulary::{Surface, VocabularyStatus},
     };
     use yomoku_storage::{PasteImportError, PasteImportOutcome, Storage};
@@ -400,6 +401,43 @@ fn real_mode_b_import_and_completion_preserve_surfaces_and_duplicate_identity() 
     .unwrap();
     assert_eq!(layout.pages().len(), 1);
     let page = layout.pages()[0];
+    // Use the persisted original output and current global status, including
+    // halfwidth/rare-kanji forms, without changing import state.
+    let before_lookup = std::fs::read(&path).unwrap();
+    let lookup = storage
+        .load_reader_tokens(imported.document.document_id, page)
+        .unwrap()
+        .unwrap();
+    assert_eq!(
+        lookup.analysis,
+        ReaderAnalysis::Available(imported.analysis_id)
+    );
+    let japanese: Vec<_> = expected
+        .tokens
+        .iter()
+        .enumerate()
+        .filter(|(_, token)| token.is_japanese)
+        .collect();
+    assert_eq!(lookup.tokens.len(), japanese.len());
+    for (actual, (index, token)) in lookup.tokens.iter().zip(japanese) {
+        assert_eq!(actual.token_index, index as u64);
+        assert_eq!(actual.anchor, token.anchor);
+        assert_eq!(actual.surface, token.surface);
+        assert_eq!(actual.reading, token.reading);
+        assert_eq!(
+            actual.dictionary_form.as_deref(),
+            token.dictionary_form.as_ref().map(Surface::as_str)
+        );
+        assert_eq!(
+            actual.vocabulary.unwrap().status,
+            if token.surface == "猫" {
+                VocabularyStatus::Known
+            } else {
+                VocabularyStatus::New
+            }
+        );
+    }
+    assert_eq!(std::fs::read(&path).unwrap(), before_lookup);
     let departing_position = ReadingPosition {
         source_id: page.source_id,
         chapter_id: page.chapter_id,
@@ -434,6 +472,25 @@ fn real_mode_b_import_and_completion_preserve_surfaces_and_duplicate_identity() 
             VocabularyStatus::Known
         );
     }
+    let completed_document = storage
+        .load_paste(imported.document.document_id)
+        .unwrap()
+        .unwrap();
+    let before_lookup = std::fs::read(&path).unwrap();
+    let lookup = storage
+        .load_reader_tokens(imported.document.document_id, page)
+        .unwrap()
+        .unwrap();
+    assert!(lookup
+        .tokens
+        .iter()
+        .all(|token| token.vocabulary.unwrap().status == VocabularyStatus::Known));
+    // EOF lookup preserves the marker/position. Only explicit OpenReader resets.
+    assert_eq!(
+        storage.load_paste(imported.document.document_id).unwrap(),
+        Some(completed_document)
+    );
+    assert_eq!(std::fs::read(&path).unwrap(), before_lookup);
     storage
         .save_reading_position(imported.document.document_id, departing_position)
         .unwrap();

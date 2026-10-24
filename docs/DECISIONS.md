@@ -1497,3 +1497,29 @@ Primary Compose APIs checked:
 - https://developer.android.com/develop/ui/compose/animation/value-based
 - https://developer.android.com/develop/ui/compose/graphics/draw/overview
 - https://developer.android.com/develop/ui/compose/side-effects
+
+## 2026-10-24 — Read-only reader tokens before word-tap transport
+
+Implement a pure page projection and a separate SQLite read API as the next
+small phase-3 prerequisite. Reuse the original stored Mode B selection and full
+analysis validation. Read live text, analysis and current statuses under one
+deferred transaction, with one exact-surface status join for visible Japanese
+tokens. Preserve explicit Missing and absent vocabulary; lookup must not rescan,
+register, reset finished-book progress or create history. Base-only output remains
+consistent with current completion; override resolution remains its own task.
+
+Expose full token index/anchor/surface and analyzer reading/dictionary form, plus
+a page-local UTF-8 display range clipped to the page. A token crossing a page
+boundary is selectable from either visible fragment with the same full identity;
+this leaves start-based completion ownership unchanged. Keep byte offsets explicit;
+the future Compose layer must convert validated page-local boundaries to UTF-16.
+Echo document/page/analysis identity for later stale-result rejection. Five-status
+values gain Serde/Facet support, but no event/view codec or Kotlin payload changes.
+
+Do not couple page projection to persisted position/preset: the supplied valid,
+nonempty source span can be the currently displayed reflowed page. Validate source
+ownership and scalar boundaries even when analysis is Missing. Missing documents
+return None. Current implementation loads/validates the whole stored chapter per
+request before the visible-page join; optimize only with measured evidence, retaining
+the immutable-validation/read-snapshot guarantees. No schema/dependency changes.
+Crux effects/FIFO/FFI/Compose taps and manual status events remain the next slice.

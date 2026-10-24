@@ -17,6 +17,7 @@ mod finished;
 mod import_dedup;
 mod imports;
 mod positions;
+mod reader_tokens;
 mod reading_time;
 mod settings;
 mod vocabulary;

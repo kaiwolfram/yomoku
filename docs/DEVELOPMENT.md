@@ -18,7 +18,7 @@ with functioning rustup can omit the PATH workaround. Do not assume this compile
 is the project's minimum supported version; establish that with dependencies.
 Cargo.lock is retained for reproducible application development.
 Crux 0.20.0 declares Rust 1.90 minimum; the full locked graph has only been tested
-with 1.99.1. Current host baseline: 219 data-free Rust tests (111 storage, eight
+with 1.99.1. Current host baseline: 229 data-free Rust tests (117 storage, eight
 runtime). Eleven analysis fixtures and one runtime fixture run separately with
 each Full loader via tools/test-sudachi.sh (see below).
 
@@ -1575,3 +1575,32 @@ additional escalation using its existing daemon; prior benign Crux/ktfmt warning
 persist. No schema/dependency change. Generated View/Event add a book-completion
 command notice and keyed acknowledgment. No full Android suite, standalone Full
 fixture/probe, release APK, process/reboot, tablet or physical-arm64 rerun.
+
+## Read-only reader token/status foundation
+
+Verified 2026-10-24 with the Rust PATH workaround above:
+```sh
+cargo build --workspace --locked --offline
+cargo test --workspace --all-features --locked --offline --quiet
+cargo fmt --all -- --check
+cargo clippy --workspace --all-targets --all-features --locked --offline -- -D warnings
+tools/test-sudachi.sh
+git diff --check
+```
+PASS: 229 data-free Rust tests (117 storage), strict Clippy/fmt and all eleven
+real-Full analysis fixtures plus the runtime fixture with each owned/mapped loader.
+Four new pure and six new repository tests cover page-local UTF-8 spans, original
+full crossing-token identity, five presets, Unicode/repeated/global surfaces, all
+five statuses, exact metadata, missing legacy analysis, deleted-entry absence and
+corruption rejection. Query-only SQLite and exact database-byte checks verify lookup
+does not mutate progress/statuses/history/overrides or recreate deleted vocabulary.
+The existing real-Full analyzed import/completion fixture now compares projected
+indices/anchors/surfaces/readings/forms and live statuses before/after completion,
+including lookup at finished EOF without the explicit reader-open reset.
+
+No schema/dependency change. Types support future Serde/Facet transport, but this
+slice adds no event/view codec, generated Kotlin, Android UI or runtime command.
+Android/JNI/lint, process/reboot and physical-arm64 checks were not rerun; their
+previous results above remain historical. Next: wire token reads and manual status
+changes through pure core/FIFO/FFI, then Compose taps/five direct choices. No failure
+or local blocker.

@@ -7,6 +7,7 @@ mod completions;
 mod documents;
 mod encounters;
 mod imports;
+mod reader_tokens;
 mod reading_time;
 mod settings;
 mod vocabulary;

@@ -1,0 +1,86 @@
+use yomoku_core::{
+    document::{DocumentId, TextAnchor, VocabularyId},
+    reader::{reader_tokens_on_page, ReaderAnalysis, ReaderTokenSnapshot, ReaderVocabulary},
+};
+
+use crate::{
+    analysis::{read_analysis, read_reader_analysis},
+    documents::load_paste_in,
+    vocabulary::decode_status,
+    Storage, StorageError,
+};
+
+impl Storage {
+    /// Read original Mode B tokens intersecting a supplied page span and their
+    /// exact-surface global statuses in one consistent transaction. This does not
+    /// load an analyzer, apply boundary overrides, reset progress, register words
+    /// or record encounters. None means the live document no longer exists.
+    pub fn load_reader_tokens(
+        &mut self,
+        document_id: DocumentId,
+        page: TextAnchor,
+    ) -> Result<Option<ReaderTokenSnapshot>, StorageError> {
+        let transaction = self.connection.transaction()?;
+        let Some(document) = load_paste_in(&transaction, document_id)? else {
+            return Ok(None);
+        };
+        if page
+            .slice(&document.chapter)
+            .map_err(|_| StorageError::InvalidAnalysis)?
+            .is_empty()
+        {
+            return Err(StorageError::InvalidAnalysis);
+        }
+        let analysis = read_reader_analysis(&transaction, document.chapter.chapter_id)?;
+        let mut tokens = Vec::new();
+        if let ReaderAnalysis::Available(id) = analysis {
+            let stored = read_analysis(&transaction, id)?.ok_or(StorageError::InvalidAnalysis)?;
+            tokens = reader_tokens_on_page(&document.chapter, &stored, page)
+                .map_err(|_| StorageError::InvalidAnalysis)?;
+            // One exact-surface join for the visible page, including repeated
+            // spellings. Analysis has no vocabulary FK: deletion leaves tokens
+            // readable with an absent entry rather than silently recreating New.
+            let mut statement = transaction.prepare(
+                "SELECT t.token_index, v.id, v.status
+                 FROM analyzed_tokens t LEFT JOIN vocabulary v ON v.surface = t.surface
+                 WHERE t.analysis_id = ?1 AND t.is_japanese = 1
+                   AND t.start_byte < ?2 AND t.end_byte > ?3
+                 ORDER BY t.token_index",
+            )?;
+            let mut rows = statement.query((
+                i64::from(id),
+                i64::from(page.range.end),
+                i64::from(page.range.start),
+            ))?;
+            for token in &mut tokens {
+                let row = rows.next()?.ok_or(StorageError::InvalidAnalysis)?;
+                if u64::try_from(row.get::<_, i64>(0)?).ok() != Some(token.token_index) {
+                    return Err(StorageError::InvalidAnalysis);
+                }
+                token.vocabulary = match (
+                    row.get::<_, Option<i64>>(1)?,
+                    row.get::<_, Option<String>>(2)?,
+                ) {
+                    (Some(id), Some(status)) => Some(ReaderVocabulary {
+                        id: VocabularyId::try_from(id)
+                            .map_err(|_| StorageError::InvalidVocabulary)?,
+                        status: decode_status(&status)?,
+                    }),
+                    (None, None) => None,
+                    _ => return Err(StorageError::InvalidVocabulary),
+                };
+            }
+            if rows.next()?.is_some() {
+                return Err(StorageError::InvalidAnalysis);
+            }
+        }
+        let snapshot = ReaderTokenSnapshot {
+            document_id,
+            page,
+            analysis,
+            tokens,
+        };
+        transaction.commit()?;
+        Ok(Some(snapshot))
+    }
+}

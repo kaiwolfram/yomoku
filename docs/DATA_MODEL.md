@@ -108,6 +108,34 @@ matching rules across occurrences, overlapping rule precedence and segmentation
 UI/application remain unimplemented. No override is applied to
 the current reader or treated as a completed-reading occurrence.
 
+## Read-only reader token/status projection
+
+`load_reader_tokens(document_id, page)` reads live immutable text, the original
+Mode B identity and visible Japanese tokens with current exact-surface vocabulary
+statuses in one deferred read transaction. None means no live document. Missing
+analysis returns `ReaderAnalysis::Missing` and no tokens; it never substitutes A/C,
+another chapter or a later B snapshot. Existing analysis is fully revalidated;
+corrupt original output/statuses error without fallback or repair. The supplied
+span must belong to the document, be nonempty and use valid UTF-8 boundaries. It
+does not need to match persisted position or today's preset, so a reflowed caller
+can request its exact displayed span without changing progress.
+
+`ReaderTokenSnapshot` echoes document/page/analysis for later stale-result checks.
+Each `ReaderToken` retains the original token index/full chapter anchor, full
+surface, optional reading/dictionary form and a clipped `display_range` relative
+to page text in UTF-8 bytes. A boundary-crossing token appears on both visible
+pages under the same identity; completion still counts it only on its start page.
+Whitespace gaps and non-Japanese tokens remain in page text without selectable
+spans. Repetitions stay separate tokens while sharing one global vocabulary ID.
+
+`ReaderVocabulary` contains ID/status, or stays absent for deleted/unregistered
+surfaces. Lookup never implicitly registers New, applies segmentation overrides,
+records encounters/status events, resets finished-book position or saves time.
+Statuses come from one exact-surface join for the visible page, not per-token
+lookups. This correctness-first implementation validates/loads the whole chapter
+analysis per request; large-document lookup performance remains unmeasured. No
+schema change, new dependency or core/runtime/FFI transport is introduced here.
+
 ## Document identities and text anchors
 `document.rs` defines distinct `DocumentId`, `SourceId` and `ChapterId` newtypes.
 Each is an integer in `1..=i64::MAX`; Rust constructors and Serde decoding reject
