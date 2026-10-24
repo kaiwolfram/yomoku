@@ -1051,3 +1051,43 @@ with the Full integration gate are superseded by this decision.
 Continue emulator pressure/reclamation work and choose production worker
 lifecycle/reuse, then integrate analyzed imports and atomic reader completion.
 Keep recording the actual ABI/device/build and limits of each verification run.
+
+## 2026-10-24 — Full mapping reclamation and production lifetime
+
+Two real anonymous-allocation pressure runs on API-36 x86_64 reclaim 68,408 and
+146,792 KiB of Full dictionary residency while its mapping stays open. The same
+PID/generation/worker then passes A/B/C, Unicode/OOV/NUL, page and long-input
+fixtures. Kernel file scan/steal counters increase; no cache drop, madvise or
+synthetic trim signal is used. PSI is denied by device policy and recorded as
+unavailable; do not infer stall latency. Exact results: SUDACHI_MEASUREMENTS.md.
+The bounded shell helper uses the already pinned NDK, allocates 32 MiB steps,
+fills all bytes with deterministic pseudorandom data to resist zram compression,
+and releases on EOF/quit/process exit with a 180-second alarm fallback. Driver
+bounds are at most 70% of guest RAM and stop after >=64 MiB measured reclaim.
+This is enough evidence to proceed with emulator integration, not a device-wide
+LMKD survival or physical-arm64 claim. The user owns the later hardware trial.
+
+Choose the verified immutable private-file mapping for production. Keep the safe
+owned loader for uncontrolled paths/tests. Integrate one lazy analyzer into the
+existing Rust FIFO EffectRouter worker, preload before opening the analyzed-import
+transaction, and reuse through foreground imports/configuration changes. Do not
+load Full on Library startup, move Sudachi across threads or reopen a pathname in
+place of the verified descriptor. Initialization failure leaves no cached analyzer
+and can retry. Publisher repair must continue preserving live inodes.
+
+Treat the analyzer as a disposable cache: release on that worker when UI becomes
+hidden/backgrounded and on final session shutdown. Queue release after in-flight
+atomic work; backgrounding must not interrupt/roll back an accepted import merely
+to trim memory. Subsequent work lazily re-verifies/reopens. Configuration changes
+keep the retained session/cache; do not interpret every Activity stop as process
+background. No new timer/executor/library or global analyzer singleton is needed.
+Production lifecycle/descriptor delivery remains an implementation/test task,
+but the loading decision and emulator measurement gate are now resolved.
+
+Primary references: Android's
+[ComponentCallbacks2 contract](https://developer.android.com/reference/android/content/ComponentCallbacks2)
+identifies UI-hidden/background as cache release opportunities; running low-memory
+levels are no longer delivered since API 34. The kernel's
+[PSI documentation](https://docs.kernel.org/accounting/psi.html) distinguishes
+measured stalls from ordinary residency/counter snapshots. Neither synthetic
+callbacks nor unavailable PSI establish real pressure/reclaim on their own.

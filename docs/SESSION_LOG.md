@@ -729,3 +729,33 @@
 - Updated plan, handoff, architecture, measurement scope and decision record.
   Documentation only; whitespace and consistency checks pass. No build/tests or
   device actions rerun; working tree was clean at start.
+
+## 2026-10-24 — Full emulator reclamation gate
+
+- Started clean. Added bounded NDK shell pressure helper and emulator-only Python
+  driver; extended only the debug Activity to revalidate on its original worker.
+  No production runtime/core/schema/dependency changes. Pressure uses anonymous
+  pseudorandom bytes, not trim signals/cache drop/madvise. Bounds/EOF/watchdog and
+  process-exit-before-file-removal cleanup keep the experiment controlled.
+- Two API-36 x86_64 runs reclaim 68,408/146,792 KiB of dictionary residency at
+  640/896 MiB helper allocation. File scan/steal counters increase; same PID and
+  analyzer generation pass A/B/C, Unicode/OOV/NUL, page and long-input fixtures
+  after release. PSI denied by device policy; no LMKD/hardware/stall-time claim.
+- Resolved the emulator loading gate. Chose lazy immutable mapping on the existing
+  FIFO Rust worker, foreground/configuration reuse and idle cache release on
+  UI-hidden/background/final session close after accepted atomic work. Production
+  descriptor delivery/lifecycle/import wiring is next, not implemented here.
+- PASS: strict helper compile, Python syntax/bound rejection, Kotlin formatting,
+  both-ABI debug/test APK assembly, strict lint, final 18/18 Android tests and two
+  actual force-stop/recovery regression pairs; whitespace. No host Rust/Full/JNI,
+  unsigned release/tablet/physical-arm64 rerun. No radio/viewport changes.
+- Initial pressure attempt lost ADB transport, excluded; original app PID survived.
+  Reconnected and confirmed exit before removing exact owned paths. Two successful
+  runs clean their files/return to Library. Initial Android suite had one existing
+  notices timeout (17/18); focused 2/2 and full 18/18 reruns pass unchanged. Reports:
+  .local/test-reports/sudachi-{memory-pressure,pressure,process-death}/. Socket
+  restrictions resolved with escalation; no open verification blocker.
+- Updated plan, architecture, measurements, decisions, commands and handoff.
+  Next: atomic analyzed/deduplicating imports in production, then persisted page
+  time/occurrences/New→Known completion before navigation. Arm64 is the user's
+  later usable-app trial; Nostr empty and Q188 still required before forwarding.

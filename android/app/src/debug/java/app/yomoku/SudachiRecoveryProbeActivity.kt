@@ -16,11 +16,12 @@ import app.yomoku.theme.YomokuTheme
 import java.io.File
 import java.io.FileOutputStream
 import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 import org.json.JSONObject
 
 /** ADB-driven process-death experiment. Never used by the production reader or startup. */
 class SudachiRecoveryProbeActivity : ComponentActivity() {
-    private val worker = Executors.newSingleThreadExecutor()
+    private val worker = Executors.newSingleThreadScheduledExecutor()
     private var generation = 0L // Accessed only on the worker, including normal destruction.
     private lateinit var directory: File
     private lateinit var phase: String
@@ -30,7 +31,7 @@ class SudachiRecoveryProbeActivity : ComponentActivity() {
         val run = intent.getStringExtra("run") ?: error("Missing probe run")
         require(run.matches(Regex("[0-9a-f]{32}")))
         phase = intent.getStringExtra("phase") ?: error("Missing probe phase")
-        require(phase in listOf("before", "after"))
+        require(phase in listOf("before", "after", "pressure"))
         directory = File(noBackupFilesDir, "process-probe-$run")
         val privateContext =
             object : ContextWrapper(applicationContext) {
@@ -60,11 +61,7 @@ class SudachiRecoveryProbeActivity : ComponentActivity() {
                 }
                 check(generation > 0) { "Native open failed: $generation" }
                 report.put("open_ms", (SystemClock.elapsedRealtimeNanos() - started) / 1_000_000.0)
-                for ((fixture, tokens) in
-                    listOf(0 to 3L, 1 to 2L, 2 to 1L, 4 to 330L, 5 to 16002L)) {
-                    check(native.nativeValidate(generation, fixture) == tokens)
-                }
-                check(native.nativeValidate(generation, 3) > 0)
+                validate(native)
                 val mapped =
                     File("/proc/self/maps").useLines { lines ->
                         lines.any { it.contains("/${directory.name}/sudachi/full-") }
@@ -73,6 +70,7 @@ class SudachiRecoveryProbeActivity : ComponentActivity() {
                 val memory = Debug.MemoryInfo()
                 Debug.getMemoryInfo(memory)
                 report.put("pss_kib", memory.totalPss).put("mapped", mapped)
+                report.put("generation", generation)
                 report.put("status", "PASS")
             } catch (failure: Throwable) {
                 Log.e("SudachiRecoveryProbe", "Probe failed", failure)
@@ -80,7 +78,42 @@ class SudachiRecoveryProbeActivity : ComponentActivity() {
             }
             publish("$phase.json", report)
             // Keep the analyzer mapped until the external driver terminates this process.
+            if (phase == "pressure" && report.optString("status") == "PASS") {
+                worker.scheduleWithFixedDelay(
+                    {
+                        val request = File(directory, "revalidate")
+                        if (request.exists() && !File(directory, "resumed.json").exists()) {
+                            val resumed =
+                                JSONObject()
+                                    .put("pid", Process.myPid())
+                                    .put("generation", generation)
+                            try {
+                                val started = SystemClock.elapsedRealtimeNanos()
+                                validate(SudachiAppProbe())
+                                resumed.put(
+                                    "validation_ms",
+                                    (SystemClock.elapsedRealtimeNanos() - started) / 1_000_000.0,
+                                )
+                                resumed.put("status", "PASS")
+                            } catch (failure: Throwable) {
+                                resumed.put("status", "FAIL").put("error", failure.toString())
+                            }
+                            publish("resumed.json", resumed)
+                        }
+                    },
+                    250,
+                    250,
+                    TimeUnit.MILLISECONDS,
+                )
+            }
         }
+    }
+
+    private fun validate(native: SudachiAppProbe) {
+        for ((fixture, tokens) in listOf(0 to 3L, 1 to 2L, 2 to 1L, 4 to 330L, 5 to 16002L)) {
+            check(native.nativeValidate(generation, fixture) == tokens)
+        }
+        check(native.nativeValidate(generation, 3) > 0)
     }
 
     override fun onDestroy() {

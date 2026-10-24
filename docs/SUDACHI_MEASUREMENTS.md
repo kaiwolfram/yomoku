@@ -2,8 +2,8 @@
 
 Current scope (user decision, 2026-10-24): physical arm64 testing is deferred to
 the user once the app is usable. It does not block production integration or
-emulator development. The remaining integration gate is emulator pressure/
-reclamation evidence and the production worker lifecycle decision. Older gate
+emulator development. Two actual emulator reclaim runs now pass and the production
+worker lifecycle is chosen; the loading gate is resolved (final section). Older gate
 descriptions below record their original scope; no hardware validation is claimed.
 
 Measured 2026-10-23, using the standalone `yomoku-analysis` example
@@ -301,3 +301,68 @@ Process-death recovery is now verified for this measurement harness. Actual
 emulator memory-pressure/reclamation and production worker lifecycle remain open;
 the loading/memory integration gate remains unchecked. Physical arm64 measurements
 are deferred to the user's later usable-app trial, independently of integration.
+
+## Actual emulator reclamation under bounded memory pressure
+
+Measured 2026-10-24 on the same API-36 x86_64/2,532,300-KiB emulator, installed
+debug Compose app and release-optimized native probe. The new
+`tools/test-sudachi-memory-pressure.py` launches MainActivity plus the debug probe,
+extracts/verifies/maps Full, validates all fixtures, then leaves the mapping idle.
+An external NDK shell helper allocates 32-MiB anonymous blocks, filling every byte
+with deterministic pseudorandom data rather than zeros to resist zram compression.
+The driver samples every 128 MiB. Its default ceiling is 1,536 MiB and never more
+than 70% of guest RAM; it stops once at least 64 MiB of dictionary RSS is reclaimed
+and kernel file-steal counters have increased. No root, cache flushing, madvise,
+synthetic trim callbacks, radio/viewport settings or dictionary writes are used.
+
+Dictionary residency is summed only over this run's Full mapping in `/proc/PID/smaps`;
+the mapping's size must remain present in every sample. Kernel `/proc/vmstat`
+file scan/steal and swap counters, `/proc/meminfo`, app `/proc/PID/status` and
+PID/generation are retained. PSI is **unavailable** (`Permission denied`), so no
+stall-time result is claimed. The helper releases allocations on quit/EOF/exit,
+with a 180-second alarm fallback. After release, the Activity reruns A/B/C,
+mixed-script/OOV/normalization/Unicode/NUL, 510-scalar page and 72-KB long-input
+validation on its original executor/analyzer; there is no reopen/reverification.
+
+| Metric | Process 4321 | Process 4561 |
+| --- | --- | --- |
+| Extraction + verification/map/init (ms) | 4609.290 | 4669.125 |
+| Initial app PSS after validation (KiB) | 427707 | 428725 |
+| Initial dictionary RSS (KiB) | 322764 | 322764 |
+| Helper allocation when threshold reached (MiB) | 640 | 896 |
+| Dictionary RSS under pressure (KiB) | 254356 | 175972 |
+| Dictionary RSS reduction (KiB) | 68408 | 146792 |
+| Global file pages scanned / reclaimed during ramp | 167509 / 114955 | 179173 / 138302 |
+| Global swap-out page delta during ramp | 24800 | 15197 |
+| Dictionary RSS just after helper release (KiB) | 231004 | 174692 |
+| Same-analyzer complete fixture validation (ms) | 44.654 | 50.560 |
+| Dictionary RSS after revalidation (KiB) | 236872 | 183104 |
+
+Both processes retain PID and positive analyzer generation through pressure and
+revalidation; all fixtures pass. Kernel `oom_kill` does not increase during either
+ramp. Global counters include all guest work and are not dictionary-specific.
+Dictionary-specific RSS falls while the live mapping remains; this demonstrates
+actual reclamation and later access correctness without forcing eviction. Reclaim
+continues between samples, including after helper release. Timing includes the
+fixture suite and its validation, not a single-page latency measurement. Two
+sequential processes with unflushed caches are a baseline, not a distribution.
+The app stays visible; this does not test background LMKD killing, process freezer
+survival, worst-case sustained pressure or physical arm64. No hardware claim.
+
+Successful reports under `.local/test-reports/sudachi-memory-pressure/`:
+`20261024T023826538706Z.json` and `20261024T023918600370Z.json`.
+The first failed attempt lost ADB transport during smaps collection at 384 MiB;
+its original app process survived. It is excluded from results. After reconnect,
+force-stop confirmed exit before its unique dictionary directory/helper were
+removed. The two successful runs cleaned their own files and returned to Library.
+The final driver records cleanup status and exact owned paths for failed-run
+recovery; it bounds error output rather than dumping the full smaps file.
+
+The emulator Full loading gate is now resolved. Choose the verified immutable
+mapping with one lazy analyzer on the existing FIFO Rust worker; reuse during
+foreground work/configuration changes, release the idle cache on UI-hidden/
+background and final session shutdown, after in-flight atomic imports. Reopen
+lazily through the verified publisher. This production lifecycle is a decision
+for the upcoming integration, not implemented behavior. See DECISIONS.md.
+Physical arm64 remains the user's deferred usable-app trial. Mid-extraction death,
+power loss, LMKD kill and larger real-book throughput remain separate limits.

@@ -84,7 +84,7 @@ results in SUDACHI_MEASUREMENTS.md.
 The owned/mapped comparison reduces release initialized anonymous memory from
 about 318 MiB to 2.5 MiB; total RSS remains similar after the complete checksum
 read. File-backed residency alone does not demonstrate reclamation under pressure.
-These measurements do not settle production storage viability.
+The later bounded pressure measurements below settle the emulator loading gate.
 Unpatched upstream cross-target checking failed in plugin/loader.rs:
 make_system_specific_name originally had no Android cfg implementation. The root
 Cargo patch now selects a dependency-only vendored snapshot at that exact commit,
@@ -95,8 +95,9 @@ Android targets compile. The profile includes +android-loader-v1; segmentation
 and embedded configuration are unchanged. App integration remains pending.
 Owned dictionary bytes alone require about 315 MiB. Mapped storage avoids that
 anonymous copy. The private extraction helper enforces immutable publication;
-production still requires pressure/physical-arm64 validation. Keep one on-demand
-worker-owned analyzer and avoid eager Library initialization or per-page reloads.
+production will consume only verified immutable private descriptors. Keep one
+on-demand worker-owned analyzer and avoid eager Library initialization or per-page
+reloads. Physical arm64 testing is deferred to the user's usable-app trial.
 
 The separate `android_app_probe` cdylib example is packaged only in debug APKs.
 Its primitive JNI boundary duplicates the verified descriptor directly, rehashes
@@ -116,10 +117,21 @@ mapped, confirms all app processes exit without graceful close, and launches a
 new process against the same test-private publication. Two x86_64 pairs preserve
 the inode/mtime/read-only permissions and pass real analysis after re-verification.
 Cleanup runs only after confirmed process exit. This is force-stop recovery,
-not an OS low-memory-killer or interrupted-extraction simulation. Emulator
-low-memory reclamation and production worker lifecycle remain the integration
-gate. Physical arm64 testing is deferred to the user's usable-app trial and does
-not block integration; see SUDACHI_MEASUREMENTS.md.
+not an OS low-memory-killer or interrupted-extraction simulation.
+The same debug Activity now accepts a pressure phase: after real analysis it
+holds its mapping until the host requests fixture revalidation on the same worker.
+An emulator-only NDK shell helper allocates bounded incompressible anonymous
+memory; the driver samples dictionary-specific smaps residency and kernel reclaim
+counters without cache dropping, madvise or synthetic trim signals. Two runs
+reclaim 67/143 MiB and preserve process/generation and fixture correctness.
+This closes the emulator loading gate; no LMKD-kill/hardware claim follows.
+Production integration will lazily load one immutable mapped analyzer on the
+existing FIFO worker, reuse it through configuration changes/foreground work,
+and release its idle cache on UI-hidden/background and final session close.
+Background release waits for in-flight atomic imports; later work reopens through
+the verified publisher. No Android/SQL I/O enters core and no new executor is
+needed. This lifecycle is chosen, not yet wired. Physical arm64 testing is deferred
+to the user's usable-app trial; see SUDACHI_MEASUREMENTS.md.
 Release APKs exclude the probe Activity/facades and the probe library.
 
 Pure `pagination` derives chapter-local TextAnchor pages from ordered immutable
@@ -191,7 +203,7 @@ errors. Import creates no position/completion/encounters and does no deduplicati
 Six synthetic repository tests and a real Full fixture per loader verify this
 composition, including concurrent registration and exact Unicode reopen. This
 repository API is not wired into the production runtime/FFI/Android paste effect;
-the Full loading/lifecycle gate remains open.
+the Full loading/lifecycle gate is resolved; production wiring remains next.
 
 Migration 0008 adds a live-document SHA-256 index for exact pasted UTF-8 bytes.
 `Storage::import_analyzed_paste` uses one immediate transaction to index legacy

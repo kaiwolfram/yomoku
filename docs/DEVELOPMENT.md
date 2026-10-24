@@ -920,3 +920,51 @@ Migration 0008 creates the hash index without scanning content on open.
 the Full gate. Direct sha2 0.11.1 reuses the existing lockfile package/version.
 All checks pass; prior nonfatal JNI weak-reference shutdown logging persists.
 No Android/Gradle/device/standalone/tablet rerun or emulator/user-file changes.
+
+## Bounded emulator Full reclamation probe
+
+Build/install the debug APK as in the process-death section, then run:
+
+```sh
+python3 tools/test-sudachi-memory-pressure.py --serial emulator-5554
+# Optional smaller allocation ceiling, in multiples of 32 MiB:
+python3 tools/test-sudachi-memory-pressure.py --serial emulator-5554 --max-mib 1024
+```
+
+The driver rejects physical devices, non-debuggable/missing app installs and
+bounds over 70% of guest RAM. It compiles only `tools/android-memory-pressure.c`
+with pinned NDK r30/API 29 and `-Wall -Wextra -Werror`; no Rust build/download or
+APK install is implicit. Never run concurrently with instrumentation/native builds.
+It force-stops the app without clearing data, launches Compose plus the debug
+pressure phase, and leaves verified Full mapped while a separate shell process
+allocates bounded incompressible anonymous memory. Every 128 MiB it checks actual
+dictionary RSS from smaps and kernel reclaim counters. Allocation stops after
+>=64 MiB dictionary reclaim or at the ceiling (default 1536 MiB). Reaching the
+ceiling without reclaim fails the gate; it does not silently raise the limit.
+
+Quit/EOF releases the helper's memory; a 180-second device alarm is the fallback.
+The original app worker/generation reruns all fixed fixtures after release.
+Cleanup confirms app exit before removing only this run's dictionary directory;
+it removes the unique helper and opens ordinary Library. No settings/app-data
+edits, published-inode writes or explicit filesystem-cache flushing. Reports retain samples, app
+status, global meminfo/vmstat, PSI availability, exact cleanup paths and outcome in
+`.local/test-reports/sudachi-memory-pressure/`. If ADB disconnects, reconnect and
+confirm helper exit/app force-stop before removing those exact paths. Preserve
+failed reports; never count partial samples as a pass. ADB can need escalation.
+Actual results and loading decision are in SUDACHI_MEASUREMENTS.md/DECISIONS.md.
+
+Verified 2026-10-24: two actual pressure/revalidation runs pass on API-36 x86_64;
+strict C compilation, debug/test APK assembly, strict lint, Kotlin formatting,
+Python syntax/bound rejection and whitespace pass. Initial full Android suite
+passed 17/18 (existing notices dialog timeout); focused notices 2/2 and final full
+18/18 pass without changing tests/timeouts. Preserved Android reports:
+`.local/test-reports/sudachi-pressure/{full-suite-initial,notices-focused,full-suite-final}/`.
+The first pressure attempt lost ADB transport and required manual cleanup after
+confirmed process exit; final successful reports/limits are in the measurements.
+Gradle/ADB sockets needed escalation for the new/focused drivers. No Rust source,
+schema or dependency changes; host Rust/Full/JNI and unsigned release were not
+rerun for this debug-only slice. No tablet/physical-arm64 execution.
+Both process-death/recovery regression pairs also pass with the updated Activity:
+`.local/test-reports/sudachi-process-death/20261024T024602925933Z.json`.
+The unprivileged driver's preflight masked a socket failure as a missing debug
+install; the already installed app passes immediately with ADB escalation.

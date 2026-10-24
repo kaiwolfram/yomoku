@@ -1,8 +1,8 @@
 # Resume here
 
-Updated: 2026-10-24. Pure active time verified; physical testing deferred to user.
+Updated: 2026-10-24. Full emulator loading gate resolved; production wiring next.
 Read AGENTS.md, plan phases 2–4 and PRODUCT_SPEC.md sections 3–4.
-Update docs/commit each verified step.
+Update docs/commit each verified step. Physical arm64 is the later user trial.
 
 ## Working
 - Pure Crux core owns navigation/Library/Settings and typed effects. FIFO worker
@@ -13,68 +13,63 @@ Update docs/commit each verified step.
 - Migrations 0005–0007 store frozen completion IDs/page/position, global surfaces/
   dated five-status history, immutable versioned A/B/C anchors and reversible
   global/local edits. No override application, forward action or vocabulary UI.
-- Storage::create_analyzed_paste atomically composes canonical text, validated
-  Mode B snapshot and unique Japanese registrations; preserves existing statuses.
-- import_analyzed_paste wraps that composition with exact UTF-8 SHA-256
-  dedup (migration 0008). Existing returns oldest live match, preserves progress/
-  title/vocab and skips analysis/rescan. Legacy hashes are filled lazily under the
-  write lock; legacy duplicates stay intact. All failures roll back, including
-  backfill. Deletion removes hash; reimport gets fresh IDs/progress. Raw creation
-  still allocates without dedup. Preload/reuse analyzer before callback; no DB
-  work or provisional IDs may escape. No encounters/position.
-  Repository only: production Android/runtime still use text-only create_paste.
-- NEW pure active_time uses supplied monotonic ms; five-minute idle cap, reader/
-  dictionary interactions reset idle; background/close pause. Checkpoints do not
-  drain/reset idle. Restore only PendingReadingTime duration, paused in a fresh
-  clock epoch. Thirteen domain tests pass; no SQLite/runtime/FFI/Android wiring.
+- Storage::import_analyzed_paste atomically composes canonical text, validated
+  Mode B snapshot and unique Japanese registrations, preserving existing statuses.
+  Migration 0008 dedups exact UTF-8 SHA-256; Existing skips analysis/rescan and
+  returns oldest live match without changing title/progress/vocab. Legacy hashes
+  fill lazily under write lock; duplicates stay intact. Every failure rolls back.
+  Deletion/reimport allocates fresh IDs/progress; raw create stays non-dedup.
+  Preload/reuse analyzer before callback; no DB work/provisional IDs may escape.
+  Repository only: Android/runtime still use text-only create_paste. No encounters.
+- Pure active_time uses supplied monotonic ms, five-minute idle cap and reader/
+  dictionary interactions. Background/close pauses; checkpoints retain pending
+  duration without draining/resetting idle. Restore duration paused in fresh clock
+  epoch. Thirteen tests; no SQLite/runtime/FFI/Android wiring or page attribution.
 - Sudachi.rs v0.7.0/android-loader-v1 and Full 20261015 stay pinned. Source verifier
-  checks 138 files; never alter shared Cargo cache. Eleven real fixtures per loader.
+  checks 138 files; never alter shared Cargo cache. Eleven fixtures per loader.
   Full is prepared outside Git; compressed APK includes complete notices.
-- Worker-only private publisher verifies size/SHA-256, syncs and atomically
-  publishes read-only files and returns that same verified descriptor. Repair
-  never writes/truncates live inodes. Eight extraction/recovery device tests pass.
-- Debug JNI probe verifies fixtures, retry/affinity/stale IDs, recreation/stop/
-  resume reuse, close/unmap/fresh-worker reopen. ADB driver verifies two actual
-  force-stop/restart pairs, new PIDs and unchanged cached inode/mtime/read-only
-  bytes. Results: SUDACHI_MEASUREMENTS.md; no pressure/LMKD/hardware claim.
-- Safe owned loader remains; unsafe mapping requires inode immutability until
-  analyzer drop. Initial checksums touch all pages; production lifecycle undecided.
+- Worker-only private publisher verifies size/SHA-256, syncs/atomically publishes
+  read-only files and returns the same verified descriptor. Repair never rewrites
+  live inodes. Eight extraction/recovery device tests pass.
+- Debug JNI/ADB probes verify fixture correctness, worker affinity/retry/stale IDs,
+  retained reuse, close/unmap/reopen and two real force-stop/restart recovery pairs.
+- NEW tools/test-sudachi-memory-pressure.py + NDK shell helper measure real reclaim:
+  two x86_64 runs reclaim 67/143 MiB dictionary RSS under bounded anonymous load;
+  original PID/generation reruns all fixtures. PSI denied; no LMKD/hardware claim.
+  Reports/limits: SUDACHI_MEASUREMENTS.md. No synthetic trim/cache drop/madvise.
+- Production decision (not wired): one lazy immutable mapped analyzer on existing
+  FIFO worker, reuse foreground/config changes; release idle cache on UI-hidden/
+  background and final session close, after accepted atomic work finishes. Later
+  work lazily re-verifies/reopens. No eager Library load/per-page reload/new worker.
+  Keep safe owned loader for uncontrolled paths. Never mutate live mapped bytes.
 - Paste text/IDs/provenance immutable; no inferred TXT chapters. Future file imports
   must hash original bytes separately. Document deletion keeps vocab.
 
 ## Next tasks (ordered)
-1. Finish Full gate: actual memory-pressure/reclamation; choose production worker
-   lifecycle/reuse on emulator. User will test physical arm64 once app is usable.
-2. After gate, wire import_analyzed_paste into runtime/FFI/Android with a reused
-   analyzer and Created/Existing summary; extend format imports later.
-3. Persist pending page time using active_time (page/reflow attribution open),
-   extend completion with occurrences/New→Known/time, then wire frozen IDs and
-   Android clock/lifecycle/interactions + Next/Previous/swipes. Finish/CI remain.
+1. Wire deduplicating import_analyzed_paste through runtime/FFI/Android, verified
+   descriptor delivery/lifecycle and Created/Existing summary; test atomic rollback,
+   vocabulary/dedup, worker reuse/release/retry and no eager Library load end to end.
+2. Persist pending page time (page/reflow attribution open), extend completion with
+   occurrences/New→Known/time, then wire frozen IDs and Android clock/lifecycle/
+   interactions + Next/Previous/swipes. Finish/format imports/CI remain unchecked.
+3. User-run physical arm64 validation once usable; defer until their app trial.
 
-## Last verified checks
-```sh
-export PATH=/home/kai/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin:$PATH
-cargo build --workspace --locked --offline
-cargo test --workspace --all-features --locked --offline
-cargo fmt --all -- --check
-cargo clippy --workspace --all-targets --all-features --locked --offline -- -D warnings
-git diff --check
-```
-PASS: 147 data-free Rust tests (76 storage), workspace build, fmt/strict Clippy.
-Thirteen time tests cover idle/lifecycle/checkpoint/restore and clock/overflow errors.
-Close/reboot is simulated at the duration boundary, not on device.
-No open failure. No Android/Kotlin/JNI/Full fixture rerun for this pure-domain step.
-Prior tools/test-sudachi.sh (11 fixtures per loader), tools/test-kotlin-bridge.sh,
-18 Android tests/lint/debug+release builds and death driver pass; commands/reports
-remain in DEVELOPMENT.md and SUDACHI_MEASUREMENTS.md. Prior nonfatal JNI shutdown
-logging remains. No emulator/user-file/radio/viewport changes.
-
-## Environment/blockers
+## Verification / environment
+- This step: debug/test APK assembly, strict lint and Kotlin format pass. Two real
+  pressure/revalidation runs, final 18/18 Android tests and two death/recovery pairs
+  pass; Python syntax/bound rejection, strict C compile and whitespace pass.
+- First pressure run lost ADB transport, excluded; original PID survived. Reconnect,
+  confirmed force-stop, then removed its owned directory/helper. Successful runs
+  clean only their files and return to Library. No radio/viewport changes.
+- Initial Android suite: 17/18 pass, existing notices dialog times out. Focused
+  SudachiAssetsTest rerun: 2/2 pass; full rerun 18/18 pass. Reports under
+  .local/test-reports/sudachi-pressure/. No timeout was relaxed or assertion removed.
+- Last host baseline: 147 data-free Rust tests (76 storage), build/fmt/strict Clippy;
+  no Rust changes/host tests rerun this step. Prior Full/host JNI results stand.
+- Commands/env: DEVELOPMENT.md (JDK17, pinned NDK/SDK/Gradle). Run debug assembly/
+  instrumentation/lint, explicit adb install -r (instrumentation uninstalls app),
+  then python3 tools/test-sudachi-memory-pressure.py --serial emulator-5554 and
+  tools/test-sudachi-process-death.py. ADB/Gradle sockets can need escalation.
 - Never run native builds/generation/tests concurrently. Prepare Full before APK
-  builds; never prepare/replace/truncate dictionary bytes during mapped probes.
-- Android env/commands: DEVELOPMENT.md. ADB/Gradle sockets may need escalation.
-  Instrumentation uninstalls app: reinstall debug before separate death driver.
-- medium_phone API 36 uses swangle/KVM; tools/start-android-emulator.sh.
-- Pressure/LMKD and mid-extraction death/power loss remain unverified. Physical
-  arm64 is deferred to user, not an integration blocker; do not claim it passed.
-- Nostr stays empty; ask Q188 before forwarding. No production edit/rename/delete.
+  builds; never prepare/replace/truncate bytes during mapped probes. Emulator uses
+  swangle/KVM; tools/start-android-emulator.sh. Nostr empty; Q188 before forwarding.
