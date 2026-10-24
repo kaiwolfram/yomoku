@@ -698,3 +698,24 @@
   integration remain unchecked. Next: Full pressure/reclamation and worker
   lifecycle/arm64 gate, deduplicating analyzed import integration, then atomic
   occurrences/New→Known/time before navigation. Nostr empty; Q188 before forwarding.
+
+## 2026-10-24 — Pure active-time accounting
+
+- Started clean. Continued the independent reader-time prerequisite while the
+  Full pressure/lifecycle/hardware gate remains open. Added pure `active_time`
+  domain values and accumulator with caller-supplied monotonic milliseconds.
+- Five-minute idle cap, foreground reader/dictionary interactions, background/
+  close pause, duplicate lifecycle signals and duration-only paused restoration
+  are covered. Checkpoints never reset idle or drain time; clock regression and
+  overflow fail without mutation. No new dependencies, schema or FFI payloads.
+- PASS: thirteen new domain tests; all 147 data-free workspace Rust tests (76
+  storage), workspace build, fmt, strict Clippy and whitespace. Restore/reboot
+  cases are simulated at the saved-duration boundary; no actual persistence,
+  Android lifecycle or device reboot is claimed. Eleven Full-data tests remain
+  ignored in the workspace run; no Full/Kotlin/JNI/Android rerun for this slice.
+- Split the plan's pure-accounting subtask from the still-unchecked durable
+  pending-time/platform/atomic-completion work. Updated architecture, data model,
+  decisions, development commands and handoff. No emulator/user-file changes.
+- Next: Full pressure and production worker lifecycle/arm64 gate, analyzed import
+  wiring, then pending-page provenance/reflow and occurrence/status/time-aware
+  atomic completion before reader controls. Nostr empty; Q188 before forwarding.

@@ -18,7 +18,7 @@ with functioning rustup can omit the PATH workaround. Do not assume this compile
 is the project's minimum supported version; establish that with dependencies.
 Cargo.lock is retained for reproducible application development.
 Crux 0.20.0 declares Rust 1.90 minimum; the full locked graph has only been tested
-with 1.99.1. Current host baseline: 134 data-free Rust tests (76 storage). Eleven real Full-data
+with 1.99.1. Current host baseline: 147 data-free Rust tests (76 storage). Eleven real Full-data
 fixtures run separately with each loader via tools/test-sudachi.sh (see below).
 
 ## Pure logical pagination checks
@@ -29,6 +29,15 @@ Unicode, combining marks, sentence fallback/quotes, EOF and invalid ownership.
 Workspace build/test/fmt/clippy pass after adding this module. Android renders
 the containing page at the persisted exact offset and global page-length preset.
 Page movement/completion remains next.
+
+## Pure active-time accounting checks
+`cargo test -p yomoku-core --test active_time --all-features --locked --offline`
+runs thirteen domain tests without Android, SQLite or real clocks. They cover
+the exact five-minute idle boundary, interaction/restart after idle, dictionary
+interactions, background/close, duplicate lifecycle signals, checkpoint frequency,
+restoring saved durations with a fresh clock epoch, regression and overflow.
+Restoration/reboot is simulated at the value boundary; platform lifecycle wiring,
+durable pending-page saves and atomic completion-time statistics remain unchecked.
 
 ## Kotlin payload generation
 ```sh

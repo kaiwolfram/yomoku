@@ -48,7 +48,8 @@ position/encounter history. Keep incremental builds green.
 - [ ] Render centered single-column pages, Next/Previous/swipes and content-bottom counter; test both directions update current position and reset scroll on navigation/reopen.
 - [x] Add repository completion command IDs/history and atomic position persistence; test duplicate callbacks count once (also concurrently/after reopen), rereading with a fresh ID counts again, position-only Previous adds no history, failures roll back, and provenance survives deletion. Migration 0005; ten new repository tests pass.
 - [ ] Wire completion intents through core/runtime/FFI with encounters/New→Known/time in the same transaction, then connect Next/Previous/swipes; verify duplicate UI callbacks and rereads end to end. The repository foundation above is not exposed as a forward action yet.
-- [ ] Implement hidden active-time accumulator with five-minute idle timeout; fake-clock tests cover interactions, dictionary popup, background, close/reboot and pending time committed only on completion.
+- [x] Implement pure hidden active-time accounting with five-minute idle timeout; thirteen fake-clock/domain tests cover interactions, dictionary popup, background/close, restored durations with a fresh clock epoch, duplicate lifecycle signals, checkpoints and invalid clocks/overflow. Checkpoints retain pending time without creating statistics; no platform/persistence integration yet.
+- [ ] Persist partial-page active time and wire the accumulator to platform monotonic clock/lifecycle/interactions; verify actual close/reopen/reboot recovery and commit time only with atomic page/post completion. Pure accounting is verified above; page/reflow attribution and durable completion handoff remain open.
 - [ ] Persist finished-at-least-once independently of position; test each finish, reopen at page 1, Finish Book return and completion animation.
 
 ## 3 — Analysis, vocabulary and dictionary

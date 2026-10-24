@@ -1016,3 +1016,27 @@ This remains repository-only work while actual Full reclamation and production
 worker ownership are unresolved. Android still uses text-only raw creation.
 Production import integration must adopt the deduplicating entry point after the
 gate; file import formats, summary/cancellation and completion/time remain open.
+
+## 2026-10-24 — Pure active-time accounting before completion integration
+Continue the independent phase-2 active-time prerequisite while Full pressure and
+hardware measurements remain open. Add a pure domain accumulator with existing
+dependencies, without attaching an incomplete timer to the production reader.
+The caller supplies monotonic milliseconds; elapsed time is capped five minutes
+after the last interaction. Opening/resuming starts an idle window; duplicate
+resume notifications do not extend it. Any foreground reader/dictionary
+interaction resets idle, including after timeout, without backfilling idle time.
+Background/close settles the interval and pauses; interactions while paused do
+not restart it. No periodic callback is needed for accurate idle capping.
+
+Checkpoint settles elapsed time without pausing, resetting idle or draining time.
+Use nonnegative i64 milliseconds for the pending duration, compatible with future
+SQLite integer persistence. Restore only that duration, always paused, never the
+monotonic clock epoch/running state: time away must not count across reopen/reboot.
+Reject clock regression/overflow before mutation rather than clamping corrupt
+values. Use timestamp differences to avoid idle-deadline overflow.
+
+Thirteen domain tests verify these rules, including simulated restart/reboot with
+a fresh clock epoch. No schema, FFI payload, app route or Android timer is added.
+Durable page attribution/reflow, lifecycle/interactions and completion integration
+stay unchecked. Freeze time with the future completion command ID and commit it
+with occurrences/New→Known/position; checkpoints are never reading statistics.

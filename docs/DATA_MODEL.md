@@ -362,6 +362,24 @@ Japanese occurrences, New→Known/status events and accumulated active time. Do 
 use absent occurrence/time data as completed-reading statistics. Final EOF alone
 does not implement finished-at-least-once, Finish Book or reopen-at-page-1 behavior.
 
+## Pending active-time domain values (no migration yet)
+`active_time::PendingReadingTime` validates nonnegative signed 64-bit milliseconds.
+`ActiveReadingTime` accepts caller-supplied monotonic u64 milliseconds; it owns no
+clock or I/O. Each foreground interval counts until five minutes after the last
+interaction. Interactions restart counting after idle without counting the gap;
+dictionary interactions use the same path. Background/reader close pauses, and
+opening/resuming starts a new idle window. Duplicate resume signals do not extend
+an existing idle window. Checkpoints account elapsed time without resetting idle
+or draining the pending total. Clock regression and overflow leave state unchanged.
+
+Only the accumulated duration may cross a process/reboot boundary: restoring it
+starts paused without saved monotonic timestamps or inferred time away. Tests
+simulate checkpoint/restore with fresh clock epochs; there is no durable pending
+time repository or actual Android close/reboot verification yet. The future
+repository must bind pending time to page/post provenance, handle reflow, and
+freeze the duration with its completion ID before committing it atomically with
+encounters/status/position. Checkpoints alone must never contribute to statistics.
+
 ## Transient application state
 `app::Destination` is Library (default), Nostr, Statistics or Vocabulary.
 `Model` owns the selected destination; `ViewModel` projects it for the shell.

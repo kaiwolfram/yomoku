@@ -25,6 +25,14 @@ whitespace may be omitted between tokens. Separate global/local boundary edits
 partition a selected exact span; they cannot edit lemmas or source text.
 Application vocabulary commands remain future work.
 
+Pure `active_time` accounts pending reading milliseconds using caller-supplied
+monotonic timestamps. Resume/interaction arms a five-minute idle window; dictionary
+interactions count, while background/reader-close pause. Checkpoints neither reset
+idle nor drain time. Only a validated nonnegative signed duration can be restored;
+restoration starts paused with no old clock epoch. This module is not connected to
+the application model, platform lifecycle, SQLite or statistics yet. Durable page
+attribution and atomic completion/time handoff remain separate work.
+
 `yomoku-analysis` is a separate Rust I/O adapter using Sudachi.rs v0.7.0 at
 `5de0410b6edfd428fc510cc9763440772e9619d5` and Full 20261015 (V1). Its constructor
 checks the exact dictionary SHA-256 before giving owned immutable bytes or a
