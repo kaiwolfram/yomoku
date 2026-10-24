@@ -174,7 +174,7 @@ fn internal_storage_results_cannot_be_injected_over_ffi() {
     // The skipped internal variant follows the final public variant. Derive its
     // discriminant so adding a public event cannot silently weaken this check.
     let mut last_public = Vec::new();
-    BincodeFfiFormat::serialize(&mut last_public, &Event::DismissImportSummary).unwrap();
+    BincodeFfiFormat::serialize(&mut last_public, &Event::RetryReadingTimeCheckpoint).unwrap();
     let internal_tag = u32::from_le_bytes(last_public.try_into().unwrap()) + 1;
     assert_eq!(
         native.update(&internal_tag.to_le_bytes()),
@@ -210,4 +210,127 @@ fn blocked_sqlite_write_does_not_block_dispatch_view_or_navigation() {
     callbacks.recv_timeout(Duration::from_secs(10)).unwrap();
     assert_eq!(view(&native).documents.len(), 1);
     assert!(!view(&native).storage_busy);
+}
+
+#[test]
+fn async_time_checkpoints_retry_exact_payload_and_restore_each_offset_after_reopen() {
+    use yomoku_core::{
+        active_time::PendingReadingTime,
+        pagination::{PageLength, ReadingPosition},
+    };
+    let db = Database::new();
+    std::fs::create_dir(&db.0).unwrap();
+    let (native, callbacks, _) = bridge(&db.path());
+    let text = format!("{}\n次の段落。", "𠮷".repeat(500));
+    let created = dispatch(&native, &callbacks, Event::CreatePaste(text));
+    let id = created.documents[0].document_id;
+    let opened = dispatch(&native, &callbacks, Event::OpenReader(id));
+    assert!(opened.reader_time.is_none());
+    let sql = rusqlite::Connection::open(db.path()).unwrap();
+    assert_eq!(
+        sql.query_row("SELECT count(*) FROM pending_reading_time", [], |row| row
+            .get::<_, i64>(
+            0
+        ))
+        .unwrap(),
+        0
+    );
+    sql.execute_batch("CREATE TRIGGER fail_time_restore BEFORE INSERT ON pending_reading_time BEGIN SELECT RAISE(ABORT, 'injected'); END").unwrap();
+    let failed = dispatch(&native, &callbacks, Event::RestoreReadingTime);
+    assert_eq!(failed.document_error, Some(DocumentError::Unavailable));
+    assert!(failed.reader_time.is_none());
+    sql.execute_batch("DROP TRIGGER fail_time_restore").unwrap();
+    let restored = dispatch(&native, &callbacks, Event::RestoreReadingTime);
+    let mut checkpoint = restored.reader_time.unwrap();
+    assert_eq!(checkpoint.pending.milliseconds(), 0);
+    checkpoint.pending = PendingReadingTime::from_millis(500).unwrap();
+    sql.execute_batch("CREATE TRIGGER fail_time_save BEFORE UPDATE ON pending_reading_time BEGIN SELECT RAISE(ABORT, 'injected'); END").unwrap();
+    let failed = dispatch(
+        &native,
+        &callbacks,
+        Event::CheckpointReadingTime(checkpoint),
+    );
+    assert_eq!(failed.document_error, Some(DocumentError::Unavailable));
+    assert!(failed.reading_time_save_pending);
+    assert_eq!(failed.reader_time.unwrap().pending.milliseconds(), 0);
+    sql.execute_batch("DROP TRIGGER fail_time_save").unwrap();
+    let retried = dispatch(&native, &callbacks, Event::RetryReadingTimeCheckpoint);
+    assert_eq!(retried.reader_time, Some(checkpoint));
+    assert!(!retried.reading_time_save_pending);
+    // Repeated absolute checkpoint delivery cannot add time twice.
+    let repeated = dispatch(
+        &native,
+        &callbacks,
+        Event::CheckpointReadingTime(checkpoint),
+    );
+    assert_eq!(repeated.reader_time, Some(checkpoint));
+    let first = opened.reader.unwrap();
+    let second_position = ReadingPosition {
+        offset: first.anchor.range.end,
+        ..first.position
+    };
+    let moved = dispatch(
+        &native,
+        &callbacks,
+        Event::SaveReadingPosition(second_position),
+    );
+    assert!(moved.reader_time.is_none());
+    let mut second = dispatch(&native, &callbacks, Event::RestoreReadingTime)
+        .reader_time
+        .unwrap();
+    assert_eq!(second.pending.milliseconds(), 0);
+    second.pending = PendingReadingTime::from_millis(700).unwrap();
+    dispatch(&native, &callbacks, Event::CheckpointReadingTime(second));
+    dispatch(
+        &native,
+        &callbacks,
+        Event::SaveReadingPosition(first.position),
+    );
+    assert_eq!(
+        dispatch(&native, &callbacks, Event::RestoreReadingTime).reader_time,
+        Some(checkpoint)
+    );
+    // Reflow changes page membership without changing either anchor's duration.
+    let mut bytes = Vec::new();
+    BincodeFfiFormat::serialize(&mut bytes, &Event::OpenSettings).unwrap();
+    native.update(&bytes).unwrap();
+    assert_eq!(
+        dispatch(
+            &native,
+            &callbacks,
+            Event::SetPageLength(PageLength::Characters1500)
+        )
+        .reader_time,
+        Some(checkpoint)
+    );
+    drop(native);
+    assert!(callbacks.recv_timeout(Duration::from_secs(10)).is_err());
+    let (reopened, callbacks, _) = bridge(&db.path());
+    let opened = dispatch(&reopened, &callbacks, Event::OpenReader(id));
+    assert!(opened.reader_time.is_none());
+    assert_eq!(
+        dispatch(&reopened, &callbacks, Event::RestoreReadingTime).reader_time,
+        Some(checkpoint)
+    );
+    assert_eq!(
+        sql.query_row(
+            "SELECT sum(milliseconds) FROM pending_reading_time",
+            [],
+            |row| row.get::<_, i64>(0)
+        )
+        .unwrap(),
+        1200
+    );
+    for table in [
+        "reading_completions",
+        "reading_occurrences",
+        "vocabulary_status_events",
+    ] {
+        assert_eq!(
+            sql.query_row(&format!("SELECT count(*) FROM {table}"), [], |row| row
+                .get::<_, i64>(0))
+                .unwrap(),
+            0
+        );
+    }
 }

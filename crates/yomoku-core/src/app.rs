@@ -8,6 +8,7 @@ use crux_core::{
 use serde::{Deserialize, Serialize};
 
 use crate::{
+    active_time::{ReadingTimeUpdate, SavedReadingTime},
     document::{DocumentId, LibraryDocument, PastedDocument},
     pagination::{PageLength, ReadingPosition},
     reader::{ReaderAnalysis, ReaderPage},
@@ -69,6 +70,9 @@ pub struct Model {
     reader_document: Option<PastedDocument>,
     page_length: Option<PageLength>,
     import_summary: Option<ImportSummary>,
+    reader_time: Option<SavedReadingTime>,
+    restoring_reader_time: bool,
+    pending_time_checkpoint: Option<StorageOperation>,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -88,6 +92,11 @@ pub enum Event {
     SaveReadingPosition(ReadingPosition),
     SetPageLength(PageLength),
     DismissImportSummary,
+    /// Explicit preparation for the platform timer; opening itself stays read-only.
+    RestoreReadingTime,
+    CheckpointReadingTime(ReadingTimeUpdate),
+    /// Retry the frozen absolute checkpoint, including its original revision.
+    RetryReadingTimeCheckpoint,
     #[serde(skip)]
     #[cfg_attr(feature = "facet_typegen", facet(skip))]
     StorageFinished(StorageResult),
@@ -109,6 +118,10 @@ pub struct ViewModel {
     /// None until persisted settings have been loaded successfully.
     pub page_length: Option<PageLength>,
     pub import_summary: Option<ImportSummary>,
+    /// Only the committed duration at the current exact reading offset.
+    pub reader_time: Option<ReadingTimeUpdate>,
+    /// Remains true after a failed checkpoint until its exact retry succeeds.
+    pub reading_time_save_pending: bool,
 }
 
 #[effect]
@@ -128,6 +141,38 @@ impl App for Yomoku {
 
     fn update(&self, event: Event, model: &mut Model) -> Command<Effect, Event> {
         let operation = match &event {
+            Event::RestoreReadingTime => {
+                let Some(reader) = model.reader.as_ref() else {
+                    return Command::done();
+                };
+                if model.reader_time.is_some() {
+                    return Command::done();
+                }
+                Some(StorageOperation::LoadReadingTime {
+                    document_id: reader.document_id,
+                    position: reader.position,
+                })
+            }
+            Event::CheckpointReadingTime(checkpoint) => {
+                let Some(previous) = model.reader_time else {
+                    return Command::done();
+                };
+                if !model.is_current_time(*checkpoint)
+                    || checkpoint.pending.milliseconds() < previous.pending().milliseconds()
+                {
+                    return Command::done();
+                }
+                Some(StorageOperation::SaveReadingTime {
+                    previous,
+                    checkpoint: *checkpoint,
+                })
+            }
+            Event::RetryReadingTimeCheckpoint => {
+                let Some(operation) = model.pending_time_checkpoint.clone() else {
+                    return Command::done();
+                };
+                Some(operation)
+            }
             Event::RefreshLibrary => Some(StorageOperation::List),
             Event::CreatePaste(text) => Some(StorageOperation::CreatePaste(text.clone())),
             Event::LoadPaste(id) | Event::OpenReader(id) => Some(StorageOperation::LoadPaste(*id)),
@@ -158,9 +203,17 @@ impl App for Yomoku {
         if let Some(operation) = operation {
             // One in-flight command per session prevents duplicate submissions and
             // stale load/list callbacks from replacing a newer snapshot.
-            if model.storage_busy {
+            if model.storage_busy
+                || (model.pending_time_checkpoint.is_some()
+                    && !matches!(event, Event::RetryReadingTimeCheckpoint))
+            {
                 return Command::done();
             }
+            if matches!(operation, StorageOperation::SaveReadingTime { .. }) {
+                model.pending_time_checkpoint = Some(operation.clone());
+            }
+            model.restoring_reader_time =
+                matches!(operation, StorageOperation::LoadReadingTime { .. });
             model.storage_busy = true;
             model.document_error = None;
             if matches!(event, Event::CreatePaste(_) | Event::OpenReader(_)) {
@@ -180,6 +233,7 @@ impl App for Yomoku {
                 model.reader = None;
                 model.reader_analysis = None;
                 model.reader_document = None;
+                model.reader_time = None;
             }
             return render::render()
                 .and(Command::request_from_shell(operation).then_send(Event::StorageFinished));
@@ -194,6 +248,7 @@ impl App for Yomoku {
                 model.reader_analysis = None;
                 model.reader_document = None;
                 model.pending_reader = None;
+                model.clear_reader_time();
             }
             Event::OpenPaste => {
                 model.import_summary = None;
@@ -204,6 +259,7 @@ impl App for Yomoku {
                 model.reader_analysis = None;
                 model.reader_document = None;
                 model.pending_reader = None;
+                model.clear_reader_time();
                 model.document_error = None;
             }
             Event::CloseDocument => {
@@ -212,6 +268,7 @@ impl App for Yomoku {
                 model.reader_analysis = None;
                 model.reader_document = None;
                 model.pending_reader = None;
+                model.clear_reader_time();
                 model.document_error = None;
             }
             Event::OpenSettings => model.settings_open = true,
@@ -219,6 +276,7 @@ impl App for Yomoku {
             Event::DismissImportSummary => model.import_summary = None,
             Event::StorageFinished(result) => {
                 model.storage_busy = false;
+                let restoring_time = std::mem::take(&mut model.restoring_reader_time);
                 let pending_reader = model.pending_reader.take();
                 let import_outcome = match &result {
                     StorageResult::Created(_) => Some(ImportOutcome::Created),
@@ -231,6 +289,17 @@ impl App for Yomoku {
                         model.apply_page_length(length);
                     }
                     StorageResult::PageLengthSaved(length) => model.apply_page_length(length),
+                    StorageResult::ReadingTimeLoaded(saved) => {
+                        if restoring_time && model.is_current_time(saved.value) {
+                            model.reader_time = Some(saved);
+                        }
+                    }
+                    StorageResult::ReadingTimeSaved(saved) => {
+                        model.pending_time_checkpoint = None;
+                        if model.is_current_time(saved.value) {
+                            model.reader_time = Some(saved);
+                        }
+                    }
                     StorageResult::Created(document) | StorageResult::Existing(document) => {
                         match document.library_summary() {
                             Ok(summary) => {
@@ -258,6 +327,7 @@ impl App for Yomoku {
                         model.reader = None;
                         model.reader_analysis = None;
                         model.reader_document = None;
+                        model.clear_reader_time();
                     }
                     StorageResult::Loaded(snapshot) => {
                         let document = snapshot.document;
@@ -300,6 +370,12 @@ impl App for Yomoku {
                             match ReaderPage::open(&document, model.page_length.unwrap_or_default())
                             {
                                 Ok(reader) => {
+                                    if model.reader_time.is_some_and(|saved| {
+                                        saved.value.document_id != reader.document_id
+                                            || saved.position() != reader.position
+                                    }) {
+                                        model.reader_time = None;
+                                    }
                                     model.reader = Some(reader);
                                     model.reader_document = Some(document.clone());
                                     model.loaded_document = Some(document);
@@ -319,6 +395,9 @@ impl App for Yomoku {
             | Event::OpenReader(_)
             | Event::SetPageLength(_)
             | Event::SaveReadingPosition(_) => unreachable!(),
+            Event::RestoreReadingTime
+            | Event::CheckpointReadingTime(_)
+            | Event::RetryReadingTimeCheckpoint => unreachable!(),
         }
         render::render()
     }
@@ -336,11 +415,27 @@ impl App for Yomoku {
             reader_analysis: model.reader_analysis,
             page_length: model.page_length,
             import_summary: model.import_summary.clone(),
+            reader_time: model.reader_time.map(|saved| saved.value),
+            reading_time_save_pending: model.pending_time_checkpoint.is_some(),
         }
     }
 }
 
 impl Model {
+    fn is_current_time(&self, value: ReadingTimeUpdate) -> bool {
+        self.content_route == ContentRoute::Reader
+            && self.reader.as_ref().is_some_and(|reader| {
+                reader.document_id == value.document_id && reader.position == value.position
+            })
+    }
+
+    fn clear_reader_time(&mut self) {
+        self.reader_time = None;
+        self.restoring_reader_time = false;
+        // Accepted saves still finish on the FIFO. Keep failed saves retryable,
+        // even after closing, before allowing any other storage mutation.
+    }
+
     fn apply_page_length(&mut self, length: PageLength) {
         self.page_length = Some(length);
         if let (Some(reader), Some(document)) = (&self.reader, &self.reader_document) {

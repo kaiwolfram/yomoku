@@ -23,8 +23,9 @@ Yomoku is under active development. The working app supports:
 
 Next/Previous controls, swipes, word lookup and vocabulary controls are still
 pending. The Rust repository atomically saves completion encounters, New→Known
-transitions, active time and position. Application completion actions and Android
-timer wiring remain unfinished. Nostr, Statistics and Vocabulary tabs currently
+transitions, active time and position. Core/worker/FFI pending-time checkpoints
+support exact retries and reopen; application completion actions and Android timer
+wiring remain unfinished. Nostr, Statistics and Vocabulary tabs currently
 show placeholders.
 
 Planned v1 features include EPUB/TXT/SRT imports, offline JMdict/JMnedict lookup,

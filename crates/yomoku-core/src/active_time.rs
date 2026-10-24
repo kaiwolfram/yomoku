@@ -1,14 +1,62 @@
 //! Hidden reading-time accounting. The caller supplies monotonic milliseconds;
 //! this module reads no clock and performs no persistence or statistics writes.
 
+use serde::{Deserialize, Serialize};
+
+use crate::{document::DocumentId, pagination::ReadingPosition};
+
 /// Time without an interaction that can still count as active reading.
 pub const IDLE_TIMEOUT_MS: u64 = 5 * 60 * 1_000;
 
 /// Only this accumulated duration is suitable for a durable partial-page save.
 /// Never persist the accumulator's monotonic timestamps across process/reboot.
 /// Page/post identity and transactional completion belong to the caller.
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+#[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
+#[serde(try_from = "i64", into = "i64")]
 pub struct PendingReadingTime(i64);
+
+impl TryFrom<i64> for PendingReadingTime {
+    type Error = ActiveTimeError;
+
+    fn try_from(value: i64) -> Result<Self, Self::Error> {
+        Self::from_millis(value)
+    }
+}
+
+impl From<PendingReadingTime> for i64 {
+    fn from(value: PendingReadingTime) -> Self {
+        value.milliseconds()
+    }
+}
+
+/// Absolute pending duration at one exact position, never a monotonic timestamp.
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
+pub struct ReadingTimeUpdate {
+    pub document_id: DocumentId,
+    pub position: ReadingPosition,
+    pub pending: PendingReadingTime,
+}
+
+/// Optimistic repository token. Hosts submit durations, never mint revisions.
+/// Storage validates this value against the durable row before every write.
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
+pub struct SavedReadingTime {
+    pub value: ReadingTimeUpdate,
+    pub revision: i64,
+}
+
+impl SavedReadingTime {
+    pub fn pending(self) -> PendingReadingTime {
+        self.value.pending
+    }
+
+    pub fn position(self) -> ReadingPosition {
+        self.value.position
+    }
+}
 
 impl PendingReadingTime {
     pub fn from_millis(milliseconds: i64) -> Result<Self, ActiveTimeError> {

@@ -139,6 +139,27 @@ fn execute(
             .map_err(map_error)?
             .map(StorageResult::PositionSaved)
             .ok_or(DocumentError::NotFound),
+        StorageOperation::LoadReadingTime {
+            document_id,
+            position,
+        } => storage
+            .load_pending_reading_time(document_id, position)
+            .map(StorageResult::ReadingTimeLoaded)
+            .map_err(map_error),
+        StorageOperation::SaveReadingTime {
+            previous,
+            checkpoint,
+        } => {
+            if previous.value.document_id != checkpoint.document_id
+                || previous.position() != checkpoint.position
+            {
+                return Err(DocumentError::InvalidDocument);
+            }
+            storage
+                .save_pending_reading_time(previous, checkpoint.pending)
+                .map(StorageResult::ReadingTimeSaved)
+                .map_err(map_error)
+        }
     }
 }
 

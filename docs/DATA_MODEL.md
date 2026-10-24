@@ -458,7 +458,7 @@ and leaves its time pending. Restore only the destination anchor's accumulator;
 do not seed it with the whole page total. That total may include other anchors.
 
 `load_pending_reading_time` validates ownership/scalar boundaries and reserves a
-zero row if absent. `SavedReadingTime` is an opaque checkpoint token containing
+zero row if absent. `SavedReadingTime` is a pure internal protocol token containing
 the anchor, previous duration and revision. `save_pending_reading_time` saves an
 absolute nondecreasing duration only at the current position. A successful save
 increments revision; an exact immediate retry returns the same result without
@@ -483,9 +483,22 @@ back. Duplicate completion IDs compare the stored duration and never consume
 new reread time or move position, even after content deletion. Historical v1 rows
 receive zero active_time_ms on upgrade; history is retained on document deletion.
 
-This is repository-only paste/page infrastructure. Encounters/New→Known must
-join this transaction before forward navigation is exposed; post identity,
-platform lifecycle/interactions and periodic checkpoint scheduling remain open.
+Core/worker/FFI now expose explicit RestoreReadingTime and anchored absolute
+CheckpointReadingTime intents. The shell receives only ReadingTimeUpdate
+(document/position/duration), without the revision. Core retains the previous
+SavedReadingTime and frozen checkpoint across failures; RetryReadingTimeCheckpoint
+resubmits them unchanged, including after reader exit. Other storage commands
+remain blocked until success. Wrong document/offset and decreasing durations are
+ignored; negative durations fail Serde decoding at FFI. A move clears the restored
+token; reflow and same-offset saves preserve it. A cancelled restore or late save
+cannot attach time to a closed reader. Existing read-only opening is unchanged:
+explicit restore reserves the zero row only when the future timer needs it.
+
+The platform must retry/coalesce busy checkpoints and finish the departing save
+before moving/completing. No automatic clock/lifecycle/interactions, periodic save,
+timer flush on close or completion intent is connected yet. This protocol creates
+no completion, encounter or status events. Migration 0010 already provides the
+analyzed completion transaction; application sequencing and post identity remain open.
 
 ## Transient application state
 `app::Destination` is Library (default), Nostr, Statistics or Vocabulary.
@@ -535,7 +548,7 @@ Submitted writes finish even if the session closes; shutdown does not block UI.
 - Add analyzer dictionary-form links (nullable) to global vocabulary and wire
   registration/status repositories into typed application/import effects.
   Reading never participates in identity.
-- Wire analyzed page completion and pending-time checkpoints into typed core/worker/
+- Wire analyzed page completion and automatic final checkpoints into typed core/worker/
   FFI operations; reread uses a new command ID and frozen analysis identity.
 - Pending page time and current text offset separate from completed events;
   permanent finished-at-least-once separate from current percentage.

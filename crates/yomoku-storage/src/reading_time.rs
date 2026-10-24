@@ -1,31 +1,13 @@
 use rusqlite::{Connection, OptionalExtension, TransactionBehavior};
 use yomoku_core::{
-    active_time::PendingReadingTime,
+    active_time::{PendingReadingTime, ReadingTimeUpdate},
     document::{DocumentId, PastedDocument, TextAnchor, TextOffset},
     pagination::{LogicalPages, PageLength, ReadingPosition},
 };
 
 use crate::{documents::load_paste_in, Storage, StorageError};
 
-/// A durable duration and optimistic checkpoint token for one exact text offset.
-/// Load a fresh token after completion; old tokens cannot resurrect consumed time.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub struct SavedReadingTime {
-    document_id: DocumentId,
-    position: ReadingPosition,
-    pending: PendingReadingTime,
-    revision: i64,
-}
-
-impl SavedReadingTime {
-    pub fn pending(self) -> PendingReadingTime {
-        self.pending
-    }
-
-    pub fn position(self) -> ReadingPosition {
-        self.position
-    }
-}
+pub use yomoku_core::active_time::SavedReadingTime;
 
 impl Storage {
     /// Restore this anchor's accumulator, initially paused with a fresh clock
@@ -70,27 +52,35 @@ impl Storage {
         let transaction = self
             .connection
             .transaction_with_behavior(TransactionBehavior::Immediate)?;
-        let document = load_paste_in(&transaction, previous.document_id)?
+        let document = load_paste_in(&transaction, previous.value.document_id)?
             .ok_or(StorageError::InvalidReadingTime)?;
         let current = document.reading_position.unwrap_or(ReadingPosition {
             source_id: document.chapter.source_id,
             chapter_id: document.chapter.chapter_id,
             offset: TextOffset::START,
         });
-        if current != previous.position || pending.milliseconds() < previous.pending.milliseconds()
+        if previous.revision <= 0
+            || current != previous.value.position
+            || pending.milliseconds() < previous.value.pending.milliseconds()
         {
             return Err(StorageError::InvalidReadingTime);
         }
-        let stored = read_anchor_in(&transaction, previous.document_id, previous.position)?
-            .ok_or(StorageError::InvalidReadingTime)?;
+        let stored = read_anchor_in(
+            &transaction,
+            previous.value.document_id,
+            previous.value.position,
+        )?
+        .ok_or(StorageError::InvalidReadingTime)?;
         let next_revision = previous
             .revision
             .checked_add(1)
             .ok_or(StorageError::InvalidReadingTime)?;
         let saved = SavedReadingTime {
-            pending,
+            value: ReadingTimeUpdate {
+                pending,
+                ..previous.value
+            },
             revision: next_revision,
-            ..previous
         };
         if stored == saved {
             // Exact retry after a committed checkpoint; never write again.
@@ -104,9 +94,9 @@ impl Storage {
             "UPDATE pending_reading_time SET milliseconds = ?4, revision = ?5
              WHERE document_id = ?1 AND chapter_id = ?2 AND byte_offset = ?3",
             (
-                i64::from(previous.document_id),
-                i64::from(previous.position.chapter_id),
-                i64::from(previous.position.offset),
+                i64::from(previous.value.document_id),
+                i64::from(previous.value.position.chapter_id),
+                i64::from(previous.value.position.offset),
                 pending.milliseconds(),
                 next_revision,
             ),
@@ -161,11 +151,13 @@ fn read_anchor_in(
                 return Err(StorageError::InvalidReadingTime);
             }
             Ok(SavedReadingTime {
-                document_id,
-                position,
+                value: ReadingTimeUpdate {
+                    document_id,
+                    position,
+                    pending: PendingReadingTime::from_millis(milliseconds)
+                        .map_err(|_| StorageError::InvalidReadingTime)?,
+                },
                 revision,
-                pending: PendingReadingTime::from_millis(milliseconds)
-                    .map_err(|_| StorageError::InvalidReadingTime)?,
             })
         })
         .transpose()
@@ -216,13 +208,15 @@ pub(crate) fn page_time_in(
             .checked_add(milliseconds)
             .ok_or(StorageError::InvalidReadingTime)?;
         anchors.push(SavedReadingTime {
-            document_id: document.document_id,
-            position: ReadingPosition {
-                source_id: page.source_id,
-                chapter_id: page.chapter_id,
-                offset,
+            value: ReadingTimeUpdate {
+                document_id: document.document_id,
+                position: ReadingPosition {
+                    source_id: page.source_id,
+                    chapter_id: page.chapter_id,
+                    offset,
+                },
+                pending,
             },
-            pending,
             revision,
         });
     }
@@ -247,9 +241,9 @@ pub(crate) fn consume_time_in(
             "UPDATE pending_reading_time SET milliseconds = 0, revision = ?4
              WHERE document_id = ?1 AND chapter_id = ?2 AND byte_offset = ?3",
             (
-                i64::from(saved.document_id),
-                i64::from(saved.position.chapter_id),
-                i64::from(saved.position.offset),
+                i64::from(saved.value.document_id),
+                i64::from(saved.value.position.chapter_id),
+                i64::from(saved.value.position.offset),
                 revision,
             ),
         )?;

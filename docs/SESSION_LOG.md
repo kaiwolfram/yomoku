@@ -917,3 +917,25 @@
   Android clock/lifecycle/interactions, then controls/Finish Book. No migration,
   dependency or legacy forward policy. No instrumentation, standalone Full suite,
   release/probes/tablet/arm64 rerun. No local blocker.
+
+## 2026-10-24 — Explicit pending-time checkpoint transport
+
+- Started clean. Added typed RestoreReadingTime/CheckpointReadingTime/retry intents
+  across core/FIFO worker/generated FFI. Moved the pure saved token to core; SQLite
+  still owns validation/I/O. Opening stays read-only; explicit restore reserves the
+  current offset's token. Only anchor/duration reaches the view, never a revision.
+- Frozen absolute checkpoints retain prior revisions across failure/reader exit;
+  unresolved saves block later storage commands. Wrong/decreasing updates ignore,
+  negative FFI durations reject, late callbacks cannot attach to closed readers.
+  Reflow/same-offset saves preserve time; a changed offset needs fresh restore.
+- PASS: workspace build, 191 data-free Rust tests (102 storage), fmt/strict Clippy,
+  host real-Full Kotlin/JNI with Unicode/analysis exchanges and negative-duration
+  rejection, Kotlin format, both debug APK builds, strict Android lint and diff
+  check. Added three core and one async worker/FFI tests; extended JNI/numeric
+  checks. Initial expected-view/event-tag failures fixed; no open failure.
+- Updated README, plan, decisions, architecture/data model, development and handoff.
+  Next: coalesce/finalize checkpoints before movement/close and freeze analyzed
+  completion intents; then Android clock/lifecycle/interactions/periodic saves and
+  controls/Finish Book. No migration/dependency/legacy forward policy. No device
+  instrumentation, standalone Full suite, release/probe execution/tablet/arm64
+  rerun; actual Android timer/close/reboot remains unverified. No local blocker.

@@ -7,6 +7,8 @@ fn starts_in_library() {
     assert_eq!(
         core.view(),
         ViewModel {
+            reader_time: None,
+            reading_time_save_pending: false,
             destination: Destination::Library,
             settings_open: false,
             documents: vec![],

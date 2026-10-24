@@ -14,6 +14,7 @@ import app.yomoku.shared.ShellEffect
 import app.yomoku.shared.ViewModel
 import app.yomoku.shared.TextOffset
 import app.yomoku.shared.ImportOutcome
+import app.yomoku.shared.PendingReadingTime
 import java.nio.file.Files
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.TimeUnit
@@ -79,6 +80,16 @@ internal fun verifyDocumentBridge() {
             check(page.anchor.range.end.value == text.toByteArray(Charsets.UTF_8).size.toLong())
             check(page.position.offset.value == 0L)
             check(page.pageNumber == 1UL && page.totalPages == 1UL)
+            check(opened.readerTime == null)
+            val initialTime = checkNotNull(listener.dispatch(bridge, Event.RestoreReadingTime).readerTime)
+            check(initialTime.position == page.position && initialTime.pending.value == 0L)
+            val checkpoint = initialTime.copy(pending = PendingReadingTime(321L))
+            val checkpointed = listener.dispatch(bridge, Event.CheckpointReadingTime(checkpoint))
+            check(checkpointed.readerTime == checkpoint && !checkpointed.readingTimeSavePending)
+            val beforeInvalidTime = bridge.view()
+            val invalidTime = Event.CheckpointReadingTime(checkpoint.copy(pending = PendingReadingTime(-1L)))
+            check(runCatching { bridge.update(invalidTime.bincodeSerialize()) }.exceptionOrNull() is FfiError.InvalidEvent)
+            check(bridge.view().contentEquals(beforeInvalidTime))
             var saved = loaded
             for (byte in listOf(text.toByteArray(Charsets.UTF_8).size.toLong(), 5L, 0L, 5L)) {
                 val position = page.position.copy(offset = TextOffset(byte))
@@ -86,6 +97,7 @@ internal fun verifyDocumentBridge() {
                 check(updated.documentError == null)
                 check(updated.reader?.position == position)
                 check(updated.readerAnalysis == analysis)
+                check(updated.readerTime == null)
                 saved = checkNotNull(updated.loadedDocument)
                 check(saved.readingPosition == position)
                 check(updated.documents.single().progressPercent == (byte * 100 / text.toByteArray(Charsets.UTF_8).size).toULong())
@@ -94,6 +106,10 @@ internal fun verifyDocumentBridge() {
             val rejected = listener.dispatch(bridge, Event.SaveReadingPosition(invalid))
             check(rejected.documentError == DocumentError.INVALIDDOCUMENT)
             check(rejected.loadedDocument == saved)
+            val currentTime = checkNotNull(listener.dispatch(bridge, Event.RestoreReadingTime).readerTime)
+            check(currentTime.position == saved.readingPosition && currentTime.pending.value == 0L)
+            val secondCheckpoint = currentTime.copy(pending = PendingReadingTime(654L))
+            check(listener.dispatch(bridge, Event.CheckpointReadingTime(secondCheckpoint)).readerTime == secondCheckpoint)
             bridge.update(Event.OpenSettings.bincodeSerialize())
             for (length in PageLength.entries) {
                 if (ViewModel.bincodeDeserialize(bridge.view()).pageLength == length) continue
@@ -102,11 +118,13 @@ internal fun verifyDocumentBridge() {
                 check(changed.reader?.position == saved.readingPosition)
                 check(changed.readerAnalysis == analysis)
                 check(changed.loadedDocument == saved)
+                check(changed.readerTime == secondCheckpoint)
             }
             bridge.update(Event.CloseSettings.bincodeSerialize())
             bridge.update(Event.CloseDocument.bincodeSerialize())
             check(ViewModel.bincodeDeserialize(bridge.view()).contentRoute == ContentRoute.MAIN)
             check(ViewModel.bincodeDeserialize(bridge.view()).readerAnalysis == null)
+            check(ViewModel.bincodeDeserialize(bridge.view()).readerTime == null)
             val duplicate = listener.dispatch(bridge, Event.CreatePaste(text))
             check(duplicate.documents.single().documentId == id)
             check(duplicate.documents.single().progressPercent > 0UL)
@@ -135,6 +153,9 @@ internal fun verifyDocumentBridge() {
             val opened = reopened.dispatch(bridge, Event.OpenReader(document.documentId))
             check(opened.reader?.text == text)
             check(opened.readerAnalysis == analysis)
+            check(opened.readerTime == null)
+            val restored = checkNotNull(reopened.dispatch(bridge, Event.RestoreReadingTime).readerTime)
+            check(restored.pending.value == 654L && restored.position == document.readingPosition)
             check(unavailableDictionary.calls.get() == 0)
             check(ViewModel.bincodeDeserialize(bridge.view()).reader?.position == document.readingPosition)
         }

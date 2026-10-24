@@ -189,6 +189,8 @@ private fun YomokuPreview() {
                 null,
                 null,
                 null,
+                readerTime = null,
+                readingTimeSavePending = false,
             )
         ) {}
     }

@@ -491,3 +491,211 @@ fn reader_analysis_is_frozen_through_position_settings_and_plain_load_and_cleare
         }
     }
 }
+
+fn restore_time(
+    core: &Core<Yomoku>,
+    milliseconds: i64,
+) -> yomoku_core::active_time::SavedReadingTime {
+    use yomoku_core::active_time::{PendingReadingTime, ReadingTimeUpdate, SavedReadingTime};
+    let reader = core.view().reader.unwrap();
+    let saved = SavedReadingTime {
+        value: ReadingTimeUpdate {
+            document_id: reader.document_id,
+            position: reader.position,
+            pending: PendingReadingTime::from_millis(milliseconds).unwrap(),
+        },
+        revision: 5,
+    };
+    let mut effects = core.process_event(Event::RestoreReadingTime);
+    assert_eq!(
+        storage_operation(&effects),
+        StorageOperation::LoadReadingTime {
+            document_id: reader.document_id,
+            position: reader.position,
+        }
+    );
+    finish(core, &mut effects, StorageResult::ReadingTimeLoaded(saved));
+    saved
+}
+
+fn storage_operation(effects: &[Effect]) -> StorageOperation {
+    effects
+        .iter()
+        .find_map(|effect| match effect {
+            Effect::Storage(request) => Some(request.operation.clone()),
+            _ => None,
+        })
+        .unwrap()
+}
+
+#[test]
+fn checkpoints_freeze_retries_and_block_movement_without_losing_committed_state() {
+    use yomoku_core::active_time::PendingReadingTime;
+    let core = Core::<Yomoku>::new();
+    assert!(core.process_event(Event::RestoreReadingTime).is_empty());
+    assert!(core
+        .process_event(Event::RetryReadingTimeCheckpoint)
+        .is_empty());
+    let mut document = document(&format!("{}\n次。", "𠮷".repeat(500)));
+    let mut effects = core.process_event(Event::OpenReader(document.document_id));
+    finish(
+        &core,
+        &mut effects,
+        loaded(document.clone(), PageLength::default()),
+    );
+    assert!(core.view().reader_time.is_none());
+    let saved = restore_time(&core, 123);
+    assert_eq!(core.view().reader_time, Some(saved.value));
+    assert!(core.process_event(Event::RestoreReadingTime).is_empty());
+    let mut checkpoint = saved.value;
+    checkpoint.pending = PendingReadingTime::from_millis(456).unwrap();
+    let mut effects = core.process_event(Event::CheckpointReadingTime(checkpoint));
+    let frozen = storage_operation(&effects);
+    assert_eq!(
+        frozen,
+        StorageOperation::SaveReadingTime {
+            previous: saved,
+            checkpoint
+        }
+    );
+    assert!(core.view().reading_time_save_pending);
+    assert_eq!(core.view().reader_time, Some(saved.value));
+    assert!(core
+        .process_event(Event::RetryReadingTimeCheckpoint)
+        .is_empty());
+    finish(
+        &core,
+        &mut effects,
+        StorageResult::Failed(DocumentError::Unavailable),
+    );
+    for event in [
+        Event::CheckpointReadingTime(checkpoint),
+        Event::SaveReadingPosition(saved.position()),
+        Event::OpenReader(document.document_id),
+        Event::RefreshLibrary,
+    ] {
+        assert!(core.process_event(event).is_empty());
+    }
+    assert!(core.view().reading_time_save_pending);
+    let mut effects = core.process_event(Event::RetryReadingTimeCheckpoint);
+    assert_eq!(storage_operation(&effects), frozen);
+    assert!(core.view().document_error.is_none());
+    let next = yomoku_core::active_time::SavedReadingTime {
+        value: checkpoint,
+        revision: 6,
+    };
+    finish(&core, &mut effects, StorageResult::ReadingTimeSaved(next));
+    assert_eq!(core.view().reader_time, Some(checkpoint));
+    assert!(!core.view().reading_time_save_pending);
+    // A same-offset save and reflow preserve the duration and revision.
+    core.process_event(Event::OpenSettings);
+    let mut effects = core.process_event(Event::SetPageLength(PageLength::Characters250));
+    finish(
+        &core,
+        &mut effects,
+        StorageResult::PageLengthSaved(PageLength::Characters250),
+    );
+    core.process_event(Event::CloseSettings);
+    assert_eq!(core.view().reader_time, Some(checkpoint));
+    let mut effects = core.process_event(Event::SaveReadingPosition(checkpoint.position));
+    document.reading_position = Some(checkpoint.position);
+    finish(
+        &core,
+        &mut effects,
+        StorageResult::PositionSaved(document.clone()),
+    );
+    assert_eq!(core.view().reader_time, Some(checkpoint));
+    let destination = ReadingPosition {
+        offset: core.view().reader.unwrap().anchor.range.end,
+        ..checkpoint.position
+    };
+    let mut effects = core.process_event(Event::SaveReadingPosition(destination));
+    document.reading_position = Some(destination);
+    finish(&core, &mut effects, StorageResult::PositionSaved(document));
+    assert!(core.view().reader_time.is_none());
+    assert!(core
+        .process_event(Event::CheckpointReadingTime(checkpoint))
+        .is_empty());
+}
+
+#[test]
+fn checkpoint_updates_reject_foreign_anchors_and_decreasing_durations() {
+    use yomoku_core::active_time::PendingReadingTime;
+    let core = Core::<Yomoku>::new();
+    let document = document("𠮷猫。");
+    let mut effects = core.process_event(Event::OpenReader(document.document_id));
+    finish(&core, &mut effects, loaded(document, PageLength::default()));
+    let saved = restore_time(&core, 900);
+    for value in [
+        yomoku_core::active_time::ReadingTimeUpdate {
+            document_id: DocumentId::try_from(2).unwrap(),
+            ..saved.value
+        },
+        yomoku_core::active_time::ReadingTimeUpdate {
+            position: ReadingPosition {
+                offset: TextOffset::try_from(4).unwrap(),
+                ..saved.position()
+            },
+            ..saved.value
+        },
+        yomoku_core::active_time::ReadingTimeUpdate {
+            pending: PendingReadingTime::from_millis(899).unwrap(),
+            ..saved.value
+        },
+    ] {
+        assert!(core
+            .process_event(Event::CheckpointReadingTime(value))
+            .is_empty());
+        assert_eq!(core.view().reader_time, Some(saved.value));
+        assert!(!core.view().reading_time_save_pending);
+    }
+}
+
+#[test]
+fn cancelled_time_restores_and_late_checkpoint_results_never_attach_to_closed_readers() {
+    for exit in [
+        Event::CloseDocument,
+        Event::OpenPaste,
+        Event::SelectDestination(Destination::Vocabulary),
+    ] {
+        let core = Core::<Yomoku>::new();
+        let document = document("𠮷猫。");
+        let mut effects = core.process_event(Event::OpenReader(document.document_id));
+        finish(
+            &core,
+            &mut effects,
+            loaded(document.clone(), PageLength::default()),
+        );
+        let saved = restore_time(&core, 900);
+        core.process_event(exit.clone());
+        assert!(core.view().reader_time.is_none());
+        let mut effects = core.process_event(Event::OpenReader(document.document_id));
+        finish(&core, &mut effects, loaded(document, PageLength::default()));
+        let mut effects = core.process_event(Event::RestoreReadingTime);
+        core.process_event(exit.clone());
+        finish(&core, &mut effects, StorageResult::ReadingTimeLoaded(saved));
+        assert!(core.view().reader_time.is_none());
+    }
+    for fail in [false, true] {
+        let core = Core::<Yomoku>::new();
+        let document = document("𠮷猫。");
+        let mut effects = core.process_event(Event::OpenReader(document.document_id));
+        finish(&core, &mut effects, loaded(document, PageLength::default()));
+        let saved = restore_time(&core, 900);
+        let mut effects = core.process_event(Event::CheckpointReadingTime(saved.value));
+        core.process_event(Event::CloseDocument);
+        if fail {
+            finish(
+                &core,
+                &mut effects,
+                StorageResult::Failed(DocumentError::Unavailable),
+            );
+            assert!(core.view().reading_time_save_pending);
+            effects = core.process_event(Event::RetryReadingTimeCheckpoint);
+        }
+        finish(&core, &mut effects, StorageResult::ReadingTimeSaved(saved));
+        assert!(core.view().reader_time.is_none());
+        assert!(!core.view().reading_time_save_pending);
+        assert_eq!(core.view().content_route, ContentRoute::Main);
+    }
+}

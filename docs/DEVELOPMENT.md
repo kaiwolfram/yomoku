@@ -1218,3 +1218,40 @@ benign Crux shutdown logging, ktfmt JVM Unsafe warning and SDK XML-version warni
 persist. No Android instrumentation, standalone owned/mapped Full fixture suite,
 release APK, probes, tablet or physical-arm64 rerun. Android timer/close/reboot and
 completion/navigation remain unchecked. No schema change or legacy rescan added.
+
+## Explicit pending-time checkpoint transport
+
+Verified 2026-10-24 using the Rust PATH workaround and Android environment above,
+with native generation/build/test runners executed sequentially:
+```sh
+cargo build --workspace --locked --offline
+cargo test --workspace --all-features --locked --offline
+cargo fmt --all -- --check
+cargo clippy --workspace --all-targets --all-features --locked --offline -- -D warnings
+tools/test-kotlin-bridge.sh
+tools/format-kotlin.sh --check
+PATH=/home/kai/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin:$PATH JAVA_HOME=/home/kai/repos/yomoku/.local/jdk-17/jdk-17.0.21+9 GRADLE_USER_HOME=/home/kai/repos/yomoku/.local/gradle ANDROID_HOME=/home/kai/Android/Sdk ./android/gradlew -p android :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug --offline --console=plain
+git diff --check
+```
+PASS: 191 data-free Rust tests (102 storage), workspace build, fmt/strict Clippy,
+real-Full Kotlin/JNI plus seven Unicode/two analysis-state exchanges, Kotlin
+formatting, both-ABI debug/test APK builds and strict lint. Four new tests cover
+core checkpoint state and asynchronous worker/FFI SQLite persistence. Existing
+JNI checks now save/restore distinct offset durations, preserve them through
+reflow and reopen with an unavailable dictionary, and reject negative duration
+payloads without changing state. Rust numeric decoding also checks full i64 range.
+
+Core freezes absolute checkpoints/prior revisions for exact retries, blocks other
+storage operations while unresolved, preserves retries after reader exit and
+ignores cancelled/late visible-state callbacks. Tests inject restore/save SQL
+failures, check repeated saves do not add time, restore offsets independently
+across movement/reopen and confirm no completion/encounter/status history appears.
+Read-only reader opening remains covered by the unchanged repository tests.
+
+Initial checks caught the added fields missing from the expected initial view
+and the FFI rejection test's outdated final public event; both corrected. Existing
+benign Crux JNI shutdown messages and ktfmt JVM Unsafe warnings persist. No open
+failure, dependency or migration change. Gradle passed in the normal sandbox.
+No instrumentation, standalone Full fixture suite, release APK or execution of
+probes/tablet/physical arm64 tests. Automatic timer/lifecycle/periodic/final saves,
+actual Android close/reboot recovery and completion sequencing remain open.

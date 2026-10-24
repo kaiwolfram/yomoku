@@ -1,6 +1,6 @@
 # Resume here
 
-Updated: 2026-10-24. Reader analysis identity restoration verified.
+Updated: 2026-10-24. Explicit pending-time checkpoint transport verified.
 Read AGENTS.md, plan phases 2–4 and PRODUCT_SPEC.md sections 3–4.
 Update docs/commit each verified step. Physical arm64 is the later user trial.
 
@@ -13,60 +13,62 @@ Update docs/commit each verified step. Physical arm64 is the later user trial.
   history, immutable A/B/C anchors, reversible edits, paste SHA-256 and time.
   Analyzed paste atomically deduplicates, saves Mode B and registers surfaces.
   Duplicates reuse oldest live exact match without rescan/progress/status changes.
-- NEW load_reader_snapshot reads document/exact position, preset and original
-  Mode B AnalysisId in one read transaction; core/worker/generated FFI carry it.
-  Earliest stored B stays fixed through reflow/position saves/plain LoadPaste;
-  later profiles/current installed engine never replace it. No token scan/load
-  of Sudachi or writes on open. ReaderAnalysis::Missing explicitly marks legacy
-  absence; still readable. None outside reader; exits/replacements/cancelled
-  loads cannot retain/attach it. Bad header/settings error without fallback/repair.
-  Full token validation remains inside completion. No legacy forward policy yet.
-- NativeBridge requires verified owned FD+1 (zero failure); Rust rehashes/maps
-  that file and closes FD on all paths. No production text-only import fallback.
-  Lazy non-Send analyzer stays on existing FIFO; healthy SQL retries reuse it.
-  onStart permits cache; onStop releases after accepted work except config
-  recreation retains warmth. onCleared drains/closes without joining the UI.
-  Library never eagerly loads Full; immutable publication preserves live inodes.
-- Created/Existing show dismissible Library summary, never open reader.
-  Settings/refresh/recreation retain it; dismissal/tab/new paste/reader clear it.
+- load_reader_snapshot reads document/exact position, preset and earliest stored
+  Mode B AnalysisId in one read-only transaction. No analyzer/token scan/writes.
+  Identity stays fixed through reflow/position/plain loads; reader exit clears it.
+  ReaderAnalysis::Missing explicitly identifies readable legacy absence. Bad
+  headers/settings error without fallback/repair. No legacy forward policy yet.
+- NEW RestoreReadingTime separately reserves an exact-offset revision token on
+  FIFO; CheckpointReadingTime accepts anchored absolute duration. Core retains
+  frozen payload/prior revision on failure; RetryReadingTimeCheckpoint resubmits
+  exactly, even after reader exit. Other storage commands stay blocked until
+  success. View exposes committed anchor/duration plus reading_time_save_pending,
+  never revisions. Negative FFI durations reject; foreign/decreasing saves ignore.
+  Reflow/same-offset saves preserve time; movement clears it for fresh restore.
+  Cancelled restores/late saves cannot attach to closed readers. No history,
+  analyzer load or automatic timer. Busy events are ignored, not queued: next
+  slice must coalesce/finalize checkpoints before moving/closing/completing.
 - Pure active_time takes monotonic ms, five-minute idle cap and interactions;
   restored durations start paused in a fresh epoch. Migration 0009 stores exact
-  offset durations/revisions. All reflow pairs assign each anchor once (boundary
-  following, EOF final). Restore only anchor duration; checkpoint before moving.
+  offset durations/revisions. Reflow assigns each anchor once (boundary following,
+  EOF final). Restore only anchor duration; freeze whole page total for completion.
 - record_analyzed_page_completion freezes AnalysisId + command/page/date/time.
-  Every Japanese repetition retains full anchors/surface/reading/lemma; tokens
-  belong to page containing start. New-only Known events link to command.
-  History/time consumption/encounters/status/position commit together. Recorded
-  returns newly_known; AlreadyRecorded has no repeated effects. Replays validate
-  frozen payload before live content; legacy completion cannot gain encounters.
-  Document deletion retains history; vocabulary deletion cascades its history.
-  Later completion registers only absent departing-page surfaces. Base analyses
-  only; effective override resolution and app completion intents remain open.
+  Every Japanese repetition retains anchors/surface/reading/lemma; tokens belong
+  to page containing start. New-only Known events link to command. History/time
+  consumption/encounters/status/position commit together. Recorded returns
+  newly_known; AlreadyRecorded repeats nothing. Replay validates frozen payload
+  before live content. Deletion preserves document history; vocabulary deletion
+  cascades its history. Only absent departing-page surfaces register on completion.
+  Base analyses only; effective override resolution/completion intents remain open.
+- NativeBridge requires verified owned FD+1 (zero failure); Rust rehashes/maps and
+  closes FD on every path. No production text-only fallback. Lazy non-Send analyzer
+  stays on FIFO; healthy SQL retries reuse it. onStart permits cache; onStop releases
+  after accepted work, except recreation retains warmth. onCleared drains/closes
+  without joining UI. Library never eagerly loads Full; live inodes immutable.
+- Created/Existing show dismissible Library summary, never open reader. Settings/
+  refresh/recreation retain it; dismissal/tab/new paste/reader clear it.
 - Sudachi.rs v0.7.0/android-loader-v1 + Full 20261015 pinned; 138 files verified.
-  Full stays outside Git; APK bundles dictionary/notices. Prior emulator pressure/
-  death results: SUDACHI_MEASUREMENTS.md. No physical-arm64/LMKD claim.
-- Paste content/IDs/provenance immutable; no inferred TXT chapters. File imports
-  must hash original bytes. No dictionary/vocabulary/override UI yet.
+  Full outside Git; APK bundles data/notices. Measurements: SUDACHI_MEASUREMENTS.md.
+  No physical-arm64/LMKD claim. Paste content/IDs/provenance immutable; no inferred
+  TXT chapters. File imports must hash original bytes. No dictionary/vocab/edit UI.
 
 ## Next tasks (ordered)
-1. Wire core/FIFO-worker/FFI pending-time checkpoints and analyzed completion
-   intents using the restored analysis ID; freeze command IDs/time across retries,
-   preserve ordering, return newly_known only on new success. Handle Missing
-   explicitly before completing a legacy page; no automatic import rescan exists.
-2. Connect Android monotonic clock/lifecycle/interactions and periodic saves;
-   verify close/reopen/reboot, then Next/Previous/swipes and Finish Book.
+1. Sequence/coalesce final checkpoints and analyzed completion intents through
+   core/FIFO/FFI. Freeze command IDs/timestamp/page total/AnalysisId across retries;
+   return newly_known only on new success. Handle Missing explicitly, no rescan.
+2. Connect Android monotonic clock/lifecycle/interactions/periodic saves and flush
+   on close; verify close/reopen/reboot, then Next/Previous/swipes and Finish Book.
 3. User-run physical arm64 validation once usable. Formats/CI remain open.
 
 ## Verification / environment
-- PASS: workspace build, 187 data-free Rust tests (102 storage), fmt/strict Clippy,
-  host real-Full Kotlin/JNI, seven Unicode + two analysis-state codec exchanges,
-  Kotlin format, Android debug/test APK builds and strict lint, diff check.
-  Tests cover original-profile selection, missing/foreign modes, corrupt headers,
-  read-only opening, exact position/preset/reopen, frozen/cleared core state and
-  no analyzer load on worker/JNI reopen. Prior benign Crux JNI shutdown logs and
-  SDK XML warning persist. No open failure/dependency change. No instrumentation,
-  standalone Full fixtures, release/probes/tablet/arm64 rerun for this slice.
-- Commands/env: DEVELOPMENT.md (latest section). Rust PATH workaround; native
-  builds/generation/tests must run sequentially. Never modify Full while mapped.
-  Gradle/ADB may need socket escalation; swangle fallback is documented.
+- PASS: workspace build, 191 data-free Rust tests (102 storage), fmt/strict Clippy,
+  real-Full Kotlin/JNI with seven Unicode/two analysis exchanges, negative-duration
+  rejection, Kotlin format, Android debug/test APK builds and strict lint, diff
+  check. Core/worker/FFI/JNI cover retries, ordering, cancellation, offset restoration
+  and reopen without dictionary loading. No open check failure/dependency/schema
+  change. Prior benign Crux shutdown/JVM Unsafe warnings persist.
+- No instrumentation, standalone Full suite, release/probes/tablet/arm64 rerun.
+  Actual Android timer/close/reboot remains unverified. Commands: DEVELOPMENT.md
+  latest section; Rust PATH workaround. Native builds/generation/tests sequential.
+  Never modify mapped Full. Gradle/ADB may need socket escalation; swangle documented.
 - Nostr config empty; ask Q188 before forwarding. No local reader blocker.

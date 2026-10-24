@@ -1273,3 +1273,27 @@ results; clear it on reader exit/replacement. Expose it in the generated view
 protocol for the upcoming completion intents. No migration, dependency, product
 feature or selected-override behavior is added. Timer checkpoints, forward intents
 and the eventual legacy-completion policy remain unfinished.
+
+## 2026-10-24 — Explicit pending-time checkpoint intents
+
+Move SavedReadingTime's pure anchor/duration/revision value into core's active_time
+protocol (reexported by storage), retaining SQLite validation and revision semantics.
+Expose RestoreReadingTime separately from OpenReader so opening stays read-only;
+the future platform timer requests the exact offset's accumulator when ready.
+The view carries only document/position/duration, never a revision or clock epoch.
+Negative milliseconds fail Rust Serde decoding; foreign anchors and decreasing
+checkpoints are ignored in core before I/O.
+
+Freeze the absolute checkpoint and previous revision when accepted. On failure,
+RetryReadingTimeCheckpoint resubmits that same payload; other storage operations
+remain blocked until it succeeds. Reader exit clears visible timer state but keeps
+this retry obligation. Accepted writes finish on the existing FIFO; late callbacks
+cannot reopen/attach time to a closed reader. Same-offset position saves and reflow
+preserve the token, while a different offset needs a fresh restore. Checkpoints
+create no history/status/encounter events, and no analyzer is loaded.
+
+This is transport/state preparation, not automatic active-time tracking. The next
+slice must sequence/coalesce checkpoints while busy, flush before movement/close,
+freeze analyzed completion IDs/time across retries, and then connect Android's
+monotonic clock/lifecycle/interactions/periodic saves. No dependency, migration,
+legacy completion policy or new product behavior is introduced.

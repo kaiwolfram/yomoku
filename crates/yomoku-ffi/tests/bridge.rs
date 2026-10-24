@@ -83,11 +83,16 @@ fn bridge_instances_have_independent_state() {
 
 #[test]
 fn document_values_reject_invalid_numbers_when_decoding_ffi_payloads() {
+    use yomoku_core::active_time::PendingReadingTime;
     use yomoku_core::document::{ChapterId, DocumentId, SourceId, TextOffset};
 
     for value in [i64::MIN, -1, 0, 1, (1 << 53) + 1, i64::MAX] {
         let mut bytes = Vec::new();
         BincodeFfiFormat::serialize(&mut bytes, &value).unwrap();
+        assert_eq!(
+            BincodeFfiFormat::deserialize::<PendingReadingTime>(&bytes).is_ok(),
+            value >= 0
+        );
         assert_eq!(
             BincodeFfiFormat::deserialize::<DocumentId>(&bytes).is_ok(),
             value > 0
