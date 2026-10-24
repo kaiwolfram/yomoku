@@ -28,6 +28,7 @@
     <string name="next_page">Next</string>
     <string name="words_marked_known">%1$s new words marked as Known</string>
     <string name="reading_progress">%1$d%%</string>
+    <string name="finished_at_least_once">Finished at least once</string>
     <string name="error_empty_paste">Enter some text to import.</string>
     <string name="error_storage_unavailable">Storage is unavailable. Please try again.</string>
     <string name="error_incompatible_database">This database version cannot be opened.</string>

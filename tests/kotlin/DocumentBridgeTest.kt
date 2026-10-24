@@ -184,6 +184,10 @@ internal fun verifyDocumentBridge() {
             val notice = checkNotNull(completed.completionNotice)
             check(notice.newlyKnown > 0UL && notice.commandId.value > 0L)
             check(completed.reader?.position?.offset == page.anchor.range.end)
+            check(completed.reader.finishedAtLeastOnce)
+            check(completed.loadedDocument?.finishedAtLeastOnce == true)
+            check(completed.documents.single().finishedAtLeastOnce)
+            check(completed.documents.single().progressPercent == 100UL)
             val committedView = bridge.view()
             bridge.update(request.bincodeSerialize()) // Late duplicate retains the committed view.
             bridge.update(Event.RetryReaderCompletion.bincodeSerialize())
@@ -194,8 +198,24 @@ internal fun verifyDocumentBridge() {
             check(reopened.dispatch(bridge, Event.RestoreReadingTime).readerTime?.pending?.value == 0L)
             val reread = reopened.dispatch(bridge, request.copy(completedAtUnixMs = 5678L), callbackCount = 2)
             check(reread.documentError == null && reread.completionNotice == null)
+            check(reread.reader?.finishedAtLeastOnce == true)
             check(unavailableDictionary.calls.get() == 0) // Stored analysis, no Sudachi reopen/rescan.
 
+        }
+        val finishedListener = DocumentListener()
+        NativeBridge(database.path, finishedListener, unavailableDictionary).use { bridge ->
+            val summary = finishedListener.dispatch(bridge, Event.RefreshLibrary).documents.single()
+            check(summary.finishedAtLeastOnce && summary.progressPercent == 100UL)
+            val loaded = checkNotNull(finishedListener.dispatch(bridge, Event.LoadPaste(document.documentId)).loadedDocument)
+            check(loaded.finishedAtLeastOnce)
+            check(loaded.readingPosition?.offset?.value == text.toByteArray(Charsets.UTF_8).size.toLong())
+            val opened = finishedListener.dispatch(bridge, Event.OpenReader(document.documentId))
+            check(opened.reader?.position?.offset?.value == 0L)
+            check(opened.reader.finishedAtLeastOnce && opened.reader.pageNumber == 1UL)
+            check(opened.documents.single().finishedAtLeastOnce && opened.documents.single().progressPercent == 0UL)
+            check(opened.readerAnalysis == analysis)
+            check(finishedListener.dispatch(bridge, Event.LoadPaste(document.documentId)).loadedDocument == opened.loadedDocument)
+            check(unavailableDictionary.calls.get() == 0)
         }
         val failure = DocumentListener()
         NativeBridge(directory.resolve("missing/db.sqlite3").path, failure, HostDictionary()).use { bridge ->

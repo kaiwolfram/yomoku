@@ -8,8 +8,10 @@ OpenPaste/CloseDocument and SelectDestination/OpenSettings/CloseSettings
 remain synchronous. RefreshLibrary/CreatePaste/LoadPaste/SaveReadingPosition/
 SetPageLength emit StorageOperation; only one storage command is accepted at a time, while navigation
 stays available.
-OpenReader uses the same load operation but tracks the requested document until
-its callback; leaving the route cancels opening without cancelling submitted I/O.
+OpenReader has a separate storage operation that atomically resets finished books
+to page 1, retaining the permanent marker and pending durations. It tracks the
+requested document until its callback; leaving the route cancels opening without
+cancelling submitted I/O, including an accepted reset. LoadPaste stays read-only.
 Successful paste creation returns to Library without opening the reader.
 StorageFinished is internal: both Serde and Facet skip it, so hosts cannot inject
 storage results. No SQL, paths, threads or platform I/O enter core.
@@ -35,7 +37,7 @@ stale/duplicate checkpoints. Reflow assigns each offset to its containing page;
 completion consumes that page's frozen total with history/position in one commit.
 Core now exposes explicit RestoreReadingTime, CheckpointReadingTime and
 RetryReadingTimeCheckpoint intents. Restore reserves the exact offset's token on
-the FIFO; it is separate from read-only reader opening. SavedReadingTime is a pure
+the FIFO; it is separate from reader snapshot loading. SavedReadingTime is a pure
 protocol value validated against SQLite; only its anchored duration reaches the
 shell view. Core freezes the checkpoint plus prior revision until success, blocks
 other storage commands while unresolved. Newer same-anchor absolute updates during
@@ -194,8 +196,10 @@ existing frozen analyzed completion. Both directions reset scroll; controls and
 the counter sit below content. Settings reflow keeps the exact position and Library percentage;
 only committed values change the preset/page. An independent active-document
 snapshot prevents repository loads from changing the text used for reader reflow.
-Opening now loads content/position, the preset and the original stored Mode B
-AnalysisId in one read transaction. The earliest Mode B snapshot is pinned,
+Reader snapshots load content/position, permanent finish state, the preset and the
+original stored Mode B AnalysisId together. Plain loads use a read transaction;
+explicit reader entry uses an immediate transaction for its finished-book reset.
+The earliest Mode B snapshot is pinned,
 independent of the installed engine/dictionary or later snapshots. Only its
 header is read; completion still validates tokens and anchors transactionally.
 ReaderAnalysis::Missing explicitly identifies legacy content with no Mode B base;
@@ -408,8 +412,10 @@ exact retries now run through core/FIFO/FFI. Android monotonic lifecycle/interac
 and native drain are connected. Page movement/swipes and positive-count toast
 rendering are connected. Migration 0011 persists a permanent finish boolean with
 final-page completion, independent of position, and backfills live pastes from EOF
-history. Its storage-only getter distinguishes absent documents; Library/reader
-projection, reopen-at-page-1, Finish Book and confetti remain next, while
+history. Library/document/reader projections carry it through generated FFI;
+Android shows an accessible checkmark independent of the current percentage.
+Explicit reopening persists page 1, while completion reloads and retained Activity
+recreation preserve the active position. Finish Book and confetti remain next, while
 effective segmentation edits and statistics aggregation remain
 separate tasks. Add analysis/import crates only with
 actual behavior; Sudachi Full defaults to B, JMdict/JMnedict remain offline data, and future Nostr I/O stays in Rust. Configuration is empty.

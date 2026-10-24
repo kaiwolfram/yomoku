@@ -371,7 +371,8 @@ impl App for Yomoku {
             }
             Event::RefreshLibrary => Some(StorageOperation::List),
             Event::CreatePaste(text) => Some(StorageOperation::CreatePaste(text.clone())),
-            Event::LoadPaste(id) | Event::OpenReader(id) => Some(StorageOperation::LoadPaste(*id)),
+            Event::LoadPaste(id) => Some(StorageOperation::LoadPaste(*id)),
+            Event::OpenReader(id) => Some(StorageOperation::OpenReader(*id)),
             Event::SetPageLength(length) => {
                 if !model.settings_open
                     || model.page_length.is_none()
@@ -619,6 +620,7 @@ impl App for Yomoku {
                     }
                     StorageResult::Loaded(snapshot) => {
                         let document = snapshot.document;
+                        model.update_library(&document);
                         model.apply_page_length(snapshot.page_length);
                         if pending_reader == Some(document.document_id)
                             && model.content_route == ContentRoute::Reader
@@ -730,18 +732,7 @@ impl Model {
     }
 
     fn apply_position(&mut self, document: PastedDocument) {
-        match document.library_summary() {
-            Ok(summary) => {
-                if let Some(entry) = self
-                    .documents
-                    .iter_mut()
-                    .find(|entry| entry.document_id == document.document_id)
-                {
-                    *entry = summary;
-                }
-            }
-            Err(_) => self.document_error = Some(DocumentError::InvalidDocument),
-        }
+        self.update_library(&document);
         if self.content_route == ContentRoute::Reader
             && self
                 .reader
@@ -763,6 +754,21 @@ impl Model {
                 }
                 Err(_) => self.document_error = Some(DocumentError::InvalidDocument),
             }
+        }
+    }
+
+    fn update_library(&mut self, document: &PastedDocument) {
+        match document.library_summary() {
+            Ok(summary) => {
+                if let Some(entry) = self
+                    .documents
+                    .iter_mut()
+                    .find(|entry| entry.document_id == document.document_id)
+                {
+                    *entry = summary;
+                }
+            }
+            Err(_) => self.document_error = Some(DocumentError::InvalidDocument),
         }
     }
 

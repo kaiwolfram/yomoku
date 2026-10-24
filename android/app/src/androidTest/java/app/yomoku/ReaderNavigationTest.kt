@@ -189,6 +189,85 @@ class ReaderNavigationTest {
     }
 
     @Test
+    fun finishCheckmarkPersistsThroughRetryRecreationAndRereadsWhileReopeningResetsPosition() {
+        val id = openDocument()
+        database().use { db ->
+            assertTrue(!core().view.reader!!.finishedAtLeastOnce)
+            compose.onNodeWithTag("reader_finished").assertDoesNotExist()
+            repeat(2) {
+                compose.onNodeWithTag("next_page").performScrollTo().performClick()
+                awaitReady()
+                assertTrue(!core().view.reader!!.finishedAtLeastOnce)
+            }
+            try {
+                db.execSQL(
+                    "CREATE TRIGGER fail_finish_ui BEFORE UPDATE OF finished_at_least_once ON documents WHEN NEW.id = $id BEGIN SELECT RAISE(ABORT, 'test finish'); END"
+                )
+                compose.onNodeWithTag("next_page").performScrollTo().performClick()
+                compose.waitUntil(30_000) {
+                    !core().view.storageBusy && core().view.documentError != null
+                }
+                assertEquals(2L, completions(db, id))
+                assertTrue(!core().view.reader!!.finishedAtLeastOnce)
+                compose.onNodeWithTag("reader_finished").assertDoesNotExist()
+                db.execSQL("DROP TRIGGER fail_finish_ui")
+                compose.onNodeWithText("Retry").performScrollTo().performClick()
+                awaitReady()
+            } finally {
+                db.execSQL("DROP TRIGGER IF EXISTS fail_finish_ui")
+            }
+            assertEquals(3L, completions(db, id))
+            assertTrue(core().view.reader!!.finishedAtLeastOnce)
+            assertEquals(
+                core().view.reader!!.anchor.range.end,
+                core().view.reader!!.position.offset,
+            )
+            compose.onNodeWithTag("reader_finished").performScrollTo().assertExists()
+            compose.activityRule.scenario.recreate()
+            awaitReady()
+            assertEquals(3UL, core().view.reader!!.pageNumber)
+            assertEquals(
+                core().view.reader!!.anchor.range.end,
+                core().view.reader!!.position.offset,
+            )
+            compose.onNodeWithText("Back").performClick()
+            awaitReady()
+            compose
+                .onNodeWithTag("finished_$id", useUnmergedTree = true)
+                .performScrollTo()
+                .assertExists()
+            compose.onNodeWithTag("progress_$id", useUnmergedTree = true).assertTextEquals("100%")
+            compose.onNodeWithTag("document_$id").performClick()
+            awaitReady()
+            assertEquals(1UL, core().view.reader!!.pageNumber)
+            assertEquals(0L, core().view.reader!!.position.offset.value)
+            assertTrue(core().view.reader!!.finishedAtLeastOnce)
+            assertEquals(
+                0UL,
+                core().view.documents.single { it.documentId.value == id }.progressPercent,
+            )
+            assertTop()
+            repeat(3) {
+                compose.onNodeWithTag("next_page").performScrollTo().performClick()
+                awaitReady()
+                assertTrue(core().view.reader!!.finishedAtLeastOnce)
+            }
+            assertEquals(6L, completions(db, id))
+            compose.onNodeWithText("Back").performClick()
+            awaitReady()
+            compose.onNodeWithTag("document_$id").performScrollTo().performClick()
+            awaitReady()
+            compose.onNodeWithText("Back").performClick()
+            awaitReady()
+            compose
+                .onNodeWithTag("finished_$id", useUnmergedTree = true)
+                .performScrollTo()
+                .assertExists()
+            compose.onNodeWithTag("progress_$id", useUnmergedTree = true).assertTextEquals("0%")
+        }
+    }
+
+    @Test
     fun positiveCompletionToastIsConsumedOnceAndZeroIsSilent() {
         awaitReady()
         var snapshot by

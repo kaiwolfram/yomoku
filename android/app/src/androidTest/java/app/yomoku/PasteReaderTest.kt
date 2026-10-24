@@ -11,6 +11,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performScrollToKey
 import androidx.compose.ui.test.performTextReplacement
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.ViewModelProvider
@@ -236,6 +237,7 @@ class PasteReaderTest {
         compose.runOnUiThread { core().dispatch(Event.CreatePaste(first + second + "終。")) }
         awaitStorage()
         val id = core().view.documents.single { it.title == title }.documentId
+        compose.onNodeWithTag("library_documents").performScrollToKey(id.value)
         compose.onNodeWithTag("progress_${id.value}", useUnmergedTree = true).assertTextEquals("0%")
         compose.onNodeWithTag("document_${id.value}").performScrollTo().performClick()
         awaitStorage()
@@ -255,6 +257,7 @@ class PasteReaderTest {
         assertReaderAtTop()
         val percent = core().view.documents.single { it.documentId == id }.progressPercent
         compose.onNodeWithText("Back").performClick()
+        compose.onNodeWithTag("library_documents").performScrollToKey(id.value)
         compose
             .onNodeWithTag("progress_${id.value}", useUnmergedTree = true)
             .assertTextEquals("$percent%")
@@ -270,6 +273,7 @@ class PasteReaderTest {
         compose.onNodeWithTag("reader_text").assertTextEquals(first)
         assertReaderAtTop()
         compose.onNodeWithText("Back").performClick()
+        compose.onNodeWithTag("library_documents").performScrollToKey(id.value)
         compose.onNodeWithTag("progress_${id.value}", useUnmergedTree = true).assertTextEquals("0%")
     }
 

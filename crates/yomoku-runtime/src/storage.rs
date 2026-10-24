@@ -127,6 +127,11 @@ fn execute(
             .map_err(map_error)?
             .map(StorageResult::Loaded)
             .ok_or(DocumentError::NotFound),
+        StorageOperation::OpenReader(id) => storage
+            .open_reader_snapshot(id)
+            .map_err(map_error)?
+            .map(StorageResult::Loaded)
+            .ok_or(DocumentError::NotFound),
         StorageOperation::SavePageLength(length) => storage
             .save_page_length(length)
             .map(StorageResult::PageLengthSaved)

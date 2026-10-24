@@ -33,7 +33,17 @@ fn command(storage: &mut Storage, document: &PastedDocument) -> PageCompletion {
 // Seed precisely the pre-marker history shape without running the newer writer
 // against an old schema. This is not a production completion path.
 fn old_completion(storage: &mut Storage, document: &PastedDocument) -> PageCompletion {
-    let completion = command(storage, document);
+    let page_length = storage.page_length().unwrap();
+    let page = ReaderPage::open(document, page_length).unwrap();
+    let completion = PageCompletion {
+        command_id: storage.new_completion_command_id().unwrap(),
+        document_id: document.document_id,
+        page: page.anchor,
+        page_length,
+        departing_position: page.position,
+        completed_at_unix_ms: 500,
+        pending_time: Default::default(),
+    };
     storage
         .connection
         .execute(
@@ -268,21 +278,35 @@ fn migration_backfills_only_live_document_eof_history_and_preserves_existing_sta
         )
         .unwrap();
     let reimport = paste(&mut old, &deleted.chapter.text);
-    old.save_reading_position(finished.document_id, position(&finished, 0))
-        .unwrap();
-    old.save_reading_position(
-        eof_only.document_id,
+    let mut finished = legacy_position(&old, &finished, position(&finished, 0)).unwrap();
+    finished.finished_at_least_once = true;
+    let eof_only = legacy_position(
+        &old,
+        &eof_only,
         position(&eof_only, eof_only.chapter.text.len()),
     )
     .unwrap();
-    let token = old
-        .load_pending_reading_time(finished.document_id, position(&finished, 0))
-        .unwrap();
-    let token = old
-        .save_pending_reading_time(token, PendingReadingTime::from_millis(1234).unwrap())
+    let token = yomoku_core::active_time::SavedReadingTime {
+        value: yomoku_core::active_time::ReadingTimeUpdate {
+            document_id: finished.document_id,
+            position: position(&finished, 0),
+            pending: PendingReadingTime::from_millis(1234).unwrap(),
+        },
+        revision: 2,
+    };
+    old.connection
+        .execute(
+            "INSERT INTO pending_reading_time VALUES (?1, ?2, 0, 1234, 2)",
+            (
+                i64::from(finished.document_id),
+                i64::from(finished.chapter.chapter_id),
+            ),
+        )
         .unwrap();
     old.save_page_length(PageLength::Characters750).unwrap();
-    let expected = old.list_documents().unwrap();
+    let expected: Vec<_> = [&finished, &incomplete, &eof_only, &reimport]
+        .map(|document| document.library_summary().unwrap())
+        .into();
     drop(old);
     for _ in 0..2 {
         let mut storage = Storage::open(database.path()).unwrap();
@@ -338,7 +362,10 @@ fn failed_backfill_rolls_back_column_history_and_data_then_retries() {
     let mut old = Storage { connection };
     let document = paste(&mut old, "猫𠮷\0終");
     old_completion(&mut old, &document);
-    let expected = old.load_paste(document.document_id).unwrap();
+    let expected = Some(PastedDocument {
+        finished_at_least_once: true,
+        ..document.clone()
+    });
     old.connection.execute_batch("CREATE TRIGGER fail_finish BEFORE UPDATE ON documents BEGIN SELECT RAISE(ABORT, 'fixture'); END;").unwrap();
     drop(old);
     assert!(matches!(
@@ -361,4 +388,120 @@ fn failed_backfill_rolls_back_column_history_and_data_then_retries() {
             .unwrap(),
         Some(true)
     );
+}
+
+#[test]
+fn explicit_finished_open_resets_durably_but_loads_and_completion_reloads_keep_position() {
+    use yomoku_core::reader::ReaderAnalysis;
+    let database = TestDatabase::new();
+    let mut storage = Storage::open(database.path()).unwrap();
+    let imported = storage
+        .create_analyzed_paste(
+            &PasteText::new(format!("{}\n終𠮷\0", "猫".repeat(1600))).unwrap(),
+            1,
+            super::imports::fixture,
+        )
+        .unwrap();
+    let document = imported.document;
+    let id = document.document_id;
+    let eof = position(&document, document.chapter.text.len());
+    let unfinished = storage.save_reading_position(id, eof).unwrap().unwrap();
+    // Position-only EOF must still reopen exactly, without a checkmark.
+    assert_eq!(
+        storage.open_reader_snapshot(id).unwrap().unwrap().document,
+        unfinished
+    );
+    let final_page = command(&mut storage, &unfinished);
+    storage.record_page_completion(final_page).unwrap();
+    let completed = storage.load_paste(id).unwrap().unwrap();
+    assert!(completed.finished_at_least_once);
+    assert_eq!(completed.reading_position, Some(eof));
+    assert_eq!(
+        storage.load_reader_snapshot(id).unwrap().unwrap().document,
+        completed
+    );
+    assert!(storage.list_documents().unwrap()[0].finished_at_least_once);
+    assert_eq!(storage.list_documents().unwrap()[0].progress_percent, 100);
+
+    for length in PageLength::ALL {
+        storage.save_page_length(length).unwrap();
+        let partial = position(&document, 3);
+        let token = storage.load_pending_reading_time(id, partial).unwrap();
+        // A finished reread's partial-page time survives closing/reopening at page 1.
+        storage.save_reading_position(id, partial).unwrap();
+        let token = storage
+            .save_pending_reading_time(token, PendingReadingTime::from_millis(123).unwrap())
+            .unwrap();
+        let before = storage.load_paste(id).unwrap().unwrap();
+        assert_eq!(
+            storage.load_reader_snapshot(id).unwrap().unwrap().document,
+            before
+        );
+        let opened = storage.open_reader_snapshot(id).unwrap().unwrap();
+        assert_eq!(opened.page_length, length);
+        assert_eq!(
+            opened.analysis,
+            ReaderAnalysis::Available(imported.analysis_id)
+        );
+        assert_eq!(
+            opened.document.reading_position,
+            Some(position(&document, 0))
+        );
+        assert!(opened.document.finished_at_least_once);
+        let page = ReaderPage::open(&opened.document, length).unwrap();
+        assert_eq!(page.page_number, 1);
+        assert!(page.finished_at_least_once);
+        drop(storage);
+        storage = Storage::open(database.path()).unwrap();
+        assert_eq!(storage.load_paste(id).unwrap(), Some(opened.document));
+        assert_eq!(
+            storage.load_pending_reading_time(id, partial).unwrap(),
+            token
+        );
+        let summary = &storage.list_documents().unwrap()[0];
+        assert!(summary.finished_at_least_once);
+        assert_eq!(summary.progress_percent, 0);
+        assert_eq!(
+            storage.record_page_completion(final_page).unwrap(),
+            CompletionOutcome::AlreadyRecorded
+        );
+        assert_eq!(
+            storage.load_paste(id).unwrap().unwrap().reading_position,
+            Some(position(&document, 0))
+        );
+    }
+    let count: i64 = storage
+        .connection
+        .query_row("SELECT COUNT(*) FROM reading_completions", [], |r| r.get(0))
+        .unwrap();
+    assert_eq!(count, 1);
+    assert!(storage
+        .open_reader_snapshot(DocumentId::try_from(i64::MAX).unwrap())
+        .unwrap()
+        .is_none());
+}
+
+#[test]
+fn finished_open_write_or_commit_failure_preserves_snapshot_and_retry_resets_once() {
+    for trigger in [
+        "CREATE TRIGGER fail_open BEFORE UPDATE ON reading_positions BEGIN SELECT RAISE(ABORT, 'fixture'); END;",
+        "CREATE TABLE deferred_failure (id INTEGER REFERENCES documents(id) DEFERRABLE INITIALLY DEFERRED); CREATE TRIGGER fail_open AFTER UPDATE ON reading_positions BEGIN INSERT INTO deferred_failure VALUES (-1); END;",
+    ] {
+        let database = TestDatabase::new();
+        let mut storage = Storage::open(database.path()).unwrap();
+        let document = paste(&mut storage, "猫𠮷\0終");
+        let completion = command(&mut storage, &document);
+        storage.record_page_completion(completion).unwrap();
+        let before = storage.load_reader_snapshot(document.document_id).unwrap().unwrap();
+        storage.connection.execute_batch(trigger).unwrap();
+        assert!(matches!(storage.open_reader_snapshot(document.document_id), Err(StorageError::Sqlite(_))));
+        assert_eq!(storage.load_reader_snapshot(document.document_id).unwrap(), Some(before));
+        storage.connection.execute_batch("DROP TRIGGER fail_open").unwrap();
+        let opened = storage.open_reader_snapshot(document.document_id).unwrap().unwrap();
+        assert_eq!(opened.document.reading_position, Some(position(&document, 0)));
+        assert!(opened.document.finished_at_least_once);
+        // Once at page 1, duplicate opens need no additional position write.
+        storage.connection.execute_batch("CREATE TRIGGER fail_open BEFORE INSERT ON reading_positions BEGIN SELECT RAISE(ABORT, 'fixture'); END;").unwrap();
+        assert_eq!(storage.open_reader_snapshot(document.document_id).unwrap(), Some(opened));
+    }
 }

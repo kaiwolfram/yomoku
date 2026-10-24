@@ -295,6 +295,7 @@ fn document(text: &str) -> PastedDocument {
     PastedDocument {
         document_id: DocumentId::try_from(1).unwrap(),
         title: "題𠮷".into(),
+        finished_at_least_once: false,
         reading_position: None,
         chapter: ChapterText {
             source_id: SourceId::try_from(2).unwrap(),
@@ -560,7 +561,7 @@ fn reader_opens_exact_first_logical_page_with_unicode_anchor_and_counter() {
     assert!(core.view().storage_busy);
     assert!(core.view().reader.is_none());
     assert!(effects.iter().any(|effect| matches!(effect,
-        Effect::Storage(request) if request.operation == StorageOperation::LoadPaste(document.document_id))));
+        Effect::Storage(request) if request.operation == StorageOperation::OpenReader(document.document_id))));
     finish(
         &core,
         &mut effects,
@@ -1523,4 +1524,80 @@ fn completion_requires_matching_visible_page_and_explicit_stored_analysis() {
         Some(DocumentError::MissingAnalysis)
     );
     assert!(!core.view().completion_save_pending);
+}
+
+#[test]
+fn finished_snapshots_keep_exact_position_until_explicit_reader_entry_and_reflow_keeps_marker() {
+    let core = Core::<Yomoku>::new();
+    let mut document = document(&format!("{}\n終𠮷", "猫".repeat(500)));
+    let id = document.document_id;
+    let mut effects = core.process_event(Event::CreatePaste(document.chapter.text.clone()));
+    finish(
+        &core,
+        &mut effects,
+        StorageResult::Created(document.clone()),
+    );
+    assert!(!core.view().documents[0].finished_at_least_once);
+    document.finished_at_least_once = true;
+    let eof = ReadingPosition {
+        source_id: document.chapter.source_id,
+        chapter_id: document.chapter.chapter_id,
+        offset: TextOffset::at(&document.chapter.text, document.chapter.text.len()).unwrap(),
+    };
+    document.reading_position = Some(eof);
+    let mut effects = core.process_event(Event::LoadPaste(id));
+    assert_eq!(storage_operation(&effects), StorageOperation::LoadPaste(id));
+    finish(
+        &core,
+        &mut effects,
+        loaded(document.clone(), PageLength::default()),
+    );
+    assert!(core.view().reader.is_none());
+    assert_eq!(core.view().loaded_document, Some(document.clone()));
+    assert!(core.view().documents[0].finished_at_least_once);
+    assert_eq!(core.view().documents[0].progress_percent, 100);
+    let mut effects = core.process_event(Event::OpenReader(id));
+    assert_eq!(
+        storage_operation(&effects),
+        StorageOperation::OpenReader(id)
+    );
+    assert!(core.process_event(Event::OpenReader(id)).is_empty());
+    finish(
+        &core,
+        &mut effects,
+        StorageResult::Failed(DocumentError::Unavailable),
+    );
+    assert_eq!(core.view().documents[0].progress_percent, 100);
+    core.process_event(Event::CloseDocument);
+    let mut effects = core.process_event(Event::OpenReader(id));
+    document.reading_position = Some(ReadingPosition {
+        offset: TextOffset::START,
+        ..eof
+    });
+    finish(
+        &core,
+        &mut effects,
+        loaded(document.clone(), PageLength::default()),
+    );
+    assert_eq!(core.view().reader.as_ref().unwrap().page_number, 1);
+    assert!(core.view().reader.as_ref().unwrap().finished_at_least_once);
+    assert_eq!(core.view().documents[0].progress_percent, 0);
+    assert!(core.view().documents[0].finished_at_least_once);
+
+    // A completion reload must keep EOF even though the document is finished.
+    let mut effects = core.process_event(Event::SaveReadingPosition(eof));
+    document.reading_position = Some(eof);
+    finish(&core, &mut effects, StorageResult::PositionSaved(document));
+    core.process_event(Event::OpenSettings);
+    let mut effects = core.process_event(Event::SetPageLength(PageLength::Characters250));
+    finish(
+        &core,
+        &mut effects,
+        StorageResult::PageLengthSaved(PageLength::Characters250),
+    );
+    let page = core.view().reader.unwrap();
+    assert_eq!(page.position, eof);
+    assert!(page.finished_at_least_once);
+    assert_eq!(core.view().documents[0].progress_percent, 100);
+    assert!(core.view().documents[0].finished_at_least_once);
 }

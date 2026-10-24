@@ -31,7 +31,7 @@ impl Storage {
     pub fn list_documents(&self) -> Result<Vec<LibraryDocument>, StorageError> {
         let mut statement = self.connection.prepare(
             "SELECT d.id, d.title, length(CAST(t.text AS BLOB)),
-                             p.chapter_id, p.byte_offset, c.id
+                             p.chapter_id, p.byte_offset, c.id, d.finished_at_least_once
                       FROM documents d
                       LEFT JOIN chapters c ON c.source_id = d.source_id AND c.chapter_index = 0
                       LEFT JOIN chapter_texts t ON t.chapter_id = c.id
@@ -46,10 +46,11 @@ impl Storage {
                 row.get::<_, Option<i64>>(3)?,
                 row.get::<_, Option<i64>>(4)?,
                 row.get::<_, Option<i64>>(5)?,
+                row.get::<_, bool>(6)?,
             ))
         })?;
         rows.map(|row| {
-            let (id, title, total_bytes, position_chapter, offset, chapter) = row?;
+            let (id, title, total_bytes, position_chapter, offset, chapter, finished_at_least_once) = row?;
             let total_bytes = total_bytes.ok_or(StorageError::InvalidDocument)?;
             let chapter = chapter.ok_or(StorageError::InvalidDocument)?;
             if position_chapter.is_some_and(|id| id != chapter) {
@@ -58,6 +59,7 @@ impl Storage {
             Ok(LibraryDocument {
                 document_id: DocumentId::try_from(id).map_err(|_| StorageError::InvalidDocument)?,
                 title,
+                finished_at_least_once,
                 progress_percent: progress_percent(offset.unwrap_or(0), total_bytes)
                     .map_err(|_| StorageError::InvalidDocument)?,
             })
@@ -99,6 +101,39 @@ impl Storage {
         let Some(document) = load_paste_in(&transaction, document_id)? else {
             return Ok(None);
         };
+        let snapshot = ReaderSnapshot {
+            page_length: read_page_length(&transaction)?,
+            analysis: read_reader_analysis(&transaction, document.chapter.chapter_id)?,
+            document,
+        };
+        transaction.commit()?;
+        Ok(Some(snapshot))
+    }
+
+    /// Explicit reader entry. A finished book starts at page 1 with the reset
+    /// persisted in the same transaction as the returned snapshot. Ordinary
+    /// reads and completion reloads must keep using the read-only load methods.
+    pub fn open_reader_snapshot(
+        &mut self,
+        document_id: DocumentId,
+    ) -> Result<Option<ReaderSnapshot>, StorageError> {
+        let transaction = self
+            .connection
+            .transaction_with_behavior(TransactionBehavior::Immediate)?;
+        let Some(mut document) = load_paste_in(&transaction, document_id)? else {
+            return Ok(None);
+        };
+        if document.finished_at_least_once {
+            let start = ReadingPosition {
+                source_id: document.chapter.source_id,
+                chapter_id: document.chapter.chapter_id,
+                offset: TextOffset::START,
+            };
+            if document.reading_position != Some(start) {
+                write_position_in(&transaction, document_id, start)?;
+                document.reading_position = Some(start);
+            }
+        }
         let snapshot = ReaderSnapshot {
             page_length: read_page_length(&transaction)?,
             analysis: read_reader_analysis(&transaction, document.chapter.chapter_id)?,
@@ -150,12 +185,18 @@ pub(crate) fn load_paste_in(
 ) -> Result<Option<PastedDocument>, StorageError> {
     let document = connection
         .query_row(
-            "SELECT source_id, title FROM documents WHERE id = ?1",
+            "SELECT source_id, title, finished_at_least_once FROM documents WHERE id = ?1",
             [i64::from(document_id)],
-            |row| Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?)),
+            |row| {
+                Ok((
+                    row.get::<_, i64>(0)?,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, bool>(2)?,
+                ))
+            },
         )
         .optional()?;
-    let Some((source_id, title)) = document else {
+    let Some((source_id, title, finished_at_least_once)) = document else {
         return Ok(None);
     };
     let source_id = SourceId::try_from(source_id).map_err(|_| StorageError::InvalidDocument)?;
@@ -193,6 +234,7 @@ pub(crate) fn load_paste_in(
     let document = PastedDocument {
         document_id,
         title,
+        finished_at_least_once,
         reading_position,
         chapter: ChapterText {
             source_id,
@@ -239,6 +281,7 @@ pub(crate) fn create_paste_in(
     Ok(PastedDocument {
         document_id,
         title: title.to_owned(),
+        finished_at_least_once: false,
         reading_position: None,
         chapter: ChapterText {
             source_id,

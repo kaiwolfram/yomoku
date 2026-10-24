@@ -172,7 +172,9 @@ fn upgrades_legacy_duplicates_lazily_and_references_oldest_live_document() {
     let first = old.create_paste(&input).unwrap();
     let second = old.create_paste(&input).unwrap();
     let other = old.create_paste(&text("犬")).unwrap();
-    let before = old.list_documents().unwrap();
+    let before: Vec<_> = [&first, &second, &other]
+        .map(|document| document.library_summary().unwrap())
+        .into();
     drop(old);
     let mut storage = Storage::open(database.path()).unwrap();
     assert_eq!(storage.list_documents().unwrap(), before);

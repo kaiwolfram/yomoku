@@ -344,7 +344,9 @@ page length and the earliest stored Mode B analysis header in one transaction.
 Available(AnalysisId) or Missing; no Mode B base means legacy absence, never an
 A/C or foreign-chapter substitution. Later profiles do not replace the original
 base. Invalid metadata/settings fail without fallback/repair. No token scan,
-analyzer load, vocabulary registration or data write is performed by opening.
+analyzer load or vocabulary registration is performed. Explicit reader entry uses
+`open_reader_snapshot` and may reset finished-book position as described below;
+`load_reader_snapshot` remains read-only.
 
 Core attaches this identity only to an accepted OpenReader load. Its optional
 view field is absent outside the opened reader, stays fixed across position saves,
@@ -389,7 +391,8 @@ saves never insert history. Concurrent duplicate submissions record once.
 This legacy entry point is repository-only infrastructure. Migration 0010 adds the
 analyzed entry point used by core/runtime/FFI/Android forward actions below. Do not
 use absent occurrence data as completed-reading statistics. Migration 0011 adds
-the permanent finish marker; Finish Book and reopen-at-page-1 remain unwired.
+the permanent finish marker; explicit reopening now starts at page 1. Finish Book
+remains unwired.
 
 ## Permanent document finish marker (migration 0011)
 `documents.finished_at_least_once` is a non-null integer boolean, constrained to
@@ -402,8 +405,20 @@ document's final chapter before setting this marker.
 The marker never follows position backward or changes with page-length settings,
 partial-time checkpoints or duplicate callbacks. `finished_at_least_once` reads
 `Option<bool>` for a document (None means absent), without changing position. It
-is a storage-only API for now: reader/Library snapshots and Android do not expose
-it yet. Each deliberate final-page reread still gets its own completion history.
+also appears on PastedDocument, LibraryDocument and ReaderPage, including generated
+Kotlin snapshots. Android renders an accessible checkmark in Library and reader.
+Each deliberate final-page reread still gets its own completion history.
+
+`StorageOperation::OpenReader` calls `open_reader_snapshot` on the FIFO. One
+immediate transaction reads the document, resets a finished document's exact
+position to chapter start, and returns its marker/settings/analysis identity.
+The reset updates Library percentage after commit and preserves all pending-time
+buckets and history. Unfinished documents keep their exact position, including
+position-only EOF. Already-at-start finished opens avoid redundant writes.
+Statement/commit failures roll back and return no new snapshot. Accepted resets
+finish even if navigation cancels the pending reader. Ordinary LoadPaste,
+load_reader_snapshot and post-completion load_paste stay read-only and preserve
+EOF/current offsets. Retained Activity recreation does not dispatch OpenReader.
 
 The migration backfills live pastes with recorded EOF history, matching document,
 source and chapter IDs and exact byte length (including embedded NUL). Current EOF
@@ -517,7 +532,7 @@ for this drain; one deferred departure is retained unchanged through failures.
 Other storage commands remain blocked until success. Wrong document/offset and decreasing durations are
 ignored; negative durations fail Serde decoding at FFI. A move clears the restored
 token; reflow and same-offset saves preserve it. A cancelled restore or late save
-cannot attach time to a closed reader. Existing read-only opening is unchanged:
+cannot attach time to a closed reader. Snapshot loading does not reserve time:
 explicit restore reserves the zero row only when the active Android driver needs it.
 
 ObserveReaderClock accepts a document/exact-position identity, nonnegative signed
@@ -577,7 +592,7 @@ FFI. Model/ViewModel add LibraryDocument (ID/title/current percentage), an optio
 storage_busy and typed document_error. Concurrent storage submissions are ignored
 while busy; navigation remains available. A successful create adds its summary
 without opening a reader; LoadPaste reads exact content without changing progress,
-while OpenReader adds the saved-position page projection described above.
+while OpenReader adds the page projection and finished-book reset described above.
 ImportSummary is separate transient confirmation state containing the committed
 document ID/title and Created/Existing outcome. DismissImportSummary clears it;
 Settings and refresh preserve it, while tab selection, opening paste/reader or
@@ -609,7 +624,8 @@ its own durable duration. Rereads reserve a new command. No new schema or depend
 version; Android automatically supplies clock/final saves and drains pending core
 obligations before native teardown. Android controls/swipes use this completion
 path; the toast consumes its transient command-keyed notice once. Migration 0011
-adds the permanent finish marker; its UI and reopening behavior remain open.
+adds the permanent finish marker; its checkmarks and reopening behavior are wired.
+Finish Book and completion confetti remain open.
 
 ## Required future schema constraints
 - Future import repositories must extend the identity/immutable-text and durable

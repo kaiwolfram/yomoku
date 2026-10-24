@@ -510,17 +510,18 @@ fn migration_preserves_v9_history_and_status_event_id_high_water_mark() {
     let old_events = count(&storage, "vocabulary_status_events");
     // The old foundation cannot run its new replay query before migration; insert
     // the exact historical event shape instead.
-    let completion = command(&mut storage, &imported.document);
+    let command_id = storage.new_completion_command_id().unwrap();
+    let document = &imported.document;
     storage
         .connection
         .execute(
             "INSERT INTO reading_completions VALUES (?1, 1, ?2, ?3, ?4, 0, ?5, 0, 500, 300, 0)",
             (
-                i64::from(completion.command_id),
-                i64::from(completion.document_id),
-                i64::from(completion.page.source_id),
-                i64::from(completion.page.chapter_id),
-                i64::from(completion.page.range.end),
+                i64::from(command_id),
+                i64::from(document.document_id),
+                i64::from(document.chapter.source_id),
+                i64::from(document.chapter.chapter_id),
+                document.chapter.text.len() as i64,
             ),
         )
         .unwrap();

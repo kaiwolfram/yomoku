@@ -1069,3 +1069,24 @@
   Next: project marker into reader/Library, checkmark/reopen-at-page-1, then Finish
   Book/confetti. No dependency/codec changes, full Android suite, process/reboot,
   tablet or physical-arm64 rerun. Nostr empty; ask Q188 before forwarding.
+
+## 2026-10-24 — Finish checkmarks and page-1 reopening
+
+- Started clean. Projected permanent finish state through document/Library/reader
+  and generated Kotlin/JNI; Android shows accessible checkmarks independent of %.
+  Explicit OpenReader atomically persists page 1 for finished books, preserving
+  history/pending durations. Plain/completion loads and retained recreation keep
+  exact position. Unfinished books retain saved offsets. No schema/dependency change.
+- PASS: 217 Rust tests (111 storage), strict Clippy/fmt/Kotlin/diff, real-Full host
+  Kotlin/JNI and seven Unicode exchanges, reproducible generation, both-ABI debug/
+  test APKs, strict Android lint and 14 distinct API-36 x86_64 tests across runs.
+  Two new repository tests, one core test and one Compose test cover reset rollback/
+  retry, rereads, marker projections, pending time, EOF reloads and recreation.
+- Historical migration fixtures now seed old rows directly. Fixed initial Kotlin
+  safe-call warnings and an existing paste-reader offscreen-row assumption; child
+  scrolling also failed, then final LazyColumn key scrolling passed the focused
+  test. Other 13 selected tests passed twice. Gradle required socket escalation.
+- Updated progress/architecture/data docs. No open failure or local blocker.
+  Next: Finish Book and per-completion confetti, including rereads/zero newly Known.
+  No full suite, release APK, standalone Full suite, process/reboot, tablet or
+  physical-arm64 rerun. Nostr stays empty; ask Q188 before forwarding.

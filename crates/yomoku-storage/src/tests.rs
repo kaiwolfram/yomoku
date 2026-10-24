@@ -23,6 +23,20 @@ mod vocabulary;
 
 static NEXT_DATABASE: AtomicU64 = AtomicU64::new(0);
 
+// Historical fixtures cannot use current snapshot queries before migration 0011.
+fn legacy_position(
+    storage: &Storage,
+    document: &yomoku_core::document::PastedDocument,
+    position: yomoku_core::pagination::ReadingPosition,
+) -> Option<yomoku_core::document::PastedDocument> {
+    crate::documents::write_position_in(&storage.connection, document.document_id, position)
+        .unwrap();
+    Some(yomoku_core::document::PastedDocument {
+        reading_position: Some(position),
+        ..document.clone()
+    })
+}
+
 struct TestDatabase(PathBuf);
 
 impl TestDatabase {

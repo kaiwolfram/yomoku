@@ -18,7 +18,7 @@ with functioning rustup can omit the PATH workaround. Do not assume this compile
 is the project's minimum supported version; establish that with dependencies.
 Cargo.lock is retained for reproducible application development.
 Crux 0.20.0 declares Rust 1.90 minimum; the full locked graph has only been tested
-with 1.99.1. Current host baseline: 214 data-free Rust tests (109 storage, eight
+with 1.99.1. Current host baseline: 217 data-free Rust tests (111 storage, eight
 runtime). Eleven analysis fixtures and one runtime fixture run separately with
 each Full loader via tools/test-sudachi.sh (see below).
 
@@ -1485,3 +1485,51 @@ persist. No open failure or dependency/public-codec change. Migration 0011 is ne
 No full Android suite, standalone owned/mapped Full fixture suite, release APK,
 process/reboot recovery, tablet or physical-arm64 rerun. Marker projection/checkmark,
 reopen-at-page-1, Finish Book and confetti remain unchecked; this slice is storage-only.
+
+## Finish projections, checkmarks and explicit page-1 reopening
+
+Verified 2026-10-24 with the Rust PATH workaround and Android
+environment above. Commands from repository root:
+```sh
+cargo test --workspace --all-features --locked --offline --quiet
+cargo fmt --all -- --check
+cargo clippy --workspace --all-targets --all-features --locked --offline -- -D warnings
+tools/test-kotlin-bridge.sh
+cargo run -p yomoku-ffi --bin generate-kotlin --features facet_typegen --locked --offline -- target/generated/kotlin-repeat
+diff -r target/generated/kotlin target/generated/kotlin-repeat
+tools/format-kotlin.sh --check
+./android/gradlew -p android :app:connectedDebugAndroidTest :app:lintDebug -Pandroid.testInstrumentationRunnerArguments.class=app.yomoku.ReaderNavigationTest,app.yomoku.ReaderClockSessionTest,app.yomoku.PasteReaderTest --offline --console=plain
+./android/gradlew -p android :app:connectedDebugAndroidTest :app:lintDebug '-Pandroid.testInstrumentationRunnerArguments.class=app.yomoku.PasteReaderTest#savedOffsetsUpdateLibraryAndReopenContainingPageAtTop' --offline --console=plain
+git diff --check
+```
+PASS: 217 data-free Rust tests (111 storage), strict Clippy/fmt, real-Full host
+Kotlin/JNI with seven Unicode exchanges, repeatable Kotlin generation and Kotlin
+formatting. Both-ABI debug/test APK builds and strict Android lint pass. Fourteen
+distinct API-36 x86_64 tests are verified: 13 pass in both selected regression runs,
+then the corrected PasteReaderTest passes in the final focused run (31 seconds).
+Latest report: `android/app/build/reports/androidTests/connected/debug/index.html`.
+
+Two new storage tests cover all five presets, marker/progress projections, exact
+unfinished/position-only EOF, read-only loads, durable finished-book reset, stored
+Mode B identity, pending-time preservation, replay after reopening, missing IDs and
+write/commit failure rollback plus retry. One new core test verifies separate
+OpenReader/LoadPaste operations, committed Library updates, failed-open preservation
+and finished-state reflow. Host JNI verifies completion remains at EOF, rereads,
+fresh-session finish projection and analyzer-free explicit page-1 reopening.
+The new Compose/JNI/SQLite test covers final-page marker failure/Retry, rereads,
+accessible checkmarks at 100% and 0%, and retained recreation without reset.
+
+The initial selected device run passed 13/14 tests, including the new finish test.
+An existing PasteReaderTest assumed its Library progress row was composed offscreen;
+it now scrolls the LazyColumn by document key before assertions, supporting
+accumulated test documents. An initial attempt to scroll the uncomposed child
+itself also failed; the final key-based correction passes.
+Current snapshot queries require schema 0011, so historical migration fixtures now
+seed old position/time/history directly rather than call newer readers. Initial
+Kotlin unnecessary-safe-call warnings were fixed. Gradle's sandbox lock/socket
+failure required escalation; prior benign Crux JNI/ktfmt warnings persist.
+
+No schema/dependency change. Generated storage protocol adds OpenReader; document,
+Library and reader payloads add the permanent boolean. No full Android suite,
+standalone Full fixture/probe, release APK, process/reboot, tablet or physical-arm64
+rerun. Finish Book and command-keyed confetti remain next.

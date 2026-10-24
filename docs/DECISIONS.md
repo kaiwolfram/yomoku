@@ -1448,3 +1448,29 @@ document finished. No dependencies or public event/view codec changes.
 
 Track SQL files alongside Rust sources in both Gradle native build tasks so a
 migration-only edit invalidates packaged native output.
+
+## 2026-10-24 — Finish checkmarks and explicit finished-book reopening
+
+Carry the permanent boolean in PastedDocument, LibraryDocument and ReaderPage so
+imports, snapshots, position saves and completion reloads preserve the same state
+through generated Kotlin/JNI. Render a labeled vector checkmark in Library and
+reader, independent of the current percentage. No schema/dependency change.
+
+Separate StorageOperation::OpenReader from LoadPaste. Its repository method uses
+one immediate transaction to read a consistent document/settings/Mode B snapshot
+and persist chapter-start position for finished books. Unfinished books keep their
+exact offset, including position-only EOF. Reset neither the finish marker nor
+pending-time buckets/history. Avoid a redundant position write if already at start.
+Failures roll back and can be retried by reopening; a navigation cancellation does
+not cancel accepted I/O. Core updates the existing Library summary after callback.
+
+Keep load_paste/load_reader_snapshot read-only, especially the worker's completion
+reload: final-page completion must leave the current reader at EOF. ReaderPage::open
+only projects the supplied exact position; it cannot infer a reopen reset. Retained
+Activity recreation likewise preserves the current position. Historical migration
+fixtures now seed old position/time/history rows directly because current snapshot
+queries require migration 0011. Finish Book and confetti remain a separate slice.
+
+The paste-reader regression test scrolls the Library container by document key
+before asserting a row, since offscreen lazy children may not be composed.
+API verified against the primary [Compose test reference](https://developer.android.com/reference/kotlin/androidx/compose/ui/test/SemanticsNodeInteraction).

@@ -20,7 +20,7 @@ pub enum ReaderAnalysis {
     Missing,
 }
 
-/// Document, settings and analysis identity read from one consistent snapshot.
+/// Document/finish state, settings and analysis identity from one consistent snapshot.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
 pub struct ReaderSnapshot {
@@ -34,6 +34,7 @@ pub struct ReaderSnapshot {
 pub struct ReaderPage {
     pub document_id: DocumentId,
     pub title: String,
+    pub finished_at_least_once: bool,
     pub text: String,
     pub anchor: TextAnchor,
     pub position: ReadingPosition,
@@ -42,6 +43,8 @@ pub struct ReaderPage {
 }
 
 impl ReaderPage {
+    /// Project the supplied exact position. Explicit finished-book reopening is
+    /// a separate storage operation; reflow/completion reloads must not reset it.
     pub fn open(document: &PastedDocument, length: PageLength) -> Result<Self, InvalidTextValue> {
         Self::at(
             document,
@@ -65,6 +68,7 @@ impl ReaderPage {
         Ok(Self {
             document_id: document.document_id,
             title: document.title.clone(),
+            finished_at_least_once: document.finished_at_least_once,
             text: anchor.slice(&document.chapter)?.to_owned(),
             anchor,
             position,
@@ -94,6 +98,7 @@ impl PastedDocument {
         Ok(LibraryDocument {
             document_id: self.document_id,
             title: self.title.clone(),
+            finished_at_least_once: self.finished_at_least_once,
             progress_percent: progress_percent(
                 self.reading_position
                     .map_or(0, |position| position.offset.into()),

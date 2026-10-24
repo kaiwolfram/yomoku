@@ -424,9 +424,8 @@ fn upgrades_version_five_preserving_documents_settings_position_and_completions(
             ),
         )
         .unwrap();
-    old.save_reading_position(doc.document_id, command.next_position(&doc).unwrap())
-        .unwrap();
-    let expected = old.load_paste(doc.document_id).unwrap();
+    let mut expected = legacy_position(&old, &doc, command.next_position(&doc).unwrap());
+    expected.as_mut().unwrap().finished_at_least_once = true;
     old.save_page_length(yomoku_core::pagination::PageLength::Characters750)
         .unwrap();
     drop(old);

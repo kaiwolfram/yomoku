@@ -386,9 +386,7 @@ fn upgrades_version_four_without_changing_existing_text_settings_or_position() {
     migrate(&mut connection, &MIGRATIONS[..4]).unwrap();
     let mut old = Storage { connection };
     let document = fixture(&mut old);
-    let expected = old
-        .save_reading_position(document.document_id, position(&document, 3))
-        .unwrap();
+    let expected = legacy_position(&old, &document, position(&document, 3));
     old.save_page_length(PageLength::Characters750).unwrap();
     drop(old);
     let mut storage = Storage::open(database.path()).unwrap();
@@ -405,9 +403,7 @@ fn failed_completion_migration_preserves_version_four_and_can_retry() {
     migrate(&mut connection, &MIGRATIONS[..4]).unwrap();
     let mut old = Storage { connection };
     let document = fixture(&mut old);
-    let expected = old
-        .save_reading_position(document.document_id, position(&document, 3))
-        .unwrap();
+    let expected = legacy_position(&old, &document, position(&document, 3));
     // Fail after the new command table has been created, within migration 0005.
     old.connection
         .execute_batch("CREATE TABLE reading_completions (fixture TEXT);")

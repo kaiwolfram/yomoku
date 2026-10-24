@@ -15,6 +15,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -27,6 +28,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import app.yomoku.shared.DocumentError
@@ -77,7 +79,21 @@ internal fun LibraryScreen(view: ViewModel, dispatch: (Event) -> Unit) {
                             .padding(vertical = 20.dp)
                             .testTag("document_${document.documentId.value}")
                 ) {
-                    Text(document.title, style = MaterialTheme.typography.titleMedium)
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            document.title,
+                            style = MaterialTheme.typography.titleMedium,
+                            modifier = Modifier.weight(1f),
+                        )
+                        if (document.finishedAtLeastOnce) {
+                            FinishedCheckmark(
+                                Modifier.testTag("finished_${document.documentId.value}")
+                            )
+                        }
+                    }
                     Text(
                         stringResource(
                             R.string.reading_progress,
@@ -177,6 +193,9 @@ internal fun ReaderScreen(view: ViewModel, dispatch: (Event) -> Unit) {
         StorageStatus(view)
         ReaderSaveRetry(view, dispatch)
         page?.let { page ->
+            if (page.finishedAtLeastOnce) {
+                FinishedCheckmark(Modifier.testTag("reader_finished"))
+            }
             Text(
                 page.text,
                 style = MaterialTheme.typography.bodyLarge,
@@ -212,6 +231,16 @@ internal fun ReaderScreen(view: ViewModel, dispatch: (Event) -> Unit) {
             }
         }
     }
+}
+
+@Composable
+private fun FinishedCheckmark(modifier: Modifier = Modifier) {
+    Icon(
+        painterResource(R.drawable.ic_finished),
+        contentDescription = stringResource(R.string.finished_at_least_once),
+        modifier = modifier,
+        tint = MaterialTheme.colorScheme.primary,
+    )
 }
 
 @Composable

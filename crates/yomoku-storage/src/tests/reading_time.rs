@@ -548,9 +548,7 @@ fn migration_preserves_v8_data_and_rolls_back_schema_and_history_on_failure() {
     migrate(&mut connection, &MIGRATIONS[..8]).unwrap();
     let mut old = Storage { connection };
     let document = fixture(&mut old);
-    let expected = old
-        .save_reading_position(document.document_id, position(&document, 3))
-        .unwrap();
+    let expected = legacy_position(&old, &document, position(&document, 3));
     old.save_page_length(PageLength::Characters750).unwrap();
     old.connection
         .execute_batch(

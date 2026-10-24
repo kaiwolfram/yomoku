@@ -110,6 +110,7 @@ impl PasteText {
 pub struct PastedDocument {
     pub document_id: DocumentId,
     pub title: String,
+    pub finished_at_least_once: bool,
     pub chapter: ChapterText,
     pub reading_position: Option<crate::pagination::ReadingPosition>,
 }
@@ -221,11 +222,12 @@ impl TextAnchor {
     }
 }
 
-/// Current position, independent of completion history or a permanent checkmark.
+/// Current progress and a permanent finish marker that is independent of position.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
 pub struct LibraryDocument {
     pub document_id: DocumentId,
     pub title: String,
     pub progress_percent: u64,
+    pub finished_at_least_once: bool,
 }

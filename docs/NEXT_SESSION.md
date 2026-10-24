@@ -1,31 +1,32 @@
 # Resume here
 
-Updated: 2026-10-24. Repository finished-at-least-once persistence verified.
+Updated: 2026-10-24. Finish checkmarks and explicit page-1 reopening verified.
 Read AGENTS.md, plan phases 2–4 and PRODUCT_SPEC.md sections 3–4.
-Update docs/commit each verified step. Physical arm64 is the later user trial.
 
 ## Working
 - Pure Crux owns navigation/Library/Settings and typed effects; FIFO owns SQLite/
   analysis. Only Render reaches UI. Fresh sessions start Library.
 - Exact UTF-8 position/Library percentage and five presets persist; reflow keeps
   offset. Scroll resets on navigation/reopen; centered column is capped at 720dp.
-- NEW Next/Previous/counter below content; left/right swipes navigate without a
+- Next/Previous/counter below content; left/right swipes navigate without a
   bottom requirement. Axis-specific drags require 48dp net movement on release.
   Next completes the departing page; anchored Previous derives the preceding page
   in Rust and only saves position. Both use retained dispatch/Pause/checkpoint drain.
   Busy/pending saves disable actions. Duplicate callbacks count once; rereads again.
   Positive CompletionNotice shows a short toast and is consumed once; zero is silent.
   EOF disables Next. Migration 0011 atomically marks final-page completion finished.
-  Storage::finished_at_least_once returns Option<bool>; backfills live EOF history,
-  never position alone. Backward/reflow/time saves retain it; delete/reimport resets
-  it while history stays. No core/Android projection/checkmark/reopen reset yet.
+  Marker crosses document/Library/reader snapshots; accessible checkmarks show it
+  independently of position. Backward/reflow/time saves retain it; deletion resets
+  it while history stays. Migration backfills live EOF history, never position alone.
 - Analyzed paste atomically deduplicates exact SHA-256, saves Mode B and registers
   unique Japanese surfaces. Duplicates reuse oldest live exact match without
   rescan/progress/status changes. Created/Existing show dismissible Library summary.
   Source content/IDs/provenance stay immutable. Reader opening never loads Sudachi.
-- load_reader_snapshot reads document/exact position, preset and earliest stored
-  Mode B AnalysisId in one read-only transaction. Identity stays fixed through
-  reflow/position/plain loads; exit clears it. Missing stays readable without repair.
+- load_reader_snapshot/load_paste stay read-only, especially completion reloads.
+  NEW OpenReader uses open_reader_snapshot: one immediate transaction resets finished
+  books to page 1 and reads marker/preset/original Mode B identity. Pending time/history
+  stay; failure rolls back. Unfinished offsets and retained recreation stay exact.
+  Identity stays fixed through reflow/position/plain loads; Missing never rescans.
 - RestoreReadingTime separately reserves an exact-offset revision on FIFO.
   Checkpoints save absolute durations; failures retain exact payload/prior revision
   for RetryReadingTimeCheckpoint. Newer updates coalesce to one maximum slot and
@@ -62,17 +63,17 @@ Update docs/commit each verified step. Physical arm64 is the later user trial.
   Full outside Git; notices bundled. SUDACHI_MEASUREMENTS.md has limits.
 
 ## Next tasks (ordered)
-1. Project finish marker into Library/reader; checkmark/reopen-at-page-1, then
-   Finish Book/confetti on each newly recorded final-page completion. Keep ordinary
-   load_paste read-only: completion reloads must not reset the current position.
+1. Finish Book return + brief confetti on EACH newly recorded final-page completion,
+   including rereads/zero newly Known. Use command-keyed transient state, never the
+   permanent flag alone. Test duplicate/retry/recreation and final clock drain.
 2. User-run physical arm64 validation once usable. Formats/dictionary/CI remain open.
 
 ## Verification / environment
-- PASS: 214 Rust tests (109 storage); host Kotlin/JNI + Unicode/analysis exchanges;
+- PASS: 217 Rust tests (111 storage); host Kotlin/JNI + Unicode exchanges;
   strict Clippy/fmt/Kotlin/diff, both-ABI debug/test APKs and strict Android lint.
-  All eight ReaderNavigationTest/ReaderClockSessionTest tests pass on API 36 x86_64.
-  Prior full 30-test suite not rerun. Commands/fixed failures: DEVELOPMENT.md latest.
+  14 distinct API-36 x86_64 Android tests verified: 13 regression passes + final
+  focused PasteReaderTest pass after lazy-list key scrolling fixed the fixture.
+  Prior full suite not rerun. Commands/fixed failures: DEVELOPMENT.md latest.
 - Prior real-process/reboot clock recovery remains verified; not rerun this slice.
-- New schema 0011; no dependency/codec changes. Gradle tracks SQL inputs now.
-  No local blocker or release/tablet/physical-arm64 rerun. Nostr config empty;
-  ask Q188 before forwarding.
+- Schema stays 0011; new OpenReader storage operation + finish fields in codecs.
+  No local blocker; no release/tablet/arm64 rerun. Nostr empty; ask Q188 before forwarding.

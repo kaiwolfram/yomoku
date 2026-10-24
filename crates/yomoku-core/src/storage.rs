@@ -16,6 +16,8 @@ pub enum StorageOperation {
     List,
     CreatePaste(String),
     LoadPaste(DocumentId),
+    /// Explicit reader entry; resets a finished document to page 1 atomically.
+    OpenReader(DocumentId),
     SaveReadingPosition {
         document_id: DocumentId,
         position: ReadingPosition,
