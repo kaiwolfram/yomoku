@@ -1008,3 +1008,24 @@
   teardown acknowledgment, then controls/swipes/toast/Finish Book. No device
   instrumentation, standalone Full suite, release/probe/tablet/arm64 rerun. Actual
   Android close/reboot remains unverified. No local blocker; Nostr empty/Q188 open.
+
+## 2026-10-24 — Android reader clock and draining native close
+
+- Started clean. Connected retained CoreSession to elapsedRealtime, Activity
+  resume/pause/interactions, 15-second Handler checkpoints and final Pause before
+  settings/movement/completion/exit. Restore waits for ready storage; same-offset
+  writes preserve idle. Accounting stays in Rust; no schema/dependency/codec change.
+- Close rejects UI dispatch, retains callbacks until busy and both pending flags
+  clear, then releases native. Failed obligations after onCleared retry exactly;
+  persistent failure retains the session while alive. Reader/Settings expose Retry
+  and unresolved saves disable presets. No partial-page history/status changes.
+- Added five JNI/SQLite driver tests, two Compose lifecycle/retry checks, a real
+  clock close/reopen test and an emulator-only reboot runner. PASS: 206 Rust tests,
+  debug/test APKs, full 26 Android tests then final 11 affected tests, strict lint,
+  Kotlin format, Python parsing/help and diff checks. Actual process/reboot restored
+  exact 259 ms then 268 ms; report/commands in DEVELOPMENT.md. Initial nonblocking
+  Android SQLite lock fixture corrected; explicit failure/retry coverage passes.
+- Updated README, plan, architecture/data model, decisions, development and handoff.
+  Next: Next/Previous/swipes/positive toast, then finished-book behavior. No local
+  blocker. No release/tablet/physical-arm64 or host Kotlin/JNI rerun. Emulator left
+  running; no OS final-flush guarantee. Nostr configuration empty and Q188 open.

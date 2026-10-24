@@ -115,7 +115,7 @@ internal fun PasteScreen(
 }
 
 @Composable
-internal fun ReaderScreen(view: ViewModel) {
+internal fun ReaderScreen(view: ViewModel, dispatch: (Event) -> Unit) {
     val scroll = remember(view.reader?.documentId, view.reader?.anchor) { ScrollState(0) }
     Column(
         modifier =
@@ -127,6 +127,7 @@ internal fun ReaderScreen(view: ViewModel) {
         verticalArrangement = Arrangement.spacedBy(24.dp),
     ) {
         StorageStatus(view)
+        ReaderSaveRetry(view, dispatch)
         view.reader?.let { page ->
             Text(
                 page.text,
@@ -141,6 +142,30 @@ internal fun ReaderScreen(view: ViewModel) {
                 ),
                 modifier = Modifier.testTag("page_counter"),
             )
+        }
+    }
+}
+
+@Composable
+internal fun ReaderSaveRetry(view: ViewModel, dispatch: (Event) -> Unit) {
+    if (
+        view.reader != null &&
+            view.documentError != null &&
+            (view.readingTimeSavePending || view.completionSavePending || view.readerTime == null)
+    ) {
+        TextButton(
+            enabled = !view.storageBusy,
+            onClick = {
+                dispatch(
+                    when {
+                        view.readingTimeSavePending -> Event.RetryReadingTimeCheckpoint
+                        view.completionSavePending -> Event.RetryReaderCompletion
+                        else -> Event.RestoreReadingTime
+                    }
+                )
+            },
+        ) {
+            Text(stringResource(R.string.retry))
         }
     }
 }

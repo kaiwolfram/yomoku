@@ -129,7 +129,7 @@ internal fun YomokuApp(view: ViewModel, dispatch: (Event) -> Unit) {
                         view.settingsOpen -> SettingsScreen(view, dispatch)
                         view.contentRoute == ContentRoute.PASTE ->
                             PasteScreen(view, pasteText, { pasteText = it }, dispatch)
-                        view.contentRoute == ContentRoute.READER -> ReaderScreen(view)
+                        view.contentRoute == ContentRoute.READER -> ReaderScreen(view, dispatch)
                         view.destination == Destination.LIBRARY -> LibraryScreen(view, dispatch)
                         else ->
                             Text(

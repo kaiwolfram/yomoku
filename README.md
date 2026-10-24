@@ -20,17 +20,17 @@ Yomoku is under active development. The working app supports:
   non-whitespace characters. Changing the preset preserves the exact text offset.
 - Phone and tablet navigation, retained sessions across Activity recreation,
   and offline access to bundled Sudachi notices.
+- Hidden active reading time, with automatic restore, interaction/idle accounting,
+  periodic saves and final saves before background, reader actions and teardown.
 
 Next/Previous controls, swipes, word lookup and vocabulary controls are still
 pending. The Rust repository atomically saves completion encounters, New→Known
 transitions, active time and position. Core/worker/FFI pending-time checkpoints
 support exact retries, coalesced saves before reader movement/exit and reopen.
 Explicit analyzed completion intents now drain checkpoints, freeze retries and update
-progress through core/FIFO/FFI, without analyzer loading. Android timer, navigation
-controls, gestures and completion toast rendering remain unfinished.
-The typed clock driver now applies resume/interaction/checkpoint/pause samples in
-Rust, retaining final saves behind unrelated storage work. Android still needs to
-produce those samples and await saved work before native teardown.
+progress through core/FIFO/FFI, without analyzer loading. Android's retained driver
+supplies monotonic samples and waits for pending saves before native teardown.
+Navigation controls, gestures and completion toast rendering remain unfinished.
 Nostr, Statistics and Vocabulary tabs currently
 show placeholders.
 

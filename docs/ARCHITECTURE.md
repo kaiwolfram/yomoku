@@ -57,8 +57,7 @@ CompletionNotice. AlreadyRecorded and zero results publish none. Successful resu
 refresh reader/Library progress from persisted content and retire consumed timer tokens.
 The worker's post-commit read can fail; retry uses the same command, reconciles the
 persisted position and suppresses duplicate notices. No analyzer is loaded for completion.
-Automatic final checkpoint production and platform clock/lifecycle/interactions/
-periodic scheduling remain separate work.
+Android supplies automatic final checkpoints and platform observations as described below.
 
 ObserveReaderClock now drives the existing pure accumulator with anchored
 Resume/Interact/Checkpoint/Pause samples after explicit RestoreReadingTime.
@@ -72,8 +71,7 @@ unrelated nonmoving storage (list, read, settings or same-offset position saves)
 Success drains the slot before accepted completion/departure; unrelated failure
 retains it for RetryReadingTimeCheckpoint. Late samples after an already accepted
 position change/import cannot queue a checkpoint for the departing offset. The
-pending flag includes waiting saves; this adds no general event queue. Android
-clock/lifecycle/interactions, scheduling and final native teardown remain unwired.
+pending flag includes waiting saves; this adds no general event queue.
 
 `yomoku-analysis` is a separate Rust I/O adapter using Sudachi.rs v0.7.0 at
 `5de0410b6edfd428fc510cc9763440772e9619d5` and Full 20261015 (V1). Its constructor
@@ -250,7 +248,7 @@ and destination position atomically. Duplicate IDs require identical payloads an
 never rewrite progress, including after reflow/reopen/deletion. Rereads allocate a
 fresh ID; position-only saves never add history. These repository methods have no
 app event/runtime/FFI entry point yet. Migration 0010 supplies the analyzed
-transaction below; platform checkpoints/forward controls remain open. Migration 0009 adds
+transaction below; Android checkpoints are connected and forward controls remain open. Migration 0009 adds
 active_time_ms to history and pending_reading_time buckets, scoped to live documents.
 Checkpoint loads reserve a zero row/revision; absolute saves validate current
 position and reject stale tokens. Completion validates the frozen page total,
@@ -339,16 +337,34 @@ bidirectional Rust/Kotlin fixtures exercise Unicode anchors and full-width IDs.
 `android/` is a Kotlin/Compose shell (min SDK 29) built with Gradle CLI/JDK 17.
 Gradle preBuild generates payloads/JNI and packages combined libraries for
 arm64-v8a/x86_64 using NDK r30/API 29. CoreSession projects Render snapshots on
-Android's main thread and ignores callbacks after close. CoreSessionOwner is an
+Android's main thread and ignores callbacks after native close. CoreSessionOwner is an
 Activity-scoped AndroidViewModel: it supplies Application.filesDir/yomoku.sqlite3,
-retains the native session across recreation, and closes it onCleared. It retains
-no Activity or independent domain state. Each new session requests Library data;
+retains the native session across recreation, and requests draining close onCleared.
+It retains no Activity or independent domain state. Each new session requests Library data;
 the database and page-length setting are first loaded on the Rust worker. A fresh
 process starts Library with no dictionary load. Activity onStart permits reuse;
 onStop queues release unless isChangingConfigurations, preserving the analyzer
 through retained recreation. Accepted imports finish atomically before release;
 hidden imports release before resolving. Final native close drains accepted work
 and drops its analyzer/provider without joining Android's UI thread.
+
+CoreSession drives the pure clock with SystemClock.elapsedRealtime samples. Activity
+onResume/onPause controls accounting independently of analyzer start/stop, including
+configuration pauses. After the visible reader's busy work finishes, restore reserves
+its exact-offset token; only its successful callback starts Resume. Handler checkpoints
+run every 15 seconds without resetting idle. Activity interaction signals include
+touch movement and generic scroll, with typed UI events sampling Pause before settings,
+movement, completion or exit. Fresh offsets restore a new epoch; EOF starts none.
+Restore failures require visible Retry. Failed checkpoint/completion obligations also
+offer Retry in reader/Settings; unresolved saves disable preset changes.
+
+Close rejects new UI dispatch immediately, pauses once and keeps callbacks alive until
+storage_busy and both save-pending flags clear. Only then does it release the native
+handle. If an obligation fails after onCleared, a one-second Handler retry resubmits
+the exact core payload; a persistent failure retains the session while the process
+survives. This never joins the UI thread or fabricates a successful save. Android can
+still kill a process before a final callback; only committed durations survive, and
+abrupt death can lose time since the latest periodic checkpoint. No OS guarantee is made.
 
 Compose shows Library titles/current percentage, a multiline paste form and a
 centered, scrollable reader column capped at 720dp. Its ScrollState is transient
@@ -360,9 +376,10 @@ Rust; the unsaved form draft and notice dialog visibility use rememberSaveable.
 The draft is retained through Settings/recreation.
 Navigation uses a bottom bar below 600dp and a scrollable rail above; Settings,
 paste and reader routes hide it. Toolbar/system Back return through Rust routes.
-Nineteen instrumentation tests pass on API 36 x86_64 phone (including production
-analyzed imports/lifecycle, eight private-extraction tests and the debug-only
-in-app analyzer probe). The two
+Android instrumentation covers production analyzed imports/lifecycle, reader-time
+accounting/drain/recovery, eight private-extraction tests and the debug-only
+in-app analyzer probe on API 36 x86_64 phone. Exact current runs are in
+DEVELOPMENT.md. The two
 asset/notices tests previously passed on phone and tablet landscape in airplane
 mode. The seven prior
 tests previously passed on phone and tablet landscape,
@@ -378,8 +395,8 @@ lifecycle are connected. TXT/EPUB/SRT parsing, metadata and multi-file import
 semantics remain unchecked. Legacy imports are not automatically rescanned.
 Explicit core/worker/FFI pending-time checkpoints coalesce during unresolved saves
 and drain before reader movement/exit or analyzed completion. Completion preparation/
-exact retries now run through core/FIFO/FFI. Android monotonic lifecycle/interactions,
-native teardown acknowledgment, page movement/swipes and toast rendering remain next;
+exact retries now run through core/FIFO/FFI. Android monotonic lifecycle/interactions
+and native drain are connected; page movement/swipes and toast rendering remain next;
 effective segmentation edits and statistics aggregation remain
 separate tasks. Add analysis/import crates only with
 actual behavior; Sudachi Full defaults to B, JMdict/JMnedict remain offline data, and future Nostr I/O stays in Rust. Configuration is empty.

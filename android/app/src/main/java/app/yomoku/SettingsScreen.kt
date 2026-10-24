@@ -46,6 +46,7 @@ internal fun SettingsScreen(view: ViewModel, dispatch: (Event) -> Unit) {
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         StorageStatus(view)
+        ReaderSaveRetry(view, dispatch)
         Text(
             stringResource(R.string.page_length_title),
             style = MaterialTheme.typography.titleMedium,
@@ -62,7 +63,11 @@ internal fun SettingsScreen(view: ViewModel, dispatch: (Event) -> Unit) {
                         PageLength.CHARACTERS1500 -> 1500
                     }
                 val selected = view.pageLength == length
-                val enabled = !view.storageBusy && view.pageLength != null
+                val enabled =
+                    !view.storageBusy &&
+                        !view.readingTimeSavePending &&
+                        !view.completionSavePending &&
+                        view.pageLength != null
                 Row(
                     modifier =
                         Modifier.fillMaxWidth()

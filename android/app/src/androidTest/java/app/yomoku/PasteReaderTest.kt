@@ -1,5 +1,6 @@
 package app.yomoku
 
+import android.database.sqlite.SQLiteDatabase
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
@@ -21,6 +22,7 @@ import app.yomoku.shared.TextOffset
 import java.io.File
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -52,6 +54,102 @@ class PasteReaderTest {
         while (File("/proc/self/maps").readText().contains("/sudachi/full-") != expected) {
             check(System.nanoTime() < deadline) { "Unexpected production dictionary mapping" }
             Thread.sleep(10)
+        }
+    }
+
+    @Test
+    fun readerClockPausesInBackgroundAndRetainsDurationsThroughRecreation() {
+        awaitStorage()
+        val title = "Reader clock ${System.nanoTime()}"
+        compose.runOnUiThread { core().dispatch(Event.CreatePaste("$title\n猫と犬。")) }
+        awaitStorage()
+        val id = core().view.documents.single { it.title == title }.documentId
+        compose.runOnUiThread { core().dispatch(Event.OpenReader(id)) }
+        compose.waitUntil(30_000) { !core().view.storageBusy && core().view.readerTime != null }
+        val retained = core()
+        Thread.sleep(150)
+        compose.activityRule.scenario.moveToState(Lifecycle.State.CREATED)
+        val instrumentation =
+            androidx.test.platform.app.InstrumentationRegistry.getInstrumentation()
+        fun saved(): Long {
+            var result = -1L
+            instrumentation.runOnMainSync {
+                if (!retained.view.storageBusy && !retained.view.readingTimeSavePending) {
+                    result = retained.view.readerTime!!.pending.value
+                }
+            }
+            return result
+        }
+        val deadline = System.nanoTime() + 30_000_000_000L
+        var paused = saved()
+        while (paused < 0) {
+            check(System.nanoTime() < deadline)
+            Thread.sleep(10)
+            paused = saved()
+        }
+        assertTrue(paused >= 150L)
+        Thread.sleep(200)
+        assertEquals(paused, saved())
+        compose.activityRule.scenario.moveToState(Lifecycle.State.RESUMED)
+        compose.activityRule.scenario.recreate()
+        assertSame(retained, core())
+        Thread.sleep(150)
+        compose.onNodeWithText("Settings").performClick()
+        awaitStorage()
+        val after = core().view.readerTime!!.pending.value
+        assertTrue(after >= paused + 150L)
+        Thread.sleep(200)
+        assertEquals(after, core().view.readerTime!!.pending.value)
+        compose.onNodeWithText("Back").performClick()
+        compose.onNodeWithText("Back").performClick()
+        awaitStorage()
+    }
+
+    @Test
+    fun readerAndSettingsOfferRetryForFailedTimeRestoreAndFinalSave() {
+        awaitStorage()
+        val title = "Reader retry ${System.nanoTime()}"
+        compose.runOnUiThread { core().dispatch(Event.CreatePaste("$title\n猫と犬。")) }
+        awaitStorage()
+        val id = core().view.documents.single { it.title == title }.documentId
+        val database = File(compose.activity.filesDir, "yomoku.sqlite3")
+        SQLiteDatabase.openDatabase(database.path, null, SQLiteDatabase.OPEN_READWRITE).use { db ->
+            try {
+                db.execSQL(
+                    "CREATE TRIGGER fail_clock_restore BEFORE INSERT ON pending_reading_time BEGIN SELECT RAISE(ABORT, 'test restore'); END"
+                )
+                compose.runOnUiThread { core().dispatch(Event.OpenReader(id)) }
+                compose.waitUntil(30_000) {
+                    !core().view.storageBusy && core().view.documentError != null
+                }
+                compose.onNodeWithTag("document_error").assertIsDisplayed()
+                db.execSQL("DROP TRIGGER fail_clock_restore")
+                compose.onNodeWithText("Retry").performClick()
+                compose.waitUntil(30_000) {
+                    !core().view.storageBusy && core().view.readerTime != null
+                }
+                db.execSQL(
+                    "CREATE TRIGGER fail_clock_save BEFORE UPDATE ON pending_reading_time BEGIN SELECT RAISE(ABORT, 'test save'); END"
+                )
+                Thread.sleep(100)
+                compose.onNodeWithText("Settings").performClick()
+                compose.waitUntil(30_000) {
+                    !core().view.storageBusy && core().view.documentError != null
+                }
+                compose.onNodeWithTag("page_length_250").assertIsNotEnabled()
+                db.execSQL("DROP TRIGGER fail_clock_save")
+                compose.onNodeWithText("Retry").performClick()
+                compose.waitUntil(30_000) {
+                    !core().view.storageBusy && !core().view.readingTimeSavePending
+                }
+                compose.onNodeWithTag("document_error").assertDoesNotExist()
+                compose.onNodeWithText("Back").performClick()
+                compose.onNodeWithText("Back").performClick()
+                awaitStorage()
+            } finally {
+                db.execSQL("DROP TRIGGER IF EXISTS fail_clock_restore")
+                db.execSQL("DROP TRIGGER IF EXISTS fail_clock_save")
+            }
         }
     }
 

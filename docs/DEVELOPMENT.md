@@ -42,10 +42,11 @@ pending-time tests: all 25 reflow pairs, exact Unicode/EOF attribution, backward
 movement, SQLite reopen with fresh clock epochs, duplicate/stale/concurrent
 checkpoints/completions, rereads, overflow, deletion and statement/commit/migration
 rollback. Migration 0009 consumes frozen time with completion history/position.
-Reboot remains simulated at the duration boundary; platform lifecycle wiring and
-actual Android close/reboot verification remain unchecked. Core/FFI checkpoints
-coalesce during unresolved saves and drain before reader departure; automatic
-platform timing remains future work. Analyzed completion now drains checkpoints,
+Rust simulates reboot at the duration boundary. Android's retained driver now
+produces lifecycle/interaction/periodic/final samples and drains before teardown;
+the latest Android verification section records actual close/reboot checks.
+Core/FFI checkpoints coalesce during unresolved saves and drain before reader
+departure. Analyzed completion now drains checkpoints,
 freezes exact retries and reconciles position through core/FIFO/FFI. Android
 controls, gestures, completion toast and finished-book behavior remain open.
 
@@ -1361,3 +1362,54 @@ Gradle passed in the normal sandbox. No schema/dependency change or open failure
 No Android observation producer/lifecycle/native teardown change yet, and no device
 instrumentation, standalone Full suite, release APK or probe/tablet/arm64 execution.
 Actual Android timer/close/reboot recovery remains unverified.
+
+## Android retained reader clock and draining close
+
+Verified 2026-10-24 with the Rust PATH workaround and Android environment above.
+No Rust/schema/dependency/codec changes. Commands (from repository root):
+```sh
+cargo test --workspace --all-features --locked --offline --quiet
+tools/format-kotlin.sh --check
+./android/gradlew -p android :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug --offline --console=plain
+./android/gradlew -p android :app:connectedDebugAndroidTest :app:lintDebug --offline --console=plain
+./android/gradlew -p android :app:connectedDebugAndroidTest :app:lintDebug -Pandroid.testInstrumentationRunnerArguments.class=app.yomoku.PasteReaderTest,app.yomoku.ReaderClockSessionTest,app.yomoku.ReaderClockRecoveryTest --offline --console=plain
+/home/kai/Android/Sdk/platform-tools/adb -s emulator-5554 install -r android/app/build/outputs/apk/debug/app-debug.apk
+/home/kai/Android/Sdk/platform-tools/adb -s emulator-5554 install -r android/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+python3 tools/test-reader-time-recovery.py --serial emulator-5554
+git diff --check
+```
+PASS: 206 data-free Rust tests, debug/test APK builds and strict Android lint.
+The full 26-test Android suite passed, then all 11 affected tests passed after
+the final same-offset idle and reader/Settings retry changes (27 distinct Android
+tests covered overall). Kotlin formatting, Python parsing/help and diff checks pass.
+Native generation/builds stayed cached because no Rust/FFI source changed. Android
+instrumentation executes the actual packaged JNI, real Full and SQLite.
+
+Five fake-clock/real-Handler driver tests verify periodic checkpoints, five-minute
+idle/interactions, duplicate lifecycle signals, settings/reflow, same-offset idle
+preservation, movement/new epochs, delayed/failed restore, closing final saves,
+frozen failed-checkpoint retries plus newer final slots, and exactly one atomic
+completion with its final duration before native release. Partial pages produce no
+completion/encounter/status history. Compose covers real Activity pause/resume and
+retention through recreation, plus Retry in reader/Settings and disabled presets
+while a failed save remains unresolved. The default recovery test closes/reopens
+with real elapsedRealtime rather than synthetic timestamps.
+
+The additional host runner installs nothing implicitly, requires an emulator and
+reboots it. It uses a unique private instrumentation database and verifies process
+IDs, a changed boot ID, exact saved/restored durations and absent reading history;
+it removes only that directory after stopping the app. Actual results: PID 6088
+saved 259 ms; PID 6129 restored exactly 259 ms and saved 268 ms; after guest reboot,
+PID 1531 restored exactly 268 ms. Report:
+`.local/test-reports/reader-time-recovery/20261024T153735796878Z.json`.
+This verifies durable final saves across a real restart/reboot, without claiming
+that an OS kill can flush in-memory time since the last periodic checkpoint.
+
+Initial ADB sandbox socket denial required escalation; the documented swangle AVD
+was started without data reset. An initial lock fixture did not block the native
+SQLite writer from Android's other SQLite library; replaced that assumption with
+final-close assertions and explicit SQL-failure/coalescing retry coverage. Existing
+blocked-SQLite host FFI tests also passed in the workspace suite. No open failure.
+Emulator left running with both debug APKs installed. No release/tablet/physical
+arm64, standalone Full fixture/probe or host Kotlin/JNI rerun. Next: controls,
+swipes/notice rendering and finished-book behavior. Nostr/Q188 remain unchanged.

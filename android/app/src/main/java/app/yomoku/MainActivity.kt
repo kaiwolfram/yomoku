@@ -1,6 +1,7 @@
 package app.yomoku
 
 import android.os.Bundle
+import android.view.MotionEvent
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
@@ -34,6 +35,32 @@ class MainActivity : ComponentActivity() {
     override fun onStart() {
         super.onStart()
         core.setForeground(true)
+    }
+
+    override fun onResume() {
+        super.onResume()
+        core.setReaderActive(true)
+    }
+
+    override fun onPause() {
+        core.setReaderActive(false)
+        super.onPause()
+    }
+
+    override fun onUserInteraction() {
+        core.onReaderInteraction()
+        super.onUserInteraction()
+    }
+
+    override fun dispatchTouchEvent(event: MotionEvent): Boolean {
+        // Activity.onUserInteraction covers down/key/trackball; include sustained scrolling.
+        if (event.actionMasked == MotionEvent.ACTION_MOVE) core.onReaderInteraction()
+        return super.dispatchTouchEvent(event)
+    }
+
+    override fun dispatchGenericMotionEvent(event: MotionEvent): Boolean {
+        if (event.actionMasked == MotionEvent.ACTION_SCROLL) core.onReaderInteraction()
+        return super.dispatchGenericMotionEvent(event)
     }
 
     override fun onStop() {

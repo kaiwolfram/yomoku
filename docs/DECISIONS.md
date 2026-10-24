@@ -1377,3 +1377,28 @@ Android production of monotonic/lifecycle/interaction/periodic/final observation
 restore scheduling and native teardown acknowledgment remain the next slice. Core,
 blocked-SQLite FFI and host Kotlin/JNI tests establish transport/accounting only;
 actual Android close/reboot recovery remains unverified.
+
+## 2026-10-24 — Retained Android reader clock and draining close
+
+Keep Kotlin responsible for observation scheduling, with all duration/idle/revision
+rules in Rust. Use SystemClock.elapsedRealtime; Activity onResume/onPause gates
+accounting separately from analyzer start/stop, including recreation. Restore only
+when an active reader is ready and the FIFO is free. Start Resume after its callback;
+do not count restore latency, settings, background or EOF. Use a 15-second Handler
+checkpoint without resetting idle; onUserInteraction plus touch movement/generic
+scroll supplies Interact. Typed reader actions submit Pause before their intent.
+Reflow preserves the offset; movement restores independently. No dependency changes.
+
+Foreground restore/save failures expose Retry in reader/Settings and pending saves
+disable preset changes. onCleared requests close, immediately rejects new dispatch,
+then retains callbacks until storage_busy and both pending flags clear. After a
+failure with no UI left, retry the core's frozen obligation every second. Persistent
+failure keeps it alive while the process survives; never silently drop a queued
+duration to release the handle. Abrupt process death can still lose uncommitted time
+since the latest checkpoint. No clock timestamp is persisted and no OS guarantee is
+added. This uses existing typed effects/FIFO, without a general Kotlin event queue.
+
+Primary Android API references checked before implementation:
+- https://developer.android.com/reference/android/os/SystemClock
+- https://developer.android.com/reference/android/app/Activity#onUserInteraction()
+- https://developer.android.com/guide/components/activities/activity-lifecycle

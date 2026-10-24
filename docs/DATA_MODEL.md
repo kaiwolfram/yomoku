@@ -447,8 +447,8 @@ or draining the pending total. Clock regression and overflow leave state unchang
 
 Only the accumulated duration may cross a process/reboot boundary: restoring it
 starts paused without saved monotonic timestamps or inferred time away. Tests
-simulate SQLite checkpoint/reopen with fresh clock epochs; actual Android
-close/reboot verification and platform timer wiring remain open.
+simulate SQLite checkpoint/reopen with fresh clock epochs. Android now supplies
+monotonic samples through the retained driver; only accumulated durations persist.
 
 `pending_reading_time` keys a live document, chapter and exact UTF-8 byte offset
 to nonnegative milliseconds and a positive signed revision. It cascades on live
@@ -496,7 +496,7 @@ Other storage commands remain blocked until success. Wrong document/offset and d
 ignored; negative durations fail Serde decoding at FFI. A move clears the restored
 token; reflow and same-offset saves preserve it. A cancelled restore or late save
 cannot attach time to a closed reader. Existing read-only opening is unchanged:
-explicit restore reserves the zero row only when the future timer needs it.
+explicit restore reserves the zero row only when the active Android driver needs it.
 
 ObserveReaderClock accepts a document/exact-position identity, nonnegative signed
 monotonic milliseconds and Resume/Interact/Checkpoint/Pause action. It drives the
@@ -515,8 +515,11 @@ The platform must restore, send Resume when ready, send interactions/periodic
 checkpoints and Pause before settings/background/departure/completion, then await
 both pending flags and storage_busy before destroying the native session. Core
 does not queue arbitrary busy operations or read a clock itself.
-No automatic clock/lifecycle/interactions, periodic save, native teardown flush or
-platform timer is connected yet. Checkpoint operations create no completion, encounter
+Android CoreSession supplies elapsedRealtime samples after successful restore,
+15-second Handler checkpoints, interactions and final Pause observations before
+settings/background/departure/completion. It waits for storage and both pending flags
+before native close, retaining exact failed obligations for retry. No platform clock
+timestamps enter SQLite. Checkpoint operations create no completion, encounter
 or status events. Analyzed completion intents are connected below; post identity
 remains open.
 
@@ -581,8 +584,8 @@ Recorded outcome alone may expose CompletionNotice(command_id, newly_known), onl
 when positive; dismissal, new completion or reader exit clears this transient state.
 Completion retires the reader's consumed time token; another anchor/reread restores
 its own durable duration. Rereads reserve a new command. No new schema or dependency
-version; automatic Android clock/final saves, controls, toast and finished-book state
-are still separate tasks. Native teardown must await all pending core obligations.
+version; Android automatically supplies clock/final saves and drains pending core
+obligations before native teardown. Controls, toast and finished-book state remain open.
 
 ## Required future schema constraints
 - Future import repositories must extend the identity/immutable-text and durable
@@ -590,7 +593,7 @@ are still separate tasks. Native teardown must await all pending core obligation
 - Add analyzer dictionary-form links (nullable) to global vocabulary and wire
   registration/status repositories into typed application/import effects.
   Reading never participates in identity.
-- Connect automatic final checkpoints and Android completion controls to the typed
+- Connect Android completion controls to the typed
   core/worker/FFI operations; preserve new reread IDs and frozen analysis identity.
 - Pending page time and current text offset separate from completed events;
   permanent finished-at-least-once separate from current percentage.
