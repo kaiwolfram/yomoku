@@ -1,6 +1,6 @@
 # Resume here
 
-Updated: 2026-10-24. Pure active-time accounting verified; Full gate remains.
+Updated: 2026-10-24. Pure active time verified; physical testing deferred to user.
 Read AGENTS.md, plan phases 2–4 and PRODUCT_SPEC.md sections 3–4.
 Update docs/commit each verified step.
 
@@ -44,7 +44,7 @@ Update docs/commit each verified step.
 
 ## Next tasks (ordered)
 1. Finish Full gate: actual memory-pressure/reclamation; choose production worker
-   lifecycle/reuse. Physical arm64 required before claiming hardware viability.
+   lifecycle/reuse on emulator. User will test physical arm64 once app is usable.
 2. After gate, wire import_analyzed_paste into runtime/FFI/Android with a reused
    analyzer and Created/Existing summary; extend format imports later.
 3. Persist pending page time using active_time (page/reflow attribution open),
@@ -75,6 +75,6 @@ logging remains. No emulator/user-file/radio/viewport changes.
 - Android env/commands: DEVELOPMENT.md. ADB/Gradle sockets may need escalation.
   Instrumentation uninstalls app: reinstall debug before separate death driver.
 - medium_phone API 36 uses swangle/KVM; tools/start-android-emulator.sh.
-- Actual pressure/LMKD, mid-extraction death/power loss and physical arm64 remain
-  unverified. Stop/resume and force-stop are not memory-pressure tests.
+- Pressure/LMKD and mid-extraction death/power loss remain unverified. Physical
+  arm64 is deferred to user, not an integration blocker; do not claim it passed.
 - Nostr stays empty; ask Q188 before forwarding. No production edit/rename/delete.

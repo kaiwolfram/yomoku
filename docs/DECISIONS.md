@@ -1040,3 +1040,14 @@ a fresh clock epoch. No schema, FFI payload, app route or Android timer is added
 Durable page attribution/reflow, lifecycle/interactions and completion integration
 stay unchecked. Freeze time with the future completion command ID and commit it
 with occurrences/New→Known/position; checkpoints are never reading statistics.
+
+## 2026-10-24 — Defer physical arm64 testing to the user's usable-app trial
+The user will test their physical device once the app is usable. Physical arm64
+validation is a later user-owned task, not a prerequisite for runtime integration
+or continued emulator development. Do not wait for hardware access or claim that
+emulator execution proves hardware viability. Earlier references grouping arm64
+with the Full integration gate are superseded by this decision.
+
+Continue emulator pressure/reclamation work and choose production worker
+lifecycle/reuse, then integrate analyzed imports and atomic reader completion.
+Keep recording the actual ABI/device/build and limits of each verification run.

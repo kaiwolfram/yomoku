@@ -1,5 +1,11 @@
 # Sudachi Full Android measurements
 
+Current scope (user decision, 2026-10-24): physical arm64 testing is deferred to
+the user once the app is usable. It does not block production integration or
+emulator development. The remaining integration gate is emulator pressure/
+reclamation evidence and the production worker lifecycle decision. Older gate
+descriptions below record their original scope; no hardware validation is claimed.
+
 Measured 2026-10-23, using the standalone `yomoku-analysis` example
 `android_probe` and `tools/measure-sudachi-android.py`. This executes the real
 checksum-verifying owned-byte constructor and adapter on Android, outside the
@@ -292,5 +298,6 @@ Android documents `am start`/`force-stop` in its
 [ADB command reference](https://developer.android.com/tools/adb#am).
 
 Process-death recovery is now verified for this measurement harness. Actual
-memory-pressure/reclamation, production worker lifecycle and physical arm64
-measurements remain open; the broader loading/memory gate remains unchecked.
+emulator memory-pressure/reclamation and production worker lifecycle remain open;
+the loading/memory integration gate remains unchecked. Physical arm64 measurements
+are deferred to the user's later usable-app trial, independently of integration.

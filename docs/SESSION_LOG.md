@@ -719,3 +719,13 @@
 - Next: Full pressure and production worker lifecycle/arm64 gate, analyzed import
   wiring, then pending-page provenance/reflow and occurrence/status/time-aware
   atomic completion before reader controls. Nostr empty; Q188 before forwarding.
+
+## 2026-10-24 — Physical-device validation deferred by user
+
+- User will test their physical device once the app is usable. Removed physical
+  arm64 from the runtime-integration gate and tracked it as a later user-owned
+  validation task. Emulator pressure/reclamation and production worker lifecycle
+  remain the next integration prerequisites; no hardware pass is claimed.
+- Updated plan, handoff, architecture, measurement scope and decision record.
+  Documentation only; whitespace and consistency checks pass. No build/tests or
+  device actions rerun; working tree was clean at start.

@@ -116,8 +116,10 @@ mapped, confirms all app processes exit without graceful close, and launches a
 new process against the same test-private publication. Two x86_64 pairs preserve
 the inode/mtime/read-only permissions and pass real analysis after re-verification.
 Cleanup runs only after confirmed process exit. This is force-stop recovery,
-not an OS low-memory-killer or interrupted-extraction simulation. Low-memory
-reclamation and physical arm64 remain gates; see SUDACHI_MEASUREMENTS.md.
+not an OS low-memory-killer or interrupted-extraction simulation. Emulator
+low-memory reclamation and production worker lifecycle remain the integration
+gate. Physical arm64 testing is deferred to the user's usable-app trial and does
+not block integration; see SUDACHI_MEASUREMENTS.md.
 Release APKs exclude the probe Activity/facades and the probe library.
 
 Pure `pagination` derives chapter-local TextAnchor pages from ordered immutable
