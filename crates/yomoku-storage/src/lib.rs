@@ -6,10 +6,12 @@ mod analysis;
 mod completions;
 mod documents;
 mod imports;
+mod reading_time;
 mod settings;
 mod vocabulary;
 
 pub use imports::{AnalyzedPaste, PasteImportError, PasteImportOutcome};
+pub use reading_time::SavedReadingTime;
 
 use std::{error::Error, fmt, path::Path, time::Duration};
 
@@ -62,6 +64,11 @@ const MIGRATIONS: &[Migration] = &[
         name: "0008_paste_content_hashes",
         sql: include_str!("../migrations/0008_paste_content_hashes.sql"),
     },
+    Migration {
+        version: 9,
+        name: "0009_pending_reading_time",
+        sql: include_str!("../migrations/0009_pending_reading_time.sql"),
+    },
 ];
 
 /// Failures are returned to the runtime; opening never resets a database.
@@ -74,6 +81,7 @@ pub enum StorageError {
     InvalidDocument,
     InvalidSettings,
     InvalidCompletion,
+    InvalidReadingTime,
     InvalidVocabulary,
     InvalidAnalysis,
 }
@@ -95,6 +103,7 @@ impl fmt::Display for StorageError {
             Self::InvalidDocument => f.write_str("stored document is inconsistent"),
             Self::InvalidSettings => f.write_str("stored settings are inconsistent"),
             Self::InvalidCompletion => f.write_str("invalid or conflicting page completion"),
+            Self::InvalidReadingTime => f.write_str("invalid or stale pending reading time"),
             Self::InvalidVocabulary => f.write_str("invalid vocabulary value or stored entry"),
             Self::InvalidAnalysis => f.write_str("invalid analysis or segmentation override"),
         }

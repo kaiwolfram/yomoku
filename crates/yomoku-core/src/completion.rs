@@ -1,6 +1,7 @@
 //! Page-completion intent values. No clocks, allocation or persistence live here.
 
 use crate::{
+    active_time::PendingReadingTime,
     document::{CompletionCommandId, DocumentId, InvalidTextValue, PastedDocument, TextAnchor},
     pagination::{LogicalPages, PageLength, ReadingPosition},
 };
@@ -16,6 +17,8 @@ pub struct PageCompletion {
     pub page_length: PageLength,
     pub departing_position: ReadingPosition,
     pub completed_at_unix_ms: i64,
+    /// Checkpoint first, then freeze the total belonging to this departing page.
+    pub pending_time: PendingReadingTime,
 }
 
 impl PageCompletion {

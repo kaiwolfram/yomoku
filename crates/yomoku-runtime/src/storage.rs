@@ -147,9 +147,9 @@ fn execute(
 pub(crate) fn map_error(error: StorageError) -> DocumentError {
     match error {
         StorageError::Sqlite(_) => DocumentError::Unavailable,
-        StorageError::InvalidDocument | StorageError::InvalidCompletion => {
-            DocumentError::InvalidDocument
-        }
+        StorageError::InvalidDocument
+        | StorageError::InvalidCompletion
+        | StorageError::InvalidReadingTime => DocumentError::InvalidDocument,
         StorageError::InvalidSettings => DocumentError::InvalidSettings,
         StorageError::UnsupportedSchemaVersion { .. }
         | StorageError::InvalidMigrationHistory

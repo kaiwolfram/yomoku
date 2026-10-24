@@ -835,3 +835,27 @@
   pending-page time/reflow attribution, then atomic completion with occurrences,
   New→Known/time and Android clock/navigation. No standalone/pressure/death probe,
   unsigned release, tablet or arm64 rerun; arm64 remains the later user trial.
+
+
+## 2026-10-24 — Persist pending time and hand it off atomically
+
+- Started clean. Migration 0009 adds durable duration/revision buckets at exact
+  UTF-8 reading offsets plus historical completion.active_time_ms (legacy zero).
+  Backward navigation retains pending time; reflow assigns stable anchors once
+  to containing pages. No timestamps from the monotonic clock cross restarts.
+- Opaque checkpoint tokens permit exact retries and reject stale/conflicting
+  saves. Completion freezes/validates a page total, consumes only its buckets,
+  advances revisions and commits time/history/position together. Duplicate IDs
+  cannot drain later reread time. Zero rows prevent stale-time resurrection;
+  consumption skips a revision to distinguish even zero-time checkpoint retries.
+- Twelve new storage tests cover all 25 presets, SQLite reopen/fresh clock epoch,
+  stale/duplicate/concurrent delivery, rereads/EOF/deletion, overflow and migration/
+  statement/commit rollback. Updated historical migration fixtures for schema 9.
+- PASS: workspace build, 169 data-free Rust tests (88 storage), fmt/strict Clippy,
+  host real-Full Kotlin/JNI + seven Unicode exchanges and whitespace checks.
+  No open failure; prior benign Crux shutdown logs persist. No new dependency.
+- Updated plan, decisions, architecture/data model, development and handoff.
+  Next: occurrences/New→Known in the completion transaction, app/worker/FFI timer
+  checkpoints, Android clock/lifecycle/interactions and forward controls/Finish.
+  No Full standalone fixtures, Android build/lint/tests, release/probes/tablet or
+  arm64 rerun; actual Android close/reboot recovery remains unchecked.

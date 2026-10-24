@@ -344,7 +344,8 @@ a deliberate reread uses a fresh ID. Issued but unused IDs are not reading event
 and are never automatically replayed. IDs survive reopen and cannot be reused.
 
 Pure `PageCompletion` carries the document, exact completed TextAnchor, page-length
-snapshot, exact departing ReadingPosition and nonnegative Unix milliseconds.
+snapshot, exact departing ReadingPosition, nonnegative Unix milliseconds and a
+validated frozen PendingReadingTime total (migration 0009).
 `next_position` validates ownership/scalar boundaries, the current exact position
 and equality with the derived logical page. For the implemented single-unit paste,
 the destination is the page's end (the next page start or final EOF).
@@ -361,16 +362,18 @@ every payload field and returns AlreadyRecorded **without writing position**,
 even after reflow, backward movement or deletion. A conflicting payload errors.
 For new events it requires an issued ID, the current preset and a valid departing
 page/position, then inserts history and updates current position in one commit.
-Statement/commit failure rolls both back; retry reuses the same intent. Position-only
+Migration 0009 also validates and consumes the page's frozen pending duration in
+that transaction (details below). Statement/commit failure rolls everything back;
+retry reuses the same intent. Position-only
 saves never insert history. Concurrent duplicate submissions record once.
 
 This is repository-only infrastructure, with no app event/runtime/FFI/Android
 forward action yet. Before exposing it, extend the same transaction with actual
-Japanese occurrences, New→Known/status events and accumulated active time. Do not
-use absent occurrence/time data as completed-reading statistics. Final EOF alone
+Japanese occurrences and New→Known/status events, then wire platform checkpoints.
+Do not use absent occurrence data as completed-reading statistics. Final EOF alone
 does not implement finished-at-least-once, Finish Book or reopen-at-page-1 behavior.
 
-## Pending active-time domain values (no migration yet)
+## Pending active-time values and repository (migration 0009)
 `active_time::PendingReadingTime` validates nonnegative signed 64-bit milliseconds.
 `ActiveReadingTime` accepts caller-supplied monotonic u64 milliseconds; it owns no
 clock or I/O. Each foreground interval counts until five minutes after the last
@@ -382,11 +385,46 @@ or draining the pending total. Clock regression and overflow leave state unchang
 
 Only the accumulated duration may cross a process/reboot boundary: restoring it
 starts paused without saved monotonic timestamps or inferred time away. Tests
-simulate checkpoint/restore with fresh clock epochs; there is no durable pending
-time repository or actual Android close/reboot verification yet. The future
-repository must bind pending time to page/post provenance, handle reflow, and
-freeze the duration with its completion ID before committing it atomically with
-encounters/status/position. Checkpoints alone must never contribute to statistics.
+simulate SQLite checkpoint/reopen with fresh clock epochs; actual Android
+close/reboot verification and platform timer wiring remain open.
+
+`pending_reading_time` keys a live document, chapter and exact UTF-8 byte offset
+to nonnegative milliseconds and a positive signed revision. It cascades on live
+document deletion. Attribution uses the exact saved reading offset where the
+accumulator began; a page-size change keeps that offset and duration intact.
+Backward navigation checkpoints the departing anchor before changing position
+and leaves its time pending. Restore only the destination anchor's accumulator;
+do not seed it with the whole page total. That total may include other anchors.
+
+`load_pending_reading_time` validates ownership/scalar boundaries and reserves a
+zero row if absent. `SavedReadingTime` is an opaque checkpoint token containing
+the anchor, previous duration and revision. `save_pending_reading_time` saves an
+absolute nondecreasing duration only at the current position. A successful save
+increments revision; an exact immediate retry returns the same result without
+writing. Conflicting/older tokens error. Only duration, never monotonic timestamps
+or idle deadlines, is persisted. Checkpoints never create reading/status events.
+
+`pending_page_time` sums anchors in a derived logical page with checked signed
+arithmetic. Boundaries belong to the following page, except EOF belongs to the
+final page, matching pagination. Reflow neither duplicates nor proportionally
+splits durations: completion credits each anchor once to its containing page.
+The worker must checkpoint first, then freeze this total with the command ID and
+timestamp, and stop writing that departing accumulator while completion resolves.
+
+`record_page_completion` compares the frozen total against durable buckets inside
+its immediate transaction. It inserts `active_time_ms`, zeroes only that page's
+buckets, advances their revisions and writes destination position in one commit.
+Consumption skips one revision so even a zero-duration checkpoint retry cannot
+mistake completion for its own successful write. Zero rows remain until document
+deletion to reject stale checkpoints after reread (no revision reset/ABA). A new
+accumulator must load a fresh token after completion. Failures roll everything
+back. Duplicate completion IDs compare the stored duration and never consume
+new reread time or move position, even after content deletion. Historical v1 rows
+receive zero active_time_ms on upgrade; history is retained on document deletion.
+
+This is repository-only paste/page infrastructure. Encounters/New→Known must
+join this transaction before forward navigation is exposed; post identity,
+platform lifecycle/interactions and periodic checkpoint scheduling remain open.
 
 ## Transient application state
 `app::Destination` is Library (default), Nostr, Statistics or Vocabulary.

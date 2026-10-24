@@ -18,7 +18,7 @@ with functioning rustup can omit the PATH workaround. Do not assume this compile
 is the project's minimum supported version; establish that with dependencies.
 Cargo.lock is retained for reproducible application development.
 Crux 0.20.0 declares Rust 1.90 minimum; the full locked graph has only been tested
-with 1.99.1. Current host baseline: 157 data-free Rust tests (76 storage, seven
+with 1.99.1. Current host baseline: 169 data-free Rust tests (88 storage, seven
 runtime). Eleven analysis fixtures and one runtime fixture run separately with
 each Full loader via tools/test-sudachi.sh (see below).
 
@@ -37,8 +37,14 @@ runs thirteen domain tests without Android, SQLite or real clocks. They cover
 the exact five-minute idle boundary, interaction/restart after idle, dictionary
 interactions, background/close, duplicate lifecycle signals, checkpoint frequency,
 restoring saved durations with a fresh clock epoch, regression and overflow.
-Restoration/reboot is simulated at the value boundary; platform lifecycle wiring,
-durable pending-page saves and atomic completion-time statistics remain unchecked.
+`cargo test -p yomoku-storage reading_time --locked --offline` adds twelve durable
+pending-time tests: all 25 reflow pairs, exact Unicode/EOF attribution, backward
+movement, SQLite reopen with fresh clock epochs, duplicate/stale/concurrent
+checkpoints/completions, rereads, overflow, deletion and statement/commit/migration
+rollback. Migration 0009 consumes frozen time with completion history/position.
+Reboot remains simulated at the duration boundary; platform lifecycle wiring and
+actual Android close/reboot verification remain unchecked. Runtime/FFI checkpoint
+ordering and occurrence/status completion integration remain future work.
 
 ## Kotlin payload generation
 ```sh
@@ -1117,3 +1123,33 @@ The emulator disconnected before a diagnostic run; restarted with the documented
 swangle flags, retaining data. Gradle/ADB escalation was used. Previous nonfatal
 Crux shutdown logging persists. No unsigned release, standalone/pressure/death
 probe, tablet or physical-arm64 rerun; prior measurements retain their limits.
+
+
+## Durable pending reading time
+
+Verified 2026-10-24 with the Rust PATH workaround above, sequentially:
+```sh
+cargo build --workspace --locked --offline
+cargo test --workspace --all-features --locked --offline
+cargo fmt --all -- --check
+cargo clippy --workspace --all-targets --all-features --locked --offline -- -D warnings
+tools/test-kotlin-bridge.sh
+git diff --check
+```
+PASS: 169 data-free Rust tests, including 88 storage tests and twelve new durable
+time tests, workspace build, formatting, strict Clippy, host real-Full Kotlin/JNI
+and seven bidirectional Unicode exchanges. Existing nonfatal Crux shutdown logs
+persist in JNI. No open failure or dependency version change.
+
+Migration 0009 stores only durations at exact UTF-8 positions with checkpoint
+revision tokens. Completion validates a frozen page total, writes active_time_ms,
+consumes that page's buckets and advances position atomically. Tests cover all
+25 preset reflow pairs, backward movement, SQLite reopen with a fresh clock epoch,
+concurrent/duplicate/stale delivery, reread protection, EOF, deletion, overflow and
+statement/commit/migration rollback. Existing migration/history fixtures now expect
+schema 9; the v5 upgrade fixture inserts the historical event shape directly.
+
+No Android source or FFI payload change; timer application/worker/FFI and platform
+wiring remain open. No standalone Full fixtures, Android build/lint/instrumentation,
+release, probes, tablet or physical-arm64 rerun. Actual Android close/reboot recovery
+is not established by the simulated fresh-epoch repository tests.

@@ -1181,3 +1181,37 @@ product behavior. Android's [Compose synchronization guidance](https://developer
 explains the separate test clock and external asynchronous work; its
 [effect guidance](https://developer.android.com/develop/ui/compose/side-effects#producestate)
 describes composition-scoped producers.
+
+
+## 2026-10-24 — Durable time attribution and completion handoff
+
+Keep pending durations at the exact chapter-local UTF-8 reading offset where the
+accumulator began, scoped to the live document. Checkpoint before moving position;
+backward navigation retains the departing offset's time without history. Reflow
+keeps all offsets/durations intact and assigns each to its containing logical page.
+Do not split durations proportionally or key them by mutable page numbers/presets.
+A page boundary belongs to the following page; EOF belongs to the final page, as
+in pagination. Restore only the destination offset's duration; freeze the sum of
+all offsets belonging to the departing page when constructing completion.
+
+Use migration 0009 and existing rusqlite APIs/dependencies. A loaded opaque
+SavedReadingTime token reserves a zero row and carries its duration/revision.
+Absolute nondecreasing checkpoints validate the current position, increment the
+revision and permit an exact immediate retry. Older/conflicting saves fail instead
+of overwriting time. Retain zero rows after consumption; advance by two revisions
+to distinguish completion from even a zero-duration checkpoint's expected retry.
+This prevents stale checkpoints from resurrecting consumed time on reread.
+
+Extend the frozen PageCompletion with PendingReadingTime. In the same immediate
+transaction validate its durable total, insert history.active_time_ms, consume only
+the departing page's buckets and persist destination position. Duplicate completion
+IDs compare duration too, then return without draining later time or moving progress.
+Migration gives historical repository-only events zero time. Deletion cascades
+pending buckets but retains completion time/provenance; no deletion API is added.
+
+This is the repository slice of PRODUCT_SPEC.md §§3.1/4: partial pages create no
+history or status changes, and only completed pages contribute time. The pure core
+still owns no clock or SQL. App/worker/FFI sequencing, periodic checkpoints, Android
+monotonic lifecycle/interactions and actual close/reboot verification remain open.
+Before exposing forward controls, add occurrences and New→Known to this transaction.
+No new dependency version, platform behavior or architecture change.

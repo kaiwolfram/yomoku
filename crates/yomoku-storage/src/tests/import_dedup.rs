@@ -417,6 +417,7 @@ fn deleting_document_removes_identity_and_reimport_starts_fresh_preserving_histo
             offset: TextOffset::START,
         },
         completed_at_unix_ms: 30,
+        pending_time: Default::default(),
     };
     storage.record_page_completion(completion).unwrap();
     // Test-only deletion; no production delete API or new semantics introduced.
@@ -491,7 +492,7 @@ fn failed_hash_migration_preserves_version_seven_database_and_can_retry() {
         .unwrap();
     drop(connection);
     let mut storage = Storage::open(database.path()).unwrap();
-    assert_eq!(storage.schema_version().unwrap(), 8);
+    assert_eq!(storage.schema_version().unwrap(), 9);
     assert_eq!(storage.load_paste(saved.document_id).unwrap(), Some(saved));
     assert_eq!(count(&storage, "paste_content_hashes"), 0);
 }

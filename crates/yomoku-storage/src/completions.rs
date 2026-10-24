@@ -6,6 +6,7 @@ use yomoku_core::{
 
 use crate::{
     documents::{load_paste_in, write_position_in},
+    reading_time::{consume_time_in, page_time_in},
     settings::read_page_length,
     Storage, StorageError,
 };
@@ -25,7 +26,7 @@ impl Storage {
     }
 
     /// Repository-only foundation. Before exposing forward navigation, extend
-    /// this transaction with analyzed encounters, New→Known events and time.
+    /// this transaction with analyzed encounters and New→Known events.
     /// Retries must supply the same ID and frozen payload; they never move progress.
     pub fn record_page_completion(
         &mut self,
@@ -44,6 +45,7 @@ impl Storage {
             ":departing": i64::from(completion.departing_position.offset),
             ":length": completion.page_length.characters() as i64,
             ":date": completion.completed_at_unix_ms,
+            ":time": completion.pending_time.milliseconds(),
         };
         // Replay precedes live-content validation: history remains retry-safe
         // after progress changes, page reflow and future document deletion.
@@ -54,6 +56,7 @@ impl Storage {
                 AND start_byte_offset = :start AND end_byte_offset = :end
                 AND departing_byte_offset = :departing AND page_length = :length
                 AND completed_at_unix_ms = :date
+                AND active_time_ms = :time
              FROM reading_completions WHERE command_id = :command",
                 values,
                 |row| row.get::<_, bool>(0),
@@ -86,13 +89,18 @@ impl Storage {
         let next = completion
             .next_position(&document)
             .map_err(|_| StorageError::InvalidCompletion)?;
+        let (pending, anchors) = page_time_in(&transaction, &document, completion.page)?;
+        if pending != completion.pending_time {
+            return Err(StorageError::InvalidCompletion);
+        }
         transaction.execute(
             "INSERT INTO reading_completions
              (command_id, semantics_version, document_id, source_id, chapter_id,
-              start_byte_offset, end_byte_offset, departing_byte_offset, page_length, completed_at_unix_ms)
-             VALUES (:command, 1, :document, :source, :chapter, :start, :end, :departing, :length, :date)",
+              start_byte_offset, end_byte_offset, departing_byte_offset, page_length, completed_at_unix_ms, active_time_ms)
+             VALUES (:command, 1, :document, :source, :chapter, :start, :end, :departing, :length, :date, :time)",
             values,
         )?;
+        consume_time_in(&transaction, &anchors)?;
         write_position_in(&transaction, completion.document_id, next)?;
         transaction.commit()?;
         Ok(CompletionOutcome::Recorded)

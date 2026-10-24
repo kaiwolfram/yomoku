@@ -29,9 +29,11 @@ Pure `active_time` accounts pending reading milliseconds using caller-supplied
 monotonic timestamps. Resume/interaction arms a five-minute idle window; dictionary
 interactions count, while background/reader-close pause. Checkpoints neither reset
 idle nor drain time. Only a validated nonnegative signed duration can be restored;
-restoration starts paused with no old clock epoch. This module is not connected to
-the application model, platform lifecycle, SQLite or statistics yet. Durable page
-attribution and atomic completion/time handoff remain separate work.
+restoration starts paused with no old clock epoch. Migration 0009's separate SQLite
+repository saves only durations at exact text offsets, with revision tokens for
+stale/duplicate checkpoints. Reflow assigns each offset to its containing page;
+completion consumes that page's frozen total with history/position in one commit.
+Application model/worker/FFI and platform clock/lifecycle wiring remain separate work.
 
 `yomoku-analysis` is a separate Rust I/O adapter using Sudachi.rs v0.7.0 at
 `5de0410b6edfd428fc510cc9763440772e9619d5` and Full 20261015 (V1). Its constructor
@@ -196,8 +198,13 @@ PageCompletion validates the exact departing page/position; storage records hist
 and destination position atomically. Duplicate IDs require identical payloads and
 never rewrite progress, including after reflow/reopen/deletion. Rereads allocate a
 fresh ID; position-only saves never add history. These repository methods have no
-app event/runtime/FFI entry point yet: real encounters, New→Known events and active
-time must join the transaction before forward controls are exposed.
+app event/runtime/FFI entry point yet: real encounters and New→Known events must
+join the transaction before forward controls are exposed. Migration 0009 adds
+active_time_ms to history and pending_reading_time buckets, scoped to live documents.
+Checkpoint loads reserve a zero row/revision; absolute saves validate current
+position and reject stale tokens. Completion validates the frozen page total,
+zeros its buckets and advances their revisions atomically. Replays compare time
+too and never drain later reread time. Only durations cross process/reboot epochs.
 Migration 0006 adds global exact-surface entries and versioned, dated registration/
 manual-status events. Registration preserves existing statuses; lookup and unchanged
 selections write no history. Immediate transactions commit registration batches or
