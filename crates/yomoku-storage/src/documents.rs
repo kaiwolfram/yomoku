@@ -53,40 +53,9 @@ impl Storage {
         let transaction = self
             .connection
             .transaction_with_behavior(TransactionBehavior::Immediate)?;
-        let title = text.initial_title();
-        transaction.execute(
-            "INSERT INTO sources (kind, original_title) VALUES ('paste', ?1)",
-            [title],
-        )?;
-        let source_id = SourceId::try_from(transaction.last_insert_rowid())
-            .map_err(|_| StorageError::InvalidDocument)?;
-        transaction.execute(
-            "INSERT INTO chapters (source_id, chapter_index) VALUES (?1, 0)",
-            [i64::from(source_id)],
-        )?;
-        let chapter_id = ChapterId::try_from(transaction.last_insert_rowid())
-            .map_err(|_| StorageError::InvalidDocument)?;
-        transaction.execute(
-            "INSERT INTO documents (source_id, title) VALUES (?1, ?2)",
-            (i64::from(source_id), title),
-        )?;
-        let document_id = DocumentId::try_from(transaction.last_insert_rowid())
-            .map_err(|_| StorageError::InvalidDocument)?;
-        transaction.execute(
-            "INSERT INTO chapter_texts (chapter_id, text) VALUES (?1, ?2)",
-            (i64::from(chapter_id), text.as_str()),
-        )?;
+        let document = create_paste_in(&transaction, text)?;
         transaction.commit()?;
-        Ok(PastedDocument {
-            document_id,
-            title: title.to_owned(),
-            reading_position: None,
-            chapter: ChapterText {
-                source_id,
-                chapter_id,
-                text: text.as_str().to_owned(),
-            },
-        })
+        Ok(document)
     }
 
     /// Read a consistent snapshot. None means the Library document is absent;
@@ -199,4 +168,44 @@ pub(crate) fn load_paste_in(
             .map_err(|_| StorageError::InvalidDocument)?;
     }
     Ok(Some(document))
+}
+
+/// Caller owns the transaction so analyzed imports can commit all rows together.
+pub(crate) fn create_paste_in(
+    connection: &Connection,
+    text: &PasteText,
+) -> Result<PastedDocument, StorageError> {
+    let title = text.initial_title();
+    connection.execute(
+        "INSERT INTO sources (kind, original_title) VALUES ('paste', ?1)",
+        [title],
+    )?;
+    let source_id = SourceId::try_from(connection.last_insert_rowid())
+        .map_err(|_| StorageError::InvalidDocument)?;
+    connection.execute(
+        "INSERT INTO chapters (source_id, chapter_index) VALUES (?1, 0)",
+        [i64::from(source_id)],
+    )?;
+    let chapter_id = ChapterId::try_from(connection.last_insert_rowid())
+        .map_err(|_| StorageError::InvalidDocument)?;
+    connection.execute(
+        "INSERT INTO documents (source_id, title) VALUES (?1, ?2)",
+        (i64::from(source_id), title),
+    )?;
+    let document_id = DocumentId::try_from(connection.last_insert_rowid())
+        .map_err(|_| StorageError::InvalidDocument)?;
+    connection.execute(
+        "INSERT INTO chapter_texts (chapter_id, text) VALUES (?1, ?2)",
+        (i64::from(chapter_id), text.as_str()),
+    )?;
+    Ok(PastedDocument {
+        document_id,
+        title: title.to_owned(),
+        reading_position: None,
+        chapter: ChapterText {
+            source_id,
+            chapter_id,
+            text: text.as_str().to_owned(),
+        },
+    })
 }

@@ -24,52 +24,7 @@ impl Storage {
         let transaction = self
             .connection
             .transaction_with_behavior(TransactionBehavior::Immediate)?;
-        let chapter = read_chapter(&transaction, chapter_id)?;
-        analysis
-            .validate(&chapter)
-            .map_err(|_| StorageError::InvalidAnalysis)?;
-        let existing: Option<i64> = transaction
-            .query_row(
-                "SELECT id FROM chapter_analyses WHERE chapter_id = ?1 AND engine_revision = ?2
-             AND dictionary_revision = ?3 AND split_mode = ?4",
-                (
-                    i64::from(chapter_id),
-                    &analysis.profile.engine_revision,
-                    &analysis.profile.dictionary_revision,
-                    encode_mode(analysis.mode),
-                ),
-                |row| row.get(0),
-            )
-            .optional()?;
-        if let Some(id) = existing {
-            let id = analysis_id(id)?;
-            if read_analysis(&transaction, id)?.as_ref() != Some(analysis) {
-                return Err(StorageError::InvalidAnalysis);
-            }
-            transaction.commit()?;
-            return Ok(id);
-        }
-        transaction.execute(
-            "INSERT INTO chapter_analyses
-             (semantics_version, chapter_id, engine_revision, dictionary_revision, split_mode)
-             VALUES (1, ?1, ?2, ?3, ?4)",
-            (
-                i64::from(chapter_id),
-                &analysis.profile.engine_revision,
-                &analysis.profile.dictionary_revision,
-                encode_mode(analysis.mode),
-            ),
-        )?;
-        let id = analysis_id(transaction.last_insert_rowid())?;
-        for (index, token) in analysis.tokens.iter().enumerate() {
-            transaction.execute(
-                "INSERT INTO analyzed_tokens (analysis_id, token_index, start_byte, end_byte,
-                 surface, is_japanese, reading, dictionary_form) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
-                (i64::from(id), index_value(index)?, i64::from(token.anchor.range.start),
-                 i64::from(token.anchor.range.end), &token.surface, token.is_japanese, &token.reading,
-                 token.dictionary_form.as_ref().map(Surface::as_str)),
-            )?;
-        }
+        let id = store_chapter_analysis_in(&transaction, chapter_id, analysis)?;
         transaction.commit()?;
         Ok(id)
     }
@@ -361,4 +316,57 @@ fn encode_mode(mode: SplitMode) -> &'static str {
         SplitMode::B => "b",
         SplitMode::C => "c",
     }
+}
+
+pub(crate) fn store_chapter_analysis_in(
+    connection: &Connection,
+    chapter_id: ChapterId,
+    analysis: &ChapterAnalysis,
+) -> Result<AnalysisId, StorageError> {
+    let chapter = read_chapter(connection, chapter_id)?;
+    analysis
+        .validate(&chapter)
+        .map_err(|_| StorageError::InvalidAnalysis)?;
+    let existing: Option<i64> = connection
+        .query_row(
+            "SELECT id FROM chapter_analyses WHERE chapter_id = ?1 AND engine_revision = ?2
+         AND dictionary_revision = ?3 AND split_mode = ?4",
+            (
+                i64::from(chapter_id),
+                &analysis.profile.engine_revision,
+                &analysis.profile.dictionary_revision,
+                encode_mode(analysis.mode),
+            ),
+            |row| row.get(0),
+        )
+        .optional()?;
+    if let Some(id) = existing {
+        let id = analysis_id(id)?;
+        if read_analysis(connection, id)?.as_ref() != Some(analysis) {
+            return Err(StorageError::InvalidAnalysis);
+        }
+        return Ok(id);
+    }
+    connection.execute(
+        "INSERT INTO chapter_analyses
+         (semantics_version, chapter_id, engine_revision, dictionary_revision, split_mode)
+         VALUES (1, ?1, ?2, ?3, ?4)",
+        (
+            i64::from(chapter_id),
+            &analysis.profile.engine_revision,
+            &analysis.profile.dictionary_revision,
+            encode_mode(analysis.mode),
+        ),
+    )?;
+    let id = analysis_id(connection.last_insert_rowid())?;
+    for (index, token) in analysis.tokens.iter().enumerate() {
+        connection.execute(
+            "INSERT INTO analyzed_tokens (analysis_id, token_index, start_byte, end_byte,
+             surface, is_japanese, reading, dictionary_form) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+            (i64::from(id), index_value(index)?, i64::from(token.anchor.range.start),
+             i64::from(token.anchor.range.end), &token.surface, token.is_japanese, &token.reading,
+             token.dictionary_form.as_ref().map(Surface::as_str)),
+        )?;
+    }
+    Ok(id)
 }

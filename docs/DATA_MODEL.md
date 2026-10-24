@@ -40,9 +40,9 @@ dated old/new event together, returns None for absent IDs and emits nothing on a
 unchanged selection. Transactions serialize concurrent writes; failure preserves
 prior entries/history. Invalid timestamps/stored values error without repair.
 
-These APIs are repository prerequisites, not analyzer/import or reading-completion
-integration. Document creation and registration must share a future import
-transaction. Completion-driven New→Known events need completion provenance and
+`create_analyzed_paste` composes document creation, analysis and registration in
+one repository transaction (see below); production import wiring remains pending.
+Completion-driven New→Known events need completion provenance and
 must share the occurrences/time/position transaction, not call manual selection.
 Existing document imports are not rescanned by this migration or by lookup.
 
@@ -68,7 +68,8 @@ kanji. OOV readings/dictionary forms are absent; original surfaces never become
 normalized identity. Normalization-generated empty original spans are omitted,
 and the complete result must still pass canonical coverage/nonoverlap validation.
 Real A/B/C output survives repository saves and reopen without a schema change.
-Import/registration composition and production analysis persistence remain pending.
+Atomic paste analysis/registration composition is implemented at the repository
+boundary; production analysis persistence remains gated by the loading/lifecycle work.
 
 `chapter_analyses` stores semantics version 1, chapter ownership, engine/dictionary
 revision and explicit `a`/`b`/`c` mode. Its unique chapter/revisions/mode key identifies
@@ -220,8 +221,31 @@ transaction for a consistent snapshot, returns None only for an absent document
 and reports missing/invalid content for an existing document as InvalidDocument.
 SQL values are bound parameters, including titles/text containing NUL or quotes.
 Both calls are synchronous I/O executed off the UI thread by runtime effects.
-This repository is the persistence part of import; SHA-256 duplicate detection,
-vocabulary registration and import timestamps remain separate unchecked tasks. No reading encounters are created here.
+The existing production paste effect still calls this text-only method. SHA-256
+duplicate detection, production analyzed-import wiring and import metadata remain
+unchecked tasks. No reading encounters are created here.
+
+`Storage::create_analyzed_paste` is a separate worker-only repository entry point.
+An immediate transaction allocates document/source/chapter identities and exact
+text, then supplies that canonical `ChapterText` to a caller-provided analyzer.
+The caller must preload/reuse the analyzer before entering this method; the
+callback holds the SQLite write transaction and must not do database work or
+publish provisional identities. Validate complete source coverage/anchors and
+require default Mode B, then store the immutable analysis and register every
+distinct token surface marked Japanese. Non-Japanese tokens remain in the
+snapshot but create no vocabulary. Use exact surfaces, including OOV Japanese;
+do not register lemmas or normalize source text.
+
+Text, tokens, new vocabulary and dated registration events commit together.
+Existing vocabulary IDs/statuses/dates/history remain unchanged. The return value
+contains the committed document, analysis ID and count of newly registered
+surfaces. `PasteImportError<E>` preserves the caller's typed analyzer failure
+separately from storage/validation failures. Callback, validation, statement and
+commit failures roll back every import row; retry starts a new transaction.
+There are no completion commands, positions, encounters or status promotions.
+No schema change, automatic rescan, deduplication or production runtime/FFI
+operation is introduced by this composition. Future exact-hash deduplication
+must wrap the production import before it is considered complete.
 
 ## Current position repository (migration 0003)
 `reading_positions` has document ID as PK/FK (cascade only this document's progress

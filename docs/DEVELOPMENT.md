@@ -18,7 +18,7 @@ with functioning rustup can omit the PATH workaround. Do not assume this compile
 is the project's minimum supported version; establish that with dependencies.
 Cargo.lock is retained for reproducible application development.
 Crux 0.20.0 declares Rust 1.90 minimum; the full locked graph has only been tested
-with 1.99.1. Current host baseline: 119 data-free Rust tests. Ten real Full-data
+with 1.99.1. Current host baseline: 125 data-free Rust tests. Eleven real Full-data
 fixtures run separately with each loader via tools/test-sudachi.sh (see below).
 
 ## Pure logical pagination checks
@@ -543,7 +543,7 @@ benign. No outstanding failure or blocker.
 
 
 ## Pinned Sudachi Full adapter (host)
-Verified 2026-10-23: Sudachi.rs v0.7.0 at
+Verified 2026-10-24: Sudachi.rs v0.7.0 at
 `5de0410b6edfd428fc510cc9763440772e9619d5`, Full 20261015 V1.
 Exact artifact/checksums/notices: third_party/sudachi/README.md. Python 3.11+ and
 standard library only; no dictionary download is triggered by a Cargo build.
@@ -555,9 +555,10 @@ tools/test-sudachi.sh
 # Optional local data path; its dictionary checksum must still match:
 YOMOKU_SUDACHI_DICTIONARY=/path/to/system_full.dic tools/test-sudachi.sh
 ```
-PASS: all ten actual Full-data tests per owned/mapped loader (A/B/C, inflections, proper nouns,
-normalization, Unicode/OOV, 72 KB input, SQLite snapshots/reopen). Ordinary
-workspace tests explicitly report these ten as ignored; run the script to
+PASS: all eleven actual Full-data tests per owned/mapped loader (A/B/C, inflections, proper nouns,
+normalization, Unicode/OOV, 72 KB input, SQLite snapshots/reopen and atomic
+analyzed-paste registration). Ordinary
+workspace tests explicitly report these eleven as ignored; run the script to
 exercise them. Prepared dictionary size is 330,506,339 bytes (about 315 MiB).
 Keep the dictionary immutable until the mapped test process exits; do not run
 preparation/replacement concurrently. The parity fixture also compares complete
@@ -857,3 +858,38 @@ in the same directory. Rust/host JNI/host Full fixtures/standalone probes/tablet
 were not rerun for this debug-only
 Kotlin/driver slice. Pressure/LMKD, mid-extraction death, power loss and physical
 arm64 remain unverified; production loading/lifecycle remains gated.
+
+
+## Atomic analyzed-paste repository
+
+`Storage::create_analyzed_paste` composes canonical text, a validated Mode B
+snapshot and all unique Japanese registrations in one immediate transaction.
+Preload/reuse the analyzer before the callback, which holds the write lock and
+must not access SQLite or expose provisional IDs. The repository has no Sudachi
+dependency; the real adapter composition lives in an explicit Full-data fixture.
+Production runtime/FFI/Android import wiring remains behind the loading gate;
+no app behavior, schema or dependency version changed in this slice.
+
+Verified 2026-10-24 with the Rust PATH workaround above:
+```sh
+cargo build --workspace --locked --offline
+cargo test --workspace --all-features --locked --offline
+cargo fmt --all -- --check
+cargo clippy --workspace --all-targets --all-features --locked --offline -- -D warnings
+tools/test-sudachi.sh
+tools/test-kotlin-bridge.sh
+git diff --check
+```
+PASS: 125 data-free Rust tests, including 67 storage tests; eleven real Full-data
+fixtures with each owned/mapped loader; 138-file source integrity; host Kotlin/JNI
+and seven Rust/Kotlin Unicode exchanges. Six new storage tests cover exact
+Unicode/repetition/non-Japanese exclusion, all existing statuses, concurrent
+imports, analyzer/validation failure, every write stage, deferred commit failure,
+retry and reopen. No completion/encounter/position is created by import.
+
+The initial new Full fixture assumed a half-width compound was a single B token;
+corrected it to validate original source spans and Japanese classification across
+the actual token boundaries. Both complete loader suites pass. JNI retains its
+previous nonfatal weak-reference shutdown logging; all assertions pass. No open
+failure. No Android build/lint/instrumentation, emulator changes or standalone
+probe rerun for this Rust repository-only change; prior device results stand.

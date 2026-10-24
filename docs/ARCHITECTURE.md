@@ -42,7 +42,7 @@ remain absent. Punctuation, Latin, numbers and emoji stay anchored without being
 vocabulary. SentenceDetector boundaries (including negative provisional limits)
 keep long chapters below the engine input limit without changing canonical text.
 The adapter does not merge conjugations, apply overrides, register vocabulary or
-write SQLite. Ten explicit Full-data fixtures include A/B/C SQLite round trips
+write SQLite. Eleven explicit Full-data fixtures include A/B/C SQLite round trips
 and full owned/mapped output parity; tools/test-sudachi.sh runs all fixtures
 with each loader, separately from ordinary data-free checks. Do not rewrite the
 prepared dictionary while mapped fixtures are running.
@@ -156,18 +156,32 @@ manual-status events. Registration preserves existing statuses; lookup and uncha
 selections write no history. Immediate transactions commit registration batches or
 status/event pairs together. These repository APIs accept analyzer-supplied surfaces
 and explicit timestamps; no SQL or clock enters core. Vocabulary-history FKs cascade
-only on vocabulary deletion; document deletion preserves entries/history. Import,
-analyzer, completion and UI integration remain pending.
+only on vocabulary deletion; document deletion preserves entries/history. Production
+import, analyzer, completion and UI integration remain pending.
 Migration 0007 persists immutable chapter analysis/token snapshots and reversible
 segmentation overrides. Identical snapshot retries reuse IDs; conflicting output
 under the same revision/mode key errors. Override replacement/deactivation commits
 atomically, keeps base output intact and preserves global rules after source content
-deletion. No production document edit/rename/delete API exists. Sixty-one storage
+deletion. No production document edit/rename/delete API exists. Sixty-seven storage
 tests cover migrations, reopen, rollback, Unicode, concurrency, ID allocation,
 settings, vocabulary, analysis anchors and completion history. New analysis/override
 repositories have no runtime/FFI/UI operations; synthetic fixtures validate storage,
 not Sudachi behavior. Cross-occurrence matching and overlapping edit resolution
 belong to the later segmentation application task.
+
+`Storage::create_analyzed_paste` composes the existing private transaction helpers
+for document creation, validated Mode B analysis and exact-surface registration.
+A caller-provided callback receives allocated canonical chapter identities; the
+caller must load/reuse its analyzer before entering the immediate transaction.
+Storage has no analyzer dependency, and core remains free of SQL/platform I/O.
+Document/text, immutable tokens and new Japanese vocabulary/dated events commit
+together; existing statuses remain intact. Analyzer/validation/write/commit errors
+roll back the entire import. Typed analyzer errors remain separate from storage
+errors. Import creates no position/completion/encounters and does no deduplication.
+Six synthetic repository tests and a real Full fixture per loader verify this
+composition, including concurrent registration and exact Unicode reopen. This
+repository API is not wired into the production runtime/FFI/Android paste effect;
+the Full loading/lifecycle gate and exact-hash duplicate handling remain open.
 
 `yomoku-ffi::YomokuBridge` wraps the router in Crux's Bincode bridge.
 BoltFFI 0.30.1 NativeBridge takes a database path and owned EffectsListener,
@@ -177,7 +191,7 @@ Core-only effects stay private. Facet generates Event/ViewModel/Requests and
 document codecs in app.yomoku.shared; BoltFFI generates the native package and JNI C.
 Native wrappers require explicit close; no global singleton exists.
 
-One hundred and nineteen data-free Rust tests cover analysis classification/
+One hundred and twenty-five data-free Rust tests cover analysis classification/
 checksum, domain, storage and bridge behavior, including an actual SQLite write
 lock proving dispatch/view/navigation remain responsive.
 The host Kotlin runner uses real JNI with -Xcheck:jni to verify navigation,
@@ -216,7 +230,8 @@ Automatic Android backup/transfer is excluded. Arm64 execution is unverified.
 
 ## Required boundaries and next work
 Paste creation is exposed through Android, but complete import semantics remain
-unchecked: deduplication, vocabulary registration and timestamps. Page movement/
-swipes requiring atomic forward completion/history and real Japanese
-analysis/vocabulary repositories remain next. Add analysis/import crates only with
+unchecked: deduplication, production analyzed-import wiring and metadata. Atomic
+analyzed-paste/registration composition now exists at the repository boundary.
+Page movement/swipes requiring atomic forward completion/history, occurrences
+and active time remain next. Add analysis/import crates only with
 actual behavior; Sudachi Full defaults to B, JMdict/JMnedict remain offline data, and future Nostr I/O stays in Rust. Configuration is empty.

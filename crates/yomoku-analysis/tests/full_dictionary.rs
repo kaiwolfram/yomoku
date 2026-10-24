@@ -274,3 +274,109 @@ fn real_snapshots_persist_all_modes_and_reopen_without_source_changes() {
     drop(reopened);
     std::fs::remove_dir_all(directory).unwrap();
 }
+
+#[test]
+#[ignore = "requires pinned Sudachi Full; run tools/test-sudachi.sh"]
+fn real_mode_b_import_atomically_registers_original_surfaces_and_preserves_status() {
+    use std::collections::BTreeSet;
+    use yomoku_analysis::AnalysisError;
+    use yomoku_core::{
+        document::PasteText,
+        vocabulary::{Surface, VocabularyStatus},
+    };
+    use yomoku_storage::{PasteImportError, Storage};
+
+    let directory = std::env::temp_dir().join(format!(
+        "yomoku-real-import-{}-{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    ));
+    std::fs::create_dir(&directory).unwrap();
+    let path = directory.join("import.sqlite3");
+    let mut storage = Storage::open(&path).unwrap();
+    let cat = Surface::new("猫").unwrap();
+    storage
+        .register_vocabulary(std::slice::from_ref(&cat), 10)
+        .unwrap();
+    let entry = storage.vocabulary_entry(&cat).unwrap().unwrap();
+    let known = storage
+        .set_vocabulary_status(entry.id, VocabularyStatus::Known, 20)
+        .unwrap()
+        .unwrap();
+    let text =
+        PasteText::new("国家公務員。猫と猫が食べた。\r\nｶﾞｯﾂﾎﾟｰｽﾞと𰻞 English 123 📖\0猫".into())
+            .unwrap();
+    assert!(matches!(
+        storage.create_analyzed_paste(&text, 30, |_| Err(AnalysisError::InvalidOutput)),
+        Err(PasteImportError::Analysis(AnalysisError::InvalidOutput))
+    ));
+    assert!(storage.list_documents().unwrap().is_empty());
+    // Reuse the preloaded analyzer; no dictionary load occurs inside the transaction.
+    let engine = analyzer();
+    let imported = storage
+        .create_analyzed_paste(&text, 30, |chapter| engine.analyze(chapter))
+        .unwrap();
+    let expected = engine.analyze(&imported.document.chapter).unwrap();
+    assert_eq!(expected.mode, SplitMode::B);
+    let surfaces: BTreeSet<_> = expected
+        .tokens
+        .iter()
+        .filter(|token| token.is_japanese)
+        .map(|token| Surface::new(&token.surface).unwrap())
+        .collect();
+    assert_eq!(imported.registered_surfaces, surfaces.len() - 1);
+    assert!(surfaces.contains(&Surface::new("𰻞").unwrap()));
+    let halfwidth_start = text.as_str().find("ｶﾞｯﾂﾎﾟｰｽﾞ").unwrap();
+    let halfwidth_end = halfwidth_start + "ｶﾞｯﾂﾎﾟｰｽﾞ".len();
+    let halfwidth_tokens: Vec<_> = expected
+        .tokens
+        .iter()
+        .filter(|token| {
+            let start = usize::try_from(i64::from(token.anchor.range.start)).unwrap();
+            (halfwidth_start..halfwidth_end).contains(&start)
+        })
+        .collect();
+    assert!(halfwidth_tokens.iter().all(|token| token.is_japanese));
+    assert_eq!(
+        halfwidth_tokens
+            .iter()
+            .map(|token| token.surface.as_str())
+            .collect::<String>(),
+        "ｶﾞｯﾂﾎﾟｰｽﾞ"
+    );
+    assert!(
+        expected
+            .tokens
+            .iter()
+            .filter(|token| token.surface == "猫")
+            .count()
+            >= 3
+    );
+    drop(storage);
+    let mut storage = Storage::open(&path).unwrap();
+    assert_eq!(
+        storage.load_paste(imported.document.document_id).unwrap(),
+        Some(imported.document)
+    );
+    assert_eq!(
+        storage.chapter_analysis(imported.analysis_id).unwrap(),
+        Some(expected)
+    );
+    assert_eq!(storage.vocabulary_entry(&cat).unwrap(), Some(known));
+    for surface in surfaces.iter().filter(|surface| **surface != cat) {
+        let entry = storage.vocabulary_entry(surface).unwrap().unwrap();
+        assert_eq!(entry.status, VocabularyStatus::New);
+        assert_eq!(entry.registered_at_unix_ms, 30);
+    }
+    for surface in ["English", "123", "。", "📖", "\0"] {
+        assert!(storage
+            .vocabulary_entry(&Surface::new(surface).unwrap())
+            .unwrap()
+            .is_none());
+    }
+    drop(storage);
+    std::fs::remove_dir_all(directory).unwrap();
+}

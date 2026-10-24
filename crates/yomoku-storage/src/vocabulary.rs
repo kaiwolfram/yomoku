@@ -9,7 +9,6 @@ use crate::{Storage, StorageError};
 impl Storage {
     /// Register analyzer-supplied Japanese surfaces, preserving existing entries.
     /// Returns the number created, not token frequency or reading encounters.
-    /// Repository prerequisite only: imports must eventually share this transaction.
     pub fn register_vocabulary(
         &mut self,
         surfaces: &[Surface],
@@ -19,25 +18,7 @@ impl Storage {
         let transaction = self
             .connection
             .transaction_with_behavior(TransactionBehavior::Immediate)?;
-        let mut created = 0;
-        for surface in surfaces {
-            if read_entry_by_surface(&transaction, surface)?.is_some() {
-                continue;
-            }
-            transaction.execute(
-                "INSERT INTO vocabulary (surface, status, registered_at_unix_ms) VALUES (?1, 'new', ?2)",
-                (surface.as_str(), registered_at_unix_ms),
-            )?;
-            let id = VocabularyId::try_from(transaction.last_insert_rowid())
-                .map_err(|_| StorageError::InvalidVocabulary)?;
-            transaction.execute(
-                "INSERT INTO vocabulary_status_events
-                 (semantics_version, vocabulary_id, old_status, new_status, cause, occurred_at_unix_ms)
-                 VALUES (1, ?1, NULL, 'new', 'registration', ?2)",
-                (i64::from(id), registered_at_unix_ms),
-            )?;
-            created += 1;
-        }
+        let created = register_vocabulary_in(&transaction, surfaces.iter(), registered_at_unix_ms)?;
         transaction.commit()?;
         Ok(created)
     }
@@ -146,4 +127,32 @@ fn read_entry_by_surface(
         .optional()?
         .map(validate_entry)
         .transpose()
+}
+
+pub(crate) fn register_vocabulary_in<'a>(
+    connection: &Connection,
+    surfaces: impl IntoIterator<Item = &'a Surface>,
+    registered_at_unix_ms: i64,
+) -> Result<usize, StorageError> {
+    validate_timestamp(registered_at_unix_ms)?;
+    let mut created = 0;
+    for surface in surfaces {
+        if read_entry_by_surface(connection, surface)?.is_some() {
+            continue;
+        }
+        connection.execute(
+            "INSERT INTO vocabulary (surface, status, registered_at_unix_ms) VALUES (?1, 'new', ?2)",
+            (surface.as_str(), registered_at_unix_ms),
+        )?;
+        let id = VocabularyId::try_from(connection.last_insert_rowid())
+            .map_err(|_| StorageError::InvalidVocabulary)?;
+        connection.execute(
+            "INSERT INTO vocabulary_status_events
+             (semantics_version, vocabulary_id, old_status, new_status, cause, occurred_at_unix_ms)
+             VALUES (1, ?1, NULL, 'new', 'registration', ?2)",
+            (i64::from(id), registered_at_unix_ms),
+        )?;
+        created += 1;
+    }
+    Ok(created)
 }

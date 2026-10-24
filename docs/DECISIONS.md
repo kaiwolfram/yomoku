@@ -956,3 +956,29 @@ interrupted extraction, power failure or physical-device viability. Leave the
 broader loading/lifecycle gate unchecked. No library/version changes.
 API evidence: Android's [ADB activity-manager commands](https://developer.android.com/tools/adb#am)
 and [DUMP permission](https://developer.android.com/reference/android/Manifest.permission#DUMP).
+
+
+## 2026-10-24 — Atomic analyzed-paste repository composition
+
+Compose the existing paste, analysis and vocabulary repositories through private
+transaction helpers, keeping their standalone commands intact. Add
+`Storage::create_analyzed_paste` with an analyzer callback rather than a storage
+dependency on Sudachi. One immediate transaction allocates canonical identities,
+passes their exact chapter text to the callback, validates/stores the default
+Mode B snapshot, and registers all unique Japanese original surfaces and dated
+New events. Existing statuses/dates/IDs remain unchanged. Never register analyzer
+lemmas, normalized text, non-Japanese tokens or reading encounters during import.
+
+Analysis runs inside the transaction so anchors use the actual allocated IDs,
+without provisional-ID rewriting or partially committed documents. This holds
+the SQLite write lock during tokenization: the worker caller must preload/reuse
+its analyzer first, and the callback must not access the database or expose IDs
+before success. Preserve typed analyzer errors in `PasteImportError<E>` without
+exposing SQL/engine dependencies to core or changing the production FFI schema.
+All analyzer/validation/write/commit failures roll back the entire new import.
+
+This is an independently verified repository prerequisite while the Full loading/
+lifecycle gate remains open. Keep the existing Android text-only paste effect
+until that gate and production import wiring are ready. Exact-hash deduplication,
+other import formats, dictionary-form aggregates and completion/time are separate
+unchecked work. No new dependencies, schema changes or destructive semantics.

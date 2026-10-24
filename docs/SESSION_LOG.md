@@ -648,3 +648,29 @@
   Next: actual pressure/reclamation and production lifecycle decision, physical
   arm64, then atomic analyzed imports and completion semantics before navigation.
   Nostr stays empty; ask Q188 before forwarding.
+
+
+## 2026-10-24 — Atomic analyzed-paste repository
+
+- Started clean. Added `Storage::create_analyzed_paste`, composing private paste,
+  analysis and registration helpers in one immediate transaction. Caller supplies
+  a preloaded/reused analyzer callback against exact allocated chapter identities;
+  typed analyzer diagnostics remain separate from storage/validation failures.
+- Validated Mode B tokens and all unique Japanese original surfaces persist with
+  text and dated New registrations. Existing statuses/IDs/dates/history survive;
+  no encounters, position, completion or deduplication. No schema/dependency or
+  production Android/runtime/FFI changes; broader import task remains unchecked.
+- Six host storage tests cover repeated/Unicode/non-Japanese tokens, preservation
+  of all statuses, concurrent imports, analyzer/invalid output, every write stage,
+  deferred commit failure, retry/reopen and isolation from another connection.
+  New real Full composition fixture preserves OOV/half-width surfaces and Known.
+- PASS: workspace build, 125 data-free Rust tests (67 storage), fmt/strict Clippy,
+  eleven Full fixtures per owned/mapped loader, pinned source integrity and host
+  Kotlin/JNI plus seven Unicode exchanges. Initial Full fixture incorrectly
+  assumed a half-width compound was a single B token; corrected the assertion to
+  validate original spans across actual tokens; both full suites pass. Prior
+  nonfatal JNI weak-reference shutdown logging remains. No open failure.
+- No Android/Gradle/device/standalone/tablet rerun or emulator/user-file changes.
+  Next: actual Full pressure/reclamation and production worker lifecycle/arm64
+  gate, production atomic analyzed import plus dedup, then occurrence/time-aware
+  completion before reader navigation. Nostr empty; ask Q188 before forwarding.

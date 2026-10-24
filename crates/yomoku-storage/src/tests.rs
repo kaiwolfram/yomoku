@@ -12,6 +12,7 @@ use super::*;
 mod analysis;
 mod completions;
 mod documents;
+mod imports;
 mod positions;
 mod settings;
 mod vocabulary;

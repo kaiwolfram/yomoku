@@ -5,8 +5,11 @@
 mod analysis;
 mod completions;
 mod documents;
+mod imports;
 mod settings;
 mod vocabulary;
+
+pub use imports::{AnalyzedPaste, PasteImportError};
 
 use std::{error::Error, fmt, path::Path, time::Duration};
 
