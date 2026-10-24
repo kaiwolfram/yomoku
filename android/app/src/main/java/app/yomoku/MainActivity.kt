@@ -11,10 +11,12 @@ import app.yomoku.shared.Event
 import app.yomoku.theme.YomokuTheme
 
 class MainActivity : ComponentActivity() {
+    private lateinit var core: CoreSession
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        val core = ViewModelProvider(this)[CoreSessionOwner::class.java].session
+        core = ViewModelProvider(this)[CoreSessionOwner::class.java].session
         setContent {
             YomokuTheme {
                 BackHandler(
@@ -27,5 +29,16 @@ class MainActivity : ComponentActivity() {
                 YomokuApp(core.view, core::dispatch)
             }
         }
+    }
+
+    override fun onStart() {
+        super.onStart()
+        core.setForeground(true)
+    }
+
+    override fun onStop() {
+        // Configuration changes retain the worker and its warm analyzer.
+        if (!isChangingConfigurations) core.setForeground(false)
+        super.onStop()
     }
 }

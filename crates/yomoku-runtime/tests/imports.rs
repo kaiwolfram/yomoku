@@ -50,6 +50,10 @@ impl Drop for Database {
 }
 
 fn dispatch(router: &EffectRouter, event: Event) -> ViewModel {
+    dispatch_with_timeout(router, event, TIMEOUT)
+}
+
+fn dispatch_with_timeout(router: &EffectRouter, event: Event, timeout: Duration) -> ViewModel {
     let (sender, receiver) = mpsc::channel();
     let initial = router.update(event, move |effects| {
         assert!(effects
@@ -61,7 +65,7 @@ fn dispatch(router: &EffectRouter, event: Event) -> ViewModel {
         .iter()
         .all(|effect| matches!(effect, ShellEffect::Render(_))));
     assert_ne!(
-        receiver.recv_timeout(TIMEOUT).unwrap(),
+        receiver.recv_timeout(timeout).unwrap(),
         thread::current().id()
     );
     let view = router.view();
@@ -591,6 +595,10 @@ impl Drop for FullAnalyzer {
 #[test]
 #[ignore = "requires pinned Sudachi Full; run tools/test-sudachi.sh"]
 fn real_full_worker_import_and_lazy_reopen_preserve_mode_b_unicode_and_vocabulary() {
+    // Real debug Full initialization can exceed the data-free harness deadline.
+    let dispatch = |router: &EffectRouter, event| {
+        dispatch_with_timeout(router, event, Duration::from_secs(60))
+    };
     let dictionary = std::env::var_os("YOMOKU_SUDACHI_DICTIONARY")
         .map(PathBuf::from)
         .unwrap_or_else(|| {

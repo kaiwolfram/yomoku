@@ -5,6 +5,7 @@ import android.os.Looper
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import app.yomoku.nativebridge.DictionaryProvider
 import app.yomoku.nativebridge.EffectsListener
 import app.yomoku.nativebridge.FfiError
 import app.yomoku.nativebridge.NativeBridge
@@ -14,7 +15,7 @@ import app.yomoku.shared.ShellEffect
 import app.yomoku.shared.ViewModel
 
 /** Owns a native handle and a render snapshot; application state stays in Rust. */
-internal class CoreSession(databasePath: String) : AutoCloseable {
+internal class CoreSession(databasePath: String, dictionary: DictionaryProvider) : AutoCloseable {
     private val mainHandler = Handler(Looper.getMainLooper())
     private var closed = false
 
@@ -34,6 +35,7 @@ internal class CoreSession(databasePath: String) : AutoCloseable {
                     mainHandler.post { if (!closed) throw error }
                 }
             },
+            dictionary,
         )
 
     var view: ViewModel by mutableStateOf(ViewModel.bincodeDeserialize(bridge.view()))
@@ -47,6 +49,12 @@ internal class CoreSession(databasePath: String) : AutoCloseable {
         requireMainThread()
         check(!closed) { "CoreSession is closed" }
         render(bridge.update(event.bincodeSerialize()))
+    }
+
+    fun setForeground(foreground: Boolean) {
+        requireMainThread()
+        check(!closed) { "CoreSession is closed" }
+        bridge.setForeground(foreground)
     }
 
     private fun render(requests: ByteArray) {

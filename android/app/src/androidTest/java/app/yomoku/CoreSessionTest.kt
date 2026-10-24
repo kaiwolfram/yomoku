@@ -15,21 +15,39 @@ class CoreSessionTest {
     @Test
     fun commandsRenderRustStateAndSessionsOwnTheirHandles() {
         InstrumentationRegistry.getInstrumentation().runOnMainSync {
-            CoreSession(":memory:").use { core ->
-                CoreSession(":memory:").use { independent ->
-                    assertEquals(Destination.LIBRARY, core.view.destination)
-                    for (destination in Destination.entries + Destination.LIBRARY) {
-                        core.dispatch(Event.SelectDestination(destination))
-                        assertEquals(destination, core.view.destination)
-                        assertEquals(Destination.LIBRARY, independent.view.destination)
-                    }
+            CoreSession(
+                    ":memory:",
+                    sudachiDictionaryProvider(
+                        InstrumentationRegistry.getInstrumentation().targetContext
+                    ),
+                )
+                .use { core ->
+                    CoreSession(
+                            ":memory:",
+                            sudachiDictionaryProvider(
+                                InstrumentationRegistry.getInstrumentation().targetContext
+                            ),
+                        )
+                        .use { independent ->
+                            assertEquals(Destination.LIBRARY, core.view.destination)
+                            for (destination in Destination.entries + Destination.LIBRARY) {
+                                core.dispatch(Event.SelectDestination(destination))
+                                assertEquals(destination, core.view.destination)
+                                assertEquals(Destination.LIBRARY, independent.view.destination)
+                            }
+                        }
+                    core.dispatch(Event.SelectDestination(Destination.VOCABULARY))
+                    assertEquals(Destination.VOCABULARY, core.view.destination)
                 }
-                core.dispatch(Event.SelectDestination(Destination.VOCABULARY))
-                assertEquals(Destination.VOCABULARY, core.view.destination)
-            }
 
             repeat(10) {
-                val core = CoreSession(":memory:")
+                val core =
+                    CoreSession(
+                        ":memory:",
+                        sudachiDictionaryProvider(
+                            InstrumentationRegistry.getInstrumentation().targetContext
+                        ),
+                    )
                 assertEquals(Destination.LIBRARY, core.view.destination)
                 core.close()
                 core.close()

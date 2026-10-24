@@ -26,7 +26,7 @@ internal fun SudachiNotices(onDismiss: () -> Unit) {
     val unavailable = stringResource(R.string.notices_unavailable)
     val notices by
         produceState<String?>(initialValue = null, assets, unavailable) {
-            value =
+            val loaded =
                 withContext(Dispatchers.IO) {
                     try {
                         listOf("LEGAL", "LICENSE-2.0.txt").joinToString("\n\n") { name ->
@@ -37,6 +37,9 @@ internal fun SudachiNotices(onDismiss: () -> Unit) {
                         unavailable
                     }
                 }
+            // Publish on Android's UI dispatcher even when the composition's
+            // effect context resumes on the I/O thread (e.g. under UI tests).
+            withContext(Dispatchers.Main.immediate) { value = loaded }
         }
     AlertDialog(
         onDismissRequest = onDismiss,

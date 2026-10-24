@@ -21,7 +21,7 @@ class DocumentSessionTest {
     private val instrumentation = InstrumentationRegistry.getInstrumentation()
 
     private fun awaitIdle(core: CoreSession): ViewModel {
-        val deadline = System.nanoTime() + 10_000_000_000L
+        val deadline = System.nanoTime() + 30_000_000_000L
         while (true) {
             lateinit var view: ViewModel
             instrumentation.runOnMainSync { view = core.view }
@@ -47,7 +47,13 @@ class DocumentSessionTest {
         var active: CoreSession? = null
         try {
             lateinit var core: CoreSession
-            instrumentation.runOnMainSync { core = CoreSession(database.absolutePath) }
+            instrumentation.runOnMainSync {
+                core =
+                    CoreSession(
+                        database.absolutePath,
+                        sudachiDictionaryProvider(instrumentation.targetContext),
+                    )
+            }
             active = core
             assertTrue(awaitIdle(core).documents.isEmpty())
             assertTrue(database.isFile)
@@ -81,7 +87,13 @@ class DocumentSessionTest {
             assertEquals(1, dispatch(core, Event.RefreshLibrary).documents.size)
             instrumentation.runOnMainSync { core.close() }
             active = null
-            instrumentation.runOnMainSync { core = CoreSession(database.absolutePath) }
+            instrumentation.runOnMainSync {
+                core =
+                    CoreSession(
+                        database.absolutePath,
+                        sudachiDictionaryProvider(instrumentation.targetContext),
+                    )
+            }
             active = core
             val initial = awaitIdle(core)
             assertEquals(summaries, initial.documents)
@@ -99,7 +111,11 @@ class DocumentSessionTest {
 
             val missing = File(directory, "missing")
             instrumentation.runOnMainSync {
-                core = CoreSession(File(missing, "db.sqlite3").absolutePath)
+                core =
+                    CoreSession(
+                        File(missing, "db.sqlite3").absolutePath,
+                        sudachiDictionaryProvider(instrumentation.targetContext),
+                    )
             }
             active = core
             assertEquals(DocumentError.UNAVAILABLE, awaitIdle(core).documentError)

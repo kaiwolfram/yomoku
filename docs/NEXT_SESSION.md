@@ -1,78 +1,71 @@
 # Resume here
 
-Updated: 2026-10-24. Import summary verified; native analyzed-import wiring next.
+Updated: 2026-10-24. Production analyzed paste and Android lifecycle verified.
 Read AGENTS.md, plan phases 2–4 and PRODUCT_SPEC.md sections 3–4.
 Update docs/commit each verified step. Physical arm64 is the later user trial.
 
 ## Working
-- Pure Crux core owns navigation/Library/Settings and typed effects. FIFO worker
-  owns SQLite; only Render reaches UI. Retained Android sessions/private DB,
-  Paste→Library and explicit reader opening work; fresh start Library.
-- Exact UTF-8 position/Library percentage persist; five presets preserve offset.
-  Scroll resets; column 720dp. NO Next/Previous/swipes before atomic completion.
-- Migrations 0005–0007 store frozen completion IDs/page/position, global surfaces/
-  dated five-status history, immutable versioned A/B/C anchors and reversible
-  global/local edits. No override application, forward action or vocabulary UI.
-- Storage::import_analyzed_paste atomically deduplicates exact UTF-8 SHA-256,
-  canonical text, Mode B snapshot and unique Japanese registrations. Existing
-  returns oldest live match without analysis/rescan/title/progress/status changes.
-  Migration 0008 lazily hashes legacy pastes under write lock, preserving duplicates.
-  All failures roll back; document deletion/reimport gets fresh IDs/progress.
-- NEW effect_router_with_analyzed_imports uses that repository on the existing
-  FIFO worker. Send loader is lazy; analyzer need not be Send, lives/drops only
-  on worker, loads before write transaction. Wall time dates registrations.
-  Failed load/engine/invalid output can retry; SQL rollback reuses healthy cache.
-  Created/Existing upsert one Library row by ID and never open the reader.
-- NEW AnalyzerLifecycle weak handle queues cache policy without retaining worker.
-  Foreground permits reuse without eager loading; background releases after prior
-  accepted work. Hidden imports finish then release; final close drains/drops.
-  Seven runtime tests + one real Full fixture per loader verify these boundaries.
-  NativeBridge/Android STILL select legacy text-only router. No verified
-  descriptor callback or platform lifecycle signals wired yet. Remove
-  production fallback when connecting native shell; do not leave optional behavior.
-- NEW typed ImportSummary distinguishes Created/Existing above Library with Close.
-  Settings/refresh/retained recreation preserve it; dismissal/tab/paste/reader/new
-  import clear it. Fresh session none; failed import preserves draft with no summary.
-  Both outcomes tested in core/worker; native currently only produces Created.
-- Pure active_time uses supplied monotonic ms, five-minute idle cap and reader/
-  dictionary interactions. Checkpoints retain pending time without resetting idle;
-  restore duration paused in fresh clock epoch. Thirteen tests; no SQLite/runtime/
-  FFI/Android timer wiring or page/reflow attribution yet.
-- Sudachi.rs v0.7.0/android-loader-v1 + Full 20261015 pinned; source verifier checks
-  138 files. Full prepared outside Git; APK bundles complete dictionary/notices.
-- Worker-only private publisher verifies size/SHA-256, syncs/atomically publishes
-  read-only files and returns same verified descriptor. Never rewrite live inodes.
-  Eight device extraction/recovery tests pass. Safe owned loader for arbitrary paths.
-- Debug JNI/ADB harnesses verify reuse/affinity/retry/close, two process-death pairs
-  and two pressure runs reclaiming 67/143 MiB dictionary RSS on API-36 x86_64.
-  Limits/results: SUDACHI_MEASUREMENTS.md. No LMKD/physical-arm64 claim.
-- Production choice: lazy immutable mapping on existing FIFO worker, retained over
-  configuration changes, idle cache release on UI-hidden/background/final close.
-  Later work re-verifies/reopens. No eager Library load/per-page reload/new worker.
-- Paste text/IDs/provenance immutable; no inferred TXT chapters. Future file imports
-  hash original bytes separately. Document deletion keeps vocab. No import encounters.
+- Pure Crux owns navigation/Library/Settings and typed effects; FIFO worker owns
+  SQLite/analysis. Only Render reaches UI. Fresh sessions start Library.
+- Exact UTF-8 position/Library percentage and five page presets persist; reflow
+  preserves the offset. Scroll resets; column 720dp. NO Next/Previous/swipes yet.
+- Migrations 0005–0007 store frozen completion IDs/page/position, five-status
+  vocabulary/history, immutable A/B/C anchors and reversible global/local edits.
+  No forward completion, override application, dictionary or vocabulary UI yet.
+- Migration 0008 + import_analyzed_paste atomically deduplicate exact UTF-8 SHA-256,
+  persist canonical text/Mode B tokens and register unique Japanese surfaces.
+  Existing references oldest live exact match without rescan/progress/status edits.
+  Legacy indexing is lazy under write lock; duplicates remain. Failures roll back.
+- NEW NativeBridge requires DictionaryProvider and selects the analyzed router;
+  Android transfers a verified owned FD+1 (zero means failure), Rust rehashes/maps
+  that exact file and closes FD on success/failure. No production text-only fallback.
+  Raw Rust constructors remain low-level storage fixtures. No new dependency version.
+- Analyzer loads lazily before write transaction on existing FIFO worker, need not
+  be Send, and stays on that worker. Load/engine errors can retry; SQL rollback
+  reuses healthy cache. Foreground permits reuse without eager loading.
+- NEW Activity onStart permits caching; onStop queues release except configuration
+  recreation retains warm worker/cache. Hidden imports finish then release; final
+  onCleared closes native handle, draining accepted work without joining UI.
+  Immutable private publication never rewrites live inodes; later work re-verifies.
+- Created/Existing show dismissible typed summary above Library; never open reader.
+  Settings/refresh/recreation preserve it; dismissal/tab/new paste/reader clear it.
+  Fresh session none; failed import retains draft. Android now delivers duplicates.
+- Pure active_time has supplied monotonic ms, five-minute idle cap and reader/
+  dictionary interactions/checkpoints; restored duration pauses in new clock epoch.
+  Thirteen tests; no SQLite/runtime/FFI/Android timer or page/reflow attribution yet.
+- Sudachi.rs v0.7.0/android-loader-v1 + Full 20261015 pinned; native builds verify
+  138 source files. Full prepared outside Git; APK bundles dictionary/notices.
+- Prior debug JNI/ADB harnesses verify actual process death/recovery and two pressure
+  runs reclaiming 67/143 MiB dictionary RSS on API-36 x86_64. No LMKD/arm64 claim.
+  Limits: SUDACHI_MEASUREMENTS.md. No eager Library/per-page loading/new executor.
+- Paste text/IDs/provenance immutable; no inferred TXT chapters. File imports must
+  hash original bytes separately. Document deletion retains vocabulary/history.
 
 ## Next tasks (ordered)
-1. Connect analyzed-import router through typed native verified-descriptor delivery,
-   Android retained/background lifecycle and end-to-end duplicate summary. Test JNI/
-   device rollback/dedup/vocab/reuse/release/retry and no eager Library load.
-2. Persist pending page time (page/reflow attribution open), extend completion with
-   occurrences/New→Known/time, then wire frozen IDs and Android clock/lifecycle/
-   interactions + Next/Previous/swipes. Finish/format imports/CI remain unchecked.
+1. Persist pending page time, deciding page/reflow attribution under the spec; test
+   checkpoints/reopen/reboot and prepare atomic completion handoff.
+2. Extend completion with occurrences/New→Known/time, wire frozen command IDs and
+   Android clock/lifecycle/interactions, then Next/Previous/swipes. Finish, format
+   imports and CI remain unchecked.
 3. User-run physical arm64 validation once usable; defer until their app trial.
 
 ## Verification / environment
-- This step: 156 data-free Rust tests (76 storage, seven runtime); workspace build,
-  fmt, strict Clippy; host Kotlin/JNI + seven Unicode exchanges; Kotlin format,
-  debug/test APKs, strict Android lint and three PasteReaderTest emulator tests pass.
-  Reports: .local/test-reports/import-summary/paste-reader/. No open blocker.
-- Initial FFI test had stale event tag; derive from last public event. Kotlin test
-  smart-cast warning fixed; final reruns pass. Connected Gradle needed escalation.
-  No Full fixtures, full Android suite, release, probes or tablet/arm64 rerun.
-  Prior baseline: Full fixtures per loader; 18/18 device tests, two death/recovery
-  pairs and two pressure runs pass. Measurements/docs retain their limits.
-- Commands/env: DEVELOPMENT.md. Rust PATH workaround, locked/offline workspace
-  build/test/fmt/Clippy, tools/test-sudachi.sh, tools/test-kotlin-bridge.sh.
-  Never run native builds/generation/tests concurrently; never prepare/replace/
-  truncate Full during mapped tests. Gradle/ADB sockets can need escalation.
-- Nostr configuration empty; ask Q188 before forwarding. No local-reader blocker.
+- PASS: workspace build, 157 data-free Rust tests, fmt/strict Clippy, eleven analysis
+  + one worker fixture per Full loader; host real-Full Kotlin/JNI + seven Unicode
+  exchanges; Kotlin format, shell syntax, both-ABI debug/test APKs, strict lint and
+  all 19 API-36 x86_64 Android tests. Reports: .local/test-reports/analyzed-import/.
+- Initial full runs 18/19 and focused notices failed at Loading. Traces showed its
+  producer could resume off-main under UI tests. Publish notices on Main.immediate;
+  original assertions/10s timeout retained. Focused 2/2 and final full 19/19 pass.
+  Earlier failed/diagnostic reports retained; temporary logging removed.
+- Real Full worker/JNI old 10s timeout fixed with 60s load waits only there; data-free
+  waits unchanged, Android storage 30s. Native TID verifies worker affinity (Java
+  Thread identity changes across JNI attachment). Benign Crux shutdown logs persist.
+- Emulator disconnected and restarted with swangle/no data reset; ADB escalation
+  used. No open failure. No unsigned release, standalone/pressure/death probes,
+  tablet or physical-arm64 rerun. Prior measurements retain their documented limits.
+- Commands/env: DEVELOPMENT.md. Rust PATH workaround; locked/offline build/test/
+  fmt/Clippy, tools/test-sudachi.sh, tools/test-kotlin-bridge.sh. Host JNI now needs
+  explicitly prepared pinned Full. Never run native builds/generation/tests together
+  or modify Full while mapped. Gradle/ADB can need socket escalation.
+- Nostr configuration empty; ask Q188 before forwarding. No local reader blocker.

@@ -1135,3 +1135,49 @@ summary/Library return. No new persistence, dependency or import semantics. The
 native shell still uses text-only creation, so duplicate summaries are exercised
 through the analyzed worker and core; Android duplicate delivery remains part of
 the production integration task. Do not mark that task complete for this UI slice.
+
+
+## 2026-10-24 — Production analyzed imports and descriptor ownership
+
+Require DictionaryProvider in NativeBridge; select the analyzed router exclusively.
+Keep the text-only Rust constructors for low-level storage fixtures, never as an
+Android fallback. Add the existing analysis crate to FFI without new versions.
+Library/settings/reopen/blank paste remain lazy; a cold duplicate may preload Full
+but never tokenizes/rescans the existing document or recreates deleted vocabulary.
+
+The publisher runs synchronously on the existing FIFO worker. Kotlin verifies the
+private immutable publication, duplicates that exact read-only descriptor using
+ParcelFileDescriptor.dup, then detachFd transfers ownership to Rust. Return FD+1
+as an i64 so zero (the generator's callback failure default) cannot accidentally
+consume stdin. Rust owns/closes the FD on load success/failure and rehashes the
+mapping itself. No pathname reopens and no Activity/session captures in the provider.
+Never mutate published inodes, including while accepted work drains after close.
+Host-only JNI fixtures use JDK reflection to duplicate the prepared immutable Full
+file; module-opening flags stay in the test runner, not the Android application.
+
+Use Activity onStart to permit reuse and onStop to queue background release, except
+isChangingConfigurations retains the warm worker/analyzer across recreation.
+CoreSessionOwner still closes only on final onCleared. No new executor, third-party dependency version,
+global analyzer singleton or eager Library initialization. SQL rollback retains
+healthy cached analysis; provider/engine failures remain retryable typed view errors.
+
+Primary API references: Android documents descriptor duplication and detach/close
+ownership in [ParcelFileDescriptor](https://developer.android.com/reference/android/os/ParcelFileDescriptor),
+and stopped visibility/configuration-change reporting in
+[Activity](https://developer.android.com/reference/android/app/Activity).
+Debug native Full initialization exceeds the previous 10-second host timeout;
+JNI and the real Full worker fixture allow 60 seconds; data-free worker waits
+remain 10 seconds and Android storage waits allow 30 seconds.
+These are bounded test waits, not performance guarantees or altered UI behavior.
+
+
+Full-suite verification also reproduced the existing notices dialog stall. Temporary
+diagnostics found its tagged text still Loading after 10 seconds, and tracing
+showed the producer could resume on an I/O thread with the UI test effect context.
+Explicitly publish loaded notices on Dispatchers.Main.immediate after the off-main
+asset read. Preserve the original full-content/recreation assertions and timeout;
+remove diagnostic logging. This is a platform state-publication fix, without new
+product behavior. Android's [Compose synchronization guidance](https://developer.android.com/develop/ui/compose/testing/synchronization)
+explains the separate test clock and external asynchronous work; its
+[effect guidance](https://developer.android.com/develop/ui/compose/side-effects#producestate)
+describes composition-scoped producers.

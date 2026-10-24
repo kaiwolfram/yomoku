@@ -5,7 +5,11 @@ import androidx.lifecycle.AndroidViewModel
 
 /** Retains the Rust session across Activity recreation without copying domain state. */
 internal class CoreSessionOwner(application: Application) : AndroidViewModel(application) {
-    val session = CoreSession(java.io.File(application.filesDir, "yomoku.sqlite3").absolutePath)
+    val session =
+        CoreSession(
+            java.io.File(application.filesDir, "yomoku.sqlite3").absolutePath,
+            sudachiDictionaryProvider(application),
+        )
 
     override fun onCleared() {
         session.close()

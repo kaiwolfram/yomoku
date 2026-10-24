@@ -62,7 +62,7 @@ impl From<SudachiError> for AnalysisError {
 }
 
 /// Load once on an I/O worker and reuse. Both loaders verify the exact storage
-/// passed to Sudachi. App extraction/lifecycle measurements remain an integration gate.
+/// passed to Sudachi. Production imports use the verified private publisher.
 pub struct Analyzer {
     dictionary: JapaneseDictionary,
 }
@@ -82,7 +82,7 @@ impl Analyzer {
     /// in this or any other process, from this call until the analyzer is dropped.
     /// A read-only handle or successful checksum alone does not ensure this.
     /// Use only with controlled, immutable files; keep the safe owned loader for
-    /// arbitrary paths. Production private-file publication is not implemented yet.
+    /// arbitrary paths. Android's private publisher preserves this lifetime rule.
     pub unsafe fn open_full_mapped(file: &fs::File) -> Result<Self, AnalysisError> {
         // SAFETY: the caller guarantees immutable backing bytes for the entire
         // mapping lifetime, including checksum verification and dictionary parsing.

@@ -3,6 +3,11 @@ set -euo pipefail
 
 repo_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$repo_dir"
+export YOMOKU_SUDACHI_DICTIONARY="${YOMOKU_SUDACHI_DICTIONARY:-$repo_dir/.local/sudachi/full-20261015/system_full.dic}"
+if [[ ! -f "$YOMOKU_SUDACHI_DICTIONARY" ]]; then
+    echo 'Prepare Sudachi Full first; production JNI imports require the real dictionary.' >&2
+    exit 1
+fi
 
 boltffi_bin="${BOLTFFI_BIN:-$repo_dir/.local/bin/boltffi}"
 kotlinc_bin="${KOTLINC_BIN:-$repo_dir/.local/kotlin-2.4.21/kotlinc/bin/kotlinc}"
@@ -39,5 +44,7 @@ cargo run -p yomoku-ffi --example unicode-fixtures --locked --offline -- write t
     target/generated/native/app tests/kotlin \
     -jvm-target 17 -Werror -include-runtime -d target/bridge-tests.jar
 "$java_bin" --enable-native-access=ALL-UNNAMED -Xcheck:jni \
+    --add-opens=java.base/java.io=ALL-UNNAMED \
+    --add-opens=java.base/sun.nio.fs=ALL-UNNAMED \
     -Djava.library.path=target -jar target/bridge-tests.jar target/unicode-fixtures
 cargo run -p yomoku-ffi --example unicode-fixtures --locked --offline -- verify target/unicode-fixtures

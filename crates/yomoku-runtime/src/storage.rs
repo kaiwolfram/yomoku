@@ -114,8 +114,8 @@ fn execute(
             if let Some(imports) = imports.as_mut() {
                 imports.import(storage, &paste)
             } else {
-                // Temporary legacy bridge path until Android supplies its
-                // verified-descriptor loader through the typed native boundary.
+                // Low-level storage fixtures only. NativeBridge always supplies
+                // an analyzed loader and cannot select this text-only branch.
                 storage
                     .create_paste(&paste)
                     .map(StorageResult::Created)

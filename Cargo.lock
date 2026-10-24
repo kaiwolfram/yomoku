@@ -1624,6 +1624,7 @@ dependencies = [
  "crux_core",
  "rusqlite",
  "serde",
+ "yomoku-analysis",
  "yomoku-core",
  "yomoku-runtime",
 ]

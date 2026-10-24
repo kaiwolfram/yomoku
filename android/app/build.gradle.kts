@@ -37,6 +37,8 @@ val buildRustBridge by
             }
         )
         inputs.file(repoDirectory.file("tools/build-android-native.sh"))
+        inputs.file(repoDirectory.file("tools/verify-sudachi-source.py"))
+        inputs.dir(repoDirectory.dir("third_party/sudachi"))
         outputs.dirs(
             nativeOutput.dir("kotlin"),
             nativeOutput.dir("native"),

@@ -25,6 +25,13 @@ private fun listenerCount(): Int {
     return (field.get(null) as Map<*, *>).size
 }
 
+private fun providerCount(): Int {
+    val field = Class.forName("app.yomoku.nativebridge.DictionaryProviderMap")
+        .getDeclaredField("map")
+    field.isAccessible = true
+    return (field.get(null) as Map<*, *>).size
+}
+
 private inline fun <reified T : Throwable> expectFailure(block: () -> Unit) {
     try {
         block()
@@ -42,9 +49,9 @@ fun main(args: Array<String>) {
     while (listenerCount() != 0 && System.nanoTime() < deadline) Thread.sleep(5)
     check(listenerCount() == 0)
     val listener = Listener()
-    NativeBridge(":memory:", listener).use { bridge ->
+    NativeBridge(":memory:", listener, HostDictionary()).use { bridge ->
         check(listenerCount() == 1)
-        NativeBridge(":memory:", Listener()).use { independent ->
+        NativeBridge(":memory:", Listener(), HostDictionary()).use { independent ->
             check(listenerCount() == 2)
             check(ViewModel.bincodeDeserialize(bridge.view()).destination == Destination.LIBRARY)
             for (destination in Destination.entries + Destination.LIBRARY) {
@@ -85,7 +92,7 @@ fun main(args: Array<String>) {
     check(listenerCount() == 0)
 
     repeat(100) {
-        val bridge = NativeBridge(":memory:", Listener())
+        val bridge = NativeBridge(":memory:", Listener(), HostDictionary())
         check(ViewModel.bincodeDeserialize(bridge.view()).destination == Destination.LIBRARY)
         bridge.close()
         bridge.close()
@@ -94,5 +101,8 @@ fun main(args: Array<String>) {
         expectFailure<IllegalStateException> { bridge.update(Event.SelectDestination(Destination.NOSTR).bincodeSerialize()) }
         expectFailure<IllegalStateException> { bridge.resolve(0u, byteArrayOf()) }
     }
+    val providerDeadline = System.nanoTime() + 10_000_000_000L
+    while (providerCount() != 0 && System.nanoTime() < providerDeadline) Thread.sleep(5)
+    check(providerCount() == 0)
     println("PASS: Kotlin/JNI navigation, codecs, typed errors, isolation and 100 handle lifecycles")
 }

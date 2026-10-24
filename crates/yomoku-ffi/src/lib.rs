@@ -7,7 +7,10 @@ use crux_core::{
     bridge::{BincodeFfiFormat, BridgeError, EffectId},
     middleware::{Bridge, Layer},
 };
-use yomoku_runtime::{effect_router, EffectRouter};
+use yomoku_runtime::{
+    effect_router, effect_router_with_analyzed_imports, AnalyzerLifecycle, AnalyzerLoader,
+    EffectRouter,
+};
 
 pub mod native;
 
@@ -41,6 +44,22 @@ pub struct YomokuBridge {
 }
 
 impl YomokuBridge {
+    /// Production imports require a loader; no text-only fallback is selected.
+    pub fn with_analyzed_imports(
+        database_path: std::path::PathBuf,
+        loader: AnalyzerLoader,
+        on_effects: impl Fn(Result<Vec<u8>, FfiError>) + Send + Sync + 'static,
+    ) -> Result<(Self, AnalyzerLifecycle), FfiError> {
+        let (router, lifecycle) = effect_router_with_analyzed_imports(database_path, loader)
+            .map_err(|_| FfiError::WorkerUnavailable)?;
+        Ok((
+            Self {
+                bridge: router.bridge(move |result| on_effects(result.map_err(Into::into))),
+            },
+            lifecycle,
+        ))
+    }
+
     /// The callback delivers effects produced after an asynchronous Rust
     /// operation completes. Hosts must dispatch it onto their UI thread.
     pub fn new(

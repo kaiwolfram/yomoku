@@ -11,12 +11,14 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextReplacement
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.ViewModelProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.yomoku.shared.ContentRoute
 import app.yomoku.shared.Event
 import app.yomoku.shared.PageLength
 import app.yomoku.shared.TextOffset
+import java.io.File
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
@@ -32,7 +34,7 @@ class PasteReaderTest {
         ViewModelProvider(compose.activity)[CoreSessionOwner::class.java].session
 
     private fun awaitStorage() {
-        compose.waitUntil(10_000) { !core().view.storageBusy }
+        compose.waitUntil(30_000) { !core().view.storageBusy }
         compose.waitForIdle()
     }
 
@@ -43,6 +45,14 @@ class PasteReaderTest {
                 .fetchSemanticsNode()
                 .config[SemanticsProperties.VerticalScrollAxisRange]
         assertEquals(0f, range.value(), 0f)
+    }
+
+    private fun awaitDictionaryMapping(expected: Boolean) {
+        val deadline = System.nanoTime() + 30_000_000_000L
+        while (File("/proc/self/maps").readText().contains("/sudachi/full-") != expected) {
+            check(System.nanoTime() < deadline) { "Unexpected production dictionary mapping" }
+            Thread.sleep(10)
+        }
     }
 
     @Test
@@ -192,11 +202,33 @@ class PasteReaderTest {
         compose.onNodeWithTag("screen_title").assertTextEquals("Library")
         compose.onNodeWithTag("reader_text").assertDoesNotExist()
         compose.onNodeWithTag("import_summary_message").assertTextEquals("Imported: $title")
+        awaitDictionaryMapping(true)
         compose.activityRule.scenario.recreate()
-        compose.onNodeWithTag("import_summary_message").assertTextEquals("Imported: $title")
+        awaitDictionaryMapping(true) // warm cache survives configuration changes
+        compose.activityRule.scenario.moveToState(Lifecycle.State.CREATED)
+        awaitDictionaryMapping(false)
+        compose.activityRule.scenario.moveToState(Lifecycle.State.RESUMED)
+        awaitDictionaryMapping(false) // returning to Library never eagerly loads Full
+        // Reimport through the actual form: same row, visible duplicate result, no reader.
+        compose.onNodeWithText("Paste text").performClick()
+        compose.onNodeWithTag("paste_text").performTextReplacement(text)
+        compose.onNodeWithText("Save to Library").performClick()
+        awaitStorage()
+        compose
+            .onNodeWithTag("import_summary_message")
+            .assertTextEquals("Already in Library: $title")
+        awaitDictionaryMapping(true)
+        assertEquals(1, core().view.documents.count { it.title == title })
+        compose.onNodeWithTag("reader_text").assertDoesNotExist()
+        compose.activityRule.scenario.recreate()
+        compose
+            .onNodeWithTag("import_summary_message")
+            .assertTextEquals("Already in Library: $title")
         compose.onNodeWithText("Settings").performClick()
         compose.onNodeWithText("Back").performClick()
-        compose.onNodeWithTag("import_summary_message").assertTextEquals("Imported: $title")
+        compose
+            .onNodeWithTag("import_summary_message")
+            .assertTextEquals("Already in Library: $title")
         compose.onNodeWithText("Close").performClick()
         compose.onNodeWithTag("import_summary").assertDoesNotExist()
         compose.activityRule.scenario.recreate()

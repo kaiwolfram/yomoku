@@ -14,31 +14,21 @@ use yomoku_core::{
     document::DocumentId,
     storage::{DocumentError, StorageResult},
 };
-use yomoku_ffi::{
-    native::{EffectsListener, NativeBridge},
-    FfiError,
-};
+use yomoku_ffi::{FfiError, YomokuBridge as NativeBridge};
 use yomoku_runtime::ShellEffectFfi;
 
 type Callbacks = mpsc::Receiver<(ThreadId, Vec<u8>)>;
-
-struct Listener(Arc<()>, mpsc::Sender<(ThreadId, Vec<u8>)>);
-impl EffectsListener for Listener {
-    fn on_effects(&self, bytes: Vec<u8>) {
-        let _keep_alive = &self.0;
-        let _ = self.1.send((thread::current().id(), bytes));
-    }
-    fn on_error(&self, error: FfiError) {
-        panic!("unexpected bridge error: {error:?}");
-    }
-}
 
 fn bridge(path: &str) -> (NativeBridge, Callbacks, Weak<()>) {
     let (sender, receiver) = mpsc::channel();
     let life = Arc::new(());
     let weak = Arc::downgrade(&life);
     (
-        NativeBridge::new(path.to_owned(), Box::new(Listener(life, sender))).unwrap(),
+        NativeBridge::new(path.into(), move |result| {
+            let _keep_alive = &life;
+            let _ = sender.send((thread::current().id(), result.unwrap()));
+        })
+        .unwrap(),
         receiver,
         weak,
     )

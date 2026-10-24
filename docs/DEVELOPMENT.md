@@ -18,7 +18,7 @@ with functioning rustup can omit the PATH workaround. Do not assume this compile
 is the project's minimum supported version; establish that with dependencies.
 Cargo.lock is retained for reproducible application development.
 Crux 0.20.0 declares Rust 1.90 minimum; the full locked graph has only been tested
-with 1.99.1. Current host baseline: 156 data-free Rust tests (76 storage, seven
+with 1.99.1. Current host baseline: 157 data-free Rust tests (76 storage, seven
 runtime). Eleven analysis fixtures and one runtime fixture run separately with
 each Full loader via tools/test-sudachi.sh (see below).
 
@@ -249,6 +249,13 @@ curl -fL 'https://raw.githubusercontent.com/openjdk/jdk/jdk-25%2B36/src/java.bas
 curl -fL 'https://raw.githubusercontent.com/openjdk/jdk/jdk-25%2B36/src/java.base/unix/native/include/jni_md.h' -o .local/jni-25/include/linux/jni_md.h
 tools/test-kotlin-bridge.sh
 ```
+
+Production JNI imports now require the explicitly prepared pinned Full dictionary
+(see Sudachi setup below). The runner checks
+`YOMOKU_SUDACHI_DICTIONARY` or `.local/sudachi/full-20261015/system_full.dic`;
+it never downloads data implicitly. Keep those bytes immutable while JNI runs.
+Host-only module-opening flags enable JDK descriptor duplication in the fixture.
+No Android SDK/Gradle is required.
 
 The script defaults to those local tools/headers, and accepts `BOLTFFI_BIN`,
 `KOTLINC_BIN`, `JAVA_BIN`, `CC`, `JAVA_HOME` and `JNI_INCLUDE_DIR` overrides.
@@ -1040,3 +1047,73 @@ Gradle initially failed on sandbox sockets and passed with escalation. No open
 failure. No Full fixtures, full Android suite, release APK, probes, tablet or
 physical-arm64 rerun; previous results retain their documented limits. No schema,
 dependency version or production analyzer behavior changed.
+
+
+## Production analyzed paste imports
+
+NativeBridge requires a DictionaryProvider; Android's retained CoreSessionOwner
+supplies the verified private publisher. FD+1 transfers an owned descriptor while
+zero signals failure, including the generator's default for a failed callback.
+The existing FIFO worker maps/rechecks Full before starting the atomic repository
+transaction. It caches only while foreground, preserves cache across configuration
+recreation, releases on Activity stop and drains accepted work on final close.
+No analyzer, SQLite handle or Android I/O enters core; no new executor/schema or
+third-party version is introduced. Native builds now verify all 138 pinned Sudachi
+files and Gradle tracks the vendored source/verifier as production native inputs.
+
+Verification commands (use the Rust/Android environments above, sequentially):
+```sh
+cargo build --workspace --locked --offline
+cargo test --workspace --all-features --locked --offline
+cargo fmt --all -- --check
+cargo clippy --workspace --all-targets --all-features --locked --offline -- -D warnings
+tools/test-sudachi.sh
+tools/test-kotlin-bridge.sh
+tools/format-kotlin.sh --check
+bash -n tools/build-android-native.sh tools/test-kotlin-bridge.sh
+./android/gradlew -p android :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug --offline --console=plain
+./android/gradlew -p android :app:connectedDebugAndroidTest --offline --console=plain
+git diff --check
+```
+
+The host JNI runner now exercises real Full failure/retry, exact duplicate summary
+and progress preservation, foreground reuse and background release/lazy reopen,
+plus eventual cleanup of both callback registries. Data-free Rust tests explicitly
+prove production NativeBridge never falls back to unanalysed text on loader failure;
+raw Rust bridge storage fixtures remain data-free. Real Full worker and JNI load
+waits allow 60 seconds; data-free worker waits remain 10 seconds. Android import
+waits allow 30 seconds. These bounded test waits are not performance guarantees.
+
+AnalyzedImportSessionTest checks actual private Full through production JNI,
+worker native TID, no eager load, typed provider failure, injected SQL rollback
+across content/hash/tokens/vocabulary/history, healthy-cache retry, unique Japanese
+registrations, Mode B, no reading events, unchanged duplicate progress/status and
+history, hidden work, actual unmapping and accepted import draining after close.
+PasteReaderTest reimports through the form and checks visible Already in Library,
+retained warm mapping through recreation, background unmapping and lazy resume.
+
+
+PASS 2026-10-24: workspace build, 157 data-free Rust tests (76 storage), fmt/strict
+Clippy, eleven analysis + one worker Full fixture with each owned/mapped loader,
+138-file source integrity, host real-Full Kotlin/JNI + seven Unicode exchanges,
+Kotlin format/shell syntax/whitespace, both-ABI debug/test APKs, strict lint and
+all nineteen API-36 x86_64 Android tests. Final device results:
+`.local/test-reports/analyzed-import/full-suite-final/`;
+focused notices results: `notices-main-thread/` in the same parent.
+
+Initial full runs passed 18/19; the existing notices test also failed in isolation.
+Temporary diagnostics caught its tagged Loading state after ten seconds. Tracing
+showed the producer could resume on the I/O thread under the test effect context.
+Publish the loaded state on Dispatchers.Main.immediate; the original content,
+recreation assertions and ten-second timeout remain unchanged. Focused 2/2 and
+final full 19/19 pass. Earlier reports/traces remain under the same report parent;
+temporary logging/test diagnostics were removed. No open check failure.
+
+Initial real Full worker/JNI waits also exceeded their old ten-second allowance.
+Only these real-data load waits now allow sixty seconds; data-free worker waits
+remain ten. Android storage waits allow thirty seconds. JNI Thread objects can
+change across detach/attach, so actual worker affinity uses native TID on device.
+The emulator disconnected before a diagnostic run; restarted with the documented
+swangle flags, retaining data. Gradle/ADB escalation was used. Previous nonfatal
+Crux shutdown logging persists. No unsigned release, standalone/pressure/death
+probe, tablet or physical-arm64 rerun; prior measurements retain their limits.

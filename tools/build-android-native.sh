@@ -3,6 +3,7 @@ set -euo pipefail
 
 repo_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$repo_dir"
+python3 tools/verify-sudachi-source.py
 
 boltffi_bin="${BOLTFFI_BIN:-$repo_dir/.local/bin/boltffi}"
 for tool in "$boltffi_bin" cargo rustc; do

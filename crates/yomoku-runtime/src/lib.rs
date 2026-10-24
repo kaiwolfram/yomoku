@@ -42,7 +42,8 @@ pub fn effect_router(database_path: std::path::PathBuf) -> std::io::Result<Effec
 
 /// Analyzed, deduplicating imports on the existing SQLite worker. The shell
 /// supplies a lazy loader, not an analyzer created on the UI thread. The legacy
-/// router remains for the current native shell until descriptor delivery lands.
+/// router is retained only for low-level storage fixtures; NativeBridge requires
+/// this analyzed router and a verified-descriptor publisher.
 pub fn effect_router_with_analyzed_imports(
     database_path: std::path::PathBuf,
     loader: AnalyzerLoader,

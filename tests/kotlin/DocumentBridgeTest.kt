@@ -32,7 +32,7 @@ private class DocumentListener : EffectsListener {
     fun dispatch(bridge: NativeBridge, event: Event): ViewModel {
         val immediate = Requests.bincodeDeserialize(bridge.update(event.bincodeSerialize()))
         check(immediate.value.single().effect is ShellEffect.Render)
-        val (thread, bytes) = checkNotNull(effects.poll(10, TimeUnit.SECONDS))
+        val (thread, bytes) = checkNotNull(effects.poll(60, TimeUnit.SECONDS))
         check(thread != Thread.currentThread())
         check(Requests.bincodeDeserialize(bytes).value.single().effect is ShellEffect.Render)
         check(errors.isEmpty())
@@ -45,11 +45,20 @@ internal fun verifyDocumentBridge() {
     try {
         val database = directory.resolve("db.sqlite3")
         val listener = DocumentListener()
+        val dictionary = HostDictionary()
         val text = "  題𠮷📖  \r\nか\u3099👩‍👩‍👧‍👦\u0000終\n"
-        val document = NativeBridge(database.path, listener).use { bridge ->
+        val document = NativeBridge(database.path, listener, dictionary).use { bridge ->
             check(!database.exists())
             check(listener.dispatch(bridge, Event.RefreshLibrary).documents.isEmpty())
+            check(dictionary.calls.get() == 0)
+            dictionary.fail = true
+            val failed = listener.dispatch(bridge, Event.CreatePaste(text))
+            check(failed.documentError == DocumentError.UNAVAILABLE)
+            check(failed.documents.isEmpty() && failed.importSummary == null)
+            dictionary.fail = false
             val created = listener.dispatch(bridge, Event.CreatePaste(text))
+            check(dictionary.calls.get() == 2)
+            check(dictionary.threads.all { it != Thread.currentThread() })
             check(created.documents.single().title == "  題𠮷📖  ")
             check(created.loadedDocument == null)
             val summary = checkNotNull(created.importSummary)
@@ -91,13 +100,25 @@ internal fun verifyDocumentBridge() {
             bridge.update(Event.CloseSettings.bincodeSerialize())
             bridge.update(Event.CloseDocument.bincodeSerialize())
             check(ViewModel.bincodeDeserialize(bridge.view()).contentRoute == ContentRoute.MAIN)
+            val duplicate = listener.dispatch(bridge, Event.CreatePaste(text))
+            check(duplicate.documents.single().documentId == id)
+            check(duplicate.documents.single().progressPercent > 0UL)
+            check(duplicate.importSummary?.outcome == ImportOutcome.EXISTING)
+            check(duplicate.contentRoute == ContentRoute.MAIN && duplicate.reader == null)
+            check(dictionary.calls.get() == 2) // foreground cache reused
+            bridge.setForeground(false)
+            listener.dispatch(bridge, Event.RefreshLibrary) // FIFO release barrier
+            bridge.setForeground(true)
+            check(dictionary.calls.get() == 2) // no eager reopen
+            check(listener.dispatch(bridge, Event.CreatePaste(text)).importSummary?.outcome == ImportOutcome.EXISTING)
+            check(dictionary.calls.get() == 3)
             check(listener.dispatch(bridge, Event.CreatePaste(" \n")).documentError == DocumentError.EMPTYPASTE)
             check(listener.dispatch(bridge, Event.RefreshLibrary).documents.size == 1)
             check(listener.dispatch(bridge, Event.LoadPaste(DocumentId(Long.MAX_VALUE))).documentError == DocumentError.NOTFOUND)
             saved
         }
         val reopened = DocumentListener()
-        NativeBridge(database.path, reopened).use { bridge ->
+        NativeBridge(database.path, reopened, HostDictionary()).use { bridge ->
             val initial = reopened.dispatch(bridge, Event.RefreshLibrary)
             check(initial.importSummary == null)
             check(initial.documents.single().documentId == document.documentId)
@@ -107,7 +128,7 @@ internal fun verifyDocumentBridge() {
             check(ViewModel.bincodeDeserialize(bridge.view()).reader?.position == document.readingPosition)
         }
         val failure = DocumentListener()
-        NativeBridge(directory.resolve("missing/db.sqlite3").path, failure).use { bridge ->
+        NativeBridge(directory.resolve("missing/db.sqlite3").path, failure, HostDictionary()).use { bridge ->
             val unavailable = failure.dispatch(bridge, Event.RefreshLibrary)
             check(unavailable.documentError == DocumentError.UNAVAILABLE)
             check(unavailable.pageLength == null)
@@ -117,7 +138,7 @@ internal fun verifyDocumentBridge() {
         // Closing during an operation must safely release the JNI callback after
         // the worker completes; the registry assertions in main wait for this.
         repeat(20) {
-            NativeBridge(":memory:", DocumentListener()).use { bridge ->
+            NativeBridge(":memory:", DocumentListener(), HostDictionary()).use { bridge ->
                 bridge.update(Event.RefreshLibrary.bincodeSerialize())
             }
         }

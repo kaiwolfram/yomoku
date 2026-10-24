@@ -2,9 +2,11 @@ package app.yomoku
 
 import android.content.Context
 import android.os.Looper
+import android.os.ParcelFileDescriptor
 import android.system.ErrnoException
 import android.system.Os
 import android.system.OsConstants
+import app.yomoku.nativebridge.DictionaryProvider
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
@@ -13,7 +15,26 @@ import java.io.InputStream
 import java.io.RandomAccessFile
 import java.security.MessageDigest
 
-/** Platform I/O only. Nothing calls this at startup; the future analyzer worker owns the handle. */
+/** Platform I/O only. The Rust FIFO worker opens this lazily on the first import. */
+internal fun sudachiDictionaryProvider(context: Context): DictionaryProvider {
+    return sudachiDictionaryProvider(sudachiDictionaryFiles(context))
+}
+
+internal fun sudachiDictionaryProvider(files: VerifiedDictionaryFiles): DictionaryProvider {
+    return object : DictionaryProvider {
+        override fun openVerifiedDictionary(): Long =
+            try {
+                files.open().use { input ->
+                    // Transfer an owned FD; +1 reserves zero for callback failure.
+                    ParcelFileDescriptor.dup(input.fd).use { it.detachFd().toLong() + 1L }
+                }
+            } catch (_: Exception) {
+                // Typed import failure in Rust; no exception crosses a foreign callback.
+                0L
+            }
+    }
+}
+
 internal fun sudachiDictionaryFiles(context: Context): VerifiedDictionaryFiles {
     val application = context.applicationContext
     return VerifiedDictionaryFiles(

@@ -41,7 +41,8 @@ unchanged selection. Transactions serialize concurrent writes; failure preserves
 prior entries/history. Invalid timestamps/stored values error without repair.
 
 `create_analyzed_paste` composes document creation, analysis and registration in
-one repository transaction (see below); production import wiring remains pending.
+one repository transaction (see below); production paste imports use its
+deduplicating wrapper on the native FIFO worker.
 Completion-driven New→Known events need completion provenance and
 must share the occurrences/time/position transaction, not call manual selection.
 Existing document imports are not rescanned by this migration or by lookup.
@@ -68,8 +69,8 @@ kanji. OOV readings/dictionary forms are absent; original surfaces never become
 normalized identity. Normalization-generated empty original spans are omitted,
 and the complete result must still pass canonical coverage/nonoverlap validation.
 Real A/B/C output survives repository saves and reopen without a schema change.
-Atomic paste analysis/registration composition is implemented at the repository
-boundary; production analysis persistence remains gated by the loading/lifecycle work.
+Production paste imports atomically persist Mode B analysis and registration
+through the verified-descriptor native worker. Existing pastes are not rescanned.
 
 `chapter_analyses` stores semantics version 1, chapter ownership, engine/dictionary
 revision and explicit `a`/`b`/`c` mode. Its unique chapter/revisions/mode key identifies
@@ -221,9 +222,9 @@ transaction for a consistent snapshot, returns None only for an absent document
 and reports missing/invalid content for an existing document as InvalidDocument.
 SQL values are bound parameters, including titles/text containing NUL or quotes.
 Both calls are synchronous I/O executed off the UI thread by runtime effects.
-The existing production paste effect still calls this text-only method. SHA-256
-duplicate detection, production analyzed-import wiring and import metadata remain
-unchecked tasks. No reading encounters are created here.
+This text-only allocation primitive is retained for low-level storage fixtures;
+NativeBridge requires analyzed/deduplicating imports below. File-import metadata
+remains unchecked. No reading encounters are created here.
 
 `Storage::create_analyzed_paste` is a separate worker-only repository entry point.
 An immediate transaction allocates document/source/chapter identities and exact
@@ -278,14 +279,14 @@ one analyzes/creates. Indexing/analyzer/validation/write/commit errors roll back
 the entire transaction, including provisional legacy hashes; earlier committed
 imports remain intact. Deleting a document removes its hash while retaining
 historical source/chapter provenance and vocabulary; reimport starts at 0% with
-new IDs. The opt-in analyzed-import runtime router now calls this repository on
+new IDs. The production analyzed-import runtime router calls this repository on
 its FIFO worker with a preloaded analyzer and a wall-clock registration timestamp.
 It maps the committed Created/Existing result to an internal storage result;
 core upserts one Library row by document ID without changing persisted state or
 opening a reader. Both results project a transient typed import summary; its
-document ID/title/outcome live only in core view state. NativeBridge/Android still
-select text-only creation until verified-descriptor delivery/lifecycle are wired.
-The current native path only produces Created. No schema,
+document ID/title/outcome live only in core view state. NativeBridge/Android
+require this path with lazy verified-descriptor loading and queued cache lifecycle.
+Both outcomes are delivered to the Android Library summary. No schema,
 production deletion or file import is added. Finished-at-least-once remains separate.
 
 ## Current position repository (migration 0003)

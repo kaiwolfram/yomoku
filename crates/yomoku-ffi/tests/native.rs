@@ -3,7 +3,7 @@ use std::sync::{Arc, Weak};
 use crux_core::bridge::{BincodeFfiFormat, FfiFormat, Requests};
 use yomoku_core::app::{Destination, Event, ViewModel};
 use yomoku_ffi::{
-    native::{EffectsListener, NativeBridge},
+    native::{DictionaryProvider, EffectsListener, NativeBridge},
     FfiError,
 };
 use yomoku_runtime::ShellEffectFfi;
@@ -22,6 +22,13 @@ impl EffectsListener for Listener {
     }
 }
 
+struct NoDictionary;
+impl DictionaryProvider for NoDictionary {
+    fn open_verified_dictionary(&self) -> i64 {
+        panic!("navigation must not load the dictionary");
+    }
+}
+
 fn bridge() -> (NativeBridge, Weak<()>) {
     let lifetime = Arc::new(());
     let weak = Arc::downgrade(&lifetime);
@@ -31,6 +38,7 @@ fn bridge() -> (NativeBridge, Weak<()>) {
             Box::new(Listener {
                 _lifetime: lifetime,
             }),
+            Box::new(NoDictionary),
         )
         .unwrap(),
         weak,
@@ -77,4 +85,58 @@ fn native_facade_can_be_shared_across_threads_and_releases_listener() {
     assert!(lifetime.upgrade().is_some());
     drop(bridge);
     assert!(lifetime.upgrade().is_none());
+}
+
+#[test]
+fn native_imports_require_a_dictionary_and_never_fall_back_to_text_only() {
+    use std::sync::{
+        atomic::{AtomicUsize, Ordering},
+        mpsc,
+    };
+    use yomoku_core::storage::DocumentError;
+    struct Missing(Arc<AtomicUsize>);
+    impl DictionaryProvider for Missing {
+        fn open_verified_dictionary(&self) -> i64 {
+            self.0.fetch_add(1, Ordering::SeqCst);
+            0
+        }
+    }
+    struct Channel(mpsc::Sender<Vec<u8>>);
+    impl EffectsListener for Channel {
+        fn on_effects(&self, bytes: Vec<u8>) {
+            self.0.send(bytes).unwrap();
+        }
+        fn on_error(&self, error: FfiError) {
+            panic!("unexpected {error:?}");
+        }
+    }
+    let (send, receive) = mpsc::channel();
+    let calls = Arc::new(AtomicUsize::new(0));
+    let native = NativeBridge::new(
+        ":memory:".into(),
+        Box::new(Channel(send)),
+        Box::new(Missing(calls.clone())),
+    )
+    .unwrap();
+    for event in [
+        Event::RefreshLibrary,
+        Event::CreatePaste("猫".into()),
+        Event::CreatePaste("猫".into()),
+    ] {
+        let mut bytes = vec![];
+        BincodeFfiFormat::serialize(&mut bytes, &event).unwrap();
+        native.update(&bytes).unwrap();
+        receive
+            .recv_timeout(std::time::Duration::from_secs(10))
+            .unwrap();
+        let view = view(&native);
+        assert!(view.documents.is_empty());
+        assert!(view.import_summary.is_none());
+        if matches!(event, Event::CreatePaste(_)) {
+            assert_eq!(view.document_error, Some(DocumentError::Unavailable));
+        } else {
+            assert_eq!(calls.load(Ordering::SeqCst), 0);
+        }
+    }
+    assert_eq!(calls.load(Ordering::SeqCst), 2);
 }

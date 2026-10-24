@@ -803,3 +803,35 @@
   Production analyzer/native descriptor/lifecycle and duplicate delivery remain
   unchecked. No schema/dependency changes, Full fixtures, full Android suite,
   release/probe/tablet or physical-arm64 rerun. No open verification blocker.
+
+
+## 2026-10-24 — Production analyzed paste imports
+
+- Started clean. NativeBridge requires DictionaryProvider and always selects the
+  analyzed/deduplicating router. Android transfers owned FD+1; Rust closes it and
+  maps/rechecks the same immutable publication on the existing FIFO worker.
+- Activity recreation retains warm analysis; background queues release, hidden
+  imports finish/release and final close drains accepted work. No eager Library
+  load/new executor/schema/version change. Native builds verify pinned Sudachi.
+- Host real Full JNI tests cover load failure/retry, exact duplicates/progress,
+  summaries, cache reuse/release/reopen and both callback registries' cleanup.
+  New data-free native test forbids text-only fallback. New device test verifies
+  actual Mode B/vocabulary transactions, SQL rollback/retry, native worker TID,
+  preserved duplicate status/history/progress, hidden release and close/drain.
+  Paste UI tests cover visible duplicates and actual recreation/background mapping.
+- PASS: build, 157 data-free Rust tests, fmt/strict Clippy, eleven analysis + one
+  worker Full fixture per loader, pinned 138-file source check, host Kotlin/JNI +
+  seven Unicode exchanges, Kotlin format/shell syntax, debug/test APKs and lint.
+- Final Android full 19/19 and strict lint PASS. Initial full runs 18/19 and focused
+  notices stalled at Loading. Trace showed producer resume on I/O under UI tests;
+  explicitly publish on Main.immediate. Original assertions/10s timeout retained;
+  focused 2/2 and full 19/19 pass. Temporary diagnostics removed; all reports retained
+  under .local/test-reports/analyzed-import/. No open failure.
+- Real Full worker/JNI old 10s timeout fixed with 60s only for those loads; data-free
+  waits unchanged, Android storage 30s. JNI thread-object assumptions replaced by
+  native TID on device. Previous benign Crux shutdown logging persists. Emulator
+  disconnected/restarted with swangle, no data reset; Gradle/ADB escalation used.
+- Updated plan, architecture/data model, decisions, development and handoff. Next:
+  pending-page time/reflow attribution, then atomic completion with occurrences,
+  New→Known/time and Android clock/navigation. No standalone/pressure/death probe,
+  unsigned release, tablet or arm64 rerun; arm64 remains the later user trial.
