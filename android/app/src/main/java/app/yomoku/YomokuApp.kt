@@ -146,6 +146,7 @@ internal fun YomokuApp(view: ViewModel, dispatch: (Event) -> Unit) {
                 }
             }
         }
+        BookCompletionCelebration(view, dispatch)
     }
 }
 
@@ -216,6 +217,7 @@ private fun YomokuPreview() {
                 readingTimeSavePending = false,
                 completionSavePending = false,
                 completionNotice = null,
+                bookCompletionNotice = null,
             )
         ) {}
     }

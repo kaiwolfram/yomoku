@@ -176,16 +176,9 @@ fn internal_storage_results_cannot_be_injected_over_ffi() {
     let mut last_public = Vec::new();
     BincodeFfiFormat::serialize(
         &mut last_public,
-        &Event::ObserveReaderClock(yomoku_core::active_time::ReaderClockSample {
-            document_id: DocumentId::try_from(1).unwrap(),
-            position: yomoku_core::pagination::ReadingPosition {
-                source_id: yomoku_core::document::SourceId::try_from(1).unwrap(),
-                chapter_id: yomoku_core::document::ChapterId::try_from(1).unwrap(),
-                offset: yomoku_core::document::TextOffset::try_from(0).unwrap(),
-            },
-            monotonic_ms: 0,
-            action: yomoku_core::active_time::ReaderClockAction::Pause,
-        }),
+        &Event::DismissBookCompletionNotice(
+            yomoku_core::document::CompletionCommandId::try_from(1).unwrap(),
+        ),
     )
     .unwrap();
     let internal_tag = u32::from_le_bytes(last_public[..4].try_into().unwrap()) + 1;

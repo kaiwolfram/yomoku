@@ -13,7 +13,7 @@ use crate::{
         SavedReadingTime,
     },
     completion::{AnalyzedCompletionOutcome, CompletionNotice, PageCompletionIntent},
-    document::{DocumentId, LibraryDocument, PastedDocument, TextAnchor},
+    document::{CompletionCommandId, DocumentId, LibraryDocument, PastedDocument, TextAnchor},
     pagination::{LogicalPages, PageLength, ReadingPosition},
     reader::{ReaderAnalysis, ReaderPage},
     storage::{DocumentError, StorageOperation, StorageResult},
@@ -81,6 +81,7 @@ pub struct Model {
     deferred_reader_event: Option<Event>,
     pending_completion: Option<StorageOperation>,
     completion_notice: Option<CompletionNotice>,
+    book_completion_notice: Option<CompletionCommandId>,
     reader_clock: Option<ActiveReadingTime>,
     time_checkpoint_can_wait: bool,
 }
@@ -129,6 +130,8 @@ pub enum Event {
         page: TextAnchor,
         position: ReadingPosition,
     },
+    /// Consume before starting the transient celebration; stale acknowledgments ignore.
+    DismissBookCompletionNotice(CompletionCommandId),
     #[serde(skip)]
     #[cfg_attr(feature = "facet_typegen", facet(skip))]
     StorageFinished(StorageResult),
@@ -156,6 +159,8 @@ pub struct ViewModel {
     pub reading_time_save_pending: bool,
     pub completion_save_pending: bool,
     pub completion_notice: Option<CompletionNotice>,
+    /// One newly recorded final-page command, independent of permanent finish state.
+    pub book_completion_notice: Option<CompletionCommandId>,
 }
 
 #[effect]
@@ -315,6 +320,7 @@ impl App for Yomoku {
                 });
                 model.pending_completion = Some(operation.clone());
                 model.completion_notice = None;
+                model.book_completion_notice = None;
                 if model.pending_time_checkpoint.is_some() || model.queued_time_checkpoint.is_some()
                 {
                     return render::render();
@@ -451,6 +457,7 @@ impl App for Yomoku {
             if matches!(event, Event::CreatePaste(_) | Event::OpenReader(_)) {
                 model.import_summary = None;
                 model.completion_notice = None;
+                model.book_completion_notice = None;
             }
             if matches!(
                 event,
@@ -474,6 +481,7 @@ impl App for Yomoku {
         match event {
             Event::SelectDestination(destination) => {
                 model.completion_notice = None;
+                model.book_completion_notice = None;
                 model.import_summary = None;
                 model.destination = destination;
                 model.settings_open = false;
@@ -486,6 +494,7 @@ impl App for Yomoku {
             }
             Event::OpenPaste => {
                 model.completion_notice = None;
+                model.book_completion_notice = None;
                 model.import_summary = None;
                 model.destination = Destination::Library;
                 model.settings_open = false;
@@ -497,20 +506,16 @@ impl App for Yomoku {
                 model.clear_reader_time();
                 model.document_error = None;
             }
-            Event::CloseDocument => {
-                model.completion_notice = None;
-                model.content_route = ContentRoute::Main;
-                model.reader = None;
-                model.reader_analysis = None;
-                model.reader_document = None;
-                model.pending_reader = None;
-                model.clear_reader_time();
-                model.document_error = None;
-            }
+            Event::CloseDocument => model.close_document(),
             Event::OpenSettings => model.settings_open = true,
             Event::CloseSettings => model.settings_open = false,
             Event::DismissImportSummary => model.import_summary = None,
             Event::DismissCompletionNotice => model.completion_notice = None,
+            Event::DismissBookCompletionNotice(id) => {
+                if model.book_completion_notice == Some(id) {
+                    model.book_completion_notice = None;
+                }
+            }
             Event::StorageFinished(result) => {
                 let failed = matches!(result, StorageResult::Failed(_));
                 model.storage_busy = false;
@@ -569,6 +574,18 @@ impl App for Yomoku {
                         else {
                             return render::render();
                         };
+                        // The frozen page identifies this completion, not the permanent
+                        // marker (which is already true on every deliberate reread).
+                        let final_page = prepared.completion.page.source_id
+                            == document.chapter.source_id
+                            && prepared.completion.page.chapter_id == document.chapter.chapter_id
+                            && prepared
+                                .completion
+                                .page
+                                .range
+                                .end
+                                .byte_index(&document.chapter.text)
+                                == Ok(document.chapter.text.len());
                         model.completion_notice = match outcome {
                             AnalyzedCompletionOutcome::Recorded { newly_known }
                                 if newly_known > 0 =>
@@ -585,7 +602,22 @@ impl App for Yomoku {
                         model.reader_time = None;
                         model.reader_clock = None;
                         model.apply_position(document);
-                        if let Some(event) = model.deferred_reader_event.take() {
+                        if final_page {
+                            // Successful Finish Book always returns to Library after
+                            // the same final-clock drain and atomic completion.
+                            model.close_document();
+                            model.destination = Destination::Library;
+                            model.settings_open = false;
+                            model.deferred_reader_event = None;
+                            if let AnalyzedCompletionOutcome::Recorded { newly_known } = outcome {
+                                model.book_completion_notice = Some(prepared.completion.command_id);
+                                model.completion_notice =
+                                    (newly_known > 0).then_some(CompletionNotice {
+                                        command_id: prepared.completion.command_id,
+                                        newly_known,
+                                    });
+                            }
+                        } else if let Some(event) = model.deferred_reader_event.take() {
                             return self.update(event, model);
                         }
                     }
@@ -682,11 +714,24 @@ impl App for Yomoku {
                 || model.queued_time_checkpoint.is_some(),
             completion_save_pending: model.pending_completion.is_some(),
             completion_notice: model.completion_notice,
+            book_completion_notice: model.book_completion_notice,
         }
     }
 }
 
 impl Model {
+    fn close_document(&mut self) {
+        self.completion_notice = None;
+        self.book_completion_notice = None;
+        self.content_route = ContentRoute::Main;
+        self.reader = None;
+        self.reader_analysis = None;
+        self.reader_document = None;
+        self.pending_reader = None;
+        self.clear_reader_time();
+        self.document_error = None;
+    }
+
     fn observe_reader_clock(&mut self, sample: ReaderClockSample) -> Option<ReadingTimeUpdate> {
         let saved = self.reader_time?;
         if sample.monotonic_ms < 0

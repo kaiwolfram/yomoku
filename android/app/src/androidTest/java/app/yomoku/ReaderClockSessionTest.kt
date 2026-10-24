@@ -279,6 +279,9 @@ class ReaderClockSessionTest {
     @Test
     fun completionCommitsTheFinalSampleBeforeClosingWithoutStartingAnotherClock() {
         Fixture().use { f ->
+            dispatch(f.core, Event.OpenSettings)
+            dispatch(f.core, Event.SetPageLength(PageLength.CHARACTERS1500))
+            dispatch(f.core, Event.CloseSettings)
             f.start()
             onMain {
                 val page = f.core.view.reader!!
@@ -292,6 +295,9 @@ class ReaderClockSessionTest {
                 assertFalse(f.core.isClosed)
             }
             awaitClosed(f.core)
+            assertEquals(ContentRoute.MAIN, f.core.view.contentRoute)
+            assertEquals(null, f.core.view.reader)
+            assertTrue(f.core.view.bookCompletionNotice != null)
             f.db.rawQuery("SELECT active_time_ms FROM reading_completions", null).use {
                 assertTrue(it.moveToFirst())
                 assertEquals(1_000L, it.getLong(0))

@@ -625,7 +625,12 @@ version; Android automatically supplies clock/final saves and drains pending cor
 obligations before native teardown. Android controls/swipes use this completion
 path; the toast consumes its transient command-keyed notice once. Migration 0011
 adds the permanent finish marker; its checkmarks and reopening behavior are wired.
-Finish Book and completion confetti remain open.
+Final-page Finish Book/swipe success returns to Library after reconciliation and
+clock drain. A separate transient book_completion_notice contains the newly Recorded
+command ID, including zero-newly-Known rereads; AlreadyRecorded exposes none. It is
+independent of the permanent marker and positive-only toast. Compose acknowledges
+the matching ID before a local 1.4-second confetti animation, so recreation cannot
+replay a consumed command. Neither animation nor its notice is persisted.
 
 ## Required future schema constraints
 - Future import repositories must extend the identity/immutable-text and durable

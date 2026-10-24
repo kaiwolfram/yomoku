@@ -1,6 +1,6 @@
 # Resume here
 
-Updated: 2026-10-24. Finish checkmarks and explicit page-1 reopening verified.
+Updated: 2026-10-24. Finish Book + command-keyed confetti verified.
 Read AGENTS.md, plan phases 2–4 and PRODUCT_SPEC.md sections 3–4.
 
 ## Working
@@ -14,24 +14,25 @@ Read AGENTS.md, plan phases 2–4 and PRODUCT_SPEC.md sections 3–4.
   in Rust and only saves position. Both use retained dispatch/Pause/checkpoint drain.
   Busy/pending saves disable actions. Duplicate callbacks count once; rereads again.
   Positive CompletionNotice shows a short toast and is consumed once; zero is silent.
-  EOF disables Next. Migration 0011 atomically marks final-page completion finished.
+  Final control says Finish Book; its action/left swipe returns to Library only after
+  final clock drain + atomic success. Failure stays with Retry. Recorded final commands
+  expose book_completion_notice even at zero New/rereads; AlreadyRecorded is silent.
+  Compose consumes the keyed notice before a local 1.4s confetti overlay; recreation
+  cannot replay it. Final return preserves positive toast. Migration 0011 marks finished.
   Marker crosses document/Library/reader snapshots; accessible checkmarks show it
   independently of position. Backward/reflow/time saves retain it; deletion resets
   it while history stays. Migration backfills live EOF history, never position alone.
 - Analyzed paste atomically deduplicates exact SHA-256, saves Mode B and registers
   unique Japanese surfaces. Duplicates reuse oldest live exact match without
   rescan/progress/status changes. Created/Existing show dismissible Library summary.
-  Source content/IDs/provenance stay immutable. Reader opening never loads Sudachi.
 - load_reader_snapshot/load_paste stay read-only, especially completion reloads.
-  NEW OpenReader uses open_reader_snapshot: one immediate transaction resets finished
+  OpenReader uses open_reader_snapshot: one immediate transaction resets finished
   books to page 1 and reads marker/preset/original Mode B identity. Pending time/history
   stay; failure rolls back. Unfinished offsets and retained recreation stay exact.
   Identity stays fixed through reflow/position/plain loads; Missing never rescans.
-- RestoreReadingTime separately reserves an exact-offset revision on FIFO.
-  Checkpoints save absolute durations; failures retain exact payload/prior revision
-  for RetryReadingTimeCheckpoint. Newer updates coalesce to one maximum slot and
-  chain returned revisions. View exposes committed duration + save-pending only.
-  Checkpoints create no history. Reflow/same-offset saves preserve idle deadline.
+- RestoreReadingTime reserves FIFO revision; absolute saves retain exact retry payload/
+  revision and coalesce newer maxima, chaining revisions. View shows committed duration
+  + pending only; no history. Reflow/same-offset saves preserve idle deadline.
 - ObserveReaderClock(document/exact position, monotonic_ms, action) drives pure
   ActiveReadingTime after restore. Five-minute idle cap; paused intervals excluded.
   Only Checkpoint/Pause save increases. Invalid/foreign/regressing samples ignore.
@@ -49,11 +50,10 @@ Read AGENTS.md, plan phases 2–4 and PRODUCT_SPEC.md sections 3–4.
   persistent failure retains the live session. Abrupt death can lose uncommitted time.
 - CompleteReaderPage freezes document/page/position/preset/AnalysisId/timestamp,
   drains checkpoints, then FIFO reserves ID + whole-page durable time atomically.
-  CompletePage commits every Japanese repetition's anchors/surface/reading/lemma,
-  New-only Known events, encounters/history/time/position together. Exact retries;
-  MissingAnalysis blocks legacy completion without rescan. Base analyses only.
-  Worker reloads persisted content; failed read retries same command. AlreadyRecorded
-  has no effects/notice. New positive Recorded exposes keyed CompletionNotice.
+  CompletePage commits occurrences/New-only Known/history/time/position together.
+  MissingAnalysis blocks legacy completion without rescan; base analyses only.
+  Worker reloads persisted content; failed read retries same frozen command.
+  AlreadyRecorded has no effects/notice.
 - Migrations 0005–0011 preserve history/vocabulary/immutable A/B/C anchors/edits/
   hashes/time. Document deletion preserves history; vocabulary deletion cascades it.
 - NativeBridge requires owned verified FD+1; Rust rehashes/maps/closes all paths.
@@ -63,17 +63,17 @@ Read AGENTS.md, plan phases 2–4 and PRODUCT_SPEC.md sections 3–4.
   Full outside Git; notices bundled. SUDACHI_MEASUREMENTS.md has limits.
 
 ## Next tasks (ordered)
-1. Finish Book return + brief confetti on EACH newly recorded final-page completion,
-   including rereads/zero newly Known. Use command-keyed transient state, never the
-   permanent flag alone. Test duplicate/retry/recreation and final clock drain.
-2. User-run physical arm64 validation once usable. Formats/dictionary/CI remain open.
+1. Phase 3 tappable tokens + five direct status choices: begin with a small typed
+   reader-token/status projection from stored Mode B; lookup opening must not mutate.
+2. Verify JMdict English/JMnedict versions/licenses and reproducible offline index.
+3. User-run physical arm64 validation once usable. Formats/CI remain open.
 
 ## Verification / environment
-- PASS: 217 Rust tests (111 storage); host Kotlin/JNI + Unicode exchanges;
-  strict Clippy/fmt/Kotlin/diff, both-ABI debug/test APKs and strict Android lint.
-  14 distinct API-36 x86_64 Android tests verified: 13 regression passes + final
-  focused PasteReaderTest pass after lazy-list key scrolling fixed the fixture.
-  Prior full suite not rerun. Commands/fixed failures: DEVELOPMENT.md latest.
-- Prior real-process/reboot clock recovery remains verified; not rerun this slice.
-- Schema stays 0011; new OpenReader storage operation + finish fields in codecs.
-  No local blocker; no release/tablet/arm64 rerun. Nostr empty; ask Q188 before forwarding.
+- PASS: 219 Rust tests (111 storage); real-Full host Kotlin/JNI + Unicode exchanges;
+  strict Clippy/fmt/Kotlin/diff, reproducible Kotlin generation, both-ABI debug/test
+  APKs + strict Android lint. All 15 selected API-36 x86_64 reader/clock/paste tests
+  pass (5m42s build/run). Full suite not rerun. Exact commands: DEVELOPMENT.md latest.
+- Initial Kotlin warning and stale reread fixture anchor fixed; final checks pass.
+  Prior process/reboot clock recovery not rerun. No schema/dependency change;
+  generated Event/View add keyed book-completion acknowledgment/notice. No local
+  blocker; no release/tablet/arm64 rerun. Nostr empty; ask Q188 before forwarding.

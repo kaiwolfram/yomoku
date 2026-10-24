@@ -226,7 +226,12 @@ internal fun ReaderScreen(view: ViewModel, dispatch: (Event) -> Unit) {
                     enabled = canAdvance,
                     modifier = Modifier.testTag("next_page"),
                 ) {
-                    Text(stringResource(R.string.next_page))
+                    Text(
+                        stringResource(
+                            if (page.pageNumber == page.totalPages) R.string.finish_book
+                            else R.string.next_page
+                        )
+                    )
                 }
             }
         }

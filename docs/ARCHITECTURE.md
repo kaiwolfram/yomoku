@@ -53,10 +53,16 @@ preset, stored AnalysisId and caller-supplied timestamp, rejecting stale/duplica
 callbacks. It waits for every accepted checkpoint, then the FIFO atomically reserves
 a command ID and freezes the whole page's durable duration. Core chains the prepared
 analyzed transaction and retains each stage unchanged for RetryReaderCompletion.
-Other storage and departures wait until success; the first deferred departure wins.
+Other storage and departures wait until success; the first deferred departure wins
+for ordinary pages. Successful final-page completion returns to Library.
 Only newly Recorded results with newly_known > 0 publish a dismissible command-keyed
 CompletionNotice. AlreadyRecorded and zero results publish none. Successful results
 refresh reader/Library progress from persisted content and retire consumed timer tokens.
+Finality is the frozen page ending at immutable paste EOF, independent of the permanent
+marker. Final success returns to Library; newly Recorded outcomes also publish a
+separate command-keyed book_completion_notice, including zero newly Known. A keyed
+acknowledgment consumes it before a local 1.4-second Compose confetti animation;
+recreation cannot replay a consumed notice. Final return preserves the positive toast.
 The worker's post-commit read can fail; retry uses the same command, reconciles the
 persisted position and suppresses duplicate notices. No analyzer is loaded for completion.
 Android supplies automatic final checkpoints and platform observations as described below.
@@ -415,7 +421,8 @@ final-page completion, independent of position, and backfills live pastes from E
 history. Library/document/reader projections carry it through generated FFI;
 Android shows an accessible checkmark independent of the current percentage.
 Explicit reopening persists page 1, while completion reloads and retained Activity
-recreation preserve the active position. Finish Book and confetti remain next, while
+recreation preserve the active position. Final-page Finish Book/swipe completion
+returns to Library and celebrates each newly Recorded command, including rereads;
 effective segmentation edits and statistics aggregation remain
 separate tasks. Add analysis/import crates only with
 actual behavior; Sudachi Full defaults to B, JMdict/JMnedict remain offline data, and future Nostr I/O stays in Rust. Configuration is empty.

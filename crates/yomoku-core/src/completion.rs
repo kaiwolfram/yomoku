@@ -55,7 +55,7 @@ pub struct CompletionNotice {
 
 impl PageCompletion {
     /// Validate the exact departing page/position against a single-unit paste.
-    /// The final page advances to EOF; finished-book behavior is a separate task.
+    /// The final page advances to EOF before the core returns to Library.
     pub fn next_position(
         self,
         document: &PastedDocument,

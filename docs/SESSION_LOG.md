@@ -1090,3 +1090,23 @@
   Next: Finish Book and per-completion confetti, including rereads/zero newly Known.
   No full suite, release APK, standalone Full suite, process/reboot, tablet or
   physical-arm64 rerun. Nostr stays empty; ask Q188 before forwarding.
+
+## 2026-10-24 — Finish Book and per-command confetti
+
+- Started clean. Final-page Finish Book/left swipe retains anchored completion and
+  final checkpoint drain, then returns to Library only after success. Failures keep
+  Retry. Separate transient command IDs celebrate every newly Recorded final page,
+  including rereads/zero New; AlreadyRecorded stays silent. Positive toast survives
+  automatic return. Compose consumes the key before a local 1.4s confetti overlay;
+  recomposition/recreation cannot replay it. No schema/dependency change.
+- PASS: 219 Rust tests (111 storage), strict Clippy/fmt/Kotlin/diff, real-Full host
+  Kotlin/JNI + seven Unicode exchanges, reproducible generation, both-ABI debug/test
+  APKs, strict Android lint and all 15 selected API-36 x86_64 tests (5m42s build/run).
+  Two new core tests and one animation test; amended real JNI/SQLite finish/reread
+  and final-clock/draining-close tests verify retry/dedup/recreation behavior.
+- Fixed initial post-finish core expectation, strict Kotlin safe-call warning and
+  stale host reread offset. Final checks pass; no open failure or local blocker.
+  Updated plan/handoff/architecture/data/decision/development/README docs. Next:
+  typed reader token/status projection and word taps; offline dictionary data/index.
+  No full Android suite, standalone Full suite, release, process/reboot, tablet or
+  physical-arm64 rerun. Nostr empty; Q188 still required before forwarding.

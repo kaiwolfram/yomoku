@@ -274,6 +274,16 @@ fn reader_clock_survives_reflow_but_movement_exit_and_completion_retire_its_epoc
             yomoku_core::completion::AnalyzedCompletionOutcome::AlreadyRecorded,
         ),
     );
+    assert_eq!(core.view().content_route, ContentRoute::Main);
+    assert!(core.view().reader_time.is_none());
+    document.reading_position = None;
+    document.finished_at_least_once = true;
+    let mut effects = core.process_event(Event::OpenReader(document.document_id));
+    finish(
+        &core,
+        &mut effects,
+        loaded(document.clone(), PageLength::Characters250),
+    );
     restore_time(&core, 0);
     core.process_event(clock(&core, 0, ReaderClockAction::Resume));
     let mut effects = core.process_event(clock(&core, 10, ReaderClockAction::Pause));
@@ -1600,4 +1610,173 @@ fn finished_snapshots_keep_exact_position_until_explicit_reader_entry_and_reflow
     assert!(page.finished_at_least_once);
     assert_eq!(core.view().documents[0].progress_percent, 100);
     assert!(core.view().documents[0].finished_at_least_once);
+}
+
+#[test]
+fn final_page_returns_to_library_and_celebrates_each_recorded_command_even_zero_and_rereads() {
+    use yomoku_core::{completion::AnalyzedCompletionOutcome, document::CompletionCommandId};
+    for outcome in [
+        AnalyzedCompletionOutcome::Recorded { newly_known: 3 },
+        AnalyzedCompletionOutcome::Recorded { newly_known: 0 },
+        AnalyzedCompletionOutcome::AlreadyRecorded,
+    ] {
+        let (core, mut document) = analyzed_reader();
+        for command in [99, 100] {
+            if command == 100 {
+                // A finished-book reopen supplies page 1 while retaining the marker.
+                document.reading_position = None;
+                let mut effects = core.process_event(Event::OpenReader(document.document_id));
+                finish(
+                    &core,
+                    &mut effects,
+                    StorageResult::Loaded(ReaderSnapshot {
+                        document: document.clone(),
+                        page_length: PageLength::default(),
+                        analysis: ReaderAnalysis::Available(AnalysisId::try_from(42).unwrap()),
+                    }),
+                );
+            }
+            let pages = yomoku_core::pagination::LogicalPages::new(
+                std::slice::from_ref(&document.chapter),
+                PageLength::default(),
+            )
+            .unwrap();
+            let last = *pages.pages().last().unwrap();
+            let position = ReadingPosition {
+                source_id: last.source_id,
+                chapter_id: last.chapter_id,
+                offset: last.range.start,
+            };
+            let mut effects = core.process_event(Event::SaveReadingPosition(position));
+            document.reading_position = Some(position);
+            finish(
+                &core,
+                &mut effects,
+                StorageResult::PositionSaved(document.clone()),
+            );
+            let request = forward(&core, 1234);
+            let mut effects = core.process_event(request.clone());
+            assert!(core.view().book_completion_notice.is_none());
+            let mut payload = prepared(storage_operation(&effects));
+            payload.completion.command_id = CompletionCommandId::try_from(command).unwrap();
+            let mut effects = resolve(
+                &core,
+                &mut effects,
+                StorageResult::PageCompletionPrepared(payload),
+            );
+            finish(
+                &core,
+                &mut effects,
+                StorageResult::Failed(DocumentError::Unavailable),
+            );
+            assert_eq!(core.view().content_route, ContentRoute::Reader);
+            assert!(core.view().book_completion_notice.is_none());
+            let mut effects = core.process_event(Event::RetryReaderCompletion);
+            assert_eq!(
+                storage_operation(&effects),
+                StorageOperation::CompletePage(payload)
+            );
+            document.reading_position = Some(payload.completion.next_position(&document).unwrap());
+            document.finished_at_least_once = true;
+            finish(
+                &core,
+                &mut effects,
+                StorageResult::PageCompleted(document.clone(), outcome),
+            );
+            let view = core.view();
+            assert_eq!(view.content_route, ContentRoute::Main);
+            assert_eq!(view.destination, Destination::Library);
+            assert!(
+                view.reader.is_none()
+                    && view.reader_time.is_none()
+                    && view.reader_analysis.is_none()
+            );
+            assert!(view.documents[0].finished_at_least_once);
+            assert_eq!(view.documents[0].progress_percent, 100);
+            assert_eq!(
+                view.book_completion_notice,
+                match outcome {
+                    AnalyzedCompletionOutcome::Recorded { .. } =>
+                        Some(payload.completion.command_id),
+                    AnalyzedCompletionOutcome::AlreadyRecorded => None,
+                }
+            );
+            assert_eq!(
+                view.completion_notice.map(|notice| notice.newly_known),
+                match outcome {
+                    AnalyzedCompletionOutcome::Recorded { newly_known } if newly_known > 0 =>
+                        Some(newly_known),
+                    _ => None,
+                }
+            );
+            assert!(core.process_event(request).is_empty());
+            assert!(core.process_event(Event::RetryReaderCompletion).is_empty());
+            assert_eq!(core.view(), view); // Duplicate callbacks cannot replay or change the notice.
+            core.process_event(Event::DismissBookCompletionNotice(
+                CompletionCommandId::try_from(1).unwrap(),
+            ));
+            assert_eq!(
+                core.view().book_completion_notice,
+                view.book_completion_notice
+            );
+            core.process_event(Event::DismissBookCompletionNotice(
+                payload.completion.command_id,
+            ));
+            assert!(core.view().book_completion_notice.is_none());
+        }
+    }
+}
+
+#[test]
+fn finish_book_waits_for_final_clock_checkpoint_and_preserves_celebration_after_deferred_exit() {
+    use yomoku_core::completion::AnalyzedCompletionOutcome;
+    let (core, mut document) = analyzed_reader();
+    let pages = yomoku_core::pagination::LogicalPages::new(
+        std::slice::from_ref(&document.chapter),
+        PageLength::default(),
+    )
+    .unwrap();
+    let last = *pages.pages().last().unwrap();
+    let position = ReadingPosition {
+        source_id: last.source_id,
+        chapter_id: last.chapter_id,
+        offset: last.range.start,
+    };
+    let mut effects = core.process_event(Event::SaveReadingPosition(position));
+    document.reading_position = Some(position);
+    finish(
+        &core,
+        &mut effects,
+        StorageResult::PositionSaved(document.clone()),
+    );
+    restore_time(&core, 10);
+    core.process_event(clock(&core, 0, ReaderClockAction::Resume));
+    let mut effects = core.process_event(clock(&core, 500, ReaderClockAction::Pause));
+    core.process_event(forward(&core, 1234));
+    core.process_event(Event::CloseDocument);
+    assert_eq!(core.view().content_route, ContentRoute::Reader);
+    assert!(core.view().book_completion_notice.is_none());
+    let mut effects = save_clock(&core, &mut effects, 510);
+    let payload = prepared(storage_operation(&effects));
+    let mut effects = resolve(
+        &core,
+        &mut effects,
+        StorageResult::PageCompletionPrepared(payload),
+    );
+    document.reading_position = Some(payload.completion.next_position(&document).unwrap());
+    document.finished_at_least_once = true;
+    finish(
+        &core,
+        &mut effects,
+        StorageResult::PageCompleted(
+            document,
+            AnalyzedCompletionOutcome::Recorded { newly_known: 0 },
+        ),
+    );
+    assert_eq!(core.view().content_route, ContentRoute::Main);
+    assert_eq!(
+        core.view().book_completion_notice,
+        Some(payload.completion.command_id)
+    );
+    assert!(core.view().reader_time.is_none() && !core.view().reading_time_save_pending);
 }

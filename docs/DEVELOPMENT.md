@@ -18,7 +18,7 @@ with functioning rustup can omit the PATH workaround. Do not assume this compile
 is the project's minimum supported version; establish that with dependencies.
 Cargo.lock is retained for reproducible application development.
 Crux 0.20.0 declares Rust 1.90 minimum; the full locked graph has only been tested
-with 1.99.1. Current host baseline: 217 data-free Rust tests (111 storage, eight
+with 1.99.1. Current host baseline: 219 data-free Rust tests (111 storage, eight
 runtime). Eleven analysis fixtures and one runtime fixture run separately with
 each Full loader via tools/test-sudachi.sh (see below).
 
@@ -1533,3 +1533,45 @@ No schema/dependency change. Generated storage protocol adds OpenReader; documen
 Library and reader payloads add the permanent boolean. No full Android suite,
 standalone Full fixture/probe, release APK, process/reboot, tablet or physical-arm64
 rerun. Finish Book and command-keyed confetti remain next.
+
+## Finish Book and per-command completion confetti
+
+Verified 2026-10-24 with the Rust PATH workaround and Android environment above.
+Host JNI/native runners ran sequentially; repeat generation used a separate directory.
+Commands from repository root:
+```sh
+cargo test --workspace --all-features --locked --offline --quiet
+cargo fmt --all -- --check
+cargo clippy --workspace --all-targets --all-features --locked --offline -- -D warnings
+tools/test-kotlin-bridge.sh
+cargo run -p yomoku-ffi --bin generate-kotlin --features facet_typegen --locked --offline -- target/generated/kotlin-repeat
+diff -r target/generated/kotlin target/generated/kotlin-repeat
+tools/format-kotlin.sh --check
+./android/gradlew -p android :app:connectedDebugAndroidTest :app:lintDebug -Pandroid.testInstrumentationRunnerArguments.class=app.yomoku.ReaderNavigationTest,app.yomoku.ReaderClockSessionTest,app.yomoku.PasteReaderTest --offline --console=plain
+git diff --check
+```
+PASS: 219 data-free Rust tests (111 storage), strict Clippy/fmt, real-Full host
+Kotlin/JNI with seven Unicode exchanges, reproducible Kotlin generation and Kotlin
+formatting. Both-ABI debug/test APK assembly, strict Android lint and all 15 selected
+API-36 x86_64 Android tests pass (5m42s build/run). Report:
+`android/app/build/reports/androidTests/connected/debug/index.html`.
+
+Two new core tests cover final-page Library return, command-keyed celebration for
+positive/zero New words and permanent-marker rereads, AlreadyRecorded silence,
+failed completion/exact retry, duplicate callbacks, stale acknowledgment and final
+clock checkpoint/deferred-exit ordering. Host JNI verifies Library return and fresh
+reread command IDs without analyzer loading. Updated Compose/JNI/SQLite finish test
+covers duplicate Finish Book callbacks, transaction failure/Retry, 100% Library
+state, recreation and rereads. A new animation test freezes the Compose clock to
+verify visible confetti, bounded duration, recomposition stability, a second command
+and no replay after recreation. The final-clock test now completes a one-page book
+and verifies one 1,000ms completion before draining close, with no leftover time.
+
+Initial core clock regression expected a reader after final completion; its fixture
+now explicitly reopens. Initial strict Kotlin build rejected an unnecessary safe
+call; fixed. The host reread fixture initially reused its pre-reopen offset, now
+captures the fresh page-1 anchor/position. Final checks pass. Gradle ran without
+additional escalation using its existing daemon; prior benign Crux/ktfmt warnings
+persist. No schema/dependency change. Generated View/Event add a book-completion
+command notice and keyed acknowledgment. No full Android suite, standalone Full
+fixture/probe, release APK, process/reboot, tablet or physical-arm64 rerun.

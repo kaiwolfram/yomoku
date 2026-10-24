@@ -1474,3 +1474,26 @@ queries require migration 0011. Finish Book and confetti remain a separate slice
 The paste-reader regression test scrolls the Library container by document key
 before asserting a row, since offscreen lazy children may not be composed.
 API verified against the primary [Compose test reference](https://developer.android.com/reference/kotlin/androidx/compose/ui/test/SemanticsNodeInteraction).
+
+## 2026-10-24 — Finish Book and command-keyed confetti
+
+Label the final page's forward control Finish Book; a left swipe takes the same
+completion path. Keep the existing anchored intent, Pause/checkpoint drain,
+frozen command and atomic SQLite transaction. Failure keeps the reader and Retry;
+success reconciles the Library at EOF and returns there, retiring the clock.
+Determine finality from the frozen page's source/chapter/end against immutable
+paste content, never from the permanent flag (already true on rereads). Future
+multi-chapter imports must extend this final-document test.
+
+Expose book_completion_notice: Option<CompletionCommandId> only for newly Recorded
+final-page results, including zero newly Known. AlreadyRecorded remains silent.
+Keep the positive-only vocabulary toast independent and preserve it on the automatic
+Library return. A keyed acknowledgment ignores stale command IDs. Compose consumes
+before starting a local 1.4-second Canvas/Animatable confetti overlay; ordinary
+recomposition does not restart it, recreation discards the animation and cannot
+replay a consumed command. No schema or dependency changes.
+
+Primary Compose APIs checked:
+- https://developer.android.com/develop/ui/compose/animation/value-based
+- https://developer.android.com/develop/ui/compose/graphics/draw/overview
+- https://developer.android.com/develop/ui/compose/side-effects

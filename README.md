@@ -36,8 +36,9 @@ progress through core/FIFO/FFI, without analyzer loading. Android's retained dri
 supplies monotonic samples and waits for pending saves before native teardown.
 Permanent finish checkmarks appear in Library and reader independently of current
 progress. Explicitly reopening a finished book persists page 1; active-reader
-recreation and completion reloads keep their current position. Finish Book and
-completion confetti remain unfinished.
+recreation and completion reloads keep their current position. Finish Book (or a
+final-page left swipe) completes the save and returns to Library with brief confetti
+on each newly recorded completion, including rereads with zero new words.
 Nostr, Statistics and Vocabulary tabs currently
 show placeholders.
 

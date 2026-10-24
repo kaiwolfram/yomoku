@@ -24,6 +24,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.yomoku.shared.CompletionCommandId
 import app.yomoku.shared.CompletionNotice
+import app.yomoku.shared.ContentRoute
 import app.yomoku.shared.Event
 import app.yomoku.shared.PageLength
 import java.io.File
@@ -203,10 +204,22 @@ class ReaderNavigationTest {
                 db.execSQL(
                     "CREATE TRIGGER fail_finish_ui BEFORE UPDATE OF finished_at_least_once ON documents WHEN NEW.id = $id BEGIN SELECT RAISE(ABORT, 'test finish'); END"
                 )
-                compose.onNodeWithTag("next_page").performScrollTo().performClick()
+                compose.onNodeWithTag("next_page").performScrollTo().assertTextEquals("Finish Book")
+                val finish =
+                    compose
+                        .onNodeWithTag("next_page")
+                        .fetchSemanticsNode()
+                        .config[SemanticsActions.OnClick]
+                        .action!!
+                compose.runOnUiThread {
+                    finish()
+                    finish()
+                }
                 compose.waitUntil(30_000) {
                     !core().view.storageBusy && core().view.documentError != null
                 }
+                assertEquals(ContentRoute.READER, core().view.contentRoute)
+                compose.onNodeWithTag("book_confetti").assertDoesNotExist()
                 assertEquals(2L, completions(db, id))
                 assertTrue(!core().view.reader!!.finishedAtLeastOnce)
                 compose.onNodeWithTag("reader_finished").assertDoesNotExist()
@@ -217,21 +230,12 @@ class ReaderNavigationTest {
                 db.execSQL("DROP TRIGGER IF EXISTS fail_finish_ui")
             }
             assertEquals(3L, completions(db, id))
-            assertTrue(core().view.reader!!.finishedAtLeastOnce)
-            assertEquals(
-                core().view.reader!!.anchor.range.end,
-                core().view.reader!!.position.offset,
-            )
-            compose.onNodeWithTag("reader_finished").performScrollTo().assertExists()
+            assertEquals(ContentRoute.MAIN, core().view.contentRoute)
+            assertEquals(null, core().view.reader)
+            assertEquals(null, core().view.bookCompletionNotice) // Presenter consumed it.
             compose.activityRule.scenario.recreate()
             awaitReady()
-            assertEquals(3UL, core().view.reader!!.pageNumber)
-            assertEquals(
-                core().view.reader!!.anchor.range.end,
-                core().view.reader!!.position.offset,
-            )
-            compose.onNodeWithText("Back").performClick()
-            awaitReady()
+            compose.onNodeWithTag("book_confetti").assertDoesNotExist()
             compose
                 .onNodeWithTag("finished_$id", useUnmergedTree = true)
                 .performScrollTo()
@@ -250,11 +254,12 @@ class ReaderNavigationTest {
             repeat(3) {
                 compose.onNodeWithTag("next_page").performScrollTo().performClick()
                 awaitReady()
-                assertTrue(core().view.reader!!.finishedAtLeastOnce)
+                assertTrue(
+                    core().view.documents.single { it.documentId.value == id }.finishedAtLeastOnce
+                )
             }
+            assertEquals(ContentRoute.MAIN, core().view.contentRoute)
             assertEquals(6L, completions(db, id))
-            compose.onNodeWithText("Back").performClick()
-            awaitReady()
             compose.onNodeWithTag("document_$id").performScrollTo().performClick()
             awaitReady()
             compose.onNodeWithText("Back").performClick()
@@ -305,5 +310,42 @@ class ReaderNavigationTest {
         compose.activityRule.scenario.recreate()
         compose.waitForIdle()
         assertEquals(1, messages.size)
+    }
+
+    @Test
+    fun celebrationAnimatesOncePerCommandAndDoesNotReplayAfterRecreation() {
+        awaitReady()
+        var snapshot by
+            mutableStateOf(core().view.copy(bookCompletionNotice = CompletionCommandId(71)))
+        val consumed = mutableListOf<Long>()
+        compose.mainClock.autoAdvance = false
+        compose.runOnUiThread {
+            compose.activity.setContent {
+                BookCompletionCelebration(snapshot) { event ->
+                    val id = (event as Event.DismissBookCompletionNotice).value
+                    consumed.add(id.value)
+                    snapshot = snapshot.copy(bookCompletionNotice = null)
+                }
+            }
+        }
+        compose.mainClock.advanceTimeBy(300)
+        compose.onNodeWithTag("book_confetti").assertExists()
+        assertEquals(listOf(71L), consumed)
+        compose.runOnUiThread { snapshot = snapshot.copy(storageBusy = true) }
+        compose.mainClock.advanceTimeBy(400)
+        compose.onNodeWithTag("book_confetti").assertExists()
+        assertEquals(listOf(71L), consumed)
+        compose.mainClock.advanceTimeBy(1_500)
+        compose.onNodeWithTag("book_confetti").assertDoesNotExist()
+        compose.runOnUiThread {
+            snapshot = snapshot.copy(bookCompletionNotice = CompletionCommandId(72))
+        }
+        compose.mainClock.advanceTimeBy(300)
+        compose.onNodeWithTag("book_confetti").assertExists()
+        assertEquals(listOf(71L, 72L), consumed)
+        compose.activityRule.scenario.recreate()
+        compose.mainClock.advanceTimeBy(300)
+        compose.onNodeWithTag("book_confetti").assertDoesNotExist()
+        compose.mainClock.autoAdvance = true
     }
 }
