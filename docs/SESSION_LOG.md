@@ -1132,3 +1132,30 @@
   changes and page-keyed stale-result rejection, then taps/five direct choices.
   Android/JNI/lint, process/reboot, release/tablet/physical-arm64 not rerun this slice.
   Nostr stays empty; ask Q188 before forwarding.
+
+## 2026-10-24 — Typed read-only reader tokens through core/FIFO/FFI
+
+- Started clean. Added explicit LoadReaderTokens(ReaderTokenKey), worker dispatch
+  and transient reader_tokens in generated Kotlin/JNI. Core requires matching
+  current/pending/result document/page/original-analysis keys, ignores cancelled
+  results/errors and invalidates cached tokens on refresh/navigation/position/
+  completion callback or changed reflow span. Missing remains empty; no analyzer
+  load, registration, status/history/position mutation or schema change.
+- Reads share the existing busy gate/FIFO and allow final checkpoints to queue.
+  A failed read drains waiting time before deferred departure. Four new core tests
+  cover stale identities/cancellation/retry/reflow/Missing and clock drain. One new
+  asynchronous FFI test verifies Unicode metadata, all five live statuses and exact
+  unchanged database bytes. Real-Full Kotlin/JNI verifies New-to-Known refresh and
+  analyzer-free reopen. Android preview supplies the added optional view field.
+- PASS: 234 Rust tests (117 storage), workspace build via JNI runner, strict Clippy/
+  fmt/diff, seven Unicode exchanges, repeatable Kotlin generation, Kotlin formatting,
+  both-ABI debug/test APK builds, strict Android lint and all 11 selected API-36
+  x86_64 core/reader/clock tests (2m38s final run).
+- Fixed a synthetic fixture missing an unselectable non-Japanese token. Gradle's
+  sandbox lock/socket denial required escalation; the initial device run disconnected
+  after four passes. Restarted the existing AVD with documented swangle flags without
+  resetting data; complete rerun passes. No open failure/local blocker.
+- Updated plan, handoff (under 80 lines), architecture/data/decisions/development
+  and README. Next: typed manual status changes, then Compose taps/five choices;
+  offline dictionary data/index. No standalone Full fixture suite, full Android
+  suite, release/tablet/physical-arm64 or separate recovery rerun. Nostr/Q188 unchanged.

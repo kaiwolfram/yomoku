@@ -7,7 +7,7 @@ use crate::active_time::{ReadingTimeUpdate, SavedReadingTime};
 use crate::completion::{AnalyzedCompletionOutcome, AnalyzedPageCompletion, PageCompletionIntent};
 use crate::document::{DocumentId, LibraryDocument, PastedDocument};
 use crate::pagination::{PageLength, ReadingPosition};
-use crate::reader::ReaderSnapshot;
+use crate::reader::{ReaderSnapshot, ReaderTokenKey, ReaderTokenSnapshot};
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
@@ -33,6 +33,8 @@ pub enum StorageOperation {
     },
     PreparePageCompletion(PageCompletionIntent),
     CompletePage(AnalyzedPageCompletion),
+    /// Read original tokens and live global statuses without registration.
+    LoadReaderTokens(ReaderTokenKey),
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -64,6 +66,7 @@ pub enum StorageResult {
     PageCompletionPrepared(AnalyzedPageCompletion),
     PageCompleted(PastedDocument, AnalyzedCompletionOutcome),
     Failed(DocumentError),
+    ReaderTokensLoaded(ReaderTokenSnapshot),
 }
 
 impl Operation for StorageOperation {

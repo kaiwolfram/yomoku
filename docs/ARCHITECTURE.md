@@ -32,14 +32,25 @@ nonempty page span. Tokens retain full chapter anchors, exact surfaces, readings
 dictionary forms and original indices; a separate page-local UTF-8 display range
 clips crossing tokens for rendering. Display overlap does not change completion's
 start-based occurrence ownership. `ReaderTokenSnapshot` echoes document/page/base
-analysis identity for future asynchronous result validation. Its optional
+analysis identity for asynchronous result validation. Its optional
 `ReaderVocabulary` carries the current global ID and one of five statuses.
 The separate `load_reader_tokens` repository reads original Mode B plus current
 exact-surface statuses in one read transaction, using one visible-token status
 join. It reuses full stored-analysis validation; no analyzer, override application,
 registration, history, position or finish-marker mutation occurs. Legacy analysis
-absence is explicit; deleted/unregistered vocabulary stays absent. This foundation
-is not yet connected to Crux effects, generated Kotlin or reader taps.
+absence is explicit; deleted/unregistered vocabulary stays absent.
+
+Explicit LoadReaderTokens(ReaderTokenKey) flows through Crux's serialized storage
+gate, the existing FIFO worker and generated Kotlin/JNI. Core accepts only the
+visible document/page/base-analysis key outside Settings, then attaches results
+only when both the pending and current keys match. reader_tokens is transient:
+refresh clears it, as do navigation, position/completion callbacks and reflow to
+a different page span. Cancelled results/errors cannot reopen or contaminate a
+departed reader. Legacy Missing is a successful empty snapshot. Reads never need
+an analyzer, and failures can be retried by submitting the same current key.
+This nonmoving read allows final time checkpoints to queue; even a failed read
+drains the waiting checkpoint before deferred departure. Compose does not request
+or display tokens yet; taps and manual status commands remain future work.
 
 Pure `active_time` accounts pending reading milliseconds using caller-supplied
 monotonic timestamps. Resume/interaction arms a five-minute idle window; dictionary

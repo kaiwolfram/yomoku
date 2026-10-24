@@ -132,6 +132,11 @@ fn execute(
             .map_err(map_error)?
             .map(StorageResult::Loaded)
             .ok_or(DocumentError::NotFound),
+        StorageOperation::LoadReaderTokens(key) => storage
+            .load_reader_tokens(key.document_id, key.page)
+            .map_err(map_error)?
+            .map(StorageResult::ReaderTokensLoaded)
+            .ok_or(DocumentError::NotFound),
         StorageOperation::SavePageLength(length) => storage
             .save_page_length(length)
             .map(StorageResult::PageLengthSaved)

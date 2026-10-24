@@ -218,6 +218,7 @@ private fun YomokuPreview() {
                 completionSavePending = false,
                 completionNotice = null,
                 bookCompletionNotice = null,
+                readerTokens = null,
             )
         ) {}
     }

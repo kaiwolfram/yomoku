@@ -1523,3 +1523,22 @@ return None. Current implementation loads/validates the whole stored chapter per
 request before the visible-page join; optimize only with measured evidence, retaining
 the immutable-validation/read-snapshot guarantees. No schema/dependency changes.
 Crux effects/FIFO/FFI/Compose taps and manual status events remain the next slice.
+
+## 2026-10-24 — Explicit typed token reads through the existing worker
+
+Add ReaderTokenKey(document/page/original analysis) to the pure protocol and an
+explicit LoadReaderTokens event/storage operation. Reuse the session's single
+storage_busy gate and FIFO; do not add a second connection or eager analyzer work.
+Reject requests outside the current reader key or while Settings is open. Return
+the repository's unchanged snapshot and require pending/result/current keys to
+match before exposing transient reader_tokens in the view. Missing analysis is
+a successful empty snapshot, not a trigger for analysis. Accepted I/O can finish
+after navigation, but its result or error cannot attach to a departed reader.
+
+Clear cached tokens on explicit refresh, navigation, position/completion results,
+and reflow to a different page span. Treat a read as nonmoving so a final time
+checkpoint can queue behind it. A failed read has no durable retry obligation:
+drain a waiting checkpoint even on failure, preserving the existing deferred-exit
+ordering. Lookup errors retry by requesting the current key again. No schema or
+dependency changes. This independently testable prerequisite deliberately leaves
+manual status events and Compose taps for the next implementation slice.

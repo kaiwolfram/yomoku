@@ -17,6 +17,8 @@ import app.yomoku.shared.ImportOutcome
 import app.yomoku.shared.PendingReadingTime
 import app.yomoku.shared.ReaderClockAction
 import app.yomoku.shared.ReaderClockSample
+import app.yomoku.shared.ReaderTokenKey
+import app.yomoku.shared.VocabularyStatus
 import java.nio.file.Files
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.TimeUnit
@@ -85,6 +87,22 @@ internal fun verifyDocumentBridge() {
             check(page.position.offset.value == 0L)
             check(page.pageNumber == 1UL && page.totalPages == 1UL)
             check(opened.readerTime == null)
+            val tokenKey = ReaderTokenKey(id, page.anchor, analysis)
+            val tokensView = listener.dispatch(bridge, Event.LoadReaderTokens(tokenKey))
+            val tokens = checkNotNull(tokensView.readerTokens)
+            check(tokens.documentId == id && tokens.page == page.anchor && tokens.analysis == analysis)
+            check(tokens.tokens.isNotEmpty())
+            check(tokens.tokens.all { it.vocabulary?.status == VocabularyStatus.NEW })
+            for (token in tokens.tokens) {
+                val visible = page.text.toByteArray(Charsets.UTF_8).copyOfRange(
+                    token.displayRange.start.value.toInt(), token.displayRange.end.value.toInt())
+                    .toString(Charsets.UTF_8)
+                check(visible == token.surface)
+                check(token.anchor.sourceId == page.anchor.sourceId)
+            }
+            check(tokensView.reader == page && tokensView.readerTime == null)
+            check(tokensView.loadedDocument == opened.loadedDocument && tokensView.completionNotice == null)
+            check(dictionary.calls.get() == 2)
             val initialTime = checkNotNull(listener.dispatch(bridge, Event.RestoreReadingTime).readerTime)
             check(initialTime.position == page.position && initialTime.pending.value == 0L)
             val checkpoint = initialTime.copy(pending = PendingReadingTime(321L))
@@ -182,6 +200,7 @@ internal fun verifyDocumentBridge() {
             check(completed.documentError == null && !completed.completionSavePending)
             check(completed.readerTime == null && completed.readerAnalysis == null)
             check(completed.contentRoute == ContentRoute.MAIN && completed.reader == null)
+            check(completed.readerTokens == null)
             check(completed.bookCompletionNotice == completed.completionNotice?.commandId)
             val notice = checkNotNull(completed.completionNotice)
             check(notice.newlyKnown > 0UL && notice.commandId.value > 0L)
@@ -200,6 +219,11 @@ internal fun verifyDocumentBridge() {
             check(reopenedBook.reader?.finishedAtLeastOnce == true)
             check(reopened.dispatch(bridge, Event.RestoreReadingTime).readerTime?.pending?.value == 0L)
             val rereadPage = checkNotNull(reopenedBook.reader)
+            val knownTokens = checkNotNull(reopened.dispatch(bridge, Event.LoadReaderTokens(
+                ReaderTokenKey(document.documentId, rereadPage.anchor, analysis))).readerTokens)
+            check(knownTokens.tokens.all { it.vocabulary?.status == VocabularyStatus.KNOWN })
+            check(knownTokens.tokens.map { it.surface }.isNotEmpty())
+            check(unavailableDictionary.calls.get() == 0)
             val reread = reopened.dispatch(bridge, Event.CompleteReaderPage(rereadPage.documentId,
                 rereadPage.anchor, rereadPage.position, 5678L), callbackCount = 2)
             check(reread.documentError == null && reread.completionNotice == null)

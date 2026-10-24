@@ -15,7 +15,7 @@ use crate::{
     completion::{AnalyzedCompletionOutcome, CompletionNotice, PageCompletionIntent},
     document::{CompletionCommandId, DocumentId, LibraryDocument, PastedDocument, TextAnchor},
     pagination::{LogicalPages, PageLength, ReadingPosition},
-    reader::{ReaderAnalysis, ReaderPage},
+    reader::{ReaderAnalysis, ReaderPage, ReaderTokenKey, ReaderTokenSnapshot},
     storage::{DocumentError, StorageOperation, StorageResult},
 };
 
@@ -84,6 +84,8 @@ pub struct Model {
     book_completion_notice: Option<CompletionCommandId>,
     reader_clock: Option<ActiveReadingTime>,
     time_checkpoint_can_wait: bool,
+    reader_tokens: Option<ReaderTokenSnapshot>,
+    pending_token_load: Option<ReaderTokenKey>,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -132,6 +134,8 @@ pub enum Event {
     },
     /// Consume before starting the transient celebration; stale acknowledgments ignore.
     DismissBookCompletionNotice(CompletionCommandId),
+    /// Explicit refresh; stale UI callbacks cannot request another page's tokens.
+    LoadReaderTokens(ReaderTokenKey),
     #[serde(skip)]
     #[cfg_attr(feature = "facet_typegen", facet(skip))]
     StorageFinished(StorageResult),
@@ -161,6 +165,8 @@ pub struct ViewModel {
     pub completion_notice: Option<CompletionNotice>,
     /// One newly recorded final-page command, independent of permanent finish state.
     pub book_completion_notice: Option<CompletionCommandId>,
+    /// None until explicitly loaded for the current document/page/base analysis.
+    pub reader_tokens: Option<ReaderTokenSnapshot>,
 }
 
 #[effect]
@@ -379,6 +385,12 @@ impl App for Yomoku {
             Event::CreatePaste(text) => Some(StorageOperation::CreatePaste(text.clone())),
             Event::LoadPaste(id) => Some(StorageOperation::LoadPaste(*id)),
             Event::OpenReader(id) => Some(StorageOperation::OpenReader(*id)),
+            Event::LoadReaderTokens(key) => {
+                if model.settings_open || model.current_token_key() != Some(*key) {
+                    return Command::done();
+                }
+                Some(StorageOperation::LoadReaderTokens(*key))
+            }
             Event::SetPageLength(length) => {
                 if !model.settings_open
                     || model.page_length.is_none()
@@ -445,6 +457,7 @@ impl App for Yomoku {
                 | StorageOperation::LoadPaste(_)
                 | StorageOperation::SavePageLength(_)
                 | StorageOperation::LoadReadingTime { .. }
+                | StorageOperation::LoadReaderTokens(_)
                 | StorageOperation::SaveReadingTime { .. } => true,
                 StorageOperation::SaveReadingPosition { position, .. } => model
                     .reader
@@ -454,6 +467,10 @@ impl App for Yomoku {
             };
             model.storage_busy = true;
             model.document_error = None;
+            if let StorageOperation::LoadReaderTokens(key) = operation {
+                model.pending_token_load = Some(key);
+                model.reader_tokens = None;
+            }
             if matches!(event, Event::CreatePaste(_) | Event::OpenReader(_)) {
                 model.import_summary = None;
                 model.completion_notice = None;
@@ -472,6 +489,7 @@ impl App for Yomoku {
                 model.pending_reader = Some(id);
                 model.reader = None;
                 model.reader_analysis = None;
+                model.reader_tokens = None;
                 model.reader_document = None;
                 model.clear_reader_time();
             }
@@ -488,6 +506,7 @@ impl App for Yomoku {
                 model.content_route = ContentRoute::Main;
                 model.reader = None;
                 model.reader_analysis = None;
+                model.reader_tokens = None;
                 model.reader_document = None;
                 model.pending_reader = None;
                 model.clear_reader_time();
@@ -501,6 +520,7 @@ impl App for Yomoku {
                 model.content_route = ContentRoute::Paste;
                 model.reader = None;
                 model.reader_analysis = None;
+                model.reader_tokens = None;
                 model.reader_document = None;
                 model.pending_reader = None;
                 model.clear_reader_time();
@@ -522,12 +542,20 @@ impl App for Yomoku {
                 model.time_checkpoint_can_wait = false;
                 let restoring_time = std::mem::take(&mut model.restoring_reader_time);
                 let pending_reader = model.pending_reader.take();
+                let token_load = model.pending_token_load.take();
                 let import_outcome = match &result {
                     StorageResult::Created(_) => Some(ImportOutcome::Created),
                     StorageResult::Existing(_) => Some(ImportOutcome::Existing),
                     _ => None,
                 };
                 match result {
+                    StorageResult::ReaderTokensLoaded(snapshot) => {
+                        if token_load == Some(snapshot.key())
+                            && model.current_token_key() == Some(snapshot.key())
+                        {
+                            model.reader_tokens = Some(snapshot);
+                        }
+                    }
                     StorageResult::Listed(documents, length) => {
                         model.documents = documents;
                         model.apply_page_length(length);
@@ -647,6 +675,7 @@ impl App for Yomoku {
                         model.content_route = ContentRoute::Main;
                         model.reader = None;
                         model.reader_analysis = None;
+                        model.reader_tokens = None;
                         model.reader_document = None;
                         model.clear_reader_time();
                     }
@@ -671,9 +700,15 @@ impl App for Yomoku {
                         model.loaded_document = Some(document);
                     }
                     StorageResult::PositionSaved(document) => model.apply_position(document),
-                    StorageResult::Failed(error) => model.document_error = Some(error),
+                    StorageResult::Failed(error) => {
+                        if token_load.is_none() || token_load == model.current_token_key() {
+                            model.document_error = Some(error);
+                        }
+                    }
                 }
-                if !failed && model.pending_time_checkpoint.is_none() {
+                // A read failure has no durable retry obligation and must not
+                // hold a final time checkpoint or deferred departure hostage.
+                if (!failed || token_load.is_some()) && model.pending_time_checkpoint.is_none() {
                     if let Some(checkpoint) = model.queued_time_checkpoint {
                         return self.update(Event::CheckpointReadingTime(checkpoint), model);
                     }
@@ -683,6 +718,7 @@ impl App for Yomoku {
             | Event::CreatePaste(_)
             | Event::LoadPaste(_)
             | Event::OpenReader(_)
+            | Event::LoadReaderTokens(_)
             | Event::SetPageLength(_)
             | Event::SaveReadingPosition(_) => unreachable!(),
             Event::RestoreReadingTime
@@ -715,17 +751,31 @@ impl App for Yomoku {
             completion_save_pending: model.pending_completion.is_some(),
             completion_notice: model.completion_notice,
             book_completion_notice: model.book_completion_notice,
+            reader_tokens: model.reader_tokens.clone(),
         }
     }
 }
 
 impl Model {
+    fn current_token_key(&self) -> Option<ReaderTokenKey> {
+        if self.content_route != ContentRoute::Reader {
+            return None;
+        }
+        let reader = self.reader.as_ref()?;
+        Some(ReaderTokenKey {
+            document_id: reader.document_id,
+            page: reader.anchor,
+            analysis: self.reader_analysis?,
+        })
+    }
+
     fn close_document(&mut self) {
         self.completion_notice = None;
         self.book_completion_notice = None;
         self.content_route = ContentRoute::Main;
         self.reader = None;
         self.reader_analysis = None;
+        self.reader_tokens = None;
         self.reader_document = None;
         self.pending_reader = None;
         self.clear_reader_time();
@@ -786,6 +836,7 @@ impl Model {
         {
             match ReaderPage::open(&document, self.page_length.unwrap_or_default()) {
                 Ok(reader) => {
+                    self.reader_tokens = None;
                     if self.reader_time.is_some_and(|saved| {
                         saved.value.document_id != reader.document_id
                             || saved.position() != reader.position
@@ -835,7 +886,12 @@ impl Model {
         self.page_length = Some(length);
         if let (Some(reader), Some(document)) = (&self.reader, &self.reader_document) {
             match ReaderPage::at(document, reader.position, length) {
-                Ok(page) => self.reader = Some(page),
+                Ok(page) => {
+                    if page.anchor != reader.anchor {
+                        self.reader_tokens = None;
+                    }
+                    self.reader = Some(page);
+                }
                 Err(_) => self.document_error = Some(DocumentError::InvalidDocument),
             }
         }

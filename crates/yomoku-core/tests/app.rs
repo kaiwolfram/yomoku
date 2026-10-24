@@ -21,6 +21,7 @@ fn starts_in_library() {
             content_route: yomoku_core::app::ContentRoute::Main,
             reader: None,
             reader_analysis: None,
+            reader_tokens: None,
             page_length: None,
             import_summary: None,
         }

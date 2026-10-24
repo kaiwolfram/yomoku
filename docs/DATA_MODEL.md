@@ -120,7 +120,7 @@ span must belong to the document, be nonempty and use valid UTF-8 boundaries. It
 does not need to match persisted position or today's preset, so a reflowed caller
 can request its exact displayed span without changing progress.
 
-`ReaderTokenSnapshot` echoes document/page/analysis for later stale-result checks.
+`ReaderTokenSnapshot` echoes document/page/analysis for stale-result checks.
 Each `ReaderToken` retains the original token index/full chapter anchor, full
 surface, optional reading/dictionary form and a clipped `display_range` relative
 to page text in UTF-8 bytes. A boundary-crossing token appears on both visible
@@ -131,6 +131,11 @@ spans. Repetitions stay separate tokens while sharing one global vocabulary ID.
 `ReaderVocabulary` contains ID/status, or stays absent for deleted/unregistered
 surfaces. Lookup never implicitly registers New, applies segmentation overrides,
 records encounters/status events, resets finished-book position or saves time.
+The transient `ReaderTokenKey` carries document/page/analysis in the explicit
+Crux/FIFO/FFI read request. Core requires the pending request, result and current
+reader identities to match before exposing `reader_tokens`; it clears cached
+tokens on departure, position/completion results or page-span reflow. This adds
+event/view payloads, not persisted columns or migrations.
 Statuses come from one exact-surface join for the visible page, not per-token
 lookups. This correctness-first implementation validates/loads the whole chapter
 analysis per request; large-document lookup performance remains unmeasured. No

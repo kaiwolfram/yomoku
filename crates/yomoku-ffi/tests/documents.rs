@@ -166,6 +166,144 @@ fn async_open_failure_is_typed_retryable_and_preserves_invalid_files() {
 }
 
 #[test]
+fn token_reads_deliver_original_unicode_metadata_and_live_statuses_without_writes() {
+    use yomoku_core::{
+        analysis::{AnalysisProfile, AnalyzedToken, ChapterAnalysis, SplitMode},
+        document::{PasteText, TextAnchor, TextOffset, TextRange},
+        reader::ReaderTokenKey,
+        vocabulary::{Surface, VocabularyStatus},
+    };
+    let db = Database::new();
+    std::fs::create_dir(&db.0).unwrap();
+    let mut storage = yomoku_storage::Storage::open(db.path()).unwrap();
+    let imported = storage
+        .create_analyzed_paste(
+            &PasteText::new("📖\0 猫𠮷 猫𠮷".into()).unwrap(),
+            100,
+            |chapter| {
+                let mut tokens: Vec<_> = chapter
+                    .text
+                    .match_indices("猫𠮷")
+                    .map(|(start, surface)| AnalyzedToken {
+                        anchor: TextAnchor {
+                            source_id: chapter.source_id,
+                            chapter_id: chapter.chapter_id,
+                            range: TextRange {
+                                start: TextOffset::at(&chapter.text, start).unwrap(),
+                                end: TextOffset::at(&chapter.text, start + surface.len()).unwrap(),
+                            },
+                        },
+                        surface: surface.into(),
+                        is_japanese: true,
+                        reading: Some("ネコヨシ".into()),
+                        dictionary_form: Some(Surface::new("猫𠮷").unwrap()),
+                    })
+                    .collect();
+                tokens.insert(
+                    0,
+                    AnalyzedToken {
+                        anchor: TextAnchor {
+                            source_id: chapter.source_id,
+                            chapter_id: chapter.chapter_id,
+                            range: TextRange {
+                                start: TextOffset::START,
+                                end: TextOffset::at(&chapter.text, "📖\0".len()).unwrap(),
+                            },
+                        },
+                        surface: "📖\0".into(),
+                        is_japanese: false,
+                        reading: None,
+                        dictionary_form: None,
+                    },
+                );
+                Ok::<_, std::convert::Infallible>(ChapterAnalysis {
+                    profile: AnalysisProfile {
+                        engine_revision: "fixture-engine@1".into(),
+                        dictionary_revision: "fixture-full@1".into(),
+                    },
+                    mode: SplitMode::B,
+                    tokens,
+                })
+            },
+        )
+        .unwrap();
+    let id = imported.document.document_id;
+    let entry = storage
+        .vocabulary_entry(&Surface::new("猫𠮷").unwrap())
+        .unwrap()
+        .unwrap();
+    let (native, callbacks, _) = bridge(&db.path());
+    let opened = dispatch(&native, &callbacks, Event::OpenReader(id));
+    let reader = opened.reader.as_ref().unwrap();
+    let key = ReaderTokenKey {
+        document_id: id,
+        page: reader.anchor,
+        analysis: opened.reader_analysis.unwrap(),
+    };
+    assert!(opened.reader_tokens.is_none());
+    for status in [
+        VocabularyStatus::New,
+        VocabularyStatus::Learning,
+        VocabularyStatus::Familiar,
+        VocabularyStatus::Known,
+        VocabularyStatus::Ignored,
+    ] {
+        storage
+            .set_vocabulary_status(entry.id, status, 200)
+            .unwrap();
+        let before = std::fs::read(db.path()).unwrap();
+        let loaded = dispatch(&native, &callbacks, Event::LoadReaderTokens(key));
+        let snapshot = loaded.reader_tokens.unwrap();
+        assert_eq!(snapshot.key(), key);
+        assert_eq!(
+            snapshot.analysis,
+            ReaderAnalysis::Available(imported.analysis_id)
+        );
+        assert_eq!(snapshot.tokens.len(), 2);
+        assert_ne!(
+            snapshot.tokens[0].token_index,
+            snapshot.tokens[1].token_index
+        );
+        for token in snapshot.tokens {
+            assert_eq!(
+                token.anchor.slice(&imported.document.chapter).unwrap(),
+                "猫𠮷"
+            );
+            assert_eq!(token.display_range.slice(&reader.text).unwrap(), "猫𠮷");
+            assert_eq!(token.surface, "猫𠮷");
+            assert_eq!(token.reading.as_deref(), Some("ネコヨシ"));
+            assert_eq!(token.dictionary_form.as_deref(), Some("猫𠮷"));
+            assert_eq!(
+                token.vocabulary.unwrap(),
+                yomoku_core::reader::ReaderVocabulary {
+                    id: entry.id,
+                    status
+                }
+            );
+        }
+        assert_eq!(loaded.reader, opened.reader);
+        assert_eq!(loaded.loaded_document, opened.loaded_document);
+        assert!(loaded.completion_notice.is_none());
+        assert_eq!(std::fs::read(db.path()).unwrap(), before);
+    }
+    // A separately opened legacy paste remains Missing; the FIFO has no loader.
+    let legacy = storage
+        .create_paste(&PasteText::new("未解析".into()).unwrap())
+        .unwrap();
+    let opened = dispatch(&native, &callbacks, Event::OpenReader(legacy.document_id));
+    let key = ReaderTokenKey {
+        document_id: legacy.document_id,
+        page: opened.reader.unwrap().anchor,
+        analysis: ReaderAnalysis::Missing,
+    };
+    let snapshot = dispatch(&native, &callbacks, Event::LoadReaderTokens(key))
+        .reader_tokens
+        .unwrap();
+    assert_eq!(snapshot.key(), key);
+    assert!(snapshot.tokens.is_empty());
+}
+
+#[test]
 fn internal_storage_results_cannot_be_injected_over_ffi() {
     let (native, _, _) = bridge(":memory:");
     // StorageFinished is skipped by Serde and by Facet generation.
@@ -176,9 +314,18 @@ fn internal_storage_results_cannot_be_injected_over_ffi() {
     let mut last_public = Vec::new();
     BincodeFfiFormat::serialize(
         &mut last_public,
-        &Event::DismissBookCompletionNotice(
-            yomoku_core::document::CompletionCommandId::try_from(1).unwrap(),
-        ),
+        &Event::LoadReaderTokens(yomoku_core::reader::ReaderTokenKey {
+            document_id: 1.try_into().unwrap(),
+            page: yomoku_core::document::TextAnchor {
+                source_id: 1.try_into().unwrap(),
+                chapter_id: 1.try_into().unwrap(),
+                range: yomoku_core::document::TextRange {
+                    start: 0.try_into().unwrap(),
+                    end: 3.try_into().unwrap(),
+                },
+            },
+            analysis: ReaderAnalysis::Missing,
+        }),
     )
     .unwrap();
     let internal_tag = u32::from_le_bytes(last_public[..4].try_into().unwrap()) + 1;

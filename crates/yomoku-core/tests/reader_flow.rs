@@ -6,7 +6,10 @@ use yomoku_core::{
         AnalysisId, ChapterId, ChapterText, DocumentId, PastedDocument, SourceId, TextOffset,
     },
     pagination::{PageLength, ReadingPosition},
-    reader::{progress_percent, ReaderAnalysis, ReaderPage, ReaderSnapshot},
+    reader::{
+        progress_percent, ReaderAnalysis, ReaderPage, ReaderSnapshot, ReaderTokenKey,
+        ReaderTokenSnapshot,
+    },
     storage::{DocumentError, StorageOperation, StorageResult},
 };
 
@@ -1227,6 +1230,218 @@ fn analyzed_reader() -> (Core<Yomoku>, PastedDocument) {
         }),
     );
     (core, document)
+}
+
+fn token_key(core: &Core<Yomoku>) -> ReaderTokenKey {
+    let view = core.view();
+    ReaderTokenKey {
+        document_id: view.reader.as_ref().unwrap().document_id,
+        page: view.reader.unwrap().anchor,
+        analysis: view.reader_analysis.unwrap(),
+    }
+}
+
+fn token_snapshot(key: ReaderTokenKey) -> ReaderTokenSnapshot {
+    ReaderTokenSnapshot {
+        document_id: key.document_id,
+        page: key.page,
+        analysis: key.analysis,
+        tokens: vec![],
+    }
+}
+
+#[test]
+fn token_loads_require_current_identity_and_reject_duplicate_or_stale_callbacks() {
+    let (core, _) = analyzed_reader();
+    let key = token_key(&core);
+    let invalid = [
+        ReaderTokenKey {
+            document_id: 99.try_into().unwrap(),
+            ..key
+        },
+        ReaderTokenKey {
+            page: yomoku_core::document::TextAnchor {
+                chapter_id: 99.try_into().unwrap(),
+                ..key.page
+            },
+            ..key
+        },
+        ReaderTokenKey {
+            page: yomoku_core::document::TextAnchor {
+                range: yomoku_core::document::TextRange {
+                    end: key.page.range.start,
+                    ..key.page.range
+                },
+                ..key.page
+            },
+            ..key
+        },
+        ReaderTokenKey {
+            analysis: ReaderAnalysis::Missing,
+            ..key
+        },
+        ReaderTokenKey {
+            analysis: ReaderAnalysis::Available(99.try_into().unwrap()),
+            ..key
+        },
+    ];
+    for bad in invalid {
+        assert!(core.process_event(Event::LoadReaderTokens(bad)).is_empty());
+        // Even a mismatched result on an accepted request must be discarded.
+        let mut effects = core.process_event(Event::LoadReaderTokens(key));
+        assert!(core.process_event(Event::LoadReaderTokens(key)).is_empty());
+        finish(
+            &core,
+            &mut effects,
+            StorageResult::ReaderTokensLoaded(token_snapshot(bad)),
+        );
+        assert!(core.view().reader_tokens.is_none());
+    }
+    core.process_event(Event::OpenSettings);
+    assert!(core.process_event(Event::LoadReaderTokens(key)).is_empty());
+    core.process_event(Event::CloseSettings);
+    let before = core.view();
+    let mut effects = core.process_event(Event::LoadReaderTokens(key));
+    assert_eq!(
+        storage_operation(&effects),
+        StorageOperation::LoadReaderTokens(key)
+    );
+    let snapshot = token_snapshot(key);
+    finish(
+        &core,
+        &mut effects,
+        StorageResult::ReaderTokensLoaded(snapshot.clone()),
+    );
+    let after = core.view();
+    assert_eq!(after.reader_tokens, Some(snapshot));
+    assert_eq!(after.reader, before.reader);
+    assert_eq!(after.loaded_document, before.loaded_document);
+    assert_eq!(after.reader_time, before.reader_time);
+    assert_eq!(after.completion_notice, before.completion_notice);
+    core.process_event(Event::CloseDocument);
+    assert!(core.view().reader_tokens.is_none());
+    assert!(core.process_event(Event::LoadReaderTokens(key)).is_empty());
+}
+
+#[test]
+fn token_reads_clear_on_reflow_movement_and_navigation_and_ignore_cancelled_errors() {
+    for exit in [
+        Event::CloseDocument,
+        Event::OpenPaste,
+        Event::SelectDestination(Destination::Nostr),
+    ] {
+        for failed in [false, true] {
+            let (core, _) = analyzed_reader();
+            let key = token_key(&core);
+            let mut effects = core.process_event(Event::LoadReaderTokens(key));
+            core.process_event(exit.clone());
+            let result = if failed {
+                StorageResult::Failed(DocumentError::Unavailable)
+            } else {
+                StorageResult::ReaderTokensLoaded(token_snapshot(key))
+            };
+            finish(&core, &mut effects, result);
+            assert!(core.view().reader_tokens.is_none());
+            assert!(core.view().document_error.is_none());
+            assert!(!core.view().storage_busy);
+        }
+    }
+    let (core, mut document) = analyzed_reader();
+    let original = token_key(&core);
+    let mut effects = core.process_event(Event::LoadReaderTokens(original));
+    finish(
+        &core,
+        &mut effects,
+        StorageResult::ReaderTokensLoaded(token_snapshot(original)),
+    );
+    core.process_event(Event::OpenSettings);
+    let mut effects = core.process_event(Event::SetPageLength(PageLength::Characters1500));
+    finish(
+        &core,
+        &mut effects,
+        StorageResult::PageLengthSaved(PageLength::Characters1500),
+    );
+    assert!(core.view().reader_tokens.is_none());
+    core.process_event(Event::CloseSettings);
+    assert!(core
+        .process_event(Event::LoadReaderTokens(original))
+        .is_empty());
+    let key = token_key(&core);
+    let mut effects = core.process_event(Event::LoadReaderTokens(key));
+    finish(
+        &core,
+        &mut effects,
+        StorageResult::ReaderTokensLoaded(token_snapshot(key)),
+    );
+    let position = ReadingPosition {
+        offset: key.page.range.end,
+        ..core.view().reader.unwrap().position
+    };
+    let mut effects = core.process_event(Event::SaveReadingPosition(position));
+    document.reading_position = Some(position);
+    finish(&core, &mut effects, StorageResult::PositionSaved(document));
+    assert!(core.view().reader_tokens.is_none());
+}
+
+#[test]
+fn token_read_failure_is_retryable_and_does_not_block_final_time_or_departure() {
+    for failed in [false, true] {
+        let (core, _) = analyzed_reader();
+        let saved = restore_time(&core, 10);
+        core.process_event(clock(&core, 0, ReaderClockAction::Resume));
+        let key = token_key(&core);
+        let mut effects = core.process_event(Event::LoadReaderTokens(key));
+        core.process_event(clock(&core, 500, ReaderClockAction::Pause));
+        core.process_event(Event::CloseDocument);
+        assert!(core.view().reading_time_save_pending);
+        assert_eq!(core.view().reader_time, Some(saved.value));
+        let result = if failed {
+            StorageResult::Failed(DocumentError::Unavailable)
+        } else {
+            StorageResult::ReaderTokensLoaded(token_snapshot(key))
+        };
+        let mut effects = resolve(&core, &mut effects, result);
+        save_clock(&core, &mut effects, 510);
+        assert_eq!(core.view().content_route, ContentRoute::Main);
+        assert!(core.view().reader_tokens.is_none());
+        assert!(!core.view().reading_time_save_pending);
+    }
+    let (core, _) = analyzed_reader();
+    let key = token_key(&core);
+    let mut effects = core.process_event(Event::LoadReaderTokens(key));
+    finish(
+        &core,
+        &mut effects,
+        StorageResult::Failed(DocumentError::Unavailable),
+    );
+    assert_eq!(core.view().document_error, Some(DocumentError::Unavailable));
+    assert!(!core.view().storage_busy);
+    let mut effects = core.process_event(Event::LoadReaderTokens(key));
+    finish(
+        &core,
+        &mut effects,
+        StorageResult::ReaderTokensLoaded(token_snapshot(key)),
+    );
+    assert!(core.view().document_error.is_none());
+    assert!(core.view().reader_tokens.is_some());
+}
+
+#[test]
+fn legacy_token_reads_expose_explicit_missing_without_requesting_analysis() {
+    let core = Core::<Yomoku>::new();
+    let document = document("猫𠮷");
+    let mut effects = core.process_event(Event::OpenReader(document.document_id));
+    finish(&core, &mut effects, loaded(document, PageLength::default()));
+    let key = token_key(&core);
+    assert_eq!(key.analysis, ReaderAnalysis::Missing);
+    let mut effects = core.process_event(Event::LoadReaderTokens(key));
+    finish(
+        &core,
+        &mut effects,
+        StorageResult::ReaderTokensLoaded(token_snapshot(key)),
+    );
+    assert_eq!(core.view().reader_tokens, Some(token_snapshot(key)));
+    assert!(core.view().completion_notice.is_none());
 }
 
 #[test]

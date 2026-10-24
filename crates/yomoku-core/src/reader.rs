@@ -31,8 +31,17 @@ pub struct ReaderSnapshot {
     pub analysis: ReaderAnalysis,
 }
 
-/// One read-only page lookup. Echoed identities let a future asynchronous caller
-/// discard results for a departed page or a different base analysis.
+/// Identity of a displayed token lookup, independent of the exact reading offset.
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
+pub struct ReaderTokenKey {
+    pub document_id: DocumentId,
+    pub page: TextAnchor,
+    pub analysis: ReaderAnalysis,
+}
+
+/// One read-only page lookup. Echoed identities let asynchronous callers discard
+/// results for a departed page or a different base analysis.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
 pub struct ReaderTokenSnapshot {
@@ -40,6 +49,16 @@ pub struct ReaderTokenSnapshot {
     pub page: TextAnchor,
     pub analysis: ReaderAnalysis,
     pub tokens: Vec<ReaderToken>,
+}
+
+impl ReaderTokenSnapshot {
+    pub fn key(&self) -> ReaderTokenKey {
+        ReaderTokenKey {
+            document_id: self.document_id,
+            page: self.page,
+            analysis: self.analysis,
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]

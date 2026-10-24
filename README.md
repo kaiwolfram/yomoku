@@ -29,8 +29,10 @@ Yomoku is under active development. The working app supports:
 
 Word lookup UI and vocabulary controls are still pending. A read-only Rust
 projection now exposes stored Mode B tokens, exact display spans and current
-global statuses without changing vocabulary or history. The Rust repository
-atomically saves completion encounters, New→Known
+global statuses through typed core/FIFO/FFI reads without changing vocabulary or
+history. Results are checked against the current document/page/analysis before
+being exposed to the host. Compose taps and manual status commands remain next.
+The Rust repository atomically saves completion encounters, New→Known
 transitions, active time and position. Core/worker/FFI pending-time checkpoints
 support exact retries, coalesced saves before reader movement/exit and reopen.
 Explicit analyzed completion intents now drain checkpoints, freeze retries and update
