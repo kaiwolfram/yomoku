@@ -1,6 +1,6 @@
 # Resume here
 
-Updated: 2026-10-24. Pending-time repository and atomic time handoff verified.
+Updated: 2026-10-24. Root README added; reader continuation unchanged.
 Read AGENTS.md, plan phases 2–4 and PRODUCT_SPEC.md sections 3–4.
 Update docs/commit each verified step. Physical arm64 is the later user trial.
 
@@ -46,7 +46,9 @@ Update docs/commit each verified step. Physical arm64 is the later user trial.
 3. User-run physical arm64 validation once usable; defer until their app trial.
 
 ## Verification / environment
-- PASS this step: workspace build, 169 data-free Rust tests (88 storage, 12 new),
+- README step: local Markdown links/anchors, command/source review and diff check
+  pass. Documentation only; no Rust/Android/JNI checks rerun or new blocker.
+- Prior implementation PASS: workspace build, 169 data-free Rust tests (88 storage, 12 new),
   fmt/strict Clippy, host real-Full Kotlin/JNI + seven Unicode exchanges, diff check.
   Twelve new tests cover SQLite reopen/fresh clock epoch, all 25 reflows, concurrent/
   stale/duplicate saves/completions, rereads/EOF/deletion/overflow and SQL/commit/

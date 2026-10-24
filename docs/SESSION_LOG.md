@@ -859,3 +859,14 @@
   checkpoints, Android clock/lifecycle/interactions and forward controls/Finish.
   No Full standalone fixtures, Android build/lint/tests, release/probes/tablet or
   arm64 rerun; actual Android close/reboot recovery remains unchecked.
+
+## 2026-10-24 — Repository README
+
+- Started clean. Added a root README describing the app, current versus planned
+  features, module boundaries, host checks, Android build/run prerequisites and
+  licensing, with links to the detailed project documents.
+- Verified local Markdown links/anchors, checked commands and version pins against
+  tracked scripts/build files and development docs, and passed git diff --check.
+  Documentation only; no Rust/Android/JNI checks rerun or new blocker.
+- Updated the continuity checklist and handoff. Next reader tasks remain atomic
+  occurrences/New→Known completion, then timer/lifecycle and navigation wiring.

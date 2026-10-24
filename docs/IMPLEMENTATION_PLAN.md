@@ -11,6 +11,7 @@ import format or external integration. The first reader milestone is paste text
 position/encounter history. Keep incremental builds green.
 
 ## 0 — Repository and continuity
+- [x] Add a root README covering implemented versus planned features, module boundaries, CLI build/test setup and licensing; verify local links and commands against repository sources.
 - [x] Inspect repository, git history/status and available CLI toolchains; preserve handoff. Result: no existing source or commits; see DEVELOPMENT.md.
 - [x] Create AGENTS.md and persistent plan, resume, decisions, architecture and data-model documents; inspect files for consistency.
 - [x] Establish a passing host Rust baseline with exact commands and document Android/toolchain limitations.
