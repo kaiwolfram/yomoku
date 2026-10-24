@@ -18,8 +18,9 @@ with functioning rustup can omit the PATH workaround. Do not assume this compile
 is the project's minimum supported version; establish that with dependencies.
 Cargo.lock is retained for reproducible application development.
 Crux 0.20.0 declares Rust 1.90 minimum; the full locked graph has only been tested
-with 1.99.1. Current host baseline: 147 data-free Rust tests (76 storage). Eleven real Full-data
-fixtures run separately with each loader via tools/test-sudachi.sh (see below).
+with 1.99.1. Current host baseline: 154 data-free Rust tests (76 storage, seven
+runtime). Eleven analysis fixtures and one runtime fixture run separately with
+each Full loader via tools/test-sudachi.sh (see below).
 
 ## Pure logical pagination checks
 `cargo test -p yomoku-core --test pagination --all-features --locked --offline`
@@ -968,3 +969,36 @@ Both process-death/recovery regression pairs also pass with the updated Activity
 `.local/test-reports/sudachi-process-death/20261024T024602925933Z.json`.
 The unprivileged driver's preflight masked a socket failure as a missing debug
 install; the already installed app passes immediately with ADB escalation.
+
+## Analyzed-import worker integration
+
+The opt-in `effect_router_with_analyzed_imports` runs a lazy analyzer factory on
+its existing FIFO SQLite worker. `PasteAnalyzer` need not be Send; platform asset
+verification/loading must finish before the repository's transaction callback.
+`AnalyzerLifecycle::set_foreground` queues cache policy and holds only a weak
+worker reference. NativeBridge/Android still use the previous text-only router;
+verified-descriptor delivery, platform signals and import summaries remain next.
+
+Verified 2026-10-24 using the Rust PATH workaround:
+```sh
+cargo build --workspace --locked --offline
+cargo test --workspace --all-features --locked --offline
+cargo fmt --all -- --check
+cargo clippy --workspace --all-targets --all-features --locked --offline -- -D warnings
+tools/test-sudachi.sh
+tools/test-kotlin-bridge.sh
+bash -n tools/test-sudachi.sh
+git diff --check
+```
+PASS: 154 data-free tests, including seven new runtime tests; 11 analysis fixtures
+and one new worker fixture with each owned/mapped Full loader; pinned 138-file
+source integrity; host Kotlin/JNI and seven bidirectional Unicode exchanges.
+The Full runner now explicitly runs the ignored runtime fixture too. New tests
+cover worker-only construction/use/drop with a non-Send analyzer, lazy Library/
+settings/blank input, database/load/engine/invalid-output retries, every write and
+deferred-commit rollback, unchanged vocabulary/status/progress on duplicate/reopen,
+background/hidden release, cache reuse and close during accepted atomic work.
+No import creates reading events or encounters. JNI's previous nonfatal
+weak-reference shutdown logging persists; assertions pass. No open failure.
+No Android build/lint/instrumentation, emulator/probe, tablet or physical-arm64
+rerun for this Rust-only step. No new dependency version or schema migration.

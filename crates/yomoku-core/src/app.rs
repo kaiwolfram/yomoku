@@ -193,9 +193,20 @@ impl App for Yomoku {
                         model.apply_page_length(length);
                     }
                     StorageResult::PageLengthSaved(length) => model.apply_page_length(length),
-                    StorageResult::Created(document) => {
+                    StorageResult::Created(document) | StorageResult::Existing(document) => {
                         match document.library_summary() {
-                            Ok(summary) => model.documents.push(summary),
+                            Ok(summary) => {
+                                if let Some(entry) = model
+                                    .documents
+                                    .iter_mut()
+                                    .find(|entry| entry.document_id == summary.document_id)
+                                {
+                                    *entry = summary;
+                                } else {
+                                    model.documents.push(summary);
+                                    model.documents.sort_by_key(|entry| entry.document_id);
+                                }
+                            }
                             Err(_) => model.document_error = Some(DocumentError::InvalidDocument),
                         }
                         model.destination = Destination::Library;

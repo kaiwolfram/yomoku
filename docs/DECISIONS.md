@@ -1091,3 +1091,30 @@ levels are no longer delivered since API 34. The kernel's
 [PSI documentation](https://docs.kernel.org/accounting/psi.html) distinguishes
 measured stalls from ordinary residency/counter snapshots. Neither synthetic
 callbacks nor unavailable PSI establish real pressure/reclaim on their own.
+
+## 2026-10-24 — Analyze imports on the existing FIFO worker
+
+Implement the Rust worker part first with an opt-in router accepting a Send
+loader factory. The ready analyzer need not be Send: create, use and drop it only
+on the worker. The platform's later loader must publish/verify and pass the same
+immutable private descriptor, then map it before the repository opens its write
+transaction. No path or SQL enters core. Existing dependency versions are reused;
+analysis/rusqlite are only added as runtime test dependencies in this step.
+
+Reuse a healthy analyzer after SQL rollback, but discard one returning an engine
+error or invalid output so retry starts fresh. Library, settings and blank input
+do not initialize it. Runtime dates registration using UNIX wall time; reading
+time keeps its separate monotonic clock. A cold duplicate currently preloads the
+analyzer as required by the repository contract, then skips tokenization/rescan.
+
+Queue foreground/hidden policy on the same FIFO. Hidden imports finish atomically
+and release their analyzer before resolving; background signals arriving during
+an import release after the accepted work. Foreground only permits caching.
+Use a weak lifecycle sender so a retained platform control cannot keep the worker
+or its callback/factory alive after close. Duplicate policy signals are harmless.
+
+Add an internal Existing result and upsert the core Library row by document ID;
+both import outcomes return to Library without opening the reader. Keep the
+current native constructor on its existing text-only router for this independently
+testable step; production analyzed-import work remains unchecked until descriptor
+delivery, lifecycle and visible Created/Existing summaries are verified on Android.

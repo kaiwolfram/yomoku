@@ -38,6 +38,8 @@ pub enum DocumentError {
 pub enum StorageResult {
     Listed(Vec<LibraryDocument>, PageLength),
     Created(PastedDocument),
+    /// Exact duplicate: preserve persisted title/position and reference it once.
+    Existing(PastedDocument),
     Loaded(PastedDocument, PageLength),
     PositionSaved(PastedDocument),
     PageLengthSaved(PageLength),

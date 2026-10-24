@@ -10,6 +10,8 @@ use yomoku_core::app::{Effect, Yomoku};
 
 mod storage;
 use storage::StorageEffects;
+mod imports;
+pub use imports::{AnalyzerLifecycle, AnalyzerLoader, PasteAnalyzer};
 
 /// Only operations owned by the platform shell belong in this enum.
 #[effect(facet_typegen)]
@@ -36,4 +38,20 @@ pub fn effect_router(database_path: std::path::PathBuf) -> std::io::Result<Effec
     Ok(Core::<Yomoku>::new()
         .handle_effects_using(StorageEffects::new(database_path)?)
         .map_effect())
+}
+
+/// Analyzed, deduplicating imports on the existing SQLite worker. The shell
+/// supplies a lazy loader, not an analyzer created on the UI thread. The legacy
+/// router remains for the current native shell until descriptor delivery lands.
+pub fn effect_router_with_analyzed_imports(
+    database_path: std::path::PathBuf,
+    loader: AnalyzerLoader,
+) -> std::io::Result<(EffectRouter, AnalyzerLifecycle)> {
+    let (effects, lifecycle) = StorageEffects::with_analyzed_imports(database_path, loader)?;
+    Ok((
+        Core::<Yomoku>::new()
+            .handle_effects_using(effects)
+            .map_effect(),
+        lifecycle,
+    ))
 }

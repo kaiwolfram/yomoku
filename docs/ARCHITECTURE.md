@@ -130,7 +130,8 @@ existing FIFO worker, reuse it through configuration changes/foreground work,
 and release its idle cache on UI-hidden/background and final session close.
 Background release waits for in-flight atomic imports; later work reopens through
 the verified publisher. No Android/SQL I/O enters core and no new executor is
-needed. This lifecycle is chosen, not yet wired. Physical arm64 testing is deferred
+needed. The opt-in Rust worker now implements this policy; native/platform
+descriptor delivery and lifecycle signals remain unwired. Physical arm64 testing is deferred
 to the user's usable-app trial; see SUDACHI_MEASUREMENTS.md.
 Release APKs exclude the probe Activity/facades and the probe library.
 
@@ -156,6 +157,24 @@ Only Render reaches ShellEffect. Dropping the bridge closes the work channel;
 submitted work finishes atomically and the worker exits without joining on the UI
 thread. Crux discards results when the session has gone away. There is no new
 async executor or dependency version.
+
+`effect_router_with_analyzed_imports` opts into the deduplicating repository path
+on that same worker. A Send factory loads/verifies a ready `PasteAnalyzer` before
+the write transaction; the analyzer itself need not be Send and is created,
+reused and dropped on the worker. Library/settings/blank-paste paths never load it.
+Runtime supplies wall-clock registration timestamps, distinct from active time.
+Created/Existing results return only committed documents. Core upserts their
+Library summary by ID, preserves saved progress, returns to Library and never
+opens a reader. Analyzer/load/invalid-output failures can retry; engine/invalid
+output discards the cache, while SQL rollback keeps a healthy analyzer reusable.
+The weak `AnalyzerLifecycle` handle queues foreground/background policy alongside
+storage work without extending worker lifetime. Hidden/background releases after
+earlier atomic work, and imports accepted while hidden release before resolving.
+Foreground permits lazy reuse without initialization. Final close drains accepted
+work and drops both analyzer and loader. Seven data-free tests use a deliberately
+non-Send analyzer; an explicit real Full fixture tests both loaders and lazy reopen.
+The original `effect_router` remains the native shell's temporary text-only path;
+remove that production fallback when NativeBridge accepts verified descriptors.
 
 `yomoku-storage` owns rusqlite 0.40.2/bundled SQLite, migration history and SQL.
 Migration 0002 separates source/chapter provenance, Library documents and canonical
@@ -203,7 +222,8 @@ errors. Import creates no position/completion/encounters and does no deduplicati
 Six synthetic repository tests and a real Full fixture per loader verify this
 composition, including concurrent registration and exact Unicode reopen. This
 repository API is not wired into the production runtime/FFI/Android paste effect;
-the Full loading/lifecycle gate is resolved; production wiring remains next.
+the Full loading/lifecycle gate is resolved. The opt-in runtime router above uses
+the deduplicating wrapper; production FFI/Android selection remains next.
 
 Migration 0008 adds a live-document SHA-256 index for exact pasted UTF-8 bytes.
 `Storage::import_analyzed_paste` uses one immediate transaction to index legacy
@@ -227,7 +247,7 @@ Core-only effects stay private. Facet generates Event/ViewModel/Requests and
 document codecs in app.yomoku.shared; BoltFFI generates the native package and JNI C.
 Native wrappers require explicit close; no global singleton exists.
 
-One hundred and thirty-four data-free Rust tests cover analysis classification/
+One hundred and fifty-four data-free Rust tests cover analysis classification/
 checksum, domain, storage and bridge behavior, including an actual SQLite write
 lock proving dispatch/view/navigation remain responsive.
 The host Kotlin runner uses real JNI with -Xcheck:jni to verify navigation,
@@ -268,7 +288,9 @@ Automatic Android backup/transfer is excluded. Arm64 execution is unverified.
 Paste creation is exposed through Android, but complete import semantics remain
 unchecked: production analyzed-import/deduplication wiring and metadata. Atomic
 analyzed-paste registration and exact-byte deduplication exist at the repository
-boundary; Android still uses raw text-only creation.
+and opt-in worker boundaries; Android still uses raw text-only creation. Next is
+verified-descriptor delivery through NativeBridge, retained/background lifecycle
+signals and a visible Created/Existing import summary.
 Page movement/swipes requiring atomic forward completion/history, occurrences
 and active time remain next. Add analysis/import crates only with
 actual behavior; Sudachi Full defaults to B, JMdict/JMnedict remain offline data, and future Nostr I/O stays in Rust. Configuration is empty.

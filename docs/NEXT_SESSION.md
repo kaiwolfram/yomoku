@@ -1,6 +1,6 @@
 # Resume here
 
-Updated: 2026-10-24. Full emulator loading gate resolved; production wiring next.
+Updated: 2026-10-24. Analyzed-import Rust worker verified; native/Android next.
 Read AGENTS.md, plan phases 2–4 and PRODUCT_SPEC.md sections 3–4.
 Update docs/commit each verified step. Physical arm64 is the later user trial.
 
@@ -13,63 +13,60 @@ Update docs/commit each verified step. Physical arm64 is the later user trial.
 - Migrations 0005–0007 store frozen completion IDs/page/position, global surfaces/
   dated five-status history, immutable versioned A/B/C anchors and reversible
   global/local edits. No override application, forward action or vocabulary UI.
-- Storage::import_analyzed_paste atomically composes canonical text, validated
-  Mode B snapshot and unique Japanese registrations, preserving existing statuses.
-  Migration 0008 dedups exact UTF-8 SHA-256; Existing skips analysis/rescan and
-  returns oldest live match without changing title/progress/vocab. Legacy hashes
-  fill lazily under write lock; duplicates stay intact. Every failure rolls back.
-  Deletion/reimport allocates fresh IDs/progress; raw create stays non-dedup.
-  Preload/reuse analyzer before callback; no DB work/provisional IDs may escape.
-  Repository only: Android/runtime still use text-only create_paste. No encounters.
+- Storage::import_analyzed_paste atomically deduplicates exact UTF-8 SHA-256,
+  canonical text, Mode B snapshot and unique Japanese registrations. Existing
+  returns oldest live match without analysis/rescan/title/progress/status changes.
+  Migration 0008 lazily hashes legacy pastes under write lock, preserving duplicates.
+  All failures roll back; document deletion/reimport gets fresh IDs/progress.
+- NEW effect_router_with_analyzed_imports uses that repository on the existing
+  FIFO worker. Send loader is lazy; analyzer need not be Send, lives/drops only
+  on worker, loads before write transaction. Wall time dates registrations.
+  Failed load/engine/invalid output can retry; SQL rollback reuses healthy cache.
+  Created/Existing upsert one Library row by ID and never open the reader.
+- NEW AnalyzerLifecycle weak handle queues cache policy without retaining worker.
+  Foreground permits reuse without eager loading; background releases after prior
+  accepted work. Hidden imports finish then release; final close drains/drops.
+  Seven runtime tests + one real Full fixture per loader verify these boundaries.
+  NativeBridge/Android STILL select legacy text-only router. No visible summary,
+  verified descriptor callback or platform lifecycle signals wired yet. Remove
+  production fallback when connecting native shell; do not leave optional behavior.
 - Pure active_time uses supplied monotonic ms, five-minute idle cap and reader/
-  dictionary interactions. Background/close pauses; checkpoints retain pending
-  duration without draining/resetting idle. Restore duration paused in fresh clock
-  epoch. Thirteen tests; no SQLite/runtime/FFI/Android wiring or page attribution.
-- Sudachi.rs v0.7.0/android-loader-v1 and Full 20261015 stay pinned. Source verifier
-  checks 138 files; never alter shared Cargo cache. Eleven fixtures per loader.
-  Full is prepared outside Git; compressed APK includes complete notices.
+  dictionary interactions. Checkpoints retain pending time without resetting idle;
+  restore duration paused in fresh clock epoch. Thirteen tests; no SQLite/runtime/
+  FFI/Android timer wiring or page/reflow attribution yet.
+- Sudachi.rs v0.7.0/android-loader-v1 + Full 20261015 pinned; source verifier checks
+  138 files. Full prepared outside Git; APK bundles complete dictionary/notices.
 - Worker-only private publisher verifies size/SHA-256, syncs/atomically publishes
-  read-only files and returns the same verified descriptor. Repair never rewrites
-  live inodes. Eight extraction/recovery device tests pass.
-- Debug JNI/ADB probes verify fixture correctness, worker affinity/retry/stale IDs,
-  retained reuse, close/unmap/reopen and two real force-stop/restart recovery pairs.
-- NEW tools/test-sudachi-memory-pressure.py + NDK shell helper measure real reclaim:
-  two x86_64 runs reclaim 67/143 MiB dictionary RSS under bounded anonymous load;
-  original PID/generation reruns all fixtures. PSI denied; no LMKD/hardware claim.
-  Reports/limits: SUDACHI_MEASUREMENTS.md. No synthetic trim/cache drop/madvise.
-- Production decision (not wired): one lazy immutable mapped analyzer on existing
-  FIFO worker, reuse foreground/config changes; release idle cache on UI-hidden/
-  background and final session close, after accepted atomic work finishes. Later
-  work lazily re-verifies/reopens. No eager Library load/per-page reload/new worker.
-  Keep safe owned loader for uncontrolled paths. Never mutate live mapped bytes.
+  read-only files and returns same verified descriptor. Never rewrite live inodes.
+  Eight device extraction/recovery tests pass. Safe owned loader for arbitrary paths.
+- Debug JNI/ADB harnesses verify reuse/affinity/retry/close, two process-death pairs
+  and two pressure runs reclaiming 67/143 MiB dictionary RSS on API-36 x86_64.
+  Limits/results: SUDACHI_MEASUREMENTS.md. No LMKD/physical-arm64 claim.
+- Production choice: lazy immutable mapping on existing FIFO worker, retained over
+  configuration changes, idle cache release on UI-hidden/background/final close.
+  Later work re-verifies/reopens. No eager Library load/per-page reload/new worker.
 - Paste text/IDs/provenance immutable; no inferred TXT chapters. Future file imports
-  must hash original bytes separately. Document deletion keeps vocab.
+  hash original bytes separately. Document deletion keeps vocab. No import encounters.
 
 ## Next tasks (ordered)
-1. Wire deduplicating import_analyzed_paste through runtime/FFI/Android, verified
-   descriptor delivery/lifecycle and Created/Existing summary; test atomic rollback,
-   vocabulary/dedup, worker reuse/release/retry and no eager Library load end to end.
+1. Connect analyzed-import router through typed native verified-descriptor delivery,
+   Android retained/background lifecycle and Created/Existing summary. Test JNI/
+   device rollback/dedup/vocab/reuse/release/retry and no eager Library load.
 2. Persist pending page time (page/reflow attribution open), extend completion with
    occurrences/New→Known/time, then wire frozen IDs and Android clock/lifecycle/
    interactions + Next/Previous/swipes. Finish/format imports/CI remain unchecked.
 3. User-run physical arm64 validation once usable; defer until their app trial.
 
 ## Verification / environment
-- This step: debug/test APK assembly, strict lint and Kotlin format pass. Two real
-  pressure/revalidation runs, final 18/18 Android tests and two death/recovery pairs
-  pass; Python syntax/bound rejection, strict C compile and whitespace pass.
-- First pressure run lost ADB transport, excluded; original PID survived. Reconnect,
-  confirmed force-stop, then removed its owned directory/helper. Successful runs
-  clean only their files and return to Library. No radio/viewport changes.
-- Initial Android suite: 17/18 pass, existing notices dialog times out. Focused
-  SudachiAssetsTest rerun: 2/2 pass; full rerun 18/18 pass. Reports under
-  .local/test-reports/sudachi-pressure/. No timeout was relaxed or assertion removed.
-- Last host baseline: 147 data-free Rust tests (76 storage), build/fmt/strict Clippy;
-  no Rust changes/host tests rerun this step. Prior Full/host JNI results stand.
-- Commands/env: DEVELOPMENT.md (JDK17, pinned NDK/SDK/Gradle). Run debug assembly/
-  instrumentation/lint, explicit adb install -r (instrumentation uninstalls app),
-  then python3 tools/test-sudachi-memory-pressure.py --serial emulator-5554 and
-  tools/test-sudachi-process-death.py. ADB/Gradle sockets can need escalation.
-- Never run native builds/generation/tests concurrently. Prepare Full before APK
-  builds; never prepare/replace/truncate bytes during mapped probes. Emulator uses
-  swangle/KVM; tools/start-android-emulator.sh. Nostr empty; Q188 before forwarding.
+- This step: 154 data-free Rust tests (76 storage, seven runtime); workspace build,
+  fmt, strict Clippy; 11 analysis + one runtime real Full fixture per owned/mapped
+  loader, 138-file source integrity; host Kotlin/JNI + seven Unicode exchanges;
+  shell syntax and whitespace pass. No open check failure/blocker.
+- No Android build/lint/instrumentation/emulator/probe rerun for this Rust slice.
+  Previous final device baseline: 18/18 tests, strict lint, debug/test APKs, two
+  death/recovery pairs and two real pressure runs pass; reports in .local/.
+- Commands/env: DEVELOPMENT.md. Rust PATH workaround, locked/offline workspace
+  build/test/fmt/Clippy, tools/test-sudachi.sh, tools/test-kotlin-bridge.sh.
+  Never run native builds/generation/tests concurrently; never prepare/replace/
+  truncate Full during mapped tests. Gradle/ADB sockets can need escalation.
+- Nostr configuration empty; ask Q188 before forwarding. No local-reader blocker.

@@ -1634,7 +1634,9 @@ version = "0.1.0"
 dependencies = [
  "crux_core",
  "facet",
+ "rusqlite",
  "serde",
+ "yomoku-analysis",
  "yomoku-core",
  "yomoku-storage",
 ]

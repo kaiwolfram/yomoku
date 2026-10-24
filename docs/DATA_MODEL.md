@@ -278,8 +278,13 @@ one analyzes/creates. Indexing/analyzer/validation/write/commit errors roll back
 the entire transaction, including provisional legacy hashes; earlier committed
 imports remain intact. Deleting a document removes its hash while retaining
 historical source/chapter provenance and vocabulary; reimport starts at 0% with
-new IDs. No production deletion, file import or Android/runtime/FFI wiring is
-added here. Finished-at-least-once semantics remain a separate task.
+new IDs. The opt-in analyzed-import runtime router now calls this repository on
+its FIFO worker with a preloaded analyzer and a wall-clock registration timestamp.
+It maps the committed Created/Existing result to an internal storage result;
+core upserts one Library row by document ID without changing persisted state or
+opening a reader. NativeBridge/Android still select text-only creation until
+verified-descriptor delivery/lifecycle and import summaries are wired. No schema,
+production deletion or file import is added. Finished-at-least-once remains separate.
 
 ## Current position repository (migration 0003)
 `reading_positions` has document ID as PK/FK (cascade only this document's progress

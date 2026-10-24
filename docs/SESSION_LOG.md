@@ -759,3 +759,27 @@
   Next: atomic analyzed/deduplicating imports in production, then persisted page
   time/occurrences/New→Known completion before navigation. Arm64 is the user's
   later usable-app trial; Nostr empty and Q188 still required before forwarding.
+
+## 2026-10-24 — Analyzed-import FIFO worker
+
+- Started clean. Added opt-in analyzed-import router, worker-local analyzer factory/
+  cache and weak lifecycle control using the existing FIFO; no new executor,
+  dependency version, schema, production JNI or Android behavior.
+- Created/Existing results contain committed documents; core upserts a Library row
+  by ID, preserves current progress and never opens the reader. Runtime dates
+  registrations; no active time, encounters or status promotions are created.
+- Analyzer loading is lazy, ready before the write transaction and retryable.
+  Engine/invalid output drops cache; SQL rollback permits healthy reuse. Hidden
+  imports finish then release; queued background/close cannot interrupt accepted
+  atomic work. Retained lifecycle handles cannot retain a closed worker/factory.
+- PASS: workspace build, 154 data-free Rust tests, fmt, strict Clippy; 11 analysis
+  + one runtime Full fixture with each owned/mapped loader; 138-file source check;
+  host Kotlin/JNI, seven Unicode exchanges, shell syntax and whitespace. Seven
+  new runtime tests cover non-Send worker affinity, dedup/status/progress/reopen,
+  all writes/deferred commit rollback/retry and background/close ordering.
+- Previous nonfatal JNI weak-reference shutdown messages persist; all assertions
+  pass. No open verification blocker. No Android/device/probe/tablet/arm64 rerun.
+- Updated plan, decisions, architecture/data model, development and handoff.
+  Next: connect the new router via typed native verified-descriptor delivery,
+  retained/background Android lifecycle and visible Created/Existing summary.
+  Production imports stay unchecked; NativeBridge still uses text-only creation.
