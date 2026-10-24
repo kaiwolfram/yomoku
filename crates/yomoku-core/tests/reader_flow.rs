@@ -7,10 +7,11 @@ use yomoku_core::{
     },
     pagination::{PageLength, ReadingPosition},
     reader::{
-        progress_percent, ReaderAnalysis, ReaderPage, ReaderSnapshot, ReaderTokenKey,
-        ReaderTokenSnapshot,
+        progress_percent, ReaderAnalysis, ReaderPage, ReaderSnapshot, ReaderStatusChange,
+        ReaderToken, ReaderTokenKey, ReaderTokenSnapshot, ReaderVocabulary,
     },
     storage::{DocumentError, StorageOperation, StorageResult},
+    vocabulary::VocabularyStatus,
 };
 
 fn clock(core: &Core<Yomoku>, monotonic_ms: i64, action: ReaderClockAction) -> Event {
@@ -1248,6 +1249,264 @@ fn token_snapshot(key: ReaderTokenKey) -> ReaderTokenSnapshot {
         analysis: key.analysis,
         tokens: vec![],
     }
+}
+
+fn load_status_tokens(core: &Core<Yomoku>) -> ReaderStatusChange {
+    let key = token_key(core);
+    let change = ReaderStatusChange {
+        key,
+        vocabulary_id: 7.try_into().unwrap(),
+        status: VocabularyStatus::Learning,
+        occurred_at_unix_ms: 1234,
+    };
+    let mut snapshot = token_snapshot(key);
+    // Repeated occurrences share one ID; a different spelling stays independent.
+    snapshot.tokens = (0..3)
+        .map(|index| {
+            let mut anchor = key.page;
+            anchor.range.start = (index * 4).try_into().unwrap();
+            anchor.range.end = (index * 4 + if index == 2 { 8 } else { 4 })
+                .try_into()
+                .unwrap();
+            ReaderToken {
+                token_index: index as u64,
+                anchor,
+                display_range: anchor.range,
+                surface: if index == 2 { "𠮷𠮷" } else { "𠮷" }.into(),
+                reading: Some("ヨシ".into()),
+                dictionary_form: Some("𠮷".into()),
+                vocabulary: Some(ReaderVocabulary {
+                    id: if index == 2 {
+                        8.try_into().unwrap()
+                    } else {
+                        change.vocabulary_id
+                    },
+                    status: VocabularyStatus::New,
+                }),
+            }
+        })
+        .collect();
+    let mut effects = core.process_event(Event::LoadReaderTokens(key));
+    finish(
+        core,
+        &mut effects,
+        StorageResult::ReaderTokensLoaded(snapshot),
+    );
+    change
+}
+
+fn status_result(change: ReaderStatusChange) -> StorageResult {
+    StorageResult::ReaderStatusChanged(
+        change,
+        Some(ReaderVocabulary {
+            id: change.vocabulary_id,
+            status: change.status,
+        }),
+    )
+}
+
+#[test]
+fn manual_status_choices_require_loaded_current_vocabulary_and_valid_timestamp() {
+    let (core, _) = analyzed_reader();
+    let key = token_key(&core);
+    let change = ReaderStatusChange {
+        key,
+        vocabulary_id: 7.try_into().unwrap(),
+        status: VocabularyStatus::Learning,
+        occurred_at_unix_ms: 0,
+    };
+    assert!(core
+        .process_event(Event::SetReaderStatus(change))
+        .is_empty());
+    let change = load_status_tokens(&core);
+    for invalid in [
+        ReaderStatusChange {
+            vocabulary_id: 99.try_into().unwrap(),
+            ..change
+        },
+        ReaderStatusChange {
+            occurred_at_unix_ms: -1,
+            ..change
+        },
+        ReaderStatusChange {
+            key: ReaderTokenKey {
+                document_id: 99.try_into().unwrap(),
+                ..key
+            },
+            ..change
+        },
+        ReaderStatusChange {
+            key: ReaderTokenKey {
+                analysis: ReaderAnalysis::Missing,
+                ..key
+            },
+            ..change
+        },
+        ReaderStatusChange {
+            key: ReaderTokenKey {
+                page: yomoku_core::document::TextAnchor {
+                    chapter_id: 99.try_into().unwrap(),
+                    ..key.page
+                },
+                ..key
+            },
+            ..change
+        },
+    ] {
+        assert!(core
+            .process_event(Event::SetReaderStatus(invalid))
+            .is_empty());
+    }
+    core.process_event(Event::OpenSettings);
+    assert!(core
+        .process_event(Event::SetReaderStatus(change))
+        .is_empty());
+    core.process_event(Event::CloseSettings);
+    let mut effects = core.process_event(Event::SetReaderStatus(change));
+    assert_eq!(
+        storage_operation(&effects),
+        StorageOperation::SetReaderStatus(change)
+    );
+    assert!(core
+        .process_event(Event::SetReaderStatus(change))
+        .is_empty());
+    finish(&core, &mut effects, status_result(change));
+}
+
+#[test]
+fn manual_status_results_update_every_visible_occurrence_without_reader_side_effects() {
+    let (core, _) = analyzed_reader();
+    let change = load_status_tokens(&core);
+    restore_time(&core, 123);
+    for status in [
+        VocabularyStatus::Learning,
+        VocabularyStatus::Familiar,
+        VocabularyStatus::Known,
+        VocabularyStatus::Ignored,
+        VocabularyStatus::New,
+    ] {
+        let change = ReaderStatusChange { status, ..change };
+        let before = core.view();
+        let mut expected = before.reader_tokens.clone().unwrap();
+        for token in expected.tokens.iter_mut().take(2) {
+            token.vocabulary.as_mut().unwrap().status = status;
+        }
+        let mut effects = core.process_event(Event::SetReaderStatus(change));
+        assert_eq!(core.view().reader_tokens, before.reader_tokens);
+        finish(&core, &mut effects, status_result(change));
+        let after = core.view();
+        assert_eq!(after.reader_tokens, Some(expected));
+        assert_eq!(after.reader, before.reader);
+        assert_eq!(after.loaded_document, before.loaded_document);
+        assert_eq!(after.documents, before.documents);
+        assert_eq!(after.reader_time, before.reader_time);
+        assert_eq!(after.completion_notice, before.completion_notice);
+        assert_eq!(after.book_completion_notice, before.book_completion_notice);
+    }
+    let mut effects = core.process_event(Event::SetReaderStatus(change));
+    finish(
+        &core,
+        &mut effects,
+        StorageResult::ReaderStatusChanged(change, None),
+    );
+    let tokens = core.view().reader_tokens.unwrap().tokens;
+    assert!(tokens[..2].iter().all(|token| token.vocabulary.is_none()));
+    assert!(tokens[2].vocabulary.is_some());
+    assert!(core
+        .process_event(Event::SetReaderStatus(change))
+        .is_empty());
+}
+
+#[test]
+fn cancelled_or_mismatched_manual_status_callbacks_cannot_attach_or_surface_errors() {
+    for exit in [
+        Event::CloseDocument,
+        Event::OpenPaste,
+        Event::SelectDestination(Destination::Nostr),
+    ] {
+        for failed in [false, true] {
+            let (core, _) = analyzed_reader();
+            let change = load_status_tokens(&core);
+            let mut effects = core.process_event(Event::SetReaderStatus(change));
+            core.process_event(exit.clone());
+            finish(
+                &core,
+                &mut effects,
+                if failed {
+                    StorageResult::Failed(DocumentError::Unavailable)
+                } else {
+                    status_result(change)
+                },
+            );
+            assert!(core.view().reader_tokens.is_none());
+            assert!(core.view().document_error.is_none());
+            assert!(!core.view().storage_busy);
+            assert!(core
+                .process_event(Event::SetReaderStatus(change))
+                .is_empty());
+        }
+    }
+    for wrong_entry in [false, true] {
+        let (core, _) = analyzed_reader();
+        let change = load_status_tokens(&core);
+        let before = core.view().reader_tokens;
+        let mut effects = core.process_event(Event::SetReaderStatus(change));
+        let result = if wrong_entry {
+            StorageResult::ReaderStatusChanged(
+                change,
+                Some(ReaderVocabulary {
+                    id: 99.try_into().unwrap(),
+                    status: change.status,
+                }),
+            )
+        } else {
+            status_result(ReaderStatusChange {
+                occurred_at_unix_ms: 999,
+                ..change
+            })
+        };
+        finish(&core, &mut effects, result);
+        assert_eq!(core.view().reader_tokens, before);
+    }
+}
+
+#[test]
+fn manual_status_failures_retry_same_choice_and_always_drain_final_clock() {
+    for failed in [false, true] {
+        let (core, _) = analyzed_reader();
+        let change = load_status_tokens(&core);
+        restore_time(&core, 10);
+        core.process_event(clock(&core, 0, ReaderClockAction::Resume));
+        let mut effects = core.process_event(Event::SetReaderStatus(change));
+        core.process_event(clock(&core, 500, ReaderClockAction::Pause));
+        core.process_event(Event::CloseDocument);
+        let mut effects = resolve(
+            &core,
+            &mut effects,
+            if failed {
+                StorageResult::Failed(DocumentError::Unavailable)
+            } else {
+                status_result(change)
+            },
+        );
+        save_clock(&core, &mut effects, 510);
+        assert_eq!(core.view().content_route, ContentRoute::Main);
+        assert!(!core.view().reading_time_save_pending);
+    }
+    let (core, _) = analyzed_reader();
+    let change = load_status_tokens(&core);
+    let before = core.view().reader_tokens;
+    let mut effects = core.process_event(Event::SetReaderStatus(change));
+    finish(
+        &core,
+        &mut effects,
+        StorageResult::Failed(DocumentError::Unavailable),
+    );
+    assert_eq!(core.view().reader_tokens, before);
+    assert_eq!(core.view().document_error, Some(DocumentError::Unavailable));
+    let mut effects = core.process_event(Event::SetReaderStatus(change));
+    finish(&core, &mut effects, status_result(change));
+    assert!(core.view().document_error.is_none());
 }
 
 #[test]

@@ -68,6 +68,17 @@ pub struct ReaderVocabulary {
     pub status: VocabularyStatus,
 }
 
+/// An explicit choice for an existing visible global entry. Lookup itself never
+/// creates a choice; the page/base identity rejects stale UI callbacks.
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
+pub struct ReaderStatusChange {
+    pub key: ReaderTokenKey,
+    pub vocabulary_id: VocabularyId,
+    pub status: VocabularyStatus,
+    pub occurred_at_unix_ms: i64,
+}
+
 /// A selectable Japanese occurrence, retaining its whole original surface even
 /// when only part is visible. display_range counts UTF-8 bytes in the page text;
 /// anchor counts UTF-8 bytes in the chapter. Neither uses Compose UTF-16 indices.

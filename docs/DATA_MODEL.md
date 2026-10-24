@@ -139,7 +139,19 @@ event/view payloads, not persisted columns or migrations.
 Statuses come from one exact-surface join for the visible page, not per-token
 lookups. This correctness-first implementation validates/loads the whole chapter
 analysis per request; large-document lookup performance remains unmeasured. No
-schema change, new dependency or core/runtime/FFI transport is introduced here.
+schema change or new dependency is required.
+
+`ReaderStatusChange` carries the current token key, existing VocabularyId, one of
+five statuses and a nonnegative Unix millisecond timestamp through core/FIFO/FFI.
+It is accepted only for vocabulary present in the loaded current snapshot. The
+existing `set_vocabulary_status` transaction changes global status and appends a
+manual event only when the value differs; progress/time/encounters remain untouched.
+The worker returns the committed ID/status directly, avoiding a fallible post-commit
+read. Core updates every visible repetition only for the matching pending/current
+key. A deleted ID returns None and clears those references; it is never recreated.
+Failures keep the prior snapshot and allow an explicit repeat choice; same-status
+replays add no event. Navigation discards transient results/errors but does not
+cancel accepted writes. Failed choices still drain queued final time saves.
 
 ## Document identities and text anchors
 `document.rs` defines distinct `DocumentId`, `SourceId` and `ChapterId` newtypes.

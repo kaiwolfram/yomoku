@@ -166,11 +166,11 @@ fn async_open_failure_is_typed_retryable_and_preserves_invalid_files() {
 }
 
 #[test]
-fn token_reads_deliver_original_unicode_metadata_and_live_statuses_without_writes() {
+fn token_reads_and_manual_choices_preserve_metadata_and_global_status_semantics() {
     use yomoku_core::{
         analysis::{AnalysisProfile, AnalyzedToken, ChapterAnalysis, SplitMode},
         document::{PasteText, TextAnchor, TextOffset, TextRange},
-        reader::ReaderTokenKey,
+        reader::{ReaderStatusChange, ReaderTokenKey},
         vocabulary::{Surface, VocabularyStatus},
     };
     let db = Database::new();
@@ -286,6 +286,125 @@ fn token_reads_deliver_original_unicode_metadata_and_live_statuses_without_write
         assert!(loaded.completion_notice.is_none());
         assert_eq!(std::fs::read(db.path()).unwrap(), before);
     }
+    // Explicit choices share the read transport's identity but mutate only the
+    // global entry and its manual history, including all repeated visible spans.
+    let sql = rusqlite::Connection::open(db.path()).unwrap();
+    sql.execute_batch("PRAGMA foreign_keys = ON;").unwrap();
+    let manual_count = || -> i64 {
+        sql.query_row(
+            "SELECT COUNT(*) FROM vocabulary_status_events WHERE cause = 'manual'",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap()
+    };
+    let change = ReaderStatusChange {
+        key,
+        vocabulary_id: entry.id,
+        status: VocabularyStatus::New,
+        occurred_at_unix_ms: 321,
+    };
+    for (index, status) in [
+        VocabularyStatus::New,
+        VocabularyStatus::Learning,
+        VocabularyStatus::Familiar,
+        VocabularyStatus::Known,
+        VocabularyStatus::Ignored,
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let change = ReaderStatusChange { status, ..change };
+        let before = manual_count();
+        let changed = dispatch(&native, &callbacks, Event::SetReaderStatus(change));
+        assert_eq!(manual_count(), before + 1);
+        let tokens = changed.reader_tokens.as_ref().unwrap();
+        assert!(tokens
+            .tokens
+            .iter()
+            .all(|token| token.vocabulary.unwrap().status == status));
+        assert_eq!(changed.reader, opened.reader);
+        assert_eq!(changed.loaded_document, opened.loaded_document);
+        assert!(changed.completion_notice.is_none());
+        assert_eq!(
+            storage
+                .vocabulary_entry(&Surface::new("猫𠮷").unwrap())
+                .unwrap()
+                .unwrap()
+                .status,
+            status
+        );
+        let repeated = dispatch(&native, &callbacks, Event::SetReaderStatus(change));
+        assert_eq!(repeated.reader_tokens, changed.reader_tokens);
+        assert_eq!(
+            manual_count(),
+            before + 1,
+            "same choice is idempotent {index}"
+        );
+    }
+    assert_eq!(
+        sql.query_row("SELECT COUNT(*) FROM vocabulary_status_events WHERE cause = 'manual' AND occurred_at_unix_ms = 321", [], |row| row.get::<_, i64>(0)).unwrap(),
+        5
+    );
+    assert_eq!(
+        sql.query_row("SELECT COUNT(*) FROM reading_completions", [], |row| row
+            .get::<_, i64>(0))
+            .unwrap(),
+        0
+    );
+    // A failed status/history transaction leaves the old snapshot and database
+    // intact. The same direct choice retries after the fault is removed.
+    sql.execute_batch("CREATE TRIGGER fail_status BEFORE INSERT ON vocabulary_status_events BEGIN SELECT RAISE(ABORT, 'fixture'); END;").unwrap();
+    let before = manual_count();
+    let failed = dispatch(&native, &callbacks, Event::SetReaderStatus(change));
+    assert_eq!(failed.document_error, Some(DocumentError::Unavailable));
+    assert!(failed
+        .reader_tokens
+        .unwrap()
+        .tokens
+        .iter()
+        .all(|token| token.vocabulary.unwrap().status == VocabularyStatus::Ignored));
+    assert_eq!(manual_count(), before);
+    assert_eq!(
+        storage
+            .vocabulary_entry(&Surface::new("猫𠮷").unwrap())
+            .unwrap()
+            .unwrap()
+            .status,
+        VocabularyStatus::Ignored
+    );
+    sql.execute_batch("DROP TRIGGER fail_status;").unwrap();
+    let retried = dispatch(&native, &callbacks, Event::SetReaderStatus(change));
+    assert!(retried.document_error.is_none());
+    assert_eq!(manual_count(), before + 1);
+    // Fresh worker/session reads the global persisted choice without an analyzer.
+    let (reopened, reopened_callbacks, _) = bridge(&db.path());
+    dispatch(&reopened, &reopened_callbacks, Event::OpenReader(id));
+    let persisted = dispatch(&reopened, &reopened_callbacks, Event::LoadReaderTokens(key));
+    assert!(persisted
+        .reader_tokens
+        .unwrap()
+        .tokens
+        .iter()
+        .all(|token| token.vocabulary.unwrap().status == VocabularyStatus::New));
+    // A deletion after lookup is never undone by an accepted stale ID choice.
+    sql.execute(
+        "DELETE FROM vocabulary WHERE id = ?1",
+        [i64::from(entry.id)],
+    )
+    .unwrap();
+    let absent = dispatch(&native, &callbacks, Event::SetReaderStatus(change));
+    assert!(absent.document_error.is_none());
+    assert!(absent
+        .reader_tokens
+        .unwrap()
+        .tokens
+        .iter()
+        .all(|token| token.vocabulary.is_none()));
+    assert!(storage
+        .vocabulary_entry(&Surface::new("猫𠮷").unwrap())
+        .unwrap()
+        .is_none());
     // A separately opened legacy paste remains Missing; the FIFO has no loader.
     let legacy = storage
         .create_paste(&PasteText::new("未解析".into()).unwrap())
@@ -314,17 +433,22 @@ fn internal_storage_results_cannot_be_injected_over_ffi() {
     let mut last_public = Vec::new();
     BincodeFfiFormat::serialize(
         &mut last_public,
-        &Event::LoadReaderTokens(yomoku_core::reader::ReaderTokenKey {
-            document_id: 1.try_into().unwrap(),
-            page: yomoku_core::document::TextAnchor {
-                source_id: 1.try_into().unwrap(),
-                chapter_id: 1.try_into().unwrap(),
-                range: yomoku_core::document::TextRange {
-                    start: 0.try_into().unwrap(),
-                    end: 3.try_into().unwrap(),
+        &Event::SetReaderStatus(yomoku_core::reader::ReaderStatusChange {
+            vocabulary_id: 1.try_into().unwrap(),
+            status: yomoku_core::vocabulary::VocabularyStatus::New,
+            occurred_at_unix_ms: 0,
+            key: yomoku_core::reader::ReaderTokenKey {
+                document_id: 1.try_into().unwrap(),
+                page: yomoku_core::document::TextAnchor {
+                    source_id: 1.try_into().unwrap(),
+                    chapter_id: 1.try_into().unwrap(),
+                    range: yomoku_core::document::TextRange {
+                        start: 0.try_into().unwrap(),
+                        end: 3.try_into().unwrap(),
+                    },
                 },
+                analysis: ReaderAnalysis::Missing,
             },
-            analysis: ReaderAnalysis::Missing,
         }),
     )
     .unwrap();

@@ -1542,3 +1542,19 @@ drain a waiting checkpoint even on failure, preserving the existing deferred-exi
 ordering. Lookup errors retry by requesting the current key again. No schema or
 dependency changes. This independently testable prerequisite deliberately leaves
 manual status events and Compose taps for the next implementation slice.
+
+## 2026-10-24 — Manual reader status choices reuse the atomic repository
+
+Use an explicit ReaderStatusChange carrying page/base identity, visible existing
+VocabularyId, target status and timestamp. Validate against the loaded token
+snapshot outside Settings and reuse the single storage gate/FIFO. Return only the
+committed optional ID/status plus echoed choice: the existing repository commits
+global status/history atomically and needs no follow-up read. Update every visible
+matching ID after success; absent/deleted IDs clear references without registration.
+Do not optimistically change the snapshot or add reading history/toasts. Existing
+same-status no-op semantics make an explicit repeat choice safe. A failed atomic
+choice has no frozen automatic-retry obligation; preserve the snapshot so the user
+can choose again. Accepted writes finish after navigation, but stale callbacks/errors
+cannot attach to a departed reader. Treat the write as nonmoving and drain queued
+final clock checkpoints on either success or failure. No schema/dependency changes;
+Compose token taps/status controls remain a separate independently testable step.

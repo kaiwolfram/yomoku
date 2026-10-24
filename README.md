@@ -31,7 +31,9 @@ Word lookup UI and vocabulary controls are still pending. A read-only Rust
 projection now exposes stored Mode B tokens, exact display spans and current
 global statuses through typed core/FIFO/FFI reads without changing vocabulary or
 history. Results are checked against the current document/page/analysis before
-being exposed to the host. Compose taps and manual status commands remain next.
+being exposed to the host. Typed manual status choices now update existing global
+entries and every visible repetition after the status/history transaction commits;
+same-status selections add no history. Compose taps and five-choice controls remain next.
 The Rust repository atomically saves completion encounters, New→Known
 transitions, active time and position. Core/worker/FFI pending-time checkpoints
 support exact retries, coalesced saves before reader movement/exit and reopen.

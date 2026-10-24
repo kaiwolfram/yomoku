@@ -5,8 +5,11 @@ import androidx.test.platform.app.InstrumentationRegistry
 import app.yomoku.shared.DocumentError
 import app.yomoku.shared.Event
 import app.yomoku.shared.PageLength
+import app.yomoku.shared.ReaderStatusChange
+import app.yomoku.shared.ReaderTokenKey
 import app.yomoku.shared.TextOffset
 import app.yomoku.shared.ViewModel
+import app.yomoku.shared.VocabularyStatus
 import java.io.File
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -36,6 +39,83 @@ class DocumentSessionTest {
     private fun dispatch(core: CoreSession, event: Event): ViewModel {
         instrumentation.runOnMainSync { core.dispatch(event) }
         return awaitIdle(core)
+    }
+
+    @Test
+    fun manualStatusesShareExactSurfacesAcrossDocumentsWithoutMovingOrCompleting() {
+        lateinit var core: CoreSession
+        instrumentation.runOnMainSync {
+            core = CoreSession(":memory:", sudachiDictionaryProvider(instrumentation.targetContext))
+        }
+        try {
+            awaitIdle(core)
+            val first = dispatch(core, Event.CreatePaste("猫 猫 犬")).documents.single().documentId
+            val opened = dispatch(core, Event.OpenReader(first))
+            val page = opened.reader!!
+            val key = ReaderTokenKey(first, page.anchor, opened.readerAnalysis!!)
+            val tokens = dispatch(core, Event.LoadReaderTokens(key)).readerTokens!!
+            val cats = tokens.tokens.filter { it.surface == "猫" }
+            assertEquals(2, cats.size)
+            val id = cats.first().vocabulary!!.id
+            assertTrue(tokens.tokens.all { it.vocabulary!!.status == VocabularyStatus.NEW })
+            for (status in VocabularyStatus.entries) {
+                val changed =
+                    dispatch(
+                        core,
+                        Event.SetReaderStatus(ReaderStatusChange(key, id, status, 1234L)),
+                    )
+                assertNull(changed.documentError)
+                assertEquals(page, changed.reader)
+                assertEquals(opened.loadedDocument, changed.loadedDocument)
+                assertNull(changed.readerTime)
+                assertNull(changed.completionNotice)
+                assertNull(changed.bookCompletionNotice)
+                val expected =
+                    tokens.tokens.map { token ->
+                        if (token.surface == "猫") {
+                            token.copy(vocabulary = token.vocabulary!!.copy(status = status))
+                        } else token
+                    }
+                assertEquals(expected, changed.readerTokens!!.tokens)
+                assertEquals(
+                    changed.readerTokens,
+                    dispatch(core, Event.LoadReaderTokens(key)).readerTokens,
+                )
+            }
+            val second =
+                dispatch(core, Event.CreatePaste("犬 猫"))
+                    .documents
+                    .single { it.documentId != first }
+                    .documentId
+            val secondOpened = dispatch(core, Event.OpenReader(second))
+            val secondKey =
+                ReaderTokenKey(second, secondOpened.reader!!.anchor, secondOpened.readerAnalysis!!)
+            val secondTokens = dispatch(core, Event.LoadReaderTokens(secondKey)).readerTokens!!
+            assertEquals(id, secondTokens.tokens.single { it.surface == "猫" }.vocabulary!!.id)
+            assertEquals(
+                VocabularyStatus.IGNORED,
+                secondTokens.tokens.single { it.surface == "猫" }.vocabulary!!.status,
+            )
+            dispatch(
+                core,
+                Event.SetReaderStatus(
+                    ReaderStatusChange(secondKey, id, VocabularyStatus.LEARNING, 2345L)
+                ),
+            )
+            dispatch(core, Event.OpenReader(first))
+            val shared = dispatch(core, Event.LoadReaderTokens(key)).readerTokens!!
+            assertTrue(
+                shared.tokens
+                    .filter { it.surface == "猫" }
+                    .all { it.vocabulary!!.status == VocabularyStatus.LEARNING }
+            )
+            assertEquals(
+                VocabularyStatus.NEW,
+                shared.tokens.single { it.surface == "犬" }.vocabulary!!.status,
+            )
+        } finally {
+            instrumentation.runOnMainSync { core.close() }
+        }
     }
 
     @Test

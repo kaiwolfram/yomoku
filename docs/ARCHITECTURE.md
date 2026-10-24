@@ -49,8 +49,19 @@ a different page span. Cancelled results/errors cannot reopen or contaminate a
 departed reader. Legacy Missing is a successful empty snapshot. Reads never need
 an analyzer, and failures can be retried by submitting the same current key.
 This nonmoving read allows final time checkpoints to queue; even a failed read
-drains the waiting checkpoint before deferred departure. Compose does not request
-or display tokens yet; taps and manual status commands remain future work.
+drains the waiting checkpoint before deferred departure.
+
+SetReaderStatus(ReaderStatusChange) shares the same gate/FIFO. Core accepts a valid
+timestamp and existing vocabulary ID from the current loaded page outside Settings.
+The worker calls the existing atomic status/history repository; no analyzer or
+post-commit reload is needed. The echoed choice/result must match pending/current
+identity before updating all visible occurrences of that ID. A deleted ID returns
+absence and clears its visible references without registration. Same-status choices
+are repository no-ops. Failure preserves the old snapshot for explicit retry by
+choosing again; no background replay obligation is created. Accepted writes finish
+after navigation, while cancelled results/errors cannot attach to the departed page.
+Success and failure both drain queued final clock checkpoints. Compose does not
+request/display tokens or offer status controls yet.
 
 Pure `active_time` accounts pending reading milliseconds using caller-supplied
 monotonic timestamps. Resume/interaction arms a five-minute idle window; dictionary

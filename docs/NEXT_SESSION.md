@@ -1,6 +1,6 @@
 # Resume here
 
-Updated: 2026-10-24. Typed reader-token reads wired through core/FIFO/FFI.
+Updated: 2026-10-24. Typed manual reader statuses wired through core/FIFO/FFI.
 Read AGENTS.md, plan phases 2–4 and PRODUCT_SPEC.md sections 3–4.
 
 ## Working
@@ -35,6 +35,11 @@ Read AGENTS.md, plan phases 2–4 and PRODUCT_SPEC.md sections 3–4.
   result and current keys match; discard cancelled errors/results. reader_tokens
   clears on refresh/navigation/position/completion callback or changed reflow span.
   Read failure can retry same key; even failure drains queued final time/departure.
+- SetReaderStatus(ReaderStatusChange) requires current loaded key/existing ID and
+  nonnegative timestamp outside Settings. FIFO uses atomic status/history repository;
+  echo/current/pending checks update every visible repetition after commit. Deleted
+  ID clears references; no registration. Same-status no-op. Failure preserves snapshot
+  for explicit repeat choice; no automatic replay. Both outcomes drain final time.
 - RestoreReadingTime reserves FIFO revision; absolute saves freeze exact retry
   payload/revision, coalesce newer maxima and chain revisions. View exposes duration,
   no history. Reflow/same-offset saves preserve the idle deadline.
@@ -58,17 +63,17 @@ Read AGENTS.md, plan phases 2–4 and PRODUCT_SPEC.md sections 3–4.
   Full outside Git, notices bundled; limits: SUDACHI_MEASUREMENTS.md.
 
 ## Next tasks (ordered)
-1. Wire typed manual status changes through core/FIFO/FFI using existing repository;
-   then Compose token taps/five direct choices. Opening lookup must not mutate.
+1. Connect Compose token loading, validated UTF-8-to-UTF-16 display spans, status
+   highlights and taps/five direct choices. Opening lookup must not mutate.
 2. Verify JMdict English/JMnedict versions/licenses and reproducible offline index.
 3. User-run physical arm64 validation once usable. Formats/CI remain open.
 
 ## Verification / environment
-- PASS: 234 Rust tests (117 storage), strict Clippy/fmt/diff; real-Full Kotlin/JNI
-  including token metadata/New-to-Known, analyzer-free reopen and Unicode exchanges;
+- PASS: 238 Rust tests (117 storage), strict Clippy/fmt/diff; real-Full Kotlin/JNI
+  including five manual choices, metadata, analyzer-free reopen and Unicode exchanges;
   repeat Kotlin generation and Kotlin formatting. DEVELOPMENT.md has exact commands.
-- PASS: both-ABI debug/test APK builds, strict Android lint and 11 API-36 x86_64
-  core/reader/clock regressions after restarting a disconnected emulator (2m38s).
-- No schema/dependency change. New typed Event/View/Storage payloads. Standalone Full
+- PASS: both-ABI debug/test APK builds, strict Android lint and all 13 API-36 x86_64
+  core/document/reader/clock tests (3m32s), including cross-document manual statuses.
+- No schema/dependency change. New typed Event/Storage payloads. Standalone Full
   fixture suite, process/reboot/release/tablet/arm64 not rerun. Nostr empty; Q188 before
   forwarding. No open failures/local blocker; Gradle socket denial required escalation.

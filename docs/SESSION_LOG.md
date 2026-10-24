@@ -1159,3 +1159,24 @@
   and README. Next: typed manual status changes, then Compose taps/five choices;
   offline dictionary data/index. No standalone Full fixture suite, full Android
   suite, release/tablet/physical-arm64 or separate recovery rerun. Nostr/Q188 unchanged.
+
+## 2026-10-24 — Typed manual reader status choices
+
+- Started clean. Added ReaderStatusChange and SetReaderStatus through pure core,
+  FIFO worker and generated Kotlin/JNI, reusing the atomic status/history repository.
+  Only existing vocabulary in the loaded current page is accepted. Successful
+  matching callbacks update every visible repetition; stale callbacks/errors ignore.
+  Same-status choices add no history, deleted IDs never register, failed choices
+  preserve the snapshot for explicit retry. Both outcomes drain final clock saves.
+- PASS: 238 Rust tests (117 storage), strict Clippy/fmt/diff, real-Full Kotlin/JNI,
+  seven Unicode exchanges, repeat generation, Kotlin formatting, both-ABI debug/test
+  APK builds, strict Android lint and all 13 selected API-36 x86_64 tests (3m32s).
+  Four new core tests and extended FFI/JNI tests verify five choices, repeated IDs,
+  cancellation/mismatches, rollback/retry, deletion and clock/departure ordering.
+  New Android test verifies all five statuses and global identity across two docs.
+- Updated plan/handoff, architecture/data, decisions, development and README.
+  No schema/dependency/View change. ADB/Gradle sandbox sockets required escalation;
+  no open failure/local blocker. Next: Compose token loading, UTF-16 spans,
+  highlights/taps/five direct controls, then offline dictionary data/index.
+  Standalone Full/full Android suite, release, recovery/tablet/physical-arm64 not
+  rerun. Nostr remains empty; Q188 remains required before forwarding.

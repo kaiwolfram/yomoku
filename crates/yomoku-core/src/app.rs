@@ -15,7 +15,7 @@ use crate::{
     completion::{AnalyzedCompletionOutcome, CompletionNotice, PageCompletionIntent},
     document::{CompletionCommandId, DocumentId, LibraryDocument, PastedDocument, TextAnchor},
     pagination::{LogicalPages, PageLength, ReadingPosition},
-    reader::{ReaderAnalysis, ReaderPage, ReaderTokenKey, ReaderTokenSnapshot},
+    reader::{ReaderAnalysis, ReaderPage, ReaderStatusChange, ReaderTokenKey, ReaderTokenSnapshot},
     storage::{DocumentError, StorageOperation, StorageResult},
 };
 
@@ -86,6 +86,7 @@ pub struct Model {
     time_checkpoint_can_wait: bool,
     reader_tokens: Option<ReaderTokenSnapshot>,
     pending_token_load: Option<ReaderTokenKey>,
+    pending_status_change: Option<ReaderStatusChange>,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -136,6 +137,8 @@ pub enum Event {
     DismissBookCompletionNotice(CompletionCommandId),
     /// Explicit refresh; stale UI callbacks cannot request another page's tokens.
     LoadReaderTokens(ReaderTokenKey),
+    /// Explicit manual choice; only existing vocabulary on the loaded page.
+    SetReaderStatus(ReaderStatusChange),
     #[serde(skip)]
     #[cfg_attr(feature = "facet_typegen", facet(skip))]
     StorageFinished(StorageResult),
@@ -391,6 +394,23 @@ impl App for Yomoku {
                 }
                 Some(StorageOperation::LoadReaderTokens(*key))
             }
+            Event::SetReaderStatus(change) => {
+                if model.settings_open
+                    || change.occurred_at_unix_ms < 0
+                    || model.current_token_key() != Some(change.key)
+                    || !model.reader_tokens.as_ref().is_some_and(|snapshot| {
+                        snapshot.key() == change.key
+                            && snapshot.tokens.iter().any(|token| {
+                                token
+                                    .vocabulary
+                                    .is_some_and(|entry| entry.id == change.vocabulary_id)
+                            })
+                    })
+                {
+                    return Command::done();
+                }
+                Some(StorageOperation::SetReaderStatus(*change))
+            }
             Event::SetPageLength(length) => {
                 if !model.settings_open
                     || model.page_length.is_none()
@@ -458,6 +478,7 @@ impl App for Yomoku {
                 | StorageOperation::SavePageLength(_)
                 | StorageOperation::LoadReadingTime { .. }
                 | StorageOperation::LoadReaderTokens(_)
+                | StorageOperation::SetReaderStatus(_)
                 | StorageOperation::SaveReadingTime { .. } => true,
                 StorageOperation::SaveReadingPosition { position, .. } => model
                     .reader
@@ -470,6 +491,9 @@ impl App for Yomoku {
             if let StorageOperation::LoadReaderTokens(key) = operation {
                 model.pending_token_load = Some(key);
                 model.reader_tokens = None;
+            }
+            if let StorageOperation::SetReaderStatus(change) = operation {
+                model.pending_status_change = Some(change);
             }
             if matches!(event, Event::CreatePaste(_) | Event::OpenReader(_)) {
                 model.import_summary = None;
@@ -543,12 +567,36 @@ impl App for Yomoku {
                 let restoring_time = std::mem::take(&mut model.restoring_reader_time);
                 let pending_reader = model.pending_reader.take();
                 let token_load = model.pending_token_load.take();
+                let status_change = model.pending_status_change.take();
                 let import_outcome = match &result {
                     StorageResult::Created(_) => Some(ImportOutcome::Created),
                     StorageResult::Existing(_) => Some(ImportOutcome::Existing),
                     _ => None,
                 };
                 match result {
+                    StorageResult::ReaderStatusChanged(change, entry) => {
+                        if status_change == Some(change)
+                            && model.current_token_key() == Some(change.key)
+                            && entry.is_none_or(|entry| {
+                                entry.id == change.vocabulary_id && entry.status == change.status
+                            })
+                        {
+                            if let Some(snapshot) = model
+                                .reader_tokens
+                                .as_mut()
+                                .filter(|snapshot| snapshot.key() == change.key)
+                            {
+                                for token in &mut snapshot.tokens {
+                                    if token
+                                        .vocabulary
+                                        .is_some_and(|entry| entry.id == change.vocabulary_id)
+                                    {
+                                        token.vocabulary = entry;
+                                    }
+                                }
+                            }
+                        }
+                    }
                     StorageResult::ReaderTokensLoaded(snapshot) => {
                         if token_load == Some(snapshot.key())
                             && model.current_token_key() == Some(snapshot.key())
@@ -701,14 +749,17 @@ impl App for Yomoku {
                     }
                     StorageResult::PositionSaved(document) => model.apply_position(document),
                     StorageResult::Failed(error) => {
-                        if token_load.is_none() || token_load == model.current_token_key() {
+                        let key = token_load.or(status_change.map(|change| change.key));
+                        if key.is_none() || key == model.current_token_key() {
                             model.document_error = Some(error);
                         }
                     }
                 }
-                // A read failure has no durable retry obligation and must not
-                // hold a final time checkpoint or deferred departure hostage.
-                if (!failed || token_load.is_some()) && model.pending_time_checkpoint.is_none() {
+                // Reads and atomic manual choices have no frozen retry obligation.
+                // Their failures must still drain final time and deferred departures.
+                if (!failed || token_load.is_some() || status_change.is_some())
+                    && model.pending_time_checkpoint.is_none()
+                {
                     if let Some(checkpoint) = model.queued_time_checkpoint {
                         return self.update(Event::CheckpointReadingTime(checkpoint), model);
                     }
@@ -719,6 +770,7 @@ impl App for Yomoku {
             | Event::LoadPaste(_)
             | Event::OpenReader(_)
             | Event::LoadReaderTokens(_)
+            | Event::SetReaderStatus(_)
             | Event::SetPageLength(_)
             | Event::SaveReadingPosition(_) => unreachable!(),
             Event::RestoreReadingTime

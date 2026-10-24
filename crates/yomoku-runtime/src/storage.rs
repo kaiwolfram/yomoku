@@ -10,6 +10,7 @@ use std::{
 use crux_core::middleware::{EffectMiddleware, EffectResolver};
 use yomoku_core::{
     document::PasteText,
+    reader::ReaderVocabulary,
     storage::{DocumentError, StorageOperation, StorageResult},
 };
 use yomoku_storage::{Storage, StorageError};
@@ -137,6 +138,22 @@ fn execute(
             .map_err(map_error)?
             .map(StorageResult::ReaderTokensLoaded)
             .ok_or(DocumentError::NotFound),
+        StorageOperation::SetReaderStatus(change) => storage
+            .set_vocabulary_status(
+                change.vocabulary_id,
+                change.status,
+                change.occurred_at_unix_ms,
+            )
+            .map(|entry| {
+                StorageResult::ReaderStatusChanged(
+                    change,
+                    entry.map(|entry| ReaderVocabulary {
+                        id: entry.id,
+                        status: entry.status,
+                    }),
+                )
+            })
+            .map_err(map_error),
         StorageOperation::SavePageLength(length) => storage
             .save_page_length(length)
             .map(StorageResult::PageLengthSaved)

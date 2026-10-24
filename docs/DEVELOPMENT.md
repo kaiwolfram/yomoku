@@ -18,7 +18,7 @@ with functioning rustup can omit the PATH workaround. Do not assume this compile
 is the project's minimum supported version; establish that with dependencies.
 Cargo.lock is retained for reproducible application development.
 Crux 0.20.0 declares Rust 1.90 minimum; the full locked graph has only been tested
-with 1.99.1. Current host baseline: 234 data-free Rust tests (117 storage, eight
+with 1.99.1. Current host baseline: 238 data-free Rust tests (117 storage, eight
 runtime). Eleven analysis fixtures and one runtime fixture run separately with
 each Full loader via tools/test-sudachi.sh (see below).
 
@@ -1645,3 +1645,50 @@ No schema/dependency change. Event/View/Storage gain typed token-read payloads;
 Android's preview constructor supplies the added optional view field. No Compose
 token request/rendering or manual status commands yet. No standalone Full fixture
 suite, release APK, process/reboot recovery, tablet or physical-arm64 rerun.
+
+## Typed manual reader status choices
+
+Verified 2026-10-24 using the Rust PATH workaround and Android/JDK environment
+above. Host JNI/native runners ran sequentially; repeat payload generation used
+its separate directory. Commands from repository root:
+```sh
+cargo test --workspace --all-features --locked --offline --quiet
+cargo fmt --all -- --check
+cargo clippy --workspace --all-targets --all-features --locked --offline -- -D warnings
+tools/test-kotlin-bridge.sh
+cargo run -p yomoku-ffi --bin generate-kotlin --features facet_typegen --locked --offline -- target/generated/kotlin-repeat
+diff -r target/generated/kotlin target/generated/kotlin-repeat
+tools/format-kotlin.sh --check
+./android/gradlew -p android :app:connectedDebugAndroidTest :app:lintDebug -Pandroid.testInstrumentationRunnerArguments.class=app.yomoku.CoreSessionTest,app.yomoku.DocumentSessionTest,app.yomoku.ReaderNavigationTest,app.yomoku.ReaderClockSessionTest --offline --console=plain
+git diff --check
+```
+PASS: 238 data-free Rust tests (117 storage), strict Clippy/fmt, real-Full host
+Kotlin/JNI, seven Unicode exchanges, reproducible payload generation and Kotlin
+formatting. After a test-fixture span adjustment, all 39 core reader-flow tests
+and strict Clippy/fmt pass again.
+Final FFI timestamp/foreign-key fixture assertions also pass with
+`cargo test -p yomoku-ffi --test documents --all-features --locked --offline token_reads_and_manual_choices_preserve_metadata_and_global_status_semantics --quiet`;
+strict Clippy passes afterward.
+Both-ABI native/debug/test APK builds, strict Android lint and all 13 selected
+API-36 x86_64 emulator tests pass (3m32s build/run). Report:
+`android/app/build/reports/androidTests/connected/debug/index.html`.
+
+Four new core tests cover visible existing IDs, invalid timestamps/stale keys,
+Settings/busy rejection, all five choices, repeated occurrences, deleted IDs,
+cancelled/mismatched results/errors, retry and final clock/deferred-exit drain on
+success or failure. Extended asynchronous FFI coverage checks dated manual history,
+same-status no-op, status/history rollback and explicit retry, analyzer-free fresh
+worker reads, no completion/position effects and deletion without re-registration.
+Real-Full Kotlin/JNI verifies every choice and unchanged metadata, repeated choices,
+fresh reads and no analyzer reload. A new Android DocumentSessionTest exercises
+all five choices and global exact-surface status across two documents with an
+independent other surface, without moving/completing the reader.
+
+ADB's sandbox socket denial and Gradle's wildcard-IP/lock socket error required
+escalation; the escalated runs pass. Prior benign Crux JNI shutdown diagnostics
+persist. No open failure or local blocker.
+
+No schema/dependency/View change. Event/Storage gain typed manual-choice payloads.
+Compose token loading/highlights/taps/five direct controls remain next. Standalone
+Full fixture/probe suite, full Android suite, release APK, process/reboot recovery,
+tablet and physical-arm64 were not rerun.

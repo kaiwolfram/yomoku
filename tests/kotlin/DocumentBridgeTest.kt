@@ -18,6 +18,7 @@ import app.yomoku.shared.PendingReadingTime
 import app.yomoku.shared.ReaderClockAction
 import app.yomoku.shared.ReaderClockSample
 import app.yomoku.shared.ReaderTokenKey
+import app.yomoku.shared.ReaderStatusChange
 import app.yomoku.shared.VocabularyStatus
 import java.nio.file.Files
 import java.util.concurrent.LinkedBlockingQueue
@@ -103,6 +104,27 @@ internal fun verifyDocumentBridge() {
             check(tokensView.reader == page && tokensView.readerTime == null)
             check(tokensView.loadedDocument == opened.loadedDocument && tokensView.completionNotice == null)
             check(dictionary.calls.get() == 2)
+            val selected = tokens.tokens.first()
+            val vocabularyId = checkNotNull(selected.vocabulary).id
+            for (status in listOf(VocabularyStatus.LEARNING, VocabularyStatus.FAMILIAR,
+                VocabularyStatus.KNOWN, VocabularyStatus.IGNORED, VocabularyStatus.NEW)) {
+                val change = ReaderStatusChange(tokenKey, vocabularyId, status, 4321L)
+                val changed = listener.dispatch(bridge, Event.SetReaderStatus(change))
+                check(changed.documentError == null && changed.reader == page)
+                check(changed.readerTime == null && changed.completionNotice == null)
+                check(changed.loadedDocument == opened.loadedDocument)
+                val expected = tokens.tokens.map { token ->
+                    if (token.vocabulary?.id == vocabularyId) {
+                        token.copy(vocabulary = checkNotNull(token.vocabulary).copy(status = status))
+                    } else token
+                }
+                check(changed.readerTokens?.tokens == expected)
+                val repeated = listener.dispatch(bridge, Event.SetReaderStatus(change))
+                check(repeated.readerTokens == changed.readerTokens)
+                val refreshed = listener.dispatch(bridge, Event.LoadReaderTokens(tokenKey))
+                check(refreshed.readerTokens == changed.readerTokens)
+                check(dictionary.calls.get() == 2)
+            }
             val initialTime = checkNotNull(listener.dispatch(bridge, Event.RestoreReadingTime).readerTime)
             check(initialTime.position == page.position && initialTime.pending.value == 0L)
             val checkpoint = initialTime.copy(pending = PendingReadingTime(321L))
