@@ -198,8 +198,8 @@ PageCompletion validates the exact departing page/position; storage records hist
 and destination position atomically. Duplicate IDs require identical payloads and
 never rewrite progress, including after reflow/reopen/deletion. Rereads allocate a
 fresh ID; position-only saves never add history. These repository methods have no
-app event/runtime/FFI entry point yet: real encounters and New→Known events must
-join the transaction before forward controls are exposed. Migration 0009 adds
+app event/runtime/FFI entry point yet. Migration 0010 supplies the analyzed
+transaction below; platform checkpoints/forward controls remain open. Migration 0009 adds
 active_time_ms to history and pending_reading_time buckets, scoped to live documents.
 Checkpoint loads reserve a zero row/revision; absolute saves validate current
 position and reject stale tokens. Completion validates the frozen page total,
@@ -211,12 +211,23 @@ selections write no history. Immediate transactions commit registration batches 
 status/event pairs together. These repository APIs accept analyzer-supplied surfaces
 and explicit timestamps; no SQL or clock enters core. Vocabulary-history FKs cascade
 only on vocabulary deletion; document deletion preserves entries/history. Paste
-imports now register analyzed surfaces atomically; completion and UI remain pending.
+imports now register analyzed surfaces atomically; vocabulary UI remains pending.
+Migration 0010 adds completion_analyses historical identities, every Japanese
+reading_occurrence and completion-linked New→Known status events in the same
+time/history/position transaction. Pure analysis selects tokens by their start
+offset, retaining whole anchors across page boundaries. Storage validates a frozen
+AnalysisId against canonical text, registers only absent departing-page surfaces,
+preserves other statuses and returns newly_known only on a new success. Replays
+check command payload/analysis identity before live content, so deletion/reflow
+cannot repeat effects. Document deletion retains occurrences/analysis provenance;
+vocabulary deletion cascades only its occurrence/status rows. Legacy completions
+remain explicitly without analyzed history. Status-table migration preserves old
+rows, IDs and allocation high-water marks. No new dependency or executor is added.
 Migration 0007 persists immutable chapter analysis/token snapshots and reversible
 segmentation overrides. Identical snapshot retries reuse IDs; conflicting output
 under the same revision/mode key errors. Override replacement/deactivation commits
 atomically, keeps base output intact and preserves global rules after source content
-deletion. No production document edit/rename/delete API exists. Seventy-six storage
+deletion. No production document edit/rename/delete API exists. Ninety-nine storage
 tests cover migrations, reopen, rollback, Unicode, concurrency, ID allocation,
 settings, vocabulary, analysis anchors and completion history. New analysis/override
 repositories have no runtime/FFI/UI operations; synthetic fixtures validate storage,
@@ -314,6 +325,8 @@ unique Japanese surfaces without encounters, deduplicate exact bytes and deliver
 Created/Existing summaries. Native descriptor delivery and retained/background
 lifecycle are connected. TXT/EPUB/SRT parsing, metadata and multi-file import
 semantics remain unchecked. Legacy imports are not automatically rescanned.
-Page movement/swipes requiring atomic forward completion/history, occurrences
-and active time remain next. Add analysis/import crates only with
+Core/worker/FFI checkpoint/completion sequencing, Android monotonic lifecycle/
+interactions and page movement/swipes remain next. The analyzed transaction is
+repository-only; effective segmentation edits and statistics aggregation remain
+separate tasks. Add analysis/import crates only with
 actual behavior; Sudachi Full defaults to B, JMdict/JMnedict remain offline data, and future Nostr I/O stays in Rust. Configuration is empty.

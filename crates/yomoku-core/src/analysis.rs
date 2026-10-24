@@ -50,6 +50,28 @@ impl std::fmt::Display for InvalidAnalysis {
 impl std::error::Error for InvalidAnalysis {}
 
 impl ChapterAnalysis {
+    /// Assign a whole Japanese occurrence to the page containing its start.
+    /// A token crossing a logical page boundary is counted exactly once, with
+    /// its original full anchor. Page derivation is validated by the caller.
+    pub fn japanese_tokens_on_page(
+        &self,
+        chapter: &ChapterText,
+        page: TextAnchor,
+    ) -> Result<Vec<(usize, &AnalyzedToken)>, InvalidAnalysis> {
+        self.validate(chapter)?;
+        page.slice(chapter).map_err(|_| InvalidAnalysis)?;
+        Ok(self
+            .tokens
+            .iter()
+            .enumerate()
+            .filter(|(_, token)| {
+                token.is_japanese
+                    && token.anchor.range.start >= page.range.start
+                    && token.anchor.range.start < page.range.end
+            })
+            .collect())
+    }
+
     pub fn validate(&self, chapter: &ChapterText) -> Result<(), InvalidAnalysis> {
         if self.profile.engine_revision.trim().is_empty()
             || self.profile.dictionary_revision.trim().is_empty()

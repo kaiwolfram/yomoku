@@ -5,6 +5,7 @@
 mod analysis;
 mod completions;
 mod documents;
+mod encounters;
 mod imports;
 mod reading_time;
 mod settings;
@@ -68,6 +69,11 @@ const MIGRATIONS: &[Migration] = &[
         version: 9,
         name: "0009_pending_reading_time",
         sql: include_str!("../migrations/0009_pending_reading_time.sql"),
+    },
+    Migration {
+        version: 10,
+        name: "0010_completion_occurrences",
+        sql: include_str!("../migrations/0010_completion_occurrences.sql"),
     },
 ];
 

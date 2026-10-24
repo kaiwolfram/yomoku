@@ -44,6 +44,69 @@ fn analysis(chapter: &ChapterText) -> ChapterAnalysis {
 }
 
 #[test]
+fn japanese_occurrences_belong_once_to_the_page_containing_their_start() {
+    use yomoku_core::pagination::{LogicalPages, PageLength};
+
+    let source = chapter(&format!(
+        "{}。\n{}。\n猫",
+        "猫".repeat(600),
+        "犬".repeat(1000)
+    ));
+    // A synthetic whole-chapter token deliberately crosses every page boundary.
+    // Its original anchor must remain intact and count once for every preset.
+    let snapshot = analysis(&source);
+    for length in PageLength::ALL {
+        let pages = LogicalPages::new(std::slice::from_ref(&source), length).unwrap();
+        let occurrences = pages
+            .pages()
+            .iter()
+            .flat_map(|page| snapshot.japanese_tokens_on_page(&source, *page).unwrap())
+            .collect::<Vec<_>>();
+        assert_eq!(occurrences, vec![(0, &snapshot.tokens[0])]);
+    }
+
+    let source = chapter("猫𠮷");
+    let mut snapshot = analysis(&source);
+    let mut second = snapshot.tokens[0].clone();
+    snapshot.tokens[0].anchor = anchor(&source, 0, 3);
+    snapshot.tokens[0].surface = "猫".into();
+    second.anchor = anchor(&source, 3, source.text.len());
+    second.surface = "𠮷".into();
+    snapshot.tokens.push(second);
+    let first = anchor(&source, 0, 3);
+    let next = anchor(&source, 3, source.text.len());
+    assert_eq!(
+        snapshot.japanese_tokens_on_page(&source, first).unwrap(),
+        vec![(0, &snapshot.tokens[0])]
+    );
+    assert_eq!(
+        snapshot.japanese_tokens_on_page(&source, next).unwrap(),
+        vec![(1, &snapshot.tokens[1])]
+    );
+    snapshot.tokens[1].is_japanese = false;
+    assert!(snapshot
+        .japanese_tokens_on_page(&source, next)
+        .unwrap()
+        .is_empty());
+}
+
+#[test]
+fn page_occurrence_projection_rejects_foreign_split_scalar_and_invalid_analysis() {
+    let chapter = chapter("猫𠮷");
+    let mut analysis = analysis(&chapter);
+    let mut page = anchor(&chapter, 0, chapter.text.len());
+    page.chapter_id = 99.try_into().unwrap();
+    assert!(analysis.japanese_tokens_on_page(&chapter, page).is_err());
+    page = anchor(&chapter, 0, chapter.text.len());
+    page.range.start = 1.try_into().unwrap();
+    assert!(analysis.japanese_tokens_on_page(&chapter, page).is_err());
+    analysis.tokens[0].surface = "犬".into();
+    assert!(analysis
+        .japanese_tokens_on_page(&chapter, anchor(&chapter, 0, chapter.text.len()))
+        .is_err());
+}
+
+#[test]
 fn exact_original_unicode_surface_and_metadata_are_separate() {
     let chapter = chapter("𠮷が食べた\0e\u{301}📖");
     let mut analysis = analysis(&chapter);

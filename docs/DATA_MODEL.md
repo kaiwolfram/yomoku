@@ -43,8 +43,8 @@ prior entries/history. Invalid timestamps/stored values error without repair.
 `create_analyzed_paste` composes document creation, analysis and registration in
 one repository transaction (see below); production paste imports use its
 deduplicating wrapper on the native FIFO worker.
-Completion-driven New→Known events need completion provenance and
-must share the occurrences/time/position transaction, not call manual selection.
+Migration 0010 adds completion-driven New→Known events with command provenance
+in the occurrences/time/position transaction, without calling manual selection.
 Existing document imports are not rescanned by this migration or by lookup.
 
 ## Analysis anchors and reversible boundaries (migration 0007)
@@ -103,9 +103,9 @@ Original selected bytes and source/chapter metadata survive content deletion, so
 global edits remain inspectable/reversible. Load validates their shape/ownership
 and, while canonical text exists, their exact source span. No production deletion
 API is introduced. Existing documents are not analyzed/rescanned by migration.
-These methods are repository prerequisites only: real analyzer output, atomic
-import registration, matching rules across occurrences, overlapping rule precedence,
-and segmentation UI/application remain unimplemented. No override is applied to
+Real analyzer output and atomic paste registration are implemented separately;
+matching rules across occurrences, overlapping rule precedence and segmentation
+UI/application remain unimplemented. No override is applied to
 the current reader or treated as a completed-reading occurrence.
 
 ## Document identities and text anchors
@@ -367,11 +367,55 @@ that transaction (details below). Statement/commit failure rolls everything back
 retry reuses the same intent. Position-only
 saves never insert history. Concurrent duplicate submissions record once.
 
-This is repository-only infrastructure, with no app event/runtime/FFI/Android
-forward action yet. Before exposing it, extend the same transaction with actual
-Japanese occurrences and New→Known/status events, then wire platform checkpoints.
-Do not use absent occurrence data as completed-reading statistics. Final EOF alone
+This legacy entry point is repository-only infrastructure. Migration 0010 adds an
+analyzed entry point below; neither has an app event/runtime/FFI/Android forward
+action yet. Do not use absent occurrence data as completed-reading statistics. Final EOF alone
 does not implement finished-at-least-once, Finish Book or reopen-at-page-1 behavior.
+
+## Analyzed page completion (migration 0010)
+`record_analyzed_page_completion` takes a frozen PageCompletion and AnalysisId.
+It shares the immediate transaction and all page/time/position validation above.
+The immutable stored analysis must validate against this document's canonical
+chapter. Missing, foreign or corrupt snapshots fail without partial effects.
+The caller must retain the analysis ID with the command across callbacks/retries.
+
+`completion_analyses` marks analyzed completions, including zero-Japanese pages,
+with semantics version 1, historical AnalysisId, exact engine/dictionary revisions
+and split mode. It references the completion, without a live-analysis FK, so text
+deletion preserves the snapshot identity. Legacy completion rows remain unchanged
+and have no such marker; migrations do not invent missing encounters/promotions.
+Retries compare the stored analysis ID before loading live content; analyzed and
+legacy commands cannot be substituted for one another under an existing ID.
+
+The pure `japanese_tokens_on_page` helper assigns each Japanese token to the page
+containing its start, retaining its entire original span if a boundary crosses it.
+A token starting at a page boundary belongs to the following page. Repetitions
+stay separate; punctuation/non-Japanese tokens never count. This selects the
+frozen base analysis only; segmentation-override resolution remains future work.
+
+`reading_occurrences` stores command/original token index, VocabularyId, full byte
+range, exact surface and optional reading/dictionary form. Command provenance
+retains source/chapter/date through reading_completions. It has no live text/token
+FK; document deletion preserves encounters. Its vocabulary FK cascades deletion,
+erasing only that entry's encounters. The entry/command index supports future
+lifetime aggregation; aggregate/UI APIs are not implemented here.
+
+Unique departing-page surfaces register only if absent (e.g. actual reading after
+vocabulary deletion); untouched pages are not rescanned. The pure New-only policy
+updates current status and inserts one dated event per changed entry, with cause
+`completion`, New→Known and a required completion_command_id FK. Registration/manual
+events retain their original constraints and NULL completion provenance. The table
+rebuild preserves existing IDs and the AUTOINCREMENT high-water mark, including an
+empty history after vocabulary deletion. A unique command/entry index prevents
+duplicate completion promotions. Learning/Familiar/Known/Ignored remain unchanged.
+
+Occurrences, registrations/promotions, pending-time consumption, history and current
+position commit together. The outcome is Recorded { newly_known } or AlreadyRecorded;
+only a new success can supply a future N>0 toast. Duplicate delivery never repeats
+status changes, recreates deleted vocabulary, consumes later reread time or moves
+progress. Rereading uses a new command ID and adds every occurrence again.
+Statement/deferred-commit/migration failure rolls back; no platform/FFI action or
+production deletion API is introduced by this repository slice.
 
 ## Pending active-time values and repository (migration 0009)
 `active_time::PendingReadingTime` validates nonnegative signed 64-bit milliseconds.
@@ -474,16 +518,16 @@ Submitted writes finish even if the session closes; shutdown does not block UI.
 - Add analyzer dictionary-form links (nullable) to global vocabulary and wire
   registration/status repositories into typed application/import effects.
   Reading never participates in identity.
-- Extend migration-0005 completion events with occurrence rows preserving repeated
-  tokens and active time in the same transaction; reread uses a new command ID.
+- Wire analyzed page completion and pending-time checkpoints into typed core/worker/
+  FFI operations; reread uses a new command ID and frozen analysis identity.
 - Pending page time and current text offset separate from completed events;
   permanent finished-at-least-once separate from current percentage.
 - Document deletion removes content/progress but preserves historical provenance,
   encounters and global vocabulary. Reimport creates fresh document progress.
 - Vocabulary deletion removes its encounter/status history, recalculates statistics
   and does not trigger rescans. Future registration starts New.
-- Complete page events, counters and New→Known changes committed in one transaction
-  using the numbered SQLite migration foundation above.
+- Derive statistics from complete analyzed events and their occurrence/status rows;
+  legacy events without analysis markers have no inferred encounter data.
 
 Refine schema with executable migration/transaction tests before claiming storage
 or accurate historical statistics are complete.

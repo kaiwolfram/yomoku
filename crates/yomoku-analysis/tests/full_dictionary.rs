@@ -277,11 +277,13 @@ fn real_snapshots_persist_all_modes_and_reopen_without_source_changes() {
 
 #[test]
 #[ignore = "requires pinned Sudachi Full; run tools/test-sudachi.sh"]
-fn real_mode_b_import_deduplicates_and_atomically_registers_original_surfaces() {
+fn real_mode_b_import_and_completion_preserve_surfaces_and_duplicate_identity() {
     use std::collections::BTreeSet;
     use yomoku_analysis::AnalysisError;
     use yomoku_core::{
+        completion::{AnalyzedCompletionOutcome, PageCompletion},
         document::PasteText,
+        pagination::{LogicalPages, PageLength, ReadingPosition},
         vocabulary::{Surface, VocabularyStatus},
     };
     use yomoku_storage::{PasteImportError, PasteImportOutcome, Storage};
@@ -372,11 +374,11 @@ fn real_mode_b_import_deduplicates_and_atomically_registers_original_surfaces() 
     assert_eq!(storage.list_documents().unwrap().len(), 1);
     assert_eq!(
         storage.load_paste(imported.document.document_id).unwrap(),
-        Some(imported.document)
+        Some(imported.document.clone())
     );
     assert_eq!(
         storage.chapter_analysis(imported.analysis_id).unwrap(),
-        Some(expected)
+        Some(expected.clone())
     );
     assert_eq!(storage.vocabulary_entry(&cat).unwrap(), Some(known));
     for surface in surfaces.iter().filter(|surface| **surface != cat) {
@@ -390,6 +392,62 @@ fn real_mode_b_import_deduplicates_and_atomically_registers_original_surfaces() 
             .unwrap()
             .is_none());
     }
+    let page_length = PageLength::default();
+    let layout = LogicalPages::new(
+        std::slice::from_ref(&imported.document.chapter),
+        page_length,
+    )
+    .unwrap();
+    assert_eq!(layout.pages().len(), 1);
+    let page = layout.pages()[0];
+    let departing_position = ReadingPosition {
+        source_id: page.source_id,
+        chapter_id: page.chapter_id,
+        offset: page.range.start,
+    };
+    let completion = PageCompletion {
+        command_id: storage.new_completion_command_id().unwrap(),
+        document_id: imported.document.document_id,
+        page,
+        page_length,
+        departing_position,
+        completed_at_unix_ms: 50,
+        pending_time: Default::default(),
+    };
+    assert_eq!(
+        storage
+            .record_analyzed_page_completion(completion, imported.analysis_id)
+            .unwrap(),
+        AnalyzedCompletionOutcome::Recorded {
+            newly_known: surfaces.len() - 1
+        }
+    );
+    assert_eq!(
+        storage
+            .record_analyzed_page_completion(completion, imported.analysis_id)
+            .unwrap(),
+        AnalyzedCompletionOutcome::AlreadyRecorded
+    );
+    for surface in &surfaces {
+        assert_eq!(
+            storage.vocabulary_entry(surface).unwrap().unwrap().status,
+            VocabularyStatus::Known
+        );
+    }
+    storage
+        .save_reading_position(imported.document.document_id, departing_position)
+        .unwrap();
+    let reread = PageCompletion {
+        command_id: storage.new_completion_command_id().unwrap(),
+        completed_at_unix_ms: 60,
+        ..completion
+    };
+    assert_eq!(
+        storage
+            .record_analyzed_page_completion(reread, imported.analysis_id)
+            .unwrap(),
+        AnalyzedCompletionOutcome::Recorded { newly_known: 0 }
+    );
     drop(storage);
     std::fs::remove_dir_all(directory).unwrap();
 }

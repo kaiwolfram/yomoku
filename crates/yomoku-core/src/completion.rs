@@ -59,3 +59,13 @@ pub enum CompletionOutcome {
     /// No effects, including no position write. A late retry cannot move a reader.
     AlreadyRecorded,
 }
+
+/// Analyzed completion is distinct from legacy position/time-only history.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum AnalyzedCompletionOutcome {
+    Recorded {
+        newly_known: usize,
+    },
+    /// Do not show another status-change toast or repeat any side effects.
+    AlreadyRecorded,
+}

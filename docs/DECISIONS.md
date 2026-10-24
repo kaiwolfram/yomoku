@@ -1215,3 +1215,40 @@ still owns no clock or SQL. App/worker/FFI sequencing, periodic checkpoints, And
 monotonic lifecycle/interactions and actual close/reboot verification remain open.
 Before exposing forward controls, add occurrences and New→Known to this transaction.
 No new dependency version, platform behavior or architecture change.
+
+## 2026-10-24 — Analyzed occurrences and promotions in atomic completion
+
+Add migration 0010 and `record_analyzed_page_completion`, freezing an existing
+immutable AnalysisId with PageCompletion's command ID/page/timestamp/duration.
+Use the existing immediate transaction for analysis validation, every Japanese
+occurrence, absent-surface registration, New-only promotion/status event, pending
+time consumption and position. The pure core selects occurrences and owns the
+New→Known policy; SQLite and analyzer loading stay outside core.
+
+Assign each entire token to the logical page containing its starting byte offset.
+This preserves exact anchors and counts a boundary-crossing word once; a token
+starting at a boundary belongs to the following page. Persist original analysis
+indices (including non-Japanese gaps), surfaces, readings and nullable dictionary
+forms. No normalization, text slicing into new words or segmentation-rule precedence
+is introduced. Effective override resolution remains its separate unchecked task.
+
+Keep a historical completion_analyses header without a live-analysis FK, preserving
+engine/dictionary/mode identity after document deletion. Its presence distinguishes
+analyzed completions, including non-Japanese pages, from legacy repository events
+with absent encounter data. Do not retrofit legacy rows with inferred statistics.
+Replay validates both payload and analysis identity before live-content lookup;
+neither legacy→analyzed nor analyzed→legacy substitution is allowed under one ID.
+Recorded reports newly_known; AlreadyRecorded carries no repeated toast or effects.
+
+Extend the existing status timeline with cause completion and a required command
+FK for New→Known only. Rebuild the constrained table while preserving rows, IDs,
+indexes and deleted-event allocation high-water marks. Vocabulary deletion cascades
+its occurrence/status rows; document deletion retains all historical provenance.
+On actual later page completion, an absent vocabulary surface registers New then
+Known in this transaction. Only departing-page surfaces participate; no existing
+document or other page is rescanned merely because vocabulary was deleted.
+
+No new dependency or product deletion API. App/worker/FFI completion/checkpoint
+ordering, platform clocks/lifecycle/interactions, controls, Finish Book and
+statistics aggregation remain open. Legacy `record_page_completion` remains a
+repository foundation, never a production forward action.

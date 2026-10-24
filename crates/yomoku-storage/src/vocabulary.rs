@@ -78,7 +78,7 @@ fn validate_timestamp(timestamp: i64) -> Result<(), StorageError> {
     Ok(())
 }
 
-fn encode_status(status: VocabularyStatus) -> &'static str {
+pub(crate) fn encode_status(status: VocabularyStatus) -> &'static str {
     match status {
         VocabularyStatus::New => "new",
         VocabularyStatus::Learning => "learning",
@@ -114,7 +114,7 @@ fn validate_entry(
     })
 }
 
-fn read_entry_by_surface(
+pub(crate) fn read_entry_by_surface(
     connection: &Connection,
     surface: &Surface,
 ) -> Result<Option<VocabularyEntry>, StorageError> {

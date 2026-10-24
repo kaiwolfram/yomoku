@@ -18,7 +18,7 @@ with functioning rustup can omit the PATH workaround. Do not assume this compile
 is the project's minimum supported version; establish that with dependencies.
 Cargo.lock is retained for reproducible application development.
 Crux 0.20.0 declares Rust 1.90 minimum; the full locked graph has only been tested
-with 1.99.1. Current host baseline: 169 data-free Rust tests (88 storage, seven
+with 1.99.1. Current host baseline: 182 data-free Rust tests (99 storage, seven
 runtime). Eleven analysis fixtures and one runtime fixture run separately with
 each Full loader via tools/test-sudachi.sh (see below).
 
@@ -44,7 +44,8 @@ checkpoints/completions, rereads, overflow, deletion and statement/commit/migrat
 rollback. Migration 0009 consumes frozen time with completion history/position.
 Reboot remains simulated at the duration boundary; platform lifecycle wiring and
 actual Android close/reboot verification remain unchecked. Runtime/FFI checkpoint
-ordering and occurrence/status completion integration remain future work.
+ordering remain future work. Analyzed occurrence/status completion now commits
+atomically in the repository (migration 0010); application wiring remains open.
 
 ## Kotlin payload generation
 ```sh
@@ -1153,3 +1154,38 @@ No Android source or FFI payload change; timer application/worker/FFI and platfo
 wiring remain open. No standalone Full fixtures, Android build/lint/instrumentation,
 release, probes, tablet or physical-arm64 rerun. Actual Android close/reboot recovery
 is not established by the simulated fresh-epoch repository tests.
+
+
+## Atomic analyzed page completion
+
+Verified 2026-10-24 using the Rust PATH workaround above, sequentially:
+```sh
+cargo build --workspace --locked --offline
+cargo test --workspace --all-features --locked --offline
+cargo fmt --all -- --check
+cargo clippy --workspace --all-targets --all-features --locked --offline -- -D warnings
+tools/test-sudachi.sh
+tools/test-kotlin-bridge.sh
+git diff --check
+```
+PASS: workspace build, 182 data-free Rust tests (99 storage), formatting/strict
+Clippy, 138-file source integrity, eleven analysis plus one worker Full fixture
+with each owned/mapped loader, host real-Full Kotlin/JNI and seven bidirectional
+Unicode exchanges. Eleven new storage tests and two pure tests cover exact
+Unicode/metadata, repetition, every status, presets/boundaries, rereads, duplicate/
+concurrent callbacks, frozen/missing/foreign/corrupt snapshots, deletion, absent
+surface registration, every write/deferred-commit failure and migration rollback.
+Version-9 upgrades preserve status-event IDs/high-water marks, including empty
+history after deletion. The existing real Mode B import fixture now exercises
+analyzed completion, retry and reread with the same prepared analyzer output.
+
+Migration 0010 adds historical analysis identities, every Japanese occurrence and
+completion-linked New→Known events, atomically with time consumption and position.
+Legacy completion data remains explicitly without analyzed history. Only base
+snapshots are selected; override resolution and all application/worker/FFI timing/
+completion ordering remain open. No new dependency or platform payload changes.
+
+Initial strict Clippy flagged a test tuple's complexity; extracted a column type
+alias and the final check passes. No open failure; prior nonfatal Crux JNI shutdown
+logging persists. No Android build/lint/instrumentation, release/probes/tablet or
+physical-arm64 rerun for this Rust repository slice. Prior device results stand.

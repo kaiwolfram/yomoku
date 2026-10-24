@@ -870,3 +870,28 @@
   Documentation only; no Rust/Android/JNI checks rerun or new blocker.
 - Updated the continuity checklist and handoff. Next reader tasks remain atomic
   occurrences/New→Known completion, then timer/lifecycle and navigation wiring.
+
+
+## 2026-10-24 — Atomic analyzed completion occurrences and New→Known
+
+- Started clean. Migration 0010 adds historical completion analysis identity,
+  per-token Japanese occurrences with full anchors/readings/lemmas, and dated
+  completion-linked New→Known events. The pure core assigns a whole token to
+  the page containing its starting offset and preserves all other statuses.
+- record_analyzed_page_completion validates the frozen snapshot and commits all
+  occurrences, missing departing-page registrations, status changes, time buckets,
+  history and position together. Replays compare payload/analysis ID before live
+  content and repeat no effects; legacy rows cannot acquire encounters by replay.
+- Document deletion retains history; vocabulary deletion cascades its encounter/
+  status rows. Actual later completion recreates only absent departing-page entries.
+  Status migration retains event IDs and allocation high-water marks even if empty.
+- PASS: workspace build, 182 data-free Rust tests (99 storage), fmt/strict Clippy,
+  eleven analysis plus one worker Full fixture per owned/mapped loader, 138-file
+  source integrity, host real-Full Kotlin/JNI, seven Unicode exchanges and diff
+  check. Added eleven storage and two pure tests; extended real Mode B composition.
+  Initial test-tuple Clippy complexity fixed with an alias. No open failure;
+  previous benign Crux JNI shutdown logging persists. No dependency change.
+- Updated README, plan, data model, architecture, decisions, development and handoff.
+  Next: core/FIFO/FFI checkpoints and analyzed completion intents, Android monotonic
+  lifecycle/interactions, then navigation and Finish Book. No Android build/lint/
+  tests, release/probes/tablet/arm64 rerun; actual close/reboot remains unverified.

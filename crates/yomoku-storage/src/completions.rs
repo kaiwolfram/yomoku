@@ -1,11 +1,12 @@
 use rusqlite::{named_params, OptionalExtension, TransactionBehavior};
 use yomoku_core::{
-    completion::{CompletionOutcome, PageCompletion},
-    document::CompletionCommandId,
+    completion::{AnalyzedCompletionOutcome, CompletionOutcome, PageCompletion},
+    document::{AnalysisId, CompletionCommandId},
 };
 
 use crate::{
     documents::{load_paste_in, write_position_in},
+    encounters::record_occurrences_in,
     reading_time::{consume_time_in, page_time_in},
     settings::read_page_length,
     Storage, StorageError,
@@ -25,13 +26,36 @@ impl Storage {
         Ok(id)
     }
 
-    /// Repository-only foundation. Before exposing forward navigation, extend
-    /// this transaction with analyzed encounters and New→Known events.
-    /// Retries must supply the same ID and frozen payload; they never move progress.
+    /// Legacy position/time-only repository foundation, not a reader forward action.
+    /// An analyzed command cannot be replayed without its frozen analysis identity.
     pub fn record_page_completion(
         &mut self,
         completion: PageCompletion,
     ) -> Result<CompletionOutcome, StorageError> {
+        self.record_completion(completion, None)
+            .map(|(outcome, _)| outcome)
+    }
+
+    /// Freeze analysis_id with the command payload. Every Japanese occurrence,
+    /// New→Known event, pending duration and destination position commits together.
+    /// Retries check identity before live content, so deletion/reflow is harmless.
+    pub fn record_analyzed_page_completion(
+        &mut self,
+        completion: PageCompletion,
+        analysis_id: AnalysisId,
+    ) -> Result<AnalyzedCompletionOutcome, StorageError> {
+        self.record_completion(completion, Some(analysis_id))
+            .map(|(outcome, newly_known)| match outcome {
+                CompletionOutcome::Recorded => AnalyzedCompletionOutcome::Recorded { newly_known },
+                CompletionOutcome::AlreadyRecorded => AnalyzedCompletionOutcome::AlreadyRecorded,
+            })
+    }
+
+    fn record_completion(
+        &mut self,
+        completion: PageCompletion,
+        analysis_id: Option<AnalysisId>,
+    ) -> Result<(CompletionOutcome, usize), StorageError> {
         let transaction = self
             .connection
             .transaction_with_behavior(TransactionBehavior::Immediate)?;
@@ -56,10 +80,11 @@ impl Storage {
                 AND start_byte_offset = :start AND end_byte_offset = :end
                 AND departing_byte_offset = :departing AND page_length = :length
                 AND completed_at_unix_ms = :date
-                AND active_time_ms = :time
+                AND active_time_ms = :time,
+                (SELECT analysis_id FROM completion_analyses WHERE command_id = :command)
              FROM reading_completions WHERE command_id = :command",
                 values,
-                |row| row.get::<_, bool>(0),
+                |row| Ok((row.get::<_, bool>(0)?, row.get::<_, Option<i64>>(1)?)),
             )
             .optional()?;
         // These position identities are redundant with the anchor and must
@@ -69,12 +94,12 @@ impl Storage {
         {
             return Err(StorageError::InvalidCompletion);
         }
-        if let Some(matches) = existing {
-            if !matches {
+        if let Some((matches, stored_analysis)) = existing {
+            if !matches || stored_analysis != analysis_id.map(i64::from) {
                 return Err(StorageError::InvalidCompletion);
             }
             transaction.commit()?;
-            return Ok(CompletionOutcome::AlreadyRecorded);
+            return Ok((CompletionOutcome::AlreadyRecorded, 0));
         }
         let issued: bool = transaction.query_row(
             "SELECT EXISTS(SELECT 1 FROM completion_commands WHERE id = ?1)",
@@ -100,9 +125,14 @@ impl Storage {
              VALUES (:command, 1, :document, :source, :chapter, :start, :end, :departing, :length, :date, :time)",
             values,
         )?;
+        let newly_known = if let Some(analysis_id) = analysis_id {
+            record_occurrences_in(&transaction, &document.chapter, completion, analysis_id)?
+        } else {
+            0
+        };
         consume_time_in(&transaction, &anchors)?;
         write_position_in(&transaction, completion.document_id, next)?;
         transaction.commit()?;
-        Ok(CompletionOutcome::Recorded)
+        Ok((CompletionOutcome::Recorded, newly_known))
     }
 }

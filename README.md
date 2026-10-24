@@ -22,8 +22,8 @@ Yomoku is under active development. The working app supports:
   and offline access to bundled Sudachi notices.
 
 Next/Previous controls, swipes, word lookup and vocabulary controls are still
-pending. Page-completion history and pending reading time have tested Rust
-repository foundations; completion encounters, status transitions and Android
+pending. The Rust repository atomically saves completion encounters, New→Known
+transitions, active time and position. Application completion actions and Android
 timer wiring remain unfinished. Nostr, Statistics and Vocabulary tabs currently
 show placeholders.
 

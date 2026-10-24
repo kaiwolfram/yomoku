@@ -146,7 +146,7 @@ fn read_chapter(connection: &Connection, id: ChapterId) -> Result<ChapterText, S
     })
 }
 
-fn read_analysis(
+pub(crate) fn read_analysis(
     connection: &Connection,
     id: AnalysisId,
 ) -> Result<Option<ChapterAnalysis>, StorageError> {
