@@ -135,8 +135,6 @@ position/encounter history. Keep incremental builds green.
 - [ ] Benchmark large EPUBs, Full dictionary, many books and heavy history; record measurements and fix demonstrated bottlenecks.
 - [ ] Run phone/tablet portrait/landscape, dark/light, airplane mode, accessibility and process-death/lifecycle matrix.
 - [ ] Review privacy, secrets, third-party redistribution/attribution, errors and asset/APK size.
-- [ ] Complete CI and document signed APK/ABI/release commands with secrets excluded; test unsigned release build.
-- [ ] Prepare GitHub Releases/Zapstore artifacts and instructions; obtain manual approval before signed publishing.
 
 ## Cross-feature acceptance matrix
 
