@@ -34,7 +34,8 @@ support exact retries, coalesced saves before reader movement/exit and reopen.
 Explicit analyzed completion intents now drain checkpoints, freeze retries and update
 progress through core/FIFO/FFI, without analyzer loading. Android's retained driver
 supplies monotonic samples and waits for pending saves before native teardown.
-Permanent finished-book state, Finish Book and confetti remain unfinished.
+The repository persists finished-at-least-once independently of position. Its
+Library checkmark, reopen-at-page-1, Finish Book and confetti remain unfinished.
 Nostr, Statistics and Vocabulary tabs currently
 show placeholders.
 

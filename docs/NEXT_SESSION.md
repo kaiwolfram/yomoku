@@ -1,6 +1,6 @@
 # Resume here
 
-Updated: 2026-10-24. Android page controls/swipes/toast verified.
+Updated: 2026-10-24. Repository finished-at-least-once persistence verified.
 Read AGENTS.md, plan phases 2–4 and PRODUCT_SPEC.md sections 3–4.
 Update docs/commit each verified step. Physical arm64 is the later user trial.
 
@@ -15,7 +15,10 @@ Update docs/commit each verified step. Physical arm64 is the later user trial.
   in Rust and only saves position. Both use retained dispatch/Pause/checkpoint drain.
   Busy/pending saves disable actions. Duplicate callbacks count once; rereads again.
   Positive CompletionNotice shows a short toast and is consumed once; zero is silent.
-  EOF disables Next. Permanent finish/checkmark/Finish Book/confetti remain open.
+  EOF disables Next. Migration 0011 atomically marks final-page completion finished.
+  Storage::finished_at_least_once returns Option<bool>; backfills live EOF history,
+  never position alone. Backward/reflow/time saves retain it; delete/reimport resets
+  it while history stays. No core/Android projection/checkmark/reopen reset yet.
 - Analyzed paste atomically deduplicates exact SHA-256, saves Mode B and registers
   unique Japanese surfaces. Duplicates reuse oldest live exact match without
   rescan/progress/status changes. Created/Existing show dismissible Library summary.
@@ -50,7 +53,7 @@ Update docs/commit each verified step. Physical arm64 is the later user trial.
   MissingAnalysis blocks legacy completion without rescan. Base analyses only.
   Worker reloads persisted content; failed read retries same command. AlreadyRecorded
   has no effects/notice. New positive Recorded exposes keyed CompletionNotice.
-- Migrations 0005–0010 preserve history/vocabulary/immutable A/B/C anchors/edits/
+- Migrations 0005–0011 preserve history/vocabulary/immutable A/B/C anchors/edits/
   hashes/time. Document deletion preserves history; vocabulary deletion cascades it.
 - NativeBridge requires owned verified FD+1; Rust rehashes/maps/closes all paths.
   Lazy analyzer stays on FIFO; background releases after accepted work, recreation
@@ -59,14 +62,17 @@ Update docs/commit each verified step. Physical arm64 is the later user trial.
   Full outside Git; notices bundled. SUDACHI_MEASUREMENTS.md has limits.
 
 ## Next tasks (ordered)
-1. Permanent finished-at-least-once/Finish Book/reopen-at-page-1 and confetti.
+1. Project finish marker into Library/reader; checkmark/reopen-at-page-1, then
+   Finish Book/confetti on each newly recorded final-page completion. Keep ordinary
+   load_paste read-only: completion reloads must not reset the current position.
 2. User-run physical arm64 validation once usable. Formats/dictionary/CI remain open.
 
 ## Verification / environment
-- PASS: 208 Rust tests; host Kotlin/JNI + Unicode/analysis exchanges; both-ABI
-  debug/test APK builds; all 30 Android tests; strict lint/Clippy/fmt/Kotlin/diff.
-  Commands and corrected initial build warnings: DEVELOPMENT.md latest section.
+- PASS: 214 Rust tests (109 storage); host Kotlin/JNI + Unicode/analysis exchanges;
+  strict Clippy/fmt/Kotlin/diff, both-ABI debug/test APKs and strict Android lint.
+  All eight ReaderNavigationTest/ReaderClockSessionTest tests pass on API 36 x86_64.
+  Prior full 30-test suite not rerun. Commands/fixed failures: DEVELOPMENT.md latest.
 - Prior real-process/reboot clock recovery remains verified; not rerun this slice.
-- No schema/dependency change or local blocker. Event codec adds anchored Previous.
-  No release/tablet/physical-arm64 rerun. Emulator left running. Nostr config empty;
+- New schema 0011; no dependency/codec changes. Gradle tracks SQL inputs now.
+  No local blocker or release/tablet/physical-arm64 rerun. Nostr config empty;
   ask Q188 before forwarding.

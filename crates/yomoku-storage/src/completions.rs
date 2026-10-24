@@ -173,6 +173,21 @@ impl Storage {
         };
         consume_time_in(&transaction, &anchors)?;
         write_position_in(&transaction, completion.document_id, next)?;
+        // The only supported document is a single-chapter paste. Only a newly
+        // recorded final page sets this permanent marker; position-only saves
+        // and duplicate command delivery cannot finish or unfinish a document.
+        if next
+            .offset
+            .byte_index(&document.chapter.text)
+            .map_err(|_| StorageError::InvalidCompletion)?
+            == document.chapter.text.len()
+        {
+            transaction.execute(
+                "UPDATE documents SET finished_at_least_once = 1
+                 WHERE id = ?1 AND finished_at_least_once = 0",
+                [i64::from(completion.document_id)],
+            )?;
+        }
         transaction.commit()?;
         Ok((CompletionOutcome::Recorded, newly_known))
     }

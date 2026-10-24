@@ -11,6 +11,22 @@ use yomoku_core::{
 use crate::{analysis::read_reader_analysis, settings::read_page_length, Storage, StorageError};
 
 impl Storage {
+    /// Permanent finish state of a live document, independent of its position.
+    /// None means the document is absent. Reading this never changes progress.
+    pub fn finished_at_least_once(
+        &self,
+        document_id: DocumentId,
+    ) -> Result<Option<bool>, StorageError> {
+        self.connection
+            .query_row(
+                "SELECT finished_at_least_once FROM documents WHERE id = ?1",
+                [i64::from(document_id)],
+                |row| row.get(0),
+            )
+            .optional()
+            .map_err(StorageError::from)
+    }
+
     /// Stable allocation order until Library sorting is implemented.
     pub fn list_documents(&self) -> Result<Vec<LibraryDocument>, StorageError> {
         let mut statement = self.connection.prepare(

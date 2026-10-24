@@ -431,7 +431,7 @@ fn upgrades_version_five_preserving_documents_settings_position_and_completions(
         .unwrap();
     drop(old);
     let mut storage = Storage::open(database.path()).unwrap();
-    assert_eq!(storage.schema_version().unwrap(), 10);
+    assert_eq!(storage.schema_version().unwrap(), 11);
     assert_eq!(storage.load_paste(doc.document_id).unwrap(), expected);
     assert_eq!(
         storage.page_length().unwrap(),
@@ -471,6 +471,6 @@ fn failed_vocabulary_migration_preserves_version_five_and_can_retry() {
             .unwrap()
             .schema_version()
             .unwrap(),
-        10
+        11
     );
 }

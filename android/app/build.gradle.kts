@@ -32,7 +32,7 @@ val buildRustBridge by
         inputs.files(repoDirectory.file("Cargo.toml"), repoDirectory.file("Cargo.lock"))
         inputs.files(
             fileTree(repoDirectory.dir("crates")) {
-                include("**/*.rs", "**/*.toml")
+                include("**/*.rs", "**/*.toml", "**/*.sql")
                 exclude("**/target/**")
             }
         )
@@ -55,7 +55,9 @@ val buildSudachiAppProbe by
         commandLine("python3", repoDirectory.file("tools/build-sudachi-app-probe.py").asFile)
         environment("ANDROID_HOME", androidComponents.sdkComponents.sdkDirectory.get().asFile)
         inputs.files(repoDirectory.file("Cargo.toml"), repoDirectory.file("Cargo.lock"))
-        inputs.files(fileTree(repoDirectory.dir("crates")) { include("**/*.rs", "**/*.toml") })
+        inputs.files(
+            fileTree(repoDirectory.dir("crates")) { include("**/*.rs", "**/*.toml", "**/*.sql") }
+        )
         inputs.dir(repoDirectory.dir("third_party/sudachi"))
         inputs.file(repoDirectory.file("tools/build-sudachi-app-probe.py"))
         inputs.file(repoDirectory.file("tools/verify-sudachi-source.py"))

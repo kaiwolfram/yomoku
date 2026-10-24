@@ -1429,3 +1429,22 @@ Primary API references checked:
 - https://developer.android.com/develop/ui/compose/touch-input/pointer-input/drag-composables
 - https://developer.android.com/develop/ui/compose/side-effects
 - https://developer.android.com/guide/topics/ui/notifiers/toasts
+
+## 2026-10-24 — Durable finish marker before reader finish UI
+
+Store finished-at-least-once as a constrained boolean on the live documents row,
+default false. The existing completion transaction sets it when a validated page
+ends at the single-chapter paste's exact EOF. Do not derive it from current position
+or reset it on backward movement/reflow. A fresh final-page reread still records
+history; the permanent boolean stays true. Deletion removes the live marker and
+reimport starts false while immutable history survives. No new destructive API.
+
+Migration 0011 backfills only matching live paste/source/chapter EOF completion
+history, using UTF-8 BLOB length (including text after NUL). Position-only EOF is
+insufficient. Keep this slice storage-only with an Option<bool> getter; snapshots,
+Library checkmark, reopen-at-page-1, Finish Book and confetti remain next. Future
+multi-chapter imports must explicitly validate the final chapter before marking a
+document finished. No dependencies or public event/view codec changes.
+
+Track SQL files alongside Rust sources in both Gradle native build tasks so a
+migration-only edit invalidates packaged native output.

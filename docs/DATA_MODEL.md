@@ -304,7 +304,7 @@ UTF-8 bytes), checked for bounds with overflow-safe u128 arithmetic. Listing use
 SQLite BLOB lengths (including text after NUL), without fetching every document's
 text or paginating the Library. It checks chapter ownership and offset bounds;
 full scalar-boundary validation happens when loading/saving a document. Current
-progress can decrease and is independent of the future finished checkmark.
+progress can decrease and is independent of the persisted finished-at-least-once marker.
 Only paste's single text unit is implemented; multi-chapter totals await imports.
 
 SaveReadingPosition is a typed position-only protocol hook for an active reader;
@@ -386,10 +386,31 @@ that transaction (details below). Statement/commit failure rolls everything back
 retry reuses the same intent. Position-only
 saves never insert history. Concurrent duplicate submissions record once.
 
-This legacy entry point is repository-only infrastructure. Migration 0010 adds an
-analyzed entry point below; neither has an app event/runtime/FFI/Android forward
-action yet. Do not use absent occurrence data as completed-reading statistics. Final EOF alone
-does not implement finished-at-least-once, Finish Book or reopen-at-page-1 behavior.
+This legacy entry point is repository-only infrastructure. Migration 0010 adds the
+analyzed entry point used by core/runtime/FFI/Android forward actions below. Do not
+use absent occurrence data as completed-reading statistics. Migration 0011 adds
+the permanent finish marker; Finish Book and reopen-at-page-1 remain unwired.
+
+## Permanent document finish marker (migration 0011)
+`documents.finished_at_least_once` is a non-null integer boolean, constrained to
+0/1 and defaulting to 0. Newly recorded completion of the final logical page sets
+it to 1 in the same immediate transaction as history, occurrences, statuses, time
+and position. Only single-chapter pastes exist today; their final page ends at the
+canonical text's UTF-8 byte length. Future multi-chapter formats must validate the
+document's final chapter before setting this marker.
+
+The marker never follows position backward or changes with page-length settings,
+partial-time checkpoints or duplicate callbacks. `finished_at_least_once` reads
+`Option<bool>` for a document (None means absent), without changing position. It
+is a storage-only API for now: reader/Library snapshots and Android do not expose
+it yet. Each deliberate final-page reread still gets its own completion history.
+
+The migration backfills live pastes with recorded EOF history, matching document,
+source and chapter IDs and exact byte length (including embedded NUL). Current EOF
+position alone is insufficient; a finished book moved backward remains finished.
+Migration failure rolls back the column, backfill and journal together. Deletion
+removes the marker with its live document; reimport defaults to false and 0%
+while old history/provenance remain. No production deletion API is added here.
 
 ## Analyzed page completion (migration 0010)
 `record_analyzed_page_completion` takes a frozen PageCompletion and AnalysisId.
@@ -587,8 +608,8 @@ Completion retires the reader's consumed time token; another anchor/reread resto
 its own durable duration. Rereads reserve a new command. No new schema or dependency
 version; Android automatically supplies clock/final saves and drains pending core
 obligations before native teardown. Android controls/swipes use this completion
-path; the toast consumes its transient command-keyed notice once. Permanent
-finished-book state remains open. No storage schema changes for navigation.
+path; the toast consumes its transient command-keyed notice once. Migration 0011
+adds the permanent finish marker; its UI and reopening behavior remain open.
 
 ## Required future schema constraints
 - Future import repositories must extend the identity/immutable-text and durable
@@ -596,8 +617,6 @@ finished-book state remains open. No storage schema changes for navigation.
 - Add analyzer dictionary-form links (nullable) to global vocabulary and wire
   registration/status repositories into typed application/import effects.
   Reading never participates in identity.
-- Pending page time and current text offset separate from completed events;
-  permanent finished-at-least-once separate from current percentage.
 - Document deletion removes content/progress but preserves historical provenance,
   encounters and global vocabulary. Reimport creates fresh document progress.
 - Vocabulary deletion removes its encounter/status history, recalculates statistics

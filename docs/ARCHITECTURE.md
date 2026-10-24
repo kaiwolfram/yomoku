@@ -406,7 +406,10 @@ Explicit core/worker/FFI pending-time checkpoints coalesce during unresolved sav
 and drain before reader movement/exit or analyzed completion. Completion preparation/
 exact retries now run through core/FIFO/FFI. Android monotonic lifecycle/interactions
 and native drain are connected. Page movement/swipes and positive-count toast
-rendering are connected; permanent finished-book state remains next, while
+rendering are connected. Migration 0011 persists a permanent finish boolean with
+final-page completion, independent of position, and backfills live pastes from EOF
+history. Its storage-only getter distinguishes absent documents; Library/reader
+projection, reopen-at-page-1, Finish Book and confetti remain next, while
 effective segmentation edits and statistics aggregation remain
 separate tasks. Add analysis/import crates only with
 actual behavior; Sudachi Full defaults to B, JMdict/JMnedict remain offline data, and future Nostr I/O stays in Rust. Configuration is empty.

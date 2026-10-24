@@ -350,7 +350,7 @@ fn history_and_replay_survive_live_document_and_text_deletion() {
 }
 
 #[test]
-fn final_page_records_exact_unicode_eof_and_remains_independent_of_finish_state() {
+fn only_final_page_records_exact_unicode_eof_and_permanent_finish_state() {
     let database = TestDatabase::new();
     let mut storage = Storage::open(database.path()).unwrap();
     let mut document = fixture(&mut storage);
@@ -359,6 +359,12 @@ fn final_page_records_exact_unicode_eof_and_remains_independent_of_finish_state(
         storage.record_page_completion(completion).unwrap();
         document = storage.load_paste(document.document_id).unwrap().unwrap();
         assert_eq!(count(&storage), expected_count);
+        assert_eq!(
+            storage
+                .finished_at_least_once(document.document_id)
+                .unwrap(),
+            Some(expected_count == 3)
+        );
     }
     assert_eq!(
         document
@@ -370,7 +376,7 @@ fn final_page_records_exact_unicode_eof_and_remains_independent_of_finish_state(
         document.chapter.text.len()
     );
     assert_eq!(storage.list_documents().unwrap()[0].progress_percent, 100);
-    // No checkmark/Finish Book behavior is claimed by this repository foundation.
+    // Finish Book/reopening and the checkmark UI remain separate from storage.
 }
 
 #[test]
@@ -386,7 +392,7 @@ fn upgrades_version_four_without_changing_existing_text_settings_or_position() {
     old.save_page_length(PageLength::Characters750).unwrap();
     drop(old);
     let mut storage = Storage::open(database.path()).unwrap();
-    assert_eq!(storage.schema_version().unwrap(), 10);
+    assert_eq!(storage.schema_version().unwrap(), 11);
     assert_eq!(storage.page_length().unwrap(), PageLength::Characters750);
     assert_eq!(storage.load_paste(document.document_id).unwrap(), expected);
     assert_eq!(count(&storage), 0);
@@ -422,7 +428,7 @@ fn failed_completion_migration_preserves_version_four_and_can_retry() {
     drop(connection);
     let mut storage = Storage::open(database.path()).unwrap();
     assert_eq!(storage.load_paste(document.document_id).unwrap(), expected);
-    assert_eq!(storage.schema_version().unwrap(), 10);
+    assert_eq!(storage.schema_version().unwrap(), 11);
     assert_eq!(count(&storage), 0);
 }
 

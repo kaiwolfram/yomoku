@@ -314,6 +314,7 @@ fn every_write_and_deferred_commit_failure_roll_back_all_completion_effects() {
         ("time", "CREATE TRIGGER fail BEFORE UPDATE ON pending_reading_time BEGIN SELECT RAISE(ABORT, 'fixture'); END;"),
         ("position insert", "CREATE TRIGGER fail BEFORE INSERT ON reading_positions BEGIN SELECT RAISE(ABORT, 'fixture'); END;"),
         ("position update", "CREATE TRIGGER fail BEFORE UPDATE ON reading_positions BEGIN SELECT RAISE(ABORT, 'fixture'); END;"),
+        ("finish marker", "CREATE TRIGGER fail BEFORE UPDATE OF finished_at_least_once ON documents BEGIN SELECT RAISE(ABORT, 'fixture'); END;"),
         ("commit", "CREATE TABLE deferred_failure (id INTEGER REFERENCES documents(id) DEFERRABLE INITIALLY DEFERRED); CREATE TRIGGER fail AFTER INSERT ON reading_occurrences BEGIN INSERT INTO deferred_failure VALUES (-1); END;"),
     ] {
         let database = TestDatabase::new();
@@ -331,12 +332,14 @@ fn every_write_and_deferred_commit_failure_roll_back_all_completion_effects() {
         storage.connection.execute_batch(sql).unwrap();
         assert!(matches!(storage.record_analyzed_page_completion(completion, imported.analysis_id), Err(StorageError::Sqlite(_))), "{stage}");
         assert_eq!(totals(&storage), before, "{stage}");
+        assert_eq!(storage.finished_at_least_once(imported.document.document_id).unwrap(), Some(false), "{stage}");
         assert_eq!(entry(&storage, "猫").status, VocabularyStatus::New, "{stage}");
         assert_eq!(storage.load_paste(imported.document.document_id).unwrap(), saved, "{stage}");
         assert_eq!(storage.load_pending_reading_time(imported.document.document_id, token.position()).unwrap(), token, "{stage}");
         storage.connection.execute_batch("DROP TRIGGER fail").unwrap();
         assert_eq!(storage.record_analyzed_page_completion(completion, imported.analysis_id).unwrap(), AnalyzedCompletionOutcome::Recorded { newly_known: 2 }, "{stage}");
         assert_eq!(count(&storage, "reading_occurrences"), 3);
+        assert_eq!(storage.finished_at_least_once(imported.document.document_id).unwrap(), Some(true), "{stage}");
     }
 }
 
@@ -523,7 +526,7 @@ fn migration_preserves_v9_history_and_status_event_id_high_water_mark() {
         .unwrap();
     drop(storage);
     let mut storage = Storage::open(database.path()).unwrap();
-    assert_eq!(storage.schema_version().unwrap(), 10);
+    assert_eq!(storage.schema_version().unwrap(), 11);
     assert_eq!(count(&storage, "vocabulary_status_events"), old_events);
     assert_eq!(count(&storage, "completion_analyses"), 0);
     assert_eq!(count(&storage, "reading_completions"), 1);
@@ -630,7 +633,7 @@ fn failed_migration_rolls_back_table_rebuild_indexes_and_history_then_retries() 
         .unwrap();
     drop(connection);
     let storage = Storage::open(database.path()).unwrap();
-    assert_eq!(storage.schema_version().unwrap(), 10);
+    assert_eq!(storage.schema_version().unwrap(), 11);
     assert_eq!(entry(&storage, "猫").status, VocabularyStatus::New);
 }
 

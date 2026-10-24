@@ -1049,3 +1049,23 @@
   No schema/dependency change or blocker; generated Event adds anchored Previous.
   No release/tablet/physical-arm64 or separate process/reboot recovery rerun.
   Nostr configuration remains empty; ask Q188 before forwarding.
+
+## 2026-10-24 — Durable finished-at-least-once repository marker
+
+- Started clean. Migration 0011 adds a constrained live-document finish boolean.
+  Final-page completion commits it with history/occurrences/status/time/position;
+  backward movement, reflow, partial-time saves and retries preserve it. EOF
+  position alone never sets it. Deletion/reimport resets it while history stays.
+- Backfill uses matching live paste EOF history and exact UTF-8 BLOB lengths.
+  Added a read-only Option<bool> getter and six repository tests, extended final-
+  page/concurrency/rollback coverage, and updated schema-version fixtures. Gradle
+  now tracks embedded SQL in both native build tasks.
+- PASS: 214 Rust tests (109 storage), strict Clippy/fmt, real-Full host Kotlin/JNI
+  with Unicode/analysis exchanges, Kotlin format, both-ABI debug/test APK builds,
+  strict Android lint and all eight ReaderNavigationTest/ReaderClockSessionTest
+  regression tests on API 36 x86_64. Fixed one stale schema expectation; Gradle's
+  sandbox lock/socket restriction required escalation. No open failure.
+- Updated plan, handoff, architecture/data model, decisions, README and commands.
+  Next: project marker into reader/Library, checkmark/reopen-at-page-1, then Finish
+  Book/confetti. No dependency/codec changes, full Android suite, process/reboot,
+  tablet or physical-arm64 rerun. Nostr empty; ask Q188 before forwarding.

@@ -18,7 +18,7 @@ with functioning rustup can omit the PATH workaround. Do not assume this compile
 is the project's minimum supported version; establish that with dependencies.
 Cargo.lock is retained for reproducible application development.
 Crux 0.20.0 declares Rust 1.90 minimum; the full locked graph has only been tested
-with 1.99.1. Current host baseline: 206 data-free Rust tests (103 storage, eight
+with 1.99.1. Current host baseline: 214 data-free Rust tests (109 storage, eight
 runtime). Eleven analysis fixtures and one runtime fixture run separately with
 each Full loader via tools/test-sudachi.sh (see below).
 
@@ -1449,3 +1449,39 @@ the final strict build/suite passes. Prior benign Crux/ktfmt warnings persist.
 No schema/dependency change; generated Event adds anchored PreviousReaderPage.
 No release, tablet, physical-arm64 or separate process/reboot recovery rerun.
 No open failure or local blocker. Next: finished-book persistence/Finish Book/confetti.
+
+## Repository permanent document finish state
+
+Verified 2026-10-24 with the Rust PATH workaround and Android environment above.
+Native generation/build/test runners executed sequentially:
+```sh
+cargo test --workspace --all-features --locked --offline --quiet
+cargo fmt --all -- --check
+cargo clippy --workspace --all-targets --all-features --locked --offline -- -D warnings
+tools/test-kotlin-bridge.sh
+tools/format-kotlin.sh --check
+./android/gradlew -p android :app:connectedDebugAndroidTest :app:lintDebug -Pandroid.testInstrumentationRunnerArguments.class=app.yomoku.ReaderNavigationTest,app.yomoku.ReaderClockSessionTest --offline --console=plain
+git diff --check
+```
+PASS: 214 data-free Rust tests (109 storage), strict Clippy/fmt, workspace build
+through the real-Full host Kotlin/JNI runner with Unicode/analysis exchanges,
+Kotlin formatting, both-ABI native/debug/test APK builds, strict Android lint and
+all eight selected API-36 x86_64 Android regression tests (151 seconds total build
+and run). Report: `android/app/build/reports/androidTests/connected/debug/index.html`.
+
+Six new repository tests cover marker durability through backward movement,
+reflow/checkpoints/reopen, each reread, position-only EOF, deletion/reimport and
+late replay, concurrent callbacks, migration EOF-history backfill (including NUL/
+supplementary Unicode) and backfill failure rollback/retry. Extended analyzed
+completion failure injection covers the marker write and confirms that all failed
+statements/deferred commits preserve history/status/time/position and false marker;
+the exact retry commits them together. Existing pagination completion coverage now
+asserts only the final page sets true. Gradle tracks embedded SQL in native inputs.
+
+Initial storage verification found one stale schema-version expectation, corrected
+before the passing workspace suite. Gradle's sandbox wildcard-IP/lock socket error
+passed with escalation. Prior benign Crux JNI shutdown and ktfmt Unsafe warnings
+persist. No open failure or dependency/public-codec change. Migration 0011 is new.
+No full Android suite, standalone owned/mapped Full fixture suite, release APK,
+process/reboot recovery, tablet or physical-arm64 rerun. Marker projection/checkmark,
+reopen-at-page-1, Finish Book and confetti remain unchecked; this slice is storage-only.
