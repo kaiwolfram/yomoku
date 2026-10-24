@@ -60,8 +60,27 @@ absence and clears its visible references without registration. Same-status choi
 are repository no-ops. Failure preserves the old snapshot for explicit retry by
 choosing again; no background replay obligation is created. Accepted writes finish
 after navigation, while cancelled results/errors cannot attach to the departed page.
-Success and failure both drain queued final clock checkpoints. Compose does not
-request/display tokens or offer status controls yet.
+Success and failure both drain queued final clock checkpoints.
+
+Compose requests tokens when the visible key has no snapshot and the storage/save
+gates are clear. A failed read stays explicit until Retry; Missing stays empty.
+An attempted-read guard survives shared error clearing by queued clock saves.
+ReaderWords checks echoed identity, ordered ranges, exact clipped surface text and
+UTF-8 scalar boundaries before mapping them to UTF-16. Inline LinkAnnotation links
+preserve the original text layout and expose keyboard/accessibility activation;
+only Japanese token spans are linked. Full crossing-token identity opens from
+either fragment. An invalid projection falls back to plain page text.
+Product light/dark status backgrounds follow the system theme; Known and absent
+vocabulary have no background. A phone bottom sheet or wide-screen side panel
+shows stored analyzer metadata and one row of five direct choices. Selection follows
+committed snapshot changes, including every repetition; pending storage/time/completion
+disables choices. Failure keeps the panel and prior status for explicit repeat.
+Snapshot invalidation, Settings, navigation and Activity recreation dismiss it.
+Definitions and encounter counts remain separate future dictionary work.
+The sheet/popup has its own Android window, so its pointer/key input explicitly calls
+the existing CoreSession interaction observer. Reading continues while it is open;
+interactions extend the same idle deadline. Annotated links are remembered across
+timer-only recompositions, without caching old status or page identities.
 
 Pure `active_time` accounts pending reading milliseconds using caller-supplied
 monotonic timestamps. Resume/interaction arms a five-minute idle window; dictionary

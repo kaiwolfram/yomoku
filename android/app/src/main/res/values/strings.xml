@@ -22,6 +22,14 @@
     <string name="import_created">Imported: %1$s</string>
     <string name="import_existing">Already in Library: %1$s</string>
     <string name="reader_title">Reader</string>
+    <string name="retry_word_lookup">Retry word lookup</string>
+    <string name="word_reading">Reading: %1$s</string>
+    <string name="word_dictionary_form">Dictionary form: %1$s</string>
+    <string name="status_new">New</string>
+    <string name="status_learning">Learning</string>
+    <string name="status_familiar">Familiar</string>
+    <string name="status_known">Known</string>
+    <string name="status_ignored">Ignored</string>
     <string name="retry">Retry</string>
     <string name="page_counter">%1$d / %2$d</string>
     <string name="previous_page">Previous</string>

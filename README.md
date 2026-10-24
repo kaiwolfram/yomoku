@@ -26,14 +26,15 @@ Yomoku is under active development. The working app supports:
   persisted progress in both directions and scroll reset on page navigation.
 - Forward completion records repeated Japanese encounters, promotes New words to
   Known and shows a positive-count toast; deliberate rereads count again.
+- Japanese words have status highlights and open a panel with their full surface,
+  analyzer reading/base form and five direct status choices. Opening it leaves
+  statuses and history unchanged; choices persist globally across repeated surfaces.
 
-Word lookup UI and vocabulary controls are still pending. A read-only Rust
-projection now exposes stored Mode B tokens, exact display spans and current
-global statuses through typed core/FIFO/FFI reads without changing vocabulary or
-history. Results are checked against the current document/page/analysis before
-being exposed to the host. Typed manual status choices now update existing global
-entries and every visible repetition after the status/history transaction commits;
-same-status selections add no history. Compose taps and five-choice controls remain next.
+Dictionary definitions and encounter counts remain pending. Compose reads stored
+Mode B tokens through typed core/FIFO/FFI, validates the current page identity and
+converts exact UTF-8 spans to UTF-16 without splitting Unicode scalars. Status
+choices update all visible repetitions after the status/history transaction commits;
+same-status selections add no history. Deleted vocabulary stays unregistered.
 The Rust repository atomically saves completion encounters, New→Known
 transitions, active time and position. Core/worker/FFI pending-time checkpoints
 support exact retries, coalesced saves before reader movement/exit and reopen.

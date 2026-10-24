@@ -1558,3 +1558,37 @@ can choose again. Accepted writes finish after navigation, but stale callbacks/e
 cannot attach to a departed reader. Treat the write as nonmoving and drain queued
 final clock checkpoints on either success or failure. No schema/dependency changes;
 Compose token taps/status controls remain a separate independently testable step.
+
+## 2026-10-24 — Compose word interaction over the existing typed snapshot
+
+Request the current key from Compose after existing storage/time/completion gates
+clear. Retry token-read errors explicitly, avoiding an automatic failure loop.
+Remember an attempted read until success/key replacement; a queued clock save can
+clear the shared document error and must not cause automatic replay.
+Validate scalar boundaries, echoed identity, ordered/clipped spans and exact
+surface text before converting page UTF-8 offsets to JVM UTF-16 indices. A malformed
+projection renders plain text. Preserve the full token identity when a page shows
+only a fragment. Use inline LinkAnnotation.Clickable with explicit product colors
+and no underline, preserving text flow and keyboard/accessibility activation.
+Remember annotations across timer-only renders; status changes rebuild them.
+
+Open a transient bottom sheet on phones and a side panel on wide displays, with
+surface, stored analyzer reading/dictionary form and one row of five direct status
+choices. Selection reflects committed Rust state;
+busy/pending saves disable controls. Failures retain the prior value for an explicit
+repeat choice; absent vocabulary stays disabled and unregistered. Opening, closing
+and recreation never send status commands. Dictionary definitions, names and
+encounter counts await their planned offline-data work; show no invented matches.
+Use LocalWindowInfo's actual container size for the 600dp breakpoint and bounded
+scrollable panel height, following Compose lint's window/insets requirements.
+
+Sheet/popup input uses a separate window and bypasses Activity.onUserInteraction, so
+forward its content and container pointer/key interactions to the clock observer. Keep
+the clock active while the panel is open, with the same five-minute idle cap.
+No dependency, schema or FFI change. Primary Compose APIs checked:
+
+- https://developer.android.com/develop/ui/compose/text/user-interactions
+- https://developer.android.com/reference/kotlin/androidx/compose/ui/text/LinkInteractionListener
+- https://developer.android.com/develop/ui/compose/components/bottom-sheets
+- https://developer.android.com/reference/kotlin/androidx/compose/ui/window/PopupProperties
+- https://android.googlesource.com/platform/frameworks/support/+/12a8e82373811d8811921d9bc331653ceb2320ee/compose/ui/ui-text/src/commonMain/kotlin/androidx/compose/ui/text/LinkAnnotation.kt

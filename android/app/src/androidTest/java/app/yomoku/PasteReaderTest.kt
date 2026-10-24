@@ -171,6 +171,7 @@ class PasteReaderTest {
             compose.runOnUiThread { core().dispatch(Event.CreatePaste(text)) }
             awaitStorage()
             val id = core().view.documents.single { it.title == title }.documentId
+            compose.onNodeWithTag("library_documents").performScrollToKey(id.value)
             compose.onNodeWithTag("document_${id.value}").performScrollTo().performClick()
             awaitStorage()
             val position =
@@ -215,6 +216,7 @@ class PasteReaderTest {
                 core().view.documents.single { it.documentId == id }.progressPercent,
             )
             compose.onNodeWithText("Back").performClick()
+            compose.onNodeWithTag("library_documents").performScrollToKey(id.value)
             compose.onNodeWithTag("document_${id.value}").performScrollTo().performClick()
             awaitStorage()
             assertEquals(position, core().view.reader!!.position)
@@ -341,6 +343,9 @@ class PasteReaderTest {
             assertEquals(ContentRoute.MAIN, view.contentRoute)
             documentTag = "document_${view.documents.single { it.title == title }.documentId.value}"
         }
+        compose
+            .onNodeWithTag("library_documents")
+            .performScrollToKey(core().view.documents.single { it.title == title }.documentId.value)
         compose.onNodeWithTag(documentTag).performScrollTo().performClick()
         awaitStorage()
         compose.onNodeWithTag("screen_title").assertTextEquals(title)

@@ -1180,3 +1180,28 @@
   highlights/taps/five direct controls, then offline dictionary data/index.
   Standalone Full/full Android suite, release, recovery/tablet/physical-arm64 not
   rerun. Nostr remains empty; Q188 remains required before forwarding.
+
+## 2026-10-24 — Compose reader word highlights and direct choices
+
+- Started clean. Connected gated token loading, validated UTF-8→UTF-16 spans,
+  product light/dark highlights and inline Japanese links. A phone bottom sheet or
+  wide side panel shows full surface/analyzer metadata and five direct choices.
+  Opens leave vocabulary/history/position untouched; committed changes update
+  repetitions. Deleted IDs stay absent, failed choices allow explicit repeat,
+  pending saves disable choices, and invalidated/recreated UI dismisses the panel.
+- Added per-key read-attempt guard so clock saves clearing errors cannot replay
+  failed lookup. Sheet/popup content input extends the existing idle deadline.
+  Definitions/names/encounter count remain next; no schema/dependency/FFI change.
+- PASS: 238 Rust tests (117 storage), strict Clippy/Rust/Kotlin formatting/diff,
+  both-ABI debug/test APK builds and strict Android lint. All 24 selected API-36
+  x86_64 phone tests pass; seven word tests also pass wide landscape/dark (31 total
+  successful executions). Saved XML under `.local/test-reports/reader-words/`.
+- Fixed strict Kotlin/lint findings, an analyzer-segmentation fixture, sheet input
+  forwarding and old uncomposed Library selectors. Recovered an AVD disconnect
+  without reset; extended initial Full-import fixture wait to 60s after cold boot.
+  Interrupted the stale failing APK run while applying fixes; final checks pass.
+  Gradle/ADB sockets required escalation. Restored AVD size/density/light mode.
+- Updated plan/handoff (79 lines), architecture/data/decisions/development and README.
+  Unrelated release-checklist deletions appeared during work and remain unstaged.
+  No open blocker. Host JNI/generation/standalone Full, release, separate reboot/
+  process and physical arm64 not rerun. Nostr/Q188 unchanged.

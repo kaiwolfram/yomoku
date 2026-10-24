@@ -153,6 +153,14 @@ Failures keep the prior snapshot and allow an explicit repeat choice; same-statu
 replays add no event. Navigation discards transient results/errors but does not
 cancel accepted writes. Failed choices still drain queued final time saves.
 
+Android converts page-local byte spans to UTF-16 only at exact scalar boundaries,
+validating echoed identity, ordering, full anchor lengths and clipped surface text.
+Full crossing-token metadata survives display clipping. Link activation opens only
+transient UI; no status command is sent until a direct choice. System-theme status
+backgrounds follow the product palette, with Known/absent entries unhighlighted.
+The panel reads current committed statuses and disables absent vocabulary rather
+than recreating it. No schema, persisted UI state or dictionary data is added.
+
 ## Document identities and text anchors
 `document.rs` defines distinct `DocumentId`, `SourceId` and `ChapterId` newtypes.
 Each is an integer in `1..=i64::MAX`; Rust constructors and Serde decoding reject

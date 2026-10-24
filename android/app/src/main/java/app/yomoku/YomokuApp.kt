@@ -42,7 +42,11 @@ import app.yomoku.theme.YomokuTheme
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-internal fun YomokuApp(view: ViewModel, dispatch: (Event) -> Unit) {
+internal fun YomokuApp(
+    view: ViewModel,
+    dispatch: (Event) -> Unit,
+    onReaderInteraction: () -> Unit = {},
+) {
     val context = LocalContext.current
     ReaderCompletionToast(view, dispatch) { message ->
         Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
@@ -135,7 +139,8 @@ internal fun YomokuApp(view: ViewModel, dispatch: (Event) -> Unit) {
                         view.settingsOpen -> SettingsScreen(view, dispatch)
                         view.contentRoute == ContentRoute.PASTE ->
                             PasteScreen(view, pasteText, { pasteText = it }, dispatch)
-                        view.contentRoute == ContentRoute.READER -> ReaderScreen(view, dispatch)
+                        view.contentRoute == ContentRoute.READER ->
+                            ReaderScreen(view, dispatch, onReaderInteraction)
                         view.destination == Destination.LIBRARY -> LibraryScreen(view, dispatch)
                         else ->
                             Text(
@@ -219,7 +224,8 @@ private fun YomokuPreview() {
                 completionNotice = null,
                 bookCompletionNotice = null,
                 readerTokens = null,
-            )
-        ) {}
+            ),
+            dispatch = {},
+        )
     }
 }

@@ -15,6 +15,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performScrollToKey
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipe
 import androidx.compose.ui.test.swipeLeft
@@ -149,6 +150,7 @@ class ReaderNavigationTest {
             assertEquals(2L, completions(db, id))
             compose.onNodeWithText("Back").performClick()
             awaitReady()
+            compose.onNodeWithTag("library_documents").performScrollToKey(id)
             compose
                 .onNodeWithTag("progress_$id", useUnmergedTree = true)
                 .performScrollTo()
@@ -236,6 +238,7 @@ class ReaderNavigationTest {
             compose.activityRule.scenario.recreate()
             awaitReady()
             compose.onNodeWithTag("book_confetti").assertDoesNotExist()
+            compose.onNodeWithTag("library_documents").performScrollToKey(id)
             compose
                 .onNodeWithTag("finished_$id", useUnmergedTree = true)
                 .performScrollTo()
@@ -260,10 +263,12 @@ class ReaderNavigationTest {
             }
             assertEquals(ContentRoute.MAIN, core().view.contentRoute)
             assertEquals(6L, completions(db, id))
+            compose.onNodeWithTag("library_documents").performScrollToKey(id)
             compose.onNodeWithTag("document_$id").performScrollTo().performClick()
             awaitReady()
             compose.onNodeWithText("Back").performClick()
             awaitReady()
+            compose.onNodeWithTag("library_documents").performScrollToKey(id)
             compose
                 .onNodeWithTag("finished_$id", useUnmergedTree = true)
                 .performScrollTo()

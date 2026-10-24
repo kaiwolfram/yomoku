@@ -1692,3 +1692,59 @@ No schema/dependency/View change. Event/Storage gain typed manual-choice payload
 Compose token loading/highlights/taps/five direct controls remain next. Standalone
 Full fixture/probe suite, full Android suite, release APK, process/reboot recovery,
 tablet and physical-arm64 were not rerun.
+
+## Compose reader word interactions
+
+Verified 2026-10-24 with the Rust PATH workaround and Android/JDK environment above.
+Run from the repository root; the two Android groups cover seven new word tests
+and seventeen reader/navigation/clock/paste regressions:
+```sh
+cargo test --workspace --all-features --locked --offline --quiet
+cargo fmt --all -- --check
+cargo clippy --workspace --all-targets --all-features --locked --offline -- -D warnings
+tools/format-kotlin.sh --check
+./android/gradlew -p android :app:connectedDebugAndroidTest :app:lintDebug -Pandroid.testInstrumentationRunnerArguments.class=app.yomoku.ReaderWordSpansTest,app.yomoku.ReaderWordsTest --offline --console=plain
+./android/gradlew -p android :app:connectedDebugAndroidTest :app:lintDebug -Pandroid.testInstrumentationRunnerArguments.class=app.yomoku.ReaderNavigationTest,app.yomoku.ReaderClockSessionTest,app.yomoku.PasteReaderTest,app.yomoku.NavigationTest --offline --console=plain
+git diff --check
+```
+The wide-screen dark-mode matrix uses the same seven-test word command between
+these reversible emulator overrides (initial mode was `no`, no size/density override):
+```sh
+/home/kai/Android/Sdk/platform-tools/adb shell wm size 2560x1600
+/home/kai/Android/Sdk/platform-tools/adb shell wm density 240
+/home/kai/Android/Sdk/platform-tools/adb shell cmd uimode night yes
+# Run the seven-test word command above.
+/home/kai/Android/Sdk/platform-tools/adb shell wm size reset
+/home/kai/Android/Sdk/platform-tools/adb shell wm density reset
+/home/kai/Android/Sdk/platform-tools/adb shell cmd uimode night no
+```
+Reports are copied to ignored `.local/test-reports/reader-words/` before subsequent
+connected runs replace the standard Gradle report. Seven tests cover exact scalar
+conversion (supplementary/combining/NUL/clipped tokens), malformed/foreign spans,
+both status palettes, actual inline taps and five choices, repeated highlights,
+unchanged lookup history/position, rollback/explicit repeat, deleted vocabulary,
+Back/recreation, save gates and read-error clearing without automatic replay.
+A fake-clock/real-JNI UI test verifies 750,000ms across sheet/panel interactions;
+the unobserved-content regression stops at 599,000ms instead.
+
+Intermediate failures fixed: Kotlin preview/default-lambda and unnecessary-assertion
+warnings; a fixture assuming a different Sudachi segmentation; deprecated
+Configuration sizing flagged by lint (use LocalWindowInfo); bottom-sheet container
+input missing metadata touches (observe content too); uncomposed Library rows in
+older tests (scroll by document key). After an emulator disconnection, restarted
+the existing AVD with documented swangle flags without clearing data. An initial
+post-boot Full import exceeded the fixture's 30s wait; its allowance is now 60s.
+Stopped the intermediate stale APK run after diagnosing its failures; its interrupted
+clock test is not an assertion result. Sandbox Gradle/ADB sockets required escalation.
+No dependency, schema or FFI change. Host Kotlin/JNI, repeat generation, standalone
+Full fixtures/probes, release APK, separate process/reboot and physical arm64 were
+not rerun for this UI slice.
+
+PASS: 238 Rust tests (117 storage), strict Clippy/Rust fmt/Kotlin fmt/diff, both-ABI
+debug/test APK builds and strict Android lint. All 24 distinct selected API-36
+x86_64 tests pass: seven phone/light word tests (1m49s build/run), seventeen existing
+regressions (7m), then the same seven word tests on wide landscape/dark (1m37s).
+Saved XML reports confirm 31 successful executions with no failures/errors.
+Restored physical 1080x2400/420dpi and night mode `no`; AVD remains running.
+No open failure or local blocker. Next: offline JMdict/JMnedict index, then actual
+definitions/names/encounter counts in the existing word panel.

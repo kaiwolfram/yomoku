@@ -27,7 +27,7 @@ class MainActivity : ComponentActivity() {
                         if (core.view.settingsOpen) Event.CloseSettings else Event.CloseDocument
                     )
                 }
-                YomokuApp(core.view, core::dispatch)
+                YomokuApp(core.view, core::dispatch, core::onReaderInteraction)
             }
         }
     }

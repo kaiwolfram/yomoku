@@ -136,7 +136,7 @@ internal fun PasteScreen(
 }
 
 @Composable
-internal fun ReaderScreen(view: ViewModel, dispatch: (Event) -> Unit) {
+internal fun ReaderScreen(view: ViewModel, dispatch: (Event) -> Unit, onInteraction: () -> Unit) {
     val scroll = remember(view.reader?.documentId, view.reader?.anchor) { ScrollState(0) }
     val page = view.reader
     val canNavigate =
@@ -196,11 +196,7 @@ internal fun ReaderScreen(view: ViewModel, dispatch: (Event) -> Unit) {
             if (page.finishedAtLeastOnce) {
                 FinishedCheckmark(Modifier.testTag("reader_finished"))
             }
-            Text(
-                page.text,
-                style = MaterialTheme.typography.bodyLarge,
-                modifier = Modifier.testTag("reader_text"),
-            )
+            ReaderWords(view, dispatch, onInteraction)
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
