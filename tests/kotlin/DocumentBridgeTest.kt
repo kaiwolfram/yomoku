@@ -31,12 +31,14 @@ private class DocumentListener : EffectsListener {
         errors.add(error)
     }
 
-    fun dispatch(bridge: NativeBridge, event: Event): ViewModel {
+    fun dispatch(bridge: NativeBridge, event: Event, callbackCount: Int = 1): ViewModel {
         val immediate = Requests.bincodeDeserialize(bridge.update(event.bincodeSerialize()))
         check(immediate.value.single().effect is ShellEffect.Render)
-        val (thread, bytes) = checkNotNull(effects.poll(60, TimeUnit.SECONDS))
-        check(thread != Thread.currentThread())
-        check(Requests.bincodeDeserialize(bytes).value.single().effect is ShellEffect.Render)
+        repeat(callbackCount) {
+            val (thread, bytes) = checkNotNull(effects.poll(60, TimeUnit.SECONDS))
+            check(thread != Thread.currentThread())
+            check(Requests.bincodeDeserialize(bytes).value.single().effect is ShellEffect.Render)
+        }
         check(errors.isEmpty())
         return ViewModel.bincodeDeserialize(bridge.view()).also { check(!it.storageBusy) }
     }
@@ -158,6 +160,26 @@ internal fun verifyDocumentBridge() {
             check(restored.pending.value == 654L && restored.position == document.readingPosition)
             check(unavailableDictionary.calls.get() == 0)
             check(ViewModel.bincodeDeserialize(bridge.view()).reader?.position == document.readingPosition)
+            val page = checkNotNull(opened.reader)
+            val request = Event.CompleteReaderPage(page.documentId, page.anchor, page.position, 1234L)
+            val completed = reopened.dispatch(bridge, request, callbackCount = 2)
+            check(completed.documentError == null && !completed.completionSavePending)
+            check(completed.readerTime == null && completed.readerAnalysis == analysis)
+            val notice = checkNotNull(completed.completionNotice)
+            check(notice.newlyKnown > 0UL && notice.commandId.value > 0L)
+            check(completed.reader?.position?.offset == page.anchor.range.end)
+            val committedView = bridge.view()
+            bridge.update(request.bincodeSerialize()) // Late duplicate retains the committed view.
+            bridge.update(Event.RetryReaderCompletion.bincodeSerialize())
+            check(bridge.view().contentEquals(committedView))
+            bridge.update(Event.DismissCompletionNotice.bincodeSerialize())
+            check(ViewModel.bincodeDeserialize(bridge.view()).completionNotice == null)
+            reopened.dispatch(bridge, Event.SaveReadingPosition(page.position))
+            check(reopened.dispatch(bridge, Event.RestoreReadingTime).readerTime?.pending?.value == 0L)
+            val reread = reopened.dispatch(bridge, request.copy(completedAtUnixMs = 5678L), callbackCount = 2)
+            check(reread.documentError == null && reread.completionNotice == null)
+            check(unavailableDictionary.calls.get() == 0) // Stored analysis, no Sudachi reopen/rescan.
+
         }
         val failure = DocumentListener()
         NativeBridge(directory.resolve("missing/db.sqlite3").path, failure, HostDictionary()).use { bridge ->

@@ -419,7 +419,7 @@ fn real_mode_b_import_and_completion_preserve_surfaces_and_duplicate_identity() 
             .record_analyzed_page_completion(completion, imported.analysis_id)
             .unwrap(),
         AnalyzedCompletionOutcome::Recorded {
-            newly_known: surfaces.len() - 1
+            newly_known: (surfaces.len() - 1) as u64
         }
     );
     assert_eq!(

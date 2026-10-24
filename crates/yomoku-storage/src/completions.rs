@@ -1,6 +1,9 @@
 use rusqlite::{named_params, OptionalExtension, TransactionBehavior};
 use yomoku_core::{
-    completion::{AnalyzedCompletionOutcome, CompletionOutcome, PageCompletion},
+    completion::{
+        AnalyzedCompletionOutcome, AnalyzedPageCompletion, CompletionOutcome, PageCompletion,
+        PageCompletionIntent,
+    },
     document::{AnalysisId, CompletionCommandId},
 };
 
@@ -13,6 +16,42 @@ use crate::{
 };
 
 impl Storage {
+    /// Reserve a command and freeze the drained page total in one transaction.
+    /// Retrying preparation after failure cannot complete or consume anything.
+    pub fn prepare_page_completion(
+        &mut self,
+        intent: PageCompletionIntent,
+    ) -> Result<AnalyzedPageCompletion, StorageError> {
+        let transaction = self
+            .connection
+            .transaction_with_behavior(TransactionBehavior::Immediate)?;
+        let document = load_paste_in(&transaction, intent.document_id)?
+            .ok_or(StorageError::InvalidCompletion)?;
+        if read_page_length(&transaction)? != intent.page_length {
+            return Err(StorageError::InvalidCompletion);
+        }
+        let (pending_time, _) = page_time_in(&transaction, &document, intent.page)?;
+        transaction.execute("INSERT INTO completion_commands DEFAULT VALUES", [])?;
+        let completion = PageCompletion {
+            command_id: CompletionCommandId::try_from(transaction.last_insert_rowid())
+                .map_err(|_| StorageError::InvalidCompletion)?,
+            document_id: intent.document_id,
+            page: intent.page,
+            page_length: intent.page_length,
+            departing_position: intent.departing_position,
+            completed_at_unix_ms: intent.completed_at_unix_ms,
+            pending_time,
+        };
+        completion
+            .next_position(&document)
+            .map_err(|_| StorageError::InvalidCompletion)?;
+        transaction.commit()?;
+        Ok(AnalyzedPageCompletion {
+            completion,
+            analysis_id: intent.analysis_id,
+        })
+    }
+
     /// Allocate once for a forward intent, not once per callback or retry.
     /// Unused IDs are harmless and never automatically completed on reopen.
     pub fn new_completion_command_id(&mut self) -> Result<CompletionCommandId, StorageError> {
@@ -46,7 +85,9 @@ impl Storage {
     ) -> Result<AnalyzedCompletionOutcome, StorageError> {
         self.record_completion(completion, Some(analysis_id))
             .map(|(outcome, newly_known)| match outcome {
-                CompletionOutcome::Recorded => AnalyzedCompletionOutcome::Recorded { newly_known },
+                CompletionOutcome::Recorded => AnalyzedCompletionOutcome::Recorded {
+                    newly_known: newly_known as u64,
+                },
                 CompletionOutcome::AlreadyRecorded => AnalyzedCompletionOutcome::AlreadyRecorded,
             })
     }

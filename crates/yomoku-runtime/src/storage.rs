@@ -160,6 +160,22 @@ fn execute(
                 .map(StorageResult::ReadingTimeSaved)
                 .map_err(map_error)
         }
+        StorageOperation::PreparePageCompletion(intent) => storage
+            .prepare_page_completion(intent)
+            .map(StorageResult::PageCompletionPrepared)
+            .map_err(map_error),
+        StorageOperation::CompletePage(prepared) => {
+            let outcome = storage
+                .record_analyzed_page_completion(prepared.completion, prepared.analysis_id)
+                .map_err(map_error)?;
+            // If this read fails, retry the frozen command. Repository replay
+            // has no side effects and returns no duplicate status notification.
+            let document = storage
+                .load_paste(prepared.completion.document_id)
+                .map_err(map_error)?
+                .ok_or(DocumentError::NotFound)?;
+            Ok(StorageResult::PageCompleted(document, outcome))
+        }
     }
 }
 

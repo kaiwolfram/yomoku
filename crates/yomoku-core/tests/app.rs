@@ -9,6 +9,8 @@ fn starts_in_library() {
         ViewModel {
             reader_time: None,
             reading_time_save_pending: false,
+            completion_save_pending: false,
+            completion_notice: None,
             destination: Destination::Library,
             settings_open: false,
             documents: vec![],

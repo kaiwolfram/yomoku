@@ -1323,3 +1323,31 @@ still drains work already submitted to FIFO, not unsubmitted coalesced core stat
 Android clock/lifecycle/periodic saves/teardown, analyzed completion and its frozen
 IDs/timestamp/page total remain open. No schema, dependency or public codec change;
 checkpoints still create no completion/encounter/status history.
+
+
+## 2026-10-24 — Freeze analyzed completion after checkpoint drain
+
+Accept CompleteReaderPage only for the visible document/page/exact position with a
+nonnegative caller timestamp. Capture the current preset and original Mode B identity
+immediately. Duplicates cannot replace that intent or generate another command;
+MissingAnalysis leaves legacy content readable without history or automatic rescan.
+An accepted completion waits for all coalesced checkpoints before preparing its total.
+The FIFO reserves a command ID and reads the entire departing page's durable buckets
+in one immediate transaction; this includes earlier offsets brought together by reflow.
+Preparation itself creates no history, consumption, status or position changes.
+
+Core freezes that prepared payload across all transaction retries. It blocks other
+storage and holds one first-wins departure until success. Once preparation starts,
+further timer updates are ignored: the platform must pause accounting and send its
+final checkpoint before requesting completion. A reread gets a new reservation.
+Completion returns persisted content for progress reconciliation; if that read fails
+after commit, retry the exact command and accept AlreadyRecorded without another
+notice or position write. Only newly Recorded positive counts expose a dismissible
+command-keyed CompletionNotice; route exit clears it. Counts use u64 in the typed
+protocol. Consumed timer tokens retire even at final EOF. A fresh forward at EOF
+is ignored; permanent finished state/Finish Book remain a separate step.
+
+No schema or external dependency version changes. The FFI test adds a workspace-only
+storage dev-dependency to seed analyzed snapshots without loading a dictionary.
+No Android timer, navigation controls, gesture, toast renderer or teardown flush is
+claimed by this slice; Android must later await both time and completion obligations.

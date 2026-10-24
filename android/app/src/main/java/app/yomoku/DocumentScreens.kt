@@ -159,6 +159,7 @@ internal fun StorageStatus(view: ViewModel) {
                     DocumentError.INVALIDDOCUMENT -> R.string.error_invalid_document
                     DocumentError.NOTFOUND -> R.string.error_document_not_found
                     DocumentError.INVALIDSETTINGS -> R.string.error_invalid_settings
+                    DocumentError.MISSINGANALYSIS -> R.string.error_missing_analysis
                 }
             ),
             color = MaterialTheme.colorScheme.error,

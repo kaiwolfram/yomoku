@@ -22,5 +22,6 @@ yomoku-runtime = { path = "../yomoku-runtime" }
 yomoku-analysis = { path = "../yomoku-analysis" }
 
 [dev-dependencies]
+yomoku-storage = { path = "../yomoku-storage" }
 serde = "=1.0.228"
 rusqlite = { version = "=0.40.2", default-features = false, features = ["bundled"] }

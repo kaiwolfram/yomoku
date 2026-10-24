@@ -913,3 +913,254 @@ fn all_reader_exit_routes_wait_for_checkpoints_and_identical_updates_do_not_chai
         }
     }
 }
+
+fn analyzed_reader() -> (Core<Yomoku>, PastedDocument) {
+    let core = Core::<Yomoku>::new();
+    let document = document(&format!("{}\n猫。", "𠮷".repeat(500)));
+    let mut effects = core.process_event(Event::CreatePaste(document.chapter.text.clone()));
+    finish(
+        &core,
+        &mut effects,
+        StorageResult::Created(document.clone()),
+    );
+    let mut effects = core.process_event(Event::OpenReader(document.document_id));
+    finish(
+        &core,
+        &mut effects,
+        StorageResult::Loaded(ReaderSnapshot {
+            document: document.clone(),
+            page_length: PageLength::default(),
+            analysis: ReaderAnalysis::Available(AnalysisId::try_from(42).unwrap()),
+        }),
+    );
+    (core, document)
+}
+
+fn forward(core: &Core<Yomoku>, completed_at_unix_ms: i64) -> Event {
+    let reader = core.view().reader.unwrap();
+    Event::CompleteReaderPage {
+        document_id: reader.document_id,
+        page: reader.anchor,
+        position: reader.position,
+        completed_at_unix_ms,
+    }
+}
+
+fn prepared(operation: StorageOperation) -> yomoku_core::completion::AnalyzedPageCompletion {
+    use yomoku_core::{
+        completion::{AnalyzedPageCompletion, PageCompletion},
+        document::CompletionCommandId,
+    };
+    let StorageOperation::PreparePageCompletion(intent) = operation else {
+        panic!("expected preparation")
+    };
+    AnalyzedPageCompletion {
+        completion: PageCompletion {
+            command_id: CompletionCommandId::try_from(99).unwrap(),
+            document_id: intent.document_id,
+            page: intent.page,
+            page_length: intent.page_length,
+            departing_position: intent.departing_position,
+            completed_at_unix_ms: intent.completed_at_unix_ms,
+            pending_time: yomoku_core::active_time::PendingReadingTime::from_millis(900).unwrap(),
+        },
+        analysis_id: intent.analysis_id,
+    }
+}
+
+#[test]
+fn analyzed_completion_drains_checkpoints_and_freezes_both_retry_stages_before_exit() {
+    use yomoku_core::{
+        active_time::{PendingReadingTime, SavedReadingTime},
+        completion::AnalyzedCompletionOutcome,
+    };
+    let (core, mut document) = analyzed_reader();
+    let saved = restore_time(&core, 10);
+    let update = |ms| yomoku_core::active_time::ReadingTimeUpdate {
+        pending: PendingReadingTime::from_millis(ms).unwrap(),
+        ..saved.value
+    };
+    let mut effects = core.process_event(Event::CheckpointReadingTime(update(100)));
+    core.process_event(Event::CheckpointReadingTime(update(200)));
+    let request = forward(&core, 1234);
+    core.process_event(request.clone());
+    assert!(core.view().completion_save_pending);
+    assert!(core.process_event(forward(&core, 9999)).is_empty());
+    core.process_event(Event::CloseDocument);
+    core.process_event(Event::OpenPaste); // First departure remains close.
+    core.process_event(Event::CheckpointReadingTime(update(900)));
+    finish(
+        &core,
+        &mut effects,
+        StorageResult::Failed(DocumentError::Unavailable),
+    );
+    assert!(core.process_event(Event::RetryReaderCompletion).is_empty());
+    let mut effects = core.process_event(Event::RetryReadingTimeCheckpoint);
+    let first_saved = SavedReadingTime {
+        value: update(100),
+        revision: saved.revision + 1,
+    };
+    let mut effects = resolve(
+        &core,
+        &mut effects,
+        StorageResult::ReadingTimeSaved(first_saved),
+    );
+    assert_eq!(
+        storage_operation(&effects),
+        StorageOperation::SaveReadingTime {
+            previous: first_saved,
+            checkpoint: update(900)
+        }
+    );
+    let mut effects = resolve(
+        &core,
+        &mut effects,
+        StorageResult::ReadingTimeSaved(SavedReadingTime {
+            value: update(900),
+            revision: first_saved.revision + 1,
+        }),
+    );
+    let frozen_intent = storage_operation(&effects);
+    let payload = prepared(frozen_intent.clone());
+    assert_eq!(payload.completion.completed_at_unix_ms, 1234);
+    assert_eq!(payload.analysis_id, AnalysisId::try_from(42).unwrap());
+    finish(
+        &core,
+        &mut effects,
+        StorageResult::Failed(DocumentError::Unavailable),
+    );
+    assert!(core.process_event(Event::RefreshLibrary).is_empty());
+    assert!(core
+        .process_event(Event::CheckpointReadingTime(update(1000)))
+        .is_empty());
+    let mut effects = core.process_event(Event::RetryReaderCompletion);
+    assert_eq!(storage_operation(&effects), frozen_intent);
+    let mut effects = resolve(
+        &core,
+        &mut effects,
+        StorageResult::PageCompletionPrepared(payload),
+    );
+    assert_eq!(
+        storage_operation(&effects),
+        StorageOperation::CompletePage(payload)
+    );
+    finish(
+        &core,
+        &mut effects,
+        StorageResult::Failed(DocumentError::Unavailable),
+    );
+    let mut effects = core.process_event(Event::RetryReaderCompletion);
+    assert_eq!(
+        storage_operation(&effects),
+        StorageOperation::CompletePage(payload)
+    );
+    assert!(core.process_event(request).is_empty());
+    document.reading_position = Some(payload.completion.next_position(&document).unwrap());
+    finish(
+        &core,
+        &mut effects,
+        StorageResult::PageCompleted(
+            document,
+            AnalyzedCompletionOutcome::Recorded { newly_known: 2 },
+        ),
+    );
+    assert_eq!(core.view().content_route, ContentRoute::Main);
+    assert!(core.view().reader.is_none() && core.view().reader_time.is_none());
+    assert!(!core.view().completion_save_pending && !core.view().reading_time_save_pending);
+    assert!(core.view().completion_notice.is_none()); // Exit retires the transient notice.
+}
+
+#[test]
+fn analyzed_completion_notifies_only_new_success_and_rejects_old_page_callbacks() {
+    use yomoku_core::completion::AnalyzedCompletionOutcome;
+    for outcome in [
+        AnalyzedCompletionOutcome::Recorded { newly_known: 2 },
+        AnalyzedCompletionOutcome::Recorded { newly_known: 0 },
+        AnalyzedCompletionOutcome::AlreadyRecorded,
+    ] {
+        let (core, mut document) = analyzed_reader();
+        let request = forward(&core, 555);
+        let mut effects = core.process_event(request.clone());
+        let payload = prepared(storage_operation(&effects));
+        let mut effects = resolve(
+            &core,
+            &mut effects,
+            StorageResult::PageCompletionPrepared(payload),
+        );
+        document.reading_position = Some(payload.completion.next_position(&document).unwrap());
+        finish(
+            &core,
+            &mut effects,
+            StorageResult::PageCompleted(document.clone(), outcome),
+        );
+        assert_eq!(
+            core.view().reader.as_ref().unwrap().position,
+            document.reading_position.unwrap()
+        );
+        assert_eq!(
+            core.view().documents[0].progress_percent,
+            document.library_summary().unwrap().progress_percent
+        );
+        assert!(!core.view().completion_save_pending && core.view().reader_time.is_none());
+        assert_eq!(
+            core.view()
+                .completion_notice
+                .map(|notice| (notice.command_id, notice.newly_known)),
+            if outcome == (AnalyzedCompletionOutcome::Recorded { newly_known: 2 }) {
+                Some((payload.completion.command_id, 2))
+            } else {
+                None
+            }
+        );
+        assert!(core.process_event(request).is_empty());
+        assert!(core.process_event(Event::RetryReaderCompletion).is_empty());
+        core.process_event(Event::DismissCompletionNotice);
+        assert!(core.view().completion_notice.is_none());
+        // Position-only backward movement enables a fresh explicit reread intent.
+        document.reading_position = Some(payload.completion.departing_position);
+        let mut effects = core.process_event(Event::SaveReadingPosition(
+            payload.completion.departing_position,
+        ));
+        finish(&core, &mut effects, StorageResult::PositionSaved(document));
+        let effects = core.process_event(forward(&core, 777));
+        assert!(
+            matches!(storage_operation(&effects), StorageOperation::PreparePageCompletion(intent) if intent.completed_at_unix_ms == 777)
+        );
+    }
+}
+
+#[test]
+fn completion_requires_matching_visible_page_and_explicit_stored_analysis() {
+    let (core, document) = analyzed_reader();
+    let mut invalid = core.view().reader.unwrap();
+    invalid.position.offset = invalid.anchor.range.end;
+    assert!(core
+        .process_event(Event::CompleteReaderPage {
+            document_id: invalid.document_id,
+            page: invalid.anchor,
+            position: invalid.position,
+            completed_at_unix_ms: 1
+        })
+        .is_empty());
+    assert!(core.process_event(forward(&core, -1)).is_empty());
+    let mut busy = core.process_event(Event::RestoreReadingTime);
+    assert!(core.process_event(forward(&core, 1)).is_empty());
+    assert!(!core.view().completion_save_pending);
+    finish(
+        &core,
+        &mut busy,
+        StorageResult::Failed(DocumentError::Unavailable),
+    );
+    core.process_event(Event::CloseDocument);
+    let mut effects = core.process_event(Event::OpenReader(document.document_id));
+    finish(&core, &mut effects, loaded(document, PageLength::default()));
+    let effects = core.process_event(forward(&core, 1));
+    assert!(!effects
+        .iter()
+        .any(|effect| matches!(effect, Effect::Storage(_))));
+    assert_eq!(
+        core.view().document_error,
+        Some(DocumentError::MissingAnalysis)
+    );
+    assert!(!core.view().completion_save_pending);
+}

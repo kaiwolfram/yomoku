@@ -46,8 +46,19 @@ for all accepted checkpoints; the first requested departure wins over duplicate 
 competing callbacks. Failure retains both the queue and departure for explicit retry.
 Cancelled restores cannot attach to closed readers. Reflow/same-offset saves preserve
 time; moving to a different offset requires a fresh restore. No SQL, clock or
-analyzer enters core. Automatic final checkpoint production, completion sequencing and
-platform clock/lifecycle/interactions/periodic scheduling remain separate work.
+analyzer enters core. CompleteReaderPage captures the visible document/page/position,
+preset, stored AnalysisId and caller-supplied timestamp, rejecting stale/duplicate
+callbacks. It waits for every accepted checkpoint, then the FIFO atomically reserves
+a command ID and freezes the whole page's durable duration. Core chains the prepared
+analyzed transaction and retains each stage unchanged for RetryReaderCompletion.
+Other storage and departures wait until success; the first deferred departure wins.
+Only newly Recorded results with newly_known > 0 publish a dismissible command-keyed
+CompletionNotice. AlreadyRecorded and zero results publish none. Successful results
+refresh reader/Library progress from persisted content and retire consumed timer tokens.
+The worker's post-commit read can fail; retry uses the same command, reconciles the
+persisted position and suppresses duplicate notices. No analyzer is loaded for completion.
+Automatic final checkpoint production and platform clock/lifecycle/interactions/
+periodic scheduling remain separate work.
 
 `yomoku-analysis` is a separate Rust I/O adapter using Sudachi.rs v0.7.0 at
 `5de0410b6edfd428fc510cc9763440772e9619d5` and Full 20261015 (V1). Its constructor
@@ -162,8 +173,8 @@ scalar-boundary and EOF validation. ReaderPage projects the page containing the
 saved position at the persisted global preset (default 500), preserving the exact
 offset separately from its page anchor/counter. These typed values cross FFI. The position-only
 save hook updates the reader and Library percentage after commit; late saves
-cannot reopen a closed reader. Page controls/swipes and atomic forward completion
-remain next. Settings reflow keeps the exact position and Library percentage;
+cannot reopen a closed reader. Explicit atomic forward intents are connected;
+Android page controls/swipes remain next. Settings reflow keeps the exact position and Library percentage;
 only committed values change the preset/page. An independent active-document
 snapshot prevents repository loads from changing the text used for reader reflow.
 Opening now loads content/position, the preset and the original stored Mode B
@@ -175,7 +186,8 @@ it remains readable without analyzer initialization, rescan or vocabulary writes
 The optional view field is absent outside an opened reader. Settings/position
 saves/plain loads preserve its identity; reader exit/replacement clears it, and
 cancelled loads cannot attach it. Corrupt metadata returns a typed error without
-fallback/repair. No forward/completion action or legacy-completion policy yet.
+fallback/repair. Forward intents return MissingAnalysis for legacy content, with
+no fallback, rescan or history. Legacy analysis recovery remains undecided.
 
 `yomoku-runtime` composes Core → HandleEffectLayer<StorageEffects> → MapEffectLayer.
 A named FIFO worker owns one lazily opened SQLite connection per bridge. Opening,
@@ -251,9 +263,9 @@ Migration 0007 persists immutable chapter analysis/token snapshots and reversibl
 segmentation overrides. Identical snapshot retries reuse IDs; conflicting output
 under the same revision/mode key errors. Override replacement/deactivation commits
 atomically, keeps base output intact and preserves global rules after source content
-deletion. No production document edit/rename/delete API exists. One hundred and two storage
+deletion. No production document edit/rename/delete API exists. One hundred and three storage
 tests cover migrations, reopen, rollback, Unicode, concurrency, ID allocation,
-settings, vocabulary, analysis anchors and completion history. Only base-analysis identity reaches runtime/FFI today; token/override
+settings, vocabulary, analysis anchors and completion history. Base-analysis identity and anchored completion intents reach core/FFI; token/override
 repositories have no UI operations; synthetic fixtures validate storage,
 not Sudachi behavior. Cross-occurrence matching and overlapping edit resolution
 belong to the later segmentation application task.
@@ -350,8 +362,9 @@ Created/Existing summaries. Native descriptor delivery and retained/background
 lifecycle are connected. TXT/EPUB/SRT parsing, metadata and multi-file import
 semantics remain unchecked. Legacy imports are not automatically rescanned.
 Explicit core/worker/FFI pending-time checkpoints coalesce during unresolved saves
-and drain before reader movement/exit. Completion sequencing, Android monotonic
-lifecycle/interactions and page movement/swipes remain next. The analyzed transaction is
-repository-only; effective segmentation edits and statistics aggregation remain
+and drain before reader movement/exit or analyzed completion. Completion preparation/
+exact retries now run through core/FIFO/FFI. Android monotonic lifecycle/interactions,
+native teardown acknowledgment, page movement/swipes and toast rendering remain next;
+effective segmentation edits and statistics aggregation remain
 separate tasks. Add analysis/import crates only with
 actual behavior; Sudachi Full defaults to B, JMdict/JMnedict remain offline data, and future Nostr I/O stays in Rust. Configuration is empty.

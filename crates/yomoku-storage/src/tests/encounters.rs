@@ -633,3 +633,82 @@ fn failed_migration_rolls_back_table_rebuild_indexes_and_history_then_retries() 
     assert_eq!(storage.schema_version().unwrap(), 10);
     assert_eq!(entry(&storage, "猫").status, VocabularyStatus::New);
 }
+
+#[test]
+fn preparation_freezes_all_page_buckets_and_reserves_only_after_successful_validation() {
+    use yomoku_core::completion::PageCompletionIntent;
+    let database = TestDatabase::new();
+    let mut storage = Storage::open(database.path()).unwrap();
+    let imported = create_import(&mut storage, "猫 猫 犬");
+    let document = &imported.document;
+    save_time(&mut storage, document, 100);
+    let second = position(document, "猫 ".len());
+    storage
+        .save_reading_position(document.document_id, second)
+        .unwrap();
+    let saved = storage
+        .load_pending_reading_time(document.document_id, second)
+        .unwrap();
+    storage
+        .save_pending_reading_time(saved, PendingReadingTime::from_millis(200).unwrap())
+        .unwrap();
+    let pages = LogicalPages::new(
+        std::slice::from_ref(&document.chapter),
+        storage.page_length().unwrap(),
+    )
+    .unwrap();
+    let intent = PageCompletionIntent {
+        document_id: document.document_id,
+        page: pages.pages()[0],
+        page_length: storage.page_length().unwrap(),
+        departing_position: second,
+        completed_at_unix_ms: 1234,
+        analysis_id: imported.analysis_id,
+    };
+    let before = totals(&storage);
+    for invalid in [
+        PageCompletionIntent {
+            completed_at_unix_ms: -1,
+            ..intent
+        },
+        PageCompletionIntent {
+            departing_position: position(document, 0),
+            ..intent
+        },
+        PageCompletionIntent {
+            page_length: yomoku_core::pagination::PageLength::Characters250,
+            ..intent
+        },
+    ] {
+        assert!(storage.prepare_page_completion(invalid).is_err());
+        assert_eq!(count(&storage, "completion_commands"), 0);
+        assert_eq!(totals(&storage), before);
+    }
+    storage.connection.execute_batch("CREATE TRIGGER fail BEFORE INSERT ON completion_commands BEGIN SELECT RAISE(ABORT, 'fixture'); END;").unwrap();
+    assert!(storage.prepare_page_completion(intent).is_err());
+    assert_eq!(count(&storage, "completion_commands"), 0);
+    storage
+        .connection
+        .execute_batch("DROP TRIGGER fail")
+        .unwrap();
+    let prepared = storage.prepare_page_completion(intent).unwrap();
+    assert_eq!(prepared.completion.pending_time.milliseconds(), 300);
+    assert_eq!(prepared.analysis_id, imported.analysis_id);
+    assert_eq!(prepared.completion.completed_at_unix_ms, 1234);
+    assert_eq!(totals(&storage), before); // No completion, position, statuses or consumption.
+    assert_eq!(count(&storage, "completion_commands"), 1);
+    assert_eq!(
+        storage
+            .record_analyzed_page_completion(prepared.completion, prepared.analysis_id)
+            .unwrap(),
+        AnalyzedCompletionOutcome::Recorded { newly_known: 2 }
+    );
+    drop(storage);
+    let mut storage = Storage::open(database.path()).unwrap();
+    assert_eq!(
+        storage
+            .record_analyzed_page_completion(prepared.completion, prepared.analysis_id)
+            .unwrap(),
+        AnalyzedCompletionOutcome::AlreadyRecorded
+    );
+}

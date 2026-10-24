@@ -351,7 +351,8 @@ reflow and plain LoadPaste results, and clears on reader exit/replacement. Late
 cancelled loads cannot restore it. Generated Kotlin codecs carry the exact i64
 identity and explicit missing variant. Completion will validate all snapshot tokens
 inside its transaction; Missing does not authorize a text-only completion path.
-Timer checkpoints, forward intents and legacy-completion policy remain open.
+Timer checkpoints and anchored forward intents are connected below. MissingAnalysis
+blocks legacy forward completion without rescan; recovery policy remains open.
 
 ## Page completion repository foundation (migration 0005)
 `CompletionCommandId` is another positive i64 identity. `completion_commands`
@@ -502,9 +503,9 @@ restore/unrelated busy operations, pause its timer and await the core's drain be
 destroying the native session. Core only coalesces during unresolved checkpoint
 saves; it does not queue arbitrary busy operations or create time itself.
 No automatic clock/lifecycle/interactions, periodic save, native teardown flush or
-completion intent is connected yet. This protocol creates
-no completion, encounter or status events. Migration 0010 already provides the
-analyzed completion transaction; application sequencing and post identity remain open.
+platform timer is connected yet. Checkpoint operations create no completion, encounter
+or status events. Analyzed completion intents are connected below; post identity
+remains open.
 
 ## Transient application state
 `app::Destination` is Library (default), Nostr, Statistics or Vocabulary.
@@ -548,14 +549,36 @@ can retry. No path or SQLite diagnostic string is exposed in application state.
 The bridge constructor takes the path separately; Android uses filesDir/yomoku.sqlite3.
 Submitted writes finish even if the session closes; shutdown does not block UI.
 
+## Analyzed completion intent transport
+CompleteReaderPage includes the visible document/page/exact position and a nonnegative
+caller-supplied Unix timestamp. Core pins the preset and stored AnalysisId at acceptance,
+rejects stale page callbacks and already-departed EOF, and drains accepted checkpoints.
+MissingAnalysis is explicit: readable legacy documents gain no inferred encounters.
+prepare_page_completion validates the current position/page/preset, reserves one command
+ID and reads all durable buckets belonging to that page in one immediate transaction.
+No history, status, time consumption or position change occurs in preparation. Core
+then retains the exact AnalyzedPageCompletion (ID, timestamp, page total and analysis)
+through failures and RetryReaderCompletion. Other storage mutations are blocked;
+reader exits/position-only moves wait, retaining the first requested departure.
+record_analyzed_page_completion performs the existing migration-0010 atomic write.
+The worker then loads the persisted document for reader/Library reconciliation. A
+failed post-commit load retains the same command: replay returns AlreadyRecorded,
+never rewrites position/time/history and produces no duplicate notification. A new
+Recorded outcome alone may expose CompletionNotice(command_id, newly_known), only
+when positive; dismissal, new completion or reader exit clears this transient state.
+Completion retires the reader's consumed time token; another anchor/reread restores
+its own durable duration. Rereads reserve a new command. No new schema or dependency
+version; automatic Android clock/final saves, controls, toast and finished-book state
+are still separate tasks. Native teardown must await all pending core obligations.
+
 ## Required future schema constraints
 - Future import repositories must extend the identity/immutable-text and durable
   chapter/byte-offset contract above to multiple chapters.
 - Add analyzer dictionary-form links (nullable) to global vocabulary and wire
   registration/status repositories into typed application/import effects.
   Reading never participates in identity.
-- Wire analyzed page completion and automatic final checkpoints into typed core/worker/
-  FFI operations; reread uses a new command ID and frozen analysis identity.
+- Connect automatic final checkpoints and Android completion controls to the typed
+  core/worker/FFI operations; preserve new reread IDs and frozen analysis identity.
 - Pending page time and current text offset separate from completed events;
   permanent finished-at-least-once separate from current percentage.
 - Document deletion removes content/progress but preserves historical provenance,

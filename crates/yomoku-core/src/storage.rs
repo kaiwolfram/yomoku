@@ -4,6 +4,7 @@ use crux_core::capability::Operation;
 use serde::{Deserialize, Serialize};
 
 use crate::active_time::{ReadingTimeUpdate, SavedReadingTime};
+use crate::completion::{AnalyzedCompletionOutcome, AnalyzedPageCompletion, PageCompletionIntent};
 use crate::document::{DocumentId, LibraryDocument, PastedDocument};
 use crate::pagination::{PageLength, ReadingPosition};
 use crate::reader::ReaderSnapshot;
@@ -28,6 +29,8 @@ pub enum StorageOperation {
         previous: SavedReadingTime,
         checkpoint: ReadingTimeUpdate,
     },
+    PreparePageCompletion(PageCompletionIntent),
+    CompletePage(AnalyzedPageCompletion),
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -40,6 +43,7 @@ pub enum DocumentError {
     InvalidDocument,
     NotFound,
     InvalidSettings,
+    MissingAnalysis,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -55,6 +59,8 @@ pub enum StorageResult {
     PageLengthSaved(PageLength),
     ReadingTimeLoaded(SavedReadingTime),
     ReadingTimeSaved(SavedReadingTime),
+    PageCompletionPrepared(AnalyzedPageCompletion),
+    PageCompleted(PastedDocument, AnalyzedCompletionOutcome),
     Failed(DocumentError),
 }
 

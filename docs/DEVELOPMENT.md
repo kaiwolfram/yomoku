@@ -18,7 +18,7 @@ with functioning rustup can omit the PATH workaround. Do not assume this compile
 is the project's minimum supported version; establish that with dependencies.
 Cargo.lock is retained for reproducible application development.
 Crux 0.20.0 declares Rust 1.90 minimum; the full locked graph has only been tested
-with 1.99.1. Current host baseline: 195 data-free Rust tests (102 storage, eight
+with 1.99.1. Current host baseline: 200 data-free Rust tests (103 storage, eight
 runtime). Eleven analysis fixtures and one runtime fixture run separately with
 each Full loader via tools/test-sudachi.sh (see below).
 
@@ -45,8 +45,9 @@ rollback. Migration 0009 consumes frozen time with completion history/position.
 Reboot remains simulated at the duration boundary; platform lifecycle wiring and
 actual Android close/reboot verification remain unchecked. Core/FFI checkpoints
 coalesce during unresolved saves and drain before reader departure; automatic
-platform timing remains future work. Analyzed occurrence/status completion commits
-atomically in the repository (migration 0010); application wiring remains open.
+platform timing remains future work. Analyzed completion now drains checkpoints,
+freezes exact retries and reconciles position through core/FIFO/FFI. Android
+controls, gestures, completion toast and finished-book behavior remain open.
 
 ## Kotlin payload generation
 ```sh
@@ -1286,3 +1287,41 @@ source changed. No device instrumentation, standalone owned/mapped Full suite,
 release APK or probe/tablet/physical-arm64 execution. Automatic timer production,
 unrelated busy-operation handling, native teardown flush and analyzed completion
 remain unimplemented; actual Android close/reboot recovery is still unverified.
+
+## Analyzed completion intent transport
+
+Verified 2026-10-24 with the Rust PATH workaround and Android environment above;
+native generation/build/test runners executed sequentially:
+```sh
+cargo build --workspace --locked --offline
+cargo test --workspace --all-features --locked --offline
+cargo fmt --all -- --check
+cargo clippy --workspace --all-targets --all-features --locked --offline -- -D warnings
+tools/test-kotlin-bridge.sh
+tools/format-kotlin.sh --check
+PATH=/home/kai/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin:$PATH JAVA_HOME=/home/kai/repos/yomoku/.local/jdk-17/jdk-17.0.21+9 GRADLE_USER_HOME=/home/kai/repos/yomoku/.local/gradle ANDROID_HOME=/home/kai/Android/Sdk ./android/gradlew -p android :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug --offline --console=plain
+git diff --check
+```
+PASS: workspace build, 200 data-free Rust tests (103 storage), fmt/strict Clippy,
+real-Full Kotlin/JNI plus seven Unicode/two analysis exchanges, Kotlin format,
+both-ABI debug/test APK builds and strict Android lint. Three core tests cover
+checkpoint-before-completion ordering, duplicate/stale callbacks, frozen preparation/
+transaction retries, deferred exit, notices, rereads and explicit MissingAnalysis.
+Repository preparation sums multiple saved offsets and rolls back invalid/failed
+reservations without history/status/position/time consumption. A blocked-SQLite FFI
+test checks nonblocking burst drain, injected completion rollback, one reserved ID,
+frozen timestamp/AnalysisId/page total, 250 occurrences then 500 on reread, New-only
+promotion and reopened position. JNI completes and rereads with an unavailable
+dictionary, proving stored analysis avoids a Sudachi reopen.
+
+Initial compile omissions, Clippy's single-match warning and the Android preview's
+missing view fields were fixed before the final passing checks. Gradle initially
+failed on sandbox lock-coordination sockets, then passed with escalation. Prior
+benign Crux shutdown, ktfmt JVM Unsafe and SDK XML-version warnings persist.
+No open failure, schema or external dependency version change. A workspace-only
+storage dev-dependency seeds FFI fixtures. Public event/view codecs add completion
+intents, pending state and command-keyed notices; Android's exhaustive error mapping
+and preview fixture are updated. No device instrumentation, standalone owned/mapped
+Full suite, release APK or probe/tablet/arm64 execution. Automatic Android timer,
+final-save/native teardown acknowledgment, controls/swipes/toast and finished-book
+state remain open; actual Android close/reboot recovery remains unverified.

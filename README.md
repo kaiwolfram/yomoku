@@ -25,7 +25,9 @@ Next/Previous controls, swipes, word lookup and vocabulary controls are still
 pending. The Rust repository atomically saves completion encounters, New→Known
 transitions, active time and position. Core/worker/FFI pending-time checkpoints
 support exact retries, coalesced saves before reader movement/exit and reopen.
-Application completion actions and Android timer wiring remain unfinished.
+Explicit analyzed completion intents now drain checkpoints, freeze retries and update
+progress through core/FIFO/FFI, without analyzer loading. Android timer, navigation
+controls, gestures and completion toast rendering remain unfinished.
 Nostr, Statistics and Vocabulary tabs currently
 show placeholders.
 

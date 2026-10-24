@@ -962,3 +962,30 @@
   still ignore; no automatic timer is connected. No device instrumentation,
   standalone Full fixture suite, release/probe/tablet/arm64 execution; actual
   Android close/reboot remains unverified. No local blocker.
+
+## 2026-10-24 — Analyzed completion intents after checkpoint drain
+
+- Started clean. Added anchored CompleteReaderPage/RetryReaderCompletion and
+  transient positive CompletionNotice through core/FIFO/generated FFI. Capture
+  page/position/preset/AnalysisId/timestamp before checkpoint drain, atomically
+  prepare command ID + whole-page durable time, then commit analyzed completion.
+  Failures retain the exact stage/payload; other storage and one first-wins
+  departure wait. Success reconciles persisted position/progress and retires time.
+  AlreadyRecorded suppresses duplicate notices; deliberate reread gets a new ID.
+  MissingAnalysis blocks legacy completion without rescan or fallback.
+- Added three core tests, one preparation repository test and a blocked-SQLite
+  FFI test for checkpoint bursts, rollback, frozen identity/time, duplicate
+  callbacks, 250→500 occurrences on reread, New-only promotion and reopened
+  position. Real-Full Kotlin/JNI now completes/rereads without dictionary access.
+- PASS: build, 200 data-free Rust tests (103 storage), fmt/strict Clippy, host
+  Kotlin/JNI + Unicode/analysis exchanges, Kotlin format, both-ABI debug/test APKs,
+  strict Android lint and diff check. Initial compile/Clippy/preview omissions
+  fixed; Gradle socket denial passed with escalation. No open failure. Existing
+  benign Crux/ktfmt/SDK warnings remain. No schema/external dependency version
+  changes; one workspace storage dev-dependency seeds the FFI fixture.
+- Updated README, plan, decisions, architecture/data model, development and handoff.
+  Next: actual Android clock/lifecycle/interactions/final checkpoints and native
+  teardown acknowledgment, then controls/swipes/toast/Finish Book. No automatic
+  timer/UI forward action yet. No device instrumentation, standalone Full suite,
+  release/probe/tablet/arm64 rerun; actual close/reboot remains unverified.
+  No local blocker; Nostr configuration remains empty and Q188 remains open.

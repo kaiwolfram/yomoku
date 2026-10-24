@@ -174,7 +174,7 @@ fn internal_storage_results_cannot_be_injected_over_ffi() {
     // The skipped internal variant follows the final public variant. Derive its
     // discriminant so adding a public event cannot silently weaken this check.
     let mut last_public = Vec::new();
-    BincodeFfiFormat::serialize(&mut last_public, &Event::RetryReadingTimeCheckpoint).unwrap();
+    BincodeFfiFormat::serialize(&mut last_public, &Event::DismissCompletionNotice).unwrap();
     let internal_tag = u32::from_le_bytes(last_public.try_into().unwrap()) + 1;
     assert_eq!(
         native.update(&internal_tag.to_le_bytes()),
@@ -453,4 +453,197 @@ fn busy_time_updates_flush_before_position_and_close_through_async_ffi() {
             0
         );
     }
+}
+
+#[test]
+fn analyzed_completion_flushes_freezes_retries_and_rereads_through_async_ffi() {
+    use yomoku_core::{
+        active_time::PendingReadingTime,
+        analysis::{AnalysisProfile, AnalyzedToken, ChapterAnalysis, SplitMode},
+        document::{PasteText, TextAnchor, TextOffset, TextRange},
+        pagination::PageLength,
+    };
+    let db = Database::new();
+    std::fs::create_dir(&db.0).unwrap();
+    let mut storage = yomoku_storage::Storage::open(db.path()).unwrap();
+    storage.save_page_length(PageLength::Characters250).unwrap();
+    let imported = storage
+        .create_analyzed_paste(
+            &PasteText::new(format!("{}English 。\n犬 犬", "猫 ".repeat(250))).unwrap(),
+            1,
+            |chapter| {
+                let mut cursor = 0;
+                let tokens = chapter
+                    .text
+                    .split_whitespace()
+                    .map(|surface| {
+                        let start = cursor + chapter.text[cursor..].find(surface).unwrap();
+                        cursor = start + surface.len();
+                        AnalyzedToken {
+                            anchor: TextAnchor {
+                                source_id: chapter.source_id,
+                                chapter_id: chapter.chapter_id,
+                                range: TextRange {
+                                    start: TextOffset::at(&chapter.text, start).unwrap(),
+                                    end: TextOffset::at(&chapter.text, cursor).unwrap(),
+                                },
+                            },
+                            surface: surface.into(),
+                            is_japanese: matches!(surface, "猫" | "犬"),
+                            reading: None,
+                            dictionary_form: None,
+                        }
+                    })
+                    .collect();
+                Ok::<_, std::convert::Infallible>(ChapterAnalysis {
+                    profile: AnalysisProfile {
+                        engine_revision: "fixture-engine".into(),
+                        dictionary_revision: "fixture-dictionary".into(),
+                    },
+                    mode: SplitMode::B,
+                    tokens,
+                })
+            },
+        )
+        .unwrap();
+    drop(storage);
+    let (native, callbacks, _) = bridge(&db.path());
+    dispatch(&native, &callbacks, Event::RefreshLibrary);
+    let opened = dispatch(
+        &native,
+        &callbacks,
+        Event::OpenReader(imported.document.document_id),
+    );
+    let first = opened.reader.unwrap();
+    let request = Event::CompleteReaderPage {
+        document_id: first.document_id,
+        page: first.anchor,
+        position: first.position,
+        completed_at_unix_ms: 1234,
+    };
+    let mut checkpoint = dispatch(&native, &callbacks, Event::RestoreReadingTime)
+        .reader_time
+        .unwrap();
+    let sql = rusqlite::Connection::open(db.path()).unwrap();
+    let send = |event: Event| {
+        let mut bytes = Vec::new();
+        BincodeFfiFormat::serialize(&mut bytes, &event).unwrap();
+        native.update(&bytes).unwrap();
+    };
+    let await_callbacks = |count| {
+        for _ in 0..count {
+            let (worker, bytes) = callbacks.recv_timeout(Duration::from_secs(10)).unwrap();
+            assert_ne!(worker, thread::current().id());
+            let requests: Requests<ShellEffectFfi> = BincodeFfiFormat::deserialize(&bytes).unwrap();
+            assert!(requests
+                .0
+                .iter()
+                .all(|request| matches!(request.effect, ShellEffectFfi::Render(_))));
+        }
+        assert!(!view(&native).storage_busy);
+    };
+    sql.execute_batch("BEGIN IMMEDIATE; CREATE TRIGGER fail BEFORE INSERT ON reading_occurrences BEGIN SELECT RAISE(ABORT, 'fixture'); END;").unwrap();
+    for ms in [100, 400, 200] {
+        checkpoint.pending = PendingReadingTime::from_millis(ms).unwrap();
+        send(Event::CheckpointReadingTime(checkpoint));
+    }
+    send(request.clone());
+    send(Event::CompleteReaderPage {
+        completed_at_unix_ms: 9999,
+        document_id: first.document_id,
+        page: first.anchor,
+        position: first.position,
+    });
+    assert!(view(&native).completion_save_pending);
+    assert!(callbacks.recv_timeout(Duration::from_millis(100)).is_err());
+    sql.execute_batch("COMMIT").unwrap();
+    await_callbacks(4); // Two checkpoints, preparation, failed completion.
+    assert_eq!(
+        view(&native).document_error,
+        Some(DocumentError::Unavailable)
+    );
+    assert!(view(&native).completion_save_pending);
+    assert_eq!(view(&native).reader.unwrap(), first);
+    let count = |table: &str| {
+        sql.query_row(&format!("SELECT count(*) FROM {table}"), [], |row| {
+            row.get::<_, i64>(0)
+        })
+        .unwrap()
+    };
+    assert_eq!(count("completion_commands"), 1);
+    assert_eq!(count("reading_completions"), 0);
+    assert_eq!(count("reading_occurrences"), 0);
+    assert!(view(&native).completion_notice.is_none());
+    sql.execute_batch("DROP TRIGGER fail").unwrap();
+    let completed = dispatch(&native, &callbacks, Event::RetryReaderCompletion);
+    assert!(!completed.completion_save_pending && !completed.reading_time_save_pending);
+    assert!(completed.reader_time.is_none());
+    assert_eq!(
+        completed.reader_analysis,
+        Some(ReaderAnalysis::Available(imported.analysis_id))
+    );
+    assert_eq!(
+        completed.reader.as_ref().unwrap().position.offset,
+        first.anchor.range.end
+    );
+    let notice = completed.completion_notice.unwrap();
+    assert_eq!(notice.newly_known, 1);
+    assert_eq!(i64::from(notice.command_id), 1);
+    assert_eq!(count("completion_commands"), 1);
+    assert_eq!(count("reading_occurrences"), 250);
+    let frozen: (i64, i64, i64) = sql.query_row("SELECT completed_at_unix_ms, active_time_ms, (SELECT analysis_id FROM completion_analyses) FROM reading_completions", [], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?))).unwrap();
+    assert_eq!(frozen, (1234, 400, i64::from(imported.analysis_id)));
+    let states: Vec<(String, String)> = sql
+        .prepare("SELECT surface, status FROM vocabulary ORDER BY surface")
+        .unwrap()
+        .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))
+        .unwrap()
+        .collect::<Result<_, _>>()
+        .unwrap();
+    assert!(states.contains(&("猫".into(), "known".into())));
+    assert!(states.contains(&("犬".into(), "new".into())));
+    let before = view(&native);
+    send(request);
+    send(Event::RetryReaderCompletion);
+    assert_eq!(view(&native), before);
+    assert!(callbacks.try_recv().is_err());
+    dispatch(
+        &native,
+        &callbacks,
+        Event::SaveReadingPosition(first.position),
+    );
+    assert_eq!(count("reading_completions"), 1); // Backward movement counts nothing.
+    assert_eq!(
+        dispatch(&native, &callbacks, Event::RestoreReadingTime)
+            .reader_time
+            .unwrap()
+            .pending
+            .milliseconds(),
+        0
+    );
+    send(Event::CompleteReaderPage {
+        document_id: first.document_id,
+        page: first.anchor,
+        position: first.position,
+        completed_at_unix_ms: 5678,
+    });
+    await_callbacks(2);
+    assert!(view(&native).completion_notice.is_none()); // Reread gets a new ID, no New words.
+    assert_eq!(count("completion_commands"), 2);
+    assert_eq!(count("reading_completions"), 2);
+    assert_eq!(count("reading_occurrences"), 500);
+    send(Event::CloseDocument);
+    drop(native);
+    assert!(callbacks.recv_timeout(Duration::from_secs(10)).is_err());
+    let (native, callbacks, _) = bridge(&db.path());
+    let reopened = dispatch(&native, &callbacks, Event::OpenReader(first.document_id));
+    assert_eq!(
+        reopened.reader.unwrap().position.offset,
+        first.anchor.range.end
+    );
+    assert_eq!(
+        reopened.reader_analysis,
+        Some(ReaderAnalysis::Available(imported.analysis_id))
+    );
+    assert!(reopened.completion_notice.is_none() && !reopened.completion_save_pending);
 }
