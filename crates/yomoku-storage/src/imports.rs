@@ -1,15 +1,18 @@
 use std::{collections::BTreeSet, error::Error, fmt};
 
-use rusqlite::TransactionBehavior;
+use rusqlite::{Connection, OptionalExtension, TransactionBehavior};
+use sha2::{Digest, Sha256};
 use yomoku_core::{
     analysis::{ChapterAnalysis, SplitMode},
-    document::{AnalysisId, ChapterText, PasteText, PastedDocument},
+    document::{AnalysisId, ChapterText, DocumentId, PasteText, PastedDocument},
     vocabulary::Surface,
 };
 
 use crate::{
-    analysis::store_chapter_analysis_in, documents::create_paste_in,
-    vocabulary::register_vocabulary_in, Storage, StorageError,
+    analysis::store_chapter_analysis_in,
+    documents::{create_paste_in, load_paste_in},
+    vocabulary::register_vocabulary_in,
+    Storage, StorageError,
 };
 
 #[derive(Debug)]
@@ -17,6 +20,14 @@ pub struct AnalyzedPaste {
     pub document: PastedDocument,
     pub analysis_id: AnalysisId,
     pub registered_surfaces: usize,
+}
+
+#[derive(Debug)]
+pub enum PasteImportOutcome {
+    Created(AnalyzedPaste),
+    /// Reference the committed live document without analysis, registration or
+    /// changes to title/progress. This may predate analyzed imports entirely.
+    Existing(PastedDocument),
 }
 
 /// Keep analyzer diagnostics typed without coupling SQLite to a particular engine.
@@ -51,6 +62,56 @@ impl<E> From<StorageError> for PasteImportError<E> {
 }
 
 impl Storage {
+    /// Atomically deduplicate exact pasted UTF-8 bytes before analyzing a new
+    /// document. The callback is never invoked for an existing document. Legacy
+    /// documents get hashes lazily; existing duplicates remain separate entries.
+    /// Like create_analyzed_paste, this must run on a worker with a ready analyzer.
+    pub fn import_analyzed_paste<E>(
+        &mut self,
+        text: &PasteText,
+        registered_at_unix_ms: i64,
+        analyze: impl FnOnce(&ChapterText) -> Result<ChapterAnalysis, E>,
+    ) -> Result<PasteImportOutcome, PasteImportError<E>> {
+        if registered_at_unix_ms < 0 {
+            return Err(StorageError::InvalidVocabulary.into());
+        }
+        let digest = Sha256::digest(text.as_str().as_bytes());
+        let transaction = self
+            .connection
+            .transaction_with_behavior(TransactionBehavior::Immediate)
+            .map_err(StorageError::from)?;
+        index_unhashed_pastes_in(&transaction)?;
+        let existing: Option<i64> = transaction
+            .query_row(
+                "SELECT document_id FROM paste_content_hashes WHERE sha256 = ?1
+                 ORDER BY document_id LIMIT 1",
+                [digest.as_slice()],
+                |row| row.get(0),
+            )
+            .optional()
+            .map_err(StorageError::from)?;
+        let outcome = if let Some(id) = existing {
+            let id = DocumentId::try_from(id).map_err(|_| StorageError::InvalidDocument)?;
+            let document = load_paste_in(&transaction, id)?.ok_or(StorageError::InvalidDocument)?;
+            // A stale/corrupt digest (or collision) must never reference unrelated text.
+            if document.chapter.text != text.as_str() {
+                return Err(StorageError::InvalidDocument.into());
+            }
+            PasteImportOutcome::Existing(document)
+        } else {
+            let imported =
+                create_analyzed_paste_in(&transaction, text, registered_at_unix_ms, analyze)?;
+            insert_paste_hash_in(
+                &transaction,
+                imported.document.document_id,
+                digest.as_slice(),
+            )?;
+            PasteImportOutcome::Created(imported)
+        };
+        transaction.commit().map_err(StorageError::from)?;
+        Ok(outcome)
+    }
+
     /// Allocate canonical source/chapter IDs, analyze, then commit text, a Mode B
     /// snapshot and unique Japanese registrations together. Run on an I/O worker.
     /// The callback must reuse an already loaded analyzer; it runs while holding
@@ -70,27 +131,69 @@ impl Storage {
             .connection
             .transaction_with_behavior(TransactionBehavior::Immediate)
             .map_err(StorageError::from)?;
-        let document = create_paste_in(&transaction, text)?;
-        let analysis = analyze(&document.chapter).map_err(PasteImportError::Analysis)?;
-        if analysis.mode != SplitMode::B {
-            return Err(StorageError::InvalidAnalysis.into());
-        }
-        let analysis_id =
-            store_chapter_analysis_in(&transaction, document.chapter.chapter_id, &analysis)?;
-        let surfaces = analysis
-            .tokens
-            .iter()
-            .filter(|token| token.is_japanese)
-            .map(|token| Surface::new(&token.surface))
-            .collect::<Result<BTreeSet<_>, _>>()
-            .map_err(|_| StorageError::InvalidAnalysis)?;
-        let registered_surfaces =
-            register_vocabulary_in(&transaction, &surfaces, registered_at_unix_ms)?;
+        let imported =
+            create_analyzed_paste_in(&transaction, text, registered_at_unix_ms, analyze)?;
         transaction.commit().map_err(StorageError::from)?;
-        Ok(AnalyzedPaste {
-            document,
-            analysis_id,
-            registered_surfaces,
-        })
+        Ok(imported)
     }
+}
+
+fn create_analyzed_paste_in<E>(
+    connection: &Connection,
+    text: &PasteText,
+    registered_at_unix_ms: i64,
+    analyze: impl FnOnce(&ChapterText) -> Result<ChapterAnalysis, E>,
+) -> Result<AnalyzedPaste, PasteImportError<E>> {
+    let document = create_paste_in(connection, text)?;
+    let analysis = analyze(&document.chapter).map_err(PasteImportError::Analysis)?;
+    if analysis.mode != SplitMode::B {
+        return Err(StorageError::InvalidAnalysis.into());
+    }
+    let analysis_id =
+        store_chapter_analysis_in(connection, document.chapter.chapter_id, &analysis)?;
+    let surfaces = analysis
+        .tokens
+        .iter()
+        .filter(|token| token.is_japanese)
+        .map(|token| Surface::new(&token.surface))
+        .collect::<Result<BTreeSet<_>, _>>()
+        .map_err(|_| StorageError::InvalidAnalysis)?;
+    let registered_surfaces = register_vocabulary_in(connection, &surfaces, registered_at_unix_ms)?;
+    Ok(AnalyzedPaste {
+        document,
+        analysis_id,
+        registered_surfaces,
+    })
+}
+
+fn insert_paste_hash_in(
+    connection: &Connection,
+    id: DocumentId,
+    digest: &[u8],
+) -> Result<(), StorageError> {
+    connection.execute(
+        "INSERT INTO paste_content_hashes (document_id, sha256) VALUES (?1, ?2)",
+        (i64::from(id), digest),
+    )?;
+    Ok(())
+}
+
+fn index_unhashed_pastes_in(connection: &Connection) -> Result<(), StorageError> {
+    let mut statement = connection.prepare(
+        "SELECT d.id FROM documents d JOIN sources s ON s.id = d.source_id
+         WHERE s.kind = 'paste'
+         AND NOT EXISTS (SELECT 1 FROM paste_content_hashes h WHERE h.document_id = d.id)
+         ORDER BY d.id",
+    )?;
+    let ids = statement
+        .query_map([], |row| row.get::<_, i64>(0))?
+        .collect::<Result<Vec<_>, _>>()?;
+    // Load/hash one document at a time; do not hold all legacy text in memory.
+    for id in ids {
+        let id = DocumentId::try_from(id).map_err(|_| StorageError::InvalidDocument)?;
+        let document = load_paste_in(connection, id)?.ok_or(StorageError::InvalidDocument)?;
+        let digest = Sha256::digest(document.chapter.text.as_bytes());
+        insert_paste_hash_in(connection, id, digest.as_slice())?;
+    }
+    Ok(())
 }

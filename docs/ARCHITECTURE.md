@@ -162,7 +162,7 @@ Migration 0007 persists immutable chapter analysis/token snapshots and reversibl
 segmentation overrides. Identical snapshot retries reuse IDs; conflicting output
 under the same revision/mode key errors. Override replacement/deactivation commits
 atomically, keeps base output intact and preserves global rules after source content
-deletion. No production document edit/rename/delete API exists. Sixty-seven storage
+deletion. No production document edit/rename/delete API exists. Seventy-six storage
 tests cover migrations, reopen, rollback, Unicode, concurrency, ID allocation,
 settings, vocabulary, analysis anchors and completion history. New analysis/override
 repositories have no runtime/FFI/UI operations; synthetic fixtures validate storage,
@@ -181,7 +181,21 @@ errors. Import creates no position/completion/encounters and does no deduplicati
 Six synthetic repository tests and a real Full fixture per loader verify this
 composition, including concurrent registration and exact Unicode reopen. This
 repository API is not wired into the production runtime/FFI/Android paste effect;
-the Full loading/lifecycle gate and exact-hash duplicate handling remain open.
+the Full loading/lifecycle gate remains open.
+
+Migration 0008 adds a live-document SHA-256 index for exact pasted UTF-8 bytes.
+`Storage::import_analyzed_paste` uses one immediate transaction to index legacy
+pastes lazily, reference the oldest live exact match, or compose a new analyzed
+import and its hash. Concurrent identical submissions analyze/create only once.
+Duplicate results preserve title, progress, analysis and vocabulary without
+rescanning or invoking the analyzer. Existing duplicate Library entries remain;
+document deletion cascades only its hash, so reimport allocates fresh identities.
+Every failure rolls back hashes and new import rows together. Nine host tests
+cover migration/retry, concurrency, byte identity, preservation and rollback;
+the real Full composition fixture also verifies deduplication after reopen.
+Raw creation methods remain allocation primitives. Production imports must use
+the deduplicating entry point after the Full gate; file identity must hash original
+file bytes separately when format importers exist.
 
 `yomoku-ffi::YomokuBridge` wraps the router in Crux's Bincode bridge.
 BoltFFI 0.30.1 NativeBridge takes a database path and owned EffectsListener,
@@ -191,7 +205,7 @@ Core-only effects stay private. Facet generates Event/ViewModel/Requests and
 document codecs in app.yomoku.shared; BoltFFI generates the native package and JNI C.
 Native wrappers require explicit close; no global singleton exists.
 
-One hundred and twenty-five data-free Rust tests cover analysis classification/
+One hundred and thirty-four data-free Rust tests cover analysis classification/
 checksum, domain, storage and bridge behavior, including an actual SQLite write
 lock proving dispatch/view/navigation remain responsive.
 The host Kotlin runner uses real JNI with -Xcheck:jni to verify navigation,
@@ -230,8 +244,9 @@ Automatic Android backup/transfer is excluded. Arm64 execution is unverified.
 
 ## Required boundaries and next work
 Paste creation is exposed through Android, but complete import semantics remain
-unchecked: deduplication, production analyzed-import wiring and metadata. Atomic
-analyzed-paste/registration composition now exists at the repository boundary.
+unchecked: production analyzed-import/deduplication wiring and metadata. Atomic
+analyzed-paste registration and exact-byte deduplication exist at the repository
+boundary; Android still uses raw text-only creation.
 Page movement/swipes requiring atomic forward completion/history, occurrences
 and active time remain next. Add analysis/import crates only with
 actual behavior; Sudachi Full defaults to B, JMdict/JMnedict remain offline data, and future Nostr I/O stays in Rust. Configuration is empty.

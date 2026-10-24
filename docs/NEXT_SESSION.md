@@ -1,7 +1,7 @@
 # Resume here
 
-Updated: 2026-10-24. Atomic analyzed-paste repository verified; Full gate remains.
-Read AGENTS.md, plan phases 2–3 and PRODUCT_SPEC.md sections 3–4.
+Updated: 2026-10-24. Exact-byte paste dedup repository verified; Full gate remains.
+Read AGENTS.md, plan phases 2–4 and PRODUCT_SPEC.md sections 3–4.
 Update docs/commit each verified step.
 
 ## Working
@@ -14,11 +14,15 @@ Update docs/commit each verified step.
 - Migrations 0005–0007 store frozen completion IDs/page/position, global surfaces/
   dated five-status history, immutable versioned A/B/C anchors and reversible
   global/local edits. No override application, forward action or vocabulary UI.
-- NEW Storage::create_analyzed_paste composes canonical paste allocation, callback
-  analysis, Mode B snapshot and unique Japanese registrations in one transaction.
-  Existing statuses/dates/IDs remain; no encounters/position/dedup. Typed analyzer
-  errors survive; all failures roll back. Preload/reuse analyzer before callback:
-  it holds the write lock and must not do DB work or publish provisional IDs.
+- Storage::create_analyzed_paste atomically composes canonical text, validated
+  Mode B snapshot and unique Japanese registrations; preserves existing statuses.
+- NEW import_analyzed_paste wraps that composition with exact UTF-8 SHA-256
+  dedup (migration 0008). Existing returns oldest live match, preserves progress/
+  title/vocab and skips analysis/rescan. Legacy hashes are filled lazily under the
+  write lock; legacy duplicates stay intact. All failures roll back, including
+  backfill. Deleted documents lose their hash; reimport gets fresh IDs/progress.
+  Raw creation APIs still allocate without dedup. Preload/reuse analyzer before
+  callback; no DB work or provisional IDs may escape. No encounters/position.
   Repository only: production Android/runtime still use text-only create_paste.
 - Sudachi.rs v0.7.0/android-loader-v1 and Full 20261015 stay pinned. Source verifier
   checks 138 files; never alter shared Cargo cache. Eleven real fixtures per loader.
@@ -33,14 +37,14 @@ Update docs/commit each verified step.
   Methods/results: SUDACHI_MEASUREMENTS.md; no pressure/LMKD/hardware claim.
 - Safe owned loader remains; unsafe mapping requires inode immutability until
   analyzer drop. Initial checksums touch all pages; production lifecycle undecided.
-- Paste text/IDs/provenance immutable; no inferred TXT chapters. Exact-hash dedup
-  and production atomic import wiring remain. Document deletion preserves vocab.
+- Paste text/IDs/provenance immutable; no inferred TXT chapters. File identity
+  must hash original bytes separately; no file importers yet. Deletion keeps vocab.
 
 ## Next tasks (ordered)
 1. Finish Full gate: actual memory-pressure/reclamation; choose production worker
    lifecycle/reuse. Physical arm64 required before claiming hardware viability.
-2. After gate, wire atomic analyzed-paste import into runtime/FFI/Android with
-   reused analyzer and exact-hash dedup; extend format imports later.
+2. After gate, wire import_analyzed_paste into runtime/FFI/Android with a reused
+   analyzer and Created/Existing summary; extend format imports later.
 3. Extend completion with occurrences/New→Known/active time, then wire frozen IDs
    through core/runtime/FFI and Next/Previous/swipes. Finish-book and CI remain.
 
@@ -55,10 +59,10 @@ tools/test-sudachi.sh
 tools/test-kotlin-bridge.sh
 git diff --check
 ```
-PASS: 125 data-free Rust tests (67 storage), 11 real Full fixtures per owned/mapped
+PASS: 134 data-free Rust tests (76 storage), 11 real Full fixtures per owned/mapped
 loader, source integrity, host Kotlin/JNI plus seven Unicode exchanges, fmt/Clippy.
-Initial Full fixture assumed a half-width compound was one B token; corrected to
-validate original source spans, both complete loader suites pass. No open failure.
+Nine new storage tests cover dedup/concurrency/Unicode/legacy/rollback/reimport.
+No open failure; prior nonfatal JNI weak-reference shutdown logging remains.
 No Android/Gradle/device/standalone/tablet rerun for this repository-only slice.
 Prior 18 Android tests/lint/debug+release builds and death driver pass; commands
 and report paths remain in DEVELOPMENT.md and SUDACHI_MEASUREMENTS.md.

@@ -18,7 +18,7 @@ with functioning rustup can omit the PATH workaround. Do not assume this compile
 is the project's minimum supported version; establish that with dependencies.
 Cargo.lock is retained for reproducible application development.
 Crux 0.20.0 declares Rust 1.90 minimum; the full locked graph has only been tested
-with 1.99.1. Current host baseline: 125 data-free Rust tests. Eleven real Full-data
+with 1.99.1. Current host baseline: 134 data-free Rust tests (76 storage). Eleven real Full-data
 fixtures run separately with each loader via tools/test-sudachi.sh (see below).
 
 ## Pure logical pagination checks
@@ -893,3 +893,21 @@ the actual token boundaries. Both complete loader suites pass. JNI retains its
 previous nonfatal weak-reference shutdown logging; all assertions pass. No open
 failure. No Android build/lint/instrumentation, emulator changes or standalone
 probe rerun for this Rust repository-only change; prior device results stand.
+
+## Exact-byte paste deduplication repository
+
+Verified 2026-10-24 with the same workspace/build/test/fmt/Clippy, Full-data,
+Kotlin/JNI and whitespace commands immediately above. PASS: 134 data-free Rust
+tests (76 storage), eleven real Full fixtures with each loader, 138-file source
+integrity and seven Rust/Kotlin Unicode exchanges. Nine new storage tests cover
+exact SHA-256 byte identity, preserved state on duplicate/reopen, concurrent
+create-once, legacy duplicate preservation/lazy indexing, every write/commit
+failure, typed analyzer failure, corrupt hash rejection and fresh reimport after
+test-only deletion with retained history/vocabulary. The real import fixture
+also checks duplicate reference after reopen without invoking the analyzer.
+
+Migration 0008 creates the hash index without scanning content on open.
+`import_analyzed_paste` is repository-only; production integration remains behind
+the Full gate. Direct sha2 0.11.1 reuses the existing lockfile package/version.
+All checks pass; prior nonfatal JNI weak-reference shutdown logging persists.
+No Android/Gradle/device/standalone/tablet rerun or emulator/user-file changes.

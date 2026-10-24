@@ -277,14 +277,14 @@ fn real_snapshots_persist_all_modes_and_reopen_without_source_changes() {
 
 #[test]
 #[ignore = "requires pinned Sudachi Full; run tools/test-sudachi.sh"]
-fn real_mode_b_import_atomically_registers_original_surfaces_and_preserves_status() {
+fn real_mode_b_import_deduplicates_and_atomically_registers_original_surfaces() {
     use std::collections::BTreeSet;
     use yomoku_analysis::AnalysisError;
     use yomoku_core::{
         document::PasteText,
         vocabulary::{Surface, VocabularyStatus},
     };
-    use yomoku_storage::{PasteImportError, Storage};
+    use yomoku_storage::{PasteImportError, PasteImportOutcome, Storage};
 
     let directory = std::env::temp_dir().join(format!(
         "yomoku-real-import-{}-{}",
@@ -310,15 +310,18 @@ fn real_mode_b_import_atomically_registers_original_surfaces_and_preserves_statu
         PasteText::new("国家公務員。猫と猫が食べた。\r\nｶﾞｯﾂﾎﾟｰｽﾞと𰻞 English 123 📖\0猫".into())
             .unwrap();
     assert!(matches!(
-        storage.create_analyzed_paste(&text, 30, |_| Err(AnalysisError::InvalidOutput)),
+        storage.import_analyzed_paste(&text, 30, |_| Err(AnalysisError::InvalidOutput)),
         Err(PasteImportError::Analysis(AnalysisError::InvalidOutput))
     ));
     assert!(storage.list_documents().unwrap().is_empty());
     // Reuse the preloaded analyzer; no dictionary load occurs inside the transaction.
     let engine = analyzer();
-    let imported = storage
-        .create_analyzed_paste(&text, 30, |chapter| engine.analyze(chapter))
-        .unwrap();
+    let PasteImportOutcome::Created(imported) = storage
+        .import_analyzed_paste(&text, 30, |chapter| engine.analyze(chapter))
+        .unwrap()
+    else {
+        panic!("expected a new import")
+    };
     let expected = engine.analyze(&imported.document.chapter).unwrap();
     assert_eq!(expected.mode, SplitMode::B);
     let surfaces: BTreeSet<_> = expected
@@ -357,6 +360,16 @@ fn real_mode_b_import_atomically_registers_original_surfaces_and_preserves_statu
     );
     drop(storage);
     let mut storage = Storage::open(&path).unwrap();
+    let duplicate = storage
+        .import_analyzed_paste(&text, 40, |_| -> Result<_, AnalysisError> {
+            panic!("duplicate must not tokenize again")
+        })
+        .unwrap();
+    let PasteImportOutcome::Existing(duplicate) = duplicate else {
+        panic!("expected an existing document")
+    };
+    assert_eq!(duplicate, imported.document);
+    assert_eq!(storage.list_documents().unwrap().len(), 1);
     assert_eq!(
         storage.load_paste(imported.document.document_id).unwrap(),
         Some(imported.document)

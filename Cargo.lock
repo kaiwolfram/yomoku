@@ -1644,6 +1644,7 @@ name = "yomoku-storage"
 version = "0.1.0"
 dependencies = [
  "rusqlite",
+ "sha2",
  "yomoku-core",
 ]
 

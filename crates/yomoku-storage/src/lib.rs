@@ -9,7 +9,7 @@ mod imports;
 mod settings;
 mod vocabulary;
 
-pub use imports::{AnalyzedPaste, PasteImportError};
+pub use imports::{AnalyzedPaste, PasteImportError, PasteImportOutcome};
 
 use std::{error::Error, fmt, path::Path, time::Duration};
 
@@ -56,6 +56,11 @@ const MIGRATIONS: &[Migration] = &[
         version: 7,
         name: "0007_analysis_anchors",
         sql: include_str!("../migrations/0007_analysis_anchors.sql"),
+    },
+    Migration {
+        version: 8,
+        name: "0008_paste_content_hashes",
+        sql: include_str!("../migrations/0008_paste_content_hashes.sql"),
     },
 ];
 

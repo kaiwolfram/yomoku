@@ -8,7 +8,7 @@ use yomoku_core::{
 
 use super::*;
 
-fn fixture(chapter: &ChapterText) -> Result<ChapterAnalysis, Infallible> {
+pub(super) fn fixture(chapter: &ChapterText) -> Result<ChapterAnalysis, Infallible> {
     // Synthetic classification only; real engine composition is tested separately.
     let mut cursor = 0;
     let tokens = chapter

@@ -674,3 +674,27 @@
   Next: actual Full pressure/reclamation and production worker lifecycle/arm64
   gate, production atomic analyzed import plus dedup, then occurrence/time-aware
   completion before reader navigation. Nostr empty; ask Q188 before forwarding.
+
+## 2026-10-24 — Exact-byte paste deduplication repository
+
+- Started clean. Added migration 0008 and `Storage::import_analyzed_paste` with
+  explicit Created/Existing outcomes. SHA-256 covers exact pasted UTF-8 bytes;
+  reused pinned sha2 0.11.1 after checking primary API documentation.
+- Duplicate imports reference the oldest live match, skip analysis/registration
+  and preserve title/progress/status/history, including deleted vocabulary.
+  Preserve legacy duplicates; lazily hash unindexed pastes under the same write
+  transaction. Concurrent identical submissions analyze/create once. New content,
+  tokens, vocabulary, hash and legacy backfill roll back together on any failure.
+- Nine storage tests verify Unicode/NUL/line-ending identity, known SHA-256,
+  concurrency, reopen, legacy upgrade/indexing, every write/deferred commit,
+  analyzer/validation/indexing failure, corrupt match and deletion/reimport with
+  retained history/vocabulary. Real Full import fixture now verifies dedup too.
+- PASS: workspace build, 134 data-free Rust tests (76 storage), fmt/strict Clippy,
+  eleven real Full fixtures per owned/mapped loader, pinned source integrity and
+  host Kotlin/JNI plus seven Unicode exchanges. Prior nonfatal weak-reference
+  shutdown logging remains; no open failure. No Android/Gradle/device/standalone/
+  tablet rerun, emulator changes or production runtime/FFI/Android wiring.
+- Checked only the paste repository subtask; file-byte identity/imports and app
+  integration remain unchecked. Next: Full pressure/reclamation and worker
+  lifecycle/arm64 gate, deduplicating analyzed import integration, then atomic
+  occurrences/New→Known/time before navigation. Nostr empty; Q188 before forwarding.

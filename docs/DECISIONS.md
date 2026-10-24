@@ -982,3 +982,37 @@ lifecycle gate remains open. Keep the existing Android text-only paste effect
 until that gate and production import wiring are ready. Exact-hash deduplication,
 other import formats, dictionary-form aggregates and completion/time are separate
 unchecked work. No new dependencies, schema changes or destructive semantics.
+
+## 2026-10-24 — Exact-byte paste identity before analysis
+
+Add `Storage::import_analyzed_paste` as the deduplicating repository entry point,
+keeping raw creation primitives for existing callers and transaction fixtures.
+For pastes, hash every canonical UTF-8 byte without normalizing line endings,
+Unicode, NUL or whitespace. File importers must hash original file bytes in a
+separate domain when implemented; identical extracted text is not file identity.
+Reuse the already locked sha2 0.11.1 as a direct storage dependency, with no
+version/new-package changes. Verify its one-shot `Sha256::digest` API against
+[primary crate documentation](https://docs.rs/sha2/0.11.1/sha2/).
+
+Migration 0008 stores a 32-byte BLOB digest per live document with a nonunique
+digest/document index. Preserve legacy duplicates and reference the lowest live
+document ID deterministically, rather than merging entries or changing progress.
+Opening creates the empty index only. On import, lazily hash unindexed pastes one
+text at a time within the same immediate transaction as duplicate lookup and
+conditional analyzed creation. This can hold the write lock across a large legacy
+Library; it avoids startup scans, partial indexes and schema-time custom SQL.
+
+Return an explicit Existing versus Created outcome. Existing skips the analyzer
+and vocabulary registration entirely, including entries later deleted by the user;
+return its current title/progress and validate exact text against the digest match.
+Concurrent submissions serialize before checking identity, so one analyzes/creates.
+Commit new text, analysis, vocabulary, hash and any legacy hash backfill together;
+all failures roll back. Hashes cascade only with their live document, allowing
+fresh IDs/progress after deletion while history/provenance/vocabulary remain.
+SQLite's [foreign-key action documentation](https://www.sqlite.org/foreignkeys.html#fk_actions)
+governs this existing cascade mechanism. No document deletion API is introduced.
+
+This remains repository-only work while actual Full reclamation and production
+worker ownership are unresolved. Android still uses text-only raw creation.
+Production import integration must adopt the deduplicating entry point after the
+gate; file import formats, summary/cancellation and completion/time remain open.

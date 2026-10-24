@@ -117,7 +117,7 @@ chapter order, page numbers, file paths or content hashes.
 - Document identifies one live Library instance and its mutable progress/title.
   Deletion/reimport must allocate a fresh identity with fresh progress/checkmark.
 - Source identifies retained historical provenance for that import. It survives
-  document deletion; exact-duplicate detection is a separate future SHA-256 key.
+  document deletion; paste duplicate keys reference live documents (migration 0008).
 - Chapter identifies one immutable canonical text unit owned by a source. EPUB
   uses its source chapters; paste/TXT/SRT use one text unit without inferred
   chapters. Chapter IDs and source ownership do not change on page reflow.
@@ -244,8 +244,42 @@ separately from storage/validation failures. Callback, validation, statement and
 commit failures roll back every import row; retry starts a new transaction.
 There are no completion commands, positions, encounters or status promotions.
 No schema change, automatic rescan, deduplication or production runtime/FFI
-operation is introduced by this composition. Future exact-hash deduplication
-must wrap the production import before it is considered complete.
+operation is introduced by this raw composition. The deduplicating wrapper below
+must be used by production imports before they are considered complete.
+
+## Exact paste identity (migration 0008)
+`paste_content_hashes` stores a live document ID (PK/FK with ON DELETE CASCADE)
+and a 32-byte SHA-256 BLOB, indexed by `(sha256, document_id)`. This table's identity
+domain is exact pasted canonical UTF-8 bytes, including line endings, whitespace,
+NUL and original Unicode spelling; neither title nor normalized/analyzed text is
+hashed. File importers must later use original file bytes and a separate identity
+domain, not hash extracted text as an exact-file duplicate key.
+
+The digest index is deliberately nonunique: migration preserves all preexisting
+duplicate Library entries. Opening adds only the empty table/index, without reading
+all text, registering vocabulary or changing document IDs/progress. Raw
+`create_paste`/`create_analyzed_paste` remain allocation primitives without hashing.
+
+`import_analyzed_paste` hashes the incoming bytes before acquiring an immediate
+transaction. It lazily hashes unindexed live pastes, one text at a time, then
+returns `PasteImportOutcome::Existing` for the lowest matching document ID. Load
+validates the document/position, and exact byte equality protects against a corrupt
+digest or collision. Duplicates invoke no analyzer and change no document, analysis,
+position, vocabulary or history; a deleted vocabulary entry is not recreated.
+Legacy hash backfill is the only possible write on this branch; fully indexed
+duplicates perform no writes. Backfill may hold the write lock across a large
+legacy Library and is not performed on app startup.
+
+For a new document it composes the raw Mode B import and hash insertion in the
+same transaction, returning `Created(AnalyzedPaste)` only after commit. The
+callback follows the same ready/reused analyzer and provisional-ID constraints
+as raw creation. Concurrent imports serialize lookup and allocation, so only
+one analyzes/creates. Indexing/analyzer/validation/write/commit errors roll back
+the entire transaction, including provisional legacy hashes; earlier committed
+imports remain intact. Deleting a document removes its hash while retaining
+historical source/chapter provenance and vocabulary; reimport starts at 0% with
+new IDs. No production deletion, file import or Android/runtime/FFI wiring is
+added here. Finished-at-least-once semantics remain a separate task.
 
 ## Current position repository (migration 0003)
 `reading_positions` has document ID as PK/FK (cascade only this document's progress

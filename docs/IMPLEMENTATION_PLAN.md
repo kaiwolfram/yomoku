@@ -80,7 +80,8 @@ position/encounter history. Keep incremental builds green.
 - [ ] Render EPUB images at source position/ratio, cover cache and external links; verify internal links are noninteractive and no TOC navigation.
 - [ ] Add shared full-screen image zoom/pan component; verify phone/tablet rotation.
 - [ ] Implement tolerant SRT parser stripping numbers/timestamps/tags while preserving cue blocks, breaks and speakers; test malformed fixtures.
-- [ ] Add SHA-256 exact duplicate identity and per-file atomic imports; test existing-document reference and failed-file isolation.
+- [x] Add repository exact-byte paste deduplication around atomic analyzed import; migration 0008, existing-document reference without analysis/rescan, concurrent create-once, Unicode/NUL identity, legacy duplicate preservation, rollback and deletion/reimport pass in nine host tests and both real Full loaders. No production wiring or file import identity yet.
+- [ ] Add SHA-256 exact duplicate identity for original file bytes and per-file atomic imports; test existing-document reference and failed-file isolation. Paste repository foundation is verified above; Android/runtime dedup wiring remains with analyzed import integration.
 - [ ] Wire Android multiple-file picker and batch summary returning to Library; test mixed formats/failures, never auto-opening reader.
 - [ ] Add progress/current-file/X-of-N, cancellation and permitted background notifications; test retained completed imports, discarded current partial and no process-death auto-resume.
 - [ ] Add Library title search/sorts, icons/covers and distinct-surface five-status bar; test global status changes and unopened ordering.
