@@ -187,7 +187,11 @@ saved position at the persisted global preset (default 500), preserving the exac
 offset separately from its page anchor/counter. These typed values cross FFI. The position-only
 save hook updates the reader and Library percentage after commit; late saves
 cannot reopen a closed reader. Explicit atomic forward intents are connected;
-Android page controls/swipes remain next. Settings reflow keeps the exact position and Library percentage;
+Android Next/Previous/swipes use the retained dispatch path, pausing the clock
+before intent capture. Anchored PreviousReaderPage derives the preceding page in
+Rust and uses position-only persistence after checkpoint drain. Forward uses the
+existing frozen analyzed completion. Both directions reset scroll; controls and
+the counter sit below content. Settings reflow keeps the exact position and Library percentage;
 only committed values change the preset/page. An independent active-document
 snapshot prevents repository loads from changing the text used for reader reflow.
 Opening now loads content/position, the preset and the original stored Mode B
@@ -246,9 +250,9 @@ Migration 0005 adds durable completion command IDs and dated page history. Pure
 PageCompletion validates the exact departing page/position; storage records history
 and destination position atomically. Duplicate IDs require identical payloads and
 never rewrite progress, including after reflow/reopen/deletion. Rereads allocate a
-fresh ID; position-only saves never add history. These repository methods have no
-app event/runtime/FFI entry point yet. Migration 0010 supplies the analyzed
-transaction below; Android checkpoints are connected and forward controls remain open. Migration 0009 adds
+fresh ID; position-only saves never add history. Analyzed completion supplies the
+typed core/runtime/FFI path. Migration 0010 supplies the analyzed transaction below;
+Android checkpoints and forward controls are connected. Migration 0009 adds
 active_time_ms to history and pending_reading_time buckets, scoped to live documents.
 Checkpoint loads reserve a zero row/revision; absolute saves validate current
 position and reject stale tokens. Completion validates the frozen page total,
@@ -369,6 +373,10 @@ abrupt death can lose time since the latest periodic checkpoint. No OS guarantee
 Compose shows Library titles/current percentage, a multiline paste form and a
 centered, scrollable reader column capped at 720dp. Its ScrollState is transient
 and keyed by document/page anchor, resetting on page changes/reopen/recreation.
+Below content, Previous/counter/Next share a row. Axis-specific horizontal swipes
+dispatch once after 48dp net movement, alongside ordinary vertical scrolling.
+An app-level keyed Compose effect consumes positive CompletionNotice and displays
+a short Android Toast once; zero stays silent and recreation does not replay it.
 Settings exposes five radio choices, disabled while unknown/busy, and offline
 Sudachi licenses/notices. Dialog visibility survives Activity recreation.
 Nostr/Statistics/Vocabulary remain placeholders. Busy/error/retry state comes from
@@ -377,7 +385,8 @@ The draft is retained through Settings/recreation.
 Navigation uses a bottom bar below 600dp and a scrollable rail above; Settings,
 paste and reader routes hide it. Toolbar/system Back return through Rust routes.
 Android instrumentation covers production analyzed imports/lifecycle, reader-time
-accounting/drain/recovery, eight private-extraction tests and the debug-only
+accounting/drain/recovery, navigation/rereads/duplicate callbacks/completion failure
+and toast consumption, eight private-extraction tests and the debug-only
 in-app analyzer probe on API 36 x86_64 phone. Exact current runs are in
 DEVELOPMENT.md. The two
 asset/notices tests previously passed on phone and tablet landscape in airplane
@@ -396,7 +405,8 @@ semantics remain unchecked. Legacy imports are not automatically rescanned.
 Explicit core/worker/FFI pending-time checkpoints coalesce during unresolved saves
 and drain before reader movement/exit or analyzed completion. Completion preparation/
 exact retries now run through core/FIFO/FFI. Android monotonic lifecycle/interactions
-and native drain are connected; page movement/swipes and toast rendering remain next;
+and native drain are connected. Page movement/swipes and positive-count toast
+rendering are connected; permanent finished-book state remains next, while
 effective segmentation edits and statistics aggregation remain
 separate tasks. Add analysis/import crates only with
 actual behavior; Sudachi Full defaults to B, JMdict/JMnedict remain offline data, and future Nostr I/O stays in Rust. Configuration is empty.

@@ -1218,6 +1218,84 @@ fn analyzed_reader() -> (Core<Yomoku>, PastedDocument) {
     (core, document)
 }
 
+#[test]
+fn previous_is_anchored_position_only_and_drains_final_time_before_moving() {
+    let (core, mut document) = analyzed_reader();
+    let first = core.view().reader.unwrap();
+    let previous = |reader: &ReaderPage| Event::PreviousReaderPage {
+        document_id: reader.document_id,
+        page: reader.anchor,
+        position: reader.position,
+    };
+    assert!(core.process_event(previous(&first)).is_empty());
+    let second_position = ReadingPosition {
+        offset: first.anchor.range.end,
+        ..first.position
+    };
+    let mut movement = core.process_event(Event::SaveReadingPosition(second_position));
+    document.reading_position = Some(second_position);
+    finish(
+        &core,
+        &mut movement,
+        StorageResult::PositionSaved(document.clone()),
+    );
+    let second = core.view().reader.unwrap();
+    assert_eq!(second.page_number, 2);
+    assert!(core.process_event(previous(&first)).is_empty());
+    restore_time(&core, 0);
+    core.process_event(clock(&core, 0, ReaderClockAction::Resume));
+    let mut checkpoint = core.process_event(clock(&core, 100, ReaderClockAction::Pause));
+    let deferred = core.process_event(previous(&second));
+    assert!(!deferred
+        .iter()
+        .any(|effect| matches!(effect, Effect::Storage(_))));
+    assert!(core.process_event(previous(&second)).is_empty());
+    let mut movement = save_clock(&core, &mut checkpoint, 100);
+    assert_eq!(
+        storage_operation(&movement),
+        StorageOperation::SaveReadingPosition {
+            document_id: document.document_id,
+            position: first.position,
+        }
+    );
+    assert!(core.process_event(previous(&second)).is_empty());
+    document.reading_position = Some(first.position);
+    finish(&core, &mut movement, StorageResult::PositionSaved(document));
+    assert_eq!(core.view().reader.unwrap().position, first.position);
+    assert!(core.view().reader_time.is_none());
+    assert!(core.view().completion_notice.is_none());
+    assert!(core.process_event(previous(&second)).is_empty());
+}
+
+#[test]
+fn previous_ignores_foreign_and_settings_callbacks() {
+    let (core, mut document) = analyzed_reader();
+    let first = core.view().reader.unwrap();
+    let position = ReadingPosition {
+        offset: first.anchor.range.end,
+        ..first.position
+    };
+    let mut effects = core.process_event(Event::SaveReadingPosition(position));
+    document.reading_position = Some(position);
+    finish(&core, &mut effects, StorageResult::PositionSaved(document));
+    let second = core.view().reader.unwrap();
+    assert!(core
+        .process_event(Event::PreviousReaderPage {
+            document_id: DocumentId::try_from(99).unwrap(),
+            page: second.anchor,
+            position: second.position,
+        })
+        .is_empty());
+    core.process_event(Event::OpenSettings);
+    assert!(core
+        .process_event(Event::PreviousReaderPage {
+            document_id: second.document_id,
+            page: second.anchor,
+            position: second.position,
+        })
+        .is_empty());
+}
+
 fn forward(core: &Core<Yomoku>, completed_at_unix_ms: i64) -> Event {
     let reader = core.view().reader.unwrap();
     Event::CompleteReaderPage {

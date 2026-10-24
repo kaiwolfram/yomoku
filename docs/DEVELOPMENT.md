@@ -1413,3 +1413,39 @@ blocked-SQLite host FFI tests also passed in the workspace suite. No open failur
 Emulator left running with both debug APKs installed. No release/tablet/physical
 arm64, standalone Full fixture/probe or host Kotlin/JNI rerun. Next: controls,
 swipes/notice rendering and finished-book behavior. Nostr/Q188 remain unchanged.
+
+## Android reader controls, swipes and completion toast
+
+Verified 2026-10-24 with the Rust PATH workaround and Android environment above.
+Run generation/native builds sequentially. Commands from repository root:
+```sh
+cargo test --workspace --all-features --locked --offline --quiet
+cargo fmt --all -- --check
+cargo clippy --workspace --all-targets --all-features --locked --offline -- -D warnings
+tools/test-kotlin-bridge.sh
+tools/format-kotlin.sh --check
+./android/gradlew -p android :app:connectedDebugAndroidTest :app:lintDebug --offline --console=plain
+git diff --check
+```
+PASS: 208 data-free Rust tests, strict Clippy/fmt, real-Full host Kotlin/JNI with
+Unicode/analysis exchanges, Kotlin format, both-ABI debug/test APK builds, strict
+Android lint and all 30 Android tests on API 36 x86_64 medium_phone (321 seconds).
+Connected tests build/package both APKs and execute the actual generated JNI.
+Report: `android/app/build/reports/androidTests/connected/debug/index.html`.
+
+Two new core tests verify anchored Previous, first-page/foreign/stale/Settings
+rejection, position-only persistence, duplicate delivery and final-time draining.
+Three new Compose/JNI/SQLite tests verify bottom controls/counter, both gesture
+directions without reaching bottom, scroll reset on navigation/reopen/recreation,
+bidirectional Library progress, short/vertical gesture rejection, duplicate rendered
+callbacks counted once and deliberate rereads counted again. Injected SQLite failure
+keeps controls disabled and Retry commits exactly once. The toast presenter receives
+one positive message, consumes its notice before recreation and stays silent at zero.
+Existing real-clock final-time completion/draining-close tests also pass.
+
+Gradle's sandbox wildcard-IP/socket failure required escalation. Initial Kotlin
+smart-cast/non-null warnings and a missing test gesture import were corrected;
+the final strict build/suite passes. Prior benign Crux/ktfmt warnings persist.
+No schema/dependency change; generated Event adds anchored PreviousReaderPage.
+No release, tablet, physical-arm64 or separate process/reboot recovery rerun.
+No open failure or local blocker. Next: finished-book persistence/Finish Book/confetti.

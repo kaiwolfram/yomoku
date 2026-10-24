@@ -311,8 +311,9 @@ SaveReadingPosition is a typed position-only protocol hook for an active reader;
 there is no user-facing seek control. It uses the existing busy guard/FIFO worker.
 The displayed page and Library summary update after commit; failures keep the
 previous snapshot. Leaving during a save does not cancel the write or reopen the
-reader when its callback arrives. Next/Previous/swipes and atomic forward
-completion must be wired in their own implementation step.
+reader when its callback arrives. Android Previous/right-swipe supplies an anchored
+PreviousReaderPage; pure core validates the visible page and derives the preceding
+page start before position-only saving. Next/left-swipe uses analyzed completion.
 
 ## Reader settings repository (migration 0004)
 `reader_settings` is a STRICT singleton table (`id = 1`) with `page_length`
@@ -429,7 +430,7 @@ duplicate completion promotions. Learning/Familiar/Known/Ignored remain unchange
 
 Occurrences, registrations/promotions, pending-time consumption, history and current
 position commit together. The outcome is Recorded { newly_known } or AlreadyRecorded;
-only a new success can supply a future N>0 toast. Duplicate delivery never repeats
+only a new success can supply an N>0 toast. Duplicate delivery never repeats
 status changes, recreates deleted vocabulary, consumes later reread time or moves
 progress. Rereading uses a new command ID and adds every occurrence again.
 Statement/deferred-commit/migration failure rolls back; no platform/FFI action or
@@ -585,7 +586,9 @@ when positive; dismissal, new completion or reader exit clears this transient st
 Completion retires the reader's consumed time token; another anchor/reread restores
 its own durable duration. Rereads reserve a new command. No new schema or dependency
 version; Android automatically supplies clock/final saves and drains pending core
-obligations before native teardown. Controls, toast and finished-book state remain open.
+obligations before native teardown. Android controls/swipes use this completion
+path; the toast consumes its transient command-keyed notice once. Permanent
+finished-book state remains open. No storage schema changes for navigation.
 
 ## Required future schema constraints
 - Future import repositories must extend the identity/immutable-text and durable
@@ -593,8 +596,6 @@ obligations before native teardown. Controls, toast and finished-book state rema
 - Add analyzer dictionary-form links (nullable) to global vocabulary and wire
   registration/status repositories into typed application/import effects.
   Reading never participates in identity.
-- Connect Android completion controls to the typed
-  core/worker/FFI operations; preserve new reread IDs and frozen analysis identity.
 - Pending page time and current text offset separate from completed events;
   permanent finished-at-least-once separate from current percentage.
 - Document deletion removes content/progress but preserves historical provenance,

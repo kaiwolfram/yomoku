@@ -2,8 +2,10 @@ package app.yomoku
 
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
@@ -20,7 +22,10 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -117,10 +122,53 @@ internal fun PasteScreen(
 @Composable
 internal fun ReaderScreen(view: ViewModel, dispatch: (Event) -> Unit) {
     val scroll = remember(view.reader?.documentId, view.reader?.anchor) { ScrollState(0) }
+    val page = view.reader
+    val canNavigate =
+        page != null &&
+            !view.storageBusy &&
+            !view.readingTimeSavePending &&
+            !view.completionSavePending
+    val canAdvance = canNavigate && page.position.offset != page.anchor.range.end
+    val canGoBack = canNavigate && page.pageNumber > 1UL
+    val next = {
+        if (canAdvance) {
+            dispatch(
+                Event.CompleteReaderPage(
+                    page.documentId,
+                    page.anchor,
+                    page.position,
+                    System.currentTimeMillis(),
+                )
+            )
+        }
+    }
+    val previous = {
+        if (canGoBack) {
+            dispatch(Event.PreviousReaderPage(page.documentId, page.anchor, page.position))
+        }
+    }
+    val swipeThreshold = with(LocalDensity.current) { 48.dp.toPx() }
     Column(
         modifier =
             Modifier.widthIn(max = 720.dp)
                 .fillMaxSize()
+                .pointerInput(page, canNavigate) {
+                    var horizontal = 0f
+                    detectHorizontalDragGestures(
+                        onDragStart = { horizontal = 0f },
+                        onDragCancel = { horizontal = 0f },
+                        onDragEnd = {
+                            if (horizontal <= -swipeThreshold) next()
+                            else if (horizontal >= swipeThreshold) previous()
+                        },
+                        onHorizontalDrag = { change, amount ->
+                            if (canNavigate) {
+                                change.consume()
+                                horizontal += amount
+                            }
+                        },
+                    )
+                }
                 .verticalScroll(scroll)
                 .testTag("reader_scroll")
                 .padding(24.dp),
@@ -128,20 +176,40 @@ internal fun ReaderScreen(view: ViewModel, dispatch: (Event) -> Unit) {
     ) {
         StorageStatus(view)
         ReaderSaveRetry(view, dispatch)
-        view.reader?.let { page ->
+        page?.let { page ->
             Text(
                 page.text,
                 style = MaterialTheme.typography.bodyLarge,
                 modifier = Modifier.testTag("reader_text"),
             )
-            Text(
-                stringResource(
-                    R.string.page_counter,
-                    page.pageNumber.toLong(),
-                    page.totalPages.toLong(),
-                ),
-                modifier = Modifier.testTag("page_counter"),
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                TextButton(
+                    onClick = previous,
+                    enabled = canGoBack,
+                    modifier = Modifier.testTag("previous_page"),
+                ) {
+                    Text(stringResource(R.string.previous_page))
+                }
+                Text(
+                    stringResource(
+                        R.string.page_counter,
+                        page.pageNumber.toLong(),
+                        page.totalPages.toLong(),
+                    ),
+                    modifier = Modifier.testTag("page_counter"),
+                )
+                TextButton(
+                    onClick = next,
+                    enabled = canAdvance,
+                    modifier = Modifier.testTag("next_page"),
+                ) {
+                    Text(stringResource(R.string.next_page))
+                }
+            }
         }
     }
 }

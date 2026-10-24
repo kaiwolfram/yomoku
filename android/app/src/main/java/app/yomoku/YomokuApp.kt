@@ -1,5 +1,6 @@
 package app.yomoku
 
+import android.widget.Toast
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Row
@@ -27,6 +28,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -41,6 +43,10 @@ import app.yomoku.theme.YomokuTheme
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun YomokuApp(view: ViewModel, dispatch: (Event) -> Unit) {
+    val context = LocalContext.current
+    ReaderCompletionToast(view, dispatch) { message ->
+        Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+    }
     var pasteText by rememberSaveable { mutableStateOf("") }
     LaunchedEffect(view.contentRoute) {
         if (view.contentRoute != ContentRoute.PASTE) pasteText = ""
@@ -139,6 +145,23 @@ internal fun YomokuApp(view: ViewModel, dispatch: (Event) -> Unit) {
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+internal fun ReaderCompletionToast(
+    view: ViewModel,
+    dispatch: (Event) -> Unit,
+    show: (String) -> Unit,
+) {
+    val notice = view.completionNotice
+    val message = stringResource(R.string.words_marked_known, notice?.newlyKnown.toString())
+    LaunchedEffect(notice?.commandId) {
+        if (notice != null) {
+            // Consume synchronously so recreation cannot replay a displayed notice.
+            dispatch(Event.DismissCompletionNotice)
+            if (notice.newlyKnown > 0UL) show(message)
         }
     }
 }

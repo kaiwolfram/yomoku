@@ -22,15 +22,19 @@ Yomoku is under active development. The working app supports:
   and offline access to bundled Sudachi notices.
 - Hidden active reading time, with automatic restore, interaction/idle accounting,
   periodic saves and final saves before background, reader actions and teardown.
+- Next/Previous controls and horizontal swipes, with a content-bottom page counter,
+  persisted progress in both directions and scroll reset on page navigation.
+- Forward completion records repeated Japanese encounters, promotes New words to
+  Known and shows a positive-count toast; deliberate rereads count again.
 
-Next/Previous controls, swipes, word lookup and vocabulary controls are still
-pending. The Rust repository atomically saves completion encounters, New→Known
+Word lookup and vocabulary controls are still pending. The Rust repository
+atomically saves completion encounters, New→Known
 transitions, active time and position. Core/worker/FFI pending-time checkpoints
 support exact retries, coalesced saves before reader movement/exit and reopen.
 Explicit analyzed completion intents now drain checkpoints, freeze retries and update
 progress through core/FIFO/FFI, without analyzer loading. Android's retained driver
 supplies monotonic samples and waits for pending saves before native teardown.
-Navigation controls, gestures and completion toast rendering remain unfinished.
+Permanent finished-book state, Finish Book and confetti remain unfinished.
 Nostr, Statistics and Vocabulary tabs currently
 show placeholders.
 

@@ -1029,3 +1029,23 @@
   Next: Next/Previous/swipes/positive toast, then finished-book behavior. No local
   blocker. No release/tablet/physical-arm64 or host Kotlin/JNI rerun. Emulator left
   running; no OS final-flush guarantee. Nostr configuration empty and Q188 open.
+
+## 2026-10-24 — Android reader navigation and completion toast
+
+- Started clean. Added content-bottom Previous/counter/Next and horizontal swipes
+  through retained CoreSession dispatch/Pause. Forward uses frozen analyzed completion;
+  new anchored PreviousReaderPage derives the previous page in pure Rust and drains
+  final checkpoints before position-only persistence. Pending work disables actions.
+- Added positive-count short Toast presentation with synchronous notice consumption.
+  Duplicate rendered callbacks count once; deliberate rereads count again. Permanent
+  finished/checkmark/Finish Book/confetti remain the next separate slice.
+- PASS: 208 Rust tests (two new core), host Kotlin/JNI plus Unicode/analysis exchanges,
+  strict Clippy/fmt/Kotlin format, both-ABI debug/test APK builds, strict Android lint
+  and all 30 API-36 x86_64 Android tests (three new Compose/JNI/SQLite tests). Covers
+  progress in both directions, scroll resets, gestures, duplicate input, SQLite
+  failure/exact Retry and toast consumption/zero silence. Initial Kotlin warnings/
+  missing import corrected; Gradle socket restriction passed with escalation.
+- Updated README, plan, architecture/data model, decisions, development and handoff.
+  No schema/dependency change or blocker; generated Event adds anchored Previous.
+  No release/tablet/physical-arm64 or separate process/reboot recovery rerun.
+  Nostr configuration remains empty; ask Q188 before forwarding.

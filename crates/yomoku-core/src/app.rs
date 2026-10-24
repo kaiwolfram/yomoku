@@ -14,7 +14,7 @@ use crate::{
     },
     completion::{AnalyzedCompletionOutcome, CompletionNotice, PageCompletionIntent},
     document::{DocumentId, LibraryDocument, PastedDocument, TextAnchor},
-    pagination::{PageLength, ReadingPosition},
+    pagination::{LogicalPages, PageLength, ReadingPosition},
     reader::{ReaderAnalysis, ReaderPage},
     storage::{DocumentError, StorageOperation, StorageResult},
 };
@@ -123,6 +123,12 @@ pub enum Event {
     /// Restore first, then supply Android's monotonic clock. Pause before any
     /// departure/completion; Checkpoint and Pause save absolute durations.
     ObserveReaderClock(ReaderClockSample),
+    /// Position-only backward navigation anchored to the visible page.
+    PreviousReaderPage {
+        document_id: DocumentId,
+        page: TextAnchor,
+        position: ReadingPosition,
+    },
     #[serde(skip)]
     #[cfg_attr(feature = "facet_typegen", facet(skip))]
     StorageFinished(StorageResult),
@@ -168,6 +174,49 @@ impl App for Yomoku {
     type Effect = Effect;
 
     fn update(&self, event: Event, model: &mut Model) -> Command<Effect, Event> {
+        if let Event::PreviousReaderPage {
+            document_id,
+            page,
+            position,
+        } = event
+        {
+            if model.content_route != ContentRoute::Reader
+                || model.settings_open
+                || model.pending_completion.is_some()
+                || !model.reader.as_ref().is_some_and(|reader| {
+                    reader.document_id == document_id
+                        && reader.anchor == page
+                        && reader.position == position
+                })
+            {
+                return Command::done();
+            }
+            let Some(document) = model.reader_document.as_ref() else {
+                return Command::done();
+            };
+            let Ok(pages) = LogicalPages::new(
+                std::slice::from_ref(&document.chapter),
+                model.page_length.unwrap_or_default(),
+            ) else {
+                return Command::done();
+            };
+            let Some(previous) = pages
+                .page_at(position)
+                .ok()
+                .and_then(|index| index.checked_sub(1))
+                .map(|index| pages.pages()[index])
+            else {
+                return Command::done();
+            };
+            return self.update(
+                Event::SaveReadingPosition(ReadingPosition {
+                    source_id: previous.source_id,
+                    chapter_id: previous.chapter_id,
+                    offset: previous.range.start,
+                }),
+                model,
+            );
+        }
         if let Event::ObserveReaderClock(sample) = event {
             let Some(update) = model.observe_reader_clock(sample) else {
                 return Command::done();
@@ -607,6 +656,7 @@ impl App for Yomoku {
             | Event::RetryReadingTimeCheckpoint
             | Event::CompleteReaderPage { .. }
             | Event::RetryReaderCompletion
+            | Event::PreviousReaderPage { .. }
             | Event::ObserveReaderClock(_) => unreachable!(),
         }
         render::render()

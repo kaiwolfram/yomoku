@@ -1402,3 +1402,30 @@ Primary Android API references checked before implementation:
 - https://developer.android.com/reference/android/os/SystemClock
 - https://developer.android.com/reference/android/app/Activity#onUserInteraction()
 - https://developer.android.com/guide/components/activities/activity-lifecycle
+
+## 2026-10-24 — Reader controls, swipes and completion toast
+
+Keep forward navigation on CompleteReaderPage and its existing frozen transaction;
+both controls and gestures go through CoreSession so Pause precedes the intent.
+Add PreviousReaderPage(document, page, exact position), validating the visible
+snapshot in pure core before deriving the preceding logical page. Feed that target
+into the existing position-only checkpoint-draining path. First page, foreign/stale
+callbacks, Settings and unresolved completion ignore Previous; duplicate deliveries
+cannot walk backward again. No SQL or pagination rules move into Kotlin.
+
+Place Previous/counter/Next below page content in the existing centered 720dp column.
+Use axis-specific horizontal drag recognition alongside vertical scrolling. Accumulate
+48dp net horizontal movement and dispatch once on release; cancel/short/vertical
+gestures do not navigate. Left completes forward without a bottom requirement;
+right only saves position. Pending storage/time/completion disables the actions.
+EOF disables further forward actions until finished-book behavior is implemented.
+
+Render the core's positive, command-keyed CompletionNotice with Android's short
+text Toast. Consume the notice synchronously in a keyed Compose effect so normal
+recomposition/Activity recreation cannot replay it. Zero counts remain silent.
+No dependency or schema changes; the generated event codec adds anchored Previous.
+
+Primary API references checked:
+- https://developer.android.com/develop/ui/compose/touch-input/pointer-input/drag-composables
+- https://developer.android.com/develop/ui/compose/side-effects
+- https://developer.android.com/guide/topics/ui/notifiers/toasts

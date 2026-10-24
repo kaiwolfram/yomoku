@@ -89,6 +89,7 @@ internal class CoreSession(
             Event.OpenPaste,
             is Event.SelectDestination,
             is Event.CompleteReaderPage,
+            is Event.PreviousReaderPage,
             is Event.OpenReader,
             is Event.LoadPaste,
             is Event.CreatePaste -> pauseClock()
