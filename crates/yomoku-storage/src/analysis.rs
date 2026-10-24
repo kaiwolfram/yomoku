@@ -7,10 +7,43 @@ use yomoku_core::{
     document::{
         AnalysisId, ChapterId, ChapterText, OverrideId, SourceId, TextAnchor, TextOffset, TextRange,
     },
+    reader::ReaderAnalysis,
     vocabulary::Surface,
 };
 
 use crate::{Storage, StorageError};
+
+/// Pin the first persisted Mode B snapshot, including its original profile.
+/// Later engine/dictionary snapshots must not silently replace an import's base.
+/// Full token/anchor validation still happens inside atomic analyzed completion.
+pub(crate) fn read_reader_analysis(
+    connection: &Connection,
+    chapter_id: ChapterId,
+) -> Result<ReaderAnalysis, StorageError> {
+    let header = connection
+        .query_row(
+            "SELECT id, semantics_version, engine_revision, dictionary_revision
+             FROM chapter_analyses WHERE chapter_id = ?1 AND split_mode = 'b'
+             ORDER BY id LIMIT 1",
+            [i64::from(chapter_id)],
+            |row| {
+                Ok((
+                    row.get::<_, i64>(0)?,
+                    row.get::<_, i64>(1)?,
+                    row.get::<_, String>(2)?,
+                    row.get::<_, String>(3)?,
+                ))
+            },
+        )
+        .optional()?;
+    let Some((id, version, engine, dictionary)) = header else {
+        return Ok(ReaderAnalysis::Missing);
+    };
+    if version != 1 || engine.trim().is_empty() || dictionary.trim().is_empty() {
+        return Err(StorageError::InvalidAnalysis);
+    }
+    Ok(ReaderAnalysis::Available(analysis_id(id)?))
+}
 
 impl Storage {
     /// Persist a validated immutable base snapshot. Identical retries reuse its ID;

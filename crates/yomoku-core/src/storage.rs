@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::document::{DocumentId, LibraryDocument, PastedDocument};
 use crate::pagination::{PageLength, ReadingPosition};
+use crate::reader::ReaderSnapshot;
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
@@ -40,7 +41,7 @@ pub enum StorageResult {
     Created(PastedDocument),
     /// Exact duplicate: preserve persisted title/position and reference it once.
     Existing(PastedDocument),
-    Loaded(PastedDocument, PageLength),
+    Loaded(ReaderSnapshot),
     PositionSaved(PastedDocument),
     PageLengthSaved(PageLength),
     Failed(DocumentError),

@@ -14,7 +14,8 @@ use rusqlite::Connection;
 use yomoku_core::{
     analysis::{AnalysisProfile, AnalyzedToken, ChapterAnalysis, SplitMode},
     app::{ContentRoute, Destination, Event, ViewModel},
-    document::{ChapterText, TextAnchor, TextOffset, TextRange},
+    document::{ChapterText, PasteText, TextAnchor, TextOffset, TextRange},
+    reader::ReaderAnalysis,
     storage::DocumentError,
     vocabulary::{Surface, VocabularyStatus},
 };
@@ -225,6 +226,42 @@ fn drain_trace(trace: &mpsc::Receiver<Trace>) -> Vec<Trace> {
             Err(mpsc::RecvTimeoutError::Disconnected) => return events,
             Err(mpsc::RecvTimeoutError::Timeout) => panic!("worker did not release its factory"),
         }
+    }
+}
+
+#[test]
+fn reader_open_restores_stored_identity_and_legacy_missing_without_loading_analyzer() {
+    let database = Database::new();
+    let mut storage = Storage::open(database.path()).unwrap();
+    let analyzed = storage
+        .create_paste(&PasteText::new("猫 𠮷".into()).unwrap())
+        .unwrap();
+    let identity = storage
+        .store_chapter_analysis(analyzed.chapter.chapter_id, &fixture(&analyzed.chapter))
+        .unwrap();
+    let legacy = storage
+        .create_paste(&PasteText::new("昔の本文".into()).unwrap())
+        .unwrap();
+    for _ in 0..2 {
+        // fresh worker/session also needs no dictionary
+        let Factory { loader, trace, .. } = Factory::new(true, None);
+        let (router, lifecycle) =
+            effect_router_with_analyzed_imports(database.path(), loader).unwrap();
+        let before = totals(&database.path());
+        for (id, expected) in [
+            (analyzed.document_id, ReaderAnalysis::Available(identity)),
+            (legacy.document_id, ReaderAnalysis::Missing),
+        ] {
+            let view = dispatch(&router, Event::OpenReader(id));
+            assert!(view.document_error.is_none());
+            assert_eq!(view.reader.unwrap().document_id, id);
+            assert_eq!(view.reader_analysis, Some(expected));
+        }
+        assert_eq!(totals(&database.path()), before);
+        assert!(trace.try_recv().is_err());
+        drop(router);
+        assert!(lifecycle.set_foreground(true).is_err());
+        assert!(drain_trace(&trace).is_empty());
     }
 }
 

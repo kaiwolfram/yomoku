@@ -12,6 +12,7 @@ use crux_core::bridge::{BincodeFfiFormat, FfiFormat, Requests};
 use yomoku_core::{
     app::{Destination, Event, ViewModel},
     document::DocumentId,
+    reader::ReaderAnalysis,
     storage::{DocumentError, StorageResult},
 };
 use yomoku_ffi::{FfiError, YomokuBridge as NativeBridge};
@@ -94,6 +95,10 @@ fn async_native_pastes_list_load_reopen_and_release_listeners() {
         .loaded_document
         .unwrap();
     assert_eq!(expected.chapter.text, text);
+    assert_eq!(
+        dispatch(&native, &callbacks, Event::OpenReader(id)).reader_analysis,
+        Some(ReaderAnalysis::Missing)
+    );
     assert_eq!(
         dispatch(&native, &callbacks, Event::CreatePaste(" \n\t".into())).document_error,
         Some(DocumentError::EmptyPaste)

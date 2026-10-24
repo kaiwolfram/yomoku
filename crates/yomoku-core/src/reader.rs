@@ -4,10 +4,30 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     document::{
-        DocumentId, InvalidTextValue, LibraryDocument, PastedDocument, TextAnchor, TextOffset,
+        AnalysisId, DocumentId, InvalidTextValue, LibraryDocument, PastedDocument, TextAnchor,
+        TextOffset,
     },
     pagination::{LogicalPages, PageLength, ReadingPosition},
 };
+
+/// The original stored Mode B base snapshot, independent of the installed engine.
+/// Missing is an explicit legacy state: opening never analyzes or registers words.
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
+#[repr(C)]
+pub enum ReaderAnalysis {
+    Available(AnalysisId),
+    Missing,
+}
+
+/// Document, settings and analysis identity read from one consistent snapshot.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
+pub struct ReaderSnapshot {
+    pub document: PastedDocument,
+    pub page_length: PageLength,
+    pub analysis: ReaderAnalysis,
+}
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]

@@ -152,6 +152,16 @@ cannot reopen a closed reader. Page controls/swipes and atomic forward completio
 remain next. Settings reflow keeps the exact position and Library percentage;
 only committed values change the preset/page. An independent active-document
 snapshot prevents repository loads from changing the text used for reader reflow.
+Opening now loads content/position, the preset and the original stored Mode B
+AnalysisId in one read transaction. The earliest Mode B snapshot is pinned,
+independent of the installed engine/dictionary or later snapshots. Only its
+header is read; completion still validates tokens and anchors transactionally.
+ReaderAnalysis::Missing explicitly identifies legacy content with no Mode B base;
+it remains readable without analyzer initialization, rescan or vocabulary writes.
+The optional view field is absent outside an opened reader. Settings/position
+saves/plain loads preserve its identity; reader exit/replacement clears it, and
+cancelled loads cannot attach it. Corrupt metadata returns a typed error without
+fallback/repair. No forward/completion action or legacy-completion policy yet.
 
 `yomoku-runtime` composes Core → HandleEffectLayer<StorageEffects> → MapEffectLayer.
 A named FIFO worker owns one lazily opened SQLite connection per bridge. Opening,
@@ -179,7 +189,7 @@ The weak `AnalyzerLifecycle` handle queues foreground/background policy alongsid
 storage work without extending worker lifetime. Hidden/background releases after
 earlier atomic work, and imports accepted while hidden release before resolving.
 Foreground permits lazy reuse without initialization. Final close drains accepted
-work and drops both analyzer and loader. Seven data-free tests use a deliberately
+work and drops both analyzer and loader. Eight data-free tests use a deliberately
 non-Send analyzer; an explicit real Full fixture tests both loaders and lazy reopen.
 NativeBridge requires this router. The original text-only `effect_router` and
 `YomokuBridge::new` remain low-level Rust storage fixtures, never Android fallbacks.
@@ -227,10 +237,10 @@ Migration 0007 persists immutable chapter analysis/token snapshots and reversibl
 segmentation overrides. Identical snapshot retries reuse IDs; conflicting output
 under the same revision/mode key errors. Override replacement/deactivation commits
 atomically, keeps base output intact and preserves global rules after source content
-deletion. No production document edit/rename/delete API exists. Ninety-nine storage
+deletion. No production document edit/rename/delete API exists. One hundred and two storage
 tests cover migrations, reopen, rollback, Unicode, concurrency, ID allocation,
-settings, vocabulary, analysis anchors and completion history. New analysis/override
-repositories have no runtime/FFI/UI operations; synthetic fixtures validate storage,
+settings, vocabulary, analysis anchors and completion history. Only base-analysis identity reaches runtime/FFI today; token/override
+repositories have no UI operations; synthetic fixtures validate storage,
 not Sudachi behavior. Cross-occurrence matching and overlapping edit resolution
 belong to the later segmentation application task.
 
@@ -277,7 +287,7 @@ Core-only effects stay private. Facet generates Event/ViewModel/Requests and
 document codecs in app.yomoku.shared; BoltFFI generates the native package and JNI C.
 Native wrappers require explicit close; no global singleton exists.
 
-One hundred and fifty-seven data-free Rust tests cover analysis classification/
+One hundred and eighty-seven data-free Rust tests cover analysis classification/
 checksum, domain, storage and bridge behavior, including an actual SQLite write
 lock proving dispatch/view/navigation remain responsive.
 The host Kotlin runner uses real JNI with -Xcheck:jni to verify navigation,

@@ -6,6 +6,7 @@ import app.yomoku.nativebridge.NativeBridge
 import app.yomoku.shared.DocumentError
 import app.yomoku.shared.ContentRoute
 import app.yomoku.shared.DocumentId
+import app.yomoku.shared.ReaderAnalysis
 import app.yomoku.shared.PageLength
 import app.yomoku.shared.Event
 import app.yomoku.shared.Requests
@@ -47,7 +48,7 @@ internal fun verifyDocumentBridge() {
         val listener = DocumentListener()
         val dictionary = HostDictionary()
         val text = "  題𠮷📖  \r\nか\u3099👩‍👩‍👧‍👦\u0000終\n"
-        val document = NativeBridge(database.path, listener, dictionary).use { bridge ->
+        val (document, analysis) = NativeBridge(database.path, listener, dictionary).use { bridge ->
             check(!database.exists())
             check(listener.dispatch(bridge, Event.RefreshLibrary).documents.isEmpty())
             check(dictionary.calls.get() == 0)
@@ -69,6 +70,9 @@ internal fun verifyDocumentBridge() {
             check(loaded.chapter.text == text)
             val opened = listener.dispatch(bridge, Event.OpenReader(id))
             check(opened.contentRoute == ContentRoute.READER)
+            val analysis = checkNotNull(opened.readerAnalysis) as ReaderAnalysis.Available
+            check(analysis.value.value > 0L)
+            check(dictionary.calls.get() == 2)
             val page = checkNotNull(opened.reader)
             check(page.documentId == id && page.text == text)
             check(page.anchor.sourceId == loaded.chapter.sourceId)
@@ -81,6 +85,7 @@ internal fun verifyDocumentBridge() {
                 val updated = listener.dispatch(bridge, Event.SaveReadingPosition(position))
                 check(updated.documentError == null)
                 check(updated.reader?.position == position)
+                check(updated.readerAnalysis == analysis)
                 saved = checkNotNull(updated.loadedDocument)
                 check(saved.readingPosition == position)
                 check(updated.documents.single().progressPercent == (byte * 100 / text.toByteArray(Charsets.UTF_8).size).toULong())
@@ -95,11 +100,13 @@ internal fun verifyDocumentBridge() {
                 val changed = listener.dispatch(bridge, Event.SetPageLength(length))
                 check(changed.pageLength == length)
                 check(changed.reader?.position == saved.readingPosition)
+                check(changed.readerAnalysis == analysis)
                 check(changed.loadedDocument == saved)
             }
             bridge.update(Event.CloseSettings.bincodeSerialize())
             bridge.update(Event.CloseDocument.bincodeSerialize())
             check(ViewModel.bincodeDeserialize(bridge.view()).contentRoute == ContentRoute.MAIN)
+            check(ViewModel.bincodeDeserialize(bridge.view()).readerAnalysis == null)
             val duplicate = listener.dispatch(bridge, Event.CreatePaste(text))
             check(duplicate.documents.single().documentId == id)
             check(duplicate.documents.single().progressPercent > 0UL)
@@ -115,16 +122,20 @@ internal fun verifyDocumentBridge() {
             check(listener.dispatch(bridge, Event.CreatePaste(" \n")).documentError == DocumentError.EMPTYPASTE)
             check(listener.dispatch(bridge, Event.RefreshLibrary).documents.size == 1)
             check(listener.dispatch(bridge, Event.LoadPaste(DocumentId(Long.MAX_VALUE))).documentError == DocumentError.NOTFOUND)
-            saved
+            saved to analysis
         }
         val reopened = DocumentListener()
-        NativeBridge(database.path, reopened, HostDictionary()).use { bridge ->
+        val unavailableDictionary = HostDictionary().also { it.fail = true }
+        NativeBridge(database.path, reopened, unavailableDictionary).use { bridge ->
             val initial = reopened.dispatch(bridge, Event.RefreshLibrary)
             check(initial.importSummary == null)
             check(initial.documents.single().documentId == document.documentId)
             check(initial.pageLength == PageLength.CHARACTERS1500)
             check(reopened.dispatch(bridge, Event.LoadPaste(document.documentId)).loadedDocument == document)
-            check(reopened.dispatch(bridge, Event.OpenReader(document.documentId)).reader?.text == text)
+            val opened = reopened.dispatch(bridge, Event.OpenReader(document.documentId))
+            check(opened.reader?.text == text)
+            check(opened.readerAnalysis == analysis)
+            check(unavailableDictionary.calls.get() == 0)
             check(ViewModel.bincodeDeserialize(bridge.view()).reader?.position == document.readingPosition)
         }
         val failure = DocumentListener()

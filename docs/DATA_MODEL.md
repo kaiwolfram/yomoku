@@ -336,6 +336,23 @@ then reprojects using the reader's exact ReadingPosition. Reflow never writes
 current position, Library progress, encounters or completion. Late settings saves
 update the global preset without reopening closed reader/Settings routes.
 
+## Reader analysis restoration (no schema change)
+`load_reader_snapshot` reads canonical paste content/current position, persisted
+page length and the earliest stored Mode B analysis header in one transaction.
+`ReaderSnapshot` returns these together on the FIFO worker. `ReaderAnalysis` is
+Available(AnalysisId) or Missing; no Mode B base means legacy absence, never an
+A/C or foreign-chapter substitution. Later profiles do not replace the original
+base. Invalid metadata/settings fail without fallback/repair. No token scan,
+analyzer load, vocabulary registration or data write is performed by opening.
+
+Core attaches this identity only to an accepted OpenReader load. Its optional
+view field is absent outside the opened reader, stays fixed across position saves,
+reflow and plain LoadPaste results, and clears on reader exit/replacement. Late
+cancelled loads cannot restore it. Generated Kotlin codecs carry the exact i64
+identity and explicit missing variant. Completion will validate all snapshot tokens
+inside its transaction; Missing does not authorize a text-only completion path.
+Timer checkpoints, forward intents and legacy-completion policy remain open.
+
 ## Page completion repository foundation (migration 0005)
 `CompletionCommandId` is another positive i64 identity. `completion_commands`
 issues it with AUTOINCREMENT before a forward intent is submitted. Repeated

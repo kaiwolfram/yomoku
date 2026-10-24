@@ -122,13 +122,11 @@ fn execute(
                     .map_err(map_error)
             }
         }
-        StorageOperation::LoadPaste(id) => Ok(StorageResult::Loaded(
-            storage
-                .load_paste(id)
-                .map_err(map_error)?
-                .ok_or(DocumentError::NotFound)?,
-            storage.page_length().map_err(map_error)?,
-        )),
+        StorageOperation::LoadPaste(id) => storage
+            .load_reader_snapshot(id)
+            .map_err(map_error)?
+            .map(StorageResult::Loaded)
+            .ok_or(DocumentError::NotFound),
         StorageOperation::SavePageLength(length) => storage
             .save_page_length(length)
             .map(StorageResult::PageLengthSaved)

@@ -895,3 +895,25 @@
   Next: core/FIFO/FFI checkpoints and analyzed completion intents, Android monotonic
   lifecycle/interactions, then navigation and Finish Book. No Android build/lint/
   tests, release/probes/tablet/arm64 rerun; actual close/reboot remains unverified.
+
+
+## 2026-10-24 — Reader analysis identity restoration
+
+- Started clean. Added a read-only reader snapshot with document/exact position,
+  preset and original Mode B identity; wired it through core/FIFO worker/generated
+  FFI. Earliest stored B stays fixed across settings/position/plain loads. Missing
+  explicitly identifies legacy absence; no dictionary loading/rescan/registration.
+  Reader exit/replacement clears identity; cancelled loads cannot attach it.
+- Added three storage, one core and one worker test; extended FFI/JNI checks and
+  two analysis-state codec exchanges (including max i64). Covers original versus
+  later profiles, wrong modes/chapters, corrupt metadata/settings, read-only reopen,
+  frozen state and actual JNI reopen with an unavailable dictionary provider.
+- PASS: workspace build, 187 data-free tests (102 storage), fmt/strict Clippy,
+  real-Full Kotlin/JNI + seven Unicode/two analysis exchanges, Kotlin format,
+  debug/test APK builds, strict Android lint and diff check. Initial missing test
+  import fixed. Prior benign Crux shutdown/JVM Unsafe/SDK XML warnings persist.
+- Updated plan, decisions, architecture/data model, development and handoff.
+  Next: time checkpoints and analyzed completion intents with frozen retries,
+  Android clock/lifecycle/interactions, then controls/Finish Book. No migration,
+  dependency or legacy forward policy. No instrumentation, standalone Full suite,
+  release/probes/tablet/arm64 rerun. No local blocker.

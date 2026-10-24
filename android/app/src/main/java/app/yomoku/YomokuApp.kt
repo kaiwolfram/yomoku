@@ -188,6 +188,7 @@ private fun YomokuPreview() {
                 null,
                 null,
                 null,
+                null,
             )
         ) {}
     }

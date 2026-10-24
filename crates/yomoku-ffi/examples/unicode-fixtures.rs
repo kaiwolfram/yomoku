@@ -5,8 +5,9 @@ use std::{env, error::Error, fs, path::Path};
 
 use crux_core::bridge::{BincodeFfiFormat, FfiFormat};
 use yomoku_core::document::{
-    ChapterId, ChapterText, DocumentId, SourceId, TextAnchor, TextOffset, TextRange,
+    AnalysisId, ChapterId, ChapterText, DocumentId, SourceId, TextAnchor, TextOffset, TextRange,
 };
+use yomoku_core::reader::ReaderAnalysis;
 
 const CASES: &[(&str, &str)] = &[
     ("", ""),
@@ -51,6 +52,22 @@ fn main() -> Result<(), Box<dyn Error>> {
             dir.join("invalid-offset.bin")
         )?)
         .is_err());
+    }
+    for (index, analysis) in [
+        ReaderAnalysis::Available(AnalysisId::try_from(i64::MAX)?),
+        ReaderAnalysis::Missing,
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        if writing {
+            fs::write(dir.join(format!("analysis-{index}.bin")), encode(&analysis))?;
+        } else {
+            let returned: ReaderAnalysis = BincodeFfiFormat::deserialize(&fs::read(
+                dir.join(format!("analysis-return-{index}.bin")),
+            )?)?;
+            assert_eq!(returned, analysis);
+        }
     }
     for (index, &(text, selected)) in CASES.iter().enumerate() {
         let chapter = ChapterText {

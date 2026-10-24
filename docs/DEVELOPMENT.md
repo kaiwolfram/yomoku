@@ -1189,3 +1189,32 @@ Initial strict Clippy flagged a test tuple's complexity; extracted a column type
 alias and the final check passes. No open failure; prior nonfatal Crux JNI shutdown
 logging persists. No Android build/lint/instrumentation, release/probes/tablet or
 physical-arm64 rerun for this Rust repository slice. Prior device results stand.
+
+
+## Reader analysis identity restoration
+
+Verified 2026-10-24 using the Rust PATH workaround above, sequentially:
+```sh
+cargo build --workspace --locked --offline
+cargo test --workspace --all-features --locked --offline
+cargo fmt --all -- --check
+cargo clippy --workspace --all-targets --all-features --locked --offline -- -D warnings
+tools/test-kotlin-bridge.sh
+tools/format-kotlin.sh --check
+PATH=/home/kai/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin:$PATH JAVA_HOME=/home/kai/repos/yomoku/.local/jdk-17/jdk-17.0.21+9 GRADLE_USER_HOME=/home/kai/repos/yomoku/.local/gradle ANDROID_HOME=/home/kai/Android/Sdk ./android/gradlew -p android :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug --offline --console=plain
+git diff --check
+```
+PASS: 187 data-free Rust tests (102 storage), workspace build, fmt/strict Clippy,
+real-Full Kotlin/JNI with seven Unicode and two analysis-state round trips,
+Kotlin format, both debug APK builds and strict Android lint. The read-only
+repository snapshot preserves exact text/position/preset and pins the earliest
+Mode B identity through reopen, independent of later profiles. Tests cover legacy
+Missing, wrong modes/chapters, corrupt metadata/settings, frozen core identity,
+route clearing and worker/JNI reopening without dictionary availability/loading.
+The codec fixture includes a full-width AnalysisId and the Missing variant.
+
+Initial missing test import fixed; no open failure or dependency change. Existing
+benign Crux shutdown logging, ktfmt JVM Unsafe warning and SDK XML-version warning
+persist. No Android instrumentation, standalone owned/mapped Full fixture suite,
+release APK, probes, tablet or physical-arm64 rerun. Android timer/close/reboot and
+completion/navigation remain unchecked. No schema change or legacy rescan added.

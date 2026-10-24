@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     document::{DocumentId, LibraryDocument, PastedDocument},
     pagination::{PageLength, ReadingPosition},
-    reader::ReaderPage,
+    reader::{ReaderAnalysis, ReaderPage},
     storage::{DocumentError, StorageOperation, StorageResult},
 };
 
@@ -64,6 +64,7 @@ pub struct Model {
     document_error: Option<DocumentError>,
     content_route: ContentRoute,
     reader: Option<ReaderPage>,
+    reader_analysis: Option<ReaderAnalysis>,
     pending_reader: Option<DocumentId>,
     reader_document: Option<PastedDocument>,
     page_length: Option<PageLength>,
@@ -103,6 +104,8 @@ pub struct ViewModel {
     pub document_error: Option<DocumentError>,
     pub content_route: ContentRoute,
     pub reader: Option<ReaderPage>,
+    /// Present only for an opened reader; Missing identifies a legacy paste.
+    pub reader_analysis: Option<ReaderAnalysis>,
     /// None until persisted settings have been loaded successfully.
     pub page_length: Option<PageLength>,
     pub import_summary: Option<ImportSummary>,
@@ -175,6 +178,7 @@ impl App for Yomoku {
                 model.content_route = ContentRoute::Reader;
                 model.pending_reader = Some(id);
                 model.reader = None;
+                model.reader_analysis = None;
                 model.reader_document = None;
             }
             return render::render()
@@ -187,6 +191,7 @@ impl App for Yomoku {
                 model.settings_open = false;
                 model.content_route = ContentRoute::Main;
                 model.reader = None;
+                model.reader_analysis = None;
                 model.reader_document = None;
                 model.pending_reader = None;
             }
@@ -196,6 +201,7 @@ impl App for Yomoku {
                 model.settings_open = false;
                 model.content_route = ContentRoute::Paste;
                 model.reader = None;
+                model.reader_analysis = None;
                 model.reader_document = None;
                 model.pending_reader = None;
                 model.document_error = None;
@@ -203,6 +209,7 @@ impl App for Yomoku {
             Event::CloseDocument => {
                 model.content_route = ContentRoute::Main;
                 model.reader = None;
+                model.reader_analysis = None;
                 model.reader_document = None;
                 model.pending_reader = None;
                 model.document_error = None;
@@ -249,16 +256,19 @@ impl App for Yomoku {
                         model.settings_open = false;
                         model.content_route = ContentRoute::Main;
                         model.reader = None;
+                        model.reader_analysis = None;
                         model.reader_document = None;
                     }
-                    StorageResult::Loaded(document, length) => {
-                        model.apply_page_length(length);
+                    StorageResult::Loaded(snapshot) => {
+                        let document = snapshot.document;
+                        model.apply_page_length(snapshot.page_length);
                         if pending_reader == Some(document.document_id)
                             && model.content_route == ContentRoute::Reader
                         {
-                            match ReaderPage::open(&document, length) {
+                            match ReaderPage::open(&document, snapshot.page_length) {
                                 Ok(reader) => {
                                     model.reader = Some(reader);
+                                    model.reader_analysis = Some(snapshot.analysis);
                                     model.reader_document = Some(document.clone());
                                 }
                                 Err(_) => {
@@ -323,6 +333,7 @@ impl App for Yomoku {
             document_error: model.document_error,
             content_route: model.content_route,
             reader: model.reader.clone(),
+            reader_analysis: model.reader_analysis,
             page_length: model.page_length,
             import_summary: model.import_summary.clone(),
         }

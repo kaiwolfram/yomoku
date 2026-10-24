@@ -3,9 +3,12 @@ use yomoku_core::document::{
     ChapterId, ChapterText, DocumentId, LibraryDocument, PasteText, PastedDocument, SourceId,
     TextOffset,
 };
-use yomoku_core::{pagination::ReadingPosition, reader::progress_percent};
+use yomoku_core::{
+    pagination::ReadingPosition,
+    reader::{progress_percent, ReaderSnapshot},
+};
 
-use crate::{Storage, StorageError};
+use crate::{analysis::read_reader_analysis, settings::read_page_length, Storage, StorageError};
 
 impl Storage {
     /// Stable allocation order until Library sorting is implemented.
@@ -68,6 +71,25 @@ impl Storage {
         let document = load_paste_in(&transaction, document_id)?;
         transaction.commit()?;
         Ok(document)
+    }
+
+    /// Read the exact position, preset and original stored Mode B identity
+    /// together. This never invokes an analyzer, scans tokens or writes data.
+    pub fn load_reader_snapshot(
+        &mut self,
+        document_id: DocumentId,
+    ) -> Result<Option<ReaderSnapshot>, StorageError> {
+        let transaction = self.connection.transaction()?;
+        let Some(document) = load_paste_in(&transaction, document_id)? else {
+            return Ok(None);
+        };
+        let snapshot = ReaderSnapshot {
+            page_length: read_page_length(&transaction)?,
+            analysis: read_reader_analysis(&transaction, document.chapter.chapter_id)?,
+            document,
+        };
+        transaction.commit()?;
+        Ok(Some(snapshot))
     }
 
     /// Save only current position. No completion/history/status changes occur.

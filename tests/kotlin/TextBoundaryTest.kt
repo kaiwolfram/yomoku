@@ -2,6 +2,7 @@ package app.yomoku.tests
 
 import app.yomoku.shared.ChapterText
 import app.yomoku.shared.DocumentId
+import app.yomoku.shared.ReaderAnalysis
 import app.yomoku.shared.TextAnchor
 import app.yomoku.shared.TextOffset
 import app.yomoku.shared.TextRange
@@ -17,6 +18,18 @@ fun verifyTextBoundaries(directory: String) {
     File(dir, "invalid-id-zero.bin").writeBytes(DocumentId(0L).bincodeSerialize())
     File(dir, "invalid-id-negative.bin").writeBytes(DocumentId(-1L).bincodeSerialize())
     File(dir, "invalid-offset.bin").writeBytes(TextOffset(-1L).bincodeSerialize())
+
+    for (index in 0..1) {
+        val bytes = File(dir, "analysis-$index.bin").readBytes()
+        val analysis = ReaderAnalysis.bincodeDeserialize(bytes)
+        if (index == 0) {
+            check((analysis as ReaderAnalysis.Available).value.value == Long.MAX_VALUE)
+        } else {
+            check(analysis is ReaderAnalysis.Missing)
+        }
+        check(analysis.bincodeSerialize().contentEquals(bytes))
+        File(dir, "analysis-return-$index.bin").writeBytes(analysis.bincodeSerialize())
+    }
 
     val selections = listOf("", "日本語", "𠮷野家😀", "か\u3099", "👩‍👩‍👧‍👦", "第二行\n\n", "端")
     for ((index, selected) in selections.withIndex()) {

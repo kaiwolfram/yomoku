@@ -1,9 +1,11 @@
 use crux_core::Core;
 use yomoku_core::{
     app::{ContentRoute, Destination, Effect, Event, ImportOutcome, ImportSummary, Yomoku},
-    document::{ChapterId, ChapterText, DocumentId, PastedDocument, SourceId, TextOffset},
+    document::{
+        AnalysisId, ChapterId, ChapterText, DocumentId, PastedDocument, SourceId, TextOffset,
+    },
     pagination::{PageLength, ReadingPosition},
-    reader::{progress_percent, ReaderPage},
+    reader::{progress_percent, ReaderAnalysis, ReaderPage, ReaderSnapshot},
     storage::{DocumentError, StorageOperation, StorageResult},
 };
 
@@ -18,6 +20,14 @@ fn document(text: &str) -> PastedDocument {
             text: text.into(),
         },
     }
+}
+
+fn loaded(document: PastedDocument, page_length: PageLength) -> StorageResult {
+    StorageResult::Loaded(ReaderSnapshot {
+        document,
+        page_length,
+        analysis: ReaderAnalysis::Missing,
+    })
 }
 
 #[test]
@@ -61,7 +71,7 @@ fn position_save_keeps_committed_view_until_success_and_late_results_only_update
         finish(
             &core,
             &mut effects,
-            StorageResult::Loaded(document.clone(), PageLength::default()),
+            loaded(document.clone(), PageLength::default()),
         );
         let previous = core.view().reader.unwrap();
         let position = ReadingPosition {
@@ -268,7 +278,7 @@ fn reader_opens_exact_first_logical_page_with_unicode_anchor_and_counter() {
     finish(
         &core,
         &mut effects,
-        StorageResult::Loaded(document.clone(), PageLength::default()),
+        loaded(document.clone(), PageLength::default()),
     );
     let page = core.view().reader.unwrap();
     assert_eq!(page.text, first);
@@ -297,13 +307,10 @@ fn cancelled_reader_loads_never_reopen_after_back_tab_or_paste_navigation() {
         let mut effects = core.process_event(Event::OpenReader(document.document_id));
         core.process_event(cancel);
         let route = core.view().content_route;
-        finish(
-            &core,
-            &mut effects,
-            StorageResult::Loaded(document, PageLength::default()),
-        );
+        finish(&core, &mut effects, loaded(document, PageLength::default()));
         assert_eq!(core.view().content_route, route);
         assert!(core.view().reader.is_none());
+        assert!(core.view().reader_analysis.is_none());
         assert!(!core.view().storage_busy);
     }
 }
@@ -327,16 +334,12 @@ fn failed_reader_can_return_to_library_and_retry_while_plain_load_never_opens_it
     finish(
         &core,
         &mut effects,
-        StorageResult::Loaded(document.clone(), PageLength::default()),
+        loaded(document.clone(), PageLength::default()),
     );
     assert_eq!(core.view().content_route, ContentRoute::Main);
     assert!(core.view().reader.is_none());
     let mut effects = core.process_event(Event::OpenReader(document.document_id));
-    finish(
-        &core,
-        &mut effects,
-        StorageResult::Loaded(document, PageLength::default()),
-    );
+    finish(&core, &mut effects, loaded(document, PageLength::default()));
     assert_eq!(core.view().reader.unwrap().total_pages, 1);
 }
 
@@ -360,11 +363,7 @@ fn settings_reflow_preserves_exact_position_for_all_presets_and_leaves_progress_
                 StorageResult::Listed(vec![document.library_summary().unwrap()], old),
             );
             let mut effects = core.process_event(Event::OpenReader(document.document_id));
-            finish(
-                &core,
-                &mut effects,
-                StorageResult::Loaded(document.clone(), old),
-            );
+            finish(&core, &mut effects, loaded(document.clone(), old));
             let previous = core.view().reader.unwrap();
             let progress = core.view().documents;
             core.process_event(Event::OpenSettings);
@@ -400,11 +399,7 @@ fn settings_failures_keep_committed_page_and_late_saves_do_not_reopen_routes() {
     assert_eq!(core.view().page_length, None);
     let document = document(&"字。\n".repeat(1000));
     let mut effects = core.process_event(Event::OpenReader(document.document_id));
-    finish(
-        &core,
-        &mut effects,
-        StorageResult::Loaded(document, PageLength::default()),
-    );
+    finish(&core, &mut effects, loaded(document, PageLength::default()));
     assert!(core
         .process_event(Event::SetPageLength(PageLength::Characters250))
         .is_empty());
@@ -431,4 +426,68 @@ fn settings_failures_keep_committed_page_and_late_saves_do_not_reopen_routes() {
     assert_eq!(core.view().content_route, ContentRoute::Main);
     assert!(!core.view().settings_open);
     assert!(core.view().reader.is_none());
+}
+
+#[test]
+fn reader_analysis_is_frozen_through_position_settings_and_plain_load_and_cleared_on_exit() {
+    for analysis in [
+        ReaderAnalysis::Missing,
+        ReaderAnalysis::Available(AnalysisId::try_from(i64::MAX).unwrap()),
+    ] {
+        for exit in [
+            Event::CloseDocument,
+            Event::OpenPaste,
+            Event::SelectDestination(Destination::Vocabulary),
+        ] {
+            let core = Core::<Yomoku>::new();
+            let document = document("𠮷猫。\n");
+            let mut effects = core.process_event(Event::OpenReader(document.document_id));
+            assert!(core.view().reader_analysis.is_none());
+            finish(
+                &core,
+                &mut effects,
+                StorageResult::Loaded(ReaderSnapshot {
+                    document: document.clone(),
+                    page_length: PageLength::default(),
+                    analysis,
+                }),
+            );
+            assert_eq!(core.view().reader_analysis, Some(analysis));
+            let mut effects = core.process_event(Event::SaveReadingPosition(
+                core.view().reader.unwrap().position,
+            ));
+            finish(
+                &core,
+                &mut effects,
+                StorageResult::PositionSaved(document.clone()),
+            );
+            assert_eq!(core.view().reader_analysis, Some(analysis));
+            core.process_event(Event::OpenSettings);
+            let mut effects = core.process_event(Event::SetPageLength(PageLength::Characters250));
+            finish(
+                &core,
+                &mut effects,
+                StorageResult::PageLengthSaved(PageLength::Characters250),
+            );
+            core.process_event(Event::CloseSettings);
+            assert_eq!(core.view().reader_analysis, Some(analysis));
+            let mut effects = core.process_event(Event::LoadPaste(document.document_id));
+            finish(
+                &core,
+                &mut effects,
+                loaded(document.clone(), PageLength::Characters250),
+            );
+            assert_eq!(core.view().reader_analysis, Some(analysis));
+            core.process_event(exit);
+            assert!(core.view().reader_analysis.is_none());
+            let mut effects = core.process_event(Event::OpenReader(document.document_id));
+            assert!(core.view().reader_analysis.is_none());
+            finish(
+                &core,
+                &mut effects,
+                loaded(document, PageLength::Characters250),
+            );
+            assert_eq!(core.view().reader_analysis, Some(ReaderAnalysis::Missing));
+        }
+    }
 }

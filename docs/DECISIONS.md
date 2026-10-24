@@ -1252,3 +1252,24 @@ No new dependency or product deletion API. App/worker/FFI completion/checkpoint
 ordering, platform clocks/lifecycle/interactions, controls, Finish Book and
 statistics aggregation remain open. Legacy `record_page_completion` remains a
 repository foundation, never a production forward action.
+
+
+## 2026-10-24 — Restore the reader's stored base analysis identity
+
+Load paste content, exact position, global page preset and Mode B AnalysisId in
+one read transaction on the existing FIFO worker. Select the earliest persisted
+Mode B snapshot for that chapter: this is the original import base today, and
+later engine/dictionary snapshots must not silently replace it. Do not select A/C
+or another chapter, compare against the currently installed engine, initialize
+Sudachi or rescan/register vocabulary while opening. Full token validation stays
+inside analyzed completion; opening reads only the stored analysis header.
+
+Represent absent Mode B analysis as ReaderAnalysis::Missing, distinct from a
+reader that is not open. Legacy pastes remain readable without inferred analysis
+or statistics. Corrupt original headers/settings return the existing typed error,
+without falling back to a later snapshot or repairing data. Freeze the selected
+identity in core through position saves, settings reflow and unrelated LoadPaste
+results; clear it on reader exit/replacement. Expose it in the generated view
+protocol for the upcoming completion intents. No migration, dependency, product
+feature or selected-override behavior is added. Timer checkpoints, forward intents
+and the eventual legacy-completion policy remain unfinished.

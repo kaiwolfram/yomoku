@@ -3,7 +3,9 @@ use yomoku_core::{
         AnalysisProfile, AnalyzedToken, ChapterAnalysis, OverrideScope, SegmentationOverride,
         SplitMode,
     },
-    document::{ChapterText, PasteText, TextAnchor, TextOffset, TextRange},
+    document::{ChapterText, DocumentId, PasteText, TextAnchor, TextOffset, TextRange},
+    pagination::{PageLength, ReadingPosition},
+    reader::{ReaderAnalysis, ReaderSnapshot},
     vocabulary::{Surface, VocabularyStatus},
 };
 
@@ -61,6 +63,135 @@ fn counts(storage: &Storage) -> (i64, i64, i64, i64) {
          (SELECT COUNT(*) FROM segmentation_overrides), (SELECT COUNT(*) FROM segmentation_override_parts)",
         [], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
     ).unwrap()
+}
+
+#[test]
+fn reader_snapshot_pins_original_mode_b_with_exact_position_and_preset_after_reopen() {
+    let database = TestDatabase::new();
+    let mut storage = Storage::open(database.path()).unwrap();
+    let mut document = storage
+        .create_paste(&PasteText::new("𠮷が食べた。\r\nABC\0e\u{301}📖".into()).unwrap())
+        .unwrap();
+    let chapter_id = document.chapter.chapter_id;
+    let mut snapshot = analysis(&document.chapter);
+    snapshot.mode = SplitMode::A;
+    storage
+        .store_chapter_analysis(chapter_id, &snapshot)
+        .unwrap();
+    snapshot.mode = SplitMode::B;
+    let original = storage
+        .store_chapter_analysis(chapter_id, &snapshot)
+        .unwrap();
+    snapshot.profile.engine_revision = "later-engine@2".into();
+    let later = storage
+        .store_chapter_analysis(chapter_id, &snapshot)
+        .unwrap();
+    assert_ne!(original, later);
+    snapshot.mode = SplitMode::C;
+    storage
+        .store_chapter_analysis(chapter_id, &snapshot)
+        .unwrap();
+    let position = ReadingPosition {
+        source_id: document.chapter.source_id,
+        chapter_id,
+        offset: TextOffset::try_from(4).unwrap(), // after supplementary Unicode
+    };
+    storage
+        .save_reading_position(document.document_id, position)
+        .unwrap();
+    document.reading_position = Some(position);
+    storage.save_page_length(PageLength::Characters750).unwrap();
+    drop(storage);
+    let mut storage = Storage::open(database.path()).unwrap();
+    storage
+        .connection
+        .pragma_update(None, "query_only", true)
+        .unwrap();
+    let before = fs::read(database.path()).unwrap();
+    assert_eq!(
+        storage.load_reader_snapshot(document.document_id).unwrap(),
+        Some(ReaderSnapshot {
+            document,
+            page_length: PageLength::Characters750,
+            analysis: ReaderAnalysis::Available(original),
+        })
+    );
+    assert_eq!(fs::read(database.path()).unwrap(), before);
+}
+
+#[test]
+fn legacy_reader_snapshot_is_explicitly_missing_and_never_substitutes_other_modes_or_chapters() {
+    let database = TestDatabase::new();
+    let mut storage = Storage::open(database.path()).unwrap();
+    let document = storage
+        .create_paste(&PasteText::new("猫".into()).unwrap())
+        .unwrap();
+    let other = storage
+        .create_paste(&PasteText::new("犬".into()).unwrap())
+        .unwrap();
+    storage
+        .store_chapter_analysis(other.chapter.chapter_id, &analysis(&other.chapter))
+        .unwrap();
+    let mut snapshot = analysis(&document.chapter);
+    for mode in [SplitMode::A, SplitMode::C] {
+        snapshot.mode = mode;
+        storage
+            .store_chapter_analysis(document.chapter.chapter_id, &snapshot)
+            .unwrap();
+    }
+    storage
+        .connection
+        .pragma_update(None, "query_only", true)
+        .unwrap();
+    let before = fs::read(database.path()).unwrap();
+    assert_eq!(
+        storage.load_reader_snapshot(document.document_id).unwrap(),
+        Some(ReaderSnapshot {
+            document,
+            page_length: PageLength::default(),
+            analysis: ReaderAnalysis::Missing,
+        })
+    );
+    assert!(storage
+        .load_reader_snapshot(DocumentId::try_from(i64::MAX).unwrap())
+        .unwrap()
+        .is_none());
+    assert_eq!(fs::read(database.path()).unwrap(), before);
+}
+
+#[test]
+fn reader_snapshot_rejects_corrupt_identity_or_settings_without_fallback_or_repair() {
+    for sql in [
+        "UPDATE chapter_analyses SET engine_revision = ' '",
+        "UPDATE chapter_analyses SET dictionary_revision = ' '",
+        "PRAGMA ignore_check_constraints = ON; UPDATE chapter_analyses SET semantics_version = 2",
+        "DELETE FROM reader_settings",
+    ] {
+        let database = TestDatabase::new();
+        let mut storage = Storage::open(database.path()).unwrap();
+        let document = storage
+            .create_paste(&PasteText::new("猫".into()).unwrap())
+            .unwrap();
+        let mut snapshot = analysis(&document.chapter);
+        storage
+            .store_chapter_analysis(document.chapter.chapter_id, &snapshot)
+            .unwrap();
+        storage.connection.execute_batch(sql).unwrap();
+        // A healthy later snapshot must not mask a broken original identity.
+        snapshot.profile.engine_revision = "later-engine@2".into();
+        snapshot.profile.dictionary_revision = "later-full@2".into();
+        storage
+            .store_chapter_analysis(document.chapter.chapter_id, &snapshot)
+            .unwrap();
+        let before = fs::read(database.path()).unwrap();
+        let result = storage.load_reader_snapshot(document.document_id);
+        if sql == "DELETE FROM reader_settings" {
+            assert!(matches!(result, Err(StorageError::InvalidSettings)));
+        } else {
+            assert!(matches!(result, Err(StorageError::InvalidAnalysis)));
+        }
+        assert_eq!(fs::read(database.path()).unwrap(), before);
+    }
 }
 
 #[test]
