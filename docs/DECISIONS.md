@@ -1297,3 +1297,29 @@ slice must sequence/coalesce checkpoints while busy, flush before movement/close
 freeze analyzed completion IDs/time across retries, and then connect Android's
 monotonic clock/lifecycle/interactions/periodic saves. No dependency, migration,
 legacy completion policy or new product behavior is introduced.
+
+## 2026-10-24 — Coalesce checkpoints before reader departure
+
+While an absolute time save is unresolved, retain its exact payload/prior revision
+for retry and coalesce subsequent valid same-anchor updates into one greatest-duration
+slot. Equal, decreasing and foreign updates do not replace it or create another
+write. On success, dispatch the coalesced value with the returned revision before
+any accepted reader departure. Updates arriving during that chained save can
+coalesce again; failures require the existing explicit retry and retain all state.
+
+Hold one CloseDocument, OpenPaste, tab selection or position-only save until the
+checkpoint drain succeeds. Keep the first requested departure; subsequent duplicate
+or competing callbacks do not replace its destination. This extends the session's
+existing one-command policy with a bounded time slot and one departure, without a
+general event queue. Reader/time/analysis stay attached while saving or retrying;
+only successful draining permits departure. Same-offset movement preserves the
+token, and changed-offset movement still requires a fresh restore.
+
+This is explicit transport sequencing, not automatic timer production. A platform
+caller must restore first, submit its final duration before requesting departure,
+pause accounting and wait for the drain before destroying the native session.
+Other unrelated busy operations retain their existing ignore policy. Native close
+still drains work already submitted to FIFO, not unsubmitted coalesced core state.
+Android clock/lifecycle/periodic saves/teardown, analyzed completion and its frozen
+IDs/timestamp/page total remain open. No schema, dependency or public codec change;
+checkpoints still create no completion/encounter/status history.

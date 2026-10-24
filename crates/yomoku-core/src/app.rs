@@ -73,6 +73,8 @@ pub struct Model {
     reader_time: Option<SavedReadingTime>,
     restoring_reader_time: bool,
     pending_time_checkpoint: Option<StorageOperation>,
+    queued_time_checkpoint: Option<ReadingTimeUpdate>,
+    deferred_reader_event: Option<Event>,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -88,12 +90,14 @@ pub enum Event {
     OpenPaste,
     OpenReader(DocumentId),
     CloseDocument,
-    /// Position-only persistence hook; page completion uses a separate command.
+    /// Position-only persistence hook; waits for accepted time checkpoints.
+    /// Page completion uses a separate command.
     SaveReadingPosition(ReadingPosition),
     SetPageLength(PageLength),
     DismissImportSummary,
     /// Explicit preparation for the platform timer; opening itself stays read-only.
     RestoreReadingTime,
+    /// Coalesce newer absolute durations while a checkpoint is unresolved.
     CheckpointReadingTime(ReadingTimeUpdate),
     /// Retry the frozen absolute checkpoint, including its original revision.
     RetryReadingTimeCheckpoint,
@@ -140,6 +144,37 @@ impl App for Yomoku {
     type Effect = Effect;
 
     fn update(&self, event: Event, model: &mut Model) -> Command<Effect, Event> {
+        if let Some(StorageOperation::SaveReadingTime { checkpoint, .. }) =
+            model.pending_time_checkpoint.as_ref()
+        {
+            match &event {
+                Event::CheckpointReadingTime(update) => {
+                    // Keep the newest absolute duration without changing the frozen
+                    // in-flight payload/revision, including after a failed save.
+                    let newest = model.queued_time_checkpoint.as_ref().unwrap_or(checkpoint);
+                    if !model.is_current_time(*update)
+                        || update.pending.milliseconds() <= newest.pending.milliseconds()
+                    {
+                        return Command::done();
+                    }
+                    model.queued_time_checkpoint = Some(*update);
+                    return render::render();
+                }
+                Event::CloseDocument
+                | Event::OpenPaste
+                | Event::SelectDestination(_)
+                | Event::SaveReadingPosition(_) => {
+                    // Accept one departure, then drain all accepted time first.
+                    // Repeated callbacks cannot replace the first destination.
+                    if model.deferred_reader_event.is_some() {
+                        return Command::done();
+                    }
+                    model.deferred_reader_event = Some(event);
+                    return render::render();
+                }
+                _ => {}
+            }
+        }
         let operation = match &event {
             Event::RestoreReadingTime => {
                 let Some(reader) = model.reader.as_ref() else {
@@ -299,6 +334,12 @@ impl App for Yomoku {
                         if model.is_current_time(saved.value) {
                             model.reader_time = Some(saved);
                         }
+                        if let Some(checkpoint) = model.queued_time_checkpoint.take() {
+                            return self.update(Event::CheckpointReadingTime(checkpoint), model);
+                        }
+                        if let Some(event) = model.deferred_reader_event.take() {
+                            return self.update(event, model);
+                        }
                     }
                     StorageResult::Created(document) | StorageResult::Existing(document) => {
                         match document.library_summary() {
@@ -432,8 +473,7 @@ impl Model {
     fn clear_reader_time(&mut self) {
         self.reader_time = None;
         self.restoring_reader_time = false;
-        // Accepted saves still finish on the FIFO. Keep failed saves retryable,
-        // even after closing, before allowing any other storage mutation.
+        // Checkpoint obligations drain before reader departure reaches here.
     }
 
     fn apply_page_length(&mut self, length: PageLength) {

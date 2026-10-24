@@ -18,7 +18,7 @@ with functioning rustup can omit the PATH workaround. Do not assume this compile
 is the project's minimum supported version; establish that with dependencies.
 Cargo.lock is retained for reproducible application development.
 Crux 0.20.0 declares Rust 1.90 minimum; the full locked graph has only been tested
-with 1.99.1. Current host baseline: 182 data-free Rust tests (99 storage, seven
+with 1.99.1. Current host baseline: 195 data-free Rust tests (102 storage, eight
 runtime). Eleven analysis fixtures and one runtime fixture run separately with
 each Full loader via tools/test-sudachi.sh (see below).
 
@@ -43,8 +43,9 @@ movement, SQLite reopen with fresh clock epochs, duplicate/stale/concurrent
 checkpoints/completions, rereads, overflow, deletion and statement/commit/migration
 rollback. Migration 0009 consumes frozen time with completion history/position.
 Reboot remains simulated at the duration boundary; platform lifecycle wiring and
-actual Android close/reboot verification remain unchecked. Runtime/FFI checkpoint
-ordering remain future work. Analyzed occurrence/status completion now commits
+actual Android close/reboot verification remain unchecked. Core/FFI checkpoints
+coalesce during unresolved saves and drain before reader departure; automatic
+platform timing remains future work. Analyzed occurrence/status completion commits
 atomically in the repository (migration 0010); application wiring remains open.
 
 ## Kotlin payload generation
@@ -1255,3 +1256,33 @@ failure, dependency or migration change. Gradle passed in the normal sandbox.
 No instrumentation, standalone Full fixture suite, release APK or execution of
 probes/tablet/physical arm64 tests. Automatic timer/lifecycle/periodic/final saves,
 actual Android close/reboot recovery and completion sequencing remain open.
+
+## Checkpoint coalescing and reader departure ordering
+
+Verified 2026-10-24 with the Rust PATH workaround and Android environment above;
+native generation/build/test runners executed sequentially:
+```sh
+cargo build --workspace --locked --offline
+cargo test --workspace --all-features --locked --offline
+cargo fmt --all -- --check
+cargo clippy --workspace --all-targets --all-features --locked --offline -- -D warnings
+tools/test-kotlin-bridge.sh
+PATH=/home/kai/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin:$PATH JAVA_HOME=/home/kai/repos/yomoku/.local/jdk-17/jdk-17.0.21+9 GRADLE_USER_HOME=/home/kai/repos/yomoku/.local/gradle ANDROID_HOME=/home/kai/Android/Sdk ./android/gradlew -p android :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug --offline --console=plain
+git diff --check
+```
+PASS: workspace build, 195 data-free Rust tests (102 storage), fmt/strict Clippy,
+host real-Full Kotlin/JNI plus seven Unicode/two analysis exchanges, negative-time
+rejection, both debug APK builds and strict Android lint. Three new core tests
+cover maximum-duration coalescing, foreign/decreasing/duplicate updates, frozen
+retries at both save stages, updates during a chained save, duplicate departures,
+position ordering and all exit routes. A blocked-SQLite async FFI test verifies
+only two saves per burst, FIFO position/close ordering, exact-offset durations
+and revision counts after reopen, and no completion/encounter/status history.
+
+The first FFI run expected revision 2 instead of 3 (reservation starts at 1);
+corrected the test expectation. Final workspace checks pass. Prior benign Crux
+JNI shutdown logging persists. No dependency/schema/public-codec change. No Kotlin
+source changed. No device instrumentation, standalone owned/mapped Full suite,
+release APK or probe/tablet/physical-arm64 execution. Automatic timer production,
+unrelated busy-operation handling, native teardown flush and analyzed completion
+remain unimplemented; actual Android close/reboot recovery is still unverified.

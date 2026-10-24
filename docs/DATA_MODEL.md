@@ -487,16 +487,22 @@ Core/worker/FFI now expose explicit RestoreReadingTime and anchored absolute
 CheckpointReadingTime intents. The shell receives only ReadingTimeUpdate
 (document/position/duration), without the revision. Core retains the previous
 SavedReadingTime and frozen checkpoint across failures; RetryReadingTimeCheckpoint
-resubmits them unchanged, including after reader exit. Other storage commands
-remain blocked until success. Wrong document/offset and decreasing durations are
+resubmits them unchanged. Newer updates during an unresolved checkpoint coalesce
+to the maximum same-anchor duration. Each successful save chains the latest queued
+value with the newly returned revision. Reader exit/position-only movement waits
+for this drain; one deferred departure is retained unchanged through failures.
+Other storage commands remain blocked until success. Wrong document/offset and decreasing durations are
 ignored; negative durations fail Serde decoding at FFI. A move clears the restored
 token; reflow and same-offset saves preserve it. A cancelled restore or late save
 cannot attach time to a closed reader. Existing read-only opening is unchanged:
 explicit restore reserves the zero row only when the future timer needs it.
 
-The platform must retry/coalesce busy checkpoints and finish the departing save
-before moving/completing. No automatic clock/lifecycle/interactions, periodic save,
-timer flush on close or completion intent is connected yet. This protocol creates
+The platform must produce a final checkpoint before requesting departure, wait for
+restore/unrelated busy operations, pause its timer and await the core's drain before
+destroying the native session. Core only coalesces during unresolved checkpoint
+saves; it does not queue arbitrary busy operations or create time itself.
+No automatic clock/lifecycle/interactions, periodic save, native teardown flush or
+completion intent is connected yet. This protocol creates
 no completion, encounter or status events. Migration 0010 already provides the
 analyzed completion transaction; application sequencing and post identity remain open.
 

@@ -38,10 +38,15 @@ RetryReadingTimeCheckpoint intents. Restore reserves the exact offset's token on
 the FIFO; it is separate from read-only reader opening. SavedReadingTime is a pure
 protocol value validated against SQLite; only its anchored duration reaches the
 shell view. Core freezes the checkpoint plus prior revision until success, blocks
-other storage commands while unresolved and retains retries even after reader exit.
-Late callbacks cannot restore closed-reader state. Reflow/same-offset saves preserve
+other storage commands while unresolved. Newer same-anchor absolute updates during
+that save coalesce to the greatest duration in one slot, without replacing the
+frozen retry payload. Successful saves chain the coalesced update using the returned
+revision. CloseDocument, OpenPaste, tab selection and position-only movement wait
+for all accepted checkpoints; the first requested departure wins over duplicate or
+competing callbacks. Failure retains both the queue and departure for explicit retry.
+Cancelled restores cannot attach to closed readers. Reflow/same-offset saves preserve
 time; moving to a different offset requires a fresh restore. No SQL, clock or
-analyzer enters core. Automatic final checkpoints, completion sequencing and
+analyzer enters core. Automatic final checkpoint production, completion sequencing and
 platform clock/lifecycle/interactions/periodic scheduling remain separate work.
 
 `yomoku-analysis` is a separate Rust I/O adapter using Sudachi.rs v0.7.0 at
@@ -296,7 +301,7 @@ Core-only effects stay private. Facet generates Event/ViewModel/Requests and
 document codecs in app.yomoku.shared; BoltFFI generates the native package and JNI C.
 Native wrappers require explicit close; no global singleton exists.
 
-One hundred and ninety-one data-free Rust tests cover analysis classification/
+One hundred and ninety-five data-free Rust tests cover analysis classification/
 checksum, domain, storage and bridge behavior, including an actual SQLite write
 lock proving dispatch/view/navigation remain responsive.
 The host Kotlin runner uses real JNI with -Xcheck:jni to verify navigation,
@@ -344,9 +349,9 @@ unique Japanese surfaces without encounters, deduplicate exact bytes and deliver
 Created/Existing summaries. Native descriptor delivery and retained/background
 lifecycle are connected. TXT/EPUB/SRT parsing, metadata and multi-file import
 semantics remain unchecked. Legacy imports are not automatically rescanned.
-Explicit core/worker/FFI pending-time checkpoint transport is verified; automatic
-final-checkpoint/completion sequencing, Android monotonic lifecycle/interactions
-and page movement/swipes remain next. The analyzed transaction is
+Explicit core/worker/FFI pending-time checkpoints coalesce during unresolved saves
+and drain before reader movement/exit. Completion sequencing, Android monotonic
+lifecycle/interactions and page movement/swipes remain next. The analyzed transaction is
 repository-only; effective segmentation edits and statistics aggregation remain
 separate tasks. Add analysis/import crates only with
 actual behavior; Sudachi Full defaults to B, JMdict/JMnedict remain offline data, and future Nostr I/O stays in Rust. Configuration is empty.

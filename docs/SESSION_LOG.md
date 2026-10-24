@@ -939,3 +939,26 @@
   controls/Finish Book. No migration/dependency/legacy forward policy. No device
   instrumentation, standalone Full suite, release/probe execution/tablet/arm64
   rerun; actual Android timer/close/reboot remains unverified. No local blocker.
+
+## 2026-10-24 — Coalesced checkpoints before reader departure
+
+- Started clean. Core coalesces newer same-anchor absolute durations while a save
+  is unresolved, preserving the frozen payload/revision for exact retry. Success
+  chains the maximum duration with the returned token; equal/decreasing/foreign
+  updates cannot overwrite it. One requested reader exit/position change waits
+  for all accepted saves; duplicates retain the first departure. Failures retain
+  both queued time and departure, with committed view state unchanged.
+- Added three core tests and one blocked-SQLite async FFI test covering chained
+  updates/retries, exit routes, duplicate destinations, nonblocking dispatch,
+  precise revision counts and exact-offset reopen without reading history.
+- PASS: workspace build, 195 data-free Rust tests (102 storage), fmt/strict Clippy,
+  real-Full Kotlin/JNI + Unicode/analysis exchanges, debug/test APK builds, strict
+  Android lint and diff check. Initial test revision expectation corrected; no
+  open failure. Prior benign Crux shutdown logging persists. No schema, dependency
+  or public-codec change; no Kotlin source changed.
+- Updated plan, README, decisions, architecture/data model, development and handoff.
+  Next: analyzed completion after checkpoint drain, then platform timer/final saves
+  and native teardown acknowledgment, controls/Finish Book. Unrelated busy events
+  still ignore; no automatic timer is connected. No device instrumentation,
+  standalone Full fixture suite, release/probe/tablet/arm64 execution; actual
+  Android close/reboot remains unverified. No local blocker.

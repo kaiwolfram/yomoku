@@ -334,3 +334,123 @@ fn async_time_checkpoints_retry_exact_payload_and_restore_each_offset_after_reop
         );
     }
 }
+
+#[test]
+fn busy_time_updates_flush_before_position_and_close_through_async_ffi() {
+    use yomoku_core::{
+        active_time::PendingReadingTime, app::ContentRoute, pagination::ReadingPosition,
+    };
+    let db = Database::new();
+    std::fs::create_dir(&db.0).unwrap();
+    let (native, callbacks, _) = bridge(&db.path());
+    let created = dispatch(
+        &native,
+        &callbacks,
+        Event::CreatePaste(format!("{}\n次。", "𠮷".repeat(500))),
+    );
+    let id = created.documents[0].document_id;
+    let opened = dispatch(&native, &callbacks, Event::OpenReader(id));
+    let first = opened.reader.unwrap();
+    let destination = ReadingPosition {
+        offset: first.anchor.range.end,
+        ..first.position
+    };
+    let mut checkpoint = dispatch(&native, &callbacks, Event::RestoreReadingTime)
+        .reader_time
+        .unwrap();
+    let sql = rusqlite::Connection::open(db.path()).unwrap();
+    let send = |event: Event| {
+        let mut bytes = Vec::new();
+        BincodeFfiFormat::serialize(&mut bytes, &event).unwrap();
+        native.update(&bytes).unwrap();
+    };
+    let await_callbacks = |count| {
+        for _ in 0..count {
+            let (worker, bytes) = callbacks.recv_timeout(Duration::from_secs(10)).unwrap();
+            assert_ne!(worker, thread::current().id());
+            let requests: Requests<ShellEffectFfi> = BincodeFfiFormat::deserialize(&bytes).unwrap();
+            assert_eq!(requests.0.len(), 1);
+            assert!(matches!(requests.0[0].effect, ShellEffectFfi::Render(_)));
+        }
+        assert!(!view(&native).storage_busy);
+        assert!(!view(&native).reading_time_save_pending);
+    };
+    sql.execute_batch("BEGIN IMMEDIATE").unwrap();
+    for ms in [100, 200, 400, 300, 400] {
+        checkpoint.pending = PendingReadingTime::from_millis(ms).unwrap();
+        send(Event::CheckpointReadingTime(checkpoint));
+    }
+    send(Event::SaveReadingPosition(destination));
+    send(Event::SaveReadingPosition(destination));
+    assert_eq!(view(&native).reader.unwrap().position, first.position);
+    assert!(callbacks.recv_timeout(Duration::from_millis(100)).is_err());
+    sql.execute_batch("COMMIT").unwrap();
+    await_callbacks(3); // First save, maximum coalesced save, then position.
+    assert_eq!(view(&native).reader.unwrap().position, destination);
+    assert!(view(&native).reader_time.is_none());
+    let mut second = dispatch(&native, &callbacks, Event::RestoreReadingTime)
+        .reader_time
+        .unwrap();
+    sql.execute_batch("BEGIN IMMEDIATE").unwrap();
+    for ms in [500, 900, 700] {
+        second.pending = PendingReadingTime::from_millis(ms).unwrap();
+        send(Event::CheckpointReadingTime(second));
+    }
+    send(Event::CloseDocument);
+    assert_eq!(view(&native).content_route, ContentRoute::Reader);
+    sql.execute_batch("COMMIT").unwrap();
+    await_callbacks(2); // Close follows the second save without another I/O.
+    assert_eq!(view(&native).content_route, ContentRoute::Main);
+    assert!(view(&native).reader.is_none());
+    drop(native);
+    assert!(callbacks.recv_timeout(Duration::from_secs(10)).is_err());
+    let (native, callbacks, _) = bridge(&db.path());
+    assert_eq!(
+        dispatch(&native, &callbacks, Event::OpenReader(id))
+            .reader
+            .unwrap()
+            .position,
+        destination
+    );
+    assert_eq!(
+        dispatch(&native, &callbacks, Event::RestoreReadingTime)
+            .reader_time
+            .unwrap()
+            .pending
+            .milliseconds(),
+        900
+    );
+    dispatch(
+        &native,
+        &callbacks,
+        Event::SaveReadingPosition(first.position),
+    );
+    assert_eq!(
+        dispatch(&native, &callbacks, Event::RestoreReadingTime)
+            .reader_time
+            .unwrap()
+            .pending
+            .milliseconds(),
+        400
+    );
+    let durable: Vec<(i64, i64)> = sql
+        .prepare("SELECT milliseconds, revision FROM pending_reading_time ORDER BY byte_offset")
+        .unwrap()
+        .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))
+        .unwrap()
+        .collect::<Result<_, _>>()
+        .unwrap();
+    assert_eq!(durable, vec![(400, 3), (900, 3)]);
+    for table in [
+        "reading_completions",
+        "reading_occurrences",
+        "vocabulary_status_events",
+    ] {
+        assert_eq!(
+            sql.query_row(&format!("SELECT count(*) FROM {table}"), [], |row| row
+                .get::<_, i64>(0))
+                .unwrap(),
+            0
+        );
+    }
+}

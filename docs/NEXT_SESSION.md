@@ -1,6 +1,6 @@
 # Resume here
 
-Updated: 2026-10-24. Explicit pending-time checkpoint transport verified.
+Updated: 2026-10-24. Checkpoint coalescing/departure ordering verified.
 Read AGENTS.md, plan phases 2–4 and PRODUCT_SPEC.md sections 3–4.
 Update docs/commit each verified step. Physical arm64 is the later user trial.
 
@@ -18,16 +18,20 @@ Update docs/commit each verified step. Physical arm64 is the later user trial.
   Identity stays fixed through reflow/position/plain loads; reader exit clears it.
   ReaderAnalysis::Missing explicitly identifies readable legacy absence. Bad
   headers/settings error without fallback/repair. No legacy forward policy yet.
-- NEW RestoreReadingTime separately reserves an exact-offset revision token on
+- RestoreReadingTime separately reserves an exact-offset revision token on
   FIFO; CheckpointReadingTime accepts anchored absolute duration. Core retains
   frozen payload/prior revision on failure; RetryReadingTimeCheckpoint resubmits
-  exactly, even after reader exit. Other storage commands stay blocked until
+  exactly. Other storage commands stay blocked until
   success. View exposes committed anchor/duration plus reading_time_save_pending,
   never revisions. Negative FFI durations reject; foreign/decreasing saves ignore.
   Reflow/same-offset saves preserve time; movement clears it for fresh restore.
-  Cancelled restores/late saves cannot attach to closed readers. No history,
-  analyzer load or automatic timer. Busy events are ignored, not queued: next
-  slice must coalesce/finalize checkpoints before moving/closing/completing.
+  NEW Updates during an unresolved checkpoint coalesce to one greatest-duration
+  slot; success chains it with the returned revision. Position-only movement,
+  CloseDocument/OpenPaste/tab exit defer until every accepted checkpoint saves.
+  First departure wins; failures retain queue/departure for explicit retry.
+  Cancelled restores cannot attach to closed readers. No history/analyzer/timer.
+  Unrelated busy operations still ignore events. Platform must restore, send its
+  final checkpoint before departure and await drain before native teardown.
 - Pure active_time takes monotonic ms, five-minute idle cap and interactions;
   restored durations start paused in a fresh epoch. Migration 0009 stores exact
   offset durations/revisions. Reflow assigns each anchor once (boundary following,
@@ -53,20 +57,21 @@ Update docs/commit each verified step. Physical arm64 is the later user trial.
   TXT chapters. File imports must hash original bytes. No dictionary/vocab/edit UI.
 
 ## Next tasks (ordered)
-1. Sequence/coalesce final checkpoints and analyzed completion intents through
+1. Sequence analyzed completion intents after checkpoint drain through
    core/FIFO/FFI. Freeze command IDs/timestamp/page total/AnalysisId across retries;
    return newly_known only on new success. Handle Missing explicitly, no rescan.
-2. Connect Android monotonic clock/lifecycle/interactions/periodic saves and flush
-   on close; verify close/reopen/reboot, then Next/Previous/swipes and Finish Book.
+2. Connect Android monotonic clock/lifecycle/interactions/periodic/final saves;
+   handle unrelated busy work and await drain before native teardown. Verify
+   close/reopen/reboot, then Next/Previous/swipes and Finish Book.
 3. User-run physical arm64 validation once usable. Formats/CI remain open.
 
 ## Verification / environment
-- PASS: workspace build, 191 data-free Rust tests (102 storage), fmt/strict Clippy,
+- PASS: workspace build, 195 data-free Rust tests (102 storage), fmt/strict Clippy,
   real-Full Kotlin/JNI with seven Unicode/two analysis exchanges, negative-duration
-  rejection, Kotlin format, Android debug/test APK builds and strict lint, diff
-  check. Core/worker/FFI/JNI cover retries, ordering, cancellation, offset restoration
-  and reopen without dictionary loading. No open check failure/dependency/schema
-  change. Prior benign Crux shutdown/JVM Unsafe warnings persist.
+  rejection, Android debug/test APK builds and strict lint, diff check. Three new
+  core tests + blocked-SQLite async FFI test cover maxima, frozen retries, chained
+  revisions, deferred departure and reopen with no history. No open failure,
+  dependency/schema/public-codec change. Benign Crux shutdown warnings persist.
 - No instrumentation, standalone Full suite, release/probes/tablet/arm64 rerun.
   Actual Android timer/close/reboot remains unverified. Commands: DEVELOPMENT.md
   latest section; Rust PATH workaround. Native builds/generation/tests sequential.
