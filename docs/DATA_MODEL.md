@@ -498,10 +498,23 @@ token; reflow and same-offset saves preserve it. A cancelled restore or late sav
 cannot attach time to a closed reader. Existing read-only opening is unchanged:
 explicit restore reserves the zero row only when the future timer needs it.
 
-The platform must produce a final checkpoint before requesting departure, wait for
-restore/unrelated busy operations, pause its timer and await the core's drain before
-destroying the native session. Core only coalesces during unresolved checkpoint
-saves; it does not queue arbitrary busy operations or create time itself.
+ObserveReaderClock accepts a document/exact-position identity, nonnegative signed
+monotonic milliseconds and Resume/Interact/Checkpoint/Pause action. It drives the
+pure accumulator only after restore; Checkpoint/Pause submit increased absolute
+durations through the same transport. Regressions, foreign identities and samples
+after departure/completion acceptance are ignored. Reflow/same-offset writes keep
+the accumulator; movement/completion/exit retire its epoch. No timestamp is saved.
+The existing maximum-duration slot can now also wait behind unrelated nonmoving
+storage. Success drains it before departure/completion; failure keeps it visible
+as reading_time_save_pending and RetryReadingTimeCheckpoint can submit it. Newer
+absolute updates can supersede an unsubmitted slot without chaining an older value.
+Samples behind already accepted movement/import are rejected: the platform must
+pause and checkpoint before submitting those operations.
+
+The platform must restore, send Resume when ready, send interactions/periodic
+checkpoints and Pause before settings/background/departure/completion, then await
+both pending flags and storage_busy before destroying the native session. Core
+does not queue arbitrary busy operations or read a clock itself.
 No automatic clock/lifecycle/interactions, periodic save, native teardown flush or
 platform timer is connected yet. Checkpoint operations create no completion, encounter
 or status events. Analyzed completion intents are connected below; post identity

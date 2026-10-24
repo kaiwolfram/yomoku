@@ -1351,3 +1351,29 @@ No schema or external dependency version changes. The FFI test adds a workspace-
 storage dev-dependency to seed analyzed snapshots without loading a dictionary.
 No Android timer, navigation controls, gesture, toast renderer or teardown flush is
 claimed by this slice; Android must later await both time and completion obligations.
+
+## 2026-10-24 — Drive the Rust timer with typed monotonic observations
+
+Keep active-time accounting in the existing pure Rust accumulator. Add an anchored
+ObserveReaderClock sample (document/exact position, signed monotonic milliseconds,
+Resume/Interact/Checkpoint/Pause) to the generated event protocol. Restore remains
+explicit and read-only reader opening stays unchanged. The host starts a clock only
+after restore and supplies observations; timestamps never enter storage or the view.
+Checkpoint/Pause save increased absolute durations. Resume and Interact only update
+hidden accounting. Negative/regressing/foreign samples are ignored, and an accepted
+departure/completion freezes further clock observations. Settings only accepts Pause;
+the host must pause before opening it. Reflow/same-offset writes preserve the clock;
+movement/completion/exit retire it. An explicit greater saved duration resets it paused.
+
+Reuse the existing greatest-duration slot when nonmoving storage is already busy.
+Drain it on success before completion/departure; retain it for explicit retry after
+failure. The save-pending flag covers this waiting slot. A new absolute update may
+supersede an unsubmitted slot, but retries of submitted writes retain their exact
+payload/revision and any newer queued duration. Reject late producers behind an
+already accepted movement/import: saving that old offset after the move is invalid.
+This retains the bounded queue and the existing FIFO; no schema/dependency changes.
+
+Android production of monotonic/lifecycle/interaction/periodic/final observations,
+restore scheduling and native teardown acknowledgment remain the next slice. Core,
+blocked-SQLite FFI and host Kotlin/JNI tests establish transport/accounting only;
+actual Android close/reboot recovery remains unverified.

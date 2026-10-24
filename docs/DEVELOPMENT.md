@@ -18,7 +18,7 @@ with functioning rustup can omit the PATH workaround. Do not assume this compile
 is the project's minimum supported version; establish that with dependencies.
 Cargo.lock is retained for reproducible application development.
 Crux 0.20.0 declares Rust 1.90 minimum; the full locked graph has only been tested
-with 1.99.1. Current host baseline: 200 data-free Rust tests (103 storage, eight
+with 1.99.1. Current host baseline: 206 data-free Rust tests (103 storage, eight
 runtime). Eleven analysis fixtures and one runtime fixture run separately with
 each Full loader via tools/test-sudachi.sh (see below).
 
@@ -1325,3 +1325,39 @@ and preview fixture are updated. No device instrumentation, standalone owned/map
 Full suite, release APK or probe/tablet/arm64 execution. Automatic Android timer,
 final-save/native teardown acknowledgment, controls/swipes/toast and finished-book
 state remain open; actual Android close/reboot recovery remains unverified.
+
+## Typed reader-clock observations
+
+Verified 2026-10-24 with the Rust PATH workaround and Android environment above,
+running native generation/build/test runners sequentially:
+```sh
+cargo build --workspace --locked --offline
+cargo test --workspace --all-features --locked --offline --quiet
+cargo fmt --all -- --check
+cargo clippy --workspace --all-targets --all-features --locked --offline -- -D warnings
+tools/test-kotlin-bridge.sh
+cargo run -p yomoku-ffi --bin generate-kotlin --features facet_typegen --locked --offline -- target/generated/kotlin-repeat
+diff -r target/generated/kotlin target/generated/kotlin-repeat
+tools/format-kotlin.sh --check
+./android/gradlew -p android :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug --offline --console=plain
+git diff --check
+```
+PASS: workspace build, 206 data-free Rust tests (103 storage), fmt/strict Clippy,
+real-Full Kotlin/JNI plus seven Unicode/two analysis exchanges, reproducible Kotlin
+generation, Kotlin formatting, both-ABI debug/test APK builds and strict lint.
+Five core tests cover restored resume/interact/checkpoint/pause, the idle cap,
+invalid/foreign/late samples, delayed callbacks, reflow, new epochs and final-save
+drain before departure/completion after unrelated storage success/failure. The new
+blocked-SQLite FFI test verifies settings-before-final-save ordering, actual SQLite
+reopen with a fresh epoch, injected save failure/exact retry and no reading history.
+JNI now generates periodic/final durations through clock samples and restores them
+without a dictionary before analyzed completion. Timestamps remain transient.
+
+Initial regression checks caught clearing the newer coalesced slot on frozen-save
+retry; fixed. Review also added coverage for superseding an unsubmitted slot and
+rejecting late samples behind an already accepted position change. Final checks
+pass. Prior benign Crux JNI shutdown logging and ktfmt Unsafe warnings persist.
+Gradle passed in the normal sandbox. No schema/dependency change or open failure.
+No Android observation producer/lifecycle/native teardown change yet, and no device
+instrumentation, standalone Full suite, release APK or probe/tablet/arm64 execution.
+Actual Android timer/close/reboot recovery remains unverified.

@@ -8,6 +8,27 @@ use crate::{document::DocumentId, pagination::ReadingPosition};
 /// Time without an interaction that can still count as active reading.
 pub const IDLE_TIMEOUT_MS: u64 = 5 * 60 * 1_000;
 
+/// Platform observations use one monotonic epoch per live reader clock. Only
+/// durations, never these timestamps, cross the persistence boundary.
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
+#[repr(C)]
+pub enum ReaderClockAction {
+    Resume,
+    Interact,
+    Checkpoint,
+    Pause,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
+pub struct ReaderClockSample {
+    pub document_id: DocumentId,
+    pub position: ReadingPosition,
+    pub monotonic_ms: i64,
+    pub action: ReaderClockAction,
+}
+
 /// Only this accumulated duration is suitable for a durable partial-page save.
 /// Never persist the accumulator's monotonic timestamps across process/reboot.
 /// Page/post identity and transactional completion belong to the caller.
@@ -108,6 +129,10 @@ pub struct ActiveReadingTime {
 }
 
 impl ActiveReadingTime {
+    pub fn pending(&self) -> PendingReadingTime {
+        self.pending
+    }
+
     pub fn from_pending(pending: PendingReadingTime) -> Self {
         Self {
             pending,

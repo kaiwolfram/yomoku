@@ -28,6 +28,9 @@ support exact retries, coalesced saves before reader movement/exit and reopen.
 Explicit analyzed completion intents now drain checkpoints, freeze retries and update
 progress through core/FIFO/FFI, without analyzer loading. Android timer, navigation
 controls, gestures and completion toast rendering remain unfinished.
+The typed clock driver now applies resume/interaction/checkpoint/pause samples in
+Rust, retaining final saves behind unrelated storage work. Android still needs to
+produce those samples and await saved work before native teardown.
 Nostr, Statistics and Vocabulary tabs currently
 show placeholders.
 

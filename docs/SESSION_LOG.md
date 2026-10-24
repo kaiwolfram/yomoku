@@ -989,3 +989,22 @@
   timer/UI forward action yet. No device instrumentation, standalone Full suite,
   release/probe/tablet/arm64 rerun; actual close/reboot remains unverified.
   No local blocker; Nostr configuration remains empty and Q188 remains open.
+
+## 2026-10-24 — Typed core reader-clock driver
+
+- Started clean. Added anchored ObserveReaderClock resume/interact/checkpoint/pause
+  events, reusing the pure Rust accumulator after explicit restore. Only absolute
+  durations reach SQLite. Idle/paused rules, reflow and fresh epochs remain in core.
+- Final checkpoints also wait behind unrelated nonmoving storage in the existing
+  maximum slot, drain before completion/departure and retain exact retries. Guard
+  late producers behind accepted movement/import and superseded unsubmitted slots.
+- PASS: build, 206 Rust tests (five new core, one blocked-SQLite FFI), fmt/strict
+  Clippy, real-Full Kotlin/JNI clock/reopen checks plus Unicode/analysis exchanges,
+  repeatable generation, Kotlin format, both-ABI debug/test APK builds, strict lint
+  and diff check. Initial cleared-retry-slot regression fixed. Prior benign Crux/
+  ktfmt warnings persist; no open failure, schema or dependency change.
+- Updated README, plan, decisions, architecture/data model, development and handoff.
+  Next: Android observation/restore/lifecycle/periodic/final-save producer and native
+  teardown acknowledgment, then controls/swipes/toast/Finish Book. No device
+  instrumentation, standalone Full suite, release/probe/tablet/arm64 rerun. Actual
+  Android close/reboot remains unverified. No local blocker; Nostr empty/Q188 open.

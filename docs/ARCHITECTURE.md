@@ -60,6 +60,21 @@ persisted position and suppresses duplicate notices. No analyzer is loaded for c
 Automatic final checkpoint production and platform clock/lifecycle/interactions/
 periodic scheduling remain separate work.
 
+ObserveReaderClock now drives the existing pure accumulator with anchored
+Resume/Interact/Checkpoint/Pause samples after explicit RestoreReadingTime.
+Only Checkpoint/Pause submit increased absolute durations; timestamps never reach
+storage or the view. Missing/foreign tokens, negative/regressing samples, settings
+interactions and samples after accepted departure/completion are ignored. Reflow
+and same-offset writes preserve the clock; movement, completion and exit retire it.
+An externally supplied greater saved duration resets the accumulator paused.
+Final checkpoints may also wait in the existing maximum-duration slot behind
+unrelated nonmoving storage (list, read, settings or same-offset position saves).
+Success drains the slot before accepted completion/departure; unrelated failure
+retains it for RetryReadingTimeCheckpoint. Late samples after an already accepted
+position change/import cannot queue a checkpoint for the departing offset. The
+pending flag includes waiting saves; this adds no general event queue. Android
+clock/lifecycle/interactions, scheduling and final native teardown remain unwired.
+
 `yomoku-analysis` is a separate Rust I/O adapter using Sudachi.rs v0.7.0 at
 `5de0410b6edfd428fc510cc9763440772e9619d5` and Full 20261015 (V1). Its constructor
 checks the exact dictionary SHA-256 before giving owned immutable bytes or a

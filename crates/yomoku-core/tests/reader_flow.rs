@@ -1,5 +1,6 @@
 use crux_core::Core;
 use yomoku_core::{
+    active_time::{ReaderClockAction, ReaderClockSample, SavedReadingTime},
     app::{ContentRoute, Destination, Effect, Event, ImportOutcome, ImportSummary, Yomoku},
     document::{
         AnalysisId, ChapterId, ChapterText, DocumentId, PastedDocument, SourceId, TextOffset,
@@ -8,6 +9,287 @@ use yomoku_core::{
     reader::{progress_percent, ReaderAnalysis, ReaderPage, ReaderSnapshot},
     storage::{DocumentError, StorageOperation, StorageResult},
 };
+
+fn clock(core: &Core<Yomoku>, monotonic_ms: i64, action: ReaderClockAction) -> Event {
+    let reader = core.view().reader.unwrap();
+    Event::ObserveReaderClock(ReaderClockSample {
+        document_id: reader.document_id,
+        position: reader.position,
+        monotonic_ms,
+        action,
+    })
+}
+
+fn save_clock(core: &Core<Yomoku>, effects: &mut [Effect], expected_ms: i64) -> Vec<Effect> {
+    let StorageOperation::SaveReadingTime {
+        previous,
+        checkpoint,
+    } = storage_operation(effects)
+    else {
+        panic!("clock must save an absolute duration");
+    };
+    assert_eq!(checkpoint.pending.milliseconds(), expected_ms);
+    resolve(
+        core,
+        effects,
+        StorageResult::ReadingTimeSaved(SavedReadingTime {
+            value: checkpoint,
+            revision: previous.revision + 1,
+        }),
+    )
+}
+
+#[test]
+fn reader_clock_requires_restore_rejects_foreign_and_invalid_samples_and_saves_only_durations() {
+    let (core, _) = analyzed_reader();
+    assert!(core
+        .process_event(clock(&core, 0, ReaderClockAction::Resume))
+        .is_empty());
+    let saved = restore_time(&core, 123);
+    assert!(core
+        .process_event(clock(&core, 1_000, ReaderClockAction::Resume))
+        .is_empty());
+    let Event::ObserveReaderClock(sample) = clock(&core, 5_000, ReaderClockAction::Pause) else {
+        unreachable!();
+    };
+    for invalid in [
+        ReaderClockSample {
+            monotonic_ms: -1,
+            ..sample
+        },
+        ReaderClockSample {
+            monotonic_ms: 999,
+            ..sample
+        },
+        ReaderClockSample {
+            document_id: DocumentId::try_from(99).unwrap(),
+            ..sample
+        },
+        ReaderClockSample {
+            position: ReadingPosition {
+                offset: TextOffset::try_from(4).unwrap(),
+                ..sample.position
+            },
+            ..sample
+        },
+    ] {
+        assert!(core
+            .process_event(Event::ObserveReaderClock(invalid))
+            .is_empty());
+        assert!(!core.view().reading_time_save_pending);
+    }
+    let mut effects = core.process_event(clock(&core, 2_000, ReaderClockAction::Checkpoint));
+    assert_eq!(core.view().reader_time, Some(saved.value));
+    // A delayed save callback does not discard the accumulator's newer interval.
+    core.process_event(clock(&core, 2_500, ReaderClockAction::Checkpoint));
+    core.process_event(clock(&core, 2_600, ReaderClockAction::Interact));
+    let mut chained = save_clock(&core, &mut effects, 1_123);
+    save_clock(&core, &mut chained, 1_623);
+    let mut effects = core.process_event(clock(&core, 3_000, ReaderClockAction::Pause));
+    save_clock(&core, &mut effects, 2_123);
+    assert!(core
+        .process_event(clock(&core, 90_000, ReaderClockAction::Checkpoint))
+        .is_empty());
+    assert_eq!(
+        core.view().reader_time.unwrap().pending.milliseconds(),
+        2_123
+    );
+}
+
+#[test]
+fn reader_clock_caps_idle_and_interactions_resume_without_backfilling_paused_or_idle_time() {
+    let (core, _) = analyzed_reader();
+    restore_time(&core, 50);
+    core.process_event(clock(&core, 10_000, ReaderClockAction::Resume));
+    core.process_event(clock(&core, 200_000, ReaderClockAction::Resume));
+    let mut effects = core.process_event(clock(&core, 900_000, ReaderClockAction::Checkpoint));
+    save_clock(&core, &mut effects, 300_050);
+    core.process_event(clock(&core, 1_000_000, ReaderClockAction::Interact));
+    let mut effects = core.process_event(clock(&core, 1_001_000, ReaderClockAction::Pause));
+    save_clock(&core, &mut effects, 301_050);
+    core.process_event(clock(&core, 2_000_000, ReaderClockAction::Interact));
+    assert!(core
+        .process_event(clock(&core, 2_001_000, ReaderClockAction::Pause))
+        .is_empty());
+    core.process_event(clock(&core, 3_000_000, ReaderClockAction::Resume));
+    let mut effects = core.process_event(clock(&core, 3_000_500, ReaderClockAction::Pause));
+    save_clock(&core, &mut effects, 301_550);
+}
+
+#[test]
+fn final_clock_checkpoint_waits_for_unrelated_work_and_drains_before_first_departure() {
+    for failed in [false, true] {
+        let (core, _) = analyzed_reader();
+        let saved = restore_time(&core, 200);
+        core.process_event(clock(&core, 0, ReaderClockAction::Resume));
+        let mut unrelated = core.process_event(Event::RefreshLibrary);
+        core.process_event(clock(&core, 100, ReaderClockAction::Checkpoint));
+        core.process_event(clock(&core, 250, ReaderClockAction::Pause));
+        assert!(core.view().reading_time_save_pending);
+        core.process_event(Event::CloseDocument);
+        core.process_event(Event::OpenPaste);
+        assert_eq!(core.view().content_route, ContentRoute::Reader);
+        assert!(core
+            .process_event(clock(&core, 999, ReaderClockAction::Resume))
+            .is_empty());
+        let mut effects = resolve(
+            &core,
+            &mut unrelated,
+            if failed {
+                StorageResult::Failed(DocumentError::Unavailable)
+            } else {
+                StorageResult::Listed(core.view().documents, PageLength::default())
+            },
+        );
+        if failed {
+            assert!(core.view().reading_time_save_pending && !core.view().storage_busy);
+            assert_eq!(core.view().reader_time, Some(saved.value));
+            assert!(core.process_event(Event::RefreshLibrary).is_empty());
+            // Before a write has started, a newer absolute checkpoint can
+            // supersede the waiting slot. Never chain the older value after it.
+            effects = core.process_event(Event::CheckpointReadingTime(
+                yomoku_core::active_time::ReadingTimeUpdate {
+                    pending: yomoku_core::active_time::PendingReadingTime::from_millis(600)
+                        .unwrap(),
+                    ..saved.value
+                },
+            ));
+        }
+        let frozen = storage_operation(&effects);
+        finish(
+            &core,
+            &mut effects,
+            StorageResult::Failed(DocumentError::Unavailable),
+        );
+        let mut effects = core.process_event(Event::RetryReadingTimeCheckpoint);
+        assert_eq!(storage_operation(&effects), frozen);
+        save_clock(&core, &mut effects, if failed { 600 } else { 450 });
+        assert_eq!(core.view().content_route, ContentRoute::Main);
+        assert!(!core.view().reading_time_save_pending);
+    }
+}
+
+#[test]
+fn clock_checkpoint_queued_behind_unrelated_work_precedes_frozen_completion_even_after_failure() {
+    for failed in [false, true] {
+        let (core, _) = analyzed_reader();
+        restore_time(&core, 100);
+        core.process_event(clock(&core, 1_000, ReaderClockAction::Resume));
+        let mut unrelated = core.process_event(Event::RefreshLibrary);
+        core.process_event(clock(&core, 2_000, ReaderClockAction::Pause));
+        let completion = forward(&core, 42);
+        core.process_event(completion);
+        assert!(core.view().completion_save_pending && core.view().reading_time_save_pending);
+        assert!(core
+            .process_event(clock(&core, 5_000, ReaderClockAction::Resume))
+            .is_empty());
+        let mut effects = resolve(
+            &core,
+            &mut unrelated,
+            if failed {
+                StorageResult::Failed(DocumentError::Unavailable)
+            } else {
+                StorageResult::Listed(core.view().documents, PageLength::default())
+            },
+        );
+        if failed {
+            assert!(core.process_event(Event::RetryReaderCompletion).is_empty());
+            effects = core.process_event(Event::RetryReadingTimeCheckpoint);
+        }
+        let effects = save_clock(&core, &mut effects, 1_100);
+        assert!(
+            matches!(storage_operation(&effects), StorageOperation::PreparePageCompletion(intent)
+            if intent.completed_at_unix_ms == 42)
+        );
+        assert!(!core.view().reading_time_save_pending && core.view().completion_save_pending);
+    }
+}
+
+#[test]
+fn reader_clock_survives_reflow_but_movement_exit_and_completion_retire_its_epoch() {
+    let (core, mut document) = analyzed_reader();
+    let saved = restore_time(&core, 100);
+    core.process_event(clock(&core, 9_000, ReaderClockAction::Resume));
+    let mut effects = core.process_event(clock(&core, 10_000, ReaderClockAction::Pause));
+    save_clock(&core, &mut effects, 1_100);
+    core.process_event(Event::OpenSettings);
+    assert!(core
+        .process_event(clock(&core, 10_100, ReaderClockAction::Resume))
+        .is_empty());
+    let mut effects = core.process_event(Event::SetPageLength(PageLength::Characters250));
+    finish(
+        &core,
+        &mut effects,
+        StorageResult::PageLengthSaved(PageLength::Characters250),
+    );
+    core.process_event(Event::CloseSettings);
+    core.process_event(clock(&core, 11_000, ReaderClockAction::Resume));
+    let mut effects = core.process_event(clock(&core, 11_500, ReaderClockAction::Pause));
+    save_clock(&core, &mut effects, 1_600);
+    let next = ReadingPosition {
+        offset: core.view().reader.unwrap().anchor.range.end,
+        ..saved.position()
+    };
+    let stale = clock(&core, 12_000, ReaderClockAction::Resume);
+    let mut effects = core.process_event(Event::SaveReadingPosition(next));
+    // The host must pause before moving. A late old-offset producer cannot queue
+    // an unsaveable checkpoint behind an already accepted position change.
+    assert!(core
+        .process_event(clock(&core, 12_000, ReaderClockAction::Pause))
+        .is_empty());
+    assert!(core
+        .process_event(Event::CheckpointReadingTime(
+            yomoku_core::active_time::ReadingTimeUpdate {
+                pending: yomoku_core::active_time::PendingReadingTime::from_millis(9_999).unwrap(),
+                ..core.view().reader_time.unwrap()
+            }
+        ))
+        .is_empty());
+    assert!(!core.view().reading_time_save_pending);
+    document.reading_position = Some(next);
+    finish(
+        &core,
+        &mut effects,
+        StorageResult::PositionSaved(document.clone()),
+    );
+    assert!(core.process_event(stale).is_empty());
+    restore_time(&core, 20);
+    // A new offset accepts a fresh monotonic epoch and cannot inherit old time.
+    core.process_event(clock(&core, 0, ReaderClockAction::Resume));
+    let mut effects = core.process_event(clock(&core, 40, ReaderClockAction::Pause));
+    save_clock(&core, &mut effects, 60);
+    let mut effects = core.process_event(forward(&core, 42));
+    let payload = prepared(storage_operation(&effects));
+    let mut effects = resolve(
+        &core,
+        &mut effects,
+        StorageResult::PageCompletionPrepared(payload),
+    );
+    document.reading_position = Some(payload.completion.next_position(&document).unwrap());
+    finish(
+        &core,
+        &mut effects,
+        StorageResult::PageCompleted(
+            document.clone(),
+            yomoku_core::completion::AnalyzedCompletionOutcome::AlreadyRecorded,
+        ),
+    );
+    restore_time(&core, 0);
+    core.process_event(clock(&core, 0, ReaderClockAction::Resume));
+    let mut effects = core.process_event(clock(&core, 10, ReaderClockAction::Pause));
+    save_clock(&core, &mut effects, 10);
+    core.process_event(Event::CloseDocument);
+    let mut effects = core.process_event(Event::OpenReader(document.document_id));
+    finish(
+        &core,
+        &mut effects,
+        loaded(document, PageLength::Characters250),
+    );
+    restore_time(&core, 10);
+    core.process_event(clock(&core, 0, ReaderClockAction::Resume));
+    let mut effects = core.process_event(clock(&core, 5, ReaderClockAction::Pause));
+    save_clock(&core, &mut effects, 15);
+}
 
 fn document(text: &str) -> PastedDocument {
     PastedDocument {

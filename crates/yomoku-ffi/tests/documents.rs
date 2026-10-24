@@ -174,8 +174,21 @@ fn internal_storage_results_cannot_be_injected_over_ffi() {
     // The skipped internal variant follows the final public variant. Derive its
     // discriminant so adding a public event cannot silently weaken this check.
     let mut last_public = Vec::new();
-    BincodeFfiFormat::serialize(&mut last_public, &Event::DismissCompletionNotice).unwrap();
-    let internal_tag = u32::from_le_bytes(last_public.try_into().unwrap()) + 1;
+    BincodeFfiFormat::serialize(
+        &mut last_public,
+        &Event::ObserveReaderClock(yomoku_core::active_time::ReaderClockSample {
+            document_id: DocumentId::try_from(1).unwrap(),
+            position: yomoku_core::pagination::ReadingPosition {
+                source_id: yomoku_core::document::SourceId::try_from(1).unwrap(),
+                chapter_id: yomoku_core::document::ChapterId::try_from(1).unwrap(),
+                offset: yomoku_core::document::TextOffset::try_from(0).unwrap(),
+            },
+            monotonic_ms: 0,
+            action: yomoku_core::active_time::ReaderClockAction::Pause,
+        }),
+    )
+    .unwrap();
+    let internal_tag = u32::from_le_bytes(last_public[..4].try_into().unwrap()) + 1;
     assert_eq!(
         native.update(&internal_tag.to_le_bytes()),
         Err(FfiError::InvalidEvent)
@@ -210,6 +223,112 @@ fn blocked_sqlite_write_does_not_block_dispatch_view_or_navigation() {
     callbacks.recv_timeout(Duration::from_secs(10)).unwrap();
     assert_eq!(view(&native).documents.len(), 1);
     assert!(!view(&native).storage_busy);
+}
+
+#[test]
+fn monotonic_clock_final_save_survives_unrelated_busy_work_close_and_fresh_epoch_reopen() {
+    use yomoku_core::{
+        active_time::{ReaderClockAction, ReaderClockSample},
+        app::ContentRoute,
+        pagination::PageLength,
+    };
+    let db = Database::new();
+    std::fs::create_dir(&db.0).unwrap();
+    let (native, callbacks, _) = bridge(&db.path());
+    let created = dispatch(&native, &callbacks, Event::CreatePaste("𠮷猫。".into()));
+    let id = created.documents[0].document_id;
+    dispatch(&native, &callbacks, Event::OpenReader(id));
+    let saved = dispatch(&native, &callbacks, Event::RestoreReadingTime)
+        .reader_time
+        .unwrap();
+    let sample = ReaderClockSample {
+        document_id: id,
+        position: saved.position,
+        monotonic_ms: 500,
+        action: ReaderClockAction::Resume,
+    };
+    let send = |event: Event| {
+        let mut bytes = Vec::new();
+        BincodeFfiFormat::serialize(&mut bytes, &event).unwrap();
+        native.update(&bytes).unwrap();
+    };
+    send(Event::ObserveReaderClock(sample));
+    send(Event::OpenSettings);
+    let sql = rusqlite::Connection::open(db.path()).unwrap();
+    sql.execute_batch("BEGIN IMMEDIATE").unwrap();
+    send(Event::SetPageLength(PageLength::Characters250));
+    send(Event::ObserveReaderClock(ReaderClockSample {
+        monotonic_ms: 1_500,
+        action: ReaderClockAction::Pause,
+        ..sample
+    }));
+    send(Event::CloseDocument);
+    assert!(view(&native).storage_busy && view(&native).reading_time_save_pending);
+    assert_eq!(view(&native).content_route, ContentRoute::Reader);
+    assert!(callbacks.recv_timeout(Duration::from_millis(100)).is_err());
+    sql.execute_batch("COMMIT").unwrap();
+    for _ in 0..2 {
+        callbacks.recv_timeout(Duration::from_secs(10)).unwrap();
+    }
+    assert!(!view(&native).storage_busy && !view(&native).reading_time_save_pending);
+    assert_eq!(view(&native).content_route, ContentRoute::Main);
+    drop(native);
+    let (native, callbacks, _) = bridge(&db.path());
+    let opened = dispatch(&native, &callbacks, Event::OpenReader(id));
+    assert_eq!(opened.page_length, Some(PageLength::Characters250));
+    assert!(opened.reader_time.is_none());
+    let saved = dispatch(&native, &callbacks, Event::RestoreReadingTime)
+        .reader_time
+        .unwrap();
+    assert_eq!(saved.pending.milliseconds(), 1_000);
+    let fresh = ReaderClockSample {
+        monotonic_ms: 0,
+        ..sample
+    };
+    let mut bytes = Vec::new();
+    BincodeFfiFormat::serialize(&mut bytes, &Event::ObserveReaderClock(fresh)).unwrap();
+    native.update(&bytes).unwrap();
+    sql.execute_batch("CREATE TRIGGER fail_clock_save BEFORE UPDATE ON pending_reading_time BEGIN SELECT RAISE(ABORT, 'injected'); END").unwrap();
+    let failed = dispatch(
+        &native,
+        &callbacks,
+        Event::ObserveReaderClock(ReaderClockSample {
+            monotonic_ms: 100,
+            action: ReaderClockAction::Pause,
+            ..fresh
+        }),
+    );
+    assert!(failed.reading_time_save_pending);
+    assert_eq!(failed.document_error, Some(DocumentError::Unavailable));
+    assert_eq!(failed.reader_time, Some(saved));
+    sql.execute_batch("DROP TRIGGER fail_clock_save").unwrap();
+    assert_eq!(
+        dispatch(&native, &callbacks, Event::RetryReadingTimeCheckpoint)
+            .reader_time
+            .unwrap()
+            .pending
+            .milliseconds(),
+        1_100
+    );
+    assert_eq!(
+        sql.query_row("SELECT milliseconds FROM pending_reading_time", [], |row| {
+            row.get::<_, i64>(0)
+        })
+        .unwrap(),
+        1_100
+    );
+    for table in [
+        "reading_completions",
+        "reading_occurrences",
+        "vocabulary_status_events",
+    ] {
+        assert_eq!(
+            sql.query_row(&format!("SELECT count(*) FROM {table}"), [], |row| row
+                .get::<_, i64>(0))
+                .unwrap(),
+            0
+        );
+    }
 }
 
 #[test]
