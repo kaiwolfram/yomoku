@@ -18,7 +18,7 @@ with functioning rustup can omit the PATH workaround. Do not assume this compile
 is the project's minimum supported version; establish that with dependencies.
 Cargo.lock is retained for reproducible application development.
 Crux 0.20.0 declares Rust 1.90 minimum; the full locked graph has only been tested
-with 1.99.1. Current host baseline: 154 data-free Rust tests (76 storage, seven
+with 1.99.1. Current host baseline: 156 data-free Rust tests (76 storage, seven
 runtime). Eleven analysis fixtures and one runtime fixture run separately with
 each Full loader via tools/test-sudachi.sh (see below).
 
@@ -1002,3 +1002,41 @@ No import creates reading events or encounters. JNI's previous nonfatal
 weak-reference shutdown logging persists; assertions pass. No open failure.
 No Android build/lint/instrumentation, emulator/probe, tablet or physical-arm64
 rerun for this Rust-only step. No new dependency version or schema migration.
+
+## Single-paste import confirmation
+
+Core projects committed Created/Existing results into transient ImportSummary
+state; Android shows the current title and Imported/Already in Library with
+Close above the list. Both outcomes return to Library without opening the reader.
+NativeBridge still selects text-only creation, so production duplicate delivery
+awaits the verified-descriptor/analyzer lifecycle integration.
+
+Verified 2026-10-24 with the Rust/Android environments above:
+```sh
+cargo build --workspace --locked --offline
+cargo test --workspace --all-features --locked --offline
+cargo fmt --all -- --check
+cargo clippy --workspace --all-targets --all-features --locked --offline -- -D warnings
+tools/test-kotlin-bridge.sh
+tools/format-kotlin.sh --check
+./android/gradlew -p android :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug --offline --console=plain
+./android/gradlew -p android :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=app.yomoku.PasteReaderTest --offline --console=plain
+git diff --check
+```
+PASS: 156 data-free Rust tests, host Kotlin/JNI and seven Unicode exchanges,
+workspace build, fmt, strict Clippy, Kotlin formatting, both-ABI debug/test APKs,
+strict Android lint and three API-36 x86_64 paste-reader tests. Core/runtime cover
+both outcomes, unchanged duplicate progress and transient-state clearing; JNI
+checks exact Unicode title delivery and fresh-session absence. The device test
+checks visible Created confirmation, explicit dismissal and retained behavior
+through Settings/recreation before opening the reader. Reports preserved under
+`.local/test-reports/import-summary/paste-reader/`.
+
+The initial workspace run caught a stale hard-coded internal-event tag in an FFI
+rejection test; it now derives the tag from the final public event. Kotlin -Werror
+caught a redundant safe call after a smart cast; fixed before final passing JNI
+run. Previous nonfatal JNI weak-reference shutdown logging persists. Connected
+Gradle initially failed on sandbox sockets and passed with escalation. No open
+failure. No Full fixtures, full Android suite, release APK, probes, tablet or
+physical-arm64 rerun; previous results retain their documented limits. No schema,
+dependency version or production analyzer behavior changed.

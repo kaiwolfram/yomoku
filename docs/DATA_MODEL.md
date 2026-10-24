@@ -282,8 +282,10 @@ new IDs. The opt-in analyzed-import runtime router now calls this repository on
 its FIFO worker with a preloaded analyzer and a wall-clock registration timestamp.
 It maps the committed Created/Existing result to an internal storage result;
 core upserts one Library row by document ID without changing persisted state or
-opening a reader. NativeBridge/Android still select text-only creation until
-verified-descriptor delivery/lifecycle and import summaries are wired. No schema,
+opening a reader. Both results project a transient typed import summary; its
+document ID/title/outcome live only in core view state. NativeBridge/Android still
+select text-only creation until verified-descriptor delivery/lifecycle are wired.
+The current native path only produces Created. No schema,
 production deletion or file import is added. Finished-at-least-once remains separate.
 
 ## Current position repository (migration 0003)
@@ -418,6 +420,10 @@ storage_busy and typed document_error. Concurrent storage submissions are ignore
 while busy; navigation remains available. A successful create adds its summary
 without opening a reader; LoadPaste reads exact content without changing progress,
 while OpenReader adds the saved-position page projection described above.
+ImportSummary is separate transient confirmation state containing the committed
+document ID/title and Created/Existing outcome. DismissImportSummary clears it;
+Settings and refresh preserve it, while tab selection, opening paste/reader or
+accepting a new import clear it. It is never persisted or restored in a new core.
 Listing is allocation order until the planned Library sorting task. Failed opens
 can retry. No path or SQLite diagnostic string is exposed in application state.
 The bridge constructor takes the path separately; Android uses filesDir/yomoku.sqlite3.

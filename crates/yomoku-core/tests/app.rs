@@ -16,6 +16,7 @@ fn starts_in_library() {
             content_route: yomoku_core::app::ContentRoute::Main,
             reader: None,
             page_length: None,
+            import_summary: None,
         }
     );
 }

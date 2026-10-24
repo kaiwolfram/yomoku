@@ -783,3 +783,23 @@
   Next: connect the new router via typed native verified-descriptor delivery,
   retained/background Android lifecycle and visible Created/Existing summary.
   Production imports stay unchecked; NativeBridge still uses text-only creation.
+
+## 2026-10-24 — Single-paste import summary
+
+- Started clean. Added typed transient ImportSummary/ImportOutcome and dismiss
+  event in core, plus Android Library confirmation and localized messages.
+  Created/Existing show their committed title without opening the reader.
+- Settings/refresh/retained recreation preserve confirmation; dismissal, tab
+  selection and new paste/reader/import flows clear it. Failed imports preserve
+  draft/error with no success summary. Fresh sessions do not restore confirmation.
+- PASS: 156 data-free Rust tests, workspace build, fmt, strict Clippy; host
+  Kotlin/JNI and seven Unicode exchanges; Kotlin format, both-ABI debug/test APKs,
+  strict Android lint and three API-36 x86_64 paste-reader tests. Reports:
+  `.local/test-reports/import-summary/paste-reader/`.
+- Initial FFI test used a stale event number; derive from final public event.
+  Fixed Kotlin smart-cast warning; final reruns pass. Connected Gradle required
+  socket escalation. Previous nonfatal JNI shutdown logging persists.
+- Updated plan, decisions, architecture/data model, development and handoff.
+  Production analyzer/native descriptor/lifecycle and duplicate delivery remain
+  unchecked. No schema/dependency changes, Full fixtures, full Android suite,
+  release/probe/tablet or physical-arm64 rerun. No open verification blocker.

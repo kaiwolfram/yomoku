@@ -1,6 +1,6 @@
 use crux_core::Core;
 use yomoku_core::{
-    app::{ContentRoute, Destination, Effect, Event, Yomoku},
+    app::{ContentRoute, Destination, Effect, Event, ImportOutcome, ImportSummary, Yomoku},
     document::{ChapterId, ChapterText, DocumentId, PastedDocument, SourceId, TextOffset},
     pagination::{PageLength, ReadingPosition},
     reader::{progress_percent, ReaderPage},
@@ -155,6 +155,7 @@ fn paste_success_returns_to_library_without_opening_reader_and_failures_keep_for
     );
     assert_eq!(core.view().content_route, ContentRoute::Paste);
     assert_eq!(core.view().document_error, Some(DocumentError::EmptyPaste));
+    assert!(core.view().import_summary.is_none());
     let mut effects = core.process_event(Event::CreatePaste("題𠮷".into()));
     assert!(core.view().document_error.is_none());
     finish(
@@ -168,6 +169,89 @@ fn paste_success_returns_to_library_without_opening_reader_and_failures_keep_for
     assert_eq!(view.documents[0].title, "題𠮷");
     assert!(view.reader.is_none());
     assert!(view.loaded_document.is_none());
+    assert_eq!(
+        view.import_summary,
+        Some(ImportSummary {
+            document_id: view.documents[0].document_id,
+            title: "題𠮷".into(),
+            outcome: ImportOutcome::Created,
+        })
+    );
+}
+
+#[test]
+fn duplicate_summary_preserves_progress_survives_settings_and_refresh_and_can_be_dismissed() {
+    let core = Core::<Yomoku>::new();
+    let mut document = document("題𠮷");
+    document.reading_position = Some(ReadingPosition {
+        source_id: document.chapter.source_id,
+        chapter_id: document.chapter.chapter_id,
+        offset: TextOffset::try_from(3).unwrap(),
+    });
+    let mut effects = core.process_event(Event::CreatePaste(document.chapter.text.clone()));
+    assert!(core.view().import_summary.is_none());
+    finish(
+        &core,
+        &mut effects,
+        StorageResult::Existing(document.clone()),
+    );
+    let summary = core.view().import_summary.unwrap();
+    assert_eq!(summary.outcome, ImportOutcome::Existing);
+    assert_eq!(summary.document_id, document.document_id);
+    assert_eq!(summary.title, document.title);
+    assert_eq!(
+        core.view().documents,
+        vec![document.library_summary().unwrap()]
+    );
+    assert!(core.view().reader.is_none());
+    assert!(core.view().loaded_document.is_none());
+    core.process_event(Event::OpenSettings);
+    core.process_event(Event::CloseSettings);
+    let mut effects = core.process_event(Event::RefreshLibrary);
+    finish(
+        &core,
+        &mut effects,
+        StorageResult::Listed(
+            vec![document.library_summary().unwrap()],
+            PageLength::default(),
+        ),
+    );
+    assert_eq!(core.view().import_summary, Some(summary));
+    for _ in 0..2 {
+        core.process_event(Event::DismissImportSummary);
+        assert!(core.view().import_summary.is_none());
+    }
+    assert_eq!(core.view().documents.len(), 1);
+    assert!(Core::<Yomoku>::new().view().import_summary.is_none());
+}
+
+#[test]
+fn leaving_library_or_starting_another_import_clears_the_previous_summary() {
+    for next in [
+        Event::SelectDestination(Destination::Vocabulary),
+        Event::OpenPaste,
+        Event::OpenReader(document("本文").document_id),
+        Event::CreatePaste("次の本文".into()),
+    ] {
+        let core = Core::<Yomoku>::new();
+        let mut effects = core.process_event(Event::CreatePaste("本文".into()));
+        finish(
+            &core,
+            &mut effects,
+            StorageResult::Created(document("本文")),
+        );
+        assert!(core.view().import_summary.is_some());
+        let mut effects = core.process_event(next);
+        assert!(core.view().import_summary.is_none());
+        if core.view().storage_busy {
+            finish(
+                &core,
+                &mut effects,
+                StorageResult::Failed(DocumentError::Unavailable),
+            );
+            assert!(core.view().import_summary.is_none());
+        }
+    }
 }
 
 #[test]

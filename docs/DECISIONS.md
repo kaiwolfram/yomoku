@@ -1118,3 +1118,20 @@ both import outcomes return to Library without opening the reader. Keep the
 current native constructor on its existing text-only router for this independently
 testable step; production analyzed-import work remains unchecked until descriptor
 delivery, lifecycle and visible Created/Existing summaries are verified on Android.
+
+## 2026-10-24 — Transient single-paste import summary
+
+Implement the summary independently of native analyzer delivery. A committed
+Created/Existing result projects a typed ImportSummary (document ID, current title,
+outcome) into core view state. Android displays Imported/Already in Library above
+the Library list with an explicit Close action; it never opens the reader.
+No timer or modal blocks subsequent work. Keep this transient result through
+Settings, Library refresh and retained Activity recreation; clear on dismissal,
+tab selection, opening a reader/paste form or accepting another import. A fresh
+session has no summary. Failures remain in the paste form with the draft intact.
+
+These are routine presentation choices under PRODUCT_SPEC.md §3.3's required
+summary/Library return. No new persistence, dependency or import semantics. The
+native shell still uses text-only creation, so duplicate summaries are exercised
+through the analyzed worker and core; Android duplicate delivery remains part of
+the production integration task. Do not mark that task complete for this UI slice.

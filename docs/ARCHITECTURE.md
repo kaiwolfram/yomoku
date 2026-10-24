@@ -165,7 +165,11 @@ reused and dropped on the worker. Library/settings/blank-paste paths never load 
 Runtime supplies wall-clock registration timestamps, distinct from active time.
 Created/Existing results return only committed documents. Core upserts their
 Library summary by ID, preserves saved progress, returns to Library and never
-opens a reader. Analyzer/load/invalid-output failures can retry; engine/invalid
+opens a reader. Core also projects a transient typed ImportSummary (document ID,
+title, Created/Existing) with a dismiss event. Android renders the confirmation
+above the Library list; Settings/refresh/retained recreation preserve it, while
+dismissal, tab selection and new import/reader flows clear it. Fresh sessions do
+not restore it. Analyzer/load/invalid-output failures can retry; engine/invalid
 output discards the cache, while SQL rollback keeps a healthy analyzer reusable.
 The weak `AnalyzerLifecycle` handle queues foreground/background policy alongside
 storage work without extending worker lifetime. Hidden/background releases after
@@ -290,7 +294,8 @@ unchecked: production analyzed-import/deduplication wiring and metadata. Atomic
 analyzed-paste registration and exact-byte deduplication exist at the repository
 and opt-in worker boundaries; Android still uses raw text-only creation. Next is
 verified-descriptor delivery through NativeBridge, retained/background lifecycle
-signals and a visible Created/Existing import summary.
+signals and end-to-end duplicate summary delivery. The visible summary is wired
+for both typed outcomes; the current native text-only path only produces Created.
 Page movement/swipes requiring atomic forward completion/history, occurrences
 and active time remain next. Add analysis/import crates only with
 actual behavior; Sudachi Full defaults to B, JMdict/JMnedict remain offline data, and future Nostr I/O stays in Rust. Configuration is empty.

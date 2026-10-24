@@ -1,6 +1,6 @@
 # Resume here
 
-Updated: 2026-10-24. Analyzed-import Rust worker verified; native/Android next.
+Updated: 2026-10-24. Import summary verified; native analyzed-import wiring next.
 Read AGENTS.md, plan phases 2–4 and PRODUCT_SPEC.md sections 3–4.
 Update docs/commit each verified step. Physical arm64 is the later user trial.
 
@@ -27,9 +27,13 @@ Update docs/commit each verified step. Physical arm64 is the later user trial.
   Foreground permits reuse without eager loading; background releases after prior
   accepted work. Hidden imports finish then release; final close drains/drops.
   Seven runtime tests + one real Full fixture per loader verify these boundaries.
-  NativeBridge/Android STILL select legacy text-only router. No visible summary,
-  verified descriptor callback or platform lifecycle signals wired yet. Remove
+  NativeBridge/Android STILL select legacy text-only router. No verified
+  descriptor callback or platform lifecycle signals wired yet. Remove
   production fallback when connecting native shell; do not leave optional behavior.
+- NEW typed ImportSummary distinguishes Created/Existing above Library with Close.
+  Settings/refresh/retained recreation preserve it; dismissal/tab/paste/reader/new
+  import clear it. Fresh session none; failed import preserves draft with no summary.
+  Both outcomes tested in core/worker; native currently only produces Created.
 - Pure active_time uses supplied monotonic ms, five-minute idle cap and reader/
   dictionary interactions. Checkpoints retain pending time without resetting idle;
   restore duration paused in fresh clock epoch. Thirteen tests; no SQLite/runtime/
@@ -50,7 +54,7 @@ Update docs/commit each verified step. Physical arm64 is the later user trial.
 
 ## Next tasks (ordered)
 1. Connect analyzed-import router through typed native verified-descriptor delivery,
-   Android retained/background lifecycle and Created/Existing summary. Test JNI/
+   Android retained/background lifecycle and end-to-end duplicate summary. Test JNI/
    device rollback/dedup/vocab/reuse/release/retry and no eager Library load.
 2. Persist pending page time (page/reflow attribution open), extend completion with
    occurrences/New→Known/time, then wire frozen IDs and Android clock/lifecycle/
@@ -58,13 +62,15 @@ Update docs/commit each verified step. Physical arm64 is the later user trial.
 3. User-run physical arm64 validation once usable; defer until their app trial.
 
 ## Verification / environment
-- This step: 154 data-free Rust tests (76 storage, seven runtime); workspace build,
-  fmt, strict Clippy; 11 analysis + one runtime real Full fixture per owned/mapped
-  loader, 138-file source integrity; host Kotlin/JNI + seven Unicode exchanges;
-  shell syntax and whitespace pass. No open check failure/blocker.
-- No Android build/lint/instrumentation/emulator/probe rerun for this Rust slice.
-  Previous final device baseline: 18/18 tests, strict lint, debug/test APKs, two
-  death/recovery pairs and two real pressure runs pass; reports in .local/.
+- This step: 156 data-free Rust tests (76 storage, seven runtime); workspace build,
+  fmt, strict Clippy; host Kotlin/JNI + seven Unicode exchanges; Kotlin format,
+  debug/test APKs, strict Android lint and three PasteReaderTest emulator tests pass.
+  Reports: .local/test-reports/import-summary/paste-reader/. No open blocker.
+- Initial FFI test had stale event tag; derive from last public event. Kotlin test
+  smart-cast warning fixed; final reruns pass. Connected Gradle needed escalation.
+  No Full fixtures, full Android suite, release, probes or tablet/arm64 rerun.
+  Prior baseline: Full fixtures per loader; 18/18 device tests, two death/recovery
+  pairs and two pressure runs pass. Measurements/docs retain their limits.
 - Commands/env: DEVELOPMENT.md. Rust PATH workaround, locked/offline workspace
   build/test/fmt/Clippy, tools/test-sudachi.sh, tools/test-kotlin-bridge.sh.
   Never run native builds/generation/tests concurrently; never prepare/replace/

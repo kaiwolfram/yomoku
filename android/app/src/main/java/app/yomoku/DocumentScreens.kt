@@ -26,6 +26,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import app.yomoku.shared.DocumentError
 import app.yomoku.shared.Event
+import app.yomoku.shared.ImportOutcome
 import app.yomoku.shared.ViewModel
 
 @Composable
@@ -35,6 +36,23 @@ internal fun LibraryScreen(view: ViewModel, dispatch: (Event) -> Unit) {
             Text(stringResource(R.string.paste_title))
         }
         StorageStatus(view)
+        view.importSummary?.let { summary ->
+            Column(modifier = Modifier.fillMaxWidth().testTag("import_summary")) {
+                Text(
+                    stringResource(
+                        when (summary.outcome) {
+                            ImportOutcome.CREATED -> R.string.import_created
+                            ImportOutcome.EXISTING -> R.string.import_existing
+                        },
+                        summary.title,
+                    ),
+                    modifier = Modifier.testTag("import_summary_message"),
+                )
+                TextButton(onClick = { dispatch(Event.DismissImportSummary) }) {
+                    Text(stringResource(R.string.close))
+                }
+            }
+        }
         if (view.documentError != null) {
             TextButton(onClick = { dispatch(Event.RefreshLibrary) }, enabled = !view.storageBusy) {
                 Text(stringResource(R.string.retry))

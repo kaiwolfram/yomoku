@@ -191,6 +191,16 @@ class PasteReaderTest {
         awaitStorage()
         compose.onNodeWithTag("screen_title").assertTextEquals("Library")
         compose.onNodeWithTag("reader_text").assertDoesNotExist()
+        compose.onNodeWithTag("import_summary_message").assertTextEquals("Imported: $title")
+        compose.activityRule.scenario.recreate()
+        compose.onNodeWithTag("import_summary_message").assertTextEquals("Imported: $title")
+        compose.onNodeWithText("Settings").performClick()
+        compose.onNodeWithText("Back").performClick()
+        compose.onNodeWithTag("import_summary_message").assertTextEquals("Imported: $title")
+        compose.onNodeWithText("Close").performClick()
+        compose.onNodeWithTag("import_summary").assertDoesNotExist()
+        compose.activityRule.scenario.recreate()
+        compose.onNodeWithTag("import_summary").assertDoesNotExist()
         var documentTag = ""
         compose.runOnUiThread {
             val view = core().view

@@ -289,6 +289,10 @@ fn worker_imports_deduplicate_preserve_status_and_progress_and_reopen() {
     let (router, lifecycle) = effect_router_with_analyzed_imports(database.path(), loader).unwrap();
     let text = "猫 猫\r\n𠮷 か\u{3099} English 。 📖 \0";
     let view = dispatch(&router, Event::CreatePaste(text.into()));
+    assert_eq!(
+        view.import_summary.as_ref().unwrap().outcome,
+        yomoku_core::app::ImportOutcome::Created
+    );
     assert!(view.document_error.is_none());
     assert_eq!(view.content_route, ContentRoute::Main);
     assert!(view.reader.is_none() && view.loaded_document.is_none());
@@ -314,6 +318,14 @@ fn worker_imports_deduplicate_preserve_status_and_progress_and_reopen() {
     assert_eq!(&before[10..], &[0, 0]);
     assert!(before[4] == 1 && before[8] == 1);
     let duplicate = dispatch(&router, Event::CreatePaste(text.into()));
+    assert_eq!(
+        duplicate.import_summary.as_ref().unwrap().outcome,
+        yomoku_core::app::ImportOutcome::Existing
+    );
+    assert_eq!(
+        duplicate.import_summary.as_ref().unwrap().document_id,
+        document_id
+    );
     assert_eq!(duplicate.documents, saved.documents);
     assert!(duplicate.reader.is_none());
     assert!(trace.try_recv().is_err());
@@ -332,6 +344,10 @@ fn worker_imports_deduplicate_preserve_status_and_progress_and_reopen() {
     let (router, lifecycle) = effect_router_with_analyzed_imports(database.path(), loader).unwrap();
     // Existing result alone must populate a fresh Library without a preceding list.
     let duplicate = dispatch(&router, Event::CreatePaste(text.into()));
+    assert_eq!(
+        duplicate.import_summary.as_ref().unwrap().outcome,
+        yomoku_core::app::ImportOutcome::Existing
+    );
     assert_eq!(duplicate.documents, saved.documents);
     assert!(matches!(
         trace.recv_timeout(TIMEOUT).unwrap(),

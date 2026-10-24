@@ -176,8 +176,13 @@ fn internal_storage_results_cannot_be_injected_over_ffi() {
     // StorageFinished is skipped by Serde and by Facet generation.
     let forged = Event::StorageFinished(StorageResult::Failed(DocumentError::Unavailable));
     assert!(BincodeFfiFormat::serialize(&mut vec![], &forged).is_err());
+    // The skipped internal variant follows the final public variant. Derive its
+    // discriminant so adding a public event cannot silently weaken this check.
+    let mut last_public = Vec::new();
+    BincodeFfiFormat::serialize(&mut last_public, &Event::DismissImportSummary).unwrap();
+    let internal_tag = u32::from_le_bytes(last_public.try_into().unwrap()) + 1;
     assert_eq!(
-        native.update(&11_u32.to_le_bytes()),
+        native.update(&internal_tag.to_le_bytes()),
         Err(FfiError::InvalidEvent)
     );
     assert!(view(&native).documents.is_empty());

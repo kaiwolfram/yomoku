@@ -12,6 +12,7 @@ import app.yomoku.shared.Requests
 import app.yomoku.shared.ShellEffect
 import app.yomoku.shared.ViewModel
 import app.yomoku.shared.TextOffset
+import app.yomoku.shared.ImportOutcome
 import java.nio.file.Files
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.TimeUnit
@@ -51,6 +52,9 @@ internal fun verifyDocumentBridge() {
             val created = listener.dispatch(bridge, Event.CreatePaste(text))
             check(created.documents.single().title == "  題𠮷📖  ")
             check(created.loadedDocument == null)
+            val summary = checkNotNull(created.importSummary)
+            check(summary.outcome == ImportOutcome.CREATED)
+            check(summary.title == "  題𠮷📖  ")
             val id = created.documents.single().documentId
             val loaded = checkNotNull(listener.dispatch(bridge, Event.LoadPaste(id)).loadedDocument)
             check(loaded.chapter.text == text)
@@ -95,6 +99,7 @@ internal fun verifyDocumentBridge() {
         val reopened = DocumentListener()
         NativeBridge(database.path, reopened).use { bridge ->
             val initial = reopened.dispatch(bridge, Event.RefreshLibrary)
+            check(initial.importSummary == null)
             check(initial.documents.single().documentId == document.documentId)
             check(initial.pageLength == PageLength.CHARACTERS1500)
             check(reopened.dispatch(bridge, Event.LoadPaste(document.documentId)).loadedDocument == document)

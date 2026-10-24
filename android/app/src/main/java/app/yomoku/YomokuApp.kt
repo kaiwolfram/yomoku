@@ -187,6 +187,7 @@ private fun YomokuPreview() {
                 ContentRoute.MAIN,
                 null,
                 null,
+                null,
             )
         ) {}
     }

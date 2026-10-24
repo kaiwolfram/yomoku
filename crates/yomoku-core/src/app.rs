@@ -37,6 +37,23 @@ pub enum ContentRoute {
     Reader,
 }
 
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
+#[repr(C)]
+pub enum ImportOutcome {
+    Created,
+    Existing,
+}
+
+/// Transient confirmation of a committed import; never restores or opens a reader.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
+pub struct ImportSummary {
+    pub document_id: DocumentId,
+    pub title: String,
+    pub outcome: ImportOutcome,
+}
+
 #[derive(Default)]
 pub struct Model {
     destination: Destination,
@@ -50,6 +67,7 @@ pub struct Model {
     pending_reader: Option<DocumentId>,
     reader_document: Option<PastedDocument>,
     page_length: Option<PageLength>,
+    import_summary: Option<ImportSummary>,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -68,6 +86,7 @@ pub enum Event {
     /// Position-only persistence hook; page completion uses a separate command.
     SaveReadingPosition(ReadingPosition),
     SetPageLength(PageLength),
+    DismissImportSummary,
     #[serde(skip)]
     #[cfg_attr(feature = "facet_typegen", facet(skip))]
     StorageFinished(StorageResult),
@@ -86,6 +105,7 @@ pub struct ViewModel {
     pub reader: Option<ReaderPage>,
     /// None until persisted settings have been loaded successfully.
     pub page_length: Option<PageLength>,
+    pub import_summary: Option<ImportSummary>,
 }
 
 #[effect]
@@ -140,6 +160,9 @@ impl App for Yomoku {
             }
             model.storage_busy = true;
             model.document_error = None;
+            if matches!(event, Event::CreatePaste(_) | Event::OpenReader(_)) {
+                model.import_summary = None;
+            }
             if matches!(
                 event,
                 Event::CreatePaste(_) | Event::LoadPaste(_) | Event::OpenReader(_)
@@ -159,6 +182,7 @@ impl App for Yomoku {
         }
         match event {
             Event::SelectDestination(destination) => {
+                model.import_summary = None;
                 model.destination = destination;
                 model.settings_open = false;
                 model.content_route = ContentRoute::Main;
@@ -167,6 +191,7 @@ impl App for Yomoku {
                 model.pending_reader = None;
             }
             Event::OpenPaste => {
+                model.import_summary = None;
                 model.destination = Destination::Library;
                 model.settings_open = false;
                 model.content_route = ContentRoute::Paste;
@@ -184,9 +209,15 @@ impl App for Yomoku {
             }
             Event::OpenSettings => model.settings_open = true,
             Event::CloseSettings => model.settings_open = false,
+            Event::DismissImportSummary => model.import_summary = None,
             Event::StorageFinished(result) => {
                 model.storage_busy = false;
                 let pending_reader = model.pending_reader.take();
+                let import_outcome = match &result {
+                    StorageResult::Created(_) => Some(ImportOutcome::Created),
+                    StorageResult::Existing(_) => Some(ImportOutcome::Existing),
+                    _ => None,
+                };
                 match result {
                     StorageResult::Listed(documents, length) => {
                         model.documents = documents;
@@ -196,6 +227,11 @@ impl App for Yomoku {
                     StorageResult::Created(document) | StorageResult::Existing(document) => {
                         match document.library_summary() {
                             Ok(summary) => {
+                                model.import_summary = Some(ImportSummary {
+                                    document_id: summary.document_id,
+                                    title: summary.title.clone(),
+                                    outcome: import_outcome.expect("import result"),
+                                });
                                 if let Some(entry) = model
                                     .documents
                                     .iter_mut()
@@ -288,6 +324,7 @@ impl App for Yomoku {
             content_route: model.content_route,
             reader: model.reader.clone(),
             page_length: model.page_length,
+            import_summary: model.import_summary.clone(),
         }
     }
 }
