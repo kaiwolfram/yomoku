@@ -18,7 +18,7 @@ with functioning rustup can omit the PATH workaround. Do not assume this compile
 is the project's minimum supported version; establish that with dependencies.
 Cargo.lock is retained for reproducible application development.
 Crux 0.20.0 declares Rust 1.90 minimum; the full locked graph has only been tested
-with 1.99.1. Current host baseline: 317 data-free Rust tests (148 storage, seventeen
+with 1.99.1. Current host baseline: 341 data-free Rust tests (148 storage, seventeen
 runtime). Twelve analysis fixtures and one runtime fixture run separately with
 each Full loader via tools/test-sudachi.sh (see below).
 
@@ -2417,3 +2417,39 @@ repository/runtime registration and Android picker wiring remain unchecked.
 Android builds/lint/device, Kotlin/JNI/codegen, explicit Full/index fixtures, release,
 process-death/reboot and physical arm64 were not rerun. The ordinary workspace run
 retains fourteen ignored data-dependent fixtures, as before.
+
+## Pure EPUB import checks
+
+Verified 2026-10-25 from the repository root with the Rust PATH workaround above:
+
+```sh
+cargo fetch
+cargo test --workspace --all-features --locked --offline --quiet
+cargo clippy --workspace --all-targets --all-features --locked --offline -- -D warnings
+cargo check -p yomoku-import --target aarch64-linux-android --target x86_64-linux-android --locked --offline
+cargo fmt --all -- --check
+git diff --check
+```
+
+PASS: 341 data-free Rust tests (24 new EPUB, 26 TXT/SRT regressions), fourteen
+data-dependent fixtures ignored as before; strict Clippy/fmt/diff and both Android
+target checks. Fixtures build Stored/Deflate archives from readable XML/XHTML;
+verify metadata/spine order, headings/emphasis/ruby/links, exact UTF-8/UTF-16
+anchors, positioned images/cover/SVG/image-only chapters, whitespace/pre/breaks,
+all page presets, large content, CRC/truncation/duplicate/alias/path/symlink errors,
+used-content encryption, unused fonts/CSS, decoding/declarations, invalid entities
+and source/entry/expansion/node/depth budgets. No filesystem extraction or network.
+
+Initial checks exposed missing roxmltree traversal APIs (use the actual tokenizer
+and node APIs), invalid surrogate references silently replaced by the tree parser,
+and stack overflow before a post-parse nesting check. Nonrecursive xmlparser
+preflight now rejects excessive depth/entity definitions before roxmltree runs,
+validates references and passes 10,000-nesting plus near-limit/CDATA/comment tests.
+Clippy's one needless borrow was corrected. All final checks pass; no open failure.
+Fetched the pinned minimal ZIP/Deflate/XML dependencies (nine new lock entries).
+
+Parser only: no EPUB repository/runtime/FFI/picker/reader wiring or migration.
+App still accepts paste/TXT. Remote images, custom/unresolved named entities and
+unsupported spine fallback chains fail explicitly; image bytes aren't decoded.
+Android APK/lint/device, JNI/codegen, explicit Full/index fixtures, release,
+process-death/reboot and physical arm64 were not rerun. No device viability claim.

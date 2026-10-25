@@ -1,5 +1,45 @@
 # Data model
 
+## Pure EPUB canonical content (no schema change)
+
+`yomoku-import::epub::EpubDocument` has an optional metadata title, ordered
+`EpubChapter` values, a container-path → media-type/original-image-bytes map and
+optional cover path. Filename fallback belongs to the future import adapter.
+Select the first OPF rootfile from container.xml. Follow spine order, including
+`linear="no"` auxiliary content because internal navigation is unavailable; never
+infer chapters from headings. Omit empty text-only chapters; an empty book fails.
+
+Each chapter stores its container path and immutable canonical UTF-8 text. Ordinary
+XHTML ASCII whitespace collapses to spaces, block boundaries to a blank line,
+`br` to LF; `pre` preserves whitespace. Ignore CSS/scripts/head/hidden content.
+Heading levels, emphasis/strong and links are half-open chapter-local byte spans.
+HTTP(S) website links are marked external; internal/other schemes retain an inert
+span and original target. Ruby retains only base text in canonical content, with
+primary `rt` readings in sorted `SourceRuby` ranges; omit fallback parentheses and
+secondary `rtc` annotations. Segmented ruby joins primary readings over the base.
+
+Each local image occupies a U+FFFC placeholder (three UTF-8 bytes) with an exact
+range, resolved container path and separate alt text. Alt/ruby readings are never
+analyzed as body text. Preserve repeated placements, storing bytes once per path.
+SVG image wrappers resolve `href`/`xlink:href`; SVG spine items become image-only
+chapters. EPUB 3 cover-image and EPUB 2 cover metadata resolve to the image map.
+No image dimensions, bitmap decoding, cover cache or reader rendering yet.
+
+Stored/Deflate ZIP reading is memory-only. Resolve relative/percent-encoded paths
+once, reject traversal outside the container, aliases/duplicate entries, symlinks,
+broken references, damaged consumed bytes and encrypted used resources. Unused
+CSS/fonts need not exist or decode, including obfuscated fonts. XML is strict
+UTF-8/UTF-16 with validated declarations, numeric references and nesting preflight;
+external DOCTYPE declarations never fetch. Custom entity definitions and unresolved
+named entities fail. Current compatibility limits include remote images and
+unsupported spine media/fallback chains; these fail rather than omit a chapter.
+Parser budgets are operational limits, not peak-memory/performance measurements.
+
+Original EPUB SHA-256/bytes, durable chapter/asset IDs, formatting/ruby persistence,
+per-chapter Mode B and unique registrations, cancellation, typed runtime/FFI and
+mixed Android selection remain future work. Do not persist these parser structs
+without the planned atomic file-import adapter. Current app imports stay paste/TXT.
+
 ## Pure SRT canonical content (no schema change)
 
 `yomoku-import::srt::SrtDocument` contains one canonical UTF-8 text string and

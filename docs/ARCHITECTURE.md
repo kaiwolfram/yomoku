@@ -16,7 +16,22 @@ Successful paste or TXT import returns to Library without opening the reader.
 StorageFinished is internal: both Serde and Facet skip it, so hosts cannot inject
 storage results. No SQL, paths, threads or platform I/O enter core.
 
-`yomoku-import` is a separate pure content-extraction boundary. Its SRT parser
+`yomoku-import` is a separate pure content-extraction boundary. Its EPUB parser
+reads Stored/Deflate ZIP entries from a borrowed byte slice, without filesystem
+extraction/network access. Container/OPF metadata selects the first package and
+spine order; each nonempty XHTML/SVG spine item stays a separate chapter. XHTML
+ignores CSS/scripts, collapses ordinary whitespace, retains paragraphs/pre/breaks,
+and projects headings/emphasis/links/ruby and image placeholders as canonical
+UTF-8 ranges. Only website links are tagged external; internal/other links stay
+inert. Referenced image/cover bytes are retained once, without decoding/caching.
+Parser budgets bound source/read expansion/entries/nodes; a nonrecursive XML
+preflight caps element nesting at 64 before the recursive tree parser. Reject
+custom entity declarations, invalid numeric references and encrypted used content;
+unused obfuscated fonts/CSS need not be opened. See DATA_MODEL.md and DECISIONS.md
+for the extraction contract and current compatibility limits. EPUB has no
+repository/runtime/reader adapter yet.
+
+Its SRT parser
 accepts decoded text and returns canonical LF text plus ordered UTF-8 cue ranges.
 Blank lines separate cues; missing counters/separators and short/dot timestamps
 recover without merging cues into prose. Strip identifiable timing/counter lines

@@ -2025,3 +2025,55 @@ and control references; escaped dialogue cannot become a stripped tag. Empty cue
 are omitted; an entirely empty result is an error. Cues are paragraphs, never
 chapters, and their ranges precede analysis/pagination. All five existing page
 presets reconstruct the canonical text exactly in fixtures.
+
+## 2026-10-25 — Pure EPUB extraction and bounded XML preflight
+
+Keep EPUB extraction in `yomoku-import`, accepting original borrowed bytes and
+returning canonical chapters/format ranges plus immutable referenced image bytes.
+No ZIP filesystem extraction, network, SQL, analyzer, durable IDs or Android change.
+Use the first declared OPF rendition and spine order, including auxiliary items
+so their text is reachable without internal-link/TOC navigation. Empty text items
+are omitted. Headings never split chapters. Filename title fallback remains at
+the adapter boundary. See DATA_MODEL.md for whitespace/ruby/image range rules.
+
+Pin `zip` 8.6.0 with default features off and only deflate-flate2, plus `flate2`
+1.1.9 with its pure Rust backend; no native compression, crypto or extra codecs.
+Pin `roxmltree` 0.21.1 for namespace-aware immutable XML trees and `xmlparser`
+0.13.6 for a nonrecursive lexical preflight. Verified the published
+[ZIP read/metadata API](https://docs.rs/zip/8.6.0/zip/read/struct.ZipFile.html),
+[compression features](https://docs.rs/zip/latest/zip/),
+[XML parsing options](https://docs.rs/roxmltree/0.21.1/roxmltree/struct.ParsingOptions.html)
+and [token ends](https://docs.rs/xmlparser/0.13.6/xmlparser/enum.ElementEnd.html),
+then checked the exact downloaded sources/Cargo feature graph before use. These
+are MIT / MIT-or-Apache dependencies, locked with nine newly required packages.
+API choice follows the [EPUB package/spine specification](https://www.w3.org/TR/epub-33/#sec-spine-elem).
+Both Android targets check. Retain complete notices when making EPUB reachable
+through the production import adapter, as done for encoding_rs in the TXT slice.
+
+Ordinary XHTML whitespace uses a deferred separator: later text appends never
+trim or insert before existing range anchors. Source ruby readings/alt text stay
+outside canonical analyzed text. U+FFFC marks each inline image's exact position
+and ensures image-only chapters can paginate; image dimensions/ratio/decoding
+remain with the renderer. Preserve source bytes once per referenced image/cover.
+HTTP(S) website links are external; retain all other targets as inert spans.
+Ignore CSS even when its unused manifest URL is remote; never fetch it.
+
+Initial adversarial nesting exposed roxmltree tokenizer recursion before a
+post-parse depth check could run (500 nested spans overflowed the host test stack).
+Preflight tokens before tree parsing, cap element depth at 64 even if callers ask
+for more, and reject entity declarations that could inject nesting after preflight.
+External DOCTYPE declarations without resolved entities are accepted without a
+resolver. Validate numeric XML references explicitly: roxmltree replaces an
+invalid surrogate reference with U+FFFD rather than failing. Final fixtures test
+10,000 nested spans fail cleanly, near-limit valid content/CDATA/comments, invalid
+references and external entities. Source/read/entry/node budgets are configurable;
+these are not measured device memory guarantees. Unsupported remote images,
+unresolved named/custom entities and spine fallback chains currently fail clearly.
+
+Reject duplicate raw ZIP names before trusting zip-rs's last-wins name index:
+scan its central-directory location for raw entry names, then normalize/validate
+each indexed path and reject aliases. All resource reads stay by validated index
+with CRC/size checks and per-entry/cumulative expansion bounds. Encryption metadata
+blocks only resources actually used; unused obfuscated fonts do not reject a book.
+Strict UTF-8/BOM or declared UTF-16 decoding never replaces malformed source bytes.
+No migration or wire/schema change. Repository/runtime and UI adapters remain open.

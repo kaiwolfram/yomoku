@@ -1543,3 +1543,24 @@
 - Updated README/plan/architecture/data/decisions/development/handoff. Next: EPUB
   parser, EPUB/SRT byte-decoding/original-file repository/runtime adapters, then
   mixed picker; reader ruby and CI independent. Nostr empty/Q188 unchanged.
+
+## 2026-10-25 — Pure EPUB extraction
+
+- Added `yomoku-import::epub`: in-memory ZIP → metadata/spine chapters, canonical
+  UTF-8 text, headings/emphasis/ruby/link ranges and positioned image/cover bytes.
+  Ignore CSS/scripts; retain auxiliary/image-only chapters and inert internal
+  links. No I/O, IDs, schema, wire or production app import changes.
+- PASS: 341 data-free Rust tests (24 new EPUB), strict Clippy/fmt/diff and both
+  Android target checks. Fixtures cover Stored/Deflate/CRC/malformed archives,
+  duplicate/alias/unsafe paths, encryption, UTF-8/UTF-16/ranges, ruby/images/links,
+  whitespace, resource limits, large text and all five pagination presets.
+- Fixed XML library recursion exposed by the first deep fixture: nonrecursive
+  lexical preflight caps depth at 64 before tree parsing, rejects custom entity
+  injection and invalid numeric references instead of silent replacement. Final
+  10,000-depth/near-limit/CDATA/comment checks pass. Corrected initial API/borrow
+  errors; no open failure/blocker. Nine pinned ZIP/Deflate/XML lock entries added.
+- Updated README/plan/architecture/data/decisions/development/handoff. Next: atomic
+  EPUB/SRT repository/runtime imports, mixed picker and EPUB/source-ruby rendering;
+  CI independent. App still paste/TXT. Compatibility limits in DATA_MODEL.md.
+  APK/lint/device/JNI/codegen/explicit Full/index/release/reboot/physical arm64
+  not rerun for this parser slice. Nostr empty/Q188 unchanged.

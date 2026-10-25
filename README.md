@@ -65,6 +65,10 @@ on each newly recorded completion, including rereads with zero new words.
 Nostr, Statistics and Vocabulary tabs currently
 show placeholders.
 
+The pure [EPUB parser](crates/yomoku-import/src/epub.rs) extracts spine-ordered
+chapters, title, headings/emphasis, source ruby, positioned images/covers and
+links while ignoring CSS. Host fixtures cover malformed archives and pagination;
+EPUB app import/rendering wiring remains planned.
 The pure [SRT parser](crates/yomoku-import/src/srt.rs) has host fixtures for cue
 boundaries, formatting, speakers and malformed input; app import wiring is pending.
 Planned v1 features include EPUB/SRT imports, custom missing-word definitions,
@@ -94,7 +98,7 @@ rendering remains planned.
 | `crates/yomoku-runtime/` | Rust EffectRouter and FIFO worker for I/O and analysis |
 | `crates/yomoku-storage/` | SQLite repositories and numbered migrations |
 | `crates/yomoku-analysis/` | Sudachi adapter and validated token snapshots |
-| `crates/yomoku-import/` | Pure TXT decoding and Aozora canonical text/ruby parsing |
+| `crates/yomoku-import/` | Pure EPUB extraction, TXT/Aozora decoding and SRT parsing |
 | `crates/yomoku-ffi/` | Typed Crux/BoltFFI bridge and Kotlin payload generation |
 | `third_party/sudachi/` | Pinned engine source, Android patch and license records |
 | `third_party/dictionaries/` | JMdict/JMnedict source lock, attribution and index contract |

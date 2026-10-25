@@ -97,7 +97,7 @@ position/encounter history. Keep incremental builds green.
 
 ## 4 — Imports and Library
 - [x] Implement TXT UTF-8/Shift-JIS detection/manual fallback in `crates/yomoku-import`; thirteen pure host tests verify strict decoding/BOMs, uncertain encoding and explicit selection, exact hard breaks, common Aozora ruby/directives, canonical UTF-8 ranges, malformed/unknown/gaiji preservation and all-preset pagination without inferred chapters. Storage/analysis and Android selection/picker wiring remain below.
-- [ ] Implement EPUB metadata/chapter/headings/emphasis/ruby/image extraction ignoring CSS; fixtures cover malformed archives and chapter boundaries.
+- [x] Implement pure EPUB metadata/spine chapter/headings/emphasis/source-ruby/image/cover/link extraction ignoring CSS. Twenty-four host fixtures cover Stored/Deflate archives, malformed/CRC/duplicate/path/encryption failures, bounded nonrecursive XML preflight, UTF-8/UTF-16/ranges, image-only chapters and all five pagination presets. Both Android targets check; original-file persistence/runtime/UI remain below.
 - [ ] Render EPUB images at source position/ratio, cover cache and external links; verify internal links are noninteractive and no TOC navigation.
 - [ ] Add shared full-screen image zoom/pan component; verify phone/tablet rotation.
 - [x] Implement tolerant SRT parser stripping numbers/timestamps/tags while preserving cue blocks, breaks and speakers; thirteen pure host tests cover canonical UTF-8 cue ranges, LF/CRLF/CR/BOM, missing counters/separators, short/dot/out-of-order timing, numeric dialogue, malformed/unknown markup, entities, large inputs and all five page presets. Original-byte decoding, repository/runtime and Android wiring remain separate tasks.
