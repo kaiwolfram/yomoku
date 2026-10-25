@@ -14,6 +14,8 @@ Yomoku is under active development. The working app supports:
 - Pasting text into a local Library, with exact-content deduplication and an
   import summary. Imports analyze Japanese text in Sudachi Mode B and register
   unique Japanese word surfaces without changing existing vocabulary statuses.
+- Selecting multiple TXT files with UTF-8/Shift-JIS encoding choices, per-file
+  failures/duplicates and a retained import summary returning to Library.
 - Opening imported text in a centered, scrollable reader, with saved text
   positions and Library progress percentages.
 - Five persisted logical page-length presets: 250, 500, 750, 1,000 and 1,500
@@ -60,7 +62,8 @@ on each newly recorded completion, including rereads with zero new words.
 Nostr, Statistics and Vocabulary tabs currently
 show placeholders.
 
-Planned v1 features include EPUB/TXT/SRT imports, custom missing-word definitions,
+Planned v1 features include EPUB/SRT imports, batch cancellation/background
+notifications, custom missing-word definitions,
 reading statistics, optional AnkiDroid integration, curated Nostr reading and
 manual encrypted backups. See the [product specification](docs/PRODUCT_SPEC.md)
 for scope and the [implementation checklist](docs/IMPLEMENTATION_PLAN.md) for
@@ -72,7 +75,9 @@ breaks, and common
 Aozora ruby/directive handling. Original-file SHA-256 deduplication, original bytes,
 canonical text/ruby, Mode B analysis and vocabulary registration commit together.
 Typed errors support encoding retries; duplicates skip analyzer loading even after
-reopen. The Android picker and encoding selection UI remain planned.
+reopen. Android now connects multiple-TXT selection, encoding choices and per-file
+summaries. Progress counts, cancellation/background notifications and reader ruby
+rendering remain planned.
 
 ## Repository layout
 

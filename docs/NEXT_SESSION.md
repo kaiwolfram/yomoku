@@ -1,6 +1,5 @@
 # Resume here
-
-Updated: 2026-10-25. Verified typed TXT FIFO/JNI imports.
+Updated: 2026-10-25. Verified Android multiple-TXT picker/encoding/summary.
 Read AGENTS.md, plan phases 2–4 and PRODUCT_SPEC.md sections 3–4.
 ## Working
 - Pure Crux owns navigation/Library/Settings; only Render reaches UI. FIFO owns
@@ -61,20 +60,20 @@ Read AGENTS.md, plan phases 2–4 and PRODUCT_SPEC.md sections 3–4.
   Separate original-file SHA-256 preserves bytes/encoding/title/progress/finish;
   new filename/text/ruby/original B/unique registrations commit together.
   ImportTxt(bytes, display name, optional encoding) reaches lazy FIFO/typed JNI.
-  Read-only exact-byte preflight skips decode/Full for duplicates even after reopen;
-  new parsing validates before Full load, repeats under authoritative transaction.
-  Typed encoding-required/strict errors retry explicitly; Created/Existing return
-  Library summary. Reader-save gates/clock pause apply. No picker or reader ruby yet.
+  Read-only duplicates skip decode/Full after reopen; new parsing validates before
+  Full and repeats under authoritative transaction. Reader-save gates/clock apply.
+- Android multiple-TXT picker reads one URI off-main at a time; retained helper
+  sequences atomic imports. UTF-8/Shift-JIS/Skip, per-file failures and duplicate
+  references show a scrollable Library summary. Recreation retains choice/results;
+  final teardown drops unsubmitted work; no persisted queue. No reader ruby yet.
 ## Next tasks (ordered)
-1. Android multiple-TXT picker/encoding choice and per-file summary returning Library;
-   progress/cancel/background semantics remain separate. ImportTxt transport is ready.
+1. Batch progress/current-file/X-of-N, cancel with current-partial rollback and
+   permitted background notifications; test no process-death auto-resume.
 2. EPUB/SRT parsers and original-file runtime imports; CI/custom entries independent.
 3. User-run physical arm64 validation once usable.
 ## Verification
-- PASS: 293 data-free Rust tests, strict Clippy/Rust/Kotlin fmt/diff; real-Full/index
-  host Kotlin/JNI + seven Unicode fixtures; reproducible Kotlin payload generation.
-- PASS: both-ABI app/test APKs, strict lint, five API-36 x86_64 import/session tests;
-  exact decoder licenses in APK. Commands/reports: DEVELOPMENT.md last section.
-- No standalone Full/Python/full-index/release app/process/reboot/tablet/arm64 rerun.
-- Host JNI/Android builds run sequentially. AVD running; no open failure/blocker.
-- No new package/version/migration. Nostr empty; ask Q188 before forwarding.
+- PASS: both-ABI debug/test builds, strict lint, Kotlin fmt/diff and two new API-36
+  x86_64 picker tests; import/session and paste/navigation regressions also run.
+- Prior Rust/JNI baseline: 293 tests/Clippy/fmt/Full/index/Unicode/codegen; not rerun.
+- Commands/reports: DEVELOPMENT.md last section; host JNI/Android builds sequential.
+- AVD running; no blocker/new package/migration. Nostr empty; ask Q188 before forwarding.

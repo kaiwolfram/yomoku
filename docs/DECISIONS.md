@@ -1821,3 +1821,34 @@ encoding_rs 0.8.35's complete upstream copyright and three license texts under
 Android `assets/licenses/encoding_rs/` now that TXT is reachable via production JNI.
 The Android picker, batch progress/cancel/background notifications, EPUB/SRT and
 source-ruby reader transport/rendering remain independent plan tasks.
+
+## 2026-10-25 — Android multi-TXT picker and encoding handoff
+
+Use the existing AndroidX `OpenMultipleDocuments` contract with `text/plain`,
+query `OpenableColumns.DISPLAY_NAME` and read original bytes through
+`ContentResolver.openInputStream` on one platform executor. Follow the
+[Android Storage Access Framework guide](https://developer.android.com/training/data-storage/shared/documents-files)
+and [AndroidX contract source](https://android.googlesource.com/platform/frameworks/support/+/7d9e2f29cffbcd522c7b0ce4d34788cf3d73213e/activity/activity/src/main/java/androidx/activity/result/contract/ActivityResultContracts.kt),
+reviewed this session. No storage permission, persistent URI grant, package/version
+or migration is needed. This slice accepts case-insensitive `.txt` display names;
+other extensions get a per-file result until their parsers are connected.
+
+Retain only URI sequencing, current bytes/encoding prompt and batch result copies
+in CoreSessionOwner's platform helper. The core remains authoritative for busy/save
+gates, atomic per-file commits, duplicates, errors and Library routes. Observe its
+render outcomes via a main-thread callback, posting the next action to avoid
+recursive core updates. Read one file at a time; never keep the whole batch's bytes.
+Uncertain encoding offers UTF-8, Shift-JIS or Skip file. A selected encoding's strict
+error keeps the same bytes available for explicit selection. Failed/skipped files
+do not abort later files. Show a scrollable per-file summary in Library; consume
+intermediate single-file summaries and clear their transient errors afterward.
+Duplicate rows name the existing document title as well as the selected filename.
+
+Use a modal import/encoding dialog for this bounded slice; retain it and results
+through recreation without retaining an Activity. Queue/bytes/results are not
+persisted or automatically resumed after process death. Final owner teardown drops
+unsubmitted work and stops URI reads; CoreSession still drains any accepted atomic
+Rust import. Progress counts, cancellation with current-transaction rollback,
+background service/notifications, EPUB/SRT and reader ruby remain separate tasks.
+Existing in-process background worker behavior supplies no process-survival guarantee.
+Large-file heap use and provider-read latency are unmeasured.

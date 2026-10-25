@@ -75,6 +75,9 @@ internal class CoreSession(
     var view: ViewModel by mutableStateOf(ViewModel.bincodeDeserialize(bridge.view()))
         private set
 
+    // Platform import sequencing observes committed core outcomes, on the main thread.
+    var onViewChanged: (() -> Unit)? = null
+
     init {
         dispatch(Event.RefreshLibrary)
     }
@@ -193,6 +196,7 @@ internal class CoreSession(
                 is ShellEffect.Render -> view = ViewModel.bincodeDeserialize(bridge.view())
             }
         }
+        onViewChanged?.invoke()
     }
 
     override fun close() {

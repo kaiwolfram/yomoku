@@ -6,6 +6,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.lifecycle.ViewModelProvider
 import app.yomoku.shared.ContentRoute
 import app.yomoku.shared.Event
@@ -13,11 +14,18 @@ import app.yomoku.theme.YomokuTheme
 
 class MainActivity : ComponentActivity() {
     private lateinit var core: CoreSession
+    private lateinit var txtImports: TxtImports
+    private val txtPicker =
+        registerForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
+            txtImports.start(uris)
+        }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        core = ViewModelProvider(this)[CoreSessionOwner::class.java].session
+        val owner = ViewModelProvider(this)[CoreSessionOwner::class.java]
+        core = owner.session
+        txtImports = owner.txtImports
         setContent {
             YomokuTheme {
                 BackHandler(
@@ -27,7 +35,10 @@ class MainActivity : ComponentActivity() {
                         if (core.view.settingsOpen) Event.CloseSettings else Event.CloseDocument
                     )
                 }
-                YomokuApp(core.view, core::dispatch, core::onReaderInteraction)
+                YomokuApp(core.view, core::dispatch, core::onReaderInteraction) {
+                    txtPicker.launch(arrayOf("text/plain"))
+                }
+                TxtImportDialogs(txtImports)
             }
         }
     }

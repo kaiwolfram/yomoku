@@ -2123,3 +2123,55 @@ Standalone Full fixtures/probes, Python/full-index scans, release app, separate
 process/reboot, tablet/dark and physical arm64 were not rerun. Next: Android picker,
 encoding choice and per-file summary; batch progress/cancel/background notifications
 and source-ruby reader transport/rendering remain separate tasks.
+
+## Android multiple-TXT picker and retained encoding/summary
+
+Run from the repository root with the Rust PATH/JDK/SDK/Gradle variables above:
+
+```sh
+tools/format-kotlin.sh --check
+./android/gradlew -p android :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug --offline --console=plain
+./android/gradlew -p android :app:connectedDebugAndroidTest :app:lintDebug -Pandroid.testInstrumentationRunnerArguments.class=app.yomoku.TxtPickerTest,app.yomoku.DocumentSessionTest,app.yomoku.AnalyzedImportSessionTest,app.yomoku.CoreSessionTest --offline --console=plain
+./android/gradlew -p android :app:connectedDebugAndroidTest :app:lintDebug '-Pandroid.testInstrumentationRunnerArguments.class=app.yomoku.TxtPickerTest,app.yomoku.NavigationTest,app.yomoku.PasteReaderTest#pasteReturnsToLibraryAndOpensFirstLogicalPageWithBackAndRecreation' --offline --console=plain
+git diff --check
+```
+
+The two connected groups contain seven and five tests (ten distinct tests).
+Save reports before subsequent runs overwrite them; this session's root is
+`.local/test-reports/txt-picker/`. Picker tests intercept the actual
+ACTION_OPEN_DOCUMENT contract result, then use an exported test-APK-only provider
+to exercise original-byte ContentResolver reads off the UI thread. The provider
+uses only Android/Java APIs because a standalone test-APK process lacks the target
+APK's Kotlin runtime. No fixture provider is included in the application APK.
+
+The nine-file batch covers Created/Existing with the existing title, unreadable
+URI, unsupported extension, undecodable bytes, explicit UTF-8 and Shift-JIS,
+skipping an uncertain file and successful continuation to a later uppercase TXT.
+Tests inspect persisted encoding, Library membership, all copied outcomes, visible
+scrollable errors/titles, no automatic reader opening, retained encoding through
+recreation/background, retained summary through recreation and consumed dismissal.
+Picker cancellation preserves Library. Existing groups exercise native/worker
+imports, exact-source persistence, failures/retries, statuses, session lifecycle,
+paste/reader and navigation.
+
+PASS: both-ABI debug/test APK builds, strict Android lint, Kotlin formatting/diff,
+and all five final picker/navigation/paste tests on API-36 x86_64 phone/light in
+airplane mode. All five distinct import/session regressions also passed in the
+earlier offline group (its remaining failure was the subsequently corrected test
+provider). Ten distinct tests passed across these runs. Saved final UI reports:
+`.local/test-reports/txt-picker/phone-final/{report,results}/`; native regression
+results are in `phone-provider-failure/`. No final application/test failure remains.
+
+Intermediate failures fixed: two member-method imports; picker monitor missing
+MIME/category matching; unavailable test-APK cache path, then standalone provider
+missing the target Kotlin runtime (use Java/pipe fixtures); duplicate filename
+selector across Library/dialog roots (scope to summary). A cold-run native import
+also exceeded 30s while Play Store updates were active; the offline rerun passed.
+The new multi-file wait permits 90s with diagnostic state. No production timeouts
+or parser/storage semantics changed. Gradle/ADB sockets and AVD startup needed
+sandbox escalation. Restored airplane mode off; emulator remains running.
+
+No Rust/FFI/schema/dependency change. Host Rust/Clippy/JNI/generation, standalone
+Full/Python/full-index scans, tablet/dark, release app, separate process/reboot
+recovery and physical arm64 were not rerun. Progress counts, transaction-aware
+batch cancellation, background notifications, EPUB/SRT and reader ruby remain.

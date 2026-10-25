@@ -39,7 +39,16 @@ Typed errors distinguish encoding choice, invalid selected encoding, unsupported
 BOM, undecodable input and empty text. Successful Created/Existing use the same
 Library summary without auto-opening. Busy/pending saves gate submissions; imports
 invalidate selected words and Android pauses the reader clock before dispatch.
-Android picker/encoding UI, batching, progress and cancellation remain separate.
+Android's retained `TxtImports` sequences multiple picker URIs and consumes committed
+per-file outcomes. `OpenMultipleDocuments(text/plain)` supplies read grants; one
+platform executor queries literal display names and reads original bytes, rejecting
+non-TXT extensions with a per-file result. Only current-file bytes are retained.
+Uncertain encoding offers UTF-8/Shift-JIS or Skip; errors never abort later files.
+Modal encoding/import state and scrollable batch summaries survive recreation,
+returning to Library without opening a reader. No URI queue/results are persisted;
+final owner teardown stops unsubmitted work while core drains accepted transactions.
+No new permission, dependency or schema. Progress counts, cancellation, background
+notifications, EPUB/SRT and source-ruby rendering remain separate.
 
 Pure document values define positive i64 identities, immutable chapter snapshots,
 UTF-8 byte anchors, checked UTF-16 conversions and literal first-line paste titles.
@@ -505,7 +514,9 @@ arm64-v8a/x86_64 using NDK r30/API 29. CoreSession projects Render snapshots on
 Android's main thread and ignores callbacks after native close. CoreSessionOwner is an
 Activity-scoped AndroidViewModel: it supplies Application.filesDir/yomoku.sqlite3,
 retains the native session across recreation, and requests draining close onCleared.
-It retains no Activity or independent domain state. Each new session requests Library data;
+It retains no Activity or independent domain state; its TXT platform helper retains
+only the in-process URI queue, current encoding input and copied per-file outcomes.
+Each new session requests Library data;
 the database and page-length setting are first loaded on the Rust worker. A fresh
 process starts Library with no dictionary load. Activity onStart permits reuse;
 onStop queues release unless isChangingConfigurations, preserving the analyzer
@@ -561,9 +572,10 @@ Automatic Android backup/transfer is excluded. Arm64 execution is unverified.
 Production paste imports now atomically persist Mode B analyses and register all
 unique Japanese surfaces without encounters, deduplicate exact bytes and deliver
 Created/Existing summaries. Native descriptor delivery and retained/background
-lifecycle are connected. TXT parsing and atomic file storage are verified separately;
-Android picker/encoding UI, EPUB/SRT parsing, metadata and multi-file import semantics
-remain unchecked. Legacy imports are not automatically rescanned.
+lifecycle are connected. TXT parsing, atomic storage and the Android multiple-file
+picker/encoding/summary path are connected. EPUB/SRT parsing, metadata, mixed-format
+batches, cancellation and background notifications remain unchecked. Legacy imports
+are not automatically rescanned.
 Explicit core/worker/FFI pending-time checkpoints coalesce during unresolved saves
 and drain before reader movement/exit or analyzed completion. Completion preparation/
 exact retries now run through core/FIFO/FFI. Android monotonic lifecycle/interactions

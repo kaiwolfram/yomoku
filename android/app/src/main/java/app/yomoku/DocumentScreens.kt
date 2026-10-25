@@ -37,10 +37,25 @@ import app.yomoku.shared.ImportOutcome
 import app.yomoku.shared.ViewModel
 
 @Composable
-internal fun LibraryScreen(view: ViewModel, dispatch: (Event) -> Unit) {
+internal fun LibraryScreen(
+    view: ViewModel,
+    dispatch: (Event) -> Unit,
+    onImportTxt: (() -> Unit)? = null,
+) {
     Column(Modifier.fillMaxSize().padding(16.dp)) {
         Button(onClick = { dispatch(Event.OpenPaste) }, enabled = !view.storageBusy) {
             Text(stringResource(R.string.paste_title))
+        }
+        if (onImportTxt != null) {
+            Button(
+                onClick = onImportTxt,
+                enabled =
+                    !view.storageBusy &&
+                        !view.readingTimeSavePending &&
+                        !view.completionSavePending,
+            ) {
+                Text(stringResource(R.string.import_txt))
+            }
         }
         StorageStatus(view)
         view.importSummary?.let { summary ->
@@ -274,25 +289,26 @@ internal fun StorageStatus(view: ViewModel) {
         LinearProgressIndicator(modifier = Modifier.fillMaxWidth().testTag("storage_busy"))
     view.documentError?.let { error ->
         Text(
-            stringResource(
-                when (error) {
-                    DocumentError.EMPTYPASTE -> R.string.error_empty_paste
-                    DocumentError.UNAVAILABLE -> R.string.error_storage_unavailable
-                    DocumentError.INCOMPATIBLEDATABASE -> R.string.error_incompatible_database
-                    DocumentError.INVALIDDOCUMENT -> R.string.error_invalid_document
-                    DocumentError.NOTFOUND -> R.string.error_document_not_found
-                    DocumentError.INVALIDSETTINGS -> R.string.error_invalid_settings
-                    DocumentError.MISSINGANALYSIS -> R.string.error_missing_analysis
-                    DocumentError.TXTENCODINGREQUIRED -> R.string.error_txt_encoding_required
-                    DocumentError.TXTINVALIDUTF8 -> R.string.error_txt_invalid_utf8
-                    DocumentError.TXTINVALIDSHIFTJIS -> R.string.error_txt_invalid_shift_jis
-                    DocumentError.TXTUNSUPPORTEDENCODING -> R.string.error_txt_unsupported_encoding
-                    DocumentError.TXTUNDECODABLE -> R.string.error_txt_undecodable
-                    DocumentError.EMPTYTXT -> R.string.error_empty_txt
-                }
-            ),
+            stringResource(error.messageResource()),
             color = MaterialTheme.colorScheme.error,
             modifier = Modifier.testTag("document_error"),
         )
     }
 }
+
+internal fun DocumentError.messageResource(): Int =
+    when (this) {
+        DocumentError.EMPTYPASTE -> R.string.error_empty_paste
+        DocumentError.UNAVAILABLE -> R.string.error_storage_unavailable
+        DocumentError.INCOMPATIBLEDATABASE -> R.string.error_incompatible_database
+        DocumentError.INVALIDDOCUMENT -> R.string.error_invalid_document
+        DocumentError.NOTFOUND -> R.string.error_document_not_found
+        DocumentError.INVALIDSETTINGS -> R.string.error_invalid_settings
+        DocumentError.MISSINGANALYSIS -> R.string.error_missing_analysis
+        DocumentError.TXTENCODINGREQUIRED -> R.string.error_txt_encoding_required
+        DocumentError.TXTINVALIDUTF8 -> R.string.error_txt_invalid_utf8
+        DocumentError.TXTINVALIDSHIFTJIS -> R.string.error_txt_invalid_shift_jis
+        DocumentError.TXTUNSUPPORTEDENCODING -> R.string.error_txt_unsupported_encoding
+        DocumentError.TXTUNDECODABLE -> R.string.error_txt_undecodable
+        DocumentError.EMPTYTXT -> R.string.error_empty_txt
+    }

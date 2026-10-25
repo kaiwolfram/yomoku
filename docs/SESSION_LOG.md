@@ -1398,3 +1398,28 @@
   arm64 not rerun. Next: Android multi-file TXT picker/encoding choice and summary;
   progress/cancel/background notifications, EPUB/SRT and ruby rendering remain.
   Nostr empty; ask Q188 before forwarding.
+
+## 2026-10-25 — Android multiple-TXT picker, encoding and per-file summary
+
+- Added Library's multiple-TXT Android picker, off-main original-byte URI reads
+  and retained sequential submission to the existing atomic Rust command. UTF-8/
+  Shift-JIS/Skip choices reuse current bytes; one failed/skipped file never aborts
+  later files. Duplicate results reference the existing title. Scrollable results
+  return to Library without opening a reader and survive Activity recreation.
+- Kept platform queue/results in CoreSessionOwner without retaining an Activity;
+  final teardown drops unsubmitted work while native accepted imports drain.
+  No persisted queue, dependency/version, FFI, schema or Rust change. Progress/
+  cancellation/background notifications, EPUB/SRT and reader ruby remain unchecked.
+- PASS: both-ABI debug/test builds, strict Android lint, Kotlin fmt/diff, five final
+  picker/navigation/paste tests and five distinct import/session regressions on
+  API-36 x86_64. New tests use actual contract callbacks and a test-APK-only pipe
+  provider; nine files verify duplicates/failures/continuation, both persisted
+  encoding choices/Skip, summary scrolling/retention/dismissal and picker cancel.
+- Fixed intermediate test imports, intent filter, cache/provider runtime and
+  duplicate selector fixtures; a cold-run native timeout passed offline. Gradle/
+  ADB/AVD required escalation. Reports: `.local/test-reports/txt-picker/`.
+  Restored airplane mode off; AVD remains running. No open blocker.
+- Updated README/plan/architecture/decisions/development/handoff. Rust/JNI/Full/
+  Python/index/release/process/reboot/tablet/arm64 not rerun this UI slice. Next:
+  progress/current-file/X-of-N, transaction-aware cancellation/background notices,
+  then EPUB/SRT. Nostr empty; ask Q188 before forwarding.
