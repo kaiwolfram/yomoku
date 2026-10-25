@@ -1,9 +1,8 @@
 # Resume here
-Updated: 2026-10-25. Verified cooperative TXT repository cancellation/commit gate.
+Updated: 2026-10-25. Verified direct TXT runtime/JNI cancellation.
 Read AGENTS.md, plan phases 2–4 and PRODUCT_SPEC.md sections 3–4.
 ## Working
-- Pure Crux owns navigation/Library/Settings; only Render reaches UI. FIFO owns
-  SQLite/analysis. Fresh sessions start Library. No I/O/SQL in core.
+- Pure Crux owns routes/Library/Settings; only Render reaches UI. FIFO owns SQLite/analysis. Fresh sessions start Library. No I/O/SQL in core.
 - Exact UTF-8 position/Library percentage + five presets persist; reflow preserves
   offset. Scroll resets on navigation/reopen; column capped at 720dp. Next/Previous/
   counter below content; 48dp net horizontal swipes require no bottom. Previous
@@ -41,8 +40,7 @@ Read AGENTS.md, plan phases 2–4 and PRODUCT_SPEC.md sections 3–4.
   commits occurrences/New-only Known/history/time/position/finish. Missing blocks.
   Reload retries exact command; AlreadyRecorded/zero silent. Positive toast once.
   Final new Recorded returns Library + consumed 1.4s confetti (zero/rereads too).
-- NativeBridge requires owned verified FD+1; Rust rehashes/maps/closes all paths.
-  FIFO analyzer releases after background work; keep live Full inodes immutable.
+- NativeBridge consumes owned verified FD+1; Rust rehashes/maps/closes all paths. FIFO releases analyzer in background; keep live Full inodes immutable.
 - Pinned 2026-10-25 JMdict English/JMnedict + sources/notices bundled; offline credits.
   Immutable index opens lazily on FIFO, reused until close/query failure.
   load_reader_word reads original B/live statuses/lifetime count atomically;
@@ -50,32 +48,32 @@ Read AGENTS.md, plan phases 2–4 and PRODUCT_SPEC.md sections 3–4.
 - LoadReaderWord/DismissReaderWord reach typed JNI; full current/pending/selected
   token identity gates attach. Live statuses refresh repetitions. Errors survive
   clock saves; outcomes drain time. Close/recreation dismiss; late results cannot open.
-- TXT strict UTF-8/Shift-JIS/Aozora composes with atomic storage (migration 0012).
-  Separate original-file SHA-256 preserves bytes/encoding/title/progress/finish;
-  new filename/text/ruby/original B/unique registrations commit together.
-  ImportTxt(bytes, display name, optional encoding) reaches lazy FIFO/typed JNI.
-  Read-only duplicates skip decode/Full after reopen; new parsing validates before
-  Full and repeats under authoritative transaction. Reader-save gates/clock apply.
+- TXT strict UTF-8/Shift-JIS/Aozora uses atomic migration-0012 original-byte
+  SHA-256 identity, filename/encoding/ruby/Mode B/unique registrations. Duplicates
+  skip decode/Full; new parsing validates before Full and repeats atomically.
+  Typed ImportTxt reaches lazy FIFO/JNI with reader-save/clock gates.
 - Android multiple-TXT picker reads one URI off-main; retained helper sequences
   atomic imports/UTF-8/Shift-JIS/Skip. Filename/X-of-N + processed-files bar survive
   recreation/background; errors/duplicates/skips count, encoding retries do not.
   Scrollable Library summary retains results. Teardown drops unsubmitted work;
   no persisted queue/progress or reader ruby. Display name publishes before bytes.
-- Storage import_analyzed_txt_cancellable + fresh shared ImportCancellation per
-  attempt returns Some(completed)/None(cancelled)/typed error. Checkpoints before/
-  after analysis; mutex guards final check + COMMIT. Cancel rolls back rows/IDs;
-  winning successful commit stays completed. No forced analyzer/SQLite interruption.
-  Runtime/JNI/Android still use noncancellable wrapper. Cancel must bypass FIFO
-  off main (may wait on COMMIT). No persisted token/queue/migration.
+- TXT cancellation shares a fresh repository handle before FIFO submission;
+  AnalyzerLifecycle/native cancelTxtImport() bypass FIFO, off main (COMMIT can
+  wait). Cancelled clears core busy without error/summary. Completed commits stay.
+  Registry clears before callbacks; weak control survives accepted closing work
+  without retaining worker. Queued/load/analysis/close/retry/JNI fixtures pass.
+  Android still has no Cancel control: stop URI submissions immediately, use a
+  separate cancellation executor, await BOTH return + current result, preserve a
+  winning commit, discard remaining URIs, guard stale provider callbacks by generation.
 ## Next tasks (ordered)
-1. Wire repository Cancel through runtime/JNI/Android; drop remaining URIs and
-   retain completed outcomes. Then background notifications/process-death test.
-2. EPUB/SRT parsers and original-file runtime imports; CI/custom entries independent.
+1. Wire Android Cancel to the verified runtime/JNI method; test URI-read/encoding/
+   analysis/commit races, recreation, retained completed outcomes and fresh batches.
+2. Permitted background progress/completion notifications + process-death/no-resume
+   acceptance. EPUB/SRT parsers/original-file imports and CI are independent next work.
 3. User-run physical arm64 validation once usable.
 ## Verification
-- PASS: 299 Rust tests (six new), strict Clippy/fmt/diff; twelve real-Full fixtures
-  + one worker fixture per owned/mapped loader.
-- Prior Android: both-ABI APKs, strict lint/Kotlin fmt, five picker/nav tests; not
-  rerun. Commands/failures: DEVELOPMENT.md last section.
-- No JNI/codegen/Android/process-death rerun or new package/migration/blocker.
+- PASS: 304 Rust tests (five new), strict Clippy/fmt/diff; real-Full/word-index host
+  Kotlin/JNI including direct cancellation; reproducible Crux/native generation.
+- Both-ABI app/test APKs + strict Android lint/Kotlin fmt pass. Commands/failures:
+  DEVELOPMENT.md last section. No Android UI/process-death rerun or new package/schema.
   Nostr empty; ask Q188 before forwarding. Physical arm64 remains unverified.

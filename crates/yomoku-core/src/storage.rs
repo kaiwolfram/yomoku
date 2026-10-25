@@ -82,6 +82,8 @@ pub enum StorageResult {
     ReaderTokensLoaded(ReaderTokenSnapshot),
     ReaderWordLoaded(Box<ReaderWordDetails>),
     ReaderStatusChanged(ReaderStatusChange, Option<ReaderVocabulary>),
+    /// Cooperative TXT cancellation rolled back the current file, without error.
+    ImportCancelled,
 }
 
 impl Operation for StorageOperation {

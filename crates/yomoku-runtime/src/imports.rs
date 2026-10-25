@@ -1,7 +1,7 @@
 //! Worker-owned import analysis. Factories may cross threads; analyzers never do.
 
 use std::{
-    sync::{mpsc, Weak},
+    sync::{mpsc, Arc, Mutex, Weak},
     time::{SystemTime, UNIX_EPOCH},
 };
 
@@ -13,7 +13,8 @@ use yomoku_core::{
 };
 use yomoku_import::txt::{self, TextEncoding as Decoding, TxtError};
 use yomoku_storage::{
-    PasteImportError, PasteImportOutcome, Storage, StorageError, TxtImportError, TxtImportOutcome,
+    ImportCancellation, PasteImportError, PasteImportOutcome, Storage, StorageError,
+    TxtImportError, TxtImportOutcome,
 };
 
 use crate::storage::{map_error, Job};
@@ -38,13 +39,23 @@ where
 /// A failed load is retryable. The factory is lazy even when Library is refreshed.
 pub type AnalyzerLoader = Box<dyn FnMut() -> Result<Box<dyn PasteAnalyzer>, DocumentError> + Send>;
 
-/// Queues cache policy on the same FIFO as accepted storage operations. Keeping
-/// this handle alive does not retain a closed bridge's worker or callback.
+/// Import worker controls: queued cache policy and direct per-file cancellation.
+/// Keeping this handle alive does not retain a closed bridge's worker or callback.
 pub struct AnalyzerLifecycle {
     pub(crate) sender: Weak<mpsc::Sender<Job>>,
+    pub(crate) txt: Weak<TxtImportControl>,
 }
 
 impl AnalyzerLifecycle {
+    /// Cancel the currently accepted TXT attempt directly, never through FIFO.
+    /// Call off the UI thread: an in-flight COMMIT can hold the per-file gate.
+    /// Stop batch submission until this call and the import result both finish.
+    /// A successful commit remains Created/Existing; idle calls are harmless.
+    pub fn cancel_txt_import(&self) -> std::io::Result<()> {
+        self.txt.upgrade().ok_or_else(worker_closed)?.cancel();
+        Ok(())
+    }
+
     /// Background/UI-hidden releases the cache after earlier atomic operations.
     /// Imports accepted while hidden finish, then release their analyzer too.
     /// Foreground permits reuse, but never eagerly opens the dictionary.
@@ -54,6 +65,41 @@ impl AnalyzerLifecycle {
             .ok_or_else(worker_closed)?
             .send(Job::Foreground(foreground))
             .map_err(|_| worker_closed())
+    }
+}
+
+/// Published synchronously before enqueue, so cancellation also reaches work
+/// waiting behind another FIFO job. Never hold this registry while taking the
+/// per-file commit gate or delivering callbacks.
+#[derive(Default)]
+pub(crate) struct TxtImportControl(Mutex<Option<Arc<ImportCancellation>>>);
+
+impl TxtImportControl {
+    pub(crate) fn begin(&self) -> Arc<ImportCancellation> {
+        let attempt = Arc::new(ImportCancellation::default());
+        *self.0.lock().unwrap_or_else(|error| error.into_inner()) = Some(attempt.clone());
+        attempt
+    }
+
+    pub(crate) fn finish(&self, attempt: &Arc<ImportCancellation>) {
+        let mut current = self.0.lock().unwrap_or_else(|error| error.into_inner());
+        if current
+            .as_ref()
+            .is_some_and(|value| Arc::ptr_eq(value, attempt))
+        {
+            *current = None;
+        }
+    }
+
+    fn cancel(&self) {
+        let attempt = self
+            .0
+            .lock()
+            .unwrap_or_else(|error| error.into_inner())
+            .clone();
+        if let Some(attempt) = attempt {
+            attempt.cancel();
+        }
     }
 }
 
@@ -91,14 +137,22 @@ impl Imports {
         &mut self,
         storage: &mut Storage,
         input: &TxtImport,
+        cancellation: &ImportCancellation,
     ) -> Result<StorageResult, DocumentError> {
+        if cancellation.is_cancelled() {
+            return Ok(StorageResult::ImportCancelled);
+        }
         // Avoid dictionary extraction/loading for an existing file, including
         // after background release or a fresh session. No title/encoding changes.
         if let Some(document) = storage
             .find_imported_txt(&input.original_bytes)
             .map_err(map_error)?
         {
-            return Ok(StorageResult::Existing(document));
+            return Ok(if cancellation.is_cancelled() {
+                StorageResult::ImportCancelled
+            } else {
+                StorageResult::Existing(document)
+            });
         }
         if input.filename.trim().is_empty() {
             return Err(DocumentError::InvalidDocument);
@@ -111,21 +165,26 @@ impl Imports {
         // The repository parses again under its authoritative atomic lookup so
         // concurrent creators cannot overwrite an existing interpretation.
         txt::parse(&input.original_bytes, selection).map_err(map_txt_error)?;
+        if cancellation.is_cancelled() {
+            return Ok(StorageResult::ImportCancelled);
+        }
         if self.analyzer.is_none() {
             self.analyzer = Some((self.loader)()?);
         }
         let analyzer = self.analyzer.as_mut().expect("loaded analyzer");
-        match storage.import_analyzed_txt(
+        match storage.import_analyzed_txt_cancellable(
             &input.original_bytes,
             &input.filename,
             selection,
             registration_timestamp()?,
+            cancellation,
             |chapter| analyzer.analyze(chapter),
         ) {
-            Ok(TxtImportOutcome::Created(imported)) => {
+            Ok(None) => Ok(StorageResult::ImportCancelled),
+            Ok(Some(TxtImportOutcome::Created(imported))) => {
                 Ok(StorageResult::Created(imported.document))
             }
-            Ok(TxtImportOutcome::Existing(document)) => Ok(StorageResult::Existing(document)),
+            Ok(Some(TxtImportOutcome::Existing(document))) => Ok(StorageResult::Existing(document)),
             Err(TxtImportError::Parse(error)) => Err(map_txt_error(error)),
             Err(TxtImportError::Analysis(error)) => {
                 self.analyzer = None;

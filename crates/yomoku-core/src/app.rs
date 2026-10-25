@@ -643,6 +643,7 @@ impl App for Yomoku {
                     _ => None,
                 };
                 match result {
+                    StorageResult::ImportCancelled => {}
                     StorageResult::ReaderWordLoaded(details) => {
                         if word_load == Some(details.selection())
                             && model.reader_word_selection == word_load

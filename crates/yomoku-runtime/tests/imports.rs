@@ -639,6 +639,249 @@ fn file_totals(path: &PathBuf) -> Vec<i64> {
 }
 
 #[test]
+fn txt_cancel_bypasses_blocked_analysis_retains_completed_files_and_retries_fresh() {
+    let database = Database::new();
+    let first = Storage::open(database.path())
+        .unwrap()
+        .import_analyzed_txt(
+            "猫".as_bytes(),
+            "completed.txt",
+            Some(yomoku_import::txt::TextEncoding::Utf8),
+            100,
+            |chapter| Ok::<_, DocumentError>(fixture(chapter)),
+        )
+        .unwrap();
+    let first = match first {
+        yomoku_storage::TxtImportOutcome::Created(value) => value.document,
+        _ => unreachable!(),
+    };
+    let mut observer = Storage::open(database.path()).unwrap();
+    let cat = observer
+        .vocabulary_entry(&Surface::new("猫").unwrap())
+        .unwrap()
+        .unwrap();
+    observer
+        .set_vocabulary_status(cat.id, VocabularyStatus::Learning, 200)
+        .unwrap();
+    let before = file_totals(&database.path());
+    let (release, gate) = mpsc::channel();
+    let Factory { loader, trace, .. } = Factory::new(false, Some(gate));
+    let (router, lifecycle) = effect_router_with_analyzed_imports(database.path(), loader).unwrap();
+    dispatch(&router, Event::RefreshLibrary);
+    lifecycle.cancel_txt_import().unwrap(); // Idle cancellation cannot poison the next attempt.
+    let (done, result) = mpsc::channel();
+    router.update(
+        txt_event("犬 犬".as_bytes(), Some(TextEncoding::Utf8)),
+        move |_| {
+            done.send(thread::current().id()).unwrap();
+        },
+    );
+    assert!(matches!(
+        trace.recv_timeout(TIMEOUT).unwrap(),
+        Trace::Load(_)
+    ));
+    assert!(matches!(
+        trace.recv_timeout(TIMEOUT).unwrap(),
+        Trace::Analyze(_)
+    ));
+    // A rejected duplicate callback must not replace the accepted cancellation handle.
+    assert!(router
+        .update(txt_event(b"rejected", None), |_| panic!(
+            "busy event accepted"
+        ))
+        .is_empty());
+    let lifecycle = thread::spawn(move || {
+        lifecycle.cancel_txt_import().unwrap();
+        lifecycle.cancel_txt_import().unwrap();
+        lifecycle
+    })
+    .join()
+    .unwrap();
+    assert!(router.view().storage_busy);
+    assert!(result.try_recv().is_err());
+    assert_eq!(file_totals(&database.path()), before);
+    lifecycle.set_foreground(false).unwrap();
+    release.send(()).unwrap();
+    assert_ne!(
+        result.recv_timeout(TIMEOUT).unwrap(),
+        thread::current().id()
+    );
+    let cancelled = router.view();
+    assert!(!cancelled.storage_busy);
+    assert!(cancelled.document_error.is_none() && cancelled.import_summary.is_none());
+    assert_eq!(cancelled.documents.len(), 1);
+    dispatch(&router, Event::RefreshLibrary); // Also drains queued background release.
+    assert_eq!(file_totals(&database.path()), before);
+    assert_eq!(
+        observer
+            .load_reader_snapshot(first.document_id)
+            .unwrap()
+            .unwrap()
+            .document,
+        first
+    );
+    assert_eq!(
+        observer
+            .vocabulary_entry(&Surface::new("猫").unwrap())
+            .unwrap()
+            .unwrap()
+            .status,
+        VocabularyStatus::Learning
+    );
+    lifecycle.cancel_txt_import().unwrap();
+    let retry = dispatch(
+        &router,
+        txt_event("犬 犬".as_bytes(), Some(TextEncoding::Utf8)),
+    );
+    assert_eq!(retry.documents.len(), 2);
+    let summary = retry.import_summary.unwrap();
+    assert_eq!(summary.outcome, yomoku_core::app::ImportOutcome::Created);
+    assert_eq!(
+        i64::from(summary.document_id),
+        i64::from(first.document_id) + 1
+    );
+    lifecycle.cancel_txt_import().unwrap(); // A completed file always remains completed.
+    assert_eq!(observer.list_documents().unwrap().len(), 2);
+    assert_eq!(
+        observer
+            .vocabulary_entry(&Surface::new("犬").unwrap())
+            .unwrap()
+            .unwrap()
+            .status,
+        VocabularyStatus::New
+    );
+}
+
+#[test]
+fn txt_cancel_during_full_load_skips_analysis_and_does_not_poison_encoding_retry() {
+    let database = Database::new();
+    let (entered, ready) = mpsc::channel();
+    let (release, gate) = mpsc::channel();
+    let analyzed = Arc::new(AtomicUsize::new(0));
+    let calls = analyzed.clone();
+    let mut gate = Some(gate);
+    let loader: AnalyzerLoader = Box::new(move || {
+        if let Some(gate) = gate.take() {
+            entered.send(()).unwrap();
+            gate.recv_timeout(TIMEOUT).unwrap();
+        }
+        let calls = calls.clone();
+        Ok(Box::new(move |chapter: &ChapterText| {
+            calls.fetch_add(1, Ordering::SeqCst);
+            Ok(fixture(chapter))
+        }))
+    });
+    let (router, lifecycle) = effect_router_with_analyzed_imports(database.path(), loader).unwrap();
+    dispatch(&router, Event::RefreshLibrary);
+    let before = file_totals(&database.path());
+    let (done, result) = mpsc::channel();
+    router.update(txt_event(b"waiting", None), move |_| done.send(()).unwrap());
+    ready.recv_timeout(TIMEOUT).unwrap();
+    lifecycle.cancel_txt_import().unwrap();
+    assert!(router.view().storage_busy);
+    release.send(()).unwrap();
+    result.recv_timeout(TIMEOUT).unwrap();
+    assert!(!router.view().storage_busy);
+    assert!(router.view().document_error.is_none() && router.view().import_summary.is_none());
+    assert_eq!(analyzed.load(Ordering::SeqCst), 0);
+    assert_eq!(file_totals(&database.path()), before);
+    assert_eq!(
+        dispatch(&router, txt_event(&[0xC2, 0xA9], None)).document_error,
+        Some(DocumentError::TxtEncodingRequired)
+    );
+    lifecycle.cancel_txt_import().unwrap();
+    let retry = dispatch(&router, txt_event(&[0xC2, 0xA9], Some(TextEncoding::Utf8)));
+    assert!(retry.document_error.is_none() && retry.import_summary.is_some());
+    assert_eq!(analyzed.load(Ordering::SeqCst), 1);
+}
+
+#[test]
+fn txt_cancel_remains_available_while_closed_router_drains_accepted_analysis() {
+    let database = Database::new();
+    let (release, gate) = mpsc::channel();
+    let Factory { loader, trace, .. } = Factory::new(false, Some(gate));
+    let (router, lifecycle) = effect_router_with_analyzed_imports(database.path(), loader).unwrap();
+    dispatch(&router, Event::RefreshLibrary);
+    let before = file_totals(&database.path());
+    router.update(txt_event(b"draining", None), |_| {});
+    assert!(matches!(
+        trace.recv_timeout(TIMEOUT).unwrap(),
+        Trace::Load(_)
+    ));
+    assert!(matches!(
+        trace.recv_timeout(TIMEOUT).unwrap(),
+        Trace::Analyze(_)
+    ));
+    drop(router);
+    assert!(lifecycle.set_foreground(false).is_err());
+    lifecycle.cancel_txt_import().unwrap();
+    release.send(()).unwrap();
+    assert!(matches!(
+        trace.recv_timeout(TIMEOUT).unwrap(),
+        Trace::Drop(_)
+    ));
+    assert_eq!(file_totals(&database.path()), before);
+    assert!(Storage::open(database.path())
+        .unwrap()
+        .list_documents()
+        .unwrap()
+        .is_empty());
+}
+
+#[test]
+fn txt_cancel_reaches_queued_attempt_before_fifo_can_start_it() {
+    struct GatedDrop {
+        entered: mpsc::Sender<()>,
+        gate: Option<mpsc::Receiver<()>>,
+    }
+    impl PasteAnalyzer for GatedDrop {
+        fn analyze(&mut self, chapter: &ChapterText) -> Result<ChapterAnalysis, DocumentError> {
+            Ok(fixture(chapter))
+        }
+    }
+    impl Drop for GatedDrop {
+        fn drop(&mut self) {
+            if let Some(gate) = self.gate.take() {
+                self.entered.send(()).unwrap();
+                gate.recv_timeout(TIMEOUT).unwrap();
+            }
+        }
+    }
+    let database = Database::new();
+    let (entered, ready) = mpsc::channel();
+    let (release, gate) = mpsc::channel();
+    let mut gate = Some(gate);
+    let loads = Arc::new(AtomicUsize::new(0));
+    let calls = loads.clone();
+    let loader: AnalyzerLoader = Box::new(move || {
+        calls.fetch_add(1, Ordering::SeqCst);
+        Ok(Box::new(GatedDrop {
+            entered: entered.clone(),
+            gate: gate.take(),
+        }))
+    });
+    let (router, lifecycle) = effect_router_with_analyzed_imports(database.path(), loader).unwrap();
+    dispatch(&router, txt_event(b"completed", None));
+    let before = file_totals(&database.path());
+    lifecycle.set_foreground(false).unwrap();
+    ready.recv_timeout(TIMEOUT).unwrap(); // FIFO blocked releasing its previous analyzer.
+    let (done, result) = mpsc::channel();
+    router.update(txt_event(b"queued", None), move |_| done.send(()).unwrap());
+    lifecycle.cancel_txt_import().unwrap();
+    assert!(router.view().storage_busy);
+    release.send(()).unwrap();
+    result.recv_timeout(TIMEOUT).unwrap();
+    assert!(!router.view().storage_busy);
+    assert!(router.view().document_error.is_none() && router.view().import_summary.is_none());
+    assert_eq!(loads.load(Ordering::SeqCst), 1);
+    assert_eq!(file_totals(&database.path()), before);
+    assert!(dispatch(&router, txt_event(b"queued", None))
+        .import_summary
+        .is_some());
+    assert_eq!(loads.load(Ordering::SeqCst), 2);
+}
+
+#[test]
 fn txt_typed_decoding_errors_skip_full_and_manual_choices_retry_without_partial_files() {
     let database = Database::new();
     let Factory { loader, trace, .. } = Factory::new(false, None);

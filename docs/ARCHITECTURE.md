@@ -39,7 +39,19 @@ or the usual typed error. Cancellation is cooperative, without interrupting acti
 decoder/analyzer/SQLite calls. The caller must request it outside the import FIFO
 and off the UI thread because a COMMIT already in progress holds the gate. Use one
 fresh handle per attempt; no persistent queue or cross-file cancellation state.
-The existing noncancellable wrapper and production runtime/JNI remain unchanged.
+Production runtime now uses this cancellable entry point. The storage middleware
+publishes a fresh attempt synchronously before FIFO submission, then clears that
+exact attempt before resolving its result. `AnalyzerLifecycle::cancel_txt_import`
+and native `cancelTxtImport()` clone the current handle under a short registry lock
+and request cancellation directly, bypassing FIFO and core/bridge update locks.
+The registry lock is never held during COMMIT, cancellation or callbacks. Weak
+lifecycle ownership permits cancelling accepted work while a closed router drains
+without keeping its worker alive. Idle calls do not poison future attempts.
+`StorageResult::ImportCancelled` clears core busy state without an error or summary;
+Created/Existing and typed failures keep their existing behavior. Cancellation
+does not forcibly stop a dictionary loader already running. Android must invoke
+the native method off main and await both its return and the import outcome before
+submitting another file; its batch helper has not connected this control yet.
 `Event::ImportTxt(TxtImport)` carries original bytes, display name and optional
 UTF-8/Shift-JIS choice through generated Kotlin/JNI to the same FIFO worker.
 A read-only hash/exact-byte preflight returns existing snapshots without Full;
@@ -61,7 +73,7 @@ outcomes / selected URIs (including errors, duplicates and skips); prompts/retri
 do not advance it. Display names publish before potentially blocked provider reads.
 No URI queue/results/progress are persisted;
 final owner teardown stops unsubmitted work while core drains accepted transactions.
-No new permission, dependency or schema. Runtime/JNI/Android cancellation, background
+No new permission, dependency or schema. Android batch cancellation, background
 notifications, EPUB/SRT and source-ruby rendering remain separate.
 
 Pure document values define positive i64 identities, immutable chapter snapshots,
@@ -588,7 +600,7 @@ unique Japanese surfaces without encounters, deduplicate exact bytes and deliver
 Created/Existing summaries. Native descriptor delivery and retained/background
 lifecycle are connected. TXT parsing, atomic storage and the Android multiple-file
 picker/encoding/summary path are connected. EPUB/SRT parsing, metadata, mixed-format
-batches, cancellation and background notifications remain unchecked. Legacy imports
+batches, Android cancellation and background notifications remain unchecked. Legacy imports
 are not automatically rescanned.
 Explicit core/worker/FFI pending-time checkpoints coalesce during unresolved saves
 and drain before reader movement/exit or analyzed completion. Completion preparation/

@@ -2244,3 +2244,42 @@ holding the gate may wait. Remaining URI disposal/summary, native lifecycle race
 background notifications and process-death/no-auto-resume acceptance remain open.
 Android builds/lint/instrumentation, host Kotlin/JNI/codegen, standalone Python/index
 scans, release, reboot, tablet/dark and physical arm64 were not rerun. No open blocker.
+
+## Direct TXT runtime/JNI cancellation
+
+Verified 2026-10-25 with the Rust PATH/JDK/SDK/Gradle environment above. Host JNI,
+repeat generation and Android native builds ran in separate stages:
+
+```sh
+cargo test --workspace --all-features --locked --offline --quiet
+cargo clippy --workspace --all-targets --all-features --locked --offline -- -D warnings
+cargo fmt --all -- --check
+tools/test-kotlin-bridge.sh
+cargo run -p yomoku-ffi --bin generate-kotlin --features facet_typegen --locked --offline -- target/generated/kotlin-repeat
+diff -r target/generated/kotlin target/generated/kotlin-repeat
+(cd crates/yomoku-ffi && CARGO_NET_OFFLINE=true ../../.local/bin/boltffi generate kotlin --deny-skipped --output ../../target/generated/native-repeat)
+diff -r target/generated/native target/generated/native-repeat
+tools/format-kotlin.sh --check
+./android/gradlew -p android :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug --offline --console=plain
+git diff --check
+```
+
+PASS: 304 data-free Rust tests (five new: four runtime, one core), strict Clippy/fmt,
+real-Full/word-index host Kotlin/JNI and seven Unicode exchanges, reproducible Crux
+and native generation, both-ABI app/test APK builds, strict lint/Kotlin formatting
+and diff checks. Channel-gated worker fixtures cover cancellation while queued,
+loading Full and analyzing, rejected duplicate callbacks, completed-file/status/ID
+preservation, fresh/encoding retries, background release and closed-router drain.
+The new real JNI fixture invokes cancellation on another JVM thread while the
+dictionary-provider callback blocks, then verifies a silent cancelled result,
+retained earlier file, successful fresh import/Mode B registrations and reopen.
+Repository commit/cancel arbitration tests also pass in the workspace run.
+
+Fixed a new fixture's incorrect vocabulary lookup method name before verification.
+Gradle initially failed sandbox wildcard-IP/socket setup; the approved offline run
+passes. Existing benign Crux close diagnostics persist. No new dependency, migration
+or permission; no open failure/blocker. Android UI/instrumentation, standalone Full
+fixtures, Python/full-index scans, release, process-death/reboot, tablet/dark and
+physical arm64 were not rerun. Android still has no Cancel control; wire it off main
+and await both the native return and current-file outcome before settling a batch.
+Notifications and process-death/no-auto-resume acceptance remain unchecked.

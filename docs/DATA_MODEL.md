@@ -27,7 +27,9 @@ checkpoints surround parsing/analysis and precede ruby writes. Final cancellatio
 check and COMMIT share a mutex, so cancellation cannot return and then allow a new
 commit to begin. A successful commit already holding the gate remains completed.
 Cancellation does not undo completed files or persist resume state. Production
-runtime/JNI and Android Cancel transport are still pending; no schema change.
+runtime/JNI shares a fresh handle before each accepted FIFO import and projects
+rollback as `StorageResult::ImportCancelled`, without an error/summary or new
+durable state. Android Cancel/remaining-URI disposal is still pending; no schema change.
 
 Migration 0012 rebuilds `sources` to permit `kind IN ('paste', 'txt')`, preserving
 all IDs, provenance and the autoincrement high-water mark. The migration runner

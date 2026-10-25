@@ -1459,3 +1459,21 @@
   Python/index/release/reboot/tablet/arm64 not rerun. Next: runtime/JNI cancellation
   control outside FIFO and off main, Android Cancel/remaining-file disposal/summary,
   then background notifications and process-death acceptance. Nostr empty/Q188.
+
+## 2026-10-25 — Direct TXT runtime/JNI cancellation
+
+- Published a fresh cancellation handle before accepted FIFO submission; direct
+  AnalyzerLifecycle/native cancelTxtImport bypasses the queue and core update lock.
+  A distinct cancelled result clears busy without error/summary. Weak controls,
+  matching-attempt cleanup and repository commit arbitration retain completed files
+  and isolate fresh retries. Android must call off main and await return + outcome.
+- PASS: 304 Rust tests (four new worker fixtures and one core fixture), strict
+  Clippy/fmt/diff, real-Full/word-index host Kotlin/JNI including blocked-provider
+  cancellation, seven Unicode exchanges, reproducible Crux/native generation,
+  both-ABI app/test APK builds, strict Android lint and Kotlin formatting.
+- Fixed a test lookup method name; Gradle wildcard-IP/socket failure needed approved
+  escalation. No new dependency/schema/permission or open blocker. Android UI tests,
+  standalone Full/Python/index/release/process/reboot/tablet/arm64 not rerun.
+- Updated architecture/data model/decisions/plan/development/handoff. Next: Android
+  Cancel/remaining-URI disposal/summary, then background notifications and actual
+  process-death/no-resume acceptance. Nostr empty; Q188 before forwarding.

@@ -1,12 +1,16 @@
 package app.yomoku.tests
 
 import app.yomoku.nativebridge.EffectsListener
+import app.yomoku.nativebridge.DictionaryProvider
 import app.yomoku.nativebridge.FfiError
 import app.yomoku.nativebridge.NativeBridge
 import app.yomoku.shared.*
 import java.nio.file.Files
 import java.util.concurrent.LinkedBlockingQueue
+import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicReference
+import kotlin.concurrent.thread
 
 private class TxtListener : EffectsListener {
     val effects = LinkedBlockingQueue<Pair<Thread, ByteArray>>()
@@ -16,6 +20,10 @@ private class TxtListener : EffectsListener {
     fun dispatch(bridge: NativeBridge, event: Event): ViewModel {
         check(Event.bincodeDeserialize(event.bincodeSerialize()) == event)
         check(Requests.bincodeDeserialize(bridge.update(event.bincodeSerialize())).value.single().effect is ShellEffect.Render)
+        return completed(bridge)
+    }
+
+    fun completed(bridge: NativeBridge): ViewModel {
         val (thread, bytes) = checkNotNull(effects.poll(60, TimeUnit.SECONDS))
         check(thread != Thread.currentThread())
         check(Requests.bincodeDeserialize(bytes).value.single().effect is ShellEffect.Render)
@@ -108,6 +116,79 @@ internal fun verifyTxtImportBridge() {
             check(fresh.calls.get() == 1)
         }
         println("PASS: typed TXT bytes/encodings, atomic import summary, original Mode B, duplicate/reopen and lazy Full JNI")
+        verifyTxtCancellationBridge()
+    } finally {
+        directory.deleteRecursively()
+    }
+}
+
+private fun verifyTxtCancellationBridge() {
+    val directory = Files.createTempDirectory("yomoku-txt-cancel-jni-").toFile()
+    try {
+        val database = directory.resolve("db.sqlite3")
+        val listener = TxtListener()
+        fun event(text: String) = Event.ImportTxt(TxtImport(text.toByteArray(Charsets.UTF_8).map { it.toUByte() }, "book.txt", TextEncoding.UTF8))
+        val first = NativeBridge(database.path, listener, HostDictionary()).use { bridge ->
+            checkNotNull(listener.dispatch(bridge, event("猫")).importSummary).documentId
+        }
+        val entered = CountDownLatch(1)
+        val release = CountDownLatch(1)
+        val delegate = HostDictionary()
+        val provider = object : DictionaryProvider by delegate {
+            override fun openVerifiedDictionary(): Long {
+                entered.countDown()
+                check(release.await(60, TimeUnit.SECONDS))
+                return delegate.openVerifiedDictionary()
+            }
+        }
+        NativeBridge(database.path, listener, provider).use { bridge ->
+            bridge.cancelTxtImport() // Idle calls cannot cancel the next accepted file.
+            check(listener.dispatch(bridge, Event.RefreshLibrary).documents.single().documentId == first)
+            bridge.update(event("犬 犬").bincodeSerialize())
+            check(entered.await(60, TimeUnit.SECONDS))
+            val returned = CountDownLatch(1)
+            val failure = AtomicReference<Throwable?>()
+            val cancel = thread(name = "txt-cancel-host") {
+                try {
+                    bridge.cancelTxtImport()
+                    bridge.cancelTxtImport()
+                } catch (error: Throwable) {
+                    failure.set(error)
+                } finally {
+                    returned.countDown()
+                }
+            }
+            try {
+                check(returned.await(10, TimeUnit.SECONDS)) // Must bypass the blocked FIFO.
+                check(failure.get() == null)
+                check(ViewModel.bincodeDeserialize(bridge.view()).storageBusy)
+                check(listener.effects.isEmpty())
+            } finally {
+                release.countDown()
+                cancel.join(60_000)
+            }
+            val cancelled = listener.completed(bridge)
+            check(cancelled.documentError == null && cancelled.importSummary == null)
+            check(cancelled.documents.single().documentId == first)
+            check(cancelled.reader == null && cancelled.contentRoute == ContentRoute.MAIN)
+            check(listener.dispatch(bridge, Event.RefreshLibrary).documents.single().documentId == first)
+            bridge.cancelTxtImport()
+            val retry = listener.dispatch(bridge, event("犬 犬"))
+            check(retry.documents.size == 2 && retry.importSummary?.outcome == ImportOutcome.CREATED)
+            val imported = checkNotNull(retry.importSummary).documentId
+            val opened = listener.dispatch(bridge, Event.OpenReader(imported))
+            val page = checkNotNull(opened.reader)
+            val key = ReaderTokenKey(imported, page.anchor, checkNotNull(opened.readerAnalysis))
+            val tokens = checkNotNull(listener.dispatch(bridge, Event.LoadReaderTokens(key)).readerTokens)
+            check(tokens.tokens.filter { it.surface == "犬" }.let { it.size == 2 && it.all { token -> token.vocabulary?.status == VocabularyStatus.NEW } })
+            check(delegate.calls.get() == 1)
+            bridge.cancelTxtImport() // No effect on a committed file or on reader work.
+        }
+        NativeBridge(database.path, listener, HostDictionary().also { it.fail = true }).use { bridge ->
+            check(listener.dispatch(bridge, Event.RefreshLibrary).documents.size == 2)
+            check(listener.dispatch(bridge, event("犬 犬")).importSummary?.outcome == ImportOutcome.EXISTING)
+        }
+        println("PASS: direct TXT cancellation bypasses blocked JNI worker, retains completed files, retries fresh and reopens")
     } finally {
         directory.deleteRecursively()
     }

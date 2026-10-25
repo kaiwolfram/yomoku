@@ -14,22 +14,28 @@ use yomoku_core::{
     storage::{DocumentError, StorageOperation, StorageResult},
 };
 use yomoku_storage::{
-    dictionary::Dictionary, reader_words::ReaderWordError, Storage, StorageError,
+    dictionary::Dictionary, reader_words::ReaderWordError, ImportCancellation, Storage,
+    StorageError,
 };
 
 /// Worker-only publisher/open callback. Failed loads remain retryable; the
 /// returned path must refer to a verified immutable dictionary index.
 pub type WordDictionaryLoader = Box<dyn FnMut() -> Result<PathBuf, DocumentError> + Send>;
 
-use crate::imports::{AnalyzerLifecycle, AnalyzerLoader, Imports};
+use crate::imports::{AnalyzerLifecycle, AnalyzerLoader, Imports, TxtImportControl};
 
 pub(crate) enum Job {
-    Storage(StorageOperation, EffectResolver<StorageResult>),
+    Storage(
+        StorageOperation,
+        EffectResolver<StorageResult>,
+        Option<Arc<ImportCancellation>>,
+    ),
     Foreground(bool),
 }
 
 pub struct StorageEffects {
     sender: Arc<mpsc::Sender<Job>>,
+    txt: Arc<TxtImportControl>,
 }
 
 impl StorageEffects {
@@ -44,6 +50,7 @@ impl StorageEffects {
         let effects = Self::spawn(path, Some(loader), None)?;
         let lifecycle = AnalyzerLifecycle {
             sender: Arc::downgrade(&effects.sender),
+            txt: Arc::downgrade(&effects.txt),
         };
         Ok((effects, lifecycle))
     }
@@ -56,6 +63,7 @@ impl StorageEffects {
         let effects = Self::spawn(path, Some(loader), Some(word_loader))?;
         let lifecycle = AnalyzerLifecycle {
             sender: Arc::downgrade(&effects.sender),
+            txt: Arc::downgrade(&effects.txt),
         };
         Ok((effects, lifecycle))
     }
@@ -66,6 +74,8 @@ impl StorageEffects {
         mut word_loader: Option<WordDictionaryLoader>,
     ) -> std::io::Result<Self> {
         let (sender, receiver) = mpsc::channel::<Job>();
+        let txt = Arc::new(TxtImportControl::default());
+        let worker_txt = txt.clone();
         thread::Builder::new()
             .name("yomoku-storage".into())
             .spawn(move || {
@@ -74,16 +84,27 @@ impl StorageEffects {
                 let mut imports = loader.map(Imports::new);
                 while let Ok(job) = receiver.recv() {
                     match job {
-                        Job::Storage(operation, mut resolver) => {
-                            let output = execute(
-                                &path,
-                                &mut storage,
-                                &mut imports,
-                                &mut word_loader,
-                                &mut dictionary,
-                                operation,
-                            )
+                        Job::Storage(operation, mut resolver, cancellation) => {
+                            let output = if cancellation
+                                .as_ref()
+                                .is_some_and(|value| value.is_cancelled())
+                            {
+                                Ok(StorageResult::ImportCancelled)
+                            } else {
+                                execute(
+                                    &path,
+                                    &mut storage,
+                                    &mut imports,
+                                    &mut word_loader,
+                                    &mut dictionary,
+                                    operation,
+                                    cancellation.as_deref(),
+                                )
+                            }
                             .unwrap_or_else(StorageResult::Failed);
+                            if let Some(cancellation) = &cancellation {
+                                worker_txt.finish(cancellation);
+                            }
                             if let Some(imports) = imports.as_mut() {
                                 imports.release_if_hidden();
                             }
@@ -101,6 +122,7 @@ impl StorageEffects {
             })?;
         Ok(Self {
             sender: Arc::new(sender),
+            txt,
         })
     }
 }
@@ -109,10 +131,16 @@ impl EffectMiddleware for StorageEffects {
     type Op = StorageOperation;
 
     fn try_process_effect(&self, operation: Self::Op, resolver: EffectResolver<StorageResult>) {
+        // The core accepts one storage operation at a time. Publish its fresh
+        // attempt before enqueue; a busy/rejected core event never replaces it.
+        let cancellation =
+            matches!(operation, StorageOperation::ImportTxt(_)).then(|| self.txt.begin());
         // The worker exits only when all senders are dropped. No detached task
         // or per-operation thread can reorder database commands.
         assert!(
-            self.sender.send(Job::Storage(operation, resolver)).is_ok(),
+            self.sender
+                .send(Job::Storage(operation, resolver, cancellation))
+                .is_ok(),
             "storage worker exited unexpectedly"
         );
     }
@@ -125,6 +153,7 @@ fn execute(
     word_loader: &mut Option<WordDictionaryLoader>,
     dictionary: &mut Option<Dictionary>,
     operation: StorageOperation,
+    cancellation: Option<&ImportCancellation>,
 ) -> Result<StorageResult, DocumentError> {
     // Reject blank input before opening/creating a database.
     let paste = match &operation {
@@ -158,7 +187,11 @@ fn execute(
         StorageOperation::ImportTxt(input) => imports
             .as_mut()
             .ok_or(DocumentError::Unavailable)?
-            .import_txt(storage, &input),
+            .import_txt(
+                storage,
+                &input,
+                cancellation.expect("TXT attempt published before enqueue"),
+            ),
         StorageOperation::LoadPaste(id) => storage
             .load_reader_snapshot(id)
             .map_err(map_error)?

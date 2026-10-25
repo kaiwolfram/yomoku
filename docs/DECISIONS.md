@@ -1895,3 +1895,32 @@ Host tests use channels rather than timing sleeps to gate analysis and commit,
 verify earlier statuses/content after reopen and assert sequence rollback. Android
 Cancel/remaining-URI disposal/summary, native lifecycle races, permitted background
 notifications and process-death acceptance remain unchecked follow-up work.
+
+## 2026-10-25 — Direct runtime/JNI TXT cancellation
+
+Publish a fresh per-attempt repository cancellation handle synchronously in storage
+middleware before enqueueing an accepted TXT effect. Core's existing single-busy
+gate prevents rejected duplicate callbacks from replacing it. Keep only a weak
+control reference in AnalyzerLifecycle and expose `NativeBridge.cancelTxtImport()`
+as a direct call outside FIFO. Clone the handle under a short registry mutex, then
+release that mutex before entering its potentially blocking commit gate. Clear
+only the matching attempt before resolving its outcome, so stale handles cannot
+cancel a later file or hold up callbacks. Accepted work draining after router drop
+still owns its control until the worker exits; the lifecycle handle does not keep
+the worker or listener alive.
+
+Use a distinct internal `StorageResult::ImportCancelled` for rollback: clear busy
+without an error, success summary, reader movement or fabricated document. Preserve
+Created/Existing when a file completed and typed failures on actual errors. Check
+queued/preflight work before Full and use repository checkpoints around analysis
+and COMMIT. An already running dictionary load is cooperative too; it may finish,
+but cancellation prevents its later analysis/transaction from starting. No new
+event, dependency, schema, durable queue or forced thread interruption.
+
+The Android batch helper must stop submission immediately on Cancel, call this
+method on a separate executor (never main or the blocked URI-reader executor),
+and await both cancellation return and the current core outcome before settling
+the summary or starting another batch. Preserve a successful commit even when
+Cancel was pressed, discard unsubmitted URIs and guard late provider callbacks
+with a batch/read generation. Android control wiring, notifications and actual
+process-death acceptance remain subsequent slices.

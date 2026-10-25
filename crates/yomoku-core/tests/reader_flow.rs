@@ -887,6 +887,26 @@ fn txt_import_waits_for_reader_saves_and_only_committed_success_returns_to_libra
     assert!(core.view().reader.is_none() && core.view().loaded_document.is_none());
 }
 
+#[test]
+fn cancelled_txt_clears_busy_without_an_error_summary_or_reader_movement() {
+    let (core, _) = analyzed_reader();
+    let before = core.view();
+    let mut effects = core.process_event(Event::ImportTxt(yomoku_core::imports::TxtImport {
+        original_bytes: b"cancelled".to_vec(),
+        filename: "cancelled.txt".into(),
+        encoding: None,
+    }));
+    assert!(core.view().storage_busy);
+    finish(&core, &mut effects, StorageResult::ImportCancelled);
+    let after = core.view();
+    assert!(!after.storage_busy);
+    assert!(after.document_error.is_none() && after.import_summary.is_none());
+    assert_eq!(after.documents, before.documents);
+    assert_eq!(after.reader, before.reader);
+    assert_eq!(after.destination, before.destination);
+    assert_eq!(after.content_route, before.content_route);
+}
+
 fn storage_operation(effects: &[Effect]) -> StorageOperation {
     effects
         .iter()

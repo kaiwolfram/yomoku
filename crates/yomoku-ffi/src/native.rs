@@ -91,6 +91,15 @@ impl NativeBridge {
             .map_err(|_| FfiError::WorkerUnavailable)
     }
 
+    /// Bypass FIFO to cancel the current TXT attempt. Call off Android's main
+    /// thread and wait for both this return and its async result before starting
+    /// another file. Already committed files remain completed.
+    pub fn cancel_txt_import(&self) -> Result<(), FfiError> {
+        self.lifecycle
+            .cancel_txt_import()
+            .map_err(|_| FfiError::WorkerUnavailable)
+    }
+
     pub fn update(&self, event: &[u8]) -> Result<Vec<u8>, FfiError> {
         self.bridge.update(event)
     }
