@@ -7,7 +7,8 @@ Android bundles the independently pinned index and complete source/legal bundle;
 size/SHA-256. Lazy worker installation verifies the same independently compiled-in
 index identity before returning a private read-only content-addressed path. Cached
 bytes are reverified; repair uses a fresh inode. This adds no user migration or
-mutable database state. FIFO/FFI lookup integration remains separate.
+mutable database state. NativeBridge passes this path lazily through the existing
+FIFO to a separately held read-only dictionary connection.
 
 The independently prepared JMdict English/JMnedict asset uses schema version 1
 (`application_id = 0x594f4449`), separate from all user-database migrations.
@@ -28,13 +29,13 @@ kana queries select every permitted spelling pair. re_nokanji/kana-only readings
 have no spelling pair; both stagk and stagr must be satisfied for each displayed
 sense. Empty applicable views authorize no displayed senses. No analyzer reading,
 normalization or fuzzy fallback narrows/broadens matches. Index access never changes
-vocabulary, encounters or position. APK verification/loading and FFI remain future
-work; format identity checks alone do not verify the asset checksum.
+vocabulary, encounters or position. The Android publisher verifies bytes before
+the FIFO opens the index; format identity checks alone do not verify the checksum.
 
 The build bundle preserves original compressed snapshots, a source/date/checksum
 lock, complete CC BY-SA attribution/legal documentation and a manifest of artifact
 hashes/tool versions. New source versions publish to fresh paths without replacing
-an asset that could be open. No mutable user schema, FFI or backup format changes.
+an asset that could be open. No mutable user schema or backup format changes.
 
 ## Implemented domain values
 - `Surface`: nonblank exact written Unicode string; equality/hash/order use exact
@@ -184,7 +185,14 @@ The request cannot supply arbitrary lookup text or a vocabulary ID. It must matc
 the original analysis and a Japanese token intersecting the supplied page. Missing
 document is None; missing/stale analysis or an invalid index is InvalidSelection.
 Dictionary errors remain distinct from empty successful matches, without partial
-results or mutation. No new schema or bridge payload is introduced yet.
+results or mutation. ReaderWordSelection carries the key/index through the typed
+Crux/FIFO/JNI request; ReaderWordDetails and concrete word/name candidate payloads
+are transient view values. A result must match the pending/current selection and
+full loaded token identity before attachment; live status may differ and refreshes
+all repetitions. Dismissal, Settings, navigation, token refresh, position/completion
+and reflow invalidate selection. Separate lookup errors survive timer saves until
+explicit retry or dismissal. Both success/failure drain queued final time. No schema
+or persisted selection is added; Compose rendering is still pending.
 
 Lifetime counts use `COUNT(*) WHERE vocabulary_id = ?` through the existing
 `reading_occurrences_by_entry` covering index. They include every completed

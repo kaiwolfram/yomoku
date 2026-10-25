@@ -1,9 +1,10 @@
 //! Immutable dictionary values and exact-form restriction rules. No I/O or
 //! analyzer-reading filter: a written surface may have several valid readings.
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
 #[serde(deny_unknown_fields)]
 pub struct Spelling {
     pub text: String,
@@ -13,7 +14,8 @@ pub struct Spelling {
     pub ke_pri: Vec<String>,
 }
 
-#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
 #[serde(deny_unknown_fields)]
 pub struct Reading {
     pub text: String,
@@ -27,7 +29,8 @@ pub struct Reading {
     pub re_pri: Vec<String>,
 }
 
-#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
 #[serde(deny_unknown_fields)]
 pub struct Translation {
     pub text: String,
@@ -36,7 +39,8 @@ pub struct Translation {
     pub g_gend: Option<String>,
 }
 
-#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
 #[serde(deny_unknown_fields)]
 pub struct LoanSource {
     pub text: String,
@@ -46,7 +50,8 @@ pub struct LoanSource {
     pub wasei: bool,
 }
 
-#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
 #[serde(deny_unknown_fields)]
 pub struct Sense {
     #[serde(default)]
@@ -72,7 +77,8 @@ pub struct Sense {
     pub glosses: Vec<Translation>,
 }
 
-#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
 #[serde(deny_unknown_fields)]
 pub struct NameGroup {
     #[serde(default)]
@@ -82,7 +88,8 @@ pub struct NameGroup {
     pub translations: Vec<Translation>,
 }
 
-#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
 #[serde(deny_unknown_fields)]
 pub struct WordEntry {
     pub kanji: Vec<Spelling>,
@@ -90,7 +97,8 @@ pub struct WordEntry {
     pub senses: Vec<Sense>,
 }
 
-#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
 #[serde(deny_unknown_fields)]
 pub struct NameEntry {
     pub kanji: Vec<Spelling>,
@@ -101,13 +109,15 @@ pub struct NameEntry {
 /// Indices refer to the original ordered payload, which remains intact.
 /// A kana query can select multiple spelling/reading pairs. `None` denotes a
 /// kana-only reading, including re_nokanji; it cannot satisfy a stagk restriction.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
 pub struct ReadingMatch {
     pub spelling_index: Option<usize>,
     pub reading_index: usize,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
 pub struct WordMatch {
     pub reading: ReadingMatch,
     pub sense_indices: Vec<usize>,
@@ -174,4 +184,47 @@ impl WordEntry {
             })
             .collect()
     }
+}
+
+/// Each candidate retains all upstream fields and applicable per-form indices.
+/// Concrete word/name types keep the generated bridge schema unambiguous.
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
+pub struct WordCandidate {
+    /// Positive source-scoped ID; word and name IDs may overlap.
+    pub entry_id: i64,
+    pub entry: WordEntry,
+    pub forms: Vec<WordFormMatch>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
+pub struct WordFormMatch {
+    pub form: String,
+    pub matches: Vec<WordMatch>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
+pub struct NameCandidate {
+    /// Positive source-scoped ID; word and name IDs may overlap.
+    pub entry_id: i64,
+    pub entry: NameEntry,
+    pub forms: Vec<NameFormMatch>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
+pub struct NameFormMatch {
+    pub form: String,
+    pub matches: Vec<ReadingMatch>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
+pub struct DictionaryCandidates {
+    pub surface: String,
+    pub dictionary_form: Option<String>,
+    pub words: Vec<WordCandidate>,
+    pub names: Vec<NameCandidate>,
 }

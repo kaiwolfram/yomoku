@@ -1705,3 +1705,27 @@ partial page or updates position/time. Preserve counts after document deletion;
 vocabulary deletion erases them and absent entries remain absent during lookup.
 This step adds no public shell schema/UI behavior. Whole-chapter validation remains
 the existing correctness-first approach; performance remains unmeasured.
+
+## 2026-10-25 — Lazy selected-word FIFO and typed bridge
+
+Extend the existing trusted DictionaryProvider with a worker-only verified index
+path callback (empty string means unavailable); Android uses wordDictionaryFiles
+with the existing pinned hash/size publication contract. Share the provider via
+Arc with the Full descriptor loader. Keep path handling/SQLite in runtime/storage;
+core receives only pure values. Open lazily on LoadReaderWord, reuse the separate
+immutable connection, and retire it on dictionary query failure so explicit retry
+can reopen repaired publication. No extra worker, migration or dependency.
+
+Move details/candidate/form-match values to core and derive Serde/Facet. The pinned
+Kotlin generator rejects two parameterizations of generic Candidate/FormMatch;
+use concrete WordCandidate/NameCandidate and corresponding form types, preserving
+all upstream metadata and applicable indices. Box only internal StorageResult's
+large details variant to keep Event's size bounded; Bincode values are unchanged.
+
+Track selection separately from the pending operation; dismissal/Settings/page
+invalidation retires it while the callback still drains final time on success or
+failure. Match full token identity except live vocabulary, which refreshes every
+visible repetition. Keep word errors separate from timer/save errors and require
+explicit retry. Successful manual choices update selected status; deleted entries
+clear status/count without registration. Land this independently testable transport
+before Compose requests/rendering; existing panel UI behavior remains unchanged.

@@ -1,6 +1,6 @@
 # Resume here
 
-Updated: 2026-10-25. Verified selected-word dictionary/count repository.
+Updated: 2026-10-25. Verified lazy selected-word FIFO/typed JNI.
 Read AGENTS.md, plan phases 2–4 and PRODUCT_SPEC.md sections 3–4.
 ## Working
 - Pure Crux owns navigation/Library/Settings; only Render reaches UI. FIFO owns
@@ -56,25 +56,25 @@ Read AGENTS.md, plan phases 2–4 and PRODUCT_SPEC.md sections 3–4.
   identity (not checksum), unions exact surface/base candidates with per-form
   provenance/separate source IDs. Typed payloads retain all fields. Display applicable
   views enforcing re_restr/re_nokanji/stagk/stagr, with all licensed readings.
-- wordDictionaryFiles is lazy/worker-only, private/no-backup; verifies size/SHA-256
-  before verifiedPath()/cache reopen. Repair preserves held inodes. No FIFO use yet.
-- load_reader_word(dictionary,key,index) reads validated original B token/status +
-  indexed exact-surface lifetime count in one user transaction; separate word/name
-  candidates retain applicable views; absent stays zero. Invalid selection/errors
-  differ from empty matches. Repository-only; no shell/UI yet.
+- wordDictionaryFiles verifies pinned size/hash on FIFO-only initial path access;
+  cached immutable connection reuses until close. Query failure retires it for repair.
+- load_reader_word validates original B token + live status/exact lifetime count in
+  one user read transaction; separate word/name candidates keep all applicable views.
+- LoadReaderWord/DismissReaderWord + details/selection/error now reach typed JNI.
+  Current/pending/selected/full token identities gate attach; live statuses refresh
+  repetitions. Errors survive clock saves; both outcomes drain time. UI not connected.
 
 ## Next tasks (ordered)
-1. Connect verified dictionary path + load_reader_word via lazy FIFO/typed FFI.
-   Add serializable details/request/view + current reader/selection cancellation.
-2. Render all applicable senses/readings, compact POS, separate names and count;
-   test simultaneous matches/no match, retry, movement/recreation and read-only opens.
-3. User-run physical arm64 validation once usable. Formats/CI remain open.
+1. Connect existing panel to LoadReaderWord/DismissReaderWord; render applicable
+   readings/senses, compact POS, separate names/count. Test retry/no match/recreation.
+2. Continue supported-format imports or CI after panel verification; both remain open.
+3. User-run physical arm64 validation once usable.
 
 ## Verification / environment
-- PASS this step: 256 data-free Rust tests (130 storage; eight new), strict
-  Clippy/Rust fmt/diff. Commands + coverage: DEVELOPMENT.md, latest section.
-- Android/JNI/Kotlin/generation/Python/real data/release/recovery/physical arm64
-  not rerun. Prior Android: 14 phone assets + two wide/dark credits; lint passed.
-- Data: .local/dictionaries/index-v1-20261025{,-repeat}/; Android reports:
-  .local/test-reports/dictionary-assets/. Full/assets preserved (all outside Git).
+- PASS: 262 Rust tests (130 storage), strict Clippy/fmt/Kotlin/diff, real-data host
+  Kotlin/JNI + seven Unicode exchanges, repeat generation, both-ABI debug/test APKs.
+- Strict lint + four API-36 x86_64 session tests pass (one new). DEVELOPMENT.md commands.
+- Python/full scans, standalone Full, tablet/dark/release/recovery/arm64 not rerun.
+- Reports: .local/test-reports/reader-word-details/. AVD running; assets preserved.
+- Run host JNI and Android builds sequentially: BoltFFI replaces shared artifacts.
 - No open failure/blocker. Nostr empty; ask Q188 before forwarding.

@@ -12,6 +12,16 @@ internal class HostDictionary : DictionaryProvider {
     val threads = CopyOnWriteArrayList<Thread>()
     @Volatile var fail = false
 
+    val wordCalls = AtomicInteger()
+    val wordThreads = CopyOnWriteArrayList<Thread>()
+    @Volatile var failWords = false
+
+    override fun verifiedWordDictionaryPath(): String {
+        wordCalls.incrementAndGet()
+        wordThreads.add(Thread.currentThread())
+        return if (failWords) "" else checkNotNull(System.getenv("YOMOKU_WORD_DICTIONARY"))
+    }
+
     override fun openVerifiedDictionary(): Long {
         calls.incrementAndGet()
         threads.add(Thread.currentThread())

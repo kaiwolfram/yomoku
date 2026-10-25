@@ -45,6 +45,7 @@ private inline fun <reified T : Throwable> expectFailure(block: () -> Unit) {
 fun main(args: Array<String>) {
     verifyTextBoundaries(args.single())
     verifyDocumentBridge()
+    verifyReaderWordBridge()
     val deadline = System.nanoTime() + 10_000_000_000L
     while (listenerCount() != 0 && System.nanoTime() < deadline) Thread.sleep(5)
     check(listenerCount() == 0)

@@ -9,6 +9,12 @@ if [[ ! -f "$YOMOKU_SUDACHI_DICTIONARY" ]]; then
     exit 1
 fi
 
+export YOMOKU_WORD_DICTIONARY="${YOMOKU_WORD_DICTIONARY:-$repo_dir/.local/dictionaries/index-v1-20261025/dictionary.sqlite3}"
+if [[ ! -f "$YOMOKU_WORD_DICTIONARY" ]]; then
+    echo 'Prepare the pinned word/name index first; selected-word JNI fixtures require it.' >&2
+    exit 1
+fi
+
 boltffi_bin="${BOLTFFI_BIN:-$repo_dir/.local/bin/boltffi}"
 kotlinc_bin="${KOTLINC_BIN:-$repo_dir/.local/kotlin-2.4.21/kotlinc/bin/kotlinc}"
 java_bin="${JAVA_BIN:-java}"

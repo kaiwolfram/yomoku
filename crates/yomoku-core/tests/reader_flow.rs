@@ -2254,3 +2254,247 @@ fn finish_book_waits_for_final_clock_checkpoint_and_preserves_celebration_after_
     );
     assert!(core.view().reader_time.is_none() && !core.view().reading_time_save_pending);
 }
+
+fn word_details(core: &Core<Yomoku>, token_index: u64) -> yomoku_core::reader::ReaderWordDetails {
+    let token = core
+        .view()
+        .reader_tokens
+        .unwrap()
+        .tokens
+        .into_iter()
+        .find(|t| t.token_index == token_index)
+        .unwrap();
+    yomoku_core::reader::ReaderWordDetails {
+        key: token_key(core),
+        encountered: 17,
+        candidates: yomoku_core::dictionary::DictionaryCandidates {
+            surface: token.surface.clone(),
+            dictionary_form: token.dictionary_form.clone(),
+            words: vec![],
+            names: vec![],
+        },
+        token,
+    }
+}
+
+#[test]
+fn selected_word_requires_visible_token_and_preserves_reader_state_with_live_status() {
+    use yomoku_core::reader::ReaderWordSelection;
+    let (core, _) = analyzed_reader();
+    let selection = ReaderWordSelection {
+        key: token_key(&core),
+        token_index: 0,
+    };
+    assert!(core
+        .process_event(Event::LoadReaderWord(selection))
+        .is_empty());
+    load_status_tokens(&core);
+    for invalid in [
+        ReaderWordSelection {
+            token_index: 99,
+            ..selection
+        },
+        ReaderWordSelection {
+            key: ReaderTokenKey {
+                analysis: ReaderAnalysis::Missing,
+                ..selection.key
+            },
+            ..selection
+        },
+    ] {
+        assert!(core
+            .process_event(Event::LoadReaderWord(invalid))
+            .is_empty());
+    }
+    core.process_event(Event::OpenSettings);
+    assert!(core
+        .process_event(Event::LoadReaderWord(selection))
+        .is_empty());
+    core.process_event(Event::CloseSettings);
+    let before = core.view();
+    let mut details = word_details(&core, 0);
+    details.token.vocabulary.as_mut().unwrap().status = VocabularyStatus::Known;
+    let mut effects = core.process_event(Event::LoadReaderWord(selection));
+    assert_eq!(
+        storage_operation(&effects),
+        StorageOperation::LoadReaderWord(selection)
+    );
+    assert!(core
+        .process_event(Event::LoadReaderWord(ReaderWordSelection {
+            token_index: 1,
+            ..selection
+        }))
+        .is_empty());
+    assert_eq!(core.view().reader_word_selection, Some(selection));
+    finish(
+        &core,
+        &mut effects,
+        StorageResult::ReaderWordLoaded(Box::new(details.clone())),
+    );
+    assert_eq!(core.view().reader_word, Some(details));
+    let after = core.view();
+    assert!(after.reader_word_error.is_none());
+    assert_eq!(after.reader, before.reader);
+    assert_eq!(after.reader_time, before.reader_time);
+    assert_eq!(after.documents, before.documents);
+    let tokens = after.reader_tokens.unwrap().tokens;
+    assert_eq!(
+        tokens[0].vocabulary.unwrap().status,
+        VocabularyStatus::Known
+    );
+    assert_eq!(tokens[1].vocabulary, tokens[0].vocabulary);
+    assert_eq!(tokens[2].vocabulary.unwrap().status, VocabularyStatus::New);
+}
+
+#[test]
+fn selected_word_cancellation_rejects_late_success_and_errors_even_after_returning_to_reader() {
+    for exit in [
+        Event::DismissReaderWord,
+        Event::CloseDocument,
+        Event::OpenPaste,
+        Event::SelectDestination(Destination::Nostr),
+        Event::OpenSettings,
+    ] {
+        for failed in [false, true] {
+            let (core, _) = analyzed_reader();
+            load_status_tokens(&core);
+            let details = word_details(&core, 0);
+            let mut effects = core.process_event(Event::LoadReaderWord(details.selection()));
+            core.process_event(exit.clone());
+            core.process_event(Event::CloseSettings);
+            finish(
+                &core,
+                &mut effects,
+                if failed {
+                    StorageResult::Failed(DocumentError::Unavailable)
+                } else {
+                    StorageResult::ReaderWordLoaded(Box::new(details))
+                },
+            );
+            assert!(core.view().reader_word.is_none());
+            assert!(core.view().reader_word_selection.is_none());
+            assert!(core.view().reader_word_error.is_none());
+            assert!(core.view().document_error.is_none());
+        }
+    }
+    assert!(Core::<Yomoku>::new().view().reader_word_selection.is_none());
+}
+
+#[test]
+fn selected_word_ignores_wrong_selection_or_token_identity_and_clears_on_refresh_movement_reflow() {
+    for mismatch in 0..3 {
+        let (core, _) = analyzed_reader();
+        load_status_tokens(&core);
+        let mut details = word_details(&core, 0);
+        let mut effects = core.process_event(Event::LoadReaderWord(details.selection()));
+        match mismatch {
+            0 => details.token.token_index = 1,
+            1 => details.key.analysis = ReaderAnalysis::Missing,
+            _ => details.token.surface = "foreign".into(),
+        }
+        finish(
+            &core,
+            &mut effects,
+            StorageResult::ReaderWordLoaded(Box::new(details)),
+        );
+        assert!(core.view().reader_word.is_none());
+    }
+    for invalidation in 0..4 {
+        let (core, _) = analyzed_reader();
+        load_status_tokens(&core);
+        let details = word_details(&core, 0);
+        let mut effects = core.process_event(Event::LoadReaderWord(details.selection()));
+        finish(
+            &core,
+            &mut effects,
+            StorageResult::ReaderWordLoaded(Box::new(details)),
+        );
+        assert!(core.view().reader_word.is_some());
+        let event = match invalidation {
+            0 => Event::LoadReaderTokens(token_key(&core)),
+            1 => Event::SaveReadingPosition(core.view().reader.unwrap().position),
+            2 => Event::RefreshLibrary,
+            _ => Event::OpenSettings,
+        };
+        core.process_event(event);
+        assert!(core.view().reader_word_selection.is_none());
+        assert!(core.view().reader_word.is_none());
+    }
+}
+
+#[test]
+fn selected_word_failure_survives_clock_saves_retries_explicitly_and_drains_before_departure() {
+    for failed in [false, true] {
+        let (core, _) = analyzed_reader();
+        load_status_tokens(&core);
+        restore_time(&core, 10);
+        core.process_event(clock(&core, 0, ReaderClockAction::Resume));
+        let details = word_details(&core, 0);
+        let mut effects = core.process_event(Event::LoadReaderWord(details.selection()));
+        core.process_event(clock(&core, 500, ReaderClockAction::Pause));
+        core.process_event(Event::CloseDocument);
+        let result = if failed {
+            StorageResult::Failed(DocumentError::Unavailable)
+        } else {
+            StorageResult::ReaderWordLoaded(Box::new(details))
+        };
+        let mut effects = resolve(&core, &mut effects, result);
+        save_clock(&core, &mut effects, 510);
+        assert_eq!(core.view().content_route, ContentRoute::Main);
+        assert!(!core.view().reading_time_save_pending);
+    }
+    let (core, _) = analyzed_reader();
+    load_status_tokens(&core);
+    restore_time(&core, 10);
+    let details = word_details(&core, 0);
+    let mut effects = core.process_event(Event::LoadReaderWord(details.selection()));
+    finish(
+        &core,
+        &mut effects,
+        StorageResult::Failed(DocumentError::Unavailable),
+    );
+    assert_eq!(
+        core.view().reader_word_error,
+        Some(DocumentError::Unavailable)
+    );
+    assert!(core.view().document_error.is_none());
+    core.process_event(clock(&core, 0, ReaderClockAction::Resume));
+    let mut effects = core.process_event(clock(&core, 500, ReaderClockAction::Checkpoint));
+    save_clock(&core, &mut effects, 510);
+    assert_eq!(
+        core.view().reader_word_error,
+        Some(DocumentError::Unavailable)
+    );
+    let mut effects = core.process_event(Event::LoadReaderWord(details.selection()));
+    assert!(core.view().reader_word_error.is_none());
+    finish(
+        &core,
+        &mut effects,
+        StorageResult::ReaderWordLoaded(Box::new(details.clone())),
+    );
+    let change = ReaderStatusChange {
+        key: details.key,
+        vocabulary_id: details.token.vocabulary.unwrap().id,
+        status: VocabularyStatus::Ignored,
+        occurred_at_unix_ms: 100,
+    };
+    let mut effects = core.process_event(Event::SetReaderStatus(change));
+    finish(&core, &mut effects, status_result(change));
+    assert_eq!(
+        core.view()
+            .reader_word
+            .unwrap()
+            .token
+            .vocabulary
+            .unwrap()
+            .status,
+        VocabularyStatus::Ignored
+    );
+    let mut effects = core.process_event(Event::SetReaderStatus(change));
+    finish(
+        &core,
+        &mut effects,
+        StorageResult::ReaderStatusChanged(change, None),
+    );
+    assert_eq!(core.view().reader_word.unwrap().encountered, 0);
+}

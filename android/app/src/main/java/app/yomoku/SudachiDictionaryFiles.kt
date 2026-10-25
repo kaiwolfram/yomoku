@@ -17,11 +17,21 @@ import java.security.MessageDigest
 
 /** Platform I/O only. The Rust FIFO worker opens this lazily on the first import. */
 internal fun sudachiDictionaryProvider(context: Context): DictionaryProvider {
-    return sudachiDictionaryProvider(sudachiDictionaryFiles(context))
+    return sudachiDictionaryProvider(sudachiDictionaryFiles(context), wordDictionaryFiles(context))
 }
 
-internal fun sudachiDictionaryProvider(files: VerifiedDictionaryFiles): DictionaryProvider {
+internal fun sudachiDictionaryProvider(
+    files: VerifiedDictionaryFiles,
+    words: VerifiedDictionaryFiles? = null,
+): DictionaryProvider {
     return object : DictionaryProvider {
+        override fun verifiedWordDictionaryPath(): String =
+            try {
+                words?.verifiedPath()?.absolutePath ?: ""
+            } catch (_: Exception) {
+                ""
+            }
+
         override fun openVerifiedDictionary(): Long =
             try {
                 files.open().use { input ->

@@ -5,8 +5,7 @@ use std::{collections::BTreeMap, error::Error, fmt, path::Path};
 
 use rusqlite::{Connection, OpenFlags};
 use yomoku_core::dictionary::{
-    matching_readings, NameEntry, Reading, ReadingMatch, Spelling, Translation, WordEntry,
-    WordMatch,
+    matching_readings, NameEntry, Reading, Spelling, Translation, WordEntry,
 };
 
 const APPLICATION_ID: i64 = 0x594f4449;
@@ -58,30 +57,9 @@ impl From<serde_json::Error> for DictionaryError {
     }
 }
 
-/// A candidate keeps every upstream field, plus an explicit applicable view for
-/// each matching query form. An empty `matches` licenses no displayed senses.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Candidate<E, M> {
-    /// Positive source-scoped ent_seq; word and name IDs may overlap.
-    pub entry_id: i64,
-    pub entry: E,
-    pub forms: Vec<FormMatch<M>>,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct FormMatch<M> {
-    pub form: String,
-    pub matches: Vec<M>,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct DictionaryCandidates {
-    /// Exact vocabulary identity, never substituted with the base form.
-    pub surface: String,
-    pub dictionary_form: Option<String>,
-    pub words: Vec<Candidate<WordEntry, WordMatch>>,
-    pub names: Vec<Candidate<NameEntry, ReadingMatch>>,
-}
+pub use yomoku_core::dictionary::{
+    DictionaryCandidates, NameCandidate, NameFormMatch, WordCandidate, WordFormMatch,
+};
 
 /// One connection for the I/O worker, separate from mutable `Storage`.
 /// The caller supplies a published immutable asset path and owns verification/
@@ -119,8 +97,8 @@ impl Dictionary {
         if surface.trim().is_empty() || dictionary_form.is_some_and(|s| s.trim().is_empty()) {
             return Err(DictionaryError::InvalidQuery);
         }
-        let mut words = BTreeMap::<i64, Candidate<WordEntry, WordMatch>>::new();
-        let mut names = BTreeMap::<i64, Candidate<NameEntry, ReadingMatch>>::new();
+        let mut words = BTreeMap::<i64, WordCandidate>::new();
+        let mut names = BTreeMap::<i64, NameCandidate>::new();
         let mut forms = vec![surface];
         if let Some(base) = dictionary_form.filter(|s| *s != surface) {
             forms.push(base);
@@ -142,13 +120,13 @@ impl Dictionary {
                         let matches = entry.matches(form);
                         words
                             .entry(entry_id)
-                            .or_insert_with(|| Candidate {
+                            .or_insert_with(|| WordCandidate {
                                 entry_id,
                                 entry,
                                 forms: Vec::new(),
                             })
                             .forms
-                            .push(FormMatch {
+                            .push(WordFormMatch {
                                 form: form.to_owned(),
                                 matches,
                             });
@@ -159,13 +137,13 @@ impl Dictionary {
                         let matches = matching_readings(&entry.kanji, &entry.readings, form);
                         names
                             .entry(entry_id)
-                            .or_insert_with(|| Candidate {
+                            .or_insert_with(|| NameCandidate {
                                 entry_id,
                                 entry,
                                 forms: Vec::new(),
                             })
                             .forms
-                            .push(FormMatch {
+                            .push(NameFormMatch {
                                 form: form.to_owned(),
                                 matches,
                             });

@@ -1282,3 +1282,29 @@
   release/recovery/physical arm64 not rerun. No open blocker. Next: verified lazy
   FIFO/FFI selected-word transport, then panel senses/readings/POS/names/count.
   Nostr remains empty; ask Q188 before forwarding.
+
+## 2026-10-25 — Lazy selected-word FIFO and typed JNI
+
+- Started clean. Added worker-only verified word-index path callback to the existing
+  provider/FIFO, lazy read-only connection reuse and failed-query retirement for
+  repaired-index retry. Moved complete candidate/details values to pure core,
+  using concrete word/name types for Kotlin generation. No new dependency/migration.
+- Added explicit selection/dismiss events and transient details/errors; current,
+  pending, selected and full token identity gate attachment. Live status refreshes
+  all repetitions; manual choices update selected status/absence. Navigation,
+  Settings and page invalidation cancel results; clock saves preserve lookup errors
+  and both read outcomes drain final time. Compose panel remains unchanged.
+- PASS: 262 Rust tests (six new), strict Clippy/Rust/Kotlin fmt/diff/shell syntax,
+  real-Full/real-index Kotlin/JNI plus seven Unicode exchanges, reproducible payloads,
+  both-ABI debug/test APK builds, strict Android lint and four API-36 x86_64 tests
+  (one new dictionary transport test plus three document/bridge regressions).
+  Full commands/coverage in DEVELOPMENT.md; saved Android reports under ignored
+  .local/test-reports/reader-word-details/. AVD remains running.
+- Fixed generator generic-name collision with concrete types and Clippy enum size
+  with internal boxing. Concurrent BoltFFI Android/host runs caused a transient JNI
+  link failure; sequential final rerun passes. Gradle/ADB sandbox sockets needed
+  escalation. No open blocker; no tablet/dark/release/recovery/physical arm64 run.
+- Updated README/index contract and architecture/data/decisions/plan/handoff.
+  Next: connect current panel to details requests, then applicable readings/senses,
+  compact POS, separate names/count, retry and recreation dismissal. Nostr remains
+  empty; ask Q188 before forwarding.

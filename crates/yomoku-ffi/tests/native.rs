@@ -24,6 +24,9 @@ impl EffectsListener for Listener {
 
 struct NoDictionary;
 impl DictionaryProvider for NoDictionary {
+    fn verified_word_dictionary_path(&self) -> String {
+        String::new()
+    }
     fn open_verified_dictionary(&self) -> i64 {
         panic!("navigation must not load the dictionary");
     }
@@ -96,6 +99,9 @@ fn native_imports_require_a_dictionary_and_never_fall_back_to_text_only() {
     use yomoku_core::storage::DocumentError;
     struct Missing(Arc<AtomicUsize>);
     impl DictionaryProvider for Missing {
+        fn verified_word_dictionary_path(&self) -> String {
+            String::new()
+        }
         fn open_verified_dictionary(&self) -> i64 {
             self.0.fetch_add(1, Ordering::SeqCst);
             0

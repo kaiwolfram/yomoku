@@ -10,6 +10,7 @@ use yomoku_core::app::{Effect, Yomoku};
 
 mod storage;
 use storage::StorageEffects;
+pub use storage::WordDictionaryLoader;
 mod imports;
 pub use imports::{AnalyzerLifecycle, AnalyzerLoader, PasteAnalyzer};
 
@@ -49,6 +50,22 @@ pub fn effect_router_with_analyzed_imports(
     loader: AnalyzerLoader,
 ) -> std::io::Result<(EffectRouter, AnalyzerLifecycle)> {
     let (effects, lifecycle) = StorageEffects::with_analyzed_imports(database_path, loader)?;
+    Ok((
+        Core::<Yomoku>::new()
+            .handle_effects_using(effects)
+            .map_effect(),
+        lifecycle,
+    ))
+}
+
+/// Production reader word lookups and imports share one lazy FIFO worker.
+pub fn effect_router_with_dictionaries(
+    database_path: std::path::PathBuf,
+    loader: AnalyzerLoader,
+    word_loader: WordDictionaryLoader,
+) -> std::io::Result<(EffectRouter, AnalyzerLifecycle)> {
+    let (effects, lifecycle) =
+        StorageEffects::with_dictionaries(database_path, loader, word_loader)?;
     Ok((
         Core::<Yomoku>::new()
             .handle_effects_using(effects)

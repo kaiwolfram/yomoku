@@ -1,7 +1,7 @@
 //! Narrow native interface. Crux owns the payload format and application state.
 
 use crate::{FfiError, YomokuBridge};
-use std::{fs::File, os::fd::FromRawFd};
+use std::{fs::File, os::fd::FromRawFd, sync::Arc};
 use yomoku_analysis::Analyzer;
 use yomoku_core::{document::ChapterText, storage::DocumentError};
 use yomoku_runtime::{AnalyzerLifecycle, PasteAnalyzer};
@@ -17,6 +17,10 @@ use yomoku_runtime::{AnalyzerLifecycle, PasteAnalyzer};
 #[boltffi::export]
 pub trait DictionaryProvider: Send + Sync {
     fn open_verified_dictionary(&self) -> i64;
+    /// Verify the pinned word/name index size/hash before returning its private,
+    /// immutable path. Called only on the FIFO worker, never during construction.
+    /// Empty string means failure. Repairs must atomically replace immutable inodes.
+    fn verified_word_dictionary_path(&self) -> String;
 }
 
 /// Asynchronous storage effects arrive on a Rust worker thread. The host must
@@ -40,6 +44,15 @@ impl NativeBridge {
         listener: Box<dyn EffectsListener>,
         dictionary: Box<dyn DictionaryProvider>,
     ) -> Result<Self, FfiError> {
+        let dictionary: Arc<dyn DictionaryProvider> = Arc::from(dictionary);
+        let words = dictionary.clone();
+        let word_loader = Box::new(move || {
+            let path = words.verified_word_dictionary_path();
+            if path.is_empty() {
+                return Err(DocumentError::Unavailable);
+            }
+            Ok(path.into())
+        });
         let loader = Box::new(move || {
             let fd = dictionary
                 .open_verified_dictionary()
@@ -60,13 +73,15 @@ impl NativeBridge {
                     .map_err(|_| DocumentError::InvalidDocument)
             }) as Box<dyn PasteAnalyzer>)
         });
-        let (bridge, lifecycle) =
-            YomokuBridge::with_analyzed_imports(database_path.into(), loader, move |result| {
-                match result {
-                    Ok(requests) => listener.on_effects(requests),
-                    Err(error) => listener.on_error(error),
-                }
-            })?;
+        let (bridge, lifecycle) = YomokuBridge::with_dictionaries(
+            database_path.into(),
+            loader,
+            word_loader,
+            move |result| match result {
+                Ok(requests) => listener.on_effects(requests),
+                Err(error) => listener.on_error(error),
+            },
+        )?;
         Ok(Self { bridge, lifecycle })
     }
 

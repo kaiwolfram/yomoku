@@ -37,7 +37,9 @@ Rust now reads this index through a separate read-only repository, with typed
 surface/base candidates and pure spelling/reading/sense restriction rules.
 Android bundles the pinned index, reproducible source inputs and complete offline
 Settings credits. Lazy private installation verifies size/SHA-256 before exposing
-a read-only path; runtime and word-panel integration remain pending.
+a read-only path. The lazy FIFO/typed JNI now returns selected-word definitions,
+name candidates and exact-surface lifetime counts with cancellation and retry;
+rendering those details in the word panel remains pending.
 Compose reads stored Mode B tokens through typed core/FIFO/FFI, validates the
 current page identity and
 converts exact UTF-8 spans to UTF-16 without splitting Unicode scalars. Status

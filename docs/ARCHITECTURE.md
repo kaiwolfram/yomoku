@@ -111,8 +111,13 @@ before supplying a read-only path; Rust open checks format identity, not a check
 Repair atomically replaces inodes without modifying held readers. Library/Settings
 never extract the index. Settings exposes complete offline credits/legal/project
 documents through the shared notice dialog; HTML documents render as text, without
-web requests. Visibility survives recreation. Production Rust does not yet receive
-this path; dictionary FIFO/FFI/UI and compact POS remain next.
+web requests. Visibility survives recreation. NativeBridge's DictionaryProvider
+also exposes verified_word_dictionary_path (empty means failure), invoked only
+on the existing FIFO worker's first selected-word request. Rust opens the separate
+read-only connection there and reuses it until worker teardown. Open failures
+remain retryable; dictionary query failures retire the cached connection so an
+explicit retry can receive a repaired immutable publication. Imports and Library/
+reader/token opens do not load this index; word lookup never loads an analyzer.
 
 `Storage::load_reader_word(dictionary, key, token_index)` composes the existing
 page-token validation/status projection with an indexed lifetime occurrence count
@@ -125,8 +130,23 @@ return a distinct typed error without partial details; empty matches are success
 Counts use the live exact-surface vocabulary ID, keeping inflections separate,
 including repetitions/rereads/history from deleted documents and excluding
 registration/pending time. Vocabulary deletion removes its counts; lookup never
-re-registers it. This is repository-only preparation for the FIFO/FFI integration,
-with no shell protocol/UI changes or large-document performance claim.
+re-registers it. No large-document performance claim is made.
+
+Pure ReaderWordSelection(key, token_index) and ReaderWordDetails plus concrete
+WordCandidate/NameCandidate and per-form match types are serializable/Facet values.
+LoadReaderWord is accepted only for a token in the current loaded snapshot, outside
+Settings and the shared busy/pending-save gates. Result attachment checks pending,
+selected and current keys plus full token identity (allowing live vocabulary changes).
+Live status/absence refreshes every visible repetition. Manual status results also
+update selected details; deleted vocabulary clears its count without registration.
+DismissReaderWord, Settings, navigation, token refresh, movement/completion and reflow
+retire the selection. Late results/errors cannot restore it. reader_word_error is
+separate from document_error, so clock saves cannot erase a failed lookup; retry is
+explicit. Success and failure both drain waiting final time saves. The internal
+StorageResult boxes details to bound the Event enum size; this does not change wire
+encoding. All reads/callbacks stay on the existing worker and only Render reaches
+Android. Compose details requests/rendering and recreation dismissal remain next;
+the existing metadata/status panel is unchanged.
 
 Pure `active_time` accounts pending reading milliseconds using caller-supplied
 monotonic timestamps. Resume/interaction arms a five-minute idle window; dictionary

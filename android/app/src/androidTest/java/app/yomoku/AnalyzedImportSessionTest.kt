@@ -67,6 +67,8 @@ class AnalyzedImportSessionTest {
         val fail = AtomicBoolean(true)
         val provider =
             object : DictionaryProvider {
+                override fun verifiedWordDictionaryPath(): String = ""
+
                 override fun openVerifiedDictionary(): Long {
                     check(Looper.myLooper() != Looper.getMainLooper())
                     synchronized(workers) { workers.add(android.os.Process.myTid()) }

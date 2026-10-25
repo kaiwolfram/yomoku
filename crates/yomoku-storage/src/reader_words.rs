@@ -3,27 +3,17 @@
 
 use std::{error::Error, fmt};
 
-use yomoku_core::reader::{ReaderToken, ReaderTokenKey};
+use yomoku_core::reader::ReaderTokenKey;
 
 use crate::{
-    dictionary::{Dictionary, DictionaryCandidates, DictionaryError},
+    dictionary::{Dictionary, DictionaryError},
     reader_tokens::load_reader_tokens_in,
     Storage, StorageError,
 };
 
 const COUNT_SQL: &str = "SELECT COUNT(*) FROM reading_occurrences WHERE vocabulary_id = ?1";
 
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct ReaderWordDetails {
-    /// Echo the page/base identity and complete selected token for cancellation.
-    pub key: ReaderTokenKey,
-    pub token: ReaderToken,
-    /// Lifetime completed-reading occurrences for this exact surface only.
-    pub encountered: u64,
-    /// Complete source data plus applicable indices, separately for words/names.
-    /// Callers must respect the applicable views when displaying definitions.
-    pub candidates: DictionaryCandidates,
-}
+pub use yomoku_core::reader::ReaderWordDetails;
 
 #[derive(Debug)]
 pub enum ReaderWordError {

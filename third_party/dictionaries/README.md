@@ -97,9 +97,10 @@ It returns complete raw payloads alongside applicable spelling/reading/sense
 indices. Display only those applicable views: raw payloads can contain senses
 restricted to other spellings/readings. All appropriate readings survive; the
 analyzer's single reading never filters homophones. No normalization/fuzzy lookup,
-vocabulary mutation or encounter query occurs. Android verified publication is
-available; FIFO/FFI/UI, shorter POS labels and encounter counts remain next. This repository
-checks format identity, not cryptographic integrity; an installer must verify the
+vocabulary mutation occurs. The selected-reader-word repository separately counts
+exact-surface lifetime encounters in a user-state read transaction. Lazy FIFO/typed
+JNI carries complete word/name candidates and count; UI and compact POS remain next.
+The index repository checks format identity, not cryptographic integrity; the installer verifies the
 manifest/checksum before supplying a published immutable path.
 
 ## Android assets and private installation
@@ -121,8 +122,10 @@ rehashes cached bytes, or stages/fsyncs/checks size and SHA-256 before atomic
 publication into private no-backup storage. The content-addressed `.sqlite3` file
 is read-only. Corrupt/unsafe cache repair replaces the inode, preserving held
 readers; interrupted staging is discarded on retry. Never open published inodes
-for writing. The Rust repository must receive only this verified path when its
-FIFO provider is connected. Library and Settings do not extract the index.
+for writing. NativeBridge's worker-only verified_word_dictionary_path callback
+supplies this verified path to the FIFO. The worker reuses a read-only connection;
+failed dictionary queries retire it so explicit retry reopens a repaired inode.
+Library, Settings, reader opening and token/status reads do not extract the index.
 
 The raw index is 279,109,632 bytes; the APK also retains both compressed XML
 inputs. Installed APK size/extraction results belong in `docs/DEVELOPMENT.md`.

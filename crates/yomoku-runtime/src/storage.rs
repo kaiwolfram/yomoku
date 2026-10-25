@@ -13,7 +13,13 @@ use yomoku_core::{
     reader::ReaderVocabulary,
     storage::{DocumentError, StorageOperation, StorageResult},
 };
-use yomoku_storage::{Storage, StorageError};
+use yomoku_storage::{
+    dictionary::Dictionary, reader_words::ReaderWordError, Storage, StorageError,
+};
+
+/// Worker-only publisher/open callback. Failed loads remain retryable; the
+/// returned path must refer to a verified immutable dictionary index.
+pub type WordDictionaryLoader = Box<dyn FnMut() -> Result<PathBuf, DocumentError> + Send>;
 
 use crate::imports::{AnalyzerLifecycle, AnalyzerLoader, Imports};
 
@@ -28,32 +34,56 @@ pub struct StorageEffects {
 
 impl StorageEffects {
     pub fn new(path: PathBuf) -> std::io::Result<Self> {
-        Self::spawn(path, None)
+        Self::spawn(path, None, None)
     }
 
     pub fn with_analyzed_imports(
         path: PathBuf,
         loader: AnalyzerLoader,
     ) -> std::io::Result<(Self, AnalyzerLifecycle)> {
-        let effects = Self::spawn(path, Some(loader))?;
+        let effects = Self::spawn(path, Some(loader), None)?;
         let lifecycle = AnalyzerLifecycle {
             sender: Arc::downgrade(&effects.sender),
         };
         Ok((effects, lifecycle))
     }
 
-    fn spawn(path: PathBuf, loader: Option<AnalyzerLoader>) -> std::io::Result<Self> {
+    pub fn with_dictionaries(
+        path: PathBuf,
+        loader: AnalyzerLoader,
+        word_loader: WordDictionaryLoader,
+    ) -> std::io::Result<(Self, AnalyzerLifecycle)> {
+        let effects = Self::spawn(path, Some(loader), Some(word_loader))?;
+        let lifecycle = AnalyzerLifecycle {
+            sender: Arc::downgrade(&effects.sender),
+        };
+        Ok((effects, lifecycle))
+    }
+
+    fn spawn(
+        path: PathBuf,
+        loader: Option<AnalyzerLoader>,
+        mut word_loader: Option<WordDictionaryLoader>,
+    ) -> std::io::Result<Self> {
         let (sender, receiver) = mpsc::channel::<Job>();
         thread::Builder::new()
             .name("yomoku-storage".into())
             .spawn(move || {
                 let mut storage = None;
+                let mut dictionary = None;
                 let mut imports = loader.map(Imports::new);
                 while let Ok(job) = receiver.recv() {
                     match job {
                         Job::Storage(operation, mut resolver) => {
-                            let output = execute(&path, &mut storage, &mut imports, operation)
-                                .unwrap_or_else(StorageResult::Failed);
+                            let output = execute(
+                                &path,
+                                &mut storage,
+                                &mut imports,
+                                &mut word_loader,
+                                &mut dictionary,
+                                operation,
+                            )
+                            .unwrap_or_else(StorageResult::Failed);
                             if let Some(imports) = imports.as_mut() {
                                 imports.release_if_hidden();
                             }
@@ -92,6 +122,8 @@ fn execute(
     path: &PathBuf,
     storage: &mut Option<Storage>,
     imports: &mut Option<Imports>,
+    word_loader: &mut Option<WordDictionaryLoader>,
+    dictionary: &mut Option<Dictionary>,
     operation: StorageOperation,
 ) -> Result<StorageResult, DocumentError> {
     // Reject blank input before opening/creating a database.
@@ -138,6 +170,28 @@ fn execute(
             .map_err(map_error)?
             .map(StorageResult::ReaderTokensLoaded)
             .ok_or(DocumentError::NotFound),
+        StorageOperation::LoadReaderWord(selection) => {
+            if dictionary.is_none() {
+                let path = word_loader.as_mut().ok_or(DocumentError::Unavailable)?()?;
+                *dictionary = Some(Dictionary::open(path).map_err(|_| DocumentError::Unavailable)?);
+            }
+            let result = storage.load_reader_word(
+                dictionary.as_ref().expect("opened dictionary"),
+                selection.key,
+                selection.token_index,
+            );
+            match result {
+                Ok(Some(details)) => Ok(StorageResult::ReaderWordLoaded(Box::new(details))),
+                Ok(None) => Err(DocumentError::NotFound),
+                Err(ReaderWordError::Storage(error)) => Err(map_error(error)),
+                Err(ReaderWordError::InvalidSelection) => Err(DocumentError::InvalidDocument),
+                Err(ReaderWordError::Dictionary(_)) => {
+                    // A repaired atomic publication must be reopened on explicit retry.
+                    *dictionary = None;
+                    Err(DocumentError::Unavailable)
+                }
+            }
+        }
         StorageOperation::SetReaderStatus(change) => storage
             .set_vocabulary_status(
                 change.vocabulary_id,

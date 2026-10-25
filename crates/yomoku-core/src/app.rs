@@ -16,6 +16,7 @@ use crate::{
     document::{CompletionCommandId, DocumentId, LibraryDocument, PastedDocument, TextAnchor},
     pagination::{LogicalPages, PageLength, ReadingPosition},
     reader::{ReaderAnalysis, ReaderPage, ReaderStatusChange, ReaderTokenKey, ReaderTokenSnapshot},
+    reader::{ReaderWordDetails, ReaderWordSelection},
     storage::{DocumentError, StorageOperation, StorageResult},
 };
 
@@ -87,6 +88,10 @@ pub struct Model {
     reader_tokens: Option<ReaderTokenSnapshot>,
     pending_token_load: Option<ReaderTokenKey>,
     pending_status_change: Option<ReaderStatusChange>,
+    pending_word_load: Option<ReaderWordSelection>,
+    reader_word_selection: Option<ReaderWordSelection>,
+    reader_word: Option<ReaderWordDetails>,
+    reader_word_error: Option<DocumentError>,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -139,6 +144,9 @@ pub enum Event {
     LoadReaderTokens(ReaderTokenKey),
     /// Explicit manual choice; only existing vocabulary on the loaded page.
     SetReaderStatus(ReaderStatusChange),
+    /// Explicit selection/refresh; rejected until current page tokens are loaded.
+    LoadReaderWord(ReaderWordSelection),
+    DismissReaderWord,
     #[serde(skip)]
     #[cfg_attr(feature = "facet_typegen", facet(skip))]
     StorageFinished(StorageResult),
@@ -170,6 +178,10 @@ pub struct ViewModel {
     pub book_completion_notice: Option<CompletionCommandId>,
     /// None until explicitly loaded for the current document/page/base analysis.
     pub reader_tokens: Option<ReaderTokenSnapshot>,
+    pub reader_word_selection: Option<ReaderWordSelection>,
+    pub reader_word: Option<ReaderWordDetails>,
+    /// Separate from save errors so timer checkpoints cannot erase a failed lookup.
+    pub reader_word_error: Option<DocumentError>,
 }
 
 #[effect]
@@ -394,6 +406,21 @@ impl App for Yomoku {
                 }
                 Some(StorageOperation::LoadReaderTokens(*key))
             }
+            Event::LoadReaderWord(selection) => {
+                if model.settings_open
+                    || model.current_token_key() != Some(selection.key)
+                    || !model.reader_tokens.as_ref().is_some_and(|snapshot| {
+                        snapshot.key() == selection.key
+                            && snapshot
+                                .tokens
+                                .iter()
+                                .any(|token| token.token_index == selection.token_index)
+                    })
+                {
+                    return Command::done();
+                }
+                Some(StorageOperation::LoadReaderWord(*selection))
+            }
             Event::SetReaderStatus(change) => {
                 if model.settings_open
                     || change.occurred_at_unix_ms < 0
@@ -477,6 +504,7 @@ impl App for Yomoku {
                 | StorageOperation::LoadPaste(_)
                 | StorageOperation::SavePageLength(_)
                 | StorageOperation::LoadReadingTime { .. }
+                | StorageOperation::LoadReaderWord(_)
                 | StorageOperation::LoadReaderTokens(_)
                 | StorageOperation::SetReaderStatus(_)
                 | StorageOperation::SaveReadingTime { .. } => true,
@@ -488,9 +516,31 @@ impl App for Yomoku {
             };
             model.storage_busy = true;
             model.document_error = None;
+            if let StorageOperation::LoadReaderWord(selection) = operation {
+                model.reader_word_selection = Some(selection);
+                model.pending_word_load = Some(selection);
+                model.reader_word = None;
+                model.reader_word_error = None;
+            }
+            // Every accepted operation that invalidates page tokens also retires
+            // its selected-word result, even if the resulting anchor is unchanged.
+            if matches!(
+                operation,
+                StorageOperation::LoadReaderTokens(_)
+                    | StorageOperation::List
+                    | StorageOperation::LoadPaste(_)
+                    | StorageOperation::OpenReader(_)
+                    | StorageOperation::CreatePaste(_)
+                    | StorageOperation::SavePageLength(_)
+                    | StorageOperation::SaveReadingPosition { .. }
+                    | StorageOperation::PreparePageCompletion(_)
+            ) {
+                model.clear_reader_word();
+            }
             if let StorageOperation::LoadReaderTokens(key) = operation {
                 model.pending_token_load = Some(key);
                 model.reader_tokens = None;
+                model.clear_reader_word();
             }
             if let StorageOperation::SetReaderStatus(change) = operation {
                 model.pending_status_change = Some(change);
@@ -514,6 +564,7 @@ impl App for Yomoku {
                 model.reader = None;
                 model.reader_analysis = None;
                 model.reader_tokens = None;
+                model.clear_reader_word();
                 model.reader_document = None;
                 model.clear_reader_time();
             }
@@ -531,6 +582,7 @@ impl App for Yomoku {
                 model.reader = None;
                 model.reader_analysis = None;
                 model.reader_tokens = None;
+                model.clear_reader_word();
                 model.reader_document = None;
                 model.pending_reader = None;
                 model.clear_reader_time();
@@ -545,13 +597,18 @@ impl App for Yomoku {
                 model.reader = None;
                 model.reader_analysis = None;
                 model.reader_tokens = None;
+                model.clear_reader_word();
                 model.reader_document = None;
                 model.pending_reader = None;
                 model.clear_reader_time();
                 model.document_error = None;
             }
             Event::CloseDocument => model.close_document(),
-            Event::OpenSettings => model.settings_open = true,
+            Event::OpenSettings => {
+                model.settings_open = true;
+                model.clear_reader_word();
+            }
+            Event::DismissReaderWord => model.clear_reader_word(),
             Event::CloseSettings => model.settings_open = false,
             Event::DismissImportSummary => model.import_summary = None,
             Event::DismissCompletionNotice => model.completion_notice = None,
@@ -568,12 +625,37 @@ impl App for Yomoku {
                 let pending_reader = model.pending_reader.take();
                 let token_load = model.pending_token_load.take();
                 let status_change = model.pending_status_change.take();
+                let word_load = model.pending_word_load.take();
                 let import_outcome = match &result {
                     StorageResult::Created(_) => Some(ImportOutcome::Created),
                     StorageResult::Existing(_) => Some(ImportOutcome::Existing),
                     _ => None,
                 };
                 match result {
+                    StorageResult::ReaderWordLoaded(details) => {
+                        if word_load == Some(details.selection())
+                            && model.reader_word_selection == word_load
+                            && model.current_token_key() == Some(details.key)
+                            && model.reader_tokens.as_ref().is_some_and(|snapshot| {
+                                snapshot.key() == details.key
+                                    && snapshot.tokens.iter().any(|token| {
+                                        let mut expected = token.clone();
+                                        expected.vocabulary = details.token.vocabulary;
+                                        expected == details.token
+                                    })
+                            })
+                        {
+                            // Status can have changed in another session since page load.
+                            if let Some(snapshot) = model.reader_tokens.as_mut() {
+                                for token in &mut snapshot.tokens {
+                                    if token.surface == details.token.surface {
+                                        token.vocabulary = details.token.vocabulary;
+                                    }
+                                }
+                            }
+                            model.reader_word = Some(*details);
+                        }
+                    }
                     StorageResult::ReaderStatusChanged(change, entry) => {
                         if status_change == Some(change)
                             && model.current_token_key() == Some(change.key)
@@ -581,6 +663,18 @@ impl App for Yomoku {
                                 entry.id == change.vocabulary_id && entry.status == change.status
                             })
                         {
+                            if let Some(details) = model.reader_word.as_mut().filter(|details| {
+                                details.key == change.key
+                                    && details
+                                        .token
+                                        .vocabulary
+                                        .is_some_and(|value| value.id == change.vocabulary_id)
+                            }) {
+                                details.token.vocabulary = entry;
+                                if entry.is_none() {
+                                    details.encountered = 0;
+                                }
+                            }
                             if let Some(snapshot) = model
                                 .reader_tokens
                                 .as_mut()
@@ -724,6 +818,7 @@ impl App for Yomoku {
                         model.reader = None;
                         model.reader_analysis = None;
                         model.reader_tokens = None;
+                        model.clear_reader_word();
                         model.reader_document = None;
                         model.clear_reader_time();
                     }
@@ -750,14 +845,23 @@ impl App for Yomoku {
                     StorageResult::PositionSaved(document) => model.apply_position(document),
                     StorageResult::Failed(error) => {
                         let key = token_load.or(status_change.map(|change| change.key));
-                        if key.is_none() || key == model.current_token_key() {
+                        if let Some(selection) = word_load {
+                            if model.reader_word_selection == Some(selection)
+                                && model.current_token_key() == Some(selection.key)
+                            {
+                                model.reader_word_error = Some(error);
+                            }
+                        } else if key.is_none() || key == model.current_token_key() {
                             model.document_error = Some(error);
                         }
                     }
                 }
                 // Reads and atomic manual choices have no frozen retry obligation.
                 // Their failures must still drain final time and deferred departures.
-                if (!failed || token_load.is_some() || status_change.is_some())
+                if (!failed
+                    || token_load.is_some()
+                    || status_change.is_some()
+                    || word_load.is_some())
                     && model.pending_time_checkpoint.is_none()
                 {
                     if let Some(checkpoint) = model.queued_time_checkpoint {
@@ -769,6 +873,7 @@ impl App for Yomoku {
             | Event::CreatePaste(_)
             | Event::LoadPaste(_)
             | Event::OpenReader(_)
+            | Event::LoadReaderWord(_)
             | Event::LoadReaderTokens(_)
             | Event::SetReaderStatus(_)
             | Event::SetPageLength(_)
@@ -804,11 +909,21 @@ impl App for Yomoku {
             completion_notice: model.completion_notice,
             book_completion_notice: model.book_completion_notice,
             reader_tokens: model.reader_tokens.clone(),
+            reader_word_selection: model.reader_word_selection,
+            reader_word: model.reader_word.clone(),
+            reader_word_error: model.reader_word_error,
         }
     }
 }
 
 impl Model {
+    fn clear_reader_word(&mut self) {
+        self.reader_word_selection = None;
+        self.reader_word = None;
+        self.reader_word_error = None;
+        // Keep the in-flight identity until its callback for clock-save draining.
+    }
+
     fn current_token_key(&self) -> Option<ReaderTokenKey> {
         if self.content_route != ContentRoute::Reader {
             return None;
@@ -828,6 +943,7 @@ impl Model {
         self.reader = None;
         self.reader_analysis = None;
         self.reader_tokens = None;
+        self.clear_reader_word();
         self.reader_document = None;
         self.pending_reader = None;
         self.clear_reader_time();
@@ -889,6 +1005,7 @@ impl Model {
             match ReaderPage::open(&document, self.page_length.unwrap_or_default()) {
                 Ok(reader) => {
                     self.reader_tokens = None;
+                    self.clear_reader_word();
                     if self.reader_time.is_some_and(|saved| {
                         saved.value.document_id != reader.document_id
                             || saved.position() != reader.position
@@ -941,6 +1058,7 @@ impl Model {
                 Ok(page) => {
                     if page.anchor != reader.anchor {
                         self.reader_tokens = None;
+                        self.clear_reader_word();
                     }
                     self.reader = Some(page);
                 }

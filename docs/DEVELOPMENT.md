@@ -1909,3 +1909,55 @@ migration or core/FFI/UI protocol. No open failure or blocker. Android/JNI/Kotli
 payload generation, Python/full-index/Sudachi fixtures, release/process/reboot and
 physical arm64 checks were not rerun for this repository-only step. Next: lazy
 verified dictionary FIFO/typed FFI and panel details/count rendering.
+
+## Selected-word lazy FIFO and typed dictionary bridge
+
+Verified 2026-10-25 using the Rust PATH and Android/JDK environment above. From
+repository root, after preparing the pinned Full and word/name index:
+
+```sh
+cargo test --workspace --all-features --locked --offline --quiet
+cargo fmt --all -- --check
+cargo clippy --workspace --all-targets --all-features --locked --offline -- -D warnings
+tools/test-kotlin-bridge.sh
+cargo run -p yomoku-ffi --bin generate-kotlin --features facet_typegen --locked --offline -- target/generated/kotlin-repeat
+diff -r target/generated/kotlin target/generated/kotlin-repeat
+tools/format-kotlin.sh --check
+bash -n tools/test-kotlin-bridge.sh
+./android/gradlew -p android :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug --offline --console=plain
+./android/gradlew -p android :app:connectedDebugAndroidTest :app:lintDebug -Pandroid.testInstrumentationRunnerArguments.class=app.yomoku.ReaderWordDetailsSessionTest,app.yomoku.DocumentSessionTest,app.yomoku.CoreSessionTest --offline --console=plain
+git diff --check
+```
+
+Run the host JNI script and Android builds sequentially: both BoltFFI generation
+paths replace host build artifacts. Concurrent execution caused a host JNI link
+failure (missing native exports); the isolated rerun passes. The host script now
+also requires `YOMOKU_WORD_DICTIONARY`, defaulting to the prepared pinned
+`.local/dictionaries/index-v1-20261025/dictionary.sqlite3`. It never downloads data.
+
+PASS: 262 data-free Rust tests (130 storage; four new core and two new asynchronous
+FFI tests), strict Clippy/Rust/Kotlin fmt/diff/shell syntax, reproducible payload
+generation, real-Full/real-index Kotlin/JNI plus seven bidirectional Unicode
+exchanges, both-ABI debug/test APK builds and strict Android lint. Four selected
+API-36 x86_64 tests pass (one new transport test, two document-session regressions,
+one bridge/session regression). Saved reports:
+`.local/test-reports/reader-word-details/{report,results}/`. AVD remains running.
+
+Coverage: lazy worker-only verified index callback/reuse without analyzer loads;
+separate simultaneous word/name payloads, all readings/senses/applicable indices,
+base-form provenance, empty matches, exact lifetime counts after reread/reopen;
+load and malformed-query failures, atomic inode repair and explicit retry;
+unchanged user/index bytes, blocked-provider dismissal, stale key/index/token
+rejection, Settings/navigation/refresh/movement/reflow cancellation, live statuses/
+deleted vocabulary, persistent word error across clock saves, final-time draining
+on both read outcomes. Core/FFI prove cancellation; Compose details requests,
+rendering and recreation dismissal remain next, with the old metadata/status panel.
+
+Intermediate generator failure rejected generic Candidate/FormMatch with different
+parameters; concrete word/name types fix it. Strict Clippy flagged the larger
+internal Event; boxing only StorageResult's details bounds it without wire changes.
+Gradle wildcard-IP/ADB socket sandbox failures required escalation; approved runs
+pass. Existing benign Crux JNI shutdown diagnostics persist. No new dependency or
+mutable migration. Python/compiler/full-index scans, standalone Sudachi fixtures/
+probes, full Android reader matrix, tablet/dark, release, process/reboot recovery
+and physical arm64 were not rerun. No open failure or blocker.

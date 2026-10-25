@@ -220,3 +220,33 @@ impl PastedDocument {
         })
     }
 }
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
+pub struct ReaderWordDetails {
+    /// Echo the page/base identity and complete selected token for cancellation.
+    pub key: ReaderTokenKey,
+    pub token: ReaderToken,
+    /// Lifetime completed-reading occurrences for this exact surface only.
+    pub encountered: u64,
+    /// Complete source data plus applicable indices, separately for words/names.
+    /// Callers must respect the applicable views when displaying definitions.
+    pub candidates: crate::dictionary::DictionaryCandidates,
+}
+
+/// A transient selection within the loaded original Mode B token snapshot.
+#[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
+pub struct ReaderWordSelection {
+    pub key: ReaderTokenKey,
+    pub token_index: u64,
+}
+
+impl ReaderWordDetails {
+    pub fn selection(&self) -> ReaderWordSelection {
+        ReaderWordSelection {
+            key: self.key,
+            token_index: self.token.token_index,
+        }
+    }
+}

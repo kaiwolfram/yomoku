@@ -9,6 +9,7 @@ use crate::document::{DocumentId, LibraryDocument, PastedDocument};
 use crate::pagination::{PageLength, ReadingPosition};
 use crate::reader::{
     ReaderSnapshot, ReaderStatusChange, ReaderTokenKey, ReaderTokenSnapshot, ReaderVocabulary,
+    ReaderWordDetails, ReaderWordSelection,
 };
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -38,6 +39,7 @@ pub enum StorageOperation {
     /// Read original tokens and live global statuses without registration.
     LoadReaderTokens(ReaderTokenKey),
     SetReaderStatus(ReaderStatusChange),
+    LoadReaderWord(ReaderWordSelection),
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -70,6 +72,7 @@ pub enum StorageResult {
     PageCompleted(PastedDocument, AnalyzedCompletionOutcome),
     Failed(DocumentError),
     ReaderTokensLoaded(ReaderTokenSnapshot),
+    ReaderWordLoaded(Box<ReaderWordDetails>),
     ReaderStatusChanged(ReaderStatusChange, Option<ReaderVocabulary>),
 }
 

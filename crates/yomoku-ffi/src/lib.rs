@@ -8,8 +8,8 @@ use crux_core::{
     middleware::{Bridge, Layer},
 };
 use yomoku_runtime::{
-    effect_router, effect_router_with_analyzed_imports, AnalyzerLifecycle, AnalyzerLoader,
-    EffectRouter,
+    effect_router, effect_router_with_analyzed_imports, effect_router_with_dictionaries,
+    AnalyzerLifecycle, AnalyzerLoader, EffectRouter, WordDictionaryLoader,
 };
 
 pub mod native;
@@ -44,6 +44,23 @@ pub struct YomokuBridge {
 }
 
 impl YomokuBridge {
+    pub fn with_dictionaries(
+        database_path: std::path::PathBuf,
+        loader: AnalyzerLoader,
+        word_loader: WordDictionaryLoader,
+        on_effects: impl Fn(Result<Vec<u8>, FfiError>) + Send + Sync + 'static,
+    ) -> Result<(Self, AnalyzerLifecycle), FfiError> {
+        let (router, lifecycle) =
+            effect_router_with_dictionaries(database_path, loader, word_loader)
+                .map_err(|_| FfiError::WorkerUnavailable)?;
+        Ok((
+            Self {
+                bridge: router.bridge(move |result| on_effects(result.map_err(Into::into))),
+            },
+            lifecycle,
+        ))
+    }
+
     /// Production imports require a loader; no text-only fallback is selected.
     pub fn with_analyzed_imports(
         database_path: std::path::PathBuf,
