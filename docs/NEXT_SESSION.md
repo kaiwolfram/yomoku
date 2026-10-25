@@ -1,6 +1,6 @@
 # Resume here
 
-Updated: 2026-10-25. Verified pure TXT decoder/Aozora parser.
+Updated: 2026-10-25. Verified atomic TXT original-file repository.
 Read AGENTS.md, plan phases 2–4 and PRODUCT_SPEC.md sections 3–4.
 ## Working
 - Pure Crux owns navigation/Library/Settings; only Render reaches UI. FIFO owns
@@ -57,24 +57,23 @@ Read AGENTS.md, plan phases 2–4 and PRODUCT_SPEC.md sections 3–4.
   Current/pending/selected/full token identities gate attach; live statuses refresh
   repetitions. Errors survive clock saves; both outcomes drain time. Compose requests
   once gates clear; close/disposal/recreation dismiss. Late callbacks cannot reopen.
-- yomoku-import::txt::parse(bytes, Option<TextEncoding>) is pure: strict UTF-8/
-  Shift-JIS (encoding_rs 0.8.35), BOM detection, explicit both-valid ambiguity.
-  Canonical text preserves hard breaks; source ruby uses separate UTF-8 ranges.
-  Common typography hidden; unknown/gaiji/malformed kept. One text, no chapter
-  inference. Not connected to storage/runtime/Android; original bytes must be hashed.
-
+- TXT pure strict UTF-8/Shift-JIS/Aozora parser now composes with atomic storage.
+  Migration 0012 widens sources.kind preserving IDs/history/FK enforcement. File
+  SHA-256 covers original BLOB, separate from paste; duplicate skips decoding/analysis
+  and preserves encoding/title/status/progress/finish. Filename title + original
+  bytes/encoding + canonical text/ruby + B/unique registrations commit together.
+  load_txt_source verifies bytes/ruby read-only; single-text reader/completion accepts
+  TXT. No runtime/FFI file path, picker or reader ruby payload/rendering yet.
 ## Next tasks (ordered)
-1. Add original-file SHA-256 dedup + atomic TXT canonical text/ruby/Mode B/unique
-   registration storage; filename title. Preserve paste semantics and source bytes.
-2. Wire typed runtime/FFI and Android multiple-file picker/encoding selection;
-   summary returns to Library. CI/custom definitions are independent open tasks.
+1. Wire TXT import through lazy FIFO runtime/typed FFI: original bytes/display name,
+   encoding-required/error outcomes, Created/Existing and existing analyzer lifecycle.
+2. Android multiple-file picker/encoding choice, per-file summary returning Library;
+   progress/cancel/background semantics remain separate. CI/custom entries independent.
 3. User-run physical arm64 validation once usable.
-
-## Verification / environment
-- PASS this slice: 275 data-free Rust tests (13 new TXT), strict Clippy/fmt/diff.
-  cargo test -p yomoku-import --locked --offline; full commands: DEVELOPMENT.md.
-- No Android/Kotlin/JNI/generation/Python/full-data/release/process/reboot/arm64
-  rerun this pure parser step. Offline dependency cache unpack required escalation.
-- Reports: .local/test-reports/reader-dictionary-panel/. AVD restored to phone/light.
-- Run host JNI and Android builds sequentially: BoltFFI replaces shared artifacts.
+## Verification
+- PASS: 287 data-free Rust tests (12 new TXT storage/migration), strict Clippy/fmt/diff;
+  all 12 real Full + 1 runtime fixtures per owned/mapped loader. DEVELOPMENT.md commands.
+- No Android/Kotlin/JNI/generation/Python/full-index/release/process/reboot/arm64
+  rerun this storage slice. No new package/version or escalation required.
+- Host JNI/Android builds must run sequentially: BoltFFI replaces shared artifacts.
 - No open failure/blocker. Nostr empty; ask Q188 before forwarding.

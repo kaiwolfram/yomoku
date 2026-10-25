@@ -18,8 +18,8 @@ with functioning rustup can omit the PATH workaround. Do not assume this compile
 is the project's minimum supported version; establish that with dependencies.
 Cargo.lock is retained for reproducible application development.
 Crux 0.20.0 declares Rust 1.90 minimum; the full locked graph has only been tested
-with 1.99.1. Current host baseline: 256 data-free Rust tests (130 storage, eight
-runtime). Eleven analysis fixtures and one runtime fixture run separately with
+with 1.99.1. Current host baseline: 287 data-free Rust tests (142 storage, eight
+runtime). Twelve analysis fixtures and one runtime fixture run separately with
 each Full loader via tools/test-sudachi.sh (see below).
 
 ## Pure TXT import checks
@@ -2034,3 +2034,43 @@ physical 1080x2400/420dpi and night `no`; AVD remains running, assets preserved.
 No new dependency, migration, Rust or wire change. Host Rust/Clippy/JNI/generation,
 Python/full-index scans, standalone Full fixtures/probes, release, separate
 process/reboot recovery and physical arm64 were not rerun. No open blocker.
+
+## Atomic TXT original-file repository
+
+Verified 2026-10-25 using the Rust PATH workaround above; no new package/version:
+
+```sh
+cargo test -p yomoku-storage tests::txt --locked --offline
+cargo test --workspace --all-features --locked --offline --quiet
+cargo fmt --all -- --check
+cargo clippy --workspace --all-targets --all-features --locked --offline -- -D warnings
+tools/test-sudachi.sh
+git diff --check
+```
+
+PASS: 287 data-free Rust tests (142 storage, twelve new TXT repository/migration
+fixtures), strict Clippy/fmt/diff. After strengthening the migration/history and
+query-only assertions, all twelve targeted tests and strict Clippy pass again.
+All twelve explicit real-Full fixtures and one runtime fixture pass with each
+owned/mapped loader, including the new TXT import/token/completion/reopen fixture.
+The script verifies the 138 pinned engine/patch files before running. Real-data
+fixtures remain explicitly ignored by the ordinary workspace command.
+
+Coverage: exact original bytes/encoding/filename and supplementary/decomposed/NUL/
+hard-break/ruby canonical text; separate paste and encoding/BOM/markup identities;
+existing duplicates bypass decode/analysis and preserve progress/finish/statuses;
+all five global statuses; unique registrations without encounters; invalid files/
+analysis/timestamps; completed-file isolation; every write/deferred commit rollback
+and retry; concurrent create-once; deletion/reimport; stale digest and invalid ruby;
+query-only unchanged-byte loads; source-table migration with old Mode B, position,
+finish, completion/occurrence/status history and source ID high-water preservation;
+rollback and FK-check/enforcement restoration. Existing paste/storage regressions pass.
+
+Intermediate fixture failures corrected: use truly ambiguous C2 A9 bytes rather
+than unambiguous UTF-8 あ, select encoding for ambiguous 猫, and explicitly disable
+FKs when constructing the corrupt migration fixture. The full-width-ID regression
+caught the rebuilt empty sources table creating a spurious sqlite_sequence row;
+remove it when the old sequence was absent. All final checks pass. No sandbox
+escalation/download, new wire payload, Android or UI change. Android/Kotlin/JNI/
+generation, Python/full-index scans, release/process/reboot and physical arm64
+were not rerun for this storage slice. No open failure/blocker.

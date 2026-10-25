@@ -145,6 +145,15 @@ fn create_analyzed_paste_in<E>(
     analyze: impl FnOnce(&ChapterText) -> Result<ChapterAnalysis, E>,
 ) -> Result<AnalyzedPaste, PasteImportError<E>> {
     let document = create_paste_in(connection, text)?;
+    analyze_document_in(connection, document, registered_at_unix_ms, analyze)
+}
+
+pub(crate) fn analyze_document_in<E>(
+    connection: &Connection,
+    document: PastedDocument,
+    registered_at_unix_ms: i64,
+    analyze: impl FnOnce(&ChapterText) -> Result<ChapterAnalysis, E>,
+) -> Result<AnalyzedPaste, PasteImportError<E>> {
     let analysis = analyze(&document.chapter).map_err(PasteImportError::Analysis)?;
     if analysis.mode != SplitMode::B {
         return Err(StorageError::InvalidAnalysis.into());

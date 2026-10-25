@@ -1,0 +1,726 @@
+use std::convert::Infallible;
+
+use sha2::{Digest, Sha256};
+use yomoku_core::{
+    analysis::{ChapterAnalysis, SplitMode},
+    document::{ChapterText, PasteText, PastedDocument},
+    reader::ReaderAnalysis,
+    vocabulary::{Surface, VocabularyStatus},
+};
+use yomoku_import::txt::{SourceRuby, TextEncoding, TxtError};
+
+use super::{imports::fixture, positions::position, *};
+
+fn created(outcome: TxtImportOutcome) -> AnalyzedPaste {
+    match outcome {
+        TxtImportOutcome::Created(imported) => imported,
+        TxtImportOutcome::Existing(_) => panic!("expected new file"),
+    }
+}
+
+fn no_analysis(_: &ChapterText) -> Result<ChapterAnalysis, Infallible> {
+    panic!("existing or invalid file must not be analyzed")
+}
+
+fn count(storage: &Storage, table: &str) -> i64 {
+    storage
+        .connection
+        .query_row(&format!("SELECT COUNT(*) FROM {table}"), [], |row| {
+            row.get(0)
+        })
+        .unwrap()
+}
+
+fn totals(storage: &Storage) -> Vec<i64> {
+    [
+        "sources",
+        "chapters",
+        "documents",
+        "chapter_texts",
+        "imported_files",
+        "source_ruby",
+        "chapter_analyses",
+        "analyzed_tokens",
+        "vocabulary",
+        "vocabulary_status_events",
+        "reading_positions",
+        "reading_completions",
+        "reading_occurrences",
+        "paste_content_hashes",
+    ]
+    .map(|table| count(storage, table))
+    .to_vec()
+}
+
+#[test]
+fn txt_atomic_canonical_ruby_original_bytes_analysis_and_filename_survive_reopen() {
+    let database = TestDatabase::new();
+    let mut storage = Storage::open(database.path()).unwrap();
+    let observer = Storage::open(database.path()).unwrap();
+    let bytes =
+        "\u{feff}｜𠮷《よし》 猫 猫\r\nか\u{3099} English 。 📖 \0\r第一章\n［＃改ページ］\n終"
+            .as_bytes();
+    let imported = created(
+        storage
+            .import_analyzed_txt(bytes, "本.txt", None, 123, |chapter| {
+                assert_eq!(totals(&observer), vec![0; 14]);
+                assert_eq!(
+                    chapter.text,
+                    "𠮷 猫 猫\r\nか\u{3099} English 。 📖 \0\r第一章\n\n終"
+                );
+                fixture(chapter)
+            })
+            .unwrap(),
+    );
+    assert_eq!(imported.document.title, "本.txt");
+    assert_eq!(imported.registered_surfaces, 5);
+    assert_eq!(count(&storage, "chapters"), 1);
+    assert_eq!(count(&storage, "reading_positions"), 0);
+    assert_eq!(count(&storage, "reading_completions"), 0);
+    assert_eq!(count(&storage, "reading_occurrences"), 0);
+    assert_eq!(count(&storage, "paste_content_hashes"), 0);
+    let kind: (String, String) = storage
+        .connection
+        .query_row("SELECT kind, original_title FROM sources", [], |row| {
+            Ok((row.get(0)?, row.get(1)?))
+        })
+        .unwrap();
+    assert_eq!(kind, ("txt".into(), "本.txt".into()));
+    let source = StoredTxtSource {
+        original_bytes: bytes.to_vec(),
+        encoding: TextEncoding::Utf8,
+        ruby: vec![SourceRuby {
+            range: 0..4,
+            reading: "よし".into(),
+        }],
+    };
+    assert_eq!(
+        storage
+            .load_txt_source(imported.document.document_id)
+            .unwrap(),
+        Some(source.clone())
+    );
+    drop(storage);
+    let mut storage = Storage::open(database.path()).unwrap();
+    let before_read = fs::read(database.path()).unwrap();
+    storage
+        .connection
+        .pragma_update(None, "query_only", true)
+        .unwrap();
+    assert_eq!(
+        storage
+            .load_txt_source(imported.document.document_id)
+            .unwrap(),
+        Some(source)
+    );
+    let snapshot = storage
+        .load_reader_snapshot(imported.document.document_id)
+        .unwrap()
+        .unwrap();
+    assert_eq!(snapshot.document, imported.document);
+    assert_eq!(
+        snapshot.analysis,
+        ReaderAnalysis::Available(imported.analysis_id)
+    );
+    assert_eq!(
+        storage.chapter_analysis(imported.analysis_id).unwrap(),
+        Some(fixture(&imported.document.chapter).unwrap())
+    );
+    assert_eq!(storage.list_documents().unwrap()[0].progress_percent, 0);
+    assert_eq!(fs::read(database.path()).unwrap(), before_read);
+}
+
+#[test]
+fn txt_existing_bypasses_decoding_and_preserves_title_progress_analysis_and_status() {
+    let database = TestDatabase::new();
+    let mut storage = Storage::open(database.path()).unwrap();
+    // Both encodings are valid but disagree: initial import explicitly selects UTF-8.
+    let bytes = "©".as_bytes();
+    let imported = created(
+        storage
+            .import_analyzed_txt(bytes, "first.txt", Some(TextEncoding::Utf8), 1, fixture)
+            .unwrap(),
+    );
+    let id = imported.document.document_id;
+    let entry = storage
+        .vocabulary_entry(&Surface::new("©").unwrap())
+        .unwrap()
+        .unwrap();
+    storage
+        .set_vocabulary_status(entry.id, VocabularyStatus::Ignored, 2)
+        .unwrap();
+    let saved = storage
+        .save_reading_position(id, position(&imported.document, 2))
+        .unwrap()
+        .unwrap();
+    storage
+        .connection
+        .execute(
+            "UPDATE documents SET finished_at_least_once = 1, title = 'renamed' WHERE id = ?1",
+            [i64::from(id)],
+        )
+        .unwrap();
+    let expected = PastedDocument {
+        title: "renamed".into(),
+        finished_at_least_once: true,
+        ..saved
+    };
+    let before = totals(&storage);
+    // An absent or different selection must not reinterpret an existing file.
+    for selection in [None, Some(TextEncoding::ShiftJis)] {
+        match storage
+            .import_analyzed_txt(bytes, "second.txt", selection, 500, no_analysis)
+            .unwrap()
+        {
+            TxtImportOutcome::Existing(document) => assert_eq!(document, expected),
+            _ => panic!("expected existing"),
+        }
+    }
+    assert_eq!(totals(&storage), before);
+    assert_eq!(
+        storage
+            .vocabulary_entry(&entry.surface)
+            .unwrap()
+            .unwrap()
+            .status,
+        VocabularyStatus::Ignored
+    );
+    assert_eq!(
+        storage.load_txt_source(id).unwrap().unwrap().encoding,
+        TextEncoding::Utf8
+    );
+    assert_eq!(
+        storage.chapter_analysis(imported.analysis_id).unwrap(),
+        Some(fixture(&expected.chapter).unwrap())
+    );
+}
+
+#[test]
+fn txt_identity_uses_original_bytes_not_filename_encoding_or_canonical_text_or_paste() {
+    let database = TestDatabase::new();
+    let mut storage = Storage::open(database.path()).unwrap();
+    // All three become the same base text; retain three distinct original sources.
+    for (bytes, selection) in [
+        ("猫".as_bytes(), Some(TextEncoding::Utf8)),
+        ("\u{feff}猫".as_bytes(), None),
+        ("｜猫《ねこ》".as_bytes(), Some(TextEncoding::Utf8)),
+        (&[0x94, 0x4c][..], None),
+    ] {
+        let imported = created(
+            storage
+                .import_analyzed_txt(bytes, "same.txt", selection, 1, fixture)
+                .unwrap(),
+        );
+        assert_eq!(imported.document.chapter.text, "猫");
+        assert_eq!(
+            storage
+                .load_txt_source(imported.document.document_id)
+                .unwrap()
+                .unwrap()
+                .original_bytes,
+            bytes
+        );
+    }
+    let paste = storage
+        .import_analyzed_paste(&PasteText::new("猫".into()).unwrap(), 2, fixture)
+        .unwrap();
+    let PasteImportOutcome::Created(paste) = paste else {
+        panic!("paste identity must be independent")
+    };
+    assert!(storage
+        .load_txt_source(paste.document.document_id)
+        .unwrap()
+        .is_none());
+    assert_eq!(count(&storage, "documents"), 5);
+    assert_eq!(count(&storage, "vocabulary_status_events"), 1);
+    assert_eq!(count(&storage, "paste_content_hashes"), 1);
+}
+
+#[test]
+fn txt_preserves_all_global_statuses_and_registers_new_surfaces_only() {
+    let database = TestDatabase::new();
+    let mut storage = Storage::open(database.path()).unwrap();
+    let mut entries = Vec::new();
+    for (word, status) in [
+        ("猫", VocabularyStatus::New),
+        ("犬", VocabularyStatus::Learning),
+        ("鳥", VocabularyStatus::Familiar),
+        ("魚", VocabularyStatus::Known),
+        ("馬", VocabularyStatus::Ignored),
+    ] {
+        let surface = Surface::new(word).unwrap();
+        storage
+            .register_vocabulary(std::slice::from_ref(&surface), 1)
+            .unwrap();
+        let entry = storage.vocabulary_entry(&surface).unwrap().unwrap();
+        entries.push(
+            storage
+                .set_vocabulary_status(entry.id, status, 2)
+                .unwrap()
+                .unwrap(),
+        );
+    }
+    let imported = created(
+        storage
+            .import_analyzed_txt(
+                "猫 犬 鳥 魚 馬 猫 𠮷".as_bytes(),
+                "words.txt",
+                Some(TextEncoding::Utf8),
+                3,
+                fixture,
+            )
+            .unwrap(),
+    );
+    assert_eq!(imported.registered_surfaces, 1);
+    for entry in entries {
+        assert_eq!(
+            storage.vocabulary_entry(&entry.surface).unwrap(),
+            Some(entry)
+        );
+    }
+}
+
+#[test]
+fn txt_invalid_files_analysis_and_dates_leave_completed_files_untouched() {
+    let database = TestDatabase::new();
+    let mut storage = Storage::open(database.path()).unwrap();
+    let saved = created(
+        storage
+            .import_analyzed_txt(b"English", "good.txt", None, 1, fixture)
+            .unwrap(),
+    );
+    let before = totals(&storage);
+    for (bytes, selection, expected) in [
+        ("©".as_bytes(), None, TxtError::EncodingRequired),
+        (
+            &[0xff],
+            Some(TextEncoding::Utf8),
+            TxtError::InvalidEncoding(TextEncoding::Utf8),
+        ),
+        (&b"\xff\xfeX"[..], None, TxtError::UnsupportedEncoding),
+        (&b" \r\n"[..], None, TxtError::EmptyText),
+    ] {
+        assert!(
+            matches!(storage.import_analyzed_txt(bytes, "bad.txt", selection, 1, no_analysis), Err(TxtImportError::Parse(error)) if error == expected)
+        );
+        assert_eq!(totals(&storage), before);
+    }
+    assert!(matches!(
+        storage.import_analyzed_txt(b"other", "", None, 1, no_analysis),
+        Err(TxtImportError::Storage(StorageError::InvalidDocument))
+    ));
+    assert!(matches!(
+        storage.import_analyzed_txt(b"other", "date.txt", None, -1, no_analysis),
+        Err(TxtImportError::Storage(StorageError::InvalidVocabulary))
+    ));
+    assert!(matches!(
+        storage.import_analyzed_txt(b"other", "analysis.txt", None, 1, |_| Err::<
+            ChapterAnalysis,
+            _,
+        >("failed")),
+        Err(TxtImportError::Analysis("failed"))
+    ));
+    for invalid in 0..3 {
+        assert!(matches!(
+            storage.import_analyzed_txt(b"other", "analysis.txt", None, 1, |chapter| {
+                let mut analysis = fixture(chapter).unwrap();
+                match invalid {
+                    0 => analysis.mode = SplitMode::A,
+                    1 => analysis.tokens.clear(),
+                    _ => analysis.tokens[0].surface = "wrong".into(),
+                }
+                Ok::<_, Infallible>(analysis)
+            }),
+            Err(TxtImportError::Storage(StorageError::InvalidAnalysis))
+        ));
+    }
+    assert_eq!(totals(&storage), before);
+    assert_eq!(
+        storage.load_paste(saved.document.document_id).unwrap(),
+        Some(saved.document)
+    );
+    created(
+        storage
+            .import_analyzed_txt(b"other", "retry.txt", None, 2, fixture)
+            .unwrap(),
+    );
+}
+
+#[test]
+fn txt_every_write_and_commit_failure_rolls_back_and_can_retry_independently() {
+    for table in [
+        "sources",
+        "chapters",
+        "documents",
+        "chapter_texts",
+        "imported_files",
+        "source_ruby",
+        "chapter_analyses",
+        "analyzed_tokens",
+        "vocabulary",
+        "vocabulary_status_events",
+        "commit",
+    ] {
+        let database = TestDatabase::new();
+        let mut storage = Storage::open(database.path()).unwrap();
+        created(
+            storage
+                .import_analyzed_txt(b"English", "completed.txt", None, 1, fixture)
+                .unwrap(),
+        );
+        let before = totals(&storage);
+        if table == "commit" {
+            storage.connection.execute_batch("CREATE TEMP TABLE parent (id INTEGER PRIMARY KEY);
+                CREATE TEMP TABLE child (id INTEGER REFERENCES parent(id) DEFERRABLE INITIALLY DEFERRED);
+                CREATE TEMP TRIGGER fail_import AFTER INSERT ON vocabulary_status_events
+                BEGIN INSERT INTO child VALUES (99); END;").unwrap();
+        } else {
+            storage.connection.execute_batch(&format!("CREATE TEMP TRIGGER fail_import AFTER INSERT ON {table} BEGIN SELECT RAISE(ABORT, 'fixture'); END;")).unwrap();
+        }
+        let bytes = "｜猫《ねこ》 犬 𠮷".as_bytes();
+        assert!(
+            matches!(
+                storage.import_analyzed_txt(bytes, "new.txt", Some(TextEncoding::Utf8), 2, fixture),
+                Err(TxtImportError::Storage(StorageError::Sqlite(_)))
+            ),
+            "{table}"
+        );
+        assert_eq!(totals(&storage), before, "{table}");
+        storage
+            .connection
+            .execute_batch("DROP TRIGGER fail_import")
+            .unwrap();
+        let imported = created(
+            storage
+                .import_analyzed_txt(bytes, "new.txt", Some(TextEncoding::Utf8), 2, fixture)
+                .unwrap(),
+        );
+        assert_eq!(imported.registered_surfaces, 3);
+        drop(storage);
+        assert_eq!(
+            Storage::open(database.path())
+                .unwrap()
+                .load_paste(imported.document.document_id)
+                .unwrap(),
+            Some(imported.document)
+        );
+    }
+}
+
+#[test]
+fn txt_concurrent_identical_files_commit_once_and_reference_same_document() {
+    let database = TestDatabase::new();
+    Storage::open(database.path()).unwrap();
+    let barrier = Arc::new(Barrier::new(3));
+    let handles: Vec<_> = (0..2)
+        .map(|index| {
+            let path = database.path();
+            let barrier = Arc::clone(&barrier);
+            std::thread::spawn(move || {
+                let mut storage = Storage::open(path).unwrap();
+                barrier.wait();
+                storage
+                    .import_analyzed_txt(
+                        "猫 猫 𠮷".as_bytes(),
+                        &format!("{index}.txt"),
+                        Some(TextEncoding::Utf8),
+                        1,
+                        fixture,
+                    )
+                    .unwrap()
+            })
+        })
+        .collect();
+    barrier.wait();
+    let mut creates = 0;
+    let documents: Vec<_> = handles
+        .into_iter()
+        .map(|handle| match handle.join().unwrap() {
+            TxtImportOutcome::Created(imported) => {
+                creates += 1;
+                imported.document
+            }
+            TxtImportOutcome::Existing(document) => document,
+        })
+        .collect();
+    assert_eq!(creates, 1);
+    assert_eq!(documents[0], documents[1]);
+    let storage = Storage::open(database.path()).unwrap();
+    assert_eq!(count(&storage, "documents"), 1);
+    assert_eq!(count(&storage, "vocabulary_status_events"), 2);
+}
+
+#[test]
+fn txt_delete_reimport_resets_live_identity_but_preserves_global_vocabulary_and_provenance() {
+    let database = TestDatabase::new();
+    let mut storage = Storage::open(database.path()).unwrap();
+    let bytes = "｜猫《ねこ》".as_bytes();
+    let imported = created(
+        storage
+            .import_analyzed_txt(bytes, "old.txt", Some(TextEncoding::Utf8), 1, fixture)
+            .unwrap(),
+    );
+    let document = imported.document;
+    let entry = storage
+        .vocabulary_entry(&Surface::new("猫").unwrap())
+        .unwrap()
+        .unwrap();
+    storage
+        .set_vocabulary_status(entry.id, VocabularyStatus::Known, 2)
+        .unwrap();
+    // No production deletion API yet; exercise its required live-row boundaries.
+    storage
+        .connection
+        .execute(
+            "DELETE FROM documents WHERE id = ?1",
+            [i64::from(document.document_id)],
+        )
+        .unwrap();
+    storage
+        .connection
+        .execute(
+            "DELETE FROM chapter_texts WHERE chapter_id = ?1",
+            [i64::from(document.chapter.chapter_id)],
+        )
+        .unwrap();
+    assert_eq!(count(&storage, "imported_files"), 0);
+    assert_eq!(count(&storage, "source_ruby"), 0);
+    assert!(storage
+        .load_txt_source(document.document_id)
+        .unwrap()
+        .is_none());
+    let new = created(
+        storage
+            .import_analyzed_txt(bytes, "new.txt", Some(TextEncoding::Utf8), 3, fixture)
+            .unwrap(),
+    );
+    assert_ne!(new.document.document_id, document.document_id);
+    assert_ne!(new.document.chapter.source_id, document.chapter.source_id);
+    assert_eq!(new.registered_surfaces, 0);
+    assert!(new.document.reading_position.is_none());
+    assert!(!new.document.finished_at_least_once);
+    assert_eq!(storage.list_documents().unwrap()[0].progress_percent, 0);
+    assert_eq!(count(&storage, "sources"), 2);
+    assert_eq!(
+        storage
+            .vocabulary_entry(&entry.surface)
+            .unwrap()
+            .unwrap()
+            .status,
+        VocabularyStatus::Known
+    );
+}
+
+#[test]
+fn txt_corrupt_digest_or_ruby_fails_closed_without_repair_or_reanalysis() {
+    for corruption in [
+        "UPDATE imported_files SET original_bytes = X'00'",
+        "DELETE FROM imported_files",
+        "UPDATE source_ruby SET start_byte = 1",
+        "UPDATE source_ruby SET end_byte = 999",
+        "UPDATE source_ruby SET ruby_index = 1",
+    ] {
+        let database = TestDatabase::new();
+        let mut storage = Storage::open(database.path()).unwrap();
+        let bytes = "｜猫《ねこ》".as_bytes();
+        let imported = created(
+            storage
+                .import_analyzed_txt(bytes, "ruby.txt", Some(TextEncoding::Utf8), 1, fixture)
+                .unwrap(),
+        );
+        storage.connection.execute_batch(corruption).unwrap();
+        assert!(matches!(
+            storage.load_txt_source(imported.document.document_id),
+            Err(StorageError::InvalidDocument)
+        ));
+        if corruption.contains("original_bytes") {
+            assert!(matches!(
+                storage.import_analyzed_txt(bytes, "retry.txt", None, 2, no_analysis),
+                Err(TxtImportError::Storage(StorageError::InvalidDocument))
+            ));
+        }
+    }
+    // Corrupt the digest so it falsely claims another file's identity.
+    let database = TestDatabase::new();
+    let mut storage = Storage::open(database.path()).unwrap();
+    created(
+        storage
+            .import_analyzed_txt(b"English", "old.txt", None, 1, fixture)
+            .unwrap(),
+    );
+    storage
+        .connection
+        .execute(
+            "UPDATE imported_files SET sha256 = ?1",
+            [Sha256::digest(b"other").as_slice()],
+        )
+        .unwrap();
+    assert!(matches!(
+        storage.import_analyzed_txt(b"other", "new.txt", None, 2, no_analysis),
+        Err(TxtImportError::Storage(StorageError::InvalidDocument))
+    ));
+    assert_eq!(count(&storage, "documents"), 1);
+}
+
+#[test]
+fn txt_migration_preserves_existing_paste_anchors_history_and_source_id_high_water() {
+    let database = TestDatabase::new();
+    let mut connection = Connection::open(database.path()).unwrap();
+    migrate(&mut connection, &MIGRATIONS[..11]).unwrap();
+    let mut storage = Storage { connection };
+    let saved = storage
+        .create_analyzed_paste(&PasteText::new("猫 𠮷".into()).unwrap(), 1, fixture)
+        .unwrap();
+    let page_length = storage.page_length().unwrap();
+    let pages = yomoku_core::pagination::LogicalPages::new(
+        std::slice::from_ref(&saved.document.chapter),
+        page_length,
+    )
+    .unwrap();
+    let completion = yomoku_core::completion::PageCompletion {
+        command_id: storage.new_completion_command_id().unwrap(),
+        document_id: saved.document.document_id,
+        page: pages.pages()[0],
+        page_length,
+        departing_position: position(&saved.document, 0),
+        completed_at_unix_ms: 2,
+        pending_time: Default::default(),
+    };
+    storage
+        .record_analyzed_page_completion(completion, saved.analysis_id)
+        .unwrap();
+    let saved_position = position(&saved.document, 4);
+    storage
+        .save_reading_position(saved.document.document_id, saved_position)
+        .unwrap();
+    storage.connection.execute("INSERT INTO sources (id, kind, original_title) VALUES (100, 'paste', 'deleted provenance fixture')", []).unwrap();
+    storage
+        .connection
+        .execute("DELETE FROM sources WHERE id = 100", [])
+        .unwrap();
+    drop(storage);
+    let mut storage = Storage::open(database.path()).unwrap();
+    let snapshot = storage
+        .load_reader_snapshot(saved.document.document_id)
+        .unwrap()
+        .unwrap();
+    assert_eq!(snapshot.document.reading_position, Some(saved_position));
+    assert_eq!(snapshot.document.chapter, saved.document.chapter);
+    assert_eq!(
+        snapshot.analysis,
+        ReaderAnalysis::Available(saved.analysis_id)
+    );
+    assert!(snapshot.document.finished_at_least_once);
+    assert_eq!(count(&storage, "reading_completions"), 1);
+    assert_eq!(count(&storage, "reading_occurrences"), 2);
+    assert_eq!(count(&storage, "vocabulary_status_events"), 4);
+    assert_eq!(
+        storage
+            .record_analyzed_page_completion(completion, saved.analysis_id)
+            .unwrap(),
+        yomoku_core::completion::AnalyzedCompletionOutcome::AlreadyRecorded
+    );
+    let new = created(
+        storage
+            .import_analyzed_txt(b"English", "new.txt", None, 2, fixture)
+            .unwrap(),
+    );
+    assert!(i64::from(new.document.chapter.source_id) > 100);
+    assert!(storage
+        .connection
+        .prepare("PRAGMA foreign_key_check")
+        .unwrap()
+        .query([])
+        .unwrap()
+        .next()
+        .unwrap()
+        .is_none());
+    assert!(storage
+        .connection
+        .execute(
+            "INSERT INTO chapters (source_id, chapter_index) VALUES (999, 0)",
+            []
+        )
+        .is_err());
+}
+
+#[test]
+fn txt_migration_failure_rolls_back_rebuild_and_restores_foreign_key_enforcement() {
+    let database = TestDatabase::new();
+    let mut connection = Connection::open(database.path()).unwrap();
+    connection
+        .pragma_update(None, "foreign_keys", true)
+        .unwrap();
+    migrate(&mut connection, &MIGRATIONS[..11]).unwrap();
+    let mut storage = Storage { connection };
+    let saved = storage
+        .create_paste(&PasteText::new("猫".into()).unwrap())
+        .unwrap();
+    storage
+        .connection
+        .execute_batch("CREATE TABLE source_ruby (fixture TEXT)")
+        .unwrap();
+    assert!(matches!(
+        migrate(&mut storage.connection, MIGRATIONS),
+        Err(StorageError::Sqlite(_))
+    ));
+    assert_eq!(storage.schema_version().unwrap(), 11);
+    assert_eq!(storage.load_paste(saved.document_id).unwrap(), Some(saved));
+    assert!(!storage
+        .connection
+        .table_exists(None, "imported_files")
+        .unwrap());
+    assert!(storage
+        .connection
+        .execute(
+            "INSERT INTO sources (kind, original_title) VALUES ('txt', 'failed')",
+            []
+        )
+        .is_err());
+    assert!(storage
+        .connection
+        .execute(
+            "INSERT INTO chapters (source_id, chapter_index) VALUES (999, 0)",
+            []
+        )
+        .is_err());
+    storage
+        .connection
+        .execute_batch("DROP TABLE source_ruby")
+        .unwrap();
+    migrate(&mut storage.connection, MIGRATIONS).unwrap();
+    created(
+        storage
+            .import_analyzed_txt(b"English", "retry.txt", None, 2, fixture)
+            .unwrap(),
+    );
+}
+
+#[test]
+fn txt_migration_foreign_key_check_rolls_back_instead_of_publishing_broken_anchors() {
+    let database = TestDatabase::new();
+    let mut connection = Connection::open(database.path()).unwrap();
+    migrate(&mut connection, &MIGRATIONS[..11]).unwrap();
+    connection
+        .pragma_update(None, "foreign_keys", false)
+        .unwrap();
+    connection
+        .execute(
+            "INSERT INTO chapters (source_id, chapter_index) VALUES (999, 0)",
+            [],
+        )
+        .unwrap();
+    connection
+        .pragma_update(None, "foreign_keys", true)
+        .unwrap();
+    assert!(matches!(
+        migrate(&mut connection, MIGRATIONS),
+        Err(StorageError::InvalidMigrationHistory)
+    ));
+    assert_eq!(history(&database.path()).len(), 11);
+    assert!(!connection.table_exists(None, "imported_files").unwrap());
+    let enabled: bool = connection
+        .pragma_query_value(None, "foreign_keys", |row| row.get(0))
+        .unwrap();
+    assert!(enabled);
+}

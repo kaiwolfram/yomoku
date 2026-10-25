@@ -1774,3 +1774,27 @@ rewrite CR/LF, extract title/author from body text or strip publication footers.
 One canonical text unit will receive its IDs in the future atomic file import.
 File-byte SHA-256, ruby persistence/rendering, filename titles and picker/manual
 selection UI remain separate wiring steps; no current paste semantics change.
+
+## 2026-10-25 — Atomic TXT file repository and source migration
+
+Keep pure decoding in yomoku-import and SQLite composition in yomoku-storage.
+Use a separate unique original-file SHA-256 domain, retaining the exact source BLOB
+and chosen encoding; equal canonical text, BOM/encoding/markup changes and pasted
+text remain distinct sources. A duplicate references its first committed canonical
+interpretation regardless of later encoding selection, with no rescan, registration,
+rename, position reset or finished reset. Filename is the caller-supplied literal
+Android display name, including extension; reject blank names for new files.
+Original bytes, canonical text/ruby, Mode B and registrations commit together;
+source ruby is separate from analysis and awaits typed reader/rendering work.
+Reuse current single-text snapshot/completion machinery and PastedDocument's wire
+shape instead of a bridge-wide rename; EPUB multi-chapter work remains separate.
+
+Migration 0012 widens sources.kind via the documented SQLite
+[table rebuild procedure](https://www.sqlite.org/lang_altertable.html#making_other_kinds_of_table_schema_changes).
+Verified the primary documentation on 2026-10-25: foreign_keys must be disabled
+outside BEGIN, rebuild through a new table rather than renaming the old parent,
+run foreign_key_check before COMMIT and restore enforcement. Preserve sources'
+AUTOINCREMENT high-water mark, including deleted IDs and the absent sequence in a
+fresh database. Migration failure restores original schema/data/history; normal
+connections retain FK enforcement. No writable_schema shortcut, new package/version,
+platform I/O in core, production deletion or Android import behavior is introduced.

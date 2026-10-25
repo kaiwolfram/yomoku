@@ -206,7 +206,7 @@ pub(crate) fn load_paste_in(
                  FROM sources
                  JOIN chapters ON chapters.source_id = sources.id
                  JOIN chapter_texts ON chapter_texts.chapter_id = chapters.id
-                 WHERE sources.id = ?1 AND sources.kind = 'paste' AND chapters.chapter_index = 0",
+                 WHERE sources.id = ?1 AND sources.kind IN ('paste', 'txt') AND chapters.chapter_index = 0",
             [i64::from(source_id)],
             |row| Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?)),
         )
@@ -256,9 +256,18 @@ pub(crate) fn create_paste_in(
     text: &PasteText,
 ) -> Result<PastedDocument, StorageError> {
     let title = text.initial_title();
+    create_single_text_in(connection, "paste", title, text.as_str())
+}
+
+pub(crate) fn create_single_text_in(
+    connection: &Connection,
+    kind: &str,
+    title: &str,
+    text: &str,
+) -> Result<PastedDocument, StorageError> {
     connection.execute(
-        "INSERT INTO sources (kind, original_title) VALUES ('paste', ?1)",
-        [title],
+        "INSERT INTO sources (kind, original_title) VALUES (?1, ?2)",
+        (kind, title),
     )?;
     let source_id = SourceId::try_from(connection.last_insert_rowid())
         .map_err(|_| StorageError::InvalidDocument)?;
@@ -276,7 +285,7 @@ pub(crate) fn create_paste_in(
         .map_err(|_| StorageError::InvalidDocument)?;
     connection.execute(
         "INSERT INTO chapter_texts (chapter_id, text) VALUES (?1, ?2)",
-        (i64::from(chapter_id), text.as_str()),
+        (i64::from(chapter_id), text),
     )?;
     Ok(PastedDocument {
         document_id,
@@ -286,7 +295,7 @@ pub(crate) fn create_paste_in(
         chapter: ChapterText {
             source_id,
             chapter_id,
-            text: text.as_str().to_owned(),
+            text: text.to_owned(),
         },
     })
 }

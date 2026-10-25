@@ -1348,3 +1348,27 @@
 - Updated plan, architecture/data docs, README, decisions, commands and handoff.
   Next: original-file SHA-256 plus atomic TXT text/ruby/Mode B/registration storage,
   then typed runtime/Android picker and encoding selection. Nostr empty; ask Q188.
+
+## 2026-10-25 — Atomic TXT original-file repository
+
+- Continued phase 4 from a clean tree. Added migration 0012, original-file SHA-256
+  identity/source BLOB/encoding and canonical source-ruby tables. A new worker-only
+  TXT repository atomically composes strict parsing, filename title, canonical text,
+  ruby, original Mode B and unique registrations; exact duplicates skip decoding/
+  analysis and preserve existing state. Paste hash semantics remain separate.
+- Shared single-text snapshot/token/completion paths accept TXT with the unchanged
+  historical bridge type. Added read-only source/ruby access; runtime/Android file
+  and ruby transport/rendering remain future work. No new package/version.
+- Rebuilt sources.kind using SQLite's documented transaction/FK-check procedure,
+  preserving existing IDs, history and autoincrement high-water marks. Migration
+  rollback restores schema/data and enforcement. Fixed a fresh-database sequence
+  regression caught by the existing full-width-ID test and corrected encoding/FK
+  fixture assumptions. No open failure/blocker.
+- PASS: 287 data-free Rust tests, strict Clippy/fmt/diff; twelve new repository/
+  migration tests and one real-Full TXT fixture. All twelve Full and one runtime
+  fixture pass with both owned/mapped loaders. Targeted tests rerun after stronger
+  query-only/history assertions. No escalation/download required.
+- Updated plan/architecture/data/decisions/README/commands/handoff. Android/Kotlin/
+  JNI/generation/Python/full-index/release/process/reboot/physical arm64 not rerun.
+  Next: lazy FIFO/typed file import with encoding uncertainty, then Android picker/
+  encoding choice and Library summary. Nostr stays empty; ask Q188 before forwarding.

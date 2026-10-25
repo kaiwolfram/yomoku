@@ -104,7 +104,8 @@ impl PasteText {
     }
 }
 
-/// A persisted paste snapshot, with a title separate from its immutable text.
+/// A persisted single-text document (paste or TXT), with an independent title.
+/// The historical type name remains stable at the typed bridge boundary.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
 pub struct PastedDocument {

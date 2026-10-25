@@ -12,10 +12,12 @@ mod reader_tokens;
 pub mod reader_words;
 mod reading_time;
 mod settings;
+mod txt;
 mod vocabulary;
 
 pub use imports::{AnalyzedPaste, PasteImportError, PasteImportOutcome};
 pub use reading_time::SavedReadingTime;
+pub use txt::{StoredTxtSource, TxtImportError, TxtImportOutcome};
 
 use std::{error::Error, fmt, path::Path, time::Duration};
 
@@ -82,6 +84,11 @@ const MIGRATIONS: &[Migration] = &[
         version: 11,
         name: "0011_finished_documents",
         sql: include_str!("../migrations/0011_finished_documents.sql"),
+    },
+    Migration {
+        version: 12,
+        name: "0012_txt_imports",
+        sql: include_str!("../migrations/0012_txt_imports.sql"),
     },
 ];
 
@@ -167,6 +174,19 @@ impl Storage {
 }
 
 fn migrate(connection: &mut Connection, migrations: &[Migration]) -> Result<(), StorageError> {
+    // SQLite's documented table-rebuild procedure requires this outside BEGIN.
+    // Restore even on rollback; no application operation uses an unchecked connection.
+    let foreign_keys: bool =
+        connection.pragma_query_value(None, "foreign_keys", |row| row.get(0))?;
+    connection.pragma_update(None, "foreign_keys", false)?;
+    let result = migrate_in(connection, migrations);
+    let restored = connection.pragma_update(None, "foreign_keys", foreign_keys);
+    result?;
+    restored?;
+    Ok(())
+}
+
+fn migrate_in(connection: &mut Connection, migrations: &[Migration]) -> Result<(), StorageError> {
     // Lock before reading history so concurrent opens cannot apply a migration twice.
     let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
     let has_history: bool = transaction.query_row(
@@ -221,6 +241,12 @@ fn migrate(connection: &mut Connection, migrations: &[Migration]) -> Result<(), 
             "INSERT INTO schema_migrations (version, name) VALUES (?1, ?2)",
             (migration.version, migration.name),
         )?;
+    }
+    if history.len() < migrations.len() {
+        let mut check = transaction.prepare("PRAGMA foreign_key_check")?;
+        if check.query([])?.next()?.is_some() {
+            return Err(StorageError::InvalidMigrationHistory);
+        }
     }
     transaction.commit()?;
     Ok(())

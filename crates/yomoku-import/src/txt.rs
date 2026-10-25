@@ -20,7 +20,7 @@ pub struct SourceRuby {
 }
 
 /// One canonical text unit: headings and page directives never create chapters.
-/// The filename supplies the title at the future storage boundary.
+/// The filename supplies the title at the storage boundary.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct TxtDocument {
     pub encoding: TextEncoding,

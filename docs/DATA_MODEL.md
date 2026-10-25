@@ -1,6 +1,6 @@
 # Data model
 
-## TXT canonical content (parser only)
+## TXT canonical content and atomic file repository (migration 0012)
 
 `yomoku-import::txt::TxtDocument` contains the selected UTF-8/Shift-JIS encoding,
 one canonical text string and ordered nonoverlapping `SourceRuby` records. Each
@@ -8,10 +8,33 @@ ruby stores a reading and a half-open UTF-8 byte range into the canonical base t
 after markup removal and before analysis/ID allocation. Hard LF/CRLF/CR and Unicode
 scalars are preserved; ruby readings do not enter analyzed text. Common layout
 directives do not create chapter boundaries. Unsupported notation stays visible.
-These values are not persisted yet; no user schema or existing paste/hash contract
-changes. The future file transaction must hash original source bytes, use the
-filename for TXT's title, and store canonical text/ruby together with original
-Mode B analysis and unique-surface registration.
+`import_analyzed_txt` hashes original bytes before its immediate transaction, then
+references the live exact match without parsing or analysis, or commits filename
+title, original bytes/selected encoding, canonical text/ruby, original Mode B and
+unique Japanese registrations together. It returns Created/Existing only after
+commit; failures discard this file and preserve earlier imports. Duplicate titles,
+selection changes or equal canonical text do not change original-byte identity.
+An exact byte comparison rejects a false digest match. Paste identity is separate.
+
+Migration 0012 rebuilds `sources` to permit `kind IN ('paste', 'txt')`, preserving
+all IDs, provenance and the autoincrement high-water mark. The migration runner
+uses SQLite's documented create/copy/drop/rename procedure with foreign keys off
+outside BEGIN, checks `foreign_key_check` before committing pending migrations,
+and restores the original enforcement setting on success or rollback. Normal
+Storage connections always enable foreign keys. Existing source/chapter/history
+references remain intact; migration never analyzes or rewrites existing text.
+
+`imported_files` stores live document PK/FK (delete cascade), unique 32-byte SHA-256,
+original BLOB and `utf8`/`shift_jis` encoding. `source_ruby` stores chapter-text FK
+(delete cascade), ordered ruby index, canonical start/end UTF-8 offsets and reading.
+Each file has one canonical chapter. `load_txt_source` reads bytes/encoding/ruby in
+one transaction, verifies digest, ordered nonoverlapping scalar ranges and readings,
+and rejects corruption without repair or reanalysis. Existing single-text snapshot,
+token, progress, completion and finished-reopen repositories now accept paste/TXT;
+their historical PastedDocument name/wire format is retained. No ruby reader payload
+or Android file flow exists yet. Deleting live content removes file identity/ruby;
+retained source/chapter/history and global vocabulary survive, and reimport starts
+with fresh IDs, position and finish state. Production deletion is still planned.
 
 ## Immutable word/name dictionary index
 
@@ -383,8 +406,8 @@ must be used by production imports before they are considered complete.
 and a 32-byte SHA-256 BLOB, indexed by `(sha256, document_id)`. This table's identity
 domain is exact pasted canonical UTF-8 bytes, including line endings, whitespace,
 NUL and original Unicode spelling; neither title nor normalized/analyzed text is
-hashed. File importers must later use original file bytes and a separate identity
-domain, not hash extracted text as an exact-file duplicate key.
+hashed. TXT uses original bytes and the separate migration-0012 file identity
+domain, never extracted text as an exact-file duplicate key.
 
 The digest index is deliberately nonunique: migration preserves all preexisting
 duplicate Library entries. Opening adds only the empty table/index, without reading

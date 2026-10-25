@@ -21,10 +21,16 @@ only. Strict UTF-8/Shift-JIS decoding returns explicit uncertainty before any
 canonicalization; a selected encoding never silently falls back or replaces errors.
 The Aozora parser produces one canonical text unit plus ordered source-ruby UTF-8
 ranges. It hides common typographic directives, retains unknown/semantic/gaiji
-notations and preserves every hard break without chapter inference. Callers retain
-original bytes for future exact-file SHA-256. The parser does not allocate durable
-IDs or perform I/O/analysis/SQL. File repository transactions, ruby persistence,
-runtime/FFI and Android picker/encoding UI are not connected yet.
+notations and preserves every hard break without chapter inference. The parser does
+not allocate durable IDs or perform I/O/analysis/SQL. Storage now consumes it in
+`import_analyzed_txt`: hash original bytes, lock one immediate transaction, reference
+an exact live file or parse/allocate/store original bytes, filename title, canonical
+text/ruby, Mode B analysis and unique registrations together. An existing file skips
+decoding/analysis and preserves its chosen encoding/statuses/progress. The analyzer
+callback obeys the same ready-worker/no-I/O/provisional-ID contract as paste. Shared
+single-text readers load paste or TXT with the historical PastedDocument wire type;
+source ruby has a separate read-only repository, awaiting reader transport/rendering.
+Runtime/FFI file imports and Android picker/encoding UI are not connected yet.
 
 Pure document values define positive i64 identities, immutable chapter snapshots,
 UTF-8 byte anchors, checked UTF-16 conversions and literal first-line paste titles.
@@ -546,8 +552,9 @@ Automatic Android backup/transfer is excluded. Arm64 execution is unverified.
 Production paste imports now atomically persist Mode B analyses and register all
 unique Japanese surfaces without encounters, deduplicate exact bytes and deliver
 Created/Existing summaries. Native descriptor delivery and retained/background
-lifecycle are connected. TXT/EPUB/SRT parsing, metadata and multi-file import
-semantics remain unchecked. Legacy imports are not automatically rescanned.
+lifecycle are connected. TXT parsing and atomic file storage are verified separately;
+file runtime/Android, EPUB/SRT parsing, metadata and multi-file import semantics
+remain unchecked. Legacy imports are not automatically rescanned.
 Explicit core/worker/FFI pending-time checkpoints coalesce during unresolved saves
 and drain before reader movement/exit or analyzed completion. Completion preparation/
 exact retries now run through core/FIFO/FFI. Android monotonic lifecycle/interactions
