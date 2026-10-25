@@ -1308,3 +1308,24 @@
   Next: connect current panel to details requests, then applicable readings/senses,
   compact POS, separate names/count, retry and recreation dismissal. Nostr remains
   empty; ask Q188 before forwarding.
+
+## 2026-10-25 — Reader dictionary panel
+
+- Recovered six uncommitted Android files from the interrupted session; preserved
+  the implementation and completed its verification. Connected the existing phone
+  sheet/wide panel to gated selected-word requests and dismissal. Render all
+  applicable expanded senses/readings, compact POS, separate name categories/
+  translations and lifetime exact-surface count; errors require explicit retry.
+- Closing/disposal/recreation and core invalidation retire selection; late results
+  cannot reopen it. Teardown tolerates Compose's final dismissal. No dependency,
+  storage migration, Rust or wire change.
+- PASS: debug/test APK builds, strict Android lint, Kotlin fmt/diff; 14 dictionary/
+  span/session tests phone/light + wide/dark, plus 17 phone reader/navigation/clock/
+  paste regressions. Six new tests cover applicable views/POS, simultaneous sources/
+  counts/read-only opens, failure/no match, late close and both movement directions.
+  Fixed the old mock selection echo and a new fixture's page-content assumption.
+- Reports: .local/test-reports/reader-dictionary-panel/. Gradle/ADB sockets needed
+  escalation; all final runs pass. Emulator restored to phone/light and left running.
+  Host Rust/JNI/generation, Python/full scans, release, separate process/reboot and
+  physical arm64 were not rerun. No open blocker. Updated plan/handoff and supporting
+  docs; next: phase-4 TXT imports, then atomic integration. Nostr empty; ask Q188.

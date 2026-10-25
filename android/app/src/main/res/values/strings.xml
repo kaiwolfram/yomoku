@@ -25,6 +25,12 @@
     <string name="retry_word_lookup">Retry word lookup</string>
     <string name="word_reading">Reading: %1$s</string>
     <string name="word_dictionary_form">Dictionary form: %1$s</string>
+    <string name="word_lookup_loading">Loading dictionary…</string>
+    <string name="word_lookup_failed">Dictionary lookup failed.</string>
+    <string name="word_encountered">Encountered %1$s times</string>
+    <string name="word_definitions">JMdict · English definitions</string>
+    <string name="word_names">JMnedict · Names</string>
+    <string name="word_no_match">No dictionary or name match.</string>
     <string name="status_new">New</string>
     <string name="status_learning">Learning</string>
     <string name="status_familiar">Familiar</string>

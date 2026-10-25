@@ -27,19 +27,20 @@ Yomoku is under active development. The working app supports:
 - Forward completion records repeated Japanese encounters, promotes New words to
   Known and shows a positive-count toast; deliberate rereads count again.
 - Japanese words have status highlights and open a panel with their full surface,
-  analyzer reading/base form and five direct status choices. Opening it leaves
-  statuses and history unchanged; choices persist globally across repeated surfaces.
+  analyzer reading/base form, expanded English definitions, separate name readings
+  and lifetime encounter count. Five direct status choices persist globally across
+  repeated surfaces; opening the panel leaves statuses and history unchanged.
 
-Dictionary definitions and encounter counts remain pending in the app. A
-[pinned offline JMdict/JMnedict compiler](third_party/dictionaries/README.md)
+The [pinned offline JMdict/JMnedict compiler](third_party/dictionaries/README.md)
 prepares the English word/name index with complete attribution and lookup fixtures.
 Rust now reads this index through a separate read-only repository, with typed
 surface/base candidates and pure spelling/reading/sense restriction rules.
 Android bundles the pinned index, reproducible source inputs and complete offline
 Settings credits. Lazy private installation verifies size/SHA-256 before exposing
-a read-only path. The lazy FIFO/typed JNI now returns selected-word definitions,
-name candidates and exact-surface lifetime counts with cancellation and retry;
-rendering those details in the word panel remains pending.
+a read-only path. The lazy FIFO/typed JNI supplies the word panel with all applicable
+readings/senses, compact grammatical labels, names and exact-surface lifetime counts.
+Lookup failures require explicit retry; dismissal, navigation and recreation discard
+the transient selection and late results.
 Compose reads stored Mode B tokens through typed core/FIFO/FFI, validates the
 current page identity and
 converts exact UTF-8 spans to UTF-16 without splitting Unicode scalars. Status
@@ -59,7 +60,7 @@ on each newly recorded completion, including rereads with zero new words.
 Nostr, Statistics and Vocabulary tabs currently
 show placeholders.
 
-Planned v1 features include EPUB/TXT/SRT imports, offline JMdict/JMnedict lookup,
+Planned v1 features include EPUB/TXT/SRT imports, custom missing-word definitions,
 reading statistics, optional AnkiDroid integration, curated Nostr reading and
 manual encrypted backups. See the [product specification](docs/PRODUCT_SPEC.md)
 for scope and the [implementation checklist](docs/IMPLEMENTATION_PLAN.md) for

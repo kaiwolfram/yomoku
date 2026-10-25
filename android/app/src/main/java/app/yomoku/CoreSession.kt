@@ -81,6 +81,8 @@ internal class CoreSession(
 
     fun dispatch(event: Event) {
         requireMainThread()
+        // Compose can dispose its transient selection after ViewModel teardown begins.
+        if (closing && event == Event.DismissReaderWord) return
         check(!closing) { "CoreSession is closing or closed" }
         // Sample before the intent: core may freeze the departing position immediately.
         when (event) {

@@ -6,7 +6,8 @@ See [attribution](ATTRIBUTION.txt), the complete [EDRDG statement](edrdg-licence
 and [CC legal code](CC-BY-SA-4.0.txt). These notices and complete project documents
 are copied beside every prepared index and bundled in Android assets. Settings
 exposes the complete attribution, legal code and project documentation offline.
-Definitions are not yet connected to the word panel.
+The word panel displays applicable English senses/readings, separate names and
+exact-surface lifetime encounter counts through the lazy read-only dictionary worker.
 
 ## Pinned sources
 

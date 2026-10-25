@@ -1961,3 +1961,49 @@ pass. Existing benign Crux JNI shutdown diagnostics persist. No new dependency o
 mutable migration. Python/compiler/full-index scans, standalone Sudachi fixtures/
 probes, full Android reader matrix, tablet/dark, release, process/reboot recovery
 and physical arm64 were not rerun. No open failure or blocker.
+
+## Reader dictionary panel
+
+Commands for the 2026-10-25 panel integration, using the Rust PATH and Android/JDK
+environment above. All required data is already prepared; these commands are offline:
+
+```sh
+tools/format-kotlin.sh --check
+./android/gradlew -p android :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug --offline --console=plain
+./android/gradlew -p android :app:connectedDebugAndroidTest :app:lintDebug -Pandroid.testInstrumentationRunnerArguments.class=app.yomoku.ReaderWordsTest,app.yomoku.ReaderDictionaryTest,app.yomoku.ReaderWordDetailsSessionTest,app.yomoku.ReaderWordSpansTest --offline --console=plain
+./android/gradlew -p android :app:connectedDebugAndroidTest :app:lintDebug '-Pandroid.testInstrumentationRunnerArguments.class=app.yomoku.ReaderWordsTest#movingBothDirectionsDismissesDetailsAndNeverRestoresTheSelection,app.yomoku.ReaderNavigationTest,app.yomoku.ReaderClockSessionTest,app.yomoku.PasteReaderTest,app.yomoku.NavigationTest' --offline --console=plain
+git diff --check
+```
+
+The first connected group has 14 tests: eight panel tests, two dictionary-view
+helpers, one real-index transport test and three Unicode/status-span tests. The
+second repeats the corrected movement test plus 17 reader/navigation/clock/paste
+regressions. For the wide/dark panel matrix, use the first group with the documented
+2560x1600/240dpi/night overrides,
+then reset size/density/night mode. Save reports before each later connected run
+overwrites them under `.local/test-reports/reader-dictionary-panel/`.
+
+Panel coverage includes separate simultaneous JMdict/JMnedict matches, applicable
+readings/senses and compact POS, inflected base lookup, lifetime counts after
+completion, unchanged position/status/history on lookup, no-match versus error,
+explicit retry after timer saves, busy/pending-save request gates, late-result
+discard after close, both movement directions, same-key token refresh,
+Settings/reflow/recreation dismissal, five choices/deleted entries and popup input
+extending the idle deadline.
+
+PASS: both-ABI debug/test APK builds, strict Android lint, Kotlin formatting and
+diff checks; all 14 dictionary/span/session tests on phone/light and wide/dark,
+and 17 phone reader/navigation/clock/paste regressions. The expanded phone group
+initially passed 13/14; the corrected movement test then passed with all 17
+regressions (18/18). The final wide/dark group passes 14/14. Saved reports are in
+`phone-initial`, `phone-regressions` and `tablet-dark` under the report root above.
+
+Recovered the six uncommitted Android files after the interrupted session. An old
+mock dispatch did not echo the core's accepted word selection; update that fixture
+and assert deferred request gates. The new movement fixture assumed page two held
+cats; tap its actual visible token instead. Both fixture failures are resolved.
+Gradle/ADB sandbox socket failures required escalation; approved runs pass. Restored
+physical 1080x2400/420dpi and night `no`; AVD remains running, assets preserved.
+No new dependency, migration, Rust or wire change. Host Rust/Clippy/JNI/generation,
+Python/full-index scans, standalone Full fixtures/probes, release, separate
+process/reboot recovery and physical arm64 were not rerun. No open blocker.

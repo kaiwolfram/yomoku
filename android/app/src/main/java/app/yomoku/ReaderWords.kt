@@ -20,6 +20,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -53,6 +54,7 @@ import app.yomoku.shared.ReaderStatusChange
 import app.yomoku.shared.ReaderToken
 import app.yomoku.shared.ReaderTokenKey
 import app.yomoku.shared.ReaderTokenSnapshot
+import app.yomoku.shared.ReaderWordSelection
 import app.yomoku.shared.ViewModel
 import app.yomoku.shared.VocabularyStatus
 
@@ -206,6 +208,23 @@ internal fun ReaderWords(view: ViewModel, dispatch: (Event) -> Unit, onInteracti
             if (key != null && snapshot != null) readerDisplayTokens(page, key, snapshot) else null
         }
     var selectedIndex by remember(key, tokens == null) { mutableStateOf<ULong?>(null) }
+    val selection = selectedIndex?.let { index -> key?.let { ReaderWordSelection(it, index) } }
+    var wordRequested by remember(selection) { mutableStateOf(false) }
+    val currentDispatch by rememberUpdatedState(dispatch)
+    DisposableEffect(Unit) {
+        onDispose { currentDispatch(Event.DismissReaderWord) }
+    }
+    LaunchedEffect(selection, canWrite, view.readerWordSelection) {
+        if (selection != null) {
+            if (wordRequested && view.readerWordSelection != selection) {
+                // Core invalidation must dismiss, including refresh at the same page anchor.
+                selectedIndex = null
+            } else if (!wordRequested && canWrite) {
+                wordRequested = true
+                dispatch(Event.LoadReaderWord(selection))
+            }
+        }
+    }
     val currentInteraction by rememberUpdatedState(onInteraction)
     val dark = isSystemInDarkTheme()
     val foreground = MaterialTheme.colorScheme.onSurface
@@ -245,7 +264,11 @@ internal fun ReaderWords(view: ViewModel, dispatch: (Event) -> Unit, onInteracti
             view,
             canWrite,
             onInteraction,
-            onClose = { selectedIndex = null },
+            onClose = {
+                selectedIndex = null
+                dispatch(Event.DismissReaderWord)
+            },
+            onRetry = { selection?.let { dispatch(Event.LoadReaderWord(it)) } },
         ) { status ->
             selected.vocabulary?.let {
                 dispatch(
@@ -266,6 +289,7 @@ private fun ReaderWordPanel(
     enabled: Boolean,
     onInteraction: () -> Unit,
     onClose: () -> Unit,
+    onRetry: () -> Unit,
     onStatus: (VocabularyStatus) -> Unit,
 ) {
     val close = {
@@ -336,6 +360,30 @@ private fun ReaderWordPanel(
             }
             StorageStatus(view)
             TextButton(onClick = close) { Text(stringResource(R.string.close)) }
+            val details =
+                view.readerWord?.takeIf {
+                    it.token == token && it.key == view.readerWordSelection?.key
+                }
+            if (details != null) {
+                ReaderDictionary(details)
+            } else if (view.readerWordError != null) {
+                Text(
+                    stringResource(R.string.word_lookup_failed),
+                    modifier = Modifier.testTag("word_lookup_error"),
+                )
+                TextButton(
+                    onClick = {
+                        onInteraction()
+                        onRetry()
+                    },
+                    enabled = enabled,
+                    modifier = Modifier.testTag("retry_word_details"),
+                ) {
+                    Text(stringResource(R.string.retry_word_lookup))
+                }
+            } else {
+                Text(stringResource(R.string.word_lookup_loading))
+            }
         }
     }
     if (wide) {

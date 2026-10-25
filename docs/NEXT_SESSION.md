@@ -1,6 +1,6 @@
 # Resume here
 
-Updated: 2026-10-25. Verified lazy selected-word FIFO/typed JNI.
+Updated: 2026-10-25. Verified reader dictionary panel.
 Read AGENTS.md, plan phases 2–4 and PRODUCT_SPEC.md sections 3–4.
 ## Working
 - Pure Crux owns navigation/Library/Settings; only Render reaches UI. FIFO owns
@@ -30,11 +30,11 @@ Read AGENTS.md, plan phases 2–4 and PRODUCT_SPEC.md sections 3–4.
 - Phone sheet/wide panel show full surface/analyzer reading/base form + five choices.
   Read-only opens; busy/pending/absent disables choices. Committed selection only;
   navigation/Settings/recreation/invalidation dismisses. Container/content input
-  extends idle clock. Definitions/names/count await app integration.
-- Clock restore reserves FIFO revision. Absolute checkpoints freeze payload/revision
-  for retry, coalesce maxima and chain revisions. Anchored monotonic observations
-  enforce five-minute idle cap, pause/background exclusion, invalid-sample rejection.
-  Reflow/same-offset saves preserve idle deadline. Movement/exit retire epoch.
+  extends idle clock. All applicable senses/readings expand with compact POS;
+  separate names/categories and lifetime count. Failure requires explicit Retry.
+- Clock restore reserves FIFO revision; absolute checkpoint retries freeze payload/
+  revision, coalesce maxima and chain revisions. Anchored samples enforce five-minute
+  idle cap/pause/background/validity. Reflow preserves deadline; movement retires epoch.
 - CoreSession uses elapsedRealtime + 15s Handler checkpoints, Activity resume/pause,
   scrolling and restore-before-Resume. Actions Pause/drain first. Retry in reader/
   Settings; pending saves disable presets. close retains callbacks until busy/BOTH
@@ -46,12 +46,10 @@ Read AGENTS.md, plan phases 2–4 and PRODUCT_SPEC.md sections 3–4.
   Final new Recorded returns Library + consumed 1.4s confetti (zero/rereads too).
 - NativeBridge requires owned verified FD+1; Rust rehashes/maps/closes all paths.
   Lazy FIFO analyzer releases after accepted background work; recreation retains it.
-  Never modify live Full inodes. Sudachi v0.7.0/android-loader-v1 + Full 20261015
-  pinned; 138 files verified; Full outside Git. See SUDACHI_MEASUREMENTS.md.
-- prepare-dictionaries.py builds pinned 2026-10-25 JMdict English/JMnedict immutable
-  SQLite/JSON/BINARY + metadata/sources/notices. Contract: third_party/dictionaries/README.md.
-  Gradle bundles pinned build/index/compiler/sources/notices; .gz.bin keeps original
-  archives; complete offline Settings credits survive recreation.
+  Never modify live Full inodes; 138-file pins/loader: SUDACHI_MEASUREMENTS.md.
+- Pinned 2026-10-25 JMdict English/JMnedict SQLite/JSON/BINARY + metadata/sources/
+  notices: third_party/dictionaries/README.md. Gradle bundles original .gz.bin sources
+  and compiler/notices; complete offline Settings credits survive recreation.
 - storage::dictionary::Dictionary opens existing read-only assets, checks format
   identity (not checksum), unions exact surface/base candidates with per-form
   provenance/separate source IDs. Typed payloads retain all fields. Display applicable
@@ -62,19 +60,21 @@ Read AGENTS.md, plan phases 2–4 and PRODUCT_SPEC.md sections 3–4.
   one user read transaction; separate word/name candidates keep all applicable views.
 - LoadReaderWord/DismissReaderWord + details/selection/error now reach typed JNI.
   Current/pending/selected/full token identities gate attach; live statuses refresh
-  repetitions. Errors survive clock saves; both outcomes drain time. UI not connected.
+  repetitions. Errors survive clock saves; both outcomes drain time. Compose requests
+  once gates clear; close/disposal/recreation dismiss. Late callbacks cannot reopen.
 
 ## Next tasks (ordered)
-1. Connect existing panel to LoadReaderWord/DismissReaderWord; render applicable
-   readings/senses, compact POS, separate names/count. Test retry/no match/recreation.
-2. Continue supported-format imports or CI after panel verification; both remain open.
+1. Continue phase-4 TXT imports: UTF-8/Shift-JIS/manual fallback and Aozora fixtures;
+   verify dependency APIs before adoption, then atomic analysis/registration wiring.
+2. CI or missing-match custom definitions remain independent open tasks.
 3. User-run physical arm64 validation once usable.
 
 ## Verification / environment
-- PASS: 262 Rust tests (130 storage), strict Clippy/fmt/Kotlin/diff, real-data host
-  Kotlin/JNI + seven Unicode exchanges, repeat generation, both-ABI debug/test APKs.
-- Strict lint + four API-36 x86_64 session tests pass (one new). DEVELOPMENT.md commands.
-- Python/full scans, standalone Full, tablet/dark/release/recovery/arm64 not rerun.
-- Reports: .local/test-reports/reader-word-details/. AVD running; assets preserved.
+- PASS this slice: Kotlin fmt/diff, both-ABI debug/test APKs + strict Android lint;
+  14 panel/span/session tests phone/light + wide/dark; 17 reader/clock/paste/nav tests.
+  Two fixture failures corrected; phone movement rerun passes. DEVELOPMENT.md commands.
+- Prior 262 Rust tests/Clippy/host JNI/generation unchanged, not rerun; no release/
+  Python/full scans/standalone Full/process/reboot/physical arm64 rerun.
+- Reports: .local/test-reports/reader-dictionary-panel/. AVD restored to phone/light.
 - Run host JNI and Android builds sequentially: BoltFFI replaces shared artifacts.
 - No open failure/blocker. Nostr empty; ask Q188 before forwarding.

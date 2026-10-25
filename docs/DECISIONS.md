@@ -1729,3 +1729,20 @@ visible repetition. Keep word errors separate from timer/save errors and require
 explicit retry. Successful manual choices update selected status; deleted entries
 clear status/count without registration. Land this independently testable transport
 before Compose requests/rendering; existing panel UI behavior remains unchanged.
+
+## 2026-10-25 — Reader dictionary panel integration
+
+Reuse the existing metadata/status phone sheet and wide panel. Keep the tapped
+token index local to Compose and request LoadReaderWord once storage/time gates
+clear. DismissReaderWord on close/disposal retires the core selection, including
+Activity recreation; tolerate only this dismissal after CoreSession teardown starts.
+Core invalidation dismisses the local panel even when its page key is unchanged.
+Errors remain distinct from successful empty matches and require explicit retry.
+
+Render every applicable JMdict sense immediately, unioning only its licensed
+spelling/reading pairs across surface/base matches in source order. Show all
+readings and compact common grammatical labels, preserving unknown English labels.
+Keep gloss qualifiers, domain/dialect/miscellaneous labels and sense notes. JMnedict
+readings/categories/translations get their own section; show the committed lifetime
+exact-surface count above both sources. No new dependency, storage schema, lookup
+policy or custom-definition behavior is introduced.

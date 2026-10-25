@@ -192,7 +192,9 @@ full loaded token identity before attachment; live status may differ and refresh
 all repetitions. Dismissal, Settings, navigation, token refresh, position/completion
 and reflow invalidate selection. Separate lookup errors survive timer saves until
 explicit retry or dismissal. Both success/failure drain queued final time. No schema
-or persisted selection is added; Compose rendering is still pending.
+or persisted selection is added. Compose renders only matching selected details,
+uses applicable reading/sense indices without broadening restrictions, and keeps
+word/name sections separate. Closing/recreation discard the transient selection.
 
 Lifetime counts use `COUNT(*) WHERE vocabulary_id = ?` through the existing
 `reading_occurrences_by_entry` covering index. They include every completed

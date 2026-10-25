@@ -145,8 +145,13 @@ separate from document_error, so clock saves cannot erase a failed lookup; retry
 explicit. Success and failure both drain waiting final time saves. The internal
 StorageResult boxes details to bound the Event enum size; this does not change wire
 encoding. All reads/callbacks stay on the existing worker and only Render reaches
-Android. Compose details requests/rendering and recreation dismissal remain next;
-the existing metadata/status panel is unchanged.
+Android. Compose requests details after busy/pending-save gates clear, once per
+selection; failed requests require explicit retry. Its phone sheet/wide panel
+renders the lifetime count, every applicable expanded sense with its licensed
+readings/compact grammatical labels and a separate names section. Selection stays
+local to the composition; closing/disposal dispatches DismissReaderWord, including
+Activity recreation. Session teardown tolerates this dismissal after closing starts.
+Core invalidation also dismisses the local panel, even at an unchanged page anchor.
 
 Pure `active_time` accounts pending reading milliseconds using caller-supplied
 monotonic timestamps. Resume/interaction arms a five-minute idle window; dictionary
