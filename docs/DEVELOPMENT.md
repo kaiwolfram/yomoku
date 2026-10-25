@@ -2209,3 +2209,38 @@ Rust/Clippy/JNI/generation, Full fixtures, Python/full-index scans, tablet/dark,
 release app, actual process-death/reboot and physical arm64 were not rerun.
 Cancellation with current-transaction rollback, permitted background notifications
 and process-death/no-auto-resume acceptance remain unchecked.
+
+## Cooperative TXT repository cancellation
+
+Verified 2026-10-25 from the repository root with the Rust PATH above:
+
+```sh
+cargo test --workspace --all-features --locked --offline --quiet
+cargo clippy --workspace --all-targets --all-features --locked --offline -- -D warnings
+cargo fmt --all -- --check
+tools/test-sudachi.sh
+git diff --check
+```
+
+PASS: 299 data-free Rust tests (148 storage), strict Clippy/fmt/diff, and all twelve
+explicit real-Full fixtures plus one runtime fixture with each owned/mapped loader.
+The Full script verifies the 138 pinned engine/patch files first. Six new storage
+tests cover cancellation before validation/SQL, shared/idempotent requests,
+channel-gated analysis rollback with earlier documents/statuses preserved after
+reopen, sequence/ID rollback, fresh explicit retry, duplicate/late-cancel isolation,
+commit/cancel gate arbitration including failure, and deferred-FK commit rollback.
+The shared persistence helper also receives the existing paste/TXT regressions.
+
+Initial targeted TXT run: the new blocked-analysis fixture opened its observer
+after the writer had started; Storage::open checks migrations under an immediate
+lock, so it failed with DatabaseBusy. Open the observer first, as existing tests
+do. The final full-workspace run passes with this correction. No production lock
+or timeout change. No escalation/download, new dependency/version or schema change.
+
+This is a repository slice: runtime/JNI and Android still call the noncancellable
+wrapper. Cancellation is cooperative, not a decoder/analyzer/SQLite interrupt;
+cancel must run outside the FIFO and off Android's main thread because a commit
+holding the gate may wait. Remaining URI disposal/summary, native lifecycle races,
+background notifications and process-death/no-auto-resume acceptance remain open.
+Android builds/lint/instrumentation, host Kotlin/JNI/codegen, standalone Python/index
+scans, release, reboot, tablet/dark and physical arm64 were not rerun. No open blocker.

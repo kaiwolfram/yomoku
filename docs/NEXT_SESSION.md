@@ -1,5 +1,5 @@
 # Resume here
-Updated: 2026-10-25. Verified retained TXT batch progress/current filename/X-of-N.
+Updated: 2026-10-25. Verified cooperative TXT repository cancellation/commit gate.
 Read AGENTS.md, plan phases 2–4 and PRODUCT_SPEC.md sections 3–4.
 ## Working
 - Pure Crux owns navigation/Library/Settings; only Render reaches UI. FIFO owns
@@ -15,22 +15,20 @@ Read AGENTS.md, plan phases 2–4 and PRODUCT_SPEC.md sections 3–4.
   atomically resets finished books to page 1/preset/Mode B; failure rolls back.
   Permanent migration-0011 finish marker survives reflow/position/time, resets on
   deletion; history remains. Missing analysis never rescans; EOF needed for backfill.
-- Tokens atomically read original B + live statuses, full metadata + clipped local
-  UTF-8 ranges; completion uses token start. Deleted IDs absent. Whole chapter
-  validated per lookup (performance unmeasured); base-only for now.
+- Tokens atomically read original B/live statuses/full metadata + clipped UTF-8
+  ranges; completion uses token start. Deleted IDs absent. Whole-chapter validation
+  per lookup (performance unmeasured); base-only for now.
 - Compose requests after busy/pending saves clear through gated FIFO/JNI. Current/
   pending/result keys must match; refresh/movement/reflow invalidates snapshots.
   Failed reads need Retry even when clock saves clear errors. UTF-8→UTF-16 checks
   scalar/identity/clipped text; invalid is plain. Known/absent unhighlighted.
-- SetReaderStatus validates loaded key/existing ID/timestamp outside Settings.
-  Atomic global status/history commit updates repetitions; same-status no-op.
-  Deleted ID clears references without registration. Failure preserves snapshot for
-  explicit repeat, no replay. Both outcomes drain waiting final time.
-- Phone sheet/wide panel show full surface/analyzer reading/base form + five choices.
-  Read-only opens; busy/pending/absent disables choices. Committed selection only;
-  navigation/Settings/recreation/invalidation dismisses. Container/content input
-  extends idle clock. All applicable senses/readings expand with compact POS;
-  separate names/categories and lifetime count. Failure requires explicit Retry.
+- SetReaderStatus validates loaded key/ID/time outside Settings. Atomic status/
+  history updates repetitions; same-status no-op. Deleted IDs never register.
+  Failure retains snapshot for explicit repeat; both outcomes drain final time.
+- Phone sheet/wide panel: surface/reading/base form, five choices; read-only open,
+  busy/pending/absent disables choices. Navigation/recreation/invalidation dismisses.
+  Input extends idle clock; expanded restriction-aware senses/readings, compact POS,
+  separate names/categories/lifetime count. Failure requires explicit Retry.
 - Clock restore reserves FIFO revision; absolute checkpoint retries freeze payload/
   revision, coalesce maxima and chain revisions. Anchored samples enforce five-minute
   idle cap/pause/background/validity. Reflow preserves deadline; movement retires epoch.
@@ -44,18 +42,14 @@ Read AGENTS.md, plan phases 2–4 and PRODUCT_SPEC.md sections 3–4.
   Reload retries exact command; AlreadyRecorded/zero silent. Positive toast once.
   Final new Recorded returns Library + consumed 1.4s confetti (zero/rereads too).
 - NativeBridge requires owned verified FD+1; Rust rehashes/maps/closes all paths.
-  Lazy FIFO analyzer releases after background work; keep live Full inodes immutable.
-- Pinned 2026-10-25 JMdict English/JMnedict SQLite/JSON/BINARY + metadata/sources/
-  notices: third_party/dictionaries/README.md. Gradle bundles original .gz.bin sources
-  and compiler/notices; complete offline Settings credits survive recreation.
-- Verified immutable dictionary path opens lazily on FIFO, reuses connection until
-  close/query failure. load_reader_word validates original B/live status/lifetime
-  count in one user read transaction. Exact surface/base word/name candidates retain
-  all metadata and restriction-aware views. Details: ARCHITECTURE.md/DATA_MODEL.md.
-- LoadReaderWord/DismissReaderWord + details/selection/error now reach typed JNI.
-  Current/pending/selected/full token identities gate attach; live statuses refresh
-  repetitions. Errors survive clock saves; both outcomes drain time. Compose requests
-  once gates clear; close/disposal/recreation dismiss. Late callbacks cannot reopen.
+  FIFO analyzer releases after background work; keep live Full inodes immutable.
+- Pinned 2026-10-25 JMdict English/JMnedict + sources/notices bundled; offline credits.
+  Immutable index opens lazily on FIFO, reused until close/query failure.
+  load_reader_word reads original B/live statuses/lifetime count atomically;
+  all exact surface/base word/name metadata/restrictions retained. See architecture.
+- LoadReaderWord/DismissReaderWord reach typed JNI; full current/pending/selected
+  token identity gates attach. Live statuses refresh repetitions. Errors survive
+  clock saves; outcomes drain time. Close/recreation dismiss; late results cannot open.
 - TXT strict UTF-8/Shift-JIS/Aozora composes with atomic storage (migration 0012).
   Separate original-file SHA-256 preserves bytes/encoding/title/progress/finish;
   new filename/text/ruby/original B/unique registrations commit together.
@@ -67,14 +61,21 @@ Read AGENTS.md, plan phases 2–4 and PRODUCT_SPEC.md sections 3–4.
   recreation/background; errors/duplicates/skips count, encoding retries do not.
   Scrollable Library summary retains results. Teardown drops unsubmitted work;
   no persisted queue/progress or reader ruby. Display name publishes before bytes.
+- Storage import_analyzed_txt_cancellable + fresh shared ImportCancellation per
+  attempt returns Some(completed)/None(cancelled)/typed error. Checkpoints before/
+  after analysis; mutex guards final check + COMMIT. Cancel rolls back rows/IDs;
+  winning successful commit stays completed. No forced analyzer/SQLite interruption.
+  Runtime/JNI/Android still use noncancellable wrapper. Cancel must bypass FIFO
+  off main (may wait on COMMIT). No persisted token/queue/migration.
 ## Next tasks (ordered)
-1. Cancel with current-partial transaction rollback; retain completed imports.
-   Then permitted background notifications + process-death/no-auto-resume test.
+1. Wire repository Cancel through runtime/JNI/Android; drop remaining URIs and
+   retain completed outcomes. Then background notifications/process-death test.
 2. EPUB/SRT parsers and original-file runtime imports; CI/custom entries independent.
 3. User-run physical arm64 validation once usable.
 ## Verification
-- PASS this slice: both-ABI debug/test APKs, strict lint, Kotlin fmt/diff; all five
-  API-36 x86_64 picker/navigation tests including blocked-read/name/progress.
-- Prior Rust/JNI baseline: 293 tests/Clippy/fmt/Full/index/Unicode/codegen; not rerun.
-- Commands/reports: DEVELOPMENT.md last section; no Rust/JNI/process-death rerun.
-- AVD running; no blocker/new package/migration. Nostr empty; ask Q188 before forwarding.
+- PASS: 299 Rust tests (six new), strict Clippy/fmt/diff; twelve real-Full fixtures
+  + one worker fixture per owned/mapped loader.
+- Prior Android: both-ABI APKs, strict lint/Kotlin fmt, five picker/nav tests; not
+  rerun. Commands/failures: DEVELOPMENT.md last section.
+- No JNI/codegen/Android/process-death rerun or new package/migration/blocker.
+  Nostr empty; ask Q188 before forwarding. Physical arm64 remains unverified.

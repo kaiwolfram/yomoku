@@ -12,8 +12,8 @@ use yomoku_import::txt::{self, SourceRuby, TextEncoding, TxtError};
 
 use crate::{
     documents::{create_single_text_in, load_paste_in},
-    imports::analyze_document_in,
-    AnalyzedPaste, PasteImportError, Storage, StorageError,
+    imports::store_analyzed_document_in,
+    AnalyzedPaste, ImportCancellation, Storage, StorageError,
 };
 
 #[derive(Debug)]
@@ -90,6 +90,36 @@ impl Storage {
         registered_at_unix_ms: i64,
         analyze: impl FnOnce(&ChapterText) -> Result<ChapterAnalysis, E>,
     ) -> Result<TxtImportOutcome, TxtImportError<E>> {
+        self.import_analyzed_txt_cancellable(
+            original_bytes,
+            filename,
+            selection,
+            registered_at_unix_ms,
+            &ImportCancellation::default(),
+            analyze,
+        )
+        // This private handle is never shared or cancelled.
+        .map(|outcome| outcome.expect("unshared import cannot be cancelled"))
+    }
+
+    /// Like `import_analyzed_txt`, with cooperative per-file cancellation.
+    /// `Ok(None)` means cancelled: all partial rows and allocated IDs roll back.
+    /// `Ok(Some(..))` means completed, even if cancellation arrives after COMMIT.
+    /// Errors remain errors, with the same rollback guarantee. Share a fresh
+    /// cancellation handle before submitting each file to a worker; never queue
+    /// the cancellation request behind that worker's import. No partial IDs escape.
+    pub fn import_analyzed_txt_cancellable<E>(
+        &mut self,
+        original_bytes: &[u8],
+        filename: &str,
+        selection: Option<TextEncoding>,
+        registered_at_unix_ms: i64,
+        cancellation: &ImportCancellation,
+        analyze: impl FnOnce(&ChapterText) -> Result<ChapterAnalysis, E>,
+    ) -> Result<Option<TxtImportOutcome>, TxtImportError<E>> {
+        if cancellation.is_cancelled() {
+            return Ok(None);
+        }
         if registered_at_unix_ms < 0 {
             return Err(StorageError::InvalidVocabulary.into());
         }
@@ -98,6 +128,9 @@ impl Storage {
             .connection
             .transaction_with_behavior(TransactionBehavior::Immediate)
             .map_err(StorageError::from)?;
+        if cancellation.is_cancelled() {
+            return Ok(None);
+        }
         let outcome = if let Some(document) =
             find_imported_in(&transaction, original_bytes, digest.as_slice())?
         {
@@ -108,6 +141,9 @@ impl Storage {
             }
             let parsed = txt::parse(original_bytes, selection).map_err(TxtImportError::Parse)?;
             validate_ruby(&parsed.text, &parsed.ruby)?;
+            if cancellation.is_cancelled() {
+                return Ok(None);
+            }
             let document = create_single_text_in(&transaction, "txt", filename, &parsed.text)?;
             transaction.execute(
                 "INSERT INTO imported_files (document_id, sha256, original_bytes, text_encoding)
@@ -115,6 +151,9 @@ impl Storage {
                 (i64::from(document.document_id), digest.as_slice(), original_bytes, encoding_name(parsed.encoding)),
             ).map_err(StorageError::from)?;
             for (index, ruby) in parsed.ruby.iter().enumerate() {
+                if cancellation.is_cancelled() {
+                    return Ok(None);
+                }
                 transaction.execute(
                     "INSERT INTO source_ruby (chapter_id, ruby_index, start_byte, end_byte, reading)
                      VALUES (?1, ?2, ?3, ?4, ?5)",
@@ -122,16 +161,28 @@ impl Storage {
                      to_i64(ruby.range.start)?, to_i64(ruby.range.end)?, &ruby.reading),
                 ).map_err(StorageError::from)?;
             }
-            let imported =
-                analyze_document_in(&transaction, document, registered_at_unix_ms, analyze)
-                    .map_err(|error| match error {
-                        PasteImportError::Analysis(error) => TxtImportError::Analysis(error),
-                        PasteImportError::Storage(error) => TxtImportError::Storage(error),
-                    })?;
+            if cancellation.is_cancelled() {
+                return Ok(None);
+            }
+            let analysis = analyze(&document.chapter).map_err(TxtImportError::Analysis)?;
+            if cancellation.is_cancelled() {
+                return Ok(None);
+            }
+            let imported = store_analyzed_document_in(
+                &transaction,
+                document,
+                registered_at_unix_ms,
+                &analysis,
+            )?;
             TxtImportOutcome::Created(imported)
         };
-        transaction.commit().map_err(StorageError::from)?;
-        Ok(outcome)
+        // Holding the cancellation gate through COMMIT makes its winner explicit:
+        // cancellation rolls back, or a completed file is retained. This check is
+        // after analysis, token writes and registrations, covering all partial data.
+        cancellation.commit(|| {
+            transaction.commit().map_err(StorageError::from)?;
+            Ok(outcome)
+        })
     }
 
     /// Read original bytes, selected encoding and canonical ruby without parsing

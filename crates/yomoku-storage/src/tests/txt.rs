@@ -53,6 +53,240 @@ fn totals(storage: &Storage) -> Vec<i64> {
 }
 
 #[test]
+fn txt_cancelled_before_start_skips_validation_database_and_analyzer() {
+    let database = TestDatabase::new();
+    let mut storage = Storage::open(database.path()).unwrap();
+    let cancellation = ImportCancellation::default();
+    cancellation.cancel();
+    // Even BEGIN IMMEDIATE would fail here. A cancelled attempt must not need it.
+    storage
+        .connection
+        .pragma_update(None, "query_only", true)
+        .unwrap();
+    let before = fs::read(database.path()).unwrap();
+    assert!(storage
+        .import_analyzed_txt_cancellable(&[0xff], "", None, -1, &cancellation, no_analysis)
+        .unwrap()
+        .is_none());
+    assert_eq!(totals(&storage), vec![0; 14]);
+    assert_eq!(fs::read(database.path()).unwrap(), before);
+}
+
+#[test]
+fn txt_cancel_during_analysis_rolls_back_current_file_and_ids_but_keeps_completed_file() {
+    use std::{sync::mpsc, time::Duration};
+
+    let database = TestDatabase::new();
+    let mut storage = Storage::open(database.path()).unwrap();
+    let completed = created(
+        storage
+            .import_analyzed_txt(
+                "猫".as_bytes(),
+                "completed.txt",
+                Some(TextEncoding::Utf8),
+                1,
+                fixture,
+            )
+            .unwrap(),
+    );
+    let surface = Surface::new("猫").unwrap();
+    let entry = storage.vocabulary_entry(&surface).unwrap().unwrap();
+    storage
+        .set_vocabulary_status(entry.id, VocabularyStatus::Known, 2)
+        .unwrap();
+    let before = totals(&storage);
+    let sequence = |storage: &Storage| {
+        storage
+            .connection
+            .prepare("SELECT name, seq FROM sqlite_sequence ORDER BY name")
+            .unwrap()
+            .query_map([], |row| {
+                Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)?))
+            })
+            .unwrap()
+            .collect::<Result<Vec<_>, _>>()
+            .unwrap()
+    };
+    let before_sequence = sequence(&storage);
+    // Open before the writer starts: opening itself checks migrations under a lock.
+    let observer = Storage::open(database.path()).unwrap();
+    let cancellation = ImportCancellation::default();
+    let worker = cancellation.clone();
+    let (entered, ready) = mpsc::channel();
+    let (release, finish) = mpsc::channel();
+    let handle = std::thread::spawn(move || {
+        let result = storage.import_analyzed_txt_cancellable(
+            "｜猫《ねこ》 犬 𠮷".as_bytes(),
+            "partial.txt",
+            Some(TextEncoding::Utf8),
+            3,
+            &worker,
+            |chapter| {
+                // Provisional document/file/ruby rows already exist in the writer.
+                entered.send(()).unwrap();
+                finish.recv_timeout(Duration::from_secs(10)).unwrap();
+                fixture(chapter)
+            },
+        );
+        assert!(result.unwrap().is_none());
+        storage
+    });
+    ready.recv_timeout(Duration::from_secs(10)).unwrap();
+    assert_eq!(totals(&observer), before);
+    cancellation.cancel();
+    release.send(()).unwrap();
+    let storage = handle.join().unwrap();
+    assert_eq!(totals(&storage), before);
+    assert_eq!(sequence(&storage), before_sequence);
+    drop(storage);
+    drop(observer);
+    let mut storage = Storage::open(database.path()).unwrap();
+    assert_eq!(totals(&storage), before);
+    assert_eq!(sequence(&storage), before_sequence);
+    assert_eq!(
+        storage.load_paste(completed.document.document_id).unwrap(),
+        Some(completed.document)
+    );
+    assert_eq!(
+        storage.vocabulary_entry(&surface).unwrap().unwrap().status,
+        VocabularyStatus::Known
+    );
+    assert!(storage
+        .find_imported_txt("｜猫《ねこ》 犬 𠮷".as_bytes())
+        .unwrap()
+        .is_none());
+    // A fresh, explicit attempt works; the cancelled handle remains cancelled.
+    let retried = created(
+        storage
+            .import_analyzed_txt_cancellable(
+                "｜猫《ねこ》 犬 𠮷".as_bytes(),
+                "retry.txt",
+                Some(TextEncoding::Utf8),
+                4,
+                &ImportCancellation::default(),
+                fixture,
+            )
+            .unwrap()
+            .unwrap(),
+    );
+    assert_eq!(retried.registered_surfaces, 2);
+    assert!(cancellation.is_cancelled());
+    assert_eq!(count(&storage, "documents"), 2);
+}
+
+#[test]
+fn txt_cancel_after_commit_retains_completed_outcome_and_does_not_cancel_other_files() {
+    let database = TestDatabase::new();
+    let mut storage = Storage::open(database.path()).unwrap();
+    let cancellation = ImportCancellation::default();
+    let first = created(
+        storage
+            .import_analyzed_txt_cancellable(b"first", "first.txt", None, 1, &cancellation, fixture)
+            .unwrap()
+            .unwrap(),
+    );
+    cancellation.cancel();
+    let before = totals(&storage);
+    assert!(storage
+        .import_analyzed_txt_cancellable(
+            b"first",
+            "duplicate.txt",
+            None,
+            2,
+            &cancellation,
+            no_analysis,
+        )
+        .unwrap()
+        .is_none());
+    assert_eq!(totals(&storage), before);
+    match storage
+        .import_analyzed_txt_cancellable(
+            b"first",
+            "duplicate.txt",
+            None,
+            2,
+            &ImportCancellation::default(),
+            no_analysis,
+        )
+        .unwrap()
+        .unwrap()
+    {
+        TxtImportOutcome::Existing(document) => assert_eq!(document, first.document),
+        _ => panic!("expected existing"),
+    }
+    let second = created(
+        storage
+            .import_analyzed_txt_cancellable(
+                b"second",
+                "second.txt",
+                None,
+                3,
+                &ImportCancellation::default(),
+                fixture,
+            )
+            .unwrap()
+            .unwrap(),
+    );
+    drop(storage);
+    let mut storage = Storage::open(database.path()).unwrap();
+    assert_eq!(
+        storage.load_paste(first.document.document_id).unwrap(),
+        Some(first.document)
+    );
+    assert_eq!(
+        storage.load_paste(second.document.document_id).unwrap(),
+        Some(second.document)
+    );
+}
+
+#[test]
+fn txt_cancellable_commit_failure_rolls_back_and_releases_cancel_gate() {
+    let database = TestDatabase::new();
+    let mut storage = Storage::open(database.path()).unwrap();
+    storage
+        .connection
+        .execute_batch(
+            "CREATE TEMP TABLE parent (id INTEGER PRIMARY KEY);
+        CREATE TEMP TABLE child (id INTEGER REFERENCES parent(id) DEFERRABLE INITIALLY DEFERRED);
+        CREATE TEMP TRIGGER fail_import AFTER INSERT ON vocabulary_status_events
+        BEGIN INSERT INTO child VALUES (99); END;",
+        )
+        .unwrap();
+    let cancellation = ImportCancellation::default();
+    assert!(matches!(
+        storage.import_analyzed_txt_cancellable(
+            "猫".as_bytes(),
+            "failed.txt",
+            Some(TextEncoding::Utf8),
+            1,
+            &cancellation,
+            fixture,
+        ),
+        Err(TxtImportError::Storage(StorageError::Sqlite(_)))
+    ));
+    assert_eq!(totals(&storage), vec![0; 14]);
+    cancellation.cancel();
+    assert!(cancellation.is_cancelled());
+    storage
+        .connection
+        .execute_batch("DROP TRIGGER fail_import")
+        .unwrap();
+    created(
+        storage
+            .import_analyzed_txt_cancellable(
+                "猫".as_bytes(),
+                "retry.txt",
+                Some(TextEncoding::Utf8),
+                2,
+                &ImportCancellation::default(),
+                fixture,
+            )
+            .unwrap()
+            .unwrap(),
+    );
+}
+
+#[test]
 fn txt_atomic_canonical_ruby_original_bytes_analysis_and_filename_survive_reopen() {
     let database = TestDatabase::new();
     let mut storage = Storage::open(database.path()).unwrap();

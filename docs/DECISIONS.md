@@ -1871,3 +1871,27 @@ and zero progress while a real ContentResolver read blocks, including recreation
 the mixed-outcome nine-file fixture verifies counted outcomes and retained choices.
 Transaction-aware cancellation, permitted background notifications and actual
 process-death acceptance remain separate unchecked work.
+
+## 2026-10-25 — Cooperative TXT repository cancellation
+
+Add cancellation first at the atomic repository boundary. Share a fresh
+`ImportCancellation` per file attempt; do not change core events, JNI or existing
+noncancellable runtime behavior in this storage slice. A cancelled result is
+`Ok(None)`, keeping cancellation separate from parser/analyzer/storage errors and
+committed Created/Existing outcomes. Check after analysis before storing its tokens
+and registrations; retain the common validated analysis-persistence helper for
+paste/TXT. An active decoder/analyzer/SQLite call is not forcibly interrupted.
+
+Serialize the final cancellation check and COMMIT with a per-file mutex. An unlocked
+check followed by COMMIT leaves a race that could publish after cancellation returns.
+If cancellation wins, drop the transaction and all provisional rows/sequence updates;
+if COMMIT wins and succeeds, retain that completed file. Commit failure still rolls
+back and releases the gate. The future runtime control path must share the handle
+before submission, bypass the import FIFO, and invoke cancellation off Android's
+main thread because it can wait for an in-flight commit. No connection, SQL, thread
+or cancellation token enters the pure core. No dependency/version or migration.
+
+Host tests use channels rather than timing sleeps to gate analysis and commit,
+verify earlier statuses/content after reopen and assert sequence rollback. Android
+Cancel/remaining-URI disposal/summary, native lifecycle races, permitted background
+notifications and process-death acceptance remain unchecked follow-up work.

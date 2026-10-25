@@ -155,11 +155,20 @@ pub(crate) fn analyze_document_in<E>(
     analyze: impl FnOnce(&ChapterText) -> Result<ChapterAnalysis, E>,
 ) -> Result<AnalyzedPaste, PasteImportError<E>> {
     let analysis = analyze(&document.chapter).map_err(PasteImportError::Analysis)?;
+    store_analyzed_document_in(connection, document, registered_at_unix_ms, &analysis)
+        .map_err(PasteImportError::Storage)
+}
+
+pub(crate) fn store_analyzed_document_in(
+    connection: &Connection,
+    document: PastedDocument,
+    registered_at_unix_ms: i64,
+    analysis: &ChapterAnalysis,
+) -> Result<AnalyzedPaste, StorageError> {
     if analysis.mode != SplitMode::B {
-        return Err(StorageError::InvalidAnalysis.into());
+        return Err(StorageError::InvalidAnalysis);
     }
-    let analysis_id =
-        store_chapter_analysis_in(connection, document.chapter.chapter_id, &analysis)?;
+    let analysis_id = store_chapter_analysis_in(connection, document.chapter.chapter_id, analysis)?;
     let surfaces = analysis
         .tokens
         .iter()

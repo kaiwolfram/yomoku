@@ -30,6 +30,16 @@ decoding/analysis and preserves its chosen encoding/statuses/progress. The analy
 callback obeys the same ready-worker/no-I/O/provisional-ID contract as paste. Shared
 single-text readers load paste or TXT with the historical PastedDocument wire type;
 source ruby has a separate read-only repository, awaiting reader transport/rendering.
+`import_analyzed_txt_cancellable` adds a shared per-file `ImportCancellation` handle.
+Checkpoints before/after parsing, ruby writes and analysis can discard provisional
+rows; the last check and COMMIT share a mutex. Cancellation winning that gate rolls
+back the entire file including IDs; a successful commit winning it remains completed.
+The result is `Some(Created/Existing)` for completed work, `None` for cancellation,
+or the usual typed error. Cancellation is cooperative, without interrupting active
+decoder/analyzer/SQLite calls. The caller must request it outside the import FIFO
+and off the UI thread because a COMMIT already in progress holds the gate. Use one
+fresh handle per attempt; no persistent queue or cross-file cancellation state.
+The existing noncancellable wrapper and production runtime/JNI remain unchanged.
 `Event::ImportTxt(TxtImport)` carries original bytes, display name and optional
 UTF-8/Shift-JIS choice through generated Kotlin/JNI to the same FIFO worker.
 A read-only hash/exact-byte preflight returns existing snapshots without Full;
@@ -51,7 +61,7 @@ outcomes / selected URIs (including errors, duplicates and skips); prompts/retri
 do not advance it. Display names publish before potentially blocked provider reads.
 No URI queue/results/progress are persisted;
 final owner teardown stops unsubmitted work while core drains accepted transactions.
-No new permission, dependency or schema. Cancellation, background
+No new permission, dependency or schema. Runtime/JNI/Android cancellation, background
 notifications, EPUB/SRT and source-ruby rendering remain separate.
 
 Pure document values define positive i64 identities, immutable chapter snapshots,

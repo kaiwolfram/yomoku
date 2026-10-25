@@ -7,6 +7,7 @@ mod completions;
 pub mod dictionary;
 mod documents;
 mod encounters;
+mod import_cancellation;
 mod imports;
 mod reader_tokens;
 pub mod reader_words;
@@ -15,6 +16,7 @@ mod settings;
 mod txt;
 mod vocabulary;
 
+pub use import_cancellation::ImportCancellation;
 pub use imports::{AnalyzedPaste, PasteImportError, PasteImportOutcome};
 pub use reading_time::SavedReadingTime;
 pub use txt::{StoredTxtSource, TxtImportError, TxtImportOutcome};

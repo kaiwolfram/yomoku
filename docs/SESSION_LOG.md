@@ -1441,3 +1441,21 @@
 - Updated README/architecture/decisions/plan/development/handoff. Next:
   transaction-aware Cancel retaining earlier commits, then permitted background
   notifications/process-death acceptance. EPUB/SRT remain next; Nostr empty/Q188.
+
+## 2026-10-25 — Cooperative TXT repository cancellation
+
+- Added shared per-file ImportCancellation and optional cancellable TXT import.
+  Checkpoints roll back the current partial file; a mutex serializes cancellation
+  with COMMIT. Completed imports remain intact. Split common validated analysis
+  persistence so TXT checks cancellation after analysis before token/registration
+  writes. Existing runtime/JNI/Android continue through the noncancellable wrapper.
+- PASS: 299 Rust tests (148 storage, six new cancellation fixtures), strict Clippy,
+  fmt/diff, twelve real-Full plus one worker fixture with each owned/mapped loader.
+  Tests cover pre-start bypass, blocked-analysis/sequence rollback, durable earlier
+  imports/statuses, fresh retry, duplicate/late-cancel isolation and commit races/
+  deferred failure. Fixed the observer fixture's migration-lock ordering.
+- Updated architecture/data model/decisions/plan/development/handoff. No new
+  dependency, migration, escalation or blocker; Android/JNI/codegen/process-death/
+  Python/index/release/reboot/tablet/arm64 not rerun. Next: runtime/JNI cancellation
+  control outside FIFO and off main, Android Cancel/remaining-file disposal/summary,
+  then background notifications and process-death acceptance. Nostr empty/Q188.

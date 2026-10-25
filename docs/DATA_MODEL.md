@@ -19,6 +19,16 @@ An exact byte comparison rejects a false digest match. Paste identity is separat
 worker uses it to skip Full on duplicates. A miss never reserves an ID or changes
 the authoritative immediate import transaction; concurrent creators still deduplicate.
 
+The optional repository entry point `import_analyzed_txt_cancellable` uses the same
+transaction with an externally shared per-file cancellation handle. `Ok(None)`
+means rollback of the whole current file, including source/chapter IDs and sequence
+updates; earlier committed content, statuses and history remain intact. Cancellation
+checkpoints surround parsing/analysis and precede ruby writes. Final cancellation
+check and COMMIT share a mutex, so cancellation cannot return and then allow a new
+commit to begin. A successful commit already holding the gate remains completed.
+Cancellation does not undo completed files or persist resume state. Production
+runtime/JNI and Android Cancel transport are still pending; no schema change.
+
 Migration 0012 rebuilds `sources` to permit `kind IN ('paste', 'txt')`, preserving
 all IDs, provenance and the autoincrement high-water mark. The migration runner
 uses SQLite's documented create/copy/drop/rename procedure with foreign keys off
@@ -35,8 +45,8 @@ one transaction, verifies digest, ordered nonoverlapping scalar ranges and readi
 and rejects corruption without repair or reanalysis. Existing single-text snapshot,
 token, progress, completion and finished-reopen repositories now accept paste/TXT;
 their historical PastedDocument name/wire format is retained. No ruby reader payload
-exists yet. Typed per-file runtime/JNI imports are connected; Android picker and
-encoding choice UI remain planned. Deleting live content removes file identity/ruby;
+exists yet. Typed per-file runtime/JNI imports and the retained Android TXT picker,
+encoding choices, progress and summary are connected. Deleting live content removes file identity/ruby;
 retained source/chapter/history and global vocabulary survive, and reimport starts
 with fresh IDs, position and finish state. Production deletion is still planned.
 
