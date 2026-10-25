@@ -13,10 +13,13 @@ use crate::{
         SavedReadingTime,
     },
     completion::{AnalyzedCompletionOutcome, CompletionNotice, PageCompletionIntent},
-    document::{CompletionCommandId, DocumentId, LibraryDocument, PastedDocument, TextAnchor},
+    document::{CompletionCommandId, DocumentId, LibraryDocument, ReaderDocument, TextAnchor},
     imports::{SrtImport, TxtImport},
     pagination::{LogicalPages, PageLength, ReadingPosition},
-    reader::{ReaderAnalysis, ReaderPage, ReaderStatusChange, ReaderTokenKey, ReaderTokenSnapshot},
+    reader::{
+        ReaderAnalysis, ReaderChapterAnalysis, ReaderPage, ReaderStatusChange, ReaderTokenKey,
+        ReaderTokenSnapshot,
+    },
     reader::{ReaderWordDetails, ReaderWordSelection},
     storage::{DocumentError, StorageOperation, StorageResult},
 };
@@ -66,14 +69,15 @@ pub struct Model {
     destination: Destination,
     settings_open: bool,
     documents: Vec<LibraryDocument>,
-    loaded_document: Option<PastedDocument>,
+    loaded_document: Option<ReaderDocument>,
     storage_busy: bool,
     document_error: Option<DocumentError>,
     content_route: ContentRoute,
     reader: Option<ReaderPage>,
     reader_analysis: Option<ReaderAnalysis>,
     pending_reader: Option<DocumentId>,
-    reader_document: Option<PastedDocument>,
+    reader_document: Option<ReaderDocument>,
+    reader_analyses: Vec<ReaderChapterAnalysis>,
     page_length: Option<PageLength>,
     import_summary: Option<ImportSummary>,
     reader_time: Option<SavedReadingTime>,
@@ -162,12 +166,12 @@ pub struct ViewModel {
     pub destination: Destination,
     pub settings_open: bool,
     pub documents: Vec<LibraryDocument>,
-    pub loaded_document: Option<PastedDocument>,
+    pub loaded_document: Option<ReaderDocument>,
     pub storage_busy: bool,
     pub document_error: Option<DocumentError>,
     pub content_route: ContentRoute,
     pub reader: Option<ReaderPage>,
-    /// Present only for an opened reader; Missing identifies a legacy paste.
+    /// Present only for an opened reader; Missing identifies a legacy document.
     pub reader_analysis: Option<ReaderAnalysis>,
     /// None until persisted settings have been loaded successfully.
     pub page_length: Option<PageLength>,
@@ -224,10 +228,9 @@ impl App for Yomoku {
             let Some(document) = model.reader_document.as_ref() else {
                 return Command::done();
             };
-            let Ok(pages) = LogicalPages::new(
-                std::slice::from_ref(&document.chapter),
-                model.page_length.unwrap_or_default(),
-            ) else {
+            let Ok(pages) =
+                LogicalPages::new(&document.chapters, model.page_length.unwrap_or_default())
+            else {
                 return Command::done();
             };
             let Some(previous) = pages
@@ -584,6 +587,7 @@ impl App for Yomoku {
                 model.reader_tokens = None;
                 model.clear_reader_word();
                 model.reader_document = None;
+                model.reader_analyses.clear();
                 model.clear_reader_time();
             }
             return render::render()
@@ -602,6 +606,7 @@ impl App for Yomoku {
                 model.reader_tokens = None;
                 model.clear_reader_word();
                 model.reader_document = None;
+                model.reader_analyses.clear();
                 model.pending_reader = None;
                 model.clear_reader_time();
             }
@@ -617,6 +622,7 @@ impl App for Yomoku {
                 model.reader_tokens = None;
                 model.clear_reader_word();
                 model.reader_document = None;
+                model.reader_analyses.clear();
                 model.pending_reader = None;
                 model.clear_reader_time();
                 model.document_error = None;
@@ -765,16 +771,12 @@ impl App for Yomoku {
                         };
                         // The frozen page identifies this completion, not the permanent
                         // marker (which is already true on every deliberate reread).
-                        let final_page = prepared.completion.page.source_id
-                            == document.chapter.source_id
-                            && prepared.completion.page.chapter_id == document.chapter.chapter_id
-                            && prepared
-                                .completion
-                                .page
-                                .range
-                                .end
-                                .byte_index(&document.chapter.text)
-                                == Ok(document.chapter.text.len());
+                        let final_page = document.chapters.last().is_some_and(|chapter| {
+                            prepared.completion.page.source_id == chapter.source_id
+                                && prepared.completion.page.chapter_id == chapter.chapter_id
+                                && prepared.completion.page.range.end.byte_index(&chapter.text)
+                                    == Ok(chapter.text.len())
+                        });
                         model.completion_notice = match outcome {
                             AnalyzedCompletionOutcome::Recorded { newly_known }
                                 if newly_known > 0 =>
@@ -834,19 +836,29 @@ impl App for Yomoku {
                         model.reader_tokens = None;
                         model.clear_reader_word();
                         model.reader_document = None;
+                        model.reader_analyses.clear();
                         model.clear_reader_time();
                     }
                     StorageResult::Loaded(snapshot) => {
+                        if snapshot.validate().is_err() {
+                            model.document_error = Some(DocumentError::InvalidDocument);
+                            return render::render();
+                        }
                         let document = snapshot.document;
                         model.update_library(&document);
                         model.apply_page_length(snapshot.page_length);
                         if pending_reader == Some(document.document_id)
                             && model.content_route == ContentRoute::Reader
                         {
-                            match ReaderPage::open(&document, snapshot.page_length) {
+                            match ReaderPage::open_document(&document, snapshot.page_length) {
                                 Ok(reader) => {
+                                    model.reader_analysis = snapshot
+                                        .analyses
+                                        .iter()
+                                        .find(|entry| entry.chapter_id == reader.anchor.chapter_id)
+                                        .map(|entry| entry.analysis);
+                                    model.reader_analyses = snapshot.analyses;
                                     model.reader = Some(reader);
-                                    model.reader_analysis = Some(snapshot.analysis);
                                     model.reader_document = Some(document.clone());
                                 }
                                 Err(_) => {
@@ -961,6 +973,7 @@ impl Model {
         self.reader_tokens = None;
         self.clear_reader_word();
         self.reader_document = None;
+        self.reader_analyses.clear();
         self.pending_reader = None;
         self.clear_reader_time();
         self.document_error = None;
@@ -1010,7 +1023,7 @@ impl Model {
         })
     }
 
-    fn apply_position(&mut self, document: PastedDocument) {
+    fn apply_position(&mut self, document: ReaderDocument) {
         self.update_library(&document);
         if self.content_route == ContentRoute::Reader
             && self
@@ -1018,7 +1031,7 @@ impl Model {
                 .as_ref()
                 .is_some_and(|reader| reader.document_id == document.document_id)
         {
-            match ReaderPage::open(&document, self.page_length.unwrap_or_default()) {
+            match ReaderPage::open_document(&document, self.page_length.unwrap_or_default()) {
                 Ok(reader) => {
                     self.reader_tokens = None;
                     self.clear_reader_word();
@@ -1029,6 +1042,11 @@ impl Model {
                         self.reader_time = None;
                         self.reader_clock = None;
                     }
+                    self.reader_analysis = self
+                        .reader_analyses
+                        .iter()
+                        .find(|entry| entry.chapter_id == reader.anchor.chapter_id)
+                        .map(|entry| entry.analysis);
                     self.reader = Some(reader);
                     self.reader_document = Some(document.clone());
                     self.loaded_document = Some(document);
@@ -1038,7 +1056,7 @@ impl Model {
         }
     }
 
-    fn update_library(&mut self, document: &PastedDocument) {
+    fn update_library(&mut self, document: &ReaderDocument) {
         match document.library_summary() {
             Ok(summary) => {
                 if let Some(entry) = self
@@ -1070,7 +1088,7 @@ impl Model {
     fn apply_page_length(&mut self, length: PageLength) {
         self.page_length = Some(length);
         if let (Some(reader), Some(document)) = (&self.reader, &self.reader_document) {
-            match ReaderPage::at(document, reader.position, length) {
+            match ReaderPage::at_document(document, reader.position, length) {
                 Ok(page) => {
                     if page.anchor != reader.anchor {
                         self.reader_tokens = None;

@@ -75,7 +75,7 @@ internal fun verifyDocumentBridge() {
             check(summary.title == "  題𠮷📖  ")
             val id = created.documents.single().documentId
             val loaded = checkNotNull(listener.dispatch(bridge, Event.LoadPaste(id)).loadedDocument)
-            check(loaded.chapter.text == text)
+            check(loaded.chapters.single().text == text)
             val opened = listener.dispatch(bridge, Event.OpenReader(id))
             check(opened.contentRoute == ContentRoute.READER)
             val analysis = checkNotNull(opened.readerAnalysis) as ReaderAnalysis.Available
@@ -83,7 +83,7 @@ internal fun verifyDocumentBridge() {
             check(dictionary.calls.get() == 2)
             val page = checkNotNull(opened.reader)
             check(page.documentId == id && page.text == text)
-            check(page.anchor.sourceId == loaded.chapter.sourceId)
+            check(page.anchor.sourceId == loaded.chapters.single().sourceId)
             check(page.anchor.range.end.value == text.toByteArray(Charsets.UTF_8).size.toLong())
             check(page.position.offset.value == 0L)
             check(page.pageNumber == 1UL && page.totalPages == 1UL)

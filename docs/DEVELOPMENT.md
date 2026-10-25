@@ -18,7 +18,7 @@ with functioning rustup can omit the PATH workaround. Do not assume this compile
 is the project's minimum supported version; establish that with dependencies.
 Cargo.lock is retained for reproducible application development.
 Crux 0.20.0 declares Rust 1.90 minimum; the full locked graph has only been tested
-with 1.99.1. Current host baseline: 395 data-free Rust tests (183 storage, 29
+with 1.99.1. Current host baseline: 399 data-free Rust tests (183 storage, 32
 runtime). Fourteen analysis fixtures and one runtime fixture run separately with
 each Full loader via tools/test-sudachi.sh (see below).
 
@@ -2688,3 +2688,59 @@ paste/TXT. App/worker/typed JNI reader migration and EPUB FIFO/import wiring rem
 open. Complete EPUB integrity reads repeat per reference; performance is unmeasured.
 APK/Android lint/device, codegen-repeat, standalone index/Python suites, release,
 process-death/reboot/tablet/dark and physical arm64 were not rerun.
+
+## Ordered application/FIFO/typed JNI readers
+
+Verified 2026-10-26 with the Rust PATH/JDK/SDK/Gradle setup above:
+
+```sh
+cargo test --workspace --all-features --locked --offline --quiet
+cargo clippy --workspace --all-targets --all-features --locked --offline -- -D warnings
+cargo fmt --all -- --check
+tools/test-kotlin-bridge.sh
+tools/format-kotlin.sh --check
+cargo run -p yomoku-ffi --bin generate-kotlin --features facet_typegen --locked --offline -- target/generated/kotlin-repeat
+diff -r target/generated/kotlin target/generated/kotlin-repeat
+(cd crates/yomoku-ffi && CARGO_NET_OFFLINE=true ../../.local/bin/boltffi generate kotlin --deny-skipped --output ../../target/generated/native-repeat)
+diff -r target/generated/native target/generated/native-repeat
+./android/gradlew -p android :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug --offline --console=plain
+./android/gradlew -p android :app:connectedDebugAndroidTest :app:lintDebug -Pandroid.testInstrumentationRunnerArguments.class=app.yomoku.DocumentSessionTest,app.yomoku.ReaderNavigationTest,app.yomoku.ReaderClockSessionTest --offline --console=plain
+git diff --check
+```
+
+PASS: 399 data-free Rust tests (one new core/three worker), strict Clippy/Rust and
+Kotlin formatting/diff, real-Full Kotlin/JNI, seven Unicode exchanges with an added
+seven-chapter ordered-document round trip, repeatable generated codecs/native
+bindings and both-ABI debug/test APK builds with strict Android lint. Sixteen
+external-data fixtures remain ignored by the ordinary Rust run. Existing benign
+Crux close diagnostics persist. All 13 focused API-36 x86_64 emulator tests pass
+(three DocumentSession, five ReaderNavigation, five ReaderClockSession), including
+persistence/statuses/TXT encodings, controls/swipes/backward progress/scroll reset,
+completion retry/rereads/checkmark/reopen/recreation/toasts/confetti and timer
+restore/idle/reflow/movement/teardown/final-save ordering. Reports retained under
+`.local/test-reports/ordered-reader/{report,results}/`.
+
+The existing AVD was cold-started with documented swangle/KVM flags without wiping
+data. ADB initially could not create its sandbox socket; escalation connects and
+the focused Gradle run passes. The AVD remains running. No open failure/blocker.
+
+New worker fixtures seed actual stored two-chapter EPUBs, then open/move/complete
+through the production FIFO/core with unusable analyzer loaders. Verify original
+per-chapter Mode B selection, tokens, whole-book counters/progress, Previous without
+history, rereads, all five reflow presets with exact later-chapter offset, separate
+123/0/456 ms completion durations, whole-book-only finish/confetti and fresh-worker
+finished reset. Image-only final content uses U+FFFC and completes with no words.
+Corrupt saved EPUB metadata fails without chapter truncation or Full; an independent
+reader then opens. The core rejects missing/duplicate/foreign analysis keys, accepts
+out-of-order keyed entries and preserves explicit per-chapter Missing.
+
+Initial synthetic fixture failures were wrong time-column naming, treating an
+EPUB image placeholder as empty text and asserting Library contents without first
+loading Library. Corrected the fixtures; production empty-text semantics stay
+unchanged. Kotlin -Werror caught an unnecessary safe call in the new codec fixture;
+fixed it. Final host checks pass. No new dependency/version, migration or permission.
+
+App picker remains paste/TXT; EPUB per-file FIFO import, mixed selection and reader
+formatting/ruby/images remain open. Complete EPUB integrity reads still repeat per
+reader operation; large-book performance is unmeasured. Standalone Full/index/Python,
+release, process-death/reboot, tablet/dark and physical arm64 were not rerun.

@@ -83,8 +83,9 @@ interpretation's title, whole-book progress and finish marker without a content
 payload. Identity and complete document validation occur in the same read/import
 transaction; inconsistent saved content fails without writes or analysis. Core
 Created/Existing results also carry Library references. Private StorageFinished
-changes do not alter exported event/request/view schemas. Application reader
-payloads remain single-text and reject EPUB. Current app imports stay paste/TXT.
+changes did not alter exported event/request/view schemas. The subsequent ordered
+reader migration changes ViewModel.loaded_document to ReaderDocument. Current app
+imports stay paste/TXT; EPUB per-file FIFO import/Android selection remain open.
 
 ## Ordered-chapter reader repositories (no migration)
 
@@ -117,10 +118,22 @@ the boundary atomically. Only completion of the whole book's final page sets the
 permanent finish marker. Replay checks still precede live-content validation;
 rereads allocate fresh IDs. Image-only final chapters complete with zero new words.
 
-Legacy `PastedDocument`/`ReaderSnapshot` and their single-text read/open/position
-APIs remain for the existing application/typed bridge. They still reject EPUB.
-No migration, serialized bridge change, Android reader capability or parser change
-is implied by these repository/domain additions.
+The application/FIFO/typed bridge now consume these ordered repositories.
+StorageResult.Loaded carries DocumentReaderSnapshot; PositionSaved/PageCompleted
+carry ReaderDocument. ViewModel.loaded_document serializes every chapter in source
+order, including the exact chapter-local position. Android renders ReaderPage as
+before. Core validates exactly one original-analysis entry per owned chapter;
+missing/duplicate/foreign keys fail. The active session retains this keyed map,
+selecting the current chapter's identity after each movement. A plain LoadPaste
+never replaces the opened reader's identities. Previous uses all chapter pages;
+reflow preserves exact chapter/offset, and only whole-book final completion returns
+to Library/celebrates. No chapter truncation, parsing, Full load or registration.
+
+Legacy PastedDocument/ReaderSnapshot and their single-text read/open/position APIs
+remain for repository callers and still reject EPUB. Their historical protocol
+names LoadPaste/OpenReader remain stable; only the loaded-document view field's
+serialized shape changes. No database migration or parser change. EPUB assets/ruby
+are not yet reader payloads, and Android selection stays paste/TXT.
 
 ## SRT canonical content and atomic file repository (migration 0013)
 
@@ -213,9 +226,9 @@ original BLOB and `utf8`/`shift_jis` encoding. `source_ruby` stores chapter-text
 (delete cascade), ordered ruby index, canonical start/end UTF-8 offsets and reading.
 Each file has one canonical chapter. `load_txt_source` reads bytes/encoding/ruby in
 one transaction, verifies digest, ordered nonoverlapping scalar ranges and readings,
-and rejects corruption without repair or reanalysis. Existing single-text snapshot,
-token, progress, completion and finished-reopen repositories now accept paste/TXT/SRT;
-their historical PastedDocument name/wire format is retained. No ruby reader payload
+and rejects corruption without repair or reanalysis. Historical single-text
+snapshot APIs accept paste/TXT/SRT; application/bridge readers now use ReaderDocument
+and the generic ordered repositories above. No ruby reader payload
 exists yet. Typed per-file runtime/JNI imports and the retained Android TXT picker,
 encoding choices, progress, Cancel and summary are connected. The Android foreground
 lease/notifications persist no queue, URI, current-file bytes, progress or summary.
@@ -546,7 +559,7 @@ title is the literal first LF/CRLF-delimited line, without trimming/truncation o
 a fallback for an empty first line. `PastedDocument` is a detached snapshot of a
 document ID, live title, one `ChapterText` and optional `reading_position`;
 mutating a snapshot does not edit
-persisted content. PastedDocument is now a generated shell/FFI payload.
+persisted content. Application/FFI snapshots now use the ordered ReaderDocument.
 
 - `sources`: positive autoincrement ID, `kind = 'paste'`, original title.
 - `chapters`: positive autoincrement ID, source FK, nonnegative chapter index,
@@ -647,7 +660,7 @@ SQLite BLOB lengths (including text after NUL), without fetching every document'
 text or paginating the Library. It checks chapter ownership and offset bounds;
 full scalar-boundary validation happens when loading/saving a document. Current
 progress can decrease and is independent of the persisted finished-at-least-once marker.
-Only paste's single text unit is implemented; multi-chapter totals await imports.
+EPUB totals include every ordered chapter; single-text sources retain one chapter.
 
 SaveReadingPosition is a typed position-only protocol hook for an active reader;
 there is no user-facing seek control. It uses the existing busy guard/FIFO worker.
@@ -682,7 +695,8 @@ update the global preset without reopening closed reader/Settings routes.
 ## Reader analysis restoration (no schema change)
 `load_reader_snapshot` reads canonical paste content/current position, persisted
 page length and the earliest stored Mode B analysis header in one transaction.
-`ReaderSnapshot` returns these together on the FIFO worker. `ReaderAnalysis` is
+The historical `ReaderSnapshot` returns these together; the FIFO now uses the
+ordered `DocumentReaderSnapshot` and one identity per chapter. `ReaderAnalysis` is
 Available(AnalysisId) or Missing; no Mode B base means legacy absence, never an
 A/C or foreign-chapter substitution. Later profiles do not replace the original
 base. Invalid metadata/settings fail without fallback/repair. No token scan,
@@ -691,8 +705,9 @@ analyzer load or vocabulary registration is performed. Explicit reader entry use
 `load_reader_snapshot` remains read-only.
 
 Core attaches this identity only to an accepted OpenReader load. Its optional
-view field is absent outside the opened reader, stays fixed across position saves,
-reflow and plain LoadPaste results, and clears on reader exit/replacement. Late
+view field is absent outside the opened reader, follows the current chapter's
+frozen identity across position saves, remains fixed on reflow/plain LoadPaste,
+and clears on reader exit/replacement. Late
 cancelled loads cannot restore it. Generated Kotlin codecs carry the exact i64
 identity and explicit missing variant. Completion will validate all snapshot tokens
 inside its transaction; Missing does not authorize a text-only completion path.
@@ -734,26 +749,25 @@ This legacy entry point is repository-only infrastructure. Migration 0010 adds t
 analyzed entry point used by core/runtime/FFI/Android forward actions below. Do not
 use absent occurrence data as completed-reading statistics. Migration 0011 adds
 the permanent finish marker; explicit reopening now starts at page 1. Finish Book
-remains unwired.
+uses the analyzed completion path and returns to Library after final-time drain.
 
 ## Permanent document finish marker (migration 0011)
 `documents.finished_at_least_once` is a non-null integer boolean, constrained to
 0/1 and defaulting to 0. Newly recorded completion of the final logical page sets
 it to 1 in the same immediate transaction as history, occurrences, statuses, time
-and position. Only single-chapter pastes exist today; their final page ends at the
-canonical text's UTF-8 byte length. Future multi-chapter formats must validate the
-document's final chapter before setting this marker.
+and position. Completion validates the whole document's final chapter and its
+canonical UTF-8 byte length; earlier chapter endings never set this marker.
 
 The marker never follows position backward or changes with page-length settings,
 partial-time checkpoints or duplicate callbacks. `finished_at_least_once` reads
 `Option<bool>` for a document (None means absent), without changing position. It
-also appears on PastedDocument, LibraryDocument and ReaderPage, including generated
+also appears on ReaderDocument, LibraryDocument and ReaderPage, including generated
 Kotlin snapshots. Android renders an accessible checkmark in Library and reader.
 Each deliberate final-page reread still gets its own completion history.
 
-`StorageOperation::OpenReader` calls `open_reader_snapshot` on the FIFO. One
+`StorageOperation::OpenReader` calls `open_document_reader_snapshot` on the FIFO. One
 immediate transaction reads the document, resets a finished document's exact
-position to chapter start, and returns its marker/settings/analysis identity.
+position to the first chapter's start, and returns its marker/settings/analysis identities.
 The reset updates Library percentage after commit and preserves all pending-time
 buckets and history. Unfinished documents keep their exact position, including
 position-only EOF. Already-at-start finished opens avoid redundant writes.

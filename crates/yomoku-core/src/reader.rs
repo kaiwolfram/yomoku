@@ -32,8 +32,8 @@ pub struct ReaderSnapshot {
 }
 
 /// Ordered whole-document text and every chapter's original Mode B identity.
-/// The legacy ReaderSnapshot remains the single-text bridge payload until the
-/// application and platform adapters migrate together.
+/// Used by the application and worker; the legacy ReaderSnapshot remains only
+/// for callers of the historical single-text storage APIs.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
 pub struct DocumentReaderSnapshot {
@@ -47,6 +47,25 @@ pub struct DocumentReaderSnapshot {
 pub struct ReaderChapterAnalysis {
     pub chapter_id: ChapterId,
     pub analysis: ReaderAnalysis,
+}
+
+impl DocumentReaderSnapshot {
+    /// Every chapter must have exactly one explicit original-analysis state.
+    /// Entries are keyed by chapter identity, not by their vector order.
+    pub fn validate(&self) -> Result<(), InvalidTextValue> {
+        self.document.validate()?;
+        if self.analyses.len() != self.document.chapters.len() {
+            return Err(InvalidTextValue);
+        }
+        let mut seen = std::collections::HashSet::new();
+        for entry in &self.analyses {
+            self.document.chapter(entry.chapter_id)?;
+            if !seen.insert(entry.chapter_id) {
+                return Err(InvalidTextValue);
+            }
+        }
+        Ok(())
+    }
 }
 
 /// Identity of a displayed token lookup, independent of the exact reading offset.

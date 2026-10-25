@@ -1667,3 +1667,24 @@
   and reader assets. App stays paste/TXT; duplicate integrity-read cost unmeasured.
   APK/Android lint/device, codegen repeat, standalone index/Python, release/reboot/
   process-death/tablet/dark and physical arm64 not rerun. Nostr/Q188 unchanged.
+
+## 2026-10-26 — Ordered application/FIFO/typed JNI readers
+
+- Application loads/opens/position saves/completion reloads now use complete ordered
+  ReaderDocument snapshots. Generated view payloads retain all chapters and exact
+  chapter-local position; active core selects each chapter's frozen original Mode B.
+  Previous/global counters/progress/reflow and whole-book-only finish are connected.
+- PASS: 399 data-free Rust tests, strict Clippy/Rust+Kotlin fmt/diff, real-Full
+  Kotlin/JNI, seven Unicode exchanges including a seven-chapter payload, repeatable
+  Crux/native bindings, both-ABI APK builds/strict Android lint and 13 focused API-36
+  x86_64 persistence/navigation/timer tests. Reports: .local/test-reports/ordered-reader/.
+  One new core/three worker fixtures cover keyed identity validation, cross-chapter
+  movement/reread/time/reflow/finish/reset, image-only completion and corrupt-reader
+  isolation without Full. Corrected synthetic expectations/Kotlin safe-call warning;
+  final checks pass. Existing benign Crux close diagnostics persist.
+- Updated README/plan/architecture/data/decisions/development/handoff. No dependency,
+  migration, permission or open blocker. AVD cold-started without data wipe; ADB
+  socket/KVM required escalation. Emulator left running. Next: EPUB per-file FIFO/JNI
+  import isolation/cancellation, mixed picker and reader assets. App stays paste/TXT;
+  complete EPUB integrity-read cost remains unmeasured. Standalone Full/index/Python,
+  release, process-death/reboot/tablet/dark and physical arm64 not rerun. Nostr/Q188 unchanged.

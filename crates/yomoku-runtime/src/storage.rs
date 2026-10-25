@@ -206,12 +206,12 @@ fn execute(
                 cancellation.expect("SRT attempt published before enqueue"),
             ),
         StorageOperation::LoadPaste(id) => storage
-            .load_reader_snapshot(id)
+            .load_document_reader_snapshot(id)
             .map_err(map_error)?
             .map(StorageResult::Loaded)
             .ok_or(DocumentError::NotFound),
         StorageOperation::OpenReader(id) => storage
-            .open_reader_snapshot(id)
+            .open_document_reader_snapshot(id)
             .map_err(map_error)?
             .map(StorageResult::Loaded)
             .ok_or(DocumentError::NotFound),
@@ -266,7 +266,7 @@ fn execute(
             document_id,
             position,
         } => storage
-            .save_reading_position(document_id, position)
+            .save_document_reading_position(document_id, position)
             .map_err(map_error)?
             .map(StorageResult::PositionSaved)
             .ok_or(DocumentError::NotFound),
@@ -302,9 +302,10 @@ fn execute(
             // If this read fails, retry the frozen command. Repository replay
             // has no side effects and returns no duplicate status notification.
             let document = storage
-                .load_paste(prepared.completion.document_id)
+                .load_document_reader_snapshot(prepared.completion.document_id)
                 .map_err(map_error)?
-                .ok_or(DocumentError::NotFound)?;
+                .ok_or(DocumentError::NotFound)?
+                .document;
             Ok(StorageResult::PageCompleted(document, outcome))
         }
     }

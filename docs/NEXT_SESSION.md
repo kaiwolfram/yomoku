@@ -1,77 +1,78 @@
 # Resume here
-Updated: 2026-10-26. Format-independent import references verified; app paste/TXT.
+Updated: 2026-10-26. Ordered app/FIFO/typed JNI readers; app imports paste/TXT.
 Read AGENTS.md, plan phases 2–4 and PRODUCT_SPEC.md sections 3–4.
 ## Working
 - Pure Crux routes/Library/Settings; Render-only UI; FIFO SQLite/analysis. Starts Library.
-- Exact chapter-local UTF-8 position/Library percentage + five presets persist;
-  reflow preserves offset. Scroll resets on navigation/reopen; column max 720dp.
+- Exact chapter-local UTF-8 position/whole-book Library percentage + five presets
+  persist; reflow preserves offset. Scroll resets on movement/reopen; column 720dp.
   Next/Previous/counter below content; net 48dp swipes need no bottom. Previous
-  saves position only. Busy/pending gates reject duplicates; rereads count.
-- Paste atomically deduplicates SHA-256, saves original B + unique Japanese
-  registrations. Existing preserves title/status/progress without rescan/writes.
-  Created/Existing show dismissible Library summary; never auto-open.
-- Legacy load_reader_snapshot/load_paste are read-only; open_reader_snapshot alone
-  resets finished books to page 1/preset/B atomically. Finish marker survives
-  position/reflow/time; deletion resets it, preserving history. Missing never rescans.
+  saves position only. Busy/pending gates reject duplicates; deliberate rereads count.
+- Paste atomically deduplicates SHA-256, saves original B + unique registrations.
+  Existing preserves title/status/progress without rescan/writes. Created/Existing
+  show dismissible Library summary; never auto-open. Nostr config remains empty.
+- Generic read-only load versus explicit open: finished books reset to first
+  chapter/page/preset/B atomically only on open. Finish survives movement/time/reflow;
+  deletion resets it, preserving history. Missing never rescans.
+- NEW App/FIFO/typed bridge uses ReaderDocument/DocumentReaderSnapshot for loads,
+  opens, saves and completion reloads, retaining all ordered chapters. ViewModel's
+  loaded_document shape changed; generated codecs rebuilt. Legacy single-text
+  repository APIs remain. Core validates one keyed original B/Missing per chapter,
+  freezes map on accepted open, selects current chapter after movement; plain loads
+  cannot replace it. Previous crosses chapters; global page counters/progress.
 - Token reads load original B/live statuses/metadata + clipped UTF-8 ranges atomically;
   completion uses token start. Deleted IDs absent. Whole-chapter validation per lookup.
-  FIFO/JNI loads after busy/pending saves clear; page/base/result identities must match.
-  Movement/reflow/refresh invalidate. Strict UTF-8→UTF-16 failures render plain text.
-- Five manual status choices update status/history atomically; same-status no-op.
-  Deleted IDs never register. Failed reads/choices require explicit retry.
+  Loads wait for busy/pending saves; full page/base/result identities gate callbacks.
+  Movement/reflow/refresh invalidate. Strict UTF-8→UTF-16 failure renders plain text.
+- Five manual choices atomically update status/history; same-status no-op. Deleted
+  entries never register. Reads/choices require explicit retry after failure.
   Phone sheet/wide panel shows readings/base, expanded restriction-aware English
   senses/compact POS, separate names/categories/lifetime counts. Opening read-only;
-  navigation/recreation dismisses, errors survive timer saves, busy/pending gates apply.
-- Clock uses elapsedRealtime/15s Handler checkpoints, restore-before-Resume,
-  five-minute idle/pause/background cap, reflow deadline and movement epochs.
-  Absolute revisions freeze retries, coalesce maxima and drain before movement/exit.
-  CoreSession close retains callbacks until busy/BOTH pending flags/direct Cancel clear;
-  retries after onCleared. Abrupt kill can lose pending.
-- Completion freezes page/position/preset/AnalysisId/time; drains final time then FIFO
-  reserves ID + whole-page duration. One transaction commits occurrences/New-only
-  Known/history/time/position/finish. Missing blocks. Exact retries; AlreadyRecorded/
-  zero silent. Positive toast once. New final Recorded returns Library + 1.4s confetti.
+  navigation/recreation dismisses; errors survive timer saves; busy/pending gates.
+- Clock uses elapsedRealtime/15s checkpoints, restore-before-Resume, five-minute
+  idle/pause/background cap, reflow deadlines and movement epochs. Absolute revisions
+  freeze retries, coalesce maxima and drain before movement/exit. CoreSession close
+  retains callbacks until busy/BOTH pending/direct Cancel clear; retries on teardown.
+  Abrupt kill can lose pending. Time stays chapter-local, including EOF.
+- Completion freezes page/position/preset/AnalysisId/time, drains final time then
+  FIFO reserves ID + whole-page duration. One transaction commits occurrences,
+  New-only Known/history/time/position/finish. Exact retries; AlreadyRecorded/zero
+  silent, positive toast once. Chapter end advances to next chapter at 0; only new
+  whole-book final completion returns Library + 1.4s confetti. Image placeholders
+  complete without words. Fresh finished-book open resets to first chapter.
 - NativeBridge consumes owned verified FD+1; Rust rehashes/maps/closes all paths.
-  FIFO releases Full in background; keep live mapped inodes immutable. Pinned
-  2026-10-25 JMdict English/JMnedict + notices/offline credits bundled. Lazy index
-  until close/query failure; full token/selection identity gates dictionary attach.
-- TXT strict UTF-8/Shift-JIS/Aozora atomic original-byte SHA-256, filename/encoding/
-  ruby/Mode B/unique registration. Duplicate skips decode/Full. Typed FIFO/JNI gates saves.
-- Android multiple-TXT retained helper reads one URI off main; sequences encoding/
-  Skip/import. Filename/X-of-N + processed bar and summary survive recreation/background.
-  No persisted queue; teardown drops unsubmitted work. Name precedes bytes.
-- cancelFileImport() bypasses FIFO off main (COMMIT may wait); TXT alias retained.
-  Fresh handle precedes submission; silent full-file rollback; winning/prior commits stay.
-  Android clears inputs/remaining, invalidates late reads, retires executors and waits
-  BOTH native return + current outcome, including draining close.
+  FIFO releases Full in background; live mapped inodes immutable. Pinned 2026-10-25
+  JMdict English/JMnedict + notices/credits bundled. Word index lazy until close/query
+  failure; full token/selection identities gate attach.
+- TXT strict UTF-8/Shift-JIS/Aozora atomic original-byte hash, filename/encoding/ruby/
+  Mode B/unique registrations. Duplicate skips decode/Full. SRT FIFO/JNI shares
+  decoder (no Aozora), original hash/filename/LF/cues/B. First interpretation wins.
+- Retained multiple-TXT helper reads one URI off main; sequences encoding/Skip/import.
+  Filename/X-of-N/processed bar + summary survive recreation/background. Name before
+  bytes. No persisted queue; teardown drops unsubmitted files, SIGKILL keeps commits.
+- cancelFileImport bypasses FIFO off main (COMMIT may wait); TXT alias retained.
+  Fresh attempt before submission; silent full-file rollback; winning/prior commits
+  stay. Android clears inputs/remaining, ignores late reads and awaits BOTH native
+  return + current outcome, including draining close. Dedicated cancellation executor.
 - dataSync lease tracks counts/name only; OS limits apply. Encoding releases it;
-  notification permission never blocks. Timeout stops lease before Cancel. Notices
-  count processed/total; taps no reader. HOME/SIGKILL retain only commits, no resume.
-- SRT repository/FIFO/JNI uses strict shared decoder (no Aozora), original hash/filename/
-  LF/cues/B/unique registration; TXT/SRT retains first interpretation. Picker pending.
-- EPUB bounded parser ignores CSS; migration 0014 atomically stores source bytes/hash/
-  title/filename, ordered chapters/formatting/ruby/links, shared cover/images and per-
-  chapter original B/unique registrations. Cancel/later failure rolls back all rows/IDs.
-  Read-only loader validates digests/counts/indexes/anchors/ownership without parsing.
-- NEW ReaderDocument + DocumentReaderSnapshot retain ordered chapters and keyed B IDs.
-  Generic load/open/position repositories support all formats. Existing completion/time/
-  token/selected-word repositories now use complete documents; next chapter starts at 0,
-  only whole-book final page finishes. Time stays chapter-local; global progress/counters.
-  New reader loads currently verify all EPUB source/assets per operation (unmeasured).
-  App/worker reader payloads still single-text and reject EPUB.
-- File preflight + TXT/SRT/EPUB Existing outcomes now return Library references,
-  validating the complete saved document atomically. Core import results also use
-  Library references; exported event/view schemas unchanged. TXT/SRT duplicate EPUB
-  references keep renamed title/later-chapter progress/finish without Full or writes;
-  corrupt content fails without rescan, and later files can still import.
+  notification permission never blocks. Timeout stops lease before Cancel. Notification
+  taps never open reader. No background queue/service restart after process death.
+- EPUB bounded parser ignores CSS. Migration 0014 atomically saves source bytes/hash/
+  metadata/ordered chapter formatting/ruby/links/shared images + chapter B/registration.
+  Any failure/Cancel rolls back all rows/IDs. Loader validates saved digests/counts/
+  anchors/ownership without parsing. Every reader operation verifies complete EPUB
+  source/assets; large-book performance unmeasured. Reader asset payload still absent.
+- Shared file preflight/Existing outcomes return Library references, validating the
+  whole document atomically. Duplicate EPUB via TXT/SRT preserves renamed/later-chapter/
+  finished state without Full/reset/writes. Corruption fails; later files continue.
 ## Next tasks (ordered)
-1. Migrate app/worker/typed JNI reader payloads to ordered documents; wire EPUB
-   FIFO/JNI using shared format-independent preflight. Never truncate chapters.
-2. Mixed EPUB/TXT/SRT picker/summary/Cancel, reader images/ruby; CI independent.
-3. User-run physical arm64 validation once usable.
+1. EPUB FIFO/typed JNI import using shared preflight: duplicates, encoding-independent
+   errors, later-chapter/commit rollback, Cancel and failed-file isolation. No truncation.
+2. Mixed EPUB/TXT/SRT picker/summary/Cancel; reader images/ruby. CI independent.
+3. User-run physical arm64 validation once usable (still deferred).
 ## Verification
-- PASS: 395 data-free Rust tests, Clippy/fmt/Kotlin fmt/diff, both storage targets;
-  fourteen real-Full analysis + one worker fixture per owned/mapped loader;
-  real-Full Kotlin/JNI + seven Unicode exchanges. Commands: DEVELOPMENT.md end.
-- No blocker. APK/Android lint/device/codegen-repeat/index/Python/release/reboot/
-  process-death/tablet/dark not rerun; physical arm64 unverified. Nostr empty/Q188.
+- 399 data-free Rust tests, Clippy/fmt/Kotlin fmt/diff, real-Full Kotlin/JNI + seven
+  Unicode exchanges including ordered payload; both-ABI APK builds/strict Android lint.
+- PASS: 13 focused API-36 x86_64 reader/persistence/timer tests; repeated Crux/native
+  generation matches exactly. Reports: .local/test-reports/ordered-reader/.
+- Exact commands/results: DEVELOPMENT.md end. Standalone Full/index/Python, release,
+  process-death/reboot/tablet/dark/physical arm64 not rerun. No product blocker/Q188.

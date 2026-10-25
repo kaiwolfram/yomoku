@@ -7,8 +7,9 @@ use yomoku_core::{
     },
     pagination::{PageLength, ReadingPosition},
     reader::{
-        progress_percent, ReaderAnalysis, ReaderPage, ReaderSnapshot, ReaderStatusChange,
-        ReaderToken, ReaderTokenKey, ReaderTokenSnapshot, ReaderVocabulary,
+        progress_percent, DocumentReaderSnapshot, ReaderAnalysis, ReaderChapterAnalysis,
+        ReaderPage, ReaderStatusChange, ReaderToken, ReaderTokenKey, ReaderTokenSnapshot,
+        ReaderVocabulary,
     },
     storage::{DocumentError, StorageOperation, StorageResult},
     vocabulary::VocabularyStatus,
@@ -41,6 +42,21 @@ fn save_clock(core: &Core<Yomoku>, effects: &mut [Effect], expected_ms: i64) -> 
             revision: previous.revision + 1,
         }),
     )
+}
+
+fn snapshot(
+    document: PastedDocument,
+    page_length: PageLength,
+    analysis: ReaderAnalysis,
+) -> StorageResult {
+    StorageResult::Loaded(DocumentReaderSnapshot {
+        analyses: vec![ReaderChapterAnalysis {
+            chapter_id: document.chapter.chapter_id,
+            analysis,
+        }],
+        document: document.into(),
+        page_length,
+    })
 }
 
 #[test]
@@ -254,7 +270,7 @@ fn reader_clock_survives_reflow_but_movement_exit_and_completion_retire_its_epoc
     finish(
         &core,
         &mut effects,
-        StorageResult::PositionSaved(document.clone()),
+        StorageResult::PositionSaved(document.clone().into()),
     );
     assert!(core.process_event(stale).is_empty());
     restore_time(&core, 20);
@@ -274,7 +290,7 @@ fn reader_clock_survives_reflow_but_movement_exit_and_completion_retire_its_epoc
         &core,
         &mut effects,
         StorageResult::PageCompleted(
-            document.clone(),
+            document.clone().into(),
             yomoku_core::completion::AnalyzedCompletionOutcome::AlreadyRecorded,
         ),
     );
@@ -320,11 +336,7 @@ fn document(text: &str) -> PastedDocument {
 }
 
 fn loaded(document: PastedDocument, page_length: PageLength) -> StorageResult {
-    StorageResult::Loaded(ReaderSnapshot {
-        document,
-        page_length,
-        analysis: ReaderAnalysis::Missing,
-    })
+    snapshot(document, page_length, ReaderAnalysis::Missing)
 }
 
 #[test]
@@ -396,7 +408,7 @@ fn position_save_keeps_committed_view_until_success_and_late_results_only_update
         finish(
             &core,
             &mut effects,
-            StorageResult::PositionSaved(document.clone()),
+            StorageResult::PositionSaved(document.clone().into()),
         );
         assert_eq!(
             core.view().documents[0],
@@ -409,7 +421,11 @@ fn position_save_keeps_committed_view_until_success_and_late_results_only_update
             assert_eq!(core.view().reader.unwrap().position, position);
             let mut effects = core.process_event(Event::SaveReadingPosition(previous.position));
             document.reading_position = Some(previous.position);
-            finish(&core, &mut effects, StorageResult::PositionSaved(document));
+            finish(
+                &core,
+                &mut effects,
+                StorageResult::PositionSaved(document.into()),
+            );
             assert_eq!(core.view().documents[0].progress_percent, 0);
             assert_eq!(core.view().reader.unwrap().page_number, 1);
         }
@@ -757,11 +773,7 @@ fn reader_analysis_is_frozen_through_position_settings_and_plain_load_and_cleare
             finish(
                 &core,
                 &mut effects,
-                StorageResult::Loaded(ReaderSnapshot {
-                    document: document.clone(),
-                    page_length: PageLength::default(),
-                    analysis,
-                }),
+                snapshot(document.clone(), PageLength::default(), analysis),
             );
             assert_eq!(core.view().reader_analysis, Some(analysis));
             let mut effects = core.process_event(Event::SaveReadingPosition(
@@ -770,7 +782,7 @@ fn reader_analysis_is_frozen_through_position_settings_and_plain_load_and_cleare
             finish(
                 &core,
                 &mut effects,
-                StorageResult::PositionSaved(document.clone()),
+                StorageResult::PositionSaved(document.clone().into()),
             );
             assert_eq!(core.view().reader_analysis, Some(analysis));
             core.process_event(Event::OpenSettings);
@@ -999,7 +1011,7 @@ fn checkpoints_freeze_retries_and_preserve_committed_state_through_reflow_and_mo
     finish(
         &core,
         &mut effects,
-        StorageResult::PositionSaved(document.clone()),
+        StorageResult::PositionSaved(document.clone().into()),
     );
     assert_eq!(core.view().reader_time, Some(checkpoint));
     let destination = ReadingPosition {
@@ -1008,7 +1020,11 @@ fn checkpoints_freeze_retries_and_preserve_committed_state_through_reflow_and_mo
     };
     let mut effects = core.process_event(Event::SaveReadingPosition(destination));
     document.reading_position = Some(destination);
-    finish(&core, &mut effects, StorageResult::PositionSaved(document));
+    finish(
+        &core,
+        &mut effects,
+        StorageResult::PositionSaved(document.into()),
+    );
     assert!(core.view().reader_time.is_none());
     assert!(core
         .process_event(Event::CheckpointReadingTime(checkpoint))
@@ -1264,7 +1280,11 @@ fn position_waits_for_every_checkpoint_and_duplicate_departures_keep_first_desti
     assert_eq!(core.view().reader, Some(first));
     assert_eq!(core.view().reader_time, Some(checkpoint));
     document.reading_position = Some(destination);
-    finish(&core, &mut effects, StorageResult::PositionSaved(document));
+    finish(
+        &core,
+        &mut effects,
+        StorageResult::PositionSaved(document.into()),
+    );
     assert_eq!(core.view().reader.unwrap().position, destination);
     assert!(core.view().reader_time.is_none());
     assert!(!core.view().reading_time_save_pending);
@@ -1321,11 +1341,11 @@ fn analyzed_reader() -> (Core<Yomoku>, PastedDocument) {
     finish(
         &core,
         &mut effects,
-        StorageResult::Loaded(ReaderSnapshot {
-            document: document.clone(),
-            page_length: PageLength::default(),
-            analysis: ReaderAnalysis::Available(AnalysisId::try_from(42).unwrap()),
-        }),
+        snapshot(
+            document.clone(),
+            PageLength::default(),
+            ReaderAnalysis::Available(AnalysisId::try_from(42).unwrap()),
+        ),
     );
     (core, document)
 }
@@ -1735,7 +1755,11 @@ fn token_reads_clear_on_reflow_movement_and_navigation_and_ignore_cancelled_erro
     };
     let mut effects = core.process_event(Event::SaveReadingPosition(position));
     document.reading_position = Some(position);
-    finish(&core, &mut effects, StorageResult::PositionSaved(document));
+    finish(
+        &core,
+        &mut effects,
+        StorageResult::PositionSaved(document.into()),
+    );
     assert!(core.view().reader_tokens.is_none());
 }
 
@@ -1819,7 +1843,7 @@ fn previous_is_anchored_position_only_and_drains_final_time_before_moving() {
     finish(
         &core,
         &mut movement,
-        StorageResult::PositionSaved(document.clone()),
+        StorageResult::PositionSaved(document.clone().into()),
     );
     let second = core.view().reader.unwrap();
     assert_eq!(second.page_number, 2);
@@ -1842,7 +1866,11 @@ fn previous_is_anchored_position_only_and_drains_final_time_before_moving() {
     );
     assert!(core.process_event(previous(&second)).is_empty());
     document.reading_position = Some(first.position);
-    finish(&core, &mut movement, StorageResult::PositionSaved(document));
+    finish(
+        &core,
+        &mut movement,
+        StorageResult::PositionSaved(document.into()),
+    );
     assert_eq!(core.view().reader.unwrap().position, first.position);
     assert!(core.view().reader_time.is_none());
     assert!(core.view().completion_notice.is_none());
@@ -1859,7 +1887,11 @@ fn previous_ignores_foreign_and_settings_callbacks() {
     };
     let mut effects = core.process_event(Event::SaveReadingPosition(position));
     document.reading_position = Some(position);
-    finish(&core, &mut effects, StorageResult::PositionSaved(document));
+    finish(
+        &core,
+        &mut effects,
+        StorageResult::PositionSaved(document.into()),
+    );
     let second = core.view().reader.unwrap();
     assert!(core
         .process_event(Event::PreviousReaderPage {
@@ -2002,7 +2034,7 @@ fn analyzed_completion_drains_checkpoints_and_freezes_both_retry_stages_before_e
         &core,
         &mut effects,
         StorageResult::PageCompleted(
-            document,
+            document.into(),
             AnalyzedCompletionOutcome::Recorded { newly_known: 2 },
         ),
     );
@@ -2033,7 +2065,7 @@ fn analyzed_completion_notifies_only_new_success_and_rejects_old_page_callbacks(
         finish(
             &core,
             &mut effects,
-            StorageResult::PageCompleted(document.clone(), outcome),
+            StorageResult::PageCompleted(document.clone().into(), outcome),
         );
         assert_eq!(
             core.view().reader.as_ref().unwrap().position,
@@ -2063,7 +2095,11 @@ fn analyzed_completion_notifies_only_new_success_and_rejects_old_page_callbacks(
         let mut effects = core.process_event(Event::SaveReadingPosition(
             payload.completion.departing_position,
         ));
-        finish(&core, &mut effects, StorageResult::PositionSaved(document));
+        finish(
+            &core,
+            &mut effects,
+            StorageResult::PositionSaved(document.into()),
+        );
         let effects = core.process_event(forward(&core, 777));
         assert!(
             matches!(storage_operation(&effects), StorageOperation::PreparePageCompletion(intent) if intent.completed_at_unix_ms == 777)
@@ -2134,7 +2170,7 @@ fn finished_snapshots_keep_exact_position_until_explicit_reader_entry_and_reflow
         loaded(document.clone(), PageLength::default()),
     );
     assert!(core.view().reader.is_none());
-    assert_eq!(core.view().loaded_document, Some(document.clone()));
+    assert_eq!(core.view().loaded_document, Some(document.clone().into()));
     assert!(core.view().documents[0].finished_at_least_once);
     assert_eq!(core.view().documents[0].progress_percent, 100);
     let mut effects = core.process_event(Event::OpenReader(id));
@@ -2168,7 +2204,11 @@ fn finished_snapshots_keep_exact_position_until_explicit_reader_entry_and_reflow
     // A completion reload must keep EOF even though the document is finished.
     let mut effects = core.process_event(Event::SaveReadingPosition(eof));
     document.reading_position = Some(eof);
-    finish(&core, &mut effects, StorageResult::PositionSaved(document));
+    finish(
+        &core,
+        &mut effects,
+        StorageResult::PositionSaved(document.into()),
+    );
     core.process_event(Event::OpenSettings);
     let mut effects = core.process_event(Event::SetPageLength(PageLength::Characters250));
     finish(
@@ -2200,11 +2240,11 @@ fn final_page_returns_to_library_and_celebrates_each_recorded_command_even_zero_
                 finish(
                     &core,
                     &mut effects,
-                    StorageResult::Loaded(ReaderSnapshot {
-                        document: document.clone(),
-                        page_length: PageLength::default(),
-                        analysis: ReaderAnalysis::Available(AnalysisId::try_from(42).unwrap()),
-                    }),
+                    snapshot(
+                        document.clone(),
+                        PageLength::default(),
+                        ReaderAnalysis::Available(AnalysisId::try_from(42).unwrap()),
+                    ),
                 );
             }
             let pages = yomoku_core::pagination::LogicalPages::new(
@@ -2223,7 +2263,7 @@ fn final_page_returns_to_library_and_celebrates_each_recorded_command_even_zero_
             finish(
                 &core,
                 &mut effects,
-                StorageResult::PositionSaved(document.clone()),
+                StorageResult::PositionSaved(document.clone().into()),
             );
             let request = forward(&core, 1234);
             let mut effects = core.process_event(request.clone());
@@ -2252,7 +2292,7 @@ fn final_page_returns_to_library_and_celebrates_each_recorded_command_even_zero_
             finish(
                 &core,
                 &mut effects,
-                StorageResult::PageCompleted(document.clone(), outcome),
+                StorageResult::PageCompleted(document.clone().into(), outcome),
             );
             let view = core.view();
             assert_eq!(view.content_route, ContentRoute::Main);
@@ -2318,7 +2358,7 @@ fn finish_book_waits_for_final_clock_checkpoint_and_preserves_celebration_after_
     finish(
         &core,
         &mut effects,
-        StorageResult::PositionSaved(document.clone()),
+        StorageResult::PositionSaved(document.clone().into()),
     );
     restore_time(&core, 10);
     core.process_event(clock(&core, 0, ReaderClockAction::Resume));
@@ -2340,7 +2380,7 @@ fn finish_book_waits_for_final_clock_checkpoint_and_preserves_celebration_after_
         &core,
         &mut effects,
         StorageResult::PageCompleted(
-            document,
+            document.into(),
             AnalyzedCompletionOutcome::Recorded { newly_known: 0 },
         ),
     );
@@ -2681,4 +2721,81 @@ fn cancelled_srt_clears_busy_without_an_error_summary_or_reader_movement() {
     assert_eq!(after.reader, before.reader);
     assert_eq!(after.destination, before.destination);
     assert_eq!(after.content_route, before.content_route);
+}
+
+#[test]
+fn ordered_snapshot_rejects_missing_duplicate_and_foreign_chapter_analysis() {
+    use yomoku_core::document::ReaderDocument;
+    let mut document: ReaderDocument = document("猫").into();
+    let mut second = document.chapters[0].clone();
+    second.chapter_id = ChapterId::try_from(4).unwrap();
+    document.chapters.push(second);
+    let entries = document
+        .chapters
+        .iter()
+        .map(|chapter| ReaderChapterAnalysis {
+            chapter_id: chapter.chapter_id,
+            analysis: ReaderAnalysis::Missing,
+        })
+        .collect::<Vec<_>>();
+    for analyses in [
+        vec![],
+        vec![entries[0]],
+        vec![entries[0], entries[0]],
+        vec![
+            entries[0],
+            ReaderChapterAnalysis {
+                chapter_id: ChapterId::try_from(99).unwrap(),
+                ..entries[1]
+            },
+        ],
+    ] {
+        let core = Core::<Yomoku>::new();
+        let mut effects = core.process_event(Event::OpenReader(document.document_id));
+        finish(
+            &core,
+            &mut effects,
+            StorageResult::Loaded(DocumentReaderSnapshot {
+                document: document.clone(),
+                page_length: PageLength::default(),
+                analyses,
+            }),
+        );
+        assert_eq!(
+            core.view().document_error,
+            Some(DocumentError::InvalidDocument)
+        );
+        assert!(core.view().reader.is_none() && core.view().loaded_document.is_none());
+    }
+    // Key order can differ from source order. Missing stays explicit per chapter.
+    let core = Core::<Yomoku>::new();
+    document.reading_position = Some(ReadingPosition {
+        source_id: document.chapters[1].source_id,
+        chapter_id: document.chapters[1].chapter_id,
+        offset: TextOffset::START,
+    });
+    let mut effects = core.process_event(Event::OpenReader(document.document_id));
+    finish(
+        &core,
+        &mut effects,
+        StorageResult::Loaded(DocumentReaderSnapshot {
+            document: document.clone(),
+            page_length: PageLength::default(),
+            analyses: vec![
+                entries[1],
+                ReaderChapterAnalysis {
+                    analysis: ReaderAnalysis::Available(AnalysisId::try_from(42).unwrap()),
+                    ..entries[0]
+                },
+            ],
+        }),
+    );
+    assert_eq!(core.view().reader_analysis, Some(ReaderAnalysis::Missing));
+    assert_eq!(core.view().reader.unwrap().page_number, 2);
+    assert_eq!(core.view().loaded_document, Some(document));
+    core.process_event(forward(&core, 123));
+    assert_eq!(
+        core.view().document_error,
+        Some(DocumentError::MissingAnalysis)
+    );
 }

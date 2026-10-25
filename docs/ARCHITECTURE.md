@@ -3,7 +3,7 @@
 ## Implemented
 `yomoku-core` is a pure Crux 0.20.0 application. It owns Library-default
 navigation, persisted page-length Settings, storage busy/error state, Library
-summaries, an optional loaded paste snapshot and Main/Paste/Reader content routes.
+summaries, an optional ordered-document snapshot and Main/Paste/Reader content routes.
 OpenPaste/CloseDocument and SelectDestination/OpenSettings/CloseSettings
 remain synchronous. RefreshLibrary/CreatePaste/LoadPaste/SaveReadingPosition/
 SetPageLength emit StorageOperation; only one storage command is accepted at a time, while navigation
@@ -58,9 +58,15 @@ import transaction repeats that authoritative lookup before parsing or analysis.
 TXT/SRT can reference an existing EPUB without truncating chapters, loading Full,
 resetting a finished book or modifying its first interpretation. Core Created/Existing
 results also carry only Library references; imports never need reader content.
-StorageFinished stays private, so exported event/request/view schemas are unchanged.
-Application/worker reader payloads still reject EPUB; migrate those before making
-EPUB selectable. No EPUB runtime/import or Android adapter exists yet.
+Application/FIFO readers now use these ordered-document repositories for loads,
+explicit opens, position saves and completion reloads. The generated ViewModel's
+loaded_document is ReaderDocument; Android still renders one ReaderPage at a time.
+Core validates one keyed original-analysis state per chapter, retains those identities
+for the reader session and selects the visible chapter's identity on movement.
+Previous uses whole-document page order; reflow preserves exact chapter/offset.
+Only the last chapter's final completion returns to Library/celebrates. Invalid
+content fails without truncating to chapter zero or loading Full. EPUB per-file
+FIFO import and Android selection/rendering of assets remain open.
 
 Its SRT parser
 accepts decoded text and returns canonical LF text plus ordered UTF-8 cue ranges.
@@ -98,7 +104,8 @@ an exact live file or parse/allocate/store original bytes, filename title, canon
 text/ruby, Mode B analysis and unique registrations together. An existing file skips
 decoding/analysis and preserves its chosen encoding/statuses/progress. The analyzer
 callback obeys the same ready-worker/no-I/O/provisional-ID contract as paste. Shared
-single-text readers load paste, TXT or SRT with the historical PastedDocument wire type;
+legacy single-text repository APIs retain PastedDocument; the application/bridge
+uses ReaderDocument for every format;
 source ruby has a separate read-only repository, awaiting reader transport/rendering.
 `import_analyzed_txt_cancellable` adds a shared per-file `ImportCancellation` handle.
 Checkpoints before/after parsing, ruby writes and analysis can discard provisional

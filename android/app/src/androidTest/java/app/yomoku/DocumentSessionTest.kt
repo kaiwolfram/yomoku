@@ -87,7 +87,7 @@ class DocumentSessionTest {
             assertNull(created.reader)
             val id = created.documents.single().documentId
             val loaded = dispatch(core, Event.LoadPaste(id)).loadedDocument!!
-            assertEquals("猫と猫。\r\n𠮷😀\u0000終", loaded.chapter.text)
+            assertEquals("猫と猫。\r\n𠮷😀\u0000終", loaded.chapters.single().text)
             val opened = dispatch(core, Event.OpenReader(id))
             val page = opened.reader!!
             val key = ReaderTokenKey(id, page.anchor, opened.readerAnalysis!!)
@@ -158,7 +158,7 @@ class DocumentSessionTest {
             val legacyId = selected.importSummary!!.documentId
             assertEquals(
                 "ﾂｩ",
-                dispatch(core, Event.LoadPaste(legacyId)).loadedDocument!!.chapter.text,
+                dispatch(core, Event.LoadPaste(legacyId)).loadedDocument!!.chapters.single().text,
             )
         } finally {
             instrumentation.runOnMainSync { core.close() }
@@ -271,7 +271,7 @@ class DocumentSessionTest {
                 dispatch(core, Event.LoadPaste(created.documents.single().documentId))
                     .loadedDocument
             assertNotNull(document)
-            assertEquals(text, document!!.chapter.text)
+            assertEquals(text, document!!.chapters.single().text)
             val opened = dispatch(core, Event.OpenReader(document.documentId)).reader!!
             val position = opened.position.copy(offset = TextOffset(5))
             val saved = dispatch(core, Event.SaveReadingPosition(position))

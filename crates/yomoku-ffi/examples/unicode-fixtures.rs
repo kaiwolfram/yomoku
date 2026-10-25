@@ -5,9 +5,10 @@ use std::{env, error::Error, fs, path::Path};
 
 use crux_core::bridge::{BincodeFfiFormat, FfiFormat};
 use yomoku_core::document::{
-    AnalysisId, ChapterId, ChapterText, DocumentId, SourceId, TextAnchor, TextOffset, TextRange,
+    AnalysisId, ChapterId, ChapterText, DocumentId, ReaderDocument, SourceId, TextAnchor,
+    TextOffset, TextRange,
 };
-use yomoku_core::reader::ReaderAnalysis;
+use yomoku_core::{pagination::ReadingPosition, reader::ReaderAnalysis};
 
 const CASES: &[(&str, &str)] = &[
     ("", ""),
@@ -68,6 +69,34 @@ fn main() -> Result<(), Box<dyn Error>> {
             )?)?;
             assert_eq!(returned, analysis);
         }
+    }
+    let ordered = ReaderDocument {
+        document_id: DocumentId::try_from(i64::MAX)?,
+        title: "章 📖".into(),
+        finished_at_least_once: true,
+        chapters: CASES
+            .iter()
+            .enumerate()
+            .map(|(index, (text, _))| ChapterText {
+                source_id: SourceId::try_from((1 << 53) + 1).unwrap(),
+                chapter_id: ChapterId::try_from(i64::MAX - index as i64).unwrap(),
+                text: (*text).into(),
+            })
+            .collect(),
+        reading_position: Some(ReadingPosition {
+            source_id: SourceId::try_from((1 << 53) + 1)?,
+            chapter_id: ChapterId::try_from(i64::MAX - 2)?,
+            offset: TextOffset::at(CASES[2].0, "A𠮷".len())?,
+        }),
+    };
+    ordered.validate()?;
+    if writing {
+        fs::write(dir.join("ordered.bin"), encode(&ordered))?;
+    } else {
+        let returned: ReaderDocument =
+            BincodeFfiFormat::deserialize(&fs::read(dir.join("ordered-return.bin"))?)?;
+        assert_eq!(returned, ordered);
+        returned.validate()?;
     }
     for (index, &(text, selected)) in CASES.iter().enumerate() {
         let chapter = ChapterText {

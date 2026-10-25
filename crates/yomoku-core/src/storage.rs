@@ -5,12 +5,12 @@ use serde::{Deserialize, Serialize};
 
 use crate::active_time::{ReadingTimeUpdate, SavedReadingTime};
 use crate::completion::{AnalyzedCompletionOutcome, AnalyzedPageCompletion, PageCompletionIntent};
-use crate::document::{DocumentId, LibraryDocument, PastedDocument};
+use crate::document::{DocumentId, LibraryDocument, ReaderDocument};
 use crate::imports::{SrtImport, TxtImport};
 use crate::pagination::{PageLength, ReadingPosition};
 use crate::reader::{
-    ReaderSnapshot, ReaderStatusChange, ReaderTokenKey, ReaderTokenSnapshot, ReaderVocabulary,
-    ReaderWordDetails, ReaderWordSelection,
+    DocumentReaderSnapshot, ReaderStatusChange, ReaderTokenKey, ReaderTokenSnapshot,
+    ReaderVocabulary, ReaderWordDetails, ReaderWordSelection,
 };
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -79,13 +79,13 @@ pub enum StorageResult {
     Created(LibraryDocument),
     /// Exact duplicate: preserve persisted title/position and reference it once.
     Existing(LibraryDocument),
-    Loaded(ReaderSnapshot),
-    PositionSaved(PastedDocument),
+    Loaded(DocumentReaderSnapshot),
+    PositionSaved(ReaderDocument),
     PageLengthSaved(PageLength),
     ReadingTimeLoaded(SavedReadingTime),
     ReadingTimeSaved(SavedReadingTime),
     PageCompletionPrepared(AnalyzedPageCompletion),
-    PageCompleted(PastedDocument, AnalyzedCompletionOutcome),
+    PageCompleted(ReaderDocument, AnalyzedCompletionOutcome),
     Failed(DocumentError),
     ReaderTokensLoaded(ReaderTokenSnapshot),
     ReaderWordLoaded(Box<ReaderWordDetails>),

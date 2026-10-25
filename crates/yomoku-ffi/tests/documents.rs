@@ -94,7 +94,7 @@ fn async_native_pastes_list_load_reopen_and_release_listeners() {
     let expected = dispatch(&native, &callbacks, Event::LoadPaste(id))
         .loaded_document
         .unwrap();
-    assert_eq!(expected.chapter.text, text);
+    assert_eq!(expected.chapters[0].text, text);
     assert_eq!(
         dispatch(&native, &callbacks, Event::OpenReader(id)).reader_analysis,
         Some(ReaderAnalysis::Missing)

@@ -67,7 +67,7 @@ internal fun verifyTxtImportBridge() {
             check(imported.documents.single().title == "本𠮷.txt")
             val id = imported.documents.single().documentId
             val loaded = checkNotNull(listener.dispatch(bridge, Event.LoadPaste(id)).loadedDocument)
-            check(loaded.chapter.text == canonical)
+            check(loaded.chapters.single().text == canonical)
             val opened = listener.dispatch(bridge, Event.OpenReader(id))
             val analysis = checkNotNull(opened.readerAnalysis) as ReaderAnalysis.Available
             val page = checkNotNull(opened.reader)
@@ -97,7 +97,7 @@ internal fun verifyTxtImportBridge() {
             check(duplicate.documents.single().title == "本𠮷.txt")
             check(duplicate.importSummary?.outcome == ImportOutcome.EXISTING)
             val loaded = checkNotNull(listener.dispatch(bridge, Event.LoadPaste(id)).loadedDocument)
-            check(loaded.readingPosition == position && loaded.chapter.text == canonical)
+            check(loaded.readingPosition == position && loaded.chapters.single().text == canonical)
             val opened = listener.dispatch(bridge, Event.OpenReader(id))
             check(opened.readerAnalysis == analysis)
             val page = checkNotNull(opened.reader)
@@ -107,12 +107,12 @@ internal fun verifyTxtImportBridge() {
             fresh.fail = false
             val selected = listener.dispatch(bridge, event(byteArrayOf(0xC2.toByte(), 0xA9.toByte()), TextEncoding.UTF8, "ambiguous.txt"))
             val selectedId = checkNotNull(selected.importSummary).documentId
-            check(checkNotNull(listener.dispatch(bridge, Event.LoadPaste(selectedId)).loadedDocument).chapter.text == "©")
+            check(checkNotNull(listener.dispatch(bridge, Event.LoadPaste(selectedId)).loadedDocument).chapters.single().text == "©")
             val existing = listener.dispatch(bridge, event(byteArrayOf(0xC2.toByte(), 0xA9.toByte()), TextEncoding.SHIFTJIS))
             check(existing.importSummary?.documentId == selectedId && existing.importSummary.outcome == ImportOutcome.EXISTING)
             val legacy = listener.dispatch(bridge, event(byteArrayOf(0x82.toByte(), 0xA0.toByte()), null, "legacy.txt"))
             val legacyId = checkNotNull(legacy.importSummary).documentId
-            check(checkNotNull(listener.dispatch(bridge, Event.LoadPaste(legacyId)).loadedDocument).chapter.text == "あ")
+            check(checkNotNull(listener.dispatch(bridge, Event.LoadPaste(legacyId)).loadedDocument).chapters.single().text == "あ")
             check(fresh.calls.get() == 1)
         }
         println("PASS: typed TXT bytes/encodings, atomic import summary, original Mode B, duplicate/reopen and lazy Full JNI")

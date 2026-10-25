@@ -2207,3 +2207,28 @@ The complete-content integrity loader also checks assets; cost remains unmeasure
 No migration, new production dependency/version, permission or destructive semantic
 change. Runtime tests reuse the existing pinned ZIP dev dependency/shared readable
 EPUB archive builder; no new lockfile package or download.
+
+## 2026-10-26 — Ordered reader payloads across core, FIFO and typed bridge
+
+Migrate application loads/explicit opens/position saves/completion reloads to the
+existing ordered-document repositories. StorageResult.Loaded uses
+DocumentReaderSnapshot; position/completion results and ViewModel.loaded_document
+use ReaderDocument. Keep the historical LoadPaste event name and single-text
+repository APIs for existing callers; the app no longer consumes PastedDocument.
+Regenerate Kotlin codecs with the changed view shape in the same build. No database
+migration, production dependency/version, parser, permission or destructive change.
+
+Validate exactly one explicit original-analysis state for every owned chapter.
+Retain the accepted reader's keyed map across its session, selecting the visible
+chapter's identity on movement rather than reusing chapter zero's analysis. Plain
+loads cannot replace these frozen identities. Previous traverses whole-document
+page order; global counters/progress and exact chapter-local reflow use ReaderDocument.
+Only completion of the last chapter's final page returns to Library/celebrates.
+Time, vocabulary and completion transactions retain their existing repositories.
+
+Keep reader transport a canonical-text projection: source formatting/ruby/assets
+stay in EPUB persistence for the rendering slice. Image-only chapters retain the
+parser's U+FFFC placeholder and complete without Japanese occurrences. Do not
+special-case them as empty text. Android picker stays paste/TXT until EPUB FIFO
+imports and mixed-file behavior are verified. Complete saved-content validation
+still reads EPUB assets on every reader operation; performance remains unmeasured.

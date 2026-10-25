@@ -2,6 +2,7 @@ package app.yomoku.tests
 
 import app.yomoku.shared.ChapterText
 import app.yomoku.shared.DocumentId
+import app.yomoku.shared.ReaderDocument
 import app.yomoku.shared.ReaderAnalysis
 import app.yomoku.shared.TextAnchor
 import app.yomoku.shared.TextOffset
@@ -30,6 +31,16 @@ fun verifyTextBoundaries(directory: String) {
         check(analysis.bincodeSerialize().contentEquals(bytes))
         File(dir, "analysis-return-$index.bin").writeBytes(analysis.bincodeSerialize())
     }
+
+    val orderedBytes = File(dir, "ordered.bin").readBytes()
+    val ordered = ReaderDocument.bincodeDeserialize(orderedBytes)
+    check(ordered.documentId.value == Long.MAX_VALUE && ordered.finishedAtLeastOnce)
+    check(ordered.chapters.size == 7 && ordered.chapters.first().text.isEmpty())
+    check(ordered.chapters.map { it.chapterId.value } == (0L..6L).map { Long.MAX_VALUE - it })
+    check(ordered.readingPosition?.chapterId == ordered.chapters[2].chapterId)
+    check(ordered.readingPosition.offset.value == "A𠮷".toByteArray(Charsets.UTF_8).size.toLong())
+    check(ordered.bincodeSerialize().contentEquals(orderedBytes))
+    File(dir, "ordered-return.bin").writeBytes(ordered.bincodeSerialize())
 
     val selections = listOf("", "日本語", "𠮷野家😀", "か\u3099", "👩‍👩‍👧‍👦", "第二行\n\n", "端")
     for ((index, selected) in selections.withIndex()) {

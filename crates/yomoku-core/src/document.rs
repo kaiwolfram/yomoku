@@ -105,7 +105,7 @@ impl PasteText {
 }
 
 /// A persisted single-text document (paste, TXT or SRT), with an independent title.
-/// The historical type name remains stable at the typed bridge boundary.
+/// Retained for the historical single-text repository APIs.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
 pub struct PastedDocument {
