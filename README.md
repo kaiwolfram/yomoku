@@ -65,6 +65,8 @@ on each newly recorded completion, including rereads with zero new words.
 Nostr, Statistics and Vocabulary tabs currently
 show placeholders.
 
+The pure [SRT parser](crates/yomoku-import/src/srt.rs) has host fixtures for cue
+boundaries, formatting, speakers and malformed input; app import wiring is pending.
 Planned v1 features include EPUB/SRT imports, custom missing-word definitions,
 reading statistics, optional AnkiDroid integration, curated Nostr reading and
 manual encrypted backups. See the [product specification](docs/PRODUCT_SPEC.md)

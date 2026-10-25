@@ -2000,3 +2000,28 @@ with one committed, one blocked and one remaining file; fresh-process checks req
 the committed document and an empty helper/no service. Exercise both notification
 permission states and restore the previous grant. This demonstrates abrupt process
 death, without claiming low-memory-killer, device/release or cache-flush coverage.
+
+## 2026-10-25 — Pure SRT extraction before file-import adapters
+
+Keep SRT extraction in `yomoku-import`, taking decoded `&str` and producing one
+canonical text unit plus ordered nonempty UTF-8 cue ranges. SRT byte decoding/
+encoding policy and original-file persistence belong to its future import adapter;
+do not send SRT through TXT's Aozora parser or change any wire/schema. Callers must
+validate supported file extensions; this is not WebVTT/ASS support. No dependency.
+
+Normalize CRLF/CR to LF and remove only a leading BOM. Preserve dialogue whitespace,
+speakers and line breaks inside cues; join cues with one blank line outside cue
+ranges. Blank lines or recognized time ranges delimit cues, including absent blank
+separators/counters. Remove an ASCII numeric counter only immediately before a
+recognized time range, preserving numeric dialogue. Recognize two/three-field
+colon timestamps with optional comma/dot fractions and trailing positioning fields;
+do not require chronological/range-valid times or parse durations. Unrecognized
+damaged metadata stays visible rather than consuming possible dialogue.
+
+Strip common HTML subtitle formatting with a nonrecursive scan, mapping `<br>` to
+a hard break. Preserve unknown/speaker tags, malformed brackets and brace notation.
+Decode basic named/numeric entities once after stripping, retaining unknown, invalid
+and control references; escaped dialogue cannot become a stripped tag. Empty cues
+are omitted; an entirely empty result is an error. Cues are paragraphs, never
+chapters, and their ranges precede analysis/pagination. All five existing page
+presets reconstruct the canonical text exactly in fixtures.

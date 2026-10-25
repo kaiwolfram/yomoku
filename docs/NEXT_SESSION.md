@@ -1,5 +1,5 @@
 # Resume here
-Updated: 2026-10-25. Verified TXT background notifications and process-death/no-resume.
+Updated: 2026-10-25. Verified pure SRT parsing; app imports remain paste/TXT.
 Read AGENTS.md, plan phases 2–4 and PRODUCT_SPEC.md sections 3–4.
 ## Working
 - Pure Crux owns routes/Library/Settings; only Render reaches UI. FIFO owns SQLite/analysis. Fresh sessions start Library. No I/O/SQL in core.
@@ -62,18 +62,18 @@ Read AGENTS.md, plan phases 2–4 and PRODUCT_SPEC.md sections 3–4.
   winning commits stay. Android clears remaining/input, invalidates late reads and
   retires executors; waits BOTH native return + outcome, including draining close.
   Registry clears before callbacks; name/number/summary retain on recreation.
-- Platform-only dataSync lease: counts/name, nonexported/nonsticky, no queue/restart; OS limits apply.
-  Encoding releases lease; separate input notice. Explicit enable asks permission;
-  denial never blocks. Timeout stops service before Cancel/drain. Notices count
-  processed/total; taps no reader. HOME/SIGKILL pairs pass granted/denied: committed
+- Platform-only nonsticky dataSync lease: counts/name, no queue/restart; OS limits apply.
+  Encoding releases lease; explicit permission/denial never blocks. Timeout stops before Cancel.
+  Notices count processed/total; taps no reader. HOME/SIGKILL pairs pass granted/denied: committed
   file remains; no unfinished/remaining/summary/count/service resume. Isolated DBs.
+- SRT: decoded text → canonical LF/cue UTF-8 ranges; no I/O/IDs. Preserves dialogue,
+  speakers/unknown markup; strips recognized timing/formatting. Encoding/wiring pending.
 ## Next tasks (ordered)
-1. EPUB/SRT parsers (pure fixtures), then original-file repository/runtime imports.
+1. EPUB parser (pure fixtures), then EPUB/SRT original-file repository/runtime imports.
 2. Mixed-format picker/summary and reader source ruby; CI is independent.
 3. User-run physical arm64 validation once usable.
 ## Verification
-- PASS: both-ABI debug/test builds, strict lint/Kotlin fmt/diff; ten API-36 x86_64
-  tests + two death pairs. Reports: .local/test-reports/txt-background/ and
-  txt-process-death/20261025T212646351293Z.json. Prior Rust baseline: 304 tests.
-- Commands/fixed failures/three Android permissions: DEVELOPMENT.md last section. No blocker/schema.
-  Rust/host JNI/Full/release/reboot not rerun; arm64 unverified. Nostr empty/Q188 before forwarding.
+- PASS: 317 Rust tests, strict Clippy/fmt/diff. Commands: DEVELOPMENT.md last section.
+- Prior Android: ten API-36 tests + two death pairs; .local/test-reports/txt-background/
+  and txt-process-death/20261025T212646351293Z.json. Not rerun this parser-only step.
+- No blocker/dependency/schema. JNI/Full/release/reboot not rerun; arm64 unverified. Nostr empty/Q188.

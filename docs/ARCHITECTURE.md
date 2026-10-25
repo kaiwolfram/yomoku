@@ -16,8 +16,16 @@ Successful paste or TXT import returns to Library without opening the reader.
 StorageFinished is internal: both Serde and Facet skip it, so hosts cannot inject
 storage results. No SQL, paths, threads or platform I/O enter core.
 
-`yomoku-import` is a separate pure byte-to-content boundary, currently with TXT
-only. Strict UTF-8/Shift-JIS decoding returns explicit uncertainty before any
+`yomoku-import` is a separate pure content-extraction boundary. Its SRT parser
+accepts decoded text and returns canonical LF text plus ordered UTF-8 cue ranges.
+Blank lines separate cues; missing counters/separators and short/dot timestamps
+recover without merging cues into prose. Strip identifiable timing/counter lines
+and common HTML formatting, preserving speakers, numeric dialogue, unknown markup
+and damaged metadata. Decode entities once after tag removal. All cues form one
+text unit before analysis/pagination. This parser has no storage/runtime/Android
+adapter yet; original-file decoding/identity and atomic registration remain open.
+
+TXT strict UTF-8/Shift-JIS decoding returns explicit uncertainty before any
 canonicalization; a selected encoding never silently falls back or replaces errors.
 The Aozora parser produces one canonical text unit plus ordered source-ruby UTF-8
 ranges. It hides common typographic directives, retains unknown/semantic/gaiji
@@ -625,8 +633,9 @@ Production paste imports now atomically persist Mode B analyses and register all
 unique Japanese surfaces without encounters, deduplicate exact bytes and deliver
 Created/Existing summaries. Native descriptor delivery and retained/background
 lifecycle are connected. TXT parsing, atomic storage and the Android multiple-file
-picker/encoding/summary path are connected. EPUB/SRT parsing, metadata, mixed-format
-batches remain unchecked. TXT background notifications use the platform-only
+picker/encoding/summary path are connected. Pure SRT extraction is fixture-tested;
+EPUB parsing, file-import adapters and mixed-format batches remain unchecked.
+TXT background notifications use the platform-only
 foreground lease described above. Legacy imports
 are not automatically rescanned.
 Explicit core/worker/FFI pending-time checkpoints coalesce during unresolved saves

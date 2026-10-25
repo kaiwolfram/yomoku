@@ -18,7 +18,7 @@ with functioning rustup can omit the PATH workaround. Do not assume this compile
 is the project's minimum supported version; establish that with dependencies.
 Cargo.lock is retained for reproducible application development.
 Crux 0.20.0 declares Rust 1.90 minimum; the full locked graph has only been tested
-with 1.99.1. Current host baseline: 293 data-free Rust tests (142 storage, thirteen
+with 1.99.1. Current host baseline: 317 data-free Rust tests (148 storage, seventeen
 runtime). Twelve analysis fixtures and one runtime fixture run separately with
 each Full loader via tools/test-sudachi.sh (see below).
 
@@ -2391,3 +2391,29 @@ FOREGROUND_SERVICE_DATA_SYNC. No new dependency/version, Rust/wire or migration.
 Gradle wildcard-IP/local sockets and AVD/KVM needed sandbox escalation. No open
 failure/blocker; emulator remains running. Rust/Clippy/host JNI/codegen, standalone
 Full/Python/index suites, tablet/dark, release/reboot and physical arm64 not rerun.
+
+## Pure SRT import checks
+
+Verified 2026-10-25 from the repository root with the Rust PATH above:
+
+```sh
+cargo test -p yomoku-import --locked --offline
+cargo test --workspace --all-features --locked --offline --quiet
+cargo clippy --workspace --all-targets --all-features --locked --offline -- -D warnings
+cargo fmt --all -- --check
+git diff --check
+```
+
+PASS: 317 data-free Rust tests, including thirteen new SRT tests and thirteen TXT
+regressions, strict Clippy/fmt/diff. SRT fixtures cover cue ranges, speakers/numeric
+dialogue, LF/CRLF/CR/BOM, missing counters/separators, dot/short/out-of-order timing,
+common tags/breaks/entities, preserved malformed metadata/unknown notation, Unicode
+and whitespace, empty input, 10,000 cues, long malformed text and all five presets.
+Review tightened numeric entities to retain malformed signed references. Final
+checks pass; no new dependency/version, schema, wire change or open blocker.
+
+Parser-only: SRT accepts decoded text; original-byte decoding/identity, atomic
+repository/runtime registration and Android picker wiring remain unchecked.
+Android builds/lint/device, Kotlin/JNI/codegen, explicit Full/index fixtures, release,
+process-death/reboot and physical arm64 were not rerun. The ordinary workspace run
+retains fourteen ignored data-dependent fixtures, as before.

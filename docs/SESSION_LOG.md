@@ -1527,3 +1527,19 @@
 - Updated README/architecture/data/decisions/plan/development/handoff. Next: pure
   EPUB/SRT parsers, repository/runtime/mixed-picker wiring. CI independent. Rust/
   Clippy/host JNI/codegen/Full/index/tablet/dark not rerun; Nostr empty/Q188 unchanged.
+
+## 2026-10-25 — Pure tolerant SRT extraction
+
+- Added `yomoku-import::srt` for decoded text → canonical LF text and UTF-8 cue
+  ranges. Strip recognizable counters/timing/common formatting; retain cue blocks,
+  within-cue breaks, speakers, numeric dialogue and unknown/damaged content.
+  Recover missing counters/separators and short/dot timing. Decode entities once
+  after tag removal. No I/O, IDs, dependencies, schema or wire changes.
+- PASS: 317 workspace Rust tests, strict Clippy/fmt/diff; thirteen new SRT tests
+  plus existing TXT regressions cover malformed/large inputs, Unicode/ranges and
+  all five pagination presets. Review tightened malformed numeric entity handling.
+  No open failure/blocker. Android/JNI/codegen/explicit Full/index/device checks
+  were not rerun for this parser-only slice.
+- Updated README/plan/architecture/data/decisions/development/handoff. Next: EPUB
+  parser, EPUB/SRT byte-decoding/original-file repository/runtime adapters, then
+  mixed picker; reader ruby and CI independent. Nostr empty/Q188 unchanged.

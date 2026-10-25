@@ -1,5 +1,23 @@
 # Data model
 
+## Pure SRT canonical content (no schema change)
+
+`yomoku-import::srt::SrtDocument` contains one canonical UTF-8 text string and
+ordered nonempty half-open byte ranges for its cues. Normalize CRLF/CR to LF,
+retain line breaks and dialogue whitespace within cues, and join cues with exactly
+one blank line outside their ranges. A leading Unicode BOM is removed. Counters
+immediately before recognizable time ranges and the ranges themselves are omitted;
+missing counters/separators, nonsequential counters and short/dot timestamps recover.
+Do not infer chapters from cues. Common HTML formatting is stripped, `<br>` becomes
+a hard break and basic/numeric entities decode once after tag removal. Speakers,
+numeric dialogue, unknown markup/entities and unrecognized damaged timing stay
+visible. Empty canonical text is rejected. No times or reading events are created.
+
+This parser takes already decoded text. SRT original-byte hashing/decoding,
+filename title, durable IDs, Mode B/unique registration, cancellation, typed import
+transport and Android selection remain future work. No SRT content is persisted
+or accepted by the current TXT-only picker/repositories.
+
 ## TXT canonical content and atomic file repository (migration 0012)
 
 `yomoku-import::txt::TxtDocument` contains the selected UTF-8/Shift-JIS encoding,
