@@ -1592,3 +1592,36 @@ No dependency, schema or FFI change. Primary Compose APIs checked:
 - https://developer.android.com/develop/ui/compose/components/bottom-sheets
 - https://developer.android.com/reference/kotlin/androidx/compose/ui/window/PopupProperties
 - https://android.googlesource.com/platform/frameworks/support/+/12a8e82373811d8811921d9bc331653ceb2320ee/compose/ui/ui-text/src/commonMain/kotlin/androidx/compose/ui/text/LinkAnnotation.kt
+
+## 2026-10-25 — Pinned independent offline word/name index
+
+Compile the official standard JMdict English (`JMdict_e.gz`, not basic/NG) and
+JMnedict XML snapshots created 2026-10-25 using Python stdlib, without new app or
+Rust dependencies. Source SHA-256/counts and notice hashes live in
+`third_party/dictionaries/sources.lock.json`. Current EDRDG terms specify CC BY-SA
+4.0 for data/derivatives. Retain full legal code, current licence statement,
+project documentation, attribution, modifications and update procedure alongside
+every index. The app integration must expose these notices in Settings before
+shipping data. Code remains MIT. Primary evidence and local copies are linked
+from `third_party/dictionaries/README.md`; the old wiki entrypoint now returns a
+closure notice, so use the official complete static project page instead.
+
+Choose a separate immutable SQLite asset with source-scoped entry IDs and ordered
+JSON payloads, plus an indexed BINARY exact-written/reading-form table. This
+reuses the eventual storage boundary without moving SQL into pure core or mixing
+dictionary data with mutable user state. Expand upstream entity labels and make
+POS inheritance explicit; retain spelling/reading/sense restrictions and all
+English glosses/name groups, including overlapping word/name entries. Compiler
+candidate inspection deliberately leaves runtime surface/base matching and
+restriction filtering for the next slice; no guessed definitions or status writes.
+
+Copy and verify compressed inputs before parsing. Validate format/date/counts,
+foreign keys and integrity; stage transactionally and publish a fresh directory
+by rename. Never replace published output. Preserve original compressed inputs
+for offline reproduction because upstream download URLs roll daily. Default
+preparation has no network; --download is explicit and rejects changed bytes.
+Record Python/SQLite/compiler versions and artifact hashes; guarantee binary
+reproducibility with identical inputs/compiler/toolchain. Two complete builds
+match byte-for-byte on Python 3.14.8/SQLite 3.51.2. Result: 279,109,632-byte index;
+no Android extraction, asset/APK size or lookup-performance claim. App bundling,
+typed Rust lookup, encounter count and panel integration remain separate work.

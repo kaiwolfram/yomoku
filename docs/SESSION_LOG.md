@@ -1205,3 +1205,22 @@
   Unrelated release-checklist deletions appeared during work and remain unstaged.
   No open blocker. Host JNI/generation/standalone Full, release, separate reboot/
   process and physical arm64 not rerun. Nostr/Q188 unchanged.
+
+## 2026-10-25 — Reproducible offline English word/name index
+
+- Started clean; pinned official JMdict English/JMnedict 2026-10-25 snapshots,
+  compressed checksums/counts and complete CC BY-SA 4.0 attribution/docs/legal code.
+  Added a stdlib-only staged SQLite compiler retaining ordered senses/readings,
+  restrictions, inherited POS, separate names and exact-form indexed candidates.
+  Default offline operation; verified source archives are retained in the bundle.
+  Published output is read-only and never replaced on changed/corrupt input.
+- PASS: nine synthetic/full dictionary tests, all 962,639 entries, two complete
+  byte-identical bundles, 238 Rust tests, strict Clippy/Rust/Kotlin formatting and
+  diff checks. Fixed unclosed Python SQLite handles and used official static docs
+  after the retired wiki redirected to a closure notice. Downloads needed network
+  escalation. No open failure/blocker; no app schema/dependency/FFI/UI change.
+- Updated plan, handoff, architecture/data, decisions, development and README.
+  Next: immutable asset loading/typed Rust candidate lookup with restriction
+  filtering, then definitions/names/lifetime count in the existing panel. Android,
+  host JNI/generation, standalone Full/release/recovery/physical-arm64 not rerun.
+  Nostr configuration remains empty; ask Q188 before forwarding.

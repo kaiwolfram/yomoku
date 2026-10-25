@@ -1748,3 +1748,42 @@ Saved XML reports confirm 31 successful executions with no failures/errors.
 Restored physical 1080x2400/420dpi and night mode `no`; AVD remains running.
 No open failure or local blocker. Next: offline JMdict/JMnedict index, then actual
 definitions/names/encounter counts in the existing word panel.
+
+## Offline JMdict English/JMnedict compilation
+
+Verified 2026-10-25 with Python 3.14.8/SQLite 3.51.2; no Python dependencies added.
+Source lock, complete notices, schema/payload contract and data-refresh procedure:
+`third_party/dictionaries/README.md`. Downloaded the two official daily snapshots
+explicitly (network required sandbox escalation), then ran all preparation offline:
+
+```sh
+python3 tools/prepare-dictionaries.py --sources .local/dictionaries/upstream
+python3 -W error tools/test-prepare-dictionaries.py --full .local/dictionaries/index-v1-20261025 -v
+python3 tools/prepare-dictionaries.py --output .local/dictionaries/index-v1-20261025-repeat
+diff -r .local/dictionaries/index-v1-20261025 .local/dictionaries/index-v1-20261025-repeat
+python3 tools/prepare-dictionaries.py --lookup 東京
+python3 -m tabnanny tools/prepare-dictionaries.py tools/test-prepare-dictionaries.py
+cargo test --workspace --all-features --locked --offline --quiet
+cargo fmt --all -- --check
+cargo clippy --workspace --all-targets --all-features --locked --offline -- -D warnings
+tools/format-kotlin.sh --check
+git diff --check
+```
+
+PASS: nine dictionary tests (eight synthetic plus one complete real-data fixture),
+two full byte-identical bundles, 238 Rust tests (117 storage), strict Clippy and
+Rust/Kotlin formatting. Without --full the real-data fixture is explicitly skipped.
+Coverage: all senses/readings, inherited POS across filtered languages, restrictions,
+gloss/loan metadata, separate simultaneous word/name matches, kana/homophones,
+supplementary/decomposed Unicode, exact/no matches, query plan/read-only database
+bytes, stable output reuse, corruption/count/date/duplicate/malformed input rollback,
+notice verification and preserved published output. Real data checks 食べる, たべる,
+ありがとう and 東京 across all 218,957 word/743,682 name entries.
+Index SHA-256: `0be9d4493aa3fa4474dbb27291820a63a27748dbc63e5517f67be39ffea8e152`.
+
+Initial tests exposed Python SQLite context managers leaving connections unclosed;
+explicit closing fixes this and the suite passes with warnings treated as errors.
+The retired wiki URL returned a closure page; retained its linked complete static
+project document instead. No open failure/blocker. No app dependency/user schema/
+FFI/UI change; Android APK/lint/device, host JNI/generation, standalone Full,
+release, process/reboot and physical-arm64 checks were not rerun for this tooling.

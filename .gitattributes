@@ -2,3 +2,7 @@
 # source verifier checks these files; whitespace cleanup would break provenance.
 third_party/sudachi/engine/** -text -whitespace
 third_party/sudachi/patches/*.patch -text -whitespace
+# Dictionary notice hashes pin original upstream bytes, including whitespace.
+third_party/dictionaries/*.html -text -whitespace
+third_party/dictionaries/*.txt -text
+third_party/dictionaries/CC-BY-SA-4.0.txt -whitespace

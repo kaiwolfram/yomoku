@@ -1,5 +1,24 @@
 # Data model
 
+## Immutable word/name dictionary index
+
+The independently prepared JMdict English/JMnedict asset uses schema version 1
+(`application_id = 0x594f4449`), separate from all user-database migrations.
+`entries(source, entry_id, payload)` retains ordered English senses, readings,
+restrictions, inherited POS and name groups in canonical JSON. Source-scoped IDs
+prevent collisions between dictionaries. `forms(surface, source, entry_id)` has
+a BINARY composite primary key for all exact written/reading candidates; no
+normalization or fuzzy matching changes spelling identity. `metadata` stores the
+locked source provenance. Full field definitions are in
+`third_party/dictionaries/README.md`. These tables do not refer to vocabulary IDs,
+statuses, positions or encounter history. Runtime lookup/asset loading is future
+work; opens must remain read-only and apply retained restrictions appropriately.
+
+The build bundle preserves original compressed snapshots, a source/date/checksum
+lock, complete CC BY-SA attribution/legal documentation and a manifest of artifact
+hashes/tool versions. New source versions publish to fresh paths without replacing
+an asset that could be open. No mutable user schema, FFI or backup format changes.
+
 ## Implemented domain values
 - `Surface`: nonblank exact written Unicode string; equality/hash/order use exact
   contents. Different readings share one identity; inflected spellings differ.

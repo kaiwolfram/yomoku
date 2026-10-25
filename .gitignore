@@ -1,6 +1,7 @@
 **/target/
 /.local/
 **/build/
+**/__pycache__/
 # This is pinned Rust source, not generated build output.
 !/third_party/sudachi/engine/sudachi/src/dic/build/
 /.gradle/

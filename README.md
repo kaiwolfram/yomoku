@@ -30,8 +30,11 @@ Yomoku is under active development. The working app supports:
   analyzer reading/base form and five direct status choices. Opening it leaves
   statuses and history unchanged; choices persist globally across repeated surfaces.
 
-Dictionary definitions and encounter counts remain pending. Compose reads stored
-Mode B tokens through typed core/FIFO/FFI, validates the current page identity and
+Dictionary definitions and encounter counts remain pending in the app. A
+[pinned offline JMdict/JMnedict compiler](third_party/dictionaries/README.md)
+prepares the English word/name index with complete attribution and lookup fixtures.
+Compose reads stored Mode B tokens through typed core/FIFO/FFI, validates the
+current page identity and
 converts exact UTF-8 spans to UTF-16 without splitting Unicode scalars. Status
 choices update all visible repetitions after the status/history transaction commits;
 same-status selections add no history. Deleted vocabulary stays unregistered.
@@ -66,6 +69,7 @@ verified progress.
 | `crates/yomoku-analysis/` | Sudachi adapter and validated token snapshots |
 | `crates/yomoku-ffi/` | Typed Crux/BoltFFI bridge and Kotlin payload generation |
 | `third_party/sudachi/` | Pinned engine source, Android patch and license records |
+| `third_party/dictionaries/` | JMdict/JMnedict source lock, attribution and index contract |
 | `tools/` | CLI build, formatting, data preparation and verification scripts |
 | `docs/` | Product requirements, architecture, development guide and handoff |
 
@@ -159,4 +163,5 @@ specification is the source of truth; record routine technical choices in
 
 Original Yomoku code is licensed under the [MIT License](LICENSE). Third-party
 engine code and dictionary data retain their own licenses and attribution
-requirements; see the [Sudachi notices](third_party/sudachi/README.md).
+requirements; see the [Sudachi notices](third_party/sudachi/README.md) and
+[JMdict/JMnedict notices](third_party/dictionaries/README.md).

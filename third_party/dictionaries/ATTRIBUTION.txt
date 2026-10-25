@@ -1,0 +1,27 @@
+Yomoku offline word and name dictionaries
+
+JMdict (Japanese and English components) and JMnedict (names) are compiled by
+James William Breen and the Electronic Dictionary Research and Development
+Group (EDRDG). Copyright in the source data remains with its owners.
+
+These files are the property of the Electronic Dictionary Research and
+Development Group, and are used in conformance with the Group's licence.
+
+Source versions: daily XML snapshots created 2026-10-25. Exact source URLs,
+SHA-256 checksums and entry counts are in sources.lock.json beside the index.
+
+Yomoku transformations: English-only gloss/translation selection; XML entities
+expanded to their human-readable labels; inherited JMdict part-of-speech labels
+made explicit; ordered entries represented as JSON in an exact-form SQLite index.
+Spelling, reading and sense restrictions are retained. The derived dictionary
+index is distributed under CC BY-SA 4.0, separately from Yomoku's MIT code.
+No endorsement by EDRDG or its contributors is implied.
+
+Licence statement: https://www.edrdg.org/edrdg/licence.html
+Licence: https://creativecommons.org/licenses/by-sa/4.0/
+Full legal code: CC-BY-SA-4.0.txt (included locally)
+JMdict: https://www.edrdg.org/wiki/JMdict-EDICT_Dictionary_Project.html
+JMnedict: https://www.edrdg.org/enamdict/enamdict_doc.html
+
+The complete EDRDG licence statement and project documentation are included
+locally as edrdg-licence.html, jmdict-project.html and jmnedict.html.

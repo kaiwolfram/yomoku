@@ -1,0 +1,26 @@
+{
+  "license": "CC-BY-SA-4.0",
+  "sources": {
+    "JMdict": {
+      "filename": "JMdict_e.gz",
+      "url": "https://www.edrdg.org/pub/Nihongo/JMdict_e.gz",
+      "date": "2026-10-25",
+      "sha256": "315589a36c90c1070f1fa52f746a2c757beca0cc1ff53a66c2d410de98047ffd",
+      "entries": 218957
+    },
+    "JMnedict": {
+      "filename": "JMnedict.xml.gz",
+      "url": "https://www.edrdg.org/pub/Nihongo/JMnedict.xml.gz",
+      "date": "2026-10-25",
+      "sha256": "a62a932a541fe1f882c7025f4358fb1cba81e45a312a98c47b1b2fe4e872954c",
+      "entries": 743682
+    }
+  },
+  "notices": {
+    "ATTRIBUTION.txt": "94ac97767ec2c29ef5c5eb00f14b3642473132524161c694a15f72448bfa5154",
+    "CC-BY-SA-4.0.txt": "28a9529c7d0bb4dc51f4bf5c116a3d16ef247a052f7591466768ddf563fd1cf5",
+    "edrdg-licence.html": "52f60ea9ca68170a2f0663d7dba381ebf1bd57c17a3347dfe21153865c156692",
+    "jmdict-project.html": "873d4730db9b07f5f2554628f30969147e5054ad1f3bc1d528418d1b4961b791",
+    "jmnedict.html": "d1b2c11db31460c7c245d16489a02182fa49c20671e0be62138d6d8ff7703516"
+  }
+}

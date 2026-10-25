@@ -82,6 +82,18 @@ the existing CoreSession interaction observer. Reading continues while it is ope
 interactions extend the same idle deadline. Annotated links are remembered across
 timer-only recompositions, without caching old status or page identities.
 
+`tools/prepare-dictionaries.py` independently compiles pinned JMdict English and
+JMnedict XML into an immutable, versioned SQLite asset using only Python stdlib.
+It preserves ordered senses/readings, restriction metadata, inherited POS and
+separate name groups as JSON, with a BINARY exact-form index and full provenance.
+Compressed inputs/notices are hashed before parsing; staged transactional builds
+publish by directory rename without replacing existing output. The bundle retains
+sources, complete attribution/licences/docs and reproducibility hashes/tool versions.
+See `third_party/dictionaries/README.md` for the index contract/update procedure.
+This tooling is separate from mutable user SQLite and is not yet bundled or
+opened by Android/runtime. Rust candidate lookup, restriction filtering, dictionary
+FFI/UI and Settings attribution remain the next integration; no I/O enters core.
+
 Pure `active_time` accounts pending reading milliseconds using caller-supplied
 monotonic timestamps. Resume/interaction arms a five-minute idle window; dictionary
 interactions count, while background/reader-close pause. Checkpoints neither reset
