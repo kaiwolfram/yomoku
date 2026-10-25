@@ -18,8 +18,8 @@ with functioning rustup can omit the PATH workaround. Do not assume this compile
 is the project's minimum supported version; establish that with dependencies.
 Cargo.lock is retained for reproducible application development.
 Crux 0.20.0 declares Rust 1.90 minimum; the full locked graph has only been tested
-with 1.99.1. Current host baseline: 341 data-free Rust tests (148 storage, seventeen
-runtime). Twelve analysis fixtures and one runtime fixture run separately with
+with 1.99.1. Current host baseline: 353 data-free Rust tests (160 storage, seventeen
+runtime). Thirteen analysis fixtures and one runtime fixture run separately with
 each Full loader via tools/test-sudachi.sh (see below).
 
 ## Pure TXT import checks
@@ -2453,3 +2453,48 @@ App still accepts paste/TXT. Remote images, custom/unresolved named entities and
 unsupported spine fallback chains fail explicitly; image bytes aren't decoded.
 Android APK/lint/device, JNI/codegen, explicit Full/index fixtures, release,
 process-death/reboot and physical arm64 were not rerun. No device viability claim.
+
+
+## Atomic SRT repository checks
+
+Verified 2026-10-25 from the repository root with the Rust PATH above:
+
+```sh
+cargo test --workspace --all-features --locked --offline --quiet
+cargo clippy --workspace --all-targets --all-features --locked --offline -- -D warnings
+tools/test-sudachi.sh
+cargo fmt --all -- --check
+git diff --check
+```
+
+Both Android storage targets also check (NDK r30/API 29, including bundled SQLite):
+
+```sh
+export CC_aarch64_linux_android=/home/kai/Android/Sdk/ndk/30.0.16248370/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android29-clang
+export AR_aarch64_linux_android=/home/kai/Android/Sdk/ndk/30.0.16248370/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-ar
+export CC_x86_64_linux_android=/home/kai/Android/Sdk/ndk/30.0.16248370/toolchains/llvm/prebuilt/linux-x86_64/bin/x86_64-linux-android29-clang
+export AR_x86_64_linux_android=/home/kai/Android/Sdk/ndk/30.0.16248370/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-ar
+cargo check -p yomoku-storage --target aarch64-linux-android --target x86_64-linux-android --locked --offline
+```
+
+PASS: 353 data-free Rust tests (twelve new SRT repository tests), strict Clippy,
+Rust fmt/diff and both Android targets. Fifteen data-dependent fixtures are ignored
+in the ordinary run. The explicit Full runner verifies pinned source integrity and
+passes thirteen analysis fixtures plus one worker fixture for each owned/mapped
+loader. The new real SRT fixture verifies canonical-only analysis, cue anchors,
+unique registration, repeated occurrences, original Mode B, atomic completion,
+finished state, duplicate-no-analysis, read-only reopen and explicit finished reset.
+
+Repository fixtures cover exact original bytes/encoding/cues/filename, no Aozora
+transformation, cross-TXT duplicate identity, BOM versus canonical/paste identity,
+Shift-JIS and ambiguous manual selection, all five existing statuses, invalid files/
+analysis/time, every statement and deferred-COMMIT failure with sequence rollback,
+blocked-analysis cancellation, prior-file preservation/fresh retry, concurrent
+creators, live deletion/reimport, corrupt identity/cue anchors and migration 0013
+rollback/retry/high-water/foreign-key preservation. Initial storage run had one
+incorrect synthetic unique-count expectation (four, not five); corrected it and
+the final workspace run passes. No open failure/blocker or new dependency.
+
+Migration 0013 is live on open; no wire/core/Kotlin change. SRT worker/FFI/picker,
+EPUB persistence and mixed-format UI remain open. JNI/codegen/APK/Android lint/device,
+standalone index/Python suites, release/reboot and physical arm64 were not rerun.

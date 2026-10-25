@@ -1,5 +1,5 @@
 # Resume here
-Updated: 2026-10-25. Pure EPUB/SRT parsing verified; app imports remain paste/TXT.
+Updated: 2026-10-25. SRT repository verified; app imports remain paste/TXT.
 Read AGENTS.md, plan phases 2–4 and PRODUCT_SPEC.md sections 3–4.
 ## Working
 - Pure Crux owns routes/Library/Settings; only Render reaches UI. FIFO owns SQLite/analysis. Fresh sessions start Library. No I/O/SQL in core.
@@ -42,8 +42,7 @@ Read AGENTS.md, plan phases 2–4 and PRODUCT_SPEC.md sections 3–4.
   Final new Recorded returns Library + consumed 1.4s confetti (zero/rereads too).
 - NativeBridge consumes owned verified FD+1; Rust rehashes/maps/closes all paths. FIFO releases analyzer in background; keep live Full inodes immutable.
 - Pinned 2026-10-25 JMdict English/JMnedict + sources/notices bundled; offline credits.
-  Immutable index opens lazily on FIFO, reused until close/query failure.
-  load_reader_word reads original B/live statuses/lifetime count atomically;
+  Lazy FIFO index until close/query failure; load_reader_word reads B/statuses/count atomically;
   all exact surface/base word/name metadata/restrictions retained. See architecture.
 - LoadReaderWord/DismissReaderWord reach typed JNI; full current/pending/selected
   token identity gates attach. Live statuses refresh repetitions. Errors survive
@@ -55,8 +54,8 @@ Read AGENTS.md, plan phases 2–4 and PRODUCT_SPEC.md sections 3–4.
 - Android multiple-TXT picker reads one URI off-main; retained helper sequences
   atomic imports/UTF-8/Shift-JIS/Skip. Filename/X-of-N + processed-files bar survive
   recreation/background; errors/duplicates/skips count, encoding retries do not.
-  Scrollable Library summary retains results. Teardown drops unsubmitted work;
-  no persisted queue/progress or reader ruby. Display name publishes before bytes.
+  Library summary retains results; teardown drops unsubmitted work. No persisted queue/progress
+  or reader ruby. Display name publishes before bytes.
 - TXT cancellation shares a fresh repository handle before FIFO submission;
   cancelTxtImport() bypasses FIFO off main (COMMIT may wait). Silent rollback;
   winning commits stay. Android clears remaining/input, invalidates late reads and
@@ -65,16 +64,17 @@ Read AGENTS.md, plan phases 2–4 and PRODUCT_SPEC.md sections 3–4.
 - Platform dataSync lease: counts/name, no queue/restart; OS limits apply. Encoding
   releases it; permission/denial never blocks, timeout stops before Cancel. Notices
   count processed/total; taps no reader. HOME/SIGKILL granted/denied preserve only commits.
-- SRT: decoded text → LF/cue ranges; keeps speakers/breaks. Encoding/wiring pending.
+- SRT repo: strict shared UTF-8/Shift-JIS (no Aozora), original-file SHA-256,
+  filename/LF/cue ranges/Mode B/unique registrations atomic. TXT/SRT identical bytes
+  reuse first interpretation. Migration 0013/read-only source/Cancel; no encounters/time; runtime pending.
 - EPUB: bytes → spine chapters/title/UTF-8 formatting/ruby/links + image/cover bytes.
-  CSS ignored; U+FFFC images. Bounded ZIP/XML preflight; 64-depth cap. No I/O/IDs.
-  Remote images/custom entities/fallback chains fail. No persistence/reader wiring.
+  CSS ignored/U+FFFC images; bounded ZIP/XML/64-depth cap. No I/O/IDs/persistence.
+  Remote images/custom entities/fallback chains fail; no reader wiring.
 ## Next tasks (ordered)
-1. EPUB/SRT original-file repository/runtime imports; atomic chapters/assets/Mode B.
-2. Mixed-format picker/summary + EPUB/source-ruby reader rendering; CI independent.
+1. SRT FIFO/typed FFI imports; encoding outcomes, duplicate-no-Full, Cancel/isolation.
+2. EPUB atomic chapters/assets/Mode B + runtime; mixed picker/reader and CI follow.
 3. User-run physical arm64 validation once usable.
 ## Verification
-- PASS: 341 Rust tests, Clippy/fmt/diff + both Android target checks. DEVELOPMENT.md end.
-- Prior device reports: .local/test-reports/txt-background/ and txt-process-death/.
-- Nine new ZIP/XML lock entries; no schema/blocker. JNI/Full/APK/device/release/reboot
-  not rerun. arm64 runtime unverified. Nostr empty/Q188. Parser compatibility: DATA_MODEL.md.
+- PASS: 353 data-free Rust tests, Clippy/fmt/diff, storage both ABIs; Full 13+1 per loader.
+- Commands/env: DEVELOPMENT.md end. One corrected synthetic count; no open blocker.
+- JNI/APK/lint/device/release/reboot not rerun; arm64 unverified. Nostr empty/Q188; EPUB limits: DATA_MODEL.md.

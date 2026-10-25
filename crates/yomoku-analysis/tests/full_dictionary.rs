@@ -656,3 +656,154 @@ fn real_txt_import_analyzes_only_canonical_text_and_completes_with_original_anch
     drop(storage);
     std::fs::remove_dir_all(directory).unwrap();
 }
+
+#[test]
+#[ignore = "requires pinned Sudachi Full; run tools/test-sudachi.sh"]
+fn real_srt_import_analyzes_only_canonical_text_and_completes_with_original_anchors() {
+    use std::collections::BTreeSet;
+    use yomoku_core::{
+        completion::{AnalyzedCompletionOutcome, PageCompletion},
+        pagination::{LogicalPages, PageLength, ReadingPosition},
+        reader::ReaderAnalysis,
+        vocabulary::{Surface, VocabularyStatus},
+    };
+    use yomoku_storage::{SrtImportOutcome, Storage};
+
+    let directory = std::env::temp_dir().join(format!(
+        "yomoku-real-srt-{}-{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    ));
+    std::fs::create_dir(&directory).unwrap();
+    let path = directory.join("srt.sqlite3");
+    let mut storage = Storage::open(&path).unwrap();
+    let engine = analyzer();
+    let bytes = "\u{feff}1\r\n00:00:01,000 --> 00:00:02,000\r\n<i>猫と猫が食べた。</i>\r\n\r\n2\r\n00:00:03,000 --> 00:00:04,000\r\n国家公務員。𠮷 English 📖\0".as_bytes();
+    let canonical = "猫と猫が食べた。\n\n国家公務員。𠮷 English 📖\0";
+    let SrtImportOutcome::Created(imported) = storage
+        .import_analyzed_srt(bytes, "吾輩.srt", None, 100, |chapter| {
+            assert_eq!(chapter.text, canonical);
+            engine.analyze(chapter)
+        })
+        .unwrap()
+    else {
+        panic!("expected new SRT")
+    };
+    let document = &imported.document;
+    let expected = engine.analyze(&document.chapter).unwrap();
+    assert_eq!(expected.mode, SplitMode::B);
+    assert_eq!(
+        storage.chapter_analysis(imported.analysis_id).unwrap(),
+        Some(expected.clone())
+    );
+    let unique: BTreeSet<_> = expected
+        .tokens
+        .iter()
+        .filter(|token| token.is_japanese)
+        .map(|token| Surface::new(&token.surface).unwrap())
+        .collect();
+    assert_eq!(imported.registered_surfaces, unique.len());
+    let source = storage
+        .load_srt_source(document.document_id)
+        .unwrap()
+        .unwrap();
+    assert_eq!(source.original_bytes, bytes);
+    assert_eq!(source.cues.len(), 2);
+    assert_eq!(&canonical[source.cues[0].clone()], "猫と猫が食べた。");
+    assert_eq!(
+        &canonical[source.cues[1].clone()],
+        "国家公務員。𠮷 English 📖\0"
+    );
+    for surface in &unique {
+        assert_eq!(
+            storage.vocabulary_entry(surface).unwrap().unwrap().status,
+            VocabularyStatus::New
+        );
+    }
+    let page_length = PageLength::default();
+    let pages = LogicalPages::new(std::slice::from_ref(&document.chapter), page_length).unwrap();
+    let page = pages.pages()[0];
+    let tokens = storage
+        .load_reader_tokens(document.document_id, page)
+        .unwrap()
+        .unwrap();
+    assert_eq!(
+        tokens.analysis,
+        ReaderAnalysis::Available(imported.analysis_id)
+    );
+    assert_eq!(
+        tokens
+            .tokens
+            .iter()
+            .filter(|token| token.surface == "猫")
+            .count(),
+        2
+    );
+    let completion = PageCompletion {
+        command_id: storage.new_completion_command_id().unwrap(),
+        document_id: document.document_id,
+        page,
+        page_length,
+        departing_position: ReadingPosition {
+            source_id: page.source_id,
+            chapter_id: page.chapter_id,
+            offset: page.range.start,
+        },
+        completed_at_unix_ms: 200,
+        pending_time: Default::default(),
+    };
+    assert_eq!(
+        storage
+            .record_analyzed_page_completion(completion, imported.analysis_id)
+            .unwrap(),
+        AnalyzedCompletionOutcome::Recorded {
+            newly_known: unique.len() as u64
+        }
+    );
+    let completed = storage.load_paste(document.document_id).unwrap().unwrap();
+    assert!(completed.finished_at_least_once);
+    assert_eq!(storage.list_documents().unwrap()[0].progress_percent, 100);
+    drop(storage);
+    let mut storage = Storage::open(&path).unwrap();
+    assert_eq!(
+        storage.load_srt_source(document.document_id).unwrap(),
+        Some(source)
+    );
+    let SrtImportOutcome::Existing(existing) = storage
+        .import_analyzed_srt(
+            bytes,
+            "renamed.srt",
+            None,
+            300,
+            |_| -> Result<ChapterAnalysis, yomoku_analysis::AnalysisError> {
+                panic!("duplicate must not analyze")
+            },
+        )
+        .unwrap()
+    else {
+        panic!("expected existing SRT")
+    };
+    assert_eq!(existing, completed);
+    assert_eq!(
+        storage
+            .record_analyzed_page_completion(completion, imported.analysis_id)
+            .unwrap(),
+        AnalyzedCompletionOutcome::AlreadyRecorded
+    );
+    assert_eq!(
+        storage
+            .open_reader_snapshot(document.document_id)
+            .unwrap()
+            .unwrap()
+            .document
+            .reading_position
+            .unwrap()
+            .offset,
+        page.range.start
+    );
+    drop(storage);
+    std::fs::remove_dir_all(directory).unwrap();
+}

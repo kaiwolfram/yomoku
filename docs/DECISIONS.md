@@ -2077,3 +2077,28 @@ with CRC/size checks and per-entry/cumulative expansion bounds. Encryption metad
 blocks only resources actually used; unused obfuscated fonts do not reject a book.
 Strict UTF-8/BOM or declared UTF-16 decoding never replaces malformed source bytes.
 No migration or wire/schema change. Repository/runtime and UI adapters remain open.
+
+
+## 2026-10-25 — Atomic SRT repository before worker/picker expansion
+
+Reuse TXT's strict UTF-8/Shift-JIS decoder directly for subtitle files; expose
+`txt::decode` without invoking Aozora canonicalization. Conservative detection,
+manual selection and unsupported-BOM/error semantics match TXT. Keep decoder
+errors typed as `SrtImportError::Decode(TxtError)` at this internal repository
+boundary; a future runtime adapter maps them to format-appropriate wire outcomes.
+No new dependency, encoding guess, lossy fallback or Android behavior is added.
+
+Use the existing unique original-byte SHA-256 index across TXT/SRT. Identical bytes
+selected under another filename/extension reference the first committed live
+interpretation, without reparsing, reanalysis or changes to statuses/progress.
+Factor the read-only lookup into `find_imported_file`; keep `find_imported_txt` as
+a delegating compatibility entry point. Paste stays in its separate identity table.
+
+Migration 0013 follows the existing source-table rebuild, widens source kinds to
+SRT and adds ordered canonical cue ranges with chapter-text deletion cascade.
+Source loading checks full cue coverage/separators/scalar boundaries and original
+byte digest without re-decoding. Import uses the same immediate transaction and
+shared per-file cancellation/COMMIT gate as TXT; all analysis/registration/cue rows
+and provisional IDs roll back together. One canonical chapter fits the existing
+reader repositories; no subtitle timestamps are used for reading time. Worker,
+FFI, picker/summary and EPUB persistence remain separate continuation steps.

@@ -1564,3 +1564,22 @@
   CI independent. App still paste/TXT. Compatibility limits in DATA_MODEL.md.
   APK/lint/device/JNI/codegen/explicit Full/index/release/reboot/physical arm64
   not rerun for this parser slice. Nostr empty/Q188 unchanged.
+
+
+## 2026-10-25 — Atomic analyzed SRT repository
+
+- Added original-byte SRT imports with shared strict UTF-8/Shift-JIS decoding (no
+  Aozora), filename title, one canonical chapter/cue ranges, Mode B and unique
+  registrations in one cancellable transaction. No import encounters/time.
+- Migration 0013 widens source kinds and adds cascading cue rows, preserving old
+  IDs/foreign keys/source high-water. Shared TXT/SRT exact-file identity references
+  the first interpretation; source loading validates digest/anchors without parsing.
+- PASS: 353 data-free Rust tests, strict Clippy/fmt/diff, storage checks on both
+  Android targets; thirteen real-Full analysis + one worker fixture per owned/mapped
+  loader. Twelve new repository fixtures plus a real SRT import/completion/reopen
+  fixture cover rollback, cancellation, concurrency, encoding, duplicates, migration
+  and status/progress preservation. Corrected one synthetic expected count.
+- Updated README/plan/architecture/data/decisions/development/handoff. Next: SRT
+  worker/typed FFI, EPUB repository/runtime, mixed picker and reader assets/ruby;
+  CI independent. App still paste/TXT. JNI/APK/lint/device/release/reboot/physical
+  arm64 not rerun; no open blocker. Nostr empty/Q188 unchanged.

@@ -40,7 +40,7 @@ per-chapter Mode B and unique registrations, cancellation, typed runtime/FFI and
 mixed Android selection remain future work. Do not persist these parser structs
 without the planned atomic file-import adapter. Current app imports stay paste/TXT.
 
-## Pure SRT canonical content (no schema change)
+## SRT canonical content and atomic file repository (migration 0013)
 
 `yomoku-import::srt::SrtDocument` contains one canonical UTF-8 text string and
 ordered nonempty half-open byte ranges for its cues. Normalize CRLF/CR to LF,
@@ -53,10 +53,33 @@ a hard break and basic/numeric entities decode once after tag removal. Speakers,
 numeric dialogue, unknown markup/entities and unrecognized damaged timing stay
 visible. Empty canonical text is rejected. No times or reading events are created.
 
-This parser takes already decoded text. SRT original-byte hashing/decoding,
-filename title, durable IDs, Mode B/unique registration, cancellation, typed import
-transport and Android selection remain future work. No SRT content is persisted
-or accepted by the current TXT-only picker/repositories.
+The parser takes decoded text. `import_analyzed_srt` and its cancellable variant
+reuse strict UTF-8/Shift-JIS decoding (`txt::decode`), including BOM handling,
+explicit selection for uncertain bytes and rejection without replacement. They
+never apply Aozora rules to subtitle dialogue. Filename supplies the literal title.
+One immediate transaction checks shared original-file SHA-256 identity, then saves
+original bytes/encoding, one canonical chapter, cue ranges, Mode B analysis and
+unique Japanese registrations. No encounters, reading time or position are added.
+Exact duplicates (including a previously imported TXT with the same bytes) reference
+the first live interpretation before decoding/analyzing, preserving title/progress/
+statuses. Equal canonical text with different original bytes remains a new file;
+paste identity is separate. `find_imported_file` is the shared read-only preflight;
+the existing `find_imported_txt` delegates to it.
+
+Migration 0013 widens source kinds to paste/TXT/SRT using the existing source-table
+rebuild protocol, preserving IDs, foreign keys and the source sequence high-water
+mark. `subtitle_cues` has a chapter-text FK with delete cascade, contiguous ordered
+cue indexes and nonempty start/end UTF-8 ranges. `load_srt_source` reads original
+bytes/encoding/cues atomically without parsing or analysis. It validates the digest,
+scalar boundaries, exact blank separators, full canonical coverage and nonempty
+cues; corruption fails without repair. Live deletion drops file identity and cue
+rows while provenance/global statuses survive. Reimport creates fresh progress.
+
+A fresh shared `ImportCancellation` uses the same before/after-analysis checks and
+final commit gate as TXT. Cancellation rolls back the entire current file and IDs;
+a winning commit and earlier files stay. Statement/commit/analysis failures also
+roll back. The repository is ready for a worker adapter; SRT runtime/FFI/Android
+selection remain future work. The current app picker still accepts TXT only.
 
 ## TXT canonical content and atomic file repository (migration 0012)
 
@@ -106,7 +129,7 @@ original BLOB and `utf8`/`shift_jis` encoding. `source_ruby` stores chapter-text
 Each file has one canonical chapter. `load_txt_source` reads bytes/encoding/ruby in
 one transaction, verifies digest, ordered nonoverlapping scalar ranges and readings,
 and rejects corruption without repair or reanalysis. Existing single-text snapshot,
-token, progress, completion and finished-reopen repositories now accept paste/TXT;
+token, progress, completion and finished-reopen repositories now accept paste/TXT/SRT;
 their historical PastedDocument name/wire format is retained. No ruby reader payload
 exists yet. Typed per-file runtime/JNI imports and the retained Android TXT picker,
 encoding choices, progress, Cancel and summary are connected. The Android foreground

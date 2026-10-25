@@ -7,18 +7,21 @@ mod completions;
 pub mod dictionary;
 mod documents;
 mod encounters;
+mod files;
 mod import_cancellation;
 mod imports;
 mod reader_tokens;
 pub mod reader_words;
 mod reading_time;
 mod settings;
+mod srt;
 mod txt;
 mod vocabulary;
 
 pub use import_cancellation::ImportCancellation;
 pub use imports::{AnalyzedPaste, PasteImportError, PasteImportOutcome};
 pub use reading_time::SavedReadingTime;
+pub use srt::{SrtImportError, SrtImportOutcome, StoredSrtSource};
 pub use txt::{StoredTxtSource, TxtImportError, TxtImportOutcome};
 
 use std::{error::Error, fmt, path::Path, time::Duration};
@@ -91,6 +94,11 @@ const MIGRATIONS: &[Migration] = &[
         version: 12,
         name: "0012_txt_imports",
         sql: include_str!("../migrations/0012_txt_imports.sql"),
+    },
+    Migration {
+        version: 13,
+        name: "0013_srt_imports",
+        sql: include_str!("../migrations/0013_srt_imports.sql"),
     },
 ];
 

@@ -69,7 +69,9 @@ pub fn parse(bytes: &[u8], selection: Option<TextEncoding>) -> Result<TxtDocumen
     })
 }
 
-fn decode(
+/// Decode a supported text file without applying TXT/Aozora markup rules.
+/// SRT adapters can reuse the same conservative encoding choice and strict errors.
+pub fn decode(
     bytes: &[u8],
     selection: Option<TextEncoding>,
 ) -> Result<(TextEncoding, Cow<'_, str>), TxtError> {

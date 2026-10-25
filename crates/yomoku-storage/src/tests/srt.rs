@@ -1,0 +1,818 @@
+use std::{convert::Infallible, sync::mpsc, time::Duration};
+
+use yomoku_core::{
+    analysis::{ChapterAnalysis, SplitMode},
+    document::{ChapterText, PasteText},
+    reader::ReaderAnalysis,
+    vocabulary::{Surface, VocabularyStatus},
+};
+use yomoku_import::txt::{TextEncoding, TxtError};
+
+use super::{imports::fixture, positions::position, *};
+
+fn created(outcome: SrtImportOutcome) -> AnalyzedPaste {
+    match outcome {
+        SrtImportOutcome::Created(imported) => imported,
+        SrtImportOutcome::Existing(_) => panic!("expected new file"),
+    }
+}
+
+fn no_analysis(_: &ChapterText) -> Result<ChapterAnalysis, Infallible> {
+    panic!("duplicate or rejected file must not be analyzed")
+}
+
+fn count(storage: &Storage, table: &str) -> i64 {
+    storage
+        .connection
+        .query_row(&format!("SELECT COUNT(*) FROM {table}"), [], |row| {
+            row.get(0)
+        })
+        .unwrap()
+}
+
+fn totals(storage: &Storage) -> Vec<i64> {
+    [
+        "sources",
+        "chapters",
+        "documents",
+        "chapter_texts",
+        "imported_files",
+        "subtitle_cues",
+        "chapter_analyses",
+        "analyzed_tokens",
+        "vocabulary",
+        "vocabulary_status_events",
+        "reading_positions",
+        "reading_completions",
+        "reading_occurrences",
+        "source_ruby",
+        "paste_content_hashes",
+    ]
+    .map(|table| count(storage, table))
+    .to_vec()
+}
+
+#[test]
+fn srt_original_bytes_cues_analysis_and_title_survive_read_only_reopen() {
+    let database = TestDatabase::new();
+    let mut storage = Storage::open(database.path()).unwrap();
+    let observer = Storage::open(database.path()).unwrap();
+    let bytes = "\u{feff}1\r\n00:00:01,000 --> 00:00:02,000\r\n<i>猫 猫</i>\r\n𠮷 📖\r\n\r\n2\r\n00:00:03,000 --> 00:00:04,000\r\n話者: ｜犬《いぬ》［＃改ページ］".as_bytes();
+    let canonical = "猫 猫\n𠮷 📖\n\n話者: ｜犬《いぬ》［＃改ページ］";
+    let imported = created(
+        storage
+            .import_analyzed_srt(bytes, "字幕.srt", None, 123, |chapter| {
+                assert_eq!(totals(&observer), vec![0; 15]);
+                assert_eq!(chapter.text, canonical);
+                fixture(chapter)
+            })
+            .unwrap(),
+    );
+    assert_eq!(imported.document.title, "字幕.srt");
+    assert_eq!(imported.registered_surfaces, 4);
+    for table in [
+        "reading_positions",
+        "reading_completions",
+        "reading_occurrences",
+        "source_ruby",
+        "paste_content_hashes",
+    ] {
+        assert_eq!(count(&storage, table), 0, "{table}");
+    }
+    let kind: (String, String) = storage
+        .connection
+        .query_row("SELECT kind, original_title FROM sources", [], |row| {
+            Ok((row.get(0)?, row.get(1)?))
+        })
+        .unwrap();
+    assert_eq!(kind, ("srt".into(), "字幕.srt".into()));
+    let split = canonical.find("\n\n").unwrap();
+    let source = StoredSrtSource {
+        original_bytes: bytes.to_vec(),
+        encoding: TextEncoding::Utf8,
+        cues: vec![0..split, split + 2..canonical.len()],
+    };
+    drop(storage);
+    let mut storage = Storage::open(database.path()).unwrap();
+    let before = fs::read(database.path()).unwrap();
+    storage
+        .connection
+        .pragma_update(None, "query_only", true)
+        .unwrap();
+    assert_eq!(
+        storage
+            .load_srt_source(imported.document.document_id)
+            .unwrap(),
+        Some(source)
+    );
+    assert_eq!(
+        storage.find_imported_file(bytes).unwrap(),
+        Some(imported.document.clone())
+    );
+    assert!(storage
+        .load_txt_source(imported.document.document_id)
+        .unwrap()
+        .is_none());
+    let snapshot = storage
+        .load_reader_snapshot(imported.document.document_id)
+        .unwrap()
+        .unwrap();
+    assert_eq!(snapshot.document, imported.document);
+    assert_eq!(
+        snapshot.analysis,
+        ReaderAnalysis::Available(imported.analysis_id)
+    );
+    assert_eq!(
+        storage.chapter_analysis(imported.analysis_id).unwrap(),
+        Some(fixture(&imported.document.chapter).unwrap())
+    );
+    assert_eq!(storage.list_documents().unwrap()[0].progress_percent, 0);
+    assert_eq!(fs::read(database.path()).unwrap(), before);
+}
+
+#[test]
+fn srt_duplicate_bypasses_decoding_and_preserves_progress_and_status() {
+    let database = TestDatabase::new();
+    let mut storage = Storage::open(database.path()).unwrap();
+    let bytes = "©".as_bytes(); // Both valid encodings disagree.
+    let imported = created(
+        storage
+            .import_analyzed_srt(bytes, "first.srt", Some(TextEncoding::Utf8), 1, fixture)
+            .unwrap(),
+    );
+    let entry = storage
+        .vocabulary_entry(&Surface::new("©").unwrap())
+        .unwrap()
+        .unwrap();
+    storage
+        .set_vocabulary_status(entry.id, VocabularyStatus::Ignored, 2)
+        .unwrap();
+    let saved = storage
+        .save_reading_position(
+            imported.document.document_id,
+            position(&imported.document, bytes.len()),
+        )
+        .unwrap()
+        .unwrap();
+    let before = totals(&storage);
+    for selection in [None, Some(TextEncoding::ShiftJis)] {
+        let SrtImportOutcome::Existing(document) = storage
+            .import_analyzed_srt(bytes, "", selection, 3, no_analysis)
+            .unwrap()
+        else {
+            panic!("expected duplicate")
+        };
+        assert_eq!(document, saved);
+        assert_eq!(totals(&storage), before);
+    }
+    assert_eq!(
+        storage
+            .load_srt_source(saved.document_id)
+            .unwrap()
+            .unwrap()
+            .encoding,
+        TextEncoding::Utf8
+    );
+    assert_eq!(
+        storage
+            .vocabulary_entry(&entry.surface)
+            .unwrap()
+            .unwrap()
+            .status,
+        VocabularyStatus::Ignored
+    );
+}
+
+#[test]
+fn srt_identity_is_original_bytes_shared_with_txt_and_separate_from_paste() {
+    let database = TestDatabase::new();
+    let mut storage = Storage::open(database.path()).unwrap();
+    let first = created(
+        storage
+            .import_analyzed_srt(b"<i>English</i>", "first.srt", None, 1, fixture)
+            .unwrap(),
+    );
+    let TxtImportOutcome::Existing(duplicate) = storage
+        .import_analyzed_txt(b"<i>English</i>", "same.txt", None, 2, no_analysis)
+        .unwrap()
+    else {
+        panic!("shared file hash")
+    };
+    assert_eq!(duplicate, first.document);
+    let TxtImportOutcome::Created(txt) = storage
+        .import_analyzed_txt(b"English", "first.txt", None, 3, fixture)
+        .unwrap()
+    else {
+        panic!("different bytes")
+    };
+    let SrtImportOutcome::Existing(duplicate) = storage
+        .import_analyzed_srt(b"English", "same.srt", None, 4, no_analysis)
+        .unwrap()
+    else {
+        panic!("shared file hash")
+    };
+    assert_eq!(duplicate, txt.document);
+    let other = created(
+        storage
+            .import_analyzed_srt(b"\xEF\xBB\xBFEnglish", "bom.srt", None, 5, fixture)
+            .unwrap(),
+    );
+    assert_eq!(other.document.chapter.text, first.document.chapter.text);
+    let PasteImportOutcome::Created(_) = storage
+        .import_analyzed_paste(&PasteText::new("English".into()).unwrap(), 6, fixture)
+        .unwrap()
+    else {
+        panic!("separate paste identity")
+    };
+    assert_eq!(count(&storage, "documents"), 4);
+    assert!(storage
+        .load_srt_source(txt.document.document_id)
+        .unwrap()
+        .is_none());
+}
+
+#[test]
+fn srt_decodes_shift_jis_and_requires_explicit_ambiguous_choice() {
+    let database = TestDatabase::new();
+    let mut storage = Storage::open(database.path()).unwrap();
+    let bytes = b"1\r\n00:00:01,000 --> 00:00:02,000\r\n\x82\xA0";
+    assert!(matches!(
+        storage.import_analyzed_srt(bytes, "bad.srt", Some(TextEncoding::Utf8), 1, no_analysis),
+        Err(SrtImportError::Decode(TxtError::InvalidEncoding(
+            TextEncoding::Utf8
+        )))
+    ));
+    let imported = created(
+        storage
+            .import_analyzed_srt(bytes, "legacy.srt", None, 2, fixture)
+            .unwrap(),
+    );
+    assert_eq!(imported.document.chapter.text, "あ");
+    assert_eq!(
+        storage
+            .load_srt_source(imported.document.document_id)
+            .unwrap()
+            .unwrap()
+            .encoding,
+        TextEncoding::ShiftJis
+    );
+    assert!(matches!(
+        storage.import_analyzed_srt("©".as_bytes(), "choice.srt", None, 3, no_analysis),
+        Err(SrtImportError::Decode(TxtError::EncodingRequired))
+    ));
+    let imported = created(
+        storage
+            .import_analyzed_srt(
+                "©".as_bytes(),
+                "choice.srt",
+                Some(TextEncoding::ShiftJis),
+                4,
+                fixture,
+            )
+            .unwrap(),
+    );
+    assert_eq!(imported.document.chapter.text, "ﾂｩ");
+}
+
+#[test]
+fn srt_preserves_all_existing_statuses_and_registers_unique_new_only() {
+    let database = TestDatabase::new();
+    let mut storage = Storage::open(database.path()).unwrap();
+    let mut entries = Vec::new();
+    for (word, status) in [
+        ("猫", VocabularyStatus::New),
+        ("犬", VocabularyStatus::Learning),
+        ("鳥", VocabularyStatus::Familiar),
+        ("魚", VocabularyStatus::Known),
+        ("馬", VocabularyStatus::Ignored),
+    ] {
+        let surface = Surface::new(word).unwrap();
+        storage
+            .register_vocabulary(std::slice::from_ref(&surface), 1)
+            .unwrap();
+        let entry = storage.vocabulary_entry(&surface).unwrap().unwrap();
+        entries.push(
+            storage
+                .set_vocabulary_status(entry.id, status, 2)
+                .unwrap()
+                .unwrap(),
+        );
+    }
+    let imported = created(
+        storage
+            .import_analyzed_srt(
+                "猫 犬 鳥\n\n魚 馬 猫 𠮷".as_bytes(),
+                "words.srt",
+                Some(TextEncoding::Utf8),
+                3,
+                fixture,
+            )
+            .unwrap(),
+    );
+    assert_eq!(imported.registered_surfaces, 1);
+    for entry in entries {
+        assert_eq!(
+            storage.vocabulary_entry(&entry.surface).unwrap(),
+            Some(entry)
+        );
+    }
+    assert_eq!(count(&storage, "reading_occurrences"), 0);
+}
+
+#[test]
+fn srt_rejected_files_analysis_and_dates_preserve_completed_files() {
+    let database = TestDatabase::new();
+    let mut storage = Storage::open(database.path()).unwrap();
+    let saved = created(
+        storage
+            .import_analyzed_srt(b"English", "saved.srt", None, 1, fixture)
+            .unwrap(),
+    );
+    let before = totals(&storage);
+    for bytes in [
+        b"".as_slice(),
+        b" \r\n",
+        b"1\n00:00:01,000 --> 00:00:02,000\n<i></i>",
+    ] {
+        assert!(matches!(
+            storage.import_analyzed_srt(bytes, "empty.srt", None, 2, no_analysis),
+            Err(SrtImportError::Empty(_))
+        ));
+    }
+    for bytes in [b"\xFF".as_slice(), b"\xFF\xFEa\0"] {
+        assert!(matches!(
+            storage.import_analyzed_srt(bytes, "invalid.srt", None, 2, no_analysis),
+            Err(SrtImportError::Decode(_))
+        ));
+    }
+    assert!(matches!(
+        storage.import_analyzed_srt(b"other", "", None, 2, no_analysis),
+        Err(SrtImportError::Storage(StorageError::InvalidDocument))
+    ));
+    assert!(matches!(
+        storage.import_analyzed_srt(b"other", "date.srt", None, -1, no_analysis),
+        Err(SrtImportError::Storage(StorageError::InvalidVocabulary))
+    ));
+    assert!(matches!(
+        storage.import_analyzed_srt(b"other", "analysis.srt", None, 2, |_| Err::<
+            ChapterAnalysis,
+            _,
+        >("failed")),
+        Err(SrtImportError::Analysis("failed"))
+    ));
+    for invalid in 0..3 {
+        assert!(matches!(
+            storage.import_analyzed_srt(b"other", "analysis.srt", None, 2, |chapter| {
+                let mut analysis = fixture(chapter).unwrap();
+                match invalid {
+                    0 => analysis.mode = SplitMode::A,
+                    1 => analysis.tokens.clear(),
+                    _ => analysis.tokens[0].surface = "wrong".into(),
+                }
+                Ok::<_, Infallible>(analysis)
+            }),
+            Err(SrtImportError::Storage(StorageError::InvalidAnalysis))
+        ));
+    }
+    assert_eq!(totals(&storage), before);
+    assert_eq!(
+        storage.load_paste(saved.document.document_id).unwrap(),
+        Some(saved.document)
+    );
+    created(
+        storage
+            .import_analyzed_srt(b"other", "next.srt", None, 3, fixture)
+            .unwrap(),
+    );
+}
+
+#[test]
+fn srt_each_write_and_commit_failure_rolls_back_all_rows_and_ids() {
+    for table in [
+        "sources",
+        "chapters",
+        "documents",
+        "chapter_texts",
+        "imported_files",
+        "subtitle_cues",
+        "chapter_analyses",
+        "analyzed_tokens",
+        "vocabulary",
+        "vocabulary_status_events",
+        "commit",
+    ] {
+        let database = TestDatabase::new();
+        let mut storage = Storage::open(database.path()).unwrap();
+        let saved = created(
+            storage
+                .import_analyzed_srt(b"English", "saved.srt", None, 1, fixture)
+                .unwrap(),
+        );
+        let before = totals(&storage);
+        let sequences = sequence(&storage);
+        if table == "commit" {
+            storage.connection.execute_batch("CREATE TEMP TABLE parent (id INTEGER PRIMARY KEY);
+                CREATE TEMP TABLE child (id INTEGER REFERENCES parent(id) DEFERRABLE INITIALLY DEFERRED);
+                CREATE TEMP TRIGGER fail_import AFTER INSERT ON vocabulary_status_events BEGIN INSERT INTO child VALUES (99); END;").unwrap();
+        } else {
+            storage.connection.execute_batch(&format!("CREATE TEMP TRIGGER fail_import AFTER INSERT ON {table} BEGIN SELECT RAISE(ABORT, 'fixture'); END;")).unwrap();
+        }
+        assert!(
+            matches!(
+                storage.import_analyzed_srt(
+                    "猫 猫\n\n𠮷".as_bytes(),
+                    "failed.srt",
+                    Some(TextEncoding::Utf8),
+                    2,
+                    fixture
+                ),
+                Err(SrtImportError::Storage(StorageError::Sqlite(_)))
+            ),
+            "{table}"
+        );
+        assert_eq!(totals(&storage), before, "{table}");
+        assert_eq!(sequence(&storage), sequences, "{table}");
+        assert_eq!(
+            storage.load_paste(saved.document.document_id).unwrap(),
+            Some(saved.document)
+        );
+        storage
+            .connection
+            .execute_batch("DROP TRIGGER fail_import")
+            .unwrap();
+        let retried = created(
+            storage
+                .import_analyzed_srt(
+                    "猫 猫\n\n𠮷".as_bytes(),
+                    "next.srt",
+                    Some(TextEncoding::Utf8),
+                    3,
+                    fixture,
+                )
+                .unwrap(),
+        );
+        assert_eq!(retried.registered_surfaces, 2);
+        drop(storage);
+        assert!(Storage::open(database.path())
+            .unwrap()
+            .load_srt_source(retried.document.document_id)
+            .unwrap()
+            .is_some());
+    }
+}
+
+fn sequence(storage: &Storage) -> Vec<(String, i64)> {
+    storage
+        .connection
+        .prepare("SELECT name, seq FROM sqlite_sequence ORDER BY name")
+        .unwrap()
+        .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))
+        .unwrap()
+        .collect::<Result<_, _>>()
+        .unwrap()
+}
+
+#[test]
+fn srt_cancellation_skips_start_and_rolls_back_blocked_analysis_only() {
+    let database = TestDatabase::new();
+    let mut storage = Storage::open(database.path()).unwrap();
+    let cancelled = ImportCancellation::default();
+    cancelled.cancel();
+    storage
+        .connection
+        .pragma_update(None, "query_only", true)
+        .unwrap();
+    assert!(storage
+        .import_analyzed_srt_cancellable(&[0xff], "", None, -1, &cancelled, no_analysis)
+        .unwrap()
+        .is_none());
+    storage
+        .connection
+        .pragma_update(None, "query_only", false)
+        .unwrap();
+    let saved = created(
+        storage
+            .import_analyzed_srt(b"English", "saved.srt", None, 1, fixture)
+            .unwrap(),
+    );
+    let before = totals(&storage);
+    let sequences = sequence(&storage);
+    let cancellation = ImportCancellation::default();
+    let caller = cancellation.clone();
+    let (entered, ready) = mpsc::channel();
+    let (release, finish) = mpsc::channel();
+    let path = database.path();
+    let worker = std::thread::spawn(move || {
+        let mut storage = Storage::open(path).unwrap();
+        storage
+            .import_analyzed_srt_cancellable(
+                "猫\n\n𠮷".as_bytes(),
+                "cancel.srt",
+                Some(TextEncoding::Utf8),
+                2,
+                &cancellation,
+                |chapter| {
+                    entered.send(()).unwrap();
+                    finish.recv_timeout(Duration::from_secs(10)).unwrap();
+                    fixture(chapter)
+                },
+            )
+            .unwrap()
+    });
+    ready.recv_timeout(Duration::from_secs(10)).unwrap();
+    assert_eq!(totals(&storage), before);
+    caller.cancel();
+    release.send(()).unwrap();
+    assert!(worker.join().unwrap().is_none());
+    assert_eq!(totals(&storage), before);
+    assert_eq!(sequence(&storage), sequences);
+    assert_eq!(
+        storage.load_paste(saved.document.document_id).unwrap(),
+        Some(saved.document)
+    );
+    let new = created(
+        storage
+            .import_analyzed_srt(
+                "猫\n\n𠮷".as_bytes(),
+                "retry.srt",
+                Some(TextEncoding::Utf8),
+                3,
+                fixture,
+            )
+            .unwrap(),
+    );
+    let late = ImportCancellation::default();
+    let result = storage
+        .import_analyzed_srt_cancellable(
+            "猫\n\n𠮷".as_bytes(),
+            "same.srt",
+            None,
+            4,
+            &late,
+            no_analysis,
+        )
+        .unwrap();
+    late.cancel();
+    assert!(
+        matches!(result, Some(SrtImportOutcome::Existing(document)) if document == new.document)
+    );
+}
+
+#[test]
+fn srt_concurrent_creators_reference_one_committed_document() {
+    let database = TestDatabase::new();
+    Storage::open(database.path()).unwrap();
+    let barrier = Arc::new(Barrier::new(3));
+    let handles: Vec<_> = (0..2)
+        .map(|index| {
+            let path = database.path();
+            let barrier = barrier.clone();
+            std::thread::spawn(move || {
+                let mut storage = Storage::open(path).unwrap();
+                barrier.wait();
+                storage
+                    .import_analyzed_srt(
+                        "猫\n\n猫 𠮷".as_bytes(),
+                        &format!("{index}.srt"),
+                        Some(TextEncoding::Utf8),
+                        1,
+                        fixture,
+                    )
+                    .unwrap()
+            })
+        })
+        .collect();
+    barrier.wait();
+    let mut creates = 0;
+    let documents: Vec<_> = handles
+        .into_iter()
+        .map(|handle| match handle.join().unwrap() {
+            SrtImportOutcome::Created(imported) => {
+                creates += 1;
+                imported.document
+            }
+            SrtImportOutcome::Existing(document) => document,
+        })
+        .collect();
+    assert_eq!(creates, 1);
+    assert_eq!(documents[0], documents[1]);
+    let storage = Storage::open(database.path()).unwrap();
+    assert_eq!(count(&storage, "subtitle_cues"), 2);
+    assert_eq!(count(&storage, "vocabulary_status_events"), 2);
+}
+
+#[test]
+fn srt_delete_reimport_discards_live_data_and_preserves_provenance_and_status() {
+    let database = TestDatabase::new();
+    let mut storage = Storage::open(database.path()).unwrap();
+    let bytes = "猫\n\n𠮷".as_bytes();
+    let old = created(
+        storage
+            .import_analyzed_srt(bytes, "old.srt", Some(TextEncoding::Utf8), 1, fixture)
+            .unwrap(),
+    );
+    let entry = storage
+        .vocabulary_entry(&Surface::new("猫").unwrap())
+        .unwrap()
+        .unwrap();
+    storage
+        .set_vocabulary_status(entry.id, VocabularyStatus::Known, 2)
+        .unwrap();
+    storage
+        .connection
+        .execute("UPDATE documents SET finished_at_least_once = 1", [])
+        .unwrap();
+    storage
+        .save_reading_position(
+            old.document.document_id,
+            position(&old.document, bytes.len()),
+        )
+        .unwrap();
+    storage
+        .connection
+        .execute(
+            "DELETE FROM documents WHERE id = ?1",
+            [i64::from(old.document.document_id)],
+        )
+        .unwrap();
+    storage
+        .connection
+        .execute(
+            "DELETE FROM chapter_texts WHERE chapter_id = ?1",
+            [i64::from(old.document.chapter.chapter_id)],
+        )
+        .unwrap();
+    assert_eq!(count(&storage, "subtitle_cues"), 0);
+    assert_eq!(count(&storage, "imported_files"), 0);
+    assert!(storage
+        .load_srt_source(old.document.document_id)
+        .unwrap()
+        .is_none());
+    let new = created(
+        storage
+            .import_analyzed_srt(bytes, "new.srt", Some(TextEncoding::Utf8), 3, fixture)
+            .unwrap(),
+    );
+    assert_ne!(new.document.document_id, old.document.document_id);
+    assert_ne!(
+        new.document.chapter.source_id,
+        old.document.chapter.source_id
+    );
+    assert_eq!(new.registered_surfaces, 0);
+    assert!(new.document.reading_position.is_none());
+    assert!(!new.document.finished_at_least_once);
+    assert_eq!(count(&storage, "sources"), 2);
+    assert_eq!(
+        storage
+            .vocabulary_entry(&entry.surface)
+            .unwrap()
+            .unwrap()
+            .status,
+        VocabularyStatus::Known
+    );
+}
+
+#[test]
+fn srt_corrupt_original_identity_or_cue_anchors_fail_without_repair() {
+    for corruption in [
+        "UPDATE imported_files SET original_bytes = X'00'",
+        "DELETE FROM imported_files",
+        "DELETE FROM subtitle_cues",
+        "UPDATE subtitle_cues SET start_byte = 1 WHERE cue_index = 0",
+        "UPDATE subtitle_cues SET end_byte = 999 WHERE cue_index = 1",
+        "DELETE FROM subtitle_cues WHERE cue_index = 1",
+        "UPDATE subtitle_cues SET cue_index = cue_index + 2",
+        "UPDATE subtitle_cues SET start_byte = 0 WHERE cue_index = 1",
+    ] {
+        let database = TestDatabase::new();
+        let mut storage = Storage::open(database.path()).unwrap();
+        let bytes = "𠮷\n\n猫".as_bytes();
+        let imported = created(
+            storage
+                .import_analyzed_srt(bytes, "bad.srt", Some(TextEncoding::Utf8), 1, fixture)
+                .unwrap(),
+        );
+        storage.connection.execute_batch(corruption).unwrap();
+        let before = fs::read(database.path()).unwrap();
+        assert!(
+            matches!(
+                storage.load_srt_source(imported.document.document_id),
+                Err(StorageError::InvalidDocument)
+            ),
+            "{corruption}"
+        );
+        assert_eq!(fs::read(database.path()).unwrap(), before);
+        if corruption.contains("original_bytes") {
+            assert!(matches!(
+                storage.find_imported_file(bytes),
+                Err(StorageError::InvalidDocument)
+            ));
+            assert!(matches!(
+                storage.import_analyzed_srt(bytes, "retry.srt", None, 2, no_analysis),
+                Err(SrtImportError::Storage(StorageError::InvalidDocument))
+            ));
+        }
+    }
+}
+
+#[test]
+fn srt_migration_preserves_paste_txt_history_and_source_id_high_water() {
+    let database = TestDatabase::new();
+    let mut connection = Connection::open(database.path()).unwrap();
+    connection
+        .pragma_update(None, "foreign_keys", true)
+        .unwrap();
+    migrate(&mut connection, &MIGRATIONS[..12]).unwrap();
+    let mut storage = Storage { connection };
+    let paste = storage
+        .create_analyzed_paste(&PasteText::new("犬".into()).unwrap(), 1, fixture)
+        .unwrap();
+    let TxtImportOutcome::Created(txt) = storage
+        .import_analyzed_txt(
+            "｜猫《ねこ》".as_bytes(),
+            "old.txt",
+            Some(TextEncoding::Utf8),
+            2,
+            fixture,
+        )
+        .unwrap()
+    else {
+        panic!("new TXT")
+    };
+    let source = storage.load_txt_source(txt.document.document_id).unwrap();
+    storage.connection.execute_batch("INSERT INTO sources (id, kind, original_title) VALUES (100, 'paste', 'deleted'); DELETE FROM sources WHERE id = 100;").unwrap();
+    let before = totals_before_migration(&storage);
+    // Force the new migration to fail after its source-table rebuild.
+    storage
+        .connection
+        .execute_batch("CREATE TABLE subtitle_cues (fixture TEXT)")
+        .unwrap();
+    assert!(matches!(
+        migrate(&mut storage.connection, MIGRATIONS),
+        Err(StorageError::Sqlite(_))
+    ));
+    assert_eq!(storage.schema_version().unwrap(), 12);
+    assert_eq!(totals_before_migration(&storage), before);
+    assert!(storage
+        .connection
+        .execute(
+            "INSERT INTO sources (kind, original_title) VALUES ('srt', 'failed')",
+            []
+        )
+        .is_err());
+    assert!(storage
+        .connection
+        .execute(
+            "INSERT INTO chapters (source_id, chapter_index) VALUES (999, 0)",
+            []
+        )
+        .is_err());
+    storage
+        .connection
+        .execute_batch("DROP TABLE subtitle_cues")
+        .unwrap();
+    drop(storage);
+    let mut storage = Storage::open(database.path()).unwrap();
+    assert_eq!(storage.schema_version().unwrap(), 13);
+    assert_eq!(totals_before_migration(&storage), before);
+    assert_eq!(
+        storage.load_txt_source(txt.document.document_id).unwrap(),
+        source
+    );
+    assert_eq!(
+        storage.load_paste(paste.document.document_id).unwrap(),
+        Some(paste.document)
+    );
+    let new = created(
+        storage
+            .import_analyzed_srt(b"English", "new.srt", None, 3, fixture)
+            .unwrap(),
+    );
+    assert!(i64::from(new.document.chapter.source_id) > 100);
+    assert!(storage
+        .connection
+        .prepare("PRAGMA foreign_key_check")
+        .unwrap()
+        .query([])
+        .unwrap()
+        .next()
+        .unwrap()
+        .is_none());
+}
+
+fn totals_before_migration(storage: &Storage) -> Vec<i64> {
+    [
+        "sources",
+        "chapters",
+        "documents",
+        "chapter_texts",
+        "imported_files",
+        "source_ruby",
+        "chapter_analyses",
+        "analyzed_tokens",
+        "vocabulary",
+        "vocabulary_status_events",
+    ]
+    .map(|table| count(storage, table))
+    .to_vec()
+}

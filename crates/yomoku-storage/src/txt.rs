@@ -12,6 +12,7 @@ use yomoku_import::txt::{self, SourceRuby, TextEncoding, TxtError};
 
 use crate::{
     documents::{create_single_text_in, load_paste_in},
+    files::{encoding_name, find_imported_in},
     imports::store_analyzed_document_in,
     AnalyzedPaste, ImportCancellation, Storage, StorageError,
 };
@@ -70,11 +71,7 @@ impl Storage {
         &mut self,
         original_bytes: &[u8],
     ) -> Result<Option<PastedDocument>, StorageError> {
-        let digest = Sha256::digest(original_bytes);
-        let transaction = self.connection.transaction()?;
-        let document = find_imported_in(&transaction, original_bytes, digest.as_slice())?;
-        transaction.commit()?;
-        Ok(document)
+        self.find_imported_file(original_bytes)
     }
 
     /// Hash original bytes before decoding; existing live files bypass parsing,
@@ -262,31 +259,6 @@ impl Storage {
     }
 }
 
-fn find_imported_in(
-    connection: &rusqlite::Connection,
-    original_bytes: &[u8],
-    digest: &[u8],
-) -> Result<Option<PastedDocument>, StorageError> {
-    let existing: Option<(i64, Vec<u8>)> = connection
-        .query_row(
-            "SELECT document_id, original_bytes FROM imported_files WHERE sha256 = ?1",
-            [digest],
-            |row| Ok((row.get(0)?, row.get(1)?)),
-        )
-        .optional()?;
-    let Some((id, stored_bytes)) = existing else {
-        return Ok(None);
-    };
-    // Fail closed on a stale/corrupt key or digest collision.
-    if stored_bytes != original_bytes {
-        return Err(StorageError::InvalidDocument);
-    }
-    let id = DocumentId::try_from(id).map_err(|_| StorageError::InvalidDocument)?;
-    load_paste_in(connection, id)?.map_or(Err(StorageError::InvalidDocument), |document| {
-        Ok(Some(document))
-    })
-}
-
 fn validate_ruby(text: &str, ruby: &[SourceRuby]) -> Result<(), StorageError> {
     let mut previous_end = 0;
     for item in ruby {
@@ -304,11 +276,4 @@ fn validate_ruby(text: &str, ruby: &[SourceRuby]) -> Result<(), StorageError> {
 
 fn to_i64(value: usize) -> Result<i64, StorageError> {
     i64::try_from(value).map_err(|_| StorageError::InvalidDocument)
-}
-
-fn encoding_name(encoding: TextEncoding) -> &'static str {
-    match encoding {
-        TextEncoding::Utf8 => "utf8",
-        TextEncoding::ShiftJis => "shift_jis",
-    }
 }

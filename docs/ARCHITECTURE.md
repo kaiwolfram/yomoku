@@ -37,8 +37,17 @@ Blank lines separate cues; missing counters/separators and short/dot timestamps
 recover without merging cues into prose. Strip identifiable timing/counter lines
 and common HTML formatting, preserving speakers, numeric dialogue, unknown markup
 and damaged metadata. Decode entities once after tag removal. All cues form one
-text unit before analysis/pagination. This parser has no storage/runtime/Android
-adapter yet; original-file decoding/identity and atomic registration remain open.
+text unit before analysis/pagination. Its repository adapter now uses the shared
+strict UTF-8/Shift-JIS decoder without Aozora transformation. `import_analyzed_srt[_cancellable]` saves original bytes,
+filename, canonical chapter/cues, original Mode B and unique registrations in one
+immediate transaction. Shared original-byte identity references an existing TXT/SRT
+before decoding/analysis; duplicates preserve their original interpretation.
+Migration 0013 widens source kinds and adds cascading cue ranges. Read-only source
+loading validates the digest, contiguous indexes, scalar ranges and exact separators.
+Cancellation uses the existing per-file commit gate, discarding partial rows/IDs
+while preserving earlier files. No reading events or time arise from import.
+The ready-analyzer/no-I/O/provisional-ID contract matches TXT; see DATA_MODEL.md.
+SRT worker/typed FFI and Android selection remain open.
 
 TXT strict UTF-8/Shift-JIS decoding returns explicit uncertainty before any
 canonicalization; a selected encoding never silently falls back or replaces errors.
@@ -51,7 +60,7 @@ an exact live file or parse/allocate/store original bytes, filename title, canon
 text/ruby, Mode B analysis and unique registrations together. An existing file skips
 decoding/analysis and preserves its chosen encoding/statuses/progress. The analyzer
 callback obeys the same ready-worker/no-I/O/provisional-ID contract as paste. Shared
-single-text readers load paste or TXT with the historical PastedDocument wire type;
+single-text readers load paste, TXT or SRT with the historical PastedDocument wire type;
 source ruby has a separate read-only repository, awaiting reader transport/rendering.
 `import_analyzed_txt_cancellable` adds a shared per-file `ImportCancellation` handle.
 Checkpoints before/after parsing, ruby writes and analysis can discard provisional
@@ -648,8 +657,9 @@ Production paste imports now atomically persist Mode B analyses and register all
 unique Japanese surfaces without encounters, deduplicate exact bytes and deliver
 Created/Existing summaries. Native descriptor delivery and retained/background
 lifecycle are connected. TXT parsing, atomic storage and the Android multiple-file
-picker/encoding/summary path are connected. Pure SRT extraction is fixture-tested;
-EPUB parsing, file-import adapters and mixed-format batches remain unchecked.
+picker/encoding/summary path are connected. SRT extraction and atomic analyzed
+repository imports are fixture-tested; SRT worker/FFI, EPUB repository/runtime
+imports and mixed-format batches remain open.
 TXT background notifications use the platform-only
 foreground lease described above. Legacy imports
 are not automatically rescanned.

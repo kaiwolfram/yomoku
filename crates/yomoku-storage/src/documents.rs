@@ -206,7 +206,7 @@ pub(crate) fn load_paste_in(
                  FROM sources
                  JOIN chapters ON chapters.source_id = sources.id
                  JOIN chapter_texts ON chapter_texts.chapter_id = chapters.id
-                 WHERE sources.id = ?1 AND sources.kind IN ('paste', 'txt') AND chapters.chapter_index = 0",
+                 WHERE sources.id = ?1 AND sources.kind IN ('paste', 'txt', 'srt') AND chapters.chapter_index = 0",
             [i64::from(source_id)],
             |row| Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?)),
         )
