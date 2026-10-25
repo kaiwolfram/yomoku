@@ -2102,3 +2102,23 @@ shared per-file cancellation/COMMIT gate as TXT; all analysis/registration/cue r
 and provisional IDs roll back together. One canonical chapter fits the existing
 reader repositories; no subtitle timestamps are used for reading time. Worker,
 FFI, picker/summary and EPUB persistence remain separate continuation steps.
+
+
+## 2026-10-25 — Typed SRT worker and shared file cancellation
+
+Add `SrtImport`/`ImportSrt` alongside TXT, preserving existing enum variant order.
+Map shared decoder failures to SRT-specific wire errors; keep empty canonical cues
+separate from encoding failures. Preflight original-file identity before checking
+new metadata/decoding or loading Full, so even a different extension/encoding/blank
+new name cannot reinterpret an existing live file. Decode/parse new input before
+loading Full and drop preflight text before analysis; the repository repeats its
+authoritative lookup/parse inside the transaction. Reuse the FIFO analyzer/cache,
+ready-worker callback contract and Library summaries without encounters/time.
+
+Generalize the one accepted import's cancellation registry for TXT/SRT. Publish a
+fresh handle before enqueue; clear that exact handle before callbacks. Expose
+`cancel_file_import`/`cancelFileImport()` outside FIFO, retaining the existing TXT
+method as a delegating compatibility entry point for the current Android helper.
+Call off main and await both return/outcome before another file. No new dependency,
+schema, batch behavior or picker capability. Android dispatch handles reader-clock
+pause and typed error resources now; mixed-format selection remains separate.

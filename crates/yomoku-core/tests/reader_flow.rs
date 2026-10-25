@@ -548,6 +548,11 @@ fn leaving_library_or_starting_another_import_clears_the_previous_summary() {
             filename: "new.txt".into(),
             encoding: None,
         }),
+        Event::ImportSrt(yomoku_core::imports::SrtImport {
+            original_bytes: b"text".to_vec(),
+            filename: "new.srt".into(),
+            encoding: None,
+        }),
     ] {
         let core = Core::<Yomoku>::new();
         let mut effects = core.process_event(Event::CreatePaste("本文".into()));
@@ -2585,4 +2590,87 @@ fn selected_word_failure_survives_clock_saves_retries_explicitly_and_drains_befo
         StorageResult::ReaderStatusChanged(change, None),
     );
     assert_eq!(core.view().reader_word.unwrap().encountered, 0);
+}
+
+#[test]
+fn srt_import_waits_for_reader_saves_and_only_committed_success_returns_to_library() {
+    use yomoku_core::{
+        active_time::PendingReadingTime,
+        imports::{SrtImport, TextEncoding},
+    };
+    let input = SrtImport {
+        original_bytes: "猫".as_bytes().to_vec(),
+        filename: "book.srt".into(),
+        encoding: Some(TextEncoding::Utf8),
+    };
+    for completion in [false, true] {
+        let (core, _) = analyzed_reader();
+        let before = core.view().reader;
+        let saved = restore_time(&core, 10);
+        let mut effects = if completion {
+            core.process_event(forward(&core, 1234))
+        } else {
+            core.process_event(Event::CheckpointReadingTime(
+                yomoku_core::active_time::ReadingTimeUpdate {
+                    pending: PendingReadingTime::from_millis(100).unwrap(),
+                    ..saved.value
+                },
+            ))
+        };
+        assert!(core
+            .process_event(Event::ImportSrt(input.clone()))
+            .is_empty());
+        finish(
+            &core,
+            &mut effects,
+            StorageResult::Failed(DocumentError::Unavailable),
+        );
+        assert!(core
+            .process_event(Event::ImportSrt(input.clone()))
+            .is_empty());
+        assert_eq!(core.view().reader, before);
+    }
+    let core = Core::<Yomoku>::new();
+    core.process_event(Event::SelectDestination(Destination::Vocabulary));
+    let mut effects = core.process_event(Event::ImportSrt(input.clone()));
+    assert_eq!(
+        storage_operation(&effects),
+        StorageOperation::ImportSrt(input.clone())
+    );
+    assert!(core.view().import_summary.is_none());
+    finish(
+        &core,
+        &mut effects,
+        StorageResult::Failed(DocumentError::SrtEncodingRequired),
+    );
+    assert_eq!(core.view().destination, Destination::Vocabulary);
+    assert!(core.view().import_summary.is_none());
+    let mut effects = core.process_event(Event::ImportSrt(input));
+    let mut imported = document("猫");
+    imported.title = "book.srt".into();
+    finish(&core, &mut effects, StorageResult::Created(imported));
+    assert_eq!(core.view().destination, Destination::Library);
+    assert_eq!(core.view().content_route, ContentRoute::Main);
+    assert_eq!(core.view().import_summary.unwrap().title, "book.srt");
+    assert!(core.view().reader.is_none() && core.view().loaded_document.is_none());
+}
+
+#[test]
+fn cancelled_srt_clears_busy_without_an_error_summary_or_reader_movement() {
+    let (core, _) = analyzed_reader();
+    let before = core.view();
+    let mut effects = core.process_event(Event::ImportSrt(yomoku_core::imports::SrtImport {
+        original_bytes: b"cancelled".to_vec(),
+        filename: "cancelled.srt".into(),
+        encoding: None,
+    }));
+    assert!(core.view().storage_busy);
+    finish(&core, &mut effects, StorageResult::ImportCancelled);
+    let after = core.view();
+    assert!(!after.storage_busy);
+    assert!(after.document_error.is_none() && after.import_summary.is_none());
+    assert_eq!(after.documents, before.documents);
+    assert_eq!(after.reader, before.reader);
+    assert_eq!(after.destination, before.destination);
+    assert_eq!(after.content_route, before.content_route);
 }

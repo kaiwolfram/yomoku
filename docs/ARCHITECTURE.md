@@ -12,7 +12,7 @@ OpenReader has a separate storage operation that atomically resets finished book
 to page 1, retaining the permanent marker and pending durations. It tracks the
 requested document until its callback; leaving the route cancels opening without
 cancelling submitted I/O, including an accepted reset. LoadPaste stays read-only.
-Successful paste or TXT import returns to Library without opening the reader.
+Successful paste, TXT or SRT import returns to Library without opening the reader.
 StorageFinished is internal: both Serde and Facet skip it, so hosts cannot inject
 storage results. No SQL, paths, threads or platform I/O enter core.
 
@@ -47,7 +47,14 @@ loading validates the digest, contiguous indexes, scalar ranges and exact separa
 Cancellation uses the existing per-file commit gate, discarding partial rows/IDs
 while preserving earlier files. No reading events or time arise from import.
 The ready-analyzer/no-I/O/provisional-ID contract matches TXT; see DATA_MODEL.md.
-SRT worker/typed FFI and Android selection remain open.
+`Event::ImportSrt(SrtImport)` now carries original bytes/display name/optional
+encoding through the same reader-save gates and FIFO/JNI worker as TXT. Its
+read-only shared-file preflight bypasses Full for duplicates; new input is decoded
+and parsed before loading Full, then checked again in the authoritative transaction.
+SRT-specific errors distinguish uncertain/invalid/unsupported/undecodable/empty
+input; malformed timing with retained dialogue remains valid. Both paths reuse
+one worker-owned analyzer cache and one published per-file cancellation registry.
+Android selection remains open; the picker still accepts TXT only.
 
 TXT strict UTF-8/Shift-JIS decoding returns explicit uncertainty before any
 canonicalization; a selected encoding never silently falls back or replaces errors.
@@ -73,12 +80,14 @@ and off the UI thread because a COMMIT already in progress holds the gate. Use o
 fresh handle per attempt; no persistent queue or cross-file cancellation state.
 Production runtime now uses this cancellable entry point. The storage middleware
 publishes a fresh attempt synchronously before FIFO submission, then clears that
-exact attempt before resolving its result. `AnalyzerLifecycle::cancel_txt_import`
-and native `cancelTxtImport()` clone the current handle under a short registry lock
+exact attempt before resolving its result. `AnalyzerLifecycle::cancel_file_import`
+and native `cancelFileImport()` clone the current handle under a short registry lock
 and request cancellation directly, bypassing FIFO and core/bridge update locks.
 The registry lock is never held during COMMIT, cancellation or callbacks. Weak
 lifecycle ownership permits cancelling accepted work while a closed router drains
 without keeping its worker alive. Idle calls do not poison future attempts.
+The existing `cancel_txt_import`/`cancelTxtImport()` delegate to this shared control
+for compatibility with the current Android TXT helper.
 `StorageResult::ImportCancelled` clears core busy state without an error or summary;
 Created/Existing and typed failures keep their existing behavior. Cancellation
 does not forcibly stop a dictionary loader already running. Android invokes the
@@ -658,8 +667,8 @@ unique Japanese surfaces without encounters, deduplicate exact bytes and deliver
 Created/Existing summaries. Native descriptor delivery and retained/background
 lifecycle are connected. TXT parsing, atomic storage and the Android multiple-file
 picker/encoding/summary path are connected. SRT extraction and atomic analyzed
-repository imports are fixture-tested; SRT worker/FFI, EPUB repository/runtime
-imports and mixed-format batches remain open.
+repository/FIFO/typed JNI imports are verified; EPUB repository/runtime imports
+and Android mixed-format batches remain open.
 TXT background notifications use the platform-only
 foreground lease described above. Legacy imports
 are not automatically rescanned.

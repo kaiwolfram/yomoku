@@ -14,7 +14,7 @@ use crate::{
     },
     completion::{AnalyzedCompletionOutcome, CompletionNotice, PageCompletionIntent},
     document::{CompletionCommandId, DocumentId, LibraryDocument, PastedDocument, TextAnchor},
-    imports::TxtImport,
+    imports::{SrtImport, TxtImport},
     pagination::{LogicalPages, PageLength, ReadingPosition},
     reader::{ReaderAnalysis, ReaderPage, ReaderStatusChange, ReaderTokenKey, ReaderTokenSnapshot},
     reader::{ReaderWordDetails, ReaderWordSelection},
@@ -150,6 +150,7 @@ pub enum Event {
     DismissReaderWord,
     /// Per-file atomic import; success returns to Library with a summary.
     ImportTxt(TxtImport),
+    ImportSrt(SrtImport),
     #[serde(skip)]
     #[cfg_attr(feature = "facet_typegen", facet(skip))]
     StorageFinished(StorageResult),
@@ -402,6 +403,7 @@ impl App for Yomoku {
             Event::RefreshLibrary => Some(StorageOperation::List),
             Event::CreatePaste(text) => Some(StorageOperation::CreatePaste(text.clone())),
             Event::ImportTxt(input) => Some(StorageOperation::ImportTxt(input.clone())),
+            Event::ImportSrt(input) => Some(StorageOperation::ImportSrt(input.clone())),
             Event::LoadPaste(id) => Some(StorageOperation::LoadPaste(*id)),
             Event::OpenReader(id) => Some(StorageOperation::OpenReader(*id)),
             Event::LoadReaderTokens(key) => {
@@ -536,6 +538,7 @@ impl App for Yomoku {
                     | StorageOperation::OpenReader(_)
                     | StorageOperation::CreatePaste(_)
                     | StorageOperation::ImportTxt(_)
+                    | StorageOperation::ImportSrt(_)
                     | StorageOperation::SavePageLength(_)
                     | StorageOperation::SaveReadingPosition { .. }
                     | StorageOperation::PreparePageCompletion(_)
@@ -552,7 +555,10 @@ impl App for Yomoku {
             }
             if matches!(
                 event,
-                Event::CreatePaste(_) | Event::ImportTxt(_) | Event::OpenReader(_)
+                Event::CreatePaste(_)
+                    | Event::ImportTxt(_)
+                    | Event::ImportSrt(_)
+                    | Event::OpenReader(_)
             ) {
                 model.import_summary = None;
                 model.completion_notice = None;
@@ -562,6 +568,7 @@ impl App for Yomoku {
                 event,
                 Event::CreatePaste(_)
                     | Event::ImportTxt(_)
+                    | Event::ImportSrt(_)
                     | Event::LoadPaste(_)
                     | Event::OpenReader(_)
             ) {
@@ -884,6 +891,7 @@ impl App for Yomoku {
             Event::RefreshLibrary
             | Event::CreatePaste(_)
             | Event::ImportTxt(_)
+            | Event::ImportSrt(_)
             | Event::LoadPaste(_)
             | Event::OpenReader(_)
             | Event::LoadReaderWord(_)

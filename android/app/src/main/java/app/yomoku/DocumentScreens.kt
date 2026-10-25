@@ -311,4 +311,10 @@ internal fun DocumentError.messageResource(): Int =
         DocumentError.TXTUNSUPPORTEDENCODING -> R.string.error_txt_unsupported_encoding
         DocumentError.TXTUNDECODABLE -> R.string.error_txt_undecodable
         DocumentError.EMPTYTXT -> R.string.error_empty_txt
+        DocumentError.SRTENCODINGREQUIRED -> R.string.error_srt_encoding_required
+        DocumentError.SRTINVALIDUTF8 -> R.string.error_srt_invalid_utf8
+        DocumentError.SRTINVALIDSHIFTJIS -> R.string.error_srt_invalid_shift_jis
+        DocumentError.SRTUNSUPPORTEDENCODING -> R.string.error_srt_unsupported_encoding
+        DocumentError.SRTUNDECODABLE -> R.string.error_srt_undecodable
+        DocumentError.EMPTYSRT -> R.string.error_empty_srt
     }

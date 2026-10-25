@@ -46,6 +46,7 @@ fun main(args: Array<String>) {
     verifyTextBoundaries(args.single())
     verifyDocumentBridge()
     verifyTxtImportBridge()
+    verifySrtImportBridge()
     verifyReaderWordBridge()
     val deadline = System.nanoTime() + 10_000_000_000L
     while (listenerCount() != 0 && System.nanoTime() < deadline) Thread.sleep(5)

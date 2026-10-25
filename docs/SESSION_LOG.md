@@ -1583,3 +1583,24 @@
   worker/typed FFI, EPUB repository/runtime, mixed picker and reader assets/ruby;
   CI independent. App still paste/TXT. JNI/APK/lint/device/release/reboot/physical
   arm64 not rerun; no open blocker. Nostr empty/Q188 unchanged.
+
+
+## 2026-10-25 — SRT FIFO imports and typed JNI
+
+- Added SrtImport/ImportSrt, format-specific encoding/empty outcomes, lazy FIFO
+  preflight/atomic import and Library summaries with the existing reader-save gates.
+  Exact TXT/SRT duplicates preserve the first interpretation without loading Full.
+- Generalized direct cancellation to cancelFileImport(); retained the TXT alias.
+  One per-file registry covers queued/load/analysis/close races; committed files
+  survive and cancelled work adds no summary/error. Android error resources and
+  clock-pause dispatch compile; picker remains TXT-only.
+- PASS: 365 data-free Rust tests, strict Clippy/Rust+Kotlin fmt/diff, real-Full
+  Kotlin/JNI and Unicode exchanges, reproducible bindings, both-ABI debug/test APKs
+  and strict Android lint. Ten new worker/two core fixtures; two new JNI scenarios.
+  Corrected initial fixture table/range expectations and regenerated a stale native
+  comment; final checks pass. Gradle local sockets required approved escalation.
+- Updated README/plan/architecture/data/decisions/development/handoff. Next: EPUB
+  atomic chapters/assets/Mode B + runtime, mixed picker/summary/Cancel, reader
+  images/source ruby and CI. No new dependency/migration or open blocker.
+  Android device/instrumentation, standalone Full/index/Python, release, process-
+  death/reboot and physical arm64 not rerun. Nostr empty/Q188 unchanged.

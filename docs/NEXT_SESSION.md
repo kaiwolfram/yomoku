@@ -1,8 +1,8 @@
 # Resume here
-Updated: 2026-10-25. SRT repository verified; app imports remain paste/TXT.
+Updated: 2026-10-25. SRT FIFO/JNI verified; app picker remains paste/TXT.
 Read AGENTS.md, plan phases 2–4 and PRODUCT_SPEC.md sections 3–4.
 ## Working
-- Pure Crux owns routes/Library/Settings; only Render reaches UI. FIFO owns SQLite/analysis. Fresh sessions start Library. No I/O/SQL in core.
+- Pure Crux owns routes/Library/Settings; only Render reaches UI. FIFO owns SQLite/analysis; no core I/O. Fresh sessions start Library.
 - Exact UTF-8 position/Library percentage + five presets persist; reflow preserves
   offset. Scroll resets on navigation/reopen; column capped at 720dp. Next/Previous/
   counter below content; 48dp net horizontal swipes require no bottom. Previous
@@ -19,8 +19,8 @@ Read AGENTS.md, plan phases 2–4 and PRODUCT_SPEC.md sections 3–4.
   per lookup (performance unmeasured); base-only for now.
 - Compose requests after busy/pending saves clear through gated FIFO/JNI. Current/
   pending/result keys must match; refresh/movement/reflow invalidates snapshots.
-  Failed reads need Retry even when clock saves clear errors. UTF-8→UTF-16 checks
-  scalar/identity/clipped text; invalid is plain. Known/absent unhighlighted.
+  Failed reads need Retry despite clock saves. UTF-8→UTF-16 checks scalar/identity/
+  clipped text; invalid is plain. Known/absent unhighlighted.
 - SetReaderStatus validates loaded key/ID/time outside Settings. Atomic status/
   history updates repetitions; same-status no-op. Deleted IDs never register.
   Failure retains snapshot for explicit repeat; both outcomes drain final time.
@@ -43,7 +43,7 @@ Read AGENTS.md, plan phases 2–4 and PRODUCT_SPEC.md sections 3–4.
 - NativeBridge consumes owned verified FD+1; Rust rehashes/maps/closes all paths. FIFO releases analyzer in background; keep live Full inodes immutable.
 - Pinned 2026-10-25 JMdict English/JMnedict + sources/notices bundled; offline credits.
   Lazy FIFO index until close/query failure; load_reader_word reads B/statuses/count atomically;
-  all exact surface/base word/name metadata/restrictions retained. See architecture.
+  exact surface/base word/name metadata/restrictions retained; see architecture.
 - LoadReaderWord/DismissReaderWord reach typed JNI; full current/pending/selected
   token identity gates attach. Live statuses refresh repetitions. Errors survive
   clock saves; outcomes drain time. Close/recreation dismiss; late results cannot open.
@@ -60,21 +60,21 @@ Read AGENTS.md, plan phases 2–4 and PRODUCT_SPEC.md sections 3–4.
   cancelTxtImport() bypasses FIFO off main (COMMIT may wait). Silent rollback;
   winning commits stay. Android clears remaining/input, invalidates late reads and
   retires executors; waits BOTH native return + outcome, including draining close.
-  Registry clears before callbacks; name/number/summary retain on recreation.
 - Platform dataSync lease: counts/name, no queue/restart; OS limits apply. Encoding
   releases it; permission/denial never blocks, timeout stops before Cancel. Notices
   count processed/total; taps no reader. HOME/SIGKILL granted/denied preserve only commits.
-- SRT repo: strict shared UTF-8/Shift-JIS (no Aozora), original-file SHA-256,
-  filename/LF/cue ranges/Mode B/unique registrations atomic. TXT/SRT identical bytes
-  reuse first interpretation. Migration 0013/read-only source/Cancel; no encounters/time; runtime pending.
+- SRT repo/FIFO/JNI: strict shared UTF-8/Shift-JIS (no Aozora), original SHA-256,
+  filename/LF/cue ranges/Mode B/unique registrations atomic. TXT/SRT exact bytes reuse
+  first interpretation without Full. Typed errors/reader gates/Library summary;
+  cancelFileImport() bypasses FIFO, TXT alias retained; Android picker pending.
 - EPUB: bytes → spine chapters/title/UTF-8 formatting/ruby/links + image/cover bytes.
-  CSS ignored/U+FFFC images; bounded ZIP/XML/64-depth cap. No I/O/IDs/persistence.
-  Remote images/custom entities/fallback chains fail; no reader wiring.
+  CSS ignored/U+FFFC images; bounded ZIP/XML/64-depth; no persistence/reader.
 ## Next tasks (ordered)
-1. SRT FIFO/typed FFI imports; encoding outcomes, duplicate-no-Full, Cancel/isolation.
-2. EPUB atomic chapters/assets/Mode B + runtime; mixed picker/reader and CI follow.
+1. EPUB atomic chapters/assets/Mode B + runtime; preserve parser budgets/metadata.
+2. Mixed EPUB/TXT/SRT picker/summary/Cancel; reader images/ruby and CI follow.
 3. User-run physical arm64 validation once usable.
 ## Verification
-- PASS: 353 data-free Rust tests, Clippy/fmt/diff, storage both ABIs; Full 13+1 per loader.
-- Commands/env: DEVELOPMENT.md end. One corrected synthetic count; no open blocker.
-- JNI/APK/lint/device/release/reboot not rerun; arm64 unverified. Nostr empty/Q188; EPUB limits: DATA_MODEL.md.
+- PASS: 365 data-free Rust tests, Clippy/Rust+Kotlin fmt/diff; real-Full JNI,
+  reproducible bindings, both-ABI debug/test APKs and strict lint. Commands: DEVELOPMENT.md end.
+- Corrected fixture table/range; no blocker. Device/standalone Full/release/reboot not rerun;
+  physical arm64 unverified. Nostr empty/Q188. EPUB limits: DATA_MODEL.md.

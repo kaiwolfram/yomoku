@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use crate::active_time::{ReadingTimeUpdate, SavedReadingTime};
 use crate::completion::{AnalyzedCompletionOutcome, AnalyzedPageCompletion, PageCompletionIntent};
 use crate::document::{DocumentId, LibraryDocument, PastedDocument};
-use crate::imports::TxtImport;
+use crate::imports::{SrtImport, TxtImport};
 use crate::pagination::{PageLength, ReadingPosition};
 use crate::reader::{
     ReaderSnapshot, ReaderStatusChange, ReaderTokenKey, ReaderTokenSnapshot, ReaderVocabulary,
@@ -42,6 +42,7 @@ pub enum StorageOperation {
     SetReaderStatus(ReaderStatusChange),
     LoadReaderWord(ReaderWordSelection),
     ImportTxt(TxtImport),
+    ImportSrt(SrtImport),
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -61,6 +62,12 @@ pub enum DocumentError {
     TxtUnsupportedEncoding,
     TxtUndecodable,
     EmptyTxt,
+    SrtEncodingRequired,
+    SrtInvalidUtf8,
+    SrtInvalidShiftJis,
+    SrtUnsupportedEncoding,
+    SrtUndecodable,
+    EmptySrt,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -82,7 +89,7 @@ pub enum StorageResult {
     ReaderTokensLoaded(ReaderTokenSnapshot),
     ReaderWordLoaded(Box<ReaderWordDetails>),
     ReaderStatusChanged(ReaderStatusChange, Option<ReaderVocabulary>),
-    /// Cooperative TXT cancellation rolled back the current file, without error.
+    /// Cooperative file cancellation rolled back the current file, without error.
     ImportCancelled,
 }
 

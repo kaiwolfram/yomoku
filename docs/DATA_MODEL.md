@@ -78,8 +78,11 @@ rows while provenance/global statuses survive. Reimport creates fresh progress.
 A fresh shared `ImportCancellation` uses the same before/after-analysis checks and
 final commit gate as TXT. Cancellation rolls back the entire current file and IDs;
 a winning commit and earlier files stay. Statement/commit/analysis failures also
-roll back. The repository is ready for a worker adapter; SRT runtime/FFI/Android
-selection remain future work. The current app picker still accepts TXT only.
+roll back. The typed FIFO/JNI adapter now carries `SrtImport` and SRT-specific
+encoding/empty outcomes. It preflights exact duplicates and decoding before Full,
+then invokes the authoritative cancellable repository. Shared `cancelFileImport()`
+bypasses FIFO for either TXT/SRT; `cancelTxtImport()` remains a compatibility alias.
+The current app picker still accepts TXT only; Android SRT selection remains open.
 
 ## TXT canonical content and atomic file repository (migration 0012)
 

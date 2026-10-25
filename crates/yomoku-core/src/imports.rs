@@ -19,3 +19,12 @@ pub struct TxtImport {
     pub filename: String,
     pub encoding: Option<TextEncoding>,
 }
+
+/// Subtitle input uses the shared strict decoder without Aozora transformation.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
+pub struct SrtImport {
+    pub original_bytes: Vec<u8>,
+    pub filename: String,
+    pub encoding: Option<TextEncoding>,
+}

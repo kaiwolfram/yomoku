@@ -8,13 +8,16 @@ use std::{
 use yomoku_core::{
     analysis::ChapterAnalysis,
     document::{ChapterText, PasteText},
-    imports::{TextEncoding, TxtImport},
+    imports::{SrtImport, TextEncoding, TxtImport},
     storage::{DocumentError, StorageResult},
 };
-use yomoku_import::txt::{self, TextEncoding as Decoding, TxtError};
+use yomoku_import::{
+    srt,
+    txt::{self, TextEncoding as Decoding, TxtError},
+};
 use yomoku_storage::{
-    ImportCancellation, PasteImportError, PasteImportOutcome, Storage, StorageError,
-    TxtImportError, TxtImportOutcome,
+    ImportCancellation, PasteImportError, PasteImportOutcome, SrtImportError, SrtImportOutcome,
+    Storage, StorageError, TxtImportError, TxtImportOutcome,
 };
 
 use crate::storage::{map_error, Job};
@@ -43,16 +46,21 @@ pub type AnalyzerLoader = Box<dyn FnMut() -> Result<Box<dyn PasteAnalyzer>, Docu
 /// Keeping this handle alive does not retain a closed bridge's worker or callback.
 pub struct AnalyzerLifecycle {
     pub(crate) sender: Weak<mpsc::Sender<Job>>,
-    pub(crate) txt: Weak<TxtImportControl>,
+    pub(crate) file: Weak<FileImportControl>,
 }
 
 impl AnalyzerLifecycle {
-    /// Cancel the currently accepted TXT attempt directly, never through FIFO.
+    /// Compatibility entry point for existing TXT callers.
+    pub fn cancel_txt_import(&self) -> std::io::Result<()> {
+        self.cancel_file_import()
+    }
+
+    /// Cancel the currently accepted TXT/SRT attempt directly, never through FIFO.
     /// Call off the UI thread: an in-flight COMMIT can hold the per-file gate.
     /// Stop batch submission until this call and the import result both finish.
     /// A successful commit remains Created/Existing; idle calls are harmless.
-    pub fn cancel_txt_import(&self) -> std::io::Result<()> {
-        self.txt.upgrade().ok_or_else(worker_closed)?.cancel();
+    pub fn cancel_file_import(&self) -> std::io::Result<()> {
+        self.file.upgrade().ok_or_else(worker_closed)?.cancel();
         Ok(())
     }
 
@@ -72,9 +80,9 @@ impl AnalyzerLifecycle {
 /// waiting behind another FIFO job. Never hold this registry while taking the
 /// per-file commit gate or delivering callbacks.
 #[derive(Default)]
-pub(crate) struct TxtImportControl(Mutex<Option<Arc<ImportCancellation>>>);
+pub(crate) struct FileImportControl(Mutex<Option<Arc<ImportCancellation>>>);
 
-impl TxtImportControl {
+impl FileImportControl {
     pub(crate) fn begin(&self) -> Arc<ImportCancellation> {
         let attempt = Arc::new(ImportCancellation::default());
         *self.0.lock().unwrap_or_else(|error| error.into_inner()) = Some(attempt.clone());
@@ -198,6 +206,76 @@ impl Imports {
         }
     }
 
+    pub(crate) fn import_srt(
+        &mut self,
+        storage: &mut Storage,
+        input: &SrtImport,
+        cancellation: &ImportCancellation,
+    ) -> Result<StorageResult, DocumentError> {
+        if cancellation.is_cancelled() {
+            return Ok(StorageResult::ImportCancelled);
+        }
+        // Avoid dictionary extraction/loading for an existing file, including
+        // after background release or a fresh session. No title/encoding changes.
+        if let Some(document) = storage
+            .find_imported_file(&input.original_bytes)
+            .map_err(map_error)?
+        {
+            return Ok(if cancellation.is_cancelled() {
+                StorageResult::ImportCancelled
+            } else {
+                StorageResult::Existing(document)
+            });
+        }
+        if input.filename.trim().is_empty() {
+            return Err(DocumentError::InvalidDocument);
+        }
+        let selection = input.encoding.map(|encoding| match encoding {
+            TextEncoding::Utf8 => Decoding::Utf8,
+            TextEncoding::ShiftJis => Decoding::ShiftJis,
+        });
+        // Validate before loading Full and before acquiring the write lock.
+        // The repository parses again under its authoritative atomic lookup so
+        // concurrent creators cannot overwrite an existing interpretation.
+        {
+            let (_, decoded) =
+                txt::decode(&input.original_bytes, selection).map_err(map_srt_decode_error)?;
+            srt::parse(&decoded).map_err(|_| DocumentError::EmptySrt)?;
+        }
+        if cancellation.is_cancelled() {
+            return Ok(StorageResult::ImportCancelled);
+        }
+        if self.analyzer.is_none() {
+            self.analyzer = Some((self.loader)()?);
+        }
+        let analyzer = self.analyzer.as_mut().expect("loaded analyzer");
+        match storage.import_analyzed_srt_cancellable(
+            &input.original_bytes,
+            &input.filename,
+            selection,
+            registration_timestamp()?,
+            cancellation,
+            |chapter| analyzer.analyze(chapter),
+        ) {
+            Ok(None) => Ok(StorageResult::ImportCancelled),
+            Ok(Some(SrtImportOutcome::Created(imported))) => {
+                Ok(StorageResult::Created(imported.document))
+            }
+            Ok(Some(SrtImportOutcome::Existing(document))) => Ok(StorageResult::Existing(document)),
+            Err(SrtImportError::Decode(error)) => Err(map_srt_decode_error(error)),
+            Err(SrtImportError::Empty(_)) => Err(DocumentError::EmptySrt),
+            Err(SrtImportError::Analysis(error)) => {
+                self.analyzer = None;
+                Err(error)
+            }
+            Err(SrtImportError::Storage(StorageError::InvalidAnalysis)) => {
+                self.analyzer = None;
+                Err(DocumentError::InvalidDocument)
+            }
+            Err(SrtImportError::Storage(error)) => Err(map_error(error)),
+        }
+    }
+
     pub(crate) fn import(
         &mut self,
         storage: &mut Storage,
@@ -247,5 +325,16 @@ fn map_txt_error(error: TxtError) -> DocumentError {
         TxtError::UnsupportedEncoding => DocumentError::TxtUnsupportedEncoding,
         TxtError::Undecodable => DocumentError::TxtUndecodable,
         TxtError::EmptyText => DocumentError::EmptyTxt,
+    }
+}
+
+fn map_srt_decode_error(error: TxtError) -> DocumentError {
+    match error {
+        TxtError::EncodingRequired => DocumentError::SrtEncodingRequired,
+        TxtError::InvalidEncoding(Decoding::Utf8) => DocumentError::SrtInvalidUtf8,
+        TxtError::InvalidEncoding(Decoding::ShiftJis) => DocumentError::SrtInvalidShiftJis,
+        TxtError::UnsupportedEncoding => DocumentError::SrtUnsupportedEncoding,
+        TxtError::Undecodable => DocumentError::SrtUndecodable,
+        TxtError::EmptyText => DocumentError::EmptySrt,
     }
 }

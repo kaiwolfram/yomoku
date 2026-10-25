@@ -2498,3 +2498,53 @@ the final workspace run passes. No open failure/blocker or new dependency.
 Migration 0013 is live on open; no wire/core/Kotlin change. SRT worker/FFI/picker,
 EPUB persistence and mixed-format UI remain open. JNI/codegen/APK/Android lint/device,
 standalone index/Python suites, release/reboot and physical arm64 were not rerun.
+
+
+## SRT FIFO and typed JNI import checks
+
+Verified 2026-10-25 from the repository root with the Rust PATH/JDK/SDK/Gradle
+variables above:
+
+```sh
+cargo test --workspace --all-features --locked --offline --quiet
+cargo clippy --workspace --all-targets --all-features --locked --offline -- -D warnings
+cargo fmt --all -- --check
+tools/test-kotlin-bridge.sh
+cargo run -p yomoku-ffi --bin generate-kotlin --features facet_typegen --locked --offline -- target/generated/kotlin-repeat
+diff -r target/generated/kotlin target/generated/kotlin-repeat
+(cd crates/yomoku-ffi && CARGO_NET_OFFLINE=true ../../.local/bin/boltffi generate kotlin --deny-skipped --output ../../target/generated/native-repeat)
+diff -r target/generated/native target/generated/native-repeat
+tools/format-kotlin.sh --check
+./android/gradlew -p android :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug --offline --console=plain
+git diff --check
+```
+
+PASS: 365 data-free Rust tests (ten new worker, two core), strict Clippy/Rust+Kotlin
+formatting/diff, real-Full/word-index host Kotlin/JNI, seven Unicode exchanges,
+reproducible Crux/native bindings, both-ABI debug/test APK builds and strict lint.
+The ordinary workspace run retains fifteen ignored data-dependent fixtures.
+
+Worker fixtures cover format-specific encoding errors before Full, metadata-only
+empty subtitles, manual UTF-8/Shift-JIS retries, original bytes/cue anchors/Mode B,
+shared TXT/SRT identity in both directions, duplicate/reopen without Full, preserved
+statuses/position, each-write/deferred-COMMIT rollback and failed-file isolation.
+Shared race schedules exercise both TXT/SRT for queued work, blocked Full loading,
+blocked analysis, double Cancel/rejected callbacks, background release, fresh retry
+and closed-router draining. Core fixtures gate pending reader saves and clear
+cancelled attempts without summary/error/movement. The new real JNI cases verify
+SRT canonicalization/encodings, Japanese registrations/live statuses, duplicate/
+reopen without Full and generic Cancel on another JVM thread while the dictionary
+provider blocks. Existing TXT/reader/dictionary/bridge regressions also pass.
+
+Initial new fixtures used the wrong cue-table name and miscounted a supplementary
+Unicode range; corrected expectations to subtitle_cues and exact UTF-8 byte length.
+One repeat-generation comparison saw an intervening native doc-comment edit;
+regeneration through the app build produces identical bindings. Gradle initially
+failed sandbox wildcard-IP/local-socket setup; the approved offline run passes.
+Existing benign Crux close diagnostics persist. No open failure/blocker.
+
+No new dependency/version or migration. App picker remains TXT-only; SRT is callable
+through typed FIFO/JNI and uses the current Library/reader repositories. Android
+instrumentation/device, standalone Full/index/Python suites, release, process-death/
+reboot, tablet/dark and physical arm64 were not rerun. Next: EPUB persistence/runtime,
+then mixed EPUB/TXT/SRT picker/summary/Cancel and reader images/source ruby.
