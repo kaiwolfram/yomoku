@@ -107,7 +107,8 @@ position/encounter history. Keep incremental builds green.
 - [ ] Extend original-file identity and per-file runtime imports to EPUB/SRT; test existing references and failed-file isolation at the worker boundary.
 - [x] Wire Android multiple-TXT picker, retained encoding choice and per-file summary returning to Library; two API-36 x86_64 tests verify duplicate references, read/decode/unsupported-file failures, later-file continuation, explicit UTF-8/Shift-JIS/Skip, persisted encoding, summary scrolling/recreation/dismissal, picker cancellation and recreation/background without auto-opening.
 - [ ] Extend Android picker and batch summary to mixed supported EPUB/TXT/SRT files; test mixed formats/failures, never auto-opening reader.
-- [ ] Add progress/current-file/X-of-N, cancellation and permitted background notifications; test retained completed imports, discarded current partial and no process-death auto-resume.
+- [x] Add retained TXT batch progress/current-file/X-of-N. Five API-36 x86_64 picker/navigation tests verify the display name during a blocked provider read, recreation/background retention, processed-file progress across successes/duplicates/failures/skips, unchanged encoding-prompt counts and dismissal reset. No time/byte progress estimate.
+- [ ] Add transaction-aware batch cancellation and permitted background progress/completion notifications; test retained completed imports, discarded current partial and no process-death auto-resume.
 - [ ] Add Library title search/sorts, icons/covers and distinct-surface five-status bar; test global status changes and unopened ordering.
 - [ ] Add rename and confirmed single/bulk/Select All document deletion; test preserved history/vocabulary and fresh progress/checkmark on reimport.
 

@@ -8,7 +8,9 @@ import android.content.IntentFilter
 import android.database.sqlite.SQLiteDatabase
 import android.net.Uri
 import android.util.Base64
+import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertRangeInfoEquals
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
@@ -118,22 +120,38 @@ class TxtPickerTest {
             assertEquals(R.string.import_file_unreadable, retained.results[2].message)
             assertEquals(R.string.import_txt_only, retained.results[3].message)
             assertEquals(DocumentError.TXTUNDECODABLE, retained.results[4].error)
+            assertEquals(9, retained.totalFiles)
+            assertEquals(6, retained.currentFileNumber)
+            compose.onNodeWithText("File 6 of 9").assertIsDisplayed()
+            compose.onNodeWithText("Processed: 5 of 9").assertIsDisplayed()
+            compose
+                .onNodeWithTag("txt_import_progress")
+                .assertRangeInfoEquals(ProgressBarRangeInfo(5f / 9f, 0f..1f))
             compose.onNodeWithText("UTF-8").assertIsDisplayed()
             compose.activityRule.scenario.recreate()
             assertSame(retained, owner().txtImports)
             compose.activityRule.scenario.moveToState(Lifecycle.State.CREATED)
             compose.activityRule.scenario.moveToState(Lifecycle.State.RESUMED)
+            compose.onNodeWithText("File 6 of 9").assertIsDisplayed()
+            compose.onNodeWithText("Processed: 5 of 9").assertIsDisplayed()
             compose.onNodeWithText("UTF-8").performClick()
             compose.waitUntil(30_000) {
                 retained.choosingEncoding && retained.filename == "$prefix-skip.txt"
             }
+            compose.onNodeWithText("File 7 of 9").assertIsDisplayed()
+            compose.onNodeWithText("Processed: 6 of 9").assertIsDisplayed()
             compose.onNodeWithText("Skip file").performClick()
             compose.waitUntil(30_000) {
                 retained.choosingEncoding && retained.filename == "$prefix-shift.txt"
             }
+            compose.onNodeWithText("File 8 of 9").assertIsDisplayed()
+            compose.onNodeWithText("Processed: 7 of 9").assertIsDisplayed()
             compose.onNodeWithText("Shift-JIS").performClick()
             compose.waitUntil(30_000) { !retained.active && retained.results.size == 9 }
             awaitIdle()
+            assertEquals(0, retained.currentFileNumber)
+            assertEquals(1f, retained.progress)
+            assertEquals("", retained.filename)
             assertEquals(ImportOutcome.CREATED, retained.results[5].outcome)
             assertEquals(R.string.import_file_skipped, retained.results[6].message)
             assertEquals(ImportOutcome.CREATED, retained.results[7].outcome)
@@ -186,10 +204,63 @@ class TxtPickerTest {
             assertEquals(9, owner().txtImports.results.size)
             compose.onNodeWithTag("txt_import_summary").assertIsDisplayed()
             compose.onNodeWithText("Close").performClick()
+            assertEquals(0, retained.totalFiles)
+            assertEquals(0f, retained.progress)
             compose.activityRule.scenario.recreate()
             compose.onNodeWithTag("txt_import_summary").assertDoesNotExist()
         } finally {
             instrumentation.removeMonitor(monitor)
+        }
+    }
+
+    @Test
+    fun currentDisplayNameAndProgressSurviveRecreationDuringBlockedProviderRead() {
+        awaitIdle()
+        val token = "slow-${System.nanoTime()}"
+        val uri =
+            Uri.Builder()
+                .scheme("content")
+                .authority("app.yomoku.test.txt-fixtures")
+                .appendPath(token)
+                .appendQueryParameter("name", "$token.txt")
+                .appendQueryParameter("gate", token)
+                .appendQueryParameter(
+                    "bytes",
+                    "wqk=",
+                ) // Ambiguous UTF-8/Shift-JIS, no import needed.
+                .build()
+        val resolver = instrumentation.targetContext.contentResolver
+        try {
+            compose.runOnIdle { owner().txtImports.start(listOf(uri)) }
+            compose.waitUntil(30_000) { owner().txtImports.filename == "$token.txt" }
+            val retained = owner().txtImports
+            assertTrue(retained.active)
+            assertFalse(retained.choosingEncoding)
+            compose.onNodeWithText("$token.txt").assertIsDisplayed()
+            compose.onNodeWithText("File 1 of 1").assertIsDisplayed()
+            compose.onNodeWithText("Processed: 0 of 1").assertIsDisplayed()
+            compose
+                .onNodeWithTag("txt_import_progress")
+                .assertRangeInfoEquals(ProgressBarRangeInfo(0f, 0f..1f))
+            compose.activityRule.scenario.recreate()
+            assertSame(retained, owner().txtImports)
+            compose.onNodeWithText("$token.txt").assertIsDisplayed()
+            compose.onNodeWithText("Processed: 0 of 1").assertIsDisplayed()
+            resolver.call(uri, "release", token, null)
+            compose.waitUntil(30_000) { retained.choosingEncoding }
+            compose.onNodeWithText("File 1 of 1").assertIsDisplayed()
+            compose.onNodeWithText("Processed: 0 of 1").assertIsDisplayed()
+            compose.onNodeWithText("Skip file").performClick()
+            compose.waitUntil(30_000) { !retained.active }
+            awaitIdle()
+            assertEquals(1, retained.results.size)
+            assertEquals(R.string.import_file_skipped, retained.results.single().message)
+            assertEquals(1f, retained.progress)
+            compose.onNodeWithText("Close").performClick()
+            assertEquals(0, retained.totalFiles)
+            assertEquals(0f, retained.progress)
+        } finally {
+            resolver.call(uri, "release", token, null)
         }
     }
 

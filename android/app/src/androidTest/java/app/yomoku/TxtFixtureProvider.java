@@ -6,14 +6,20 @@ import android.database.Cursor;
 import android.database.MatrixCursor;
 import android.net.Uri;
 import android.os.Looper;
+import android.os.Bundle;
 import android.os.ParcelFileDescriptor;
 import android.provider.OpenableColumns;
 import android.util.Base64;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 
 /** Test APK providers run without the target APK's Kotlin runtime. Keep this fixture standalone. */
 public final class TxtFixtureProvider extends ContentProvider {
+    private final ConcurrentHashMap<String, CountDownLatch> gates = new ConcurrentHashMap<>();
+
     @Override
     public boolean onCreate() {
         return true;
@@ -28,7 +34,8 @@ public final class TxtFixtureProvider extends ContentProvider {
     public Cursor query(Uri uri, String[] projection, String selection, String[] args, String sort) {
         requireWorker();
         MatrixCursor cursor = new MatrixCursor(new String[] {OpenableColumns.DISPLAY_NAME});
-        cursor.addRow(new Object[] {uri.getLastPathSegment()});
+        String name = uri.getQueryParameter("name");
+        cursor.addRow(new Object[] {name == null ? uri.getLastPathSegment() : name});
         return cursor;
     }
 
@@ -45,8 +52,13 @@ public final class TxtFixtureProvider extends ContentProvider {
             new Thread(() -> {
                 try (ParcelFileDescriptor.AutoCloseOutputStream output =
                         new ParcelFileDescriptor.AutoCloseOutputStream(pipe[1])) {
+                    String gate = uri.getQueryParameter("gate");
+                    if (gate != null && !gates.computeIfAbsent(gate, key -> new CountDownLatch(1))
+                            .await(30, TimeUnit.SECONDS)) {
+                        throw new IOException("Test read gate timed out");
+                    }
                     output.write(bytes);
-                } catch (IOException error) {
+                } catch (IOException | InterruptedException error) {
                     throw new IllegalStateException(error);
                 }
             }).start();
@@ -54,6 +66,15 @@ public final class TxtFixtureProvider extends ContentProvider {
         } catch (IOException error) {
             throw new FileNotFoundException(error.toString());
         }
+    }
+
+    @Override
+    public Bundle call(String method, String arg, Bundle extras) {
+        if (!"release".equals(method) || arg == null) {
+            throw new UnsupportedOperationException("Unknown fixture operation");
+        }
+        gates.computeIfAbsent(arg, key -> new CountDownLatch(1)).countDown();
+        return Bundle.EMPTY;
     }
 
     private static void requireWorker() {

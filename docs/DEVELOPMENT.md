@@ -2175,3 +2175,37 @@ No Rust/FFI/schema/dependency change. Host Rust/Clippy/JNI/generation, standalon
 Full/Python/full-index scans, tablet/dark, release app, separate process/reboot
 recovery and physical arm64 were not rerun. Progress counts, transaction-aware
 batch cancellation, background notifications, EPUB/SRT and reader ruby remain.
+
+
+## Retained TXT current-file and batch progress
+
+Verified 2026-10-25 with the Rust PATH/JDK/SDK/Gradle variables above:
+
+```sh
+tools/format-kotlin.sh --check
+./android/gradlew -p android :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug --offline --console=plain
+./android/gradlew -p android :app:connectedDebugAndroidTest :app:lintDebug -Pandroid.testInstrumentationRunnerArguments.class=app.yomoku.TxtPickerTest,app.yomoku.NavigationTest --offline --console=plain
+git diff --check
+```
+
+PASS: both-ABI debug/test APK builds, strict lint, Kotlin formatting/diff and all
+five API-36 x86_64 phone/light picker/navigation tests. Reports copied to
+`.local/test-reports/txt-progress/phone/{report,results}/`.
+
+The new test-only gated pipe keeps an actual ContentResolver byte read blocked;
+the queried display name (different from the URI segment), File 1 of 1 and zero
+processed progress remain visible through Activity recreation. Releasing the gate
+reaches the retained encoding prompt without advancing the count; Skip completes
+one outcome. The nine-file fixture now asserts 5/9, 6/9 and 7/9 processed outcomes,
+including duplicates, read/format/decode failures and skips; encoding choice and
+background/recreation retain the count, and summary dismissal resets it. Existing
+picker cancellation and navigation/native-session lifecycle regressions pass.
+
+The initial lint run rejected count wording as a plural candidate; use the
+quantity-neutral “Processed: X of N” label. Final lint passes. Gradle local socket
+setup needed sandbox escalation for the connected run. No new dependency/version,
+permission, Rust/wire/schema change, open failure or blocker. AVD left running.
+Rust/Clippy/JNI/generation, Full fixtures, Python/full-index scans, tablet/dark,
+release app, actual process-death/reboot and physical arm64 were not rerun.
+Cancellation with current-transaction rollback, permitted background notifications
+and process-death/no-auto-resume acceptance remain unchecked.

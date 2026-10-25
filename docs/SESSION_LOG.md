@@ -1423,3 +1423,21 @@
   Python/index/release/process/reboot/tablet/arm64 not rerun this UI slice. Next:
   progress/current-file/X-of-N, transaction-aware cancellation/background notices,
   then EPUB/SRT. Nostr empty; ask Q188 before forwarding.
+
+
+## 2026-10-25 — Retained TXT current-file and batch progress
+
+- Added File X of N, queried filename before original-byte reads and a determinate
+  processed-files bar to the retained import dialog, including encoding prompts.
+  Terminal successes/duplicates/errors/skips advance once; retries do not. Counts
+  reset on dismissal/new batches. No time/byte progress or persistence claim.
+- PASS: both-ABI debug/test APK builds, strict Android lint, Kotlin formatting/diff
+  and all five API-36 x86_64 picker/navigation tests. Added a gated pipe/recreation
+  fixture and extended the mixed-outcome nine-file fixture with progress semantics.
+  Reports: `.local/test-reports/txt-progress/phone/`.
+- Fixed initial lint count wording; connected Gradle sockets required escalation.
+  No new dependency, permission, Rust/wire/schema change or open blocker. AVD left
+  running. Rust/JNI/Full/Python/index/tablet/release/process/arm64 not rerun.
+- Updated README/architecture/decisions/plan/development/handoff. Next:
+  transaction-aware Cancel retaining earlier commits, then permitted background
+  notifications/process-death acceptance. EPUB/SRT remain next; Nostr empty/Q188.

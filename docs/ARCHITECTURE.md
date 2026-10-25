@@ -45,9 +45,13 @@ platform executor queries literal display names and reads original bytes, reject
 non-TXT extensions with a per-file result. Only current-file bytes are retained.
 Uncertain encoding offers UTF-8/Shift-JIS or Skip; errors never abort later files.
 Modal encoding/import state and scrollable batch summaries survive recreation,
-returning to Library without opening a reader. No URI queue/results are persisted;
+returning to Library without opening a reader. Current filename and File X of N
+remain visible during reads/imports/encoding choices. Batch progress is terminal
+outcomes / selected URIs (including errors, duplicates and skips); prompts/retries
+do not advance it. Display names publish before potentially blocked provider reads.
+No URI queue/results/progress are persisted;
 final owner teardown stops unsubmitted work while core drains accepted transactions.
-No new permission, dependency or schema. Progress counts, cancellation, background
+No new permission, dependency or schema. Cancellation, background
 notifications, EPUB/SRT and source-ruby rendering remain separate.
 
 Pure document values define positive i64 identities, immutable chapter snapshots,

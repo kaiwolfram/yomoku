@@ -1,5 +1,7 @@
 <resources>
     <string name="import_txt">Import TXT files</string>
+    <string name="import_current_file">File %1$d of %2$d</string>
+    <string name="import_files_processed">Processed: %1$d of %2$d</string>
     <string name="import_summary_title">Import summary</string>
     <string name="import_file_created">Imported</string>
     <string name="import_file_unreadable">Could not read this file. Select it again to retry.</string>

@@ -1,5 +1,5 @@
 # Resume here
-Updated: 2026-10-25. Verified Android multiple-TXT picker/encoding/summary.
+Updated: 2026-10-25. Verified retained TXT batch progress/current filename/X-of-N.
 Read AGENTS.md, plan phases 2–4 and PRODUCT_SPEC.md sections 3–4.
 ## Working
 - Pure Crux owns navigation/Library/Settings; only Render reaches UI. FIFO owns
@@ -62,18 +62,19 @@ Read AGENTS.md, plan phases 2–4 and PRODUCT_SPEC.md sections 3–4.
   ImportTxt(bytes, display name, optional encoding) reaches lazy FIFO/typed JNI.
   Read-only duplicates skip decode/Full after reopen; new parsing validates before
   Full and repeats under authoritative transaction. Reader-save gates/clock apply.
-- Android multiple-TXT picker reads one URI off-main at a time; retained helper
-  sequences atomic imports. UTF-8/Shift-JIS/Skip, per-file failures and duplicate
-  references show a scrollable Library summary. Recreation retains choice/results;
-  final teardown drops unsubmitted work; no persisted queue. No reader ruby yet.
+- Android multiple-TXT picker reads one URI off-main; retained helper sequences
+  atomic imports/UTF-8/Shift-JIS/Skip. Filename/X-of-N + processed-files bar survive
+  recreation/background; errors/duplicates/skips count, encoding retries do not.
+  Scrollable Library summary retains results. Teardown drops unsubmitted work;
+  no persisted queue/progress or reader ruby. Display name publishes before bytes.
 ## Next tasks (ordered)
-1. Batch progress/current-file/X-of-N, cancel with current-partial rollback and
-   permitted background notifications; test no process-death auto-resume.
+1. Cancel with current-partial transaction rollback; retain completed imports.
+   Then permitted background notifications + process-death/no-auto-resume test.
 2. EPUB/SRT parsers and original-file runtime imports; CI/custom entries independent.
 3. User-run physical arm64 validation once usable.
 ## Verification
-- PASS: both-ABI debug/test builds, strict lint, Kotlin fmt/diff and two new API-36
-  x86_64 picker tests; import/session and paste/navigation regressions also run.
+- PASS this slice: both-ABI debug/test APKs, strict lint, Kotlin fmt/diff; all five
+  API-36 x86_64 picker/navigation tests including blocked-read/name/progress.
 - Prior Rust/JNI baseline: 293 tests/Clippy/fmt/Full/index/Unicode/codegen; not rerun.
-- Commands/reports: DEVELOPMENT.md last section; host JNI/Android builds sequential.
+- Commands/reports: DEVELOPMENT.md last section; no Rust/JNI/process-death rerun.
 - AVD running; no blocker/new package/migration. Nostr empty; ask Q188 before forwarding.

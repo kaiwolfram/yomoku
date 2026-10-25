@@ -43,6 +43,17 @@ internal class TxtImports(private val resolver: ContentResolver, private val cor
     var filename by mutableStateOf("")
         private set
 
+    var totalFiles by mutableStateOf(0)
+        private set
+
+    val currentFileNumber: Int
+        get() = if (active) results.size + 1 else 0
+
+    // Count terminal outcomes, including errors, duplicates and skips. Never estimate
+    // byte/analyzer progress or count an encoding prompt/retry as a completed file.
+    val progress: Float
+        get() = if (totalFiles == 0) 0f else results.size.toFloat() / totalFiles
+
     var encodingError: DocumentError? by mutableStateOf(null)
         private set
 
@@ -68,6 +79,7 @@ internal class TxtImports(private val resolver: ContentResolver, private val cor
         )
             return
         results = emptyList()
+        totalFiles = uris.size
         core.dispatch(Event.DismissImportSummary)
         queue.addAll(uris)
         active = true
@@ -80,12 +92,13 @@ internal class TxtImports(private val resolver: ContentResolver, private val cor
         encodingError = null
         if (queue.isEmpty()) {
             active = false
+            filename = ""
             // Clear the last file's transient error; each result remains in the batch summary.
             core.dispatch(Event.RefreshLibrary)
             return
         }
         val uri = queue.removeFirst()
-        filename = ""
+        filename = uri.lastPathSegment.orEmpty()
         reader.execute {
             var name = uri.lastPathSegment.orEmpty()
             val loaded =
@@ -97,6 +110,9 @@ internal class TxtImports(private val resolver: ContentResolver, private val cor
                                 if (cursor.moveToFirst()) cursor.getString(0) else null
                             }
                             ?.takeIf { it.isNotBlank() } ?: error("Missing display name")
+                    // Publish the display name before a potentially slow provider read.
+                    val displayName = name
+                    handler.post { if (!closed) filename = displayName }
                     if (!name.endsWith(".txt", ignoreCase = true)) {
                         null
                     } else {
@@ -181,7 +197,10 @@ internal class TxtImports(private val resolver: ContentResolver, private val cor
 
     fun dismissSummary() {
         checkMainThread()
-        if (!active) results = emptyList()
+        if (!active) {
+            results = emptyList()
+            totalFiles = 0
+        }
     }
 
     override fun close() {

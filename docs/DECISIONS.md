@@ -1852,3 +1852,22 @@ Rust import. Progress counts, cancellation with current-transaction rollback,
 background service/notifications, EPUB/SRT and reader ruby remain separate tasks.
 Existing in-process background worker behavior supplies no process-survival guarantee.
 Large-file heap use and provider-read latency are unmeasured.
+
+## 2026-10-25 — File-count TXT batch progress
+
+Keep the selected-file total in the existing retained Android helper and derive
+File X of N from terminal results plus the current file. The determinate bar uses
+processed files / total selected files: Created, Existing, errors and Skip each
+advance once; encoding prompts and retries do not advance. This measures batch
+outcomes, not elapsed time, bytes or analyzer progress. Clear counts on summary
+dismissal and reset for each accepted batch. Publish the queried display name on
+main before reading original bytes, with the URI's last segment as a temporary
+fallback. No I/O, transaction, permission or process-survival semantics change.
+
+Use the existing pinned Material3 determinate `LinearProgressIndicator` lambda
+API, checked against the [official Compose progress guide](https://developer.android.com/develop/ui/compose/components/progress).
+No dependency/version adoption. A test-only gated pipe provider verifies the name
+and zero progress while a real ContentResolver read blocks, including recreation;
+the mixed-outcome nine-file fixture verifies counted outcomes and retained choices.
+Transaction-aware cancellation, permitted background notifications and actual
+process-death acceptance remain separate unchecked work.

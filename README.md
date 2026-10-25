@@ -15,7 +15,8 @@ Yomoku is under active development. The working app supports:
   import summary. Imports analyze Japanese text in Sudachi Mode B and register
   unique Japanese word surfaces without changing existing vocabulary statuses.
 - Selecting multiple TXT files with UTF-8/Shift-JIS encoding choices, per-file
-  failures/duplicates and a retained import summary returning to Library.
+  failures/duplicates, current-file/batch progress and a retained import summary
+  returning to Library.
 - Opening imported text in a centered, scrollable reader, with saved text
   positions and Library progress percentages.
 - Five persisted logical page-length presets: 250, 500, 750, 1,000 and 1,500
@@ -76,8 +77,8 @@ Aozora ruby/directive handling. Original-file SHA-256 deduplication, original by
 canonical text/ruby, Mode B analysis and vocabulary registration commit together.
 Typed errors support encoding retries; duplicates skip analyzer loading even after
 reopen. Android now connects multiple-TXT selection, encoding choices and per-file
-summaries. Progress counts, cancellation/background notifications and reader ruby
-rendering remain planned.
+summaries and current-file/batch progress. Cancellation/background notifications
+and reader ruby rendering remain planned.
 
 ## Repository layout
 

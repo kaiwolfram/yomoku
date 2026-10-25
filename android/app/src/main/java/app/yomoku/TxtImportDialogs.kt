@@ -29,7 +29,25 @@ internal fun TxtImportDialogs(imports: TxtImports) {
             title = { Text(stringResource(R.string.import_txt)) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(
+                        stringResource(
+                            R.string.import_current_file,
+                            imports.currentFileNumber,
+                            imports.totalFiles,
+                        )
+                    )
                     Text(imports.filename)
+                    Text(
+                        stringResource(
+                            R.string.import_files_processed,
+                            imports.results.size,
+                            imports.totalFiles,
+                        )
+                    )
+                    LinearProgressIndicator(
+                        progress = { imports.progress },
+                        modifier = Modifier.fillMaxWidth().testTag("txt_import_progress"),
+                    )
                     if (imports.choosingEncoding) {
                         Text(stringResource(checkNotNull(imports.encodingError).messageResource()))
                         TextButton(onClick = { imports.selectEncoding(TextEncoding.UTF8) }) {
@@ -38,8 +56,6 @@ internal fun TxtImportDialogs(imports: TxtImports) {
                         TextButton(onClick = { imports.selectEncoding(TextEncoding.SHIFTJIS) }) {
                             Text("Shift-JIS")
                         }
-                    } else {
-                        LinearProgressIndicator(Modifier.fillMaxWidth().testTag("txt_import_busy"))
                     }
                 }
             },
