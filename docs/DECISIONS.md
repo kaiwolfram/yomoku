@@ -2122,3 +2122,35 @@ method as a delegating compatibility entry point for the current Android helper.
 Call off main and await both return/outcome before another file. No new dependency,
 schema, batch behavior or picker capability. Android dispatch handles reader-clock
 pause and typed error resources now; mixed-format selection remains separate.
+
+## 2026-10-26 — Atomic EPUB repository before multi-chapter transport
+
+Keep the bounded pure parser as the only EPUB canonicalizer. Save its ordered
+spine chapters without flattening them, retaining metadata title/filename fallback,
+source ruby, overlapping formatting/link ranges, image placeholders/alt and original
+image bytes. Reuse source/chapter IDs and source_ruby; asset identity is the live
+DocumentId plus normalized container path, shared by cover/repeated placements.
+Normalized SQLite rows retain parser output without serializing its Rust layout.
+Saved counts/digests detect missing chapters/annotations/assets and damaged content
+on read; read-only loading never reparses the ZIP or repairs stored content.
+
+Migration 0014 follows the established source-table rebuild and widens the existing
+original-file encoding discriminator with an EPUB container marker. Preserve old
+file hashes/bytes/encodings, IDs, foreign keys and source high-water marks. One
+immediate transaction creates all chapters/assets, each original validated Mode B
+and unique registrations. Factor analyzed-chapter registration out of the existing
+single-text composition rather than manufacture single-text EPUB snapshots. Reuse
+the cooperative per-file cancellation/COMMIT gate. Later-chapter failures discard
+earlier provisional chapters/registrations/IDs; committed prior files stay intact.
+
+Add a format-independent file-ID preflight and return Existing(DocumentId) from
+the EPUB repository. This references an earlier TXT/SRT interpretation without
+decoding/analysis or a misleading single-chapter payload. The historical single-text
+preflight/results and reader APIs still reject EPUB. Generalize their transport,
+reader completion/time/tokens and whole-book finish semantics before connecting
+EPUB FIFO/JNI or Android selection. Library percentage now sums all canonical
+chapter bytes with preceding-chapter offsets and rejects incomplete/foreign chapters.
+
+No new production dependency/version or wire/UI behavior. Shared test archives
+reuse the already pinned zip 8.6.0 as a dev dependency in storage/analysis; no new
+lockfile packages. No permission, queue, rendering or data-destructive semantic change.

@@ -7,6 +7,7 @@ mod completions;
 pub mod dictionary;
 mod documents;
 mod encounters;
+mod epub;
 mod files;
 mod import_cancellation;
 mod imports;
@@ -18,6 +19,9 @@ mod srt;
 mod txt;
 mod vocabulary;
 
+pub use epub::{
+    AnalyzedEpub, EpubImportError, EpubImportOutcome, StoredEpubChapter, StoredEpubDocument,
+};
 pub use import_cancellation::ImportCancellation;
 pub use imports::{AnalyzedPaste, PasteImportError, PasteImportOutcome};
 pub use reading_time::SavedReadingTime;
@@ -99,6 +103,11 @@ const MIGRATIONS: &[Migration] = &[
         version: 13,
         name: "0013_srt_imports",
         sql: include_str!("../migrations/0013_srt_imports.sql"),
+    },
+    Migration {
+        version: 14,
+        name: "0014_epub_imports",
+        sql: include_str!("../migrations/0014_epub_imports.sql"),
     },
 ];
 

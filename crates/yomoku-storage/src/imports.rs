@@ -4,7 +4,7 @@ use rusqlite::{Connection, OptionalExtension, TransactionBehavior};
 use sha2::{Digest, Sha256};
 use yomoku_core::{
     analysis::{ChapterAnalysis, SplitMode},
-    document::{AnalysisId, ChapterText, DocumentId, PasteText, PastedDocument},
+    document::{AnalysisId, ChapterId, ChapterText, DocumentId, PasteText, PastedDocument},
     vocabulary::Surface,
 };
 
@@ -165,10 +165,29 @@ pub(crate) fn store_analyzed_document_in(
     registered_at_unix_ms: i64,
     analysis: &ChapterAnalysis,
 ) -> Result<AnalyzedPaste, StorageError> {
+    let (analysis_id, registered_surfaces) = store_analyzed_chapter_in(
+        connection,
+        document.chapter.chapter_id,
+        registered_at_unix_ms,
+        analysis,
+    )?;
+    Ok(AnalyzedPaste {
+        document,
+        analysis_id,
+        registered_surfaces,
+    })
+}
+
+pub(crate) fn store_analyzed_chapter_in(
+    connection: &Connection,
+    chapter_id: ChapterId,
+    registered_at_unix_ms: i64,
+    analysis: &ChapterAnalysis,
+) -> Result<(AnalysisId, usize), StorageError> {
     if analysis.mode != SplitMode::B {
         return Err(StorageError::InvalidAnalysis);
     }
-    let analysis_id = store_chapter_analysis_in(connection, document.chapter.chapter_id, analysis)?;
+    let analysis_id = store_chapter_analysis_in(connection, chapter_id, analysis)?;
     let surfaces = analysis
         .tokens
         .iter()
@@ -177,11 +196,7 @@ pub(crate) fn store_analyzed_document_in(
         .collect::<Result<BTreeSet<_>, _>>()
         .map_err(|_| StorageError::InvalidAnalysis)?;
     let registered_surfaces = register_vocabulary_in(connection, &surfaces, registered_at_unix_ms)?;
-    Ok(AnalyzedPaste {
-        document,
-        analysis_id,
-        registered_surfaces,
-    })
+    Ok((analysis_id, registered_surfaces))
 }
 
 fn insert_paste_hash_in(

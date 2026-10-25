@@ -1676,6 +1676,7 @@ dependencies = [
  "sudachi",
  "yomoku-core",
  "yomoku-storage",
+ "zip",
 ]
 
 [[package]]
@@ -1736,6 +1737,7 @@ dependencies = [
  "sha2",
  "yomoku-core",
  "yomoku-import",
+ "zip",
 ]
 
 [[package]]

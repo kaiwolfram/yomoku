@@ -18,8 +18,8 @@ with functioning rustup can omit the PATH workaround. Do not assume this compile
 is the project's minimum supported version; establish that with dependencies.
 Cargo.lock is retained for reproducible application development.
 Crux 0.20.0 declares Rust 1.90 minimum; the full locked graph has only been tested
-with 1.99.1. Current host baseline: 353 data-free Rust tests (160 storage, seventeen
-runtime). Thirteen analysis fixtures and one runtime fixture run separately with
+with 1.99.1. Current host baseline: 379 data-free Rust tests (174 storage, 27
+runtime). Fourteen analysis fixtures and one runtime fixture run separately with
 each Full loader via tools/test-sudachi.sh (see below).
 
 ## Pure TXT import checks
@@ -2548,3 +2548,56 @@ through typed FIFO/JNI and uses the current Library/reader repositories. Android
 instrumentation/device, standalone Full/index/Python suites, release, process-death/
 reboot, tablet/dark and physical arm64 were not rerun. Next: EPUB persistence/runtime,
 then mixed EPUB/TXT/SRT picker/summary/Cancel and reader images/source ruby.
+
+## Atomic EPUB repository and multi-chapter Library progress
+
+Verified 2026-10-26 from the repository root with the Rust PATH above; host JNI
+also uses JAVA_HOME from the existing JDK setup:
+
+```sh
+cargo test --workspace --all-features --locked --offline --quiet
+cargo clippy --workspace --all-targets --all-features --locked --offline -- -D warnings
+cargo fmt --all -- --check
+tools/test-sudachi.sh
+tools/test-kotlin-bridge.sh
+git diff --check
+```
+
+Both Android storage targets check with bundled SQLite/NDK r30/API 29:
+
+```sh
+export CC_aarch64_linux_android=/home/kai/Android/Sdk/ndk/30.0.16248370/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android29-clang
+export AR_aarch64_linux_android=/home/kai/Android/Sdk/ndk/30.0.16248370/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-ar
+export CC_x86_64_linux_android=/home/kai/Android/Sdk/ndk/30.0.16248370/toolchains/llvm/prebuilt/linux-x86_64/bin/x86_64-linux-android29-clang
+export AR_x86_64_linux_android=/home/kai/Android/Sdk/ndk/30.0.16248370/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-ar
+cargo check -p yomoku-storage --target aarch64-linux-android --target x86_64-linux-android --locked --offline
+```
+
+PASS: 379 data-free Rust tests (fourteen new repository fixtures), sixteen
+data-dependent fixtures ignored in the ordinary run; strict Clippy/fmt/diff and
+both Android target checks. The explicit Full runner verifies source integrity and
+passes fourteen analysis fixtures plus one worker fixture per owned/mapped loader.
+Its new EPUB fixture verifies every canonical chapter, original Mode B/anchors,
+cross-chapter unique registration, preserved Learning, source-ruby exclusion,
+chapter-bounded pagination and duplicate/reopen without rescan. Host Kotlin/JNI
+passes existing TXT/SRT cancellation/imports, reader/dictionary/navigation/lifecycle
+and seven Unicode exchanges against the migrated database. No EPUB wire path yet.
+
+Repository fixtures verify original bytes/title/filename/metadata, spine ordering,
+all formatting/ruby/link/placement/image bytes, image-only chapters, repeated shared
+assets and case-insensitive website schemes. Tests cover all statuses, equal text
+with different source bytes, prior-TXT duplicate reference, renamed/finished/later-
+chapter progress preservation, every statement and deferred-COMMIT rollback with
+sequence preservation, second-chapter analysis/validation failure, blocked-analysis
+Cancel, pre-/late cancellation, concurrent create-once, live deletion/reimport,
+corruption without repair, migration rollback/retry/high-water/FK preservation and
+whole-book Library percentage in both directions with foreign-position rejection.
+
+Clippy initially requested indirection for the large Created result; boxed that
+variant and final checks pass. Existing benign Crux close diagnostics persist.
+No new production dependency/version, wire change or open blocker; zip is reused
+only for shared test fixtures. Migration 0014 is applied on normal database open.
+No escalation/download needed. APK/Android lint/instrumentation/device, repeated
+codegen reproducibility, standalone word-index/Python, release, process-death/reboot,
+tablet/dark and physical arm64 were not rerun. App remains paste/TXT; generalize
+single-text duplicate/reader payloads before exposing EPUB through FIFO/JNI/picker.

@@ -13,6 +13,7 @@ mod analysis;
 mod completions;
 mod documents;
 mod encounters;
+mod epub;
 mod finished;
 mod import_dedup;
 mod imports;
@@ -84,8 +85,8 @@ fn history(path: &Path) -> Vec<(i64, String)> {
 
 fn failing_migration() -> Migration {
     Migration {
-        version: 14,
-        name: "0014_failure_fixture",
+        version: 15,
+        name: "0015_failure_fixture",
         sql: "CREATE TABLE partial_fixture (value TEXT); INSERT INTO partial_fixture VALUES ('途中'); INSERT INTO nonexistent VALUES (1);",
     }
 }
@@ -96,7 +97,7 @@ fn creates_empty_database_and_reopens_without_reapplying_migrations() {
     assert!(!database.path().exists());
     for _ in 0..3 {
         let storage = Storage::open(database.path()).unwrap();
-        assert_eq!(storage.schema_version().unwrap(), 13);
+        assert_eq!(storage.schema_version().unwrap(), 14);
     }
     assert_eq!(
         history(&database.path()),
@@ -113,7 +114,8 @@ fn creates_empty_database_and_reopens_without_reapplying_migrations() {
             (10, "0010_completion_occurrences".into()),
             (11, "0011_finished_documents".into()),
             (12, "0012_txt_imports".into()),
-            (13, "0013_srt_imports".into())
+            (13, "0013_srt_imports".into()),
+            (14, "0014_epub_imports".into())
         ]
     );
     let connection = Connection::open(database.path()).unwrap();
@@ -161,7 +163,7 @@ fn upgrades_existing_database_in_order_and_preserves_data_on_reopen() {
                 .unwrap(),
             "日本語𠮷📖"
         );
-        assert_eq!(history(&database.path()).len(), 13);
+        assert_eq!(history(&database.path()).len(), 14);
     }
 }
 
@@ -189,6 +191,7 @@ fn failed_upgrade_rolls_back_schema_data_and_history() {
                 Migration { ..MIGRATIONS[10] },
                 Migration { ..MIGRATIONS[11] },
                 Migration { ..MIGRATIONS[12] },
+                Migration { ..MIGRATIONS[13] },
                 failing_migration()
             ]
         ),
@@ -232,6 +235,7 @@ fn failed_initialization_rolls_back_all_pending_migrations_and_can_retry() {
                 Migration { ..MIGRATIONS[10] },
                 Migration { ..MIGRATIONS[11] },
                 Migration { ..MIGRATIONS[12] },
+                Migration { ..MIGRATIONS[13] },
                 failing_migration()
             ]
         ),
@@ -246,7 +250,7 @@ fn failed_initialization_rolls_back_all_pending_migrations_and_can_retry() {
             .unwrap()
             .schema_version()
             .unwrap(),
-        13
+        14
     );
 }
 
@@ -257,7 +261,7 @@ fn rejects_newer_schema_without_rewriting_history() {
     Connection::open(database.path())
         .unwrap()
         .execute(
-            "INSERT INTO schema_migrations VALUES (14, '0014_future')",
+            "INSERT INTO schema_migrations VALUES (15, '0015_future')",
             [],
         )
         .unwrap();
@@ -265,8 +269,8 @@ fn rejects_newer_schema_without_rewriting_history() {
     assert!(matches!(
         Storage::open(database.path()),
         Err(StorageError::UnsupportedSchemaVersion {
-            found: 14,
-            supported: 13
+            found: 15,
+            supported: 14
         })
     ));
     assert_eq!(fs::read(database.path()).unwrap(), before);
@@ -375,9 +379,9 @@ fn concurrent_initialization_records_migration_once() {
             let path = database.path();
             scope.spawn(move || {
                 barrier.wait();
-                assert_eq!(Storage::open(path).unwrap().schema_version().unwrap(), 13);
+                assert_eq!(Storage::open(path).unwrap().schema_version().unwrap(), 14);
             });
         }
     });
-    assert_eq!(history(&database.path()).len(), 13);
+    assert_eq!(history(&database.path()).len(), 14);
 }

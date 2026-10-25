@@ -28,8 +28,20 @@ Parser budgets bound source/read expansion/entries/nodes; a nonrecursive XML
 preflight caps element nesting at 64 before the recursive tree parser. Reject
 custom entity declarations, invalid numeric references and encrypted used content;
 unused obfuscated fonts/CSS need not be opened. See DATA_MODEL.md and DECISIONS.md
-for the extraction contract and current compatibility limits. EPUB has no
-repository/runtime/reader adapter yet.
+for the extraction contract and current compatibility limits.
+EPUB's repository adapter now saves original-file SHA-256/bytes, metadata/filename,
+ordered canonical chapters, ruby/formatting/link/image spans and separate image
+bytes in one immediate transaction. Each chapter gets an original validated Mode B
+snapshot and globally unique registration through the shared analyzed-chapter
+composition; the whole file rolls back if any chapter fails or cancellation wins.
+Migration 0014 preserves existing source IDs/high-water marks/file identities.
+Read-only multi-chapter loading validates digests, counts, indexes, ownership and
+UTF-8 anchors without parsing or analyzing. Library progress sums earlier chapter
+lengths plus the current chapter offset against total book bytes.
+The generic file-ID preflight and EPUB Existing result support references to the
+first interpretation without a single-text payload. The historical TXT/SRT/reader
+payloads deliberately reject EPUB; extend those and the FIFO/typed JNI before
+making EPUB selectable. No EPUB runtime/reader/Android adapter exists yet.
 
 Its SRT parser
 accepts decoded text and returns canonical LF text plus ordered UTF-8 cue ranges.

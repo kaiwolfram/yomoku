@@ -1,10 +1,10 @@
 # Data model
 
-## Pure EPUB canonical content (no schema change)
+## EPUB canonical content and atomic repository (migration 0014)
 
 `yomoku-import::epub::EpubDocument` has an optional metadata title, ordered
 `EpubChapter` values, a container-path → media-type/original-image-bytes map and
-optional cover path. Filename fallback belongs to the future import adapter.
+optional cover path. The repository adapter supplies the filename title fallback.
 Select the first OPF rootfile from container.xml. Follow spine order, including
 `linear="no"` auxiliary content because internal navigation is unavailable; never
 infer chapters from headings. Omit empty text-only chapters; an empty book fails.
@@ -35,10 +35,50 @@ named entities fail. Current compatibility limits include remote images and
 unsupported spine media/fallback chains; these fail rather than omit a chapter.
 Parser budgets are operational limits, not peak-memory/performance measurements.
 
-Original EPUB SHA-256/bytes, durable chapter/asset IDs, formatting/ruby persistence,
-per-chapter Mode B and unique registrations, cancellation, typed runtime/FFI and
-mixed Android selection remain future work. Do not persist these parser structs
-without the planned atomic file-import adapter. Current app imports stay paste/TXT.
+`import_analyzed_epub[_cancellable]` uses the bounded default parser and one
+immediate transaction. Shared `imported_files` identity hashes original container
+bytes, independent of canonical text/paste identity. Duplicates reference the first
+live DocumentId before parsing/analysis, including an earlier TXT/SRT interpretation.
+The new `find_imported_file_id` reads that identity without a single-text payload.
+SHA matches require exact byte equality. Different bytes with equal canonical
+content remain new documents. Title uses metadata when present, otherwise the
+literal display filename; retain both filename and optional original metadata title.
+
+Migration 0014 rebuilds `sources` to widen kinds to EPUB and `imported_files` to
+allow `text_encoding = 'epub'` (a container marker, not a text decoder choice).
+Existing IDs, file hashes, foreign keys and source sequence high-water marks survive
+atomically; failure restores the old schema/data. No existing content is reparsed.
+Allocate ordered provenance chapters plus live canonical text. `epub_documents`
+stores filename/metadata title/cover path and chapter/asset counts. `epub_chapters`
+stores each live chapter's container path, text digest and ruby/span/placement counts.
+`source_ruby` reuses canonical chapter-local UTF-8 ranges. `epub_spans` stores ordered
+heading/emphasis/strong/external/inert link spans, including level/target. Overlapping
+formatting is preserved. `epub_assets` stores one media type/original BLOB/digest per
+(DocumentId, container path); this composite identity is shared by cover and repeated
+placements. `epub_inline_images` stores ordered placeholder ranges/alt/path with
+chapter/document and asset ownership FKs. No bitmap decoding/dimensions/cache yet.
+
+The ready analyzer runs once per canonical chapter inside that same transaction.
+Each original Mode B snapshot and all unique Japanese surface registrations commit
+together, preserving existing statuses and creating no encounters/time/position.
+Cancellation checkpoints surround parsing, assets, chapters and analysis; use the
+existing final commit gate outside FIFO/off main. Cancellation or any later-chapter,
+statement or COMMIT failure rolls back the entire file, including allocated IDs.
+A winning commit and earlier files remain. No persistent import queue is added.
+
+`load_epub_document` atomically reads all saved chapters/assets/source bytes with
+their durable identities, without ZIP parsing or analysis. Verify digests, expected
+counts, contiguous indexes, UTF-8 anchors, image placeholders/references and position
+ownership. Corruption fails without repair. Library progress sums preceding chapter
+bytes plus the current chapter offset over total canonical book bytes; backward
+movement can decrease it. Live deletion cascades EPUB metadata/assets; deleting
+chapter text drops source ruby, while provenance/analyses/global vocabulary survive.
+Reimport allocates fresh IDs/position/finish state. Production deletion remains planned.
+
+EPUB runtime/FFI, multi-chapter reader snapshots/completion/time/token operations and
+mixed Android selection remain open. The historical single-text `find_imported_file`,
+TXT/SRT duplicate results and reader payloads reject EPUB rather than truncate it;
+generalize these before exposing EPUB in production. Current app imports stay paste/TXT.
 
 ## SRT canonical content and atomic file repository (migration 0013)
 

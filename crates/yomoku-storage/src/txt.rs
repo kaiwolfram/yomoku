@@ -259,7 +259,7 @@ impl Storage {
     }
 }
 
-fn validate_ruby(text: &str, ruby: &[SourceRuby]) -> Result<(), StorageError> {
+pub(crate) fn validate_ruby(text: &str, ruby: &[SourceRuby]) -> Result<(), StorageError> {
     let mut previous_end = 0;
     for item in ruby {
         if item.range.start < previous_end

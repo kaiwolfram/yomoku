@@ -8,8 +8,22 @@ use yomoku_import::txt::TextEncoding;
 use crate::{documents::load_paste_in, Storage, StorageError};
 
 impl Storage {
-    /// Read-only preflight across file kinds. Existing bytes retain the first
-    /// committed interpretation even if selected with another name/extension.
+    /// Format-independent read-only preflight. A duplicate's identity is enough
+    /// to reference its existing interpretation without a single-chapter payload.
+    pub fn find_imported_file_id(
+        &mut self,
+        original_bytes: &[u8],
+    ) -> Result<Option<DocumentId>, StorageError> {
+        let digest = Sha256::digest(original_bytes);
+        let transaction = self.connection.transaction()?;
+        let id = find_imported_id_in(&transaction, original_bytes, digest.as_slice())?;
+        transaction.commit()?;
+        Ok(id)
+    }
+
+    /// Single-text preflight across TXT/SRT. Existing bytes retain the first
+    /// interpretation. Multi-chapter adapters must use find_imported_file_id;
+    /// this historical payload rejects EPUB rather than truncating its chapters.
     pub fn find_imported_file(
         &mut self,
         original_bytes: &[u8],
@@ -27,6 +41,21 @@ pub(crate) fn find_imported_in(
     original_bytes: &[u8],
     digest: &[u8],
 ) -> Result<Option<PastedDocument>, StorageError> {
+    let Some(id) = find_imported_id_in(connection, original_bytes, digest)? else {
+        return Ok(None);
+    };
+    load_paste_in(connection, id)?.map_or(Err(StorageError::InvalidDocument), |document| {
+        Ok(Some(document))
+    })
+}
+
+/// Format-independent identity for multi-chapter adapters. Single-text callers
+/// continue to load their complete historical payload through find_imported_in.
+pub(crate) fn find_imported_id_in(
+    connection: &rusqlite::Connection,
+    original_bytes: &[u8],
+    digest: &[u8],
+) -> Result<Option<DocumentId>, StorageError> {
     let existing: Option<(i64, Vec<u8>)> = connection
         .query_row(
             "SELECT document_id, original_bytes FROM imported_files WHERE sha256 = ?1",
@@ -42,9 +71,7 @@ pub(crate) fn find_imported_in(
         return Err(StorageError::InvalidDocument);
     }
     let id = DocumentId::try_from(id).map_err(|_| StorageError::InvalidDocument)?;
-    load_paste_in(connection, id)?.map_or(Err(StorageError::InvalidDocument), |document| {
-        Ok(Some(document))
-    })
+    Ok(Some(id))
 }
 
 pub(crate) fn encoding_name(encoding: TextEncoding) -> &'static str {

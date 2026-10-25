@@ -17,3 +17,4 @@ memmap2 = "=0.9.12"
 
 [dev-dependencies]
 yomoku-storage = { path = "../yomoku-storage" }
+zip = { version = "=8.6.0", default-features = false, features = ["deflate-flate2"] }

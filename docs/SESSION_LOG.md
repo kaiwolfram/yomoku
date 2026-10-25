@@ -1604,3 +1604,25 @@
   images/source ruby and CI. No new dependency/migration or open blocker.
   Android device/instrumentation, standalone Full/index/Python, release, process-
   death/reboot and physical arm64 not rerun. Nostr empty/Q188 unchanged.
+
+## 2026-10-26 — Atomic EPUB persistence
+
+- Added migration 0014 and EPUB repository: original SHA-256/bytes, metadata/title
+  fallback, ordered canonical chapters/ruby/formatting/link/image spans, shared
+  cover/image bytes, per-chapter original Mode B and unique registration together.
+  Existing file-ID references bypass parsing/analysis. Shared cancellation/COMMIT
+  arbitration rolls back a partial book; all prior committed files remain.
+- Read-only reopen validates counts/digests/anchors/ownership without reparsing.
+  Library progress now includes all chapters and validates complete chapter sets.
+- PASS: 379 data-free Rust tests, strict Clippy/fmt/diff, fourteen real-Full analysis
+  + one worker fixture per owned/mapped loader, existing real-Full Kotlin/JNI and
+  seven Unicode exchanges, both Android storage target checks. Fourteen new
+  repository tests and one explicit Full fixture. Boxed the large import result
+  after Clippy feedback. No open failure/blocker or escalation/download.
+- Updated README/plan/architecture/data/decisions/development/handoff. Next:
+  multi-chapter reader/import-reference transport and EPUB FIFO/JNI, mixed picker,
+  then reader assets/ruby. Historical single-text APIs deliberately reject EPUB;
+  app remains paste/TXT. Migration preserves prior IDs/FKs/high-water/file identity.
+  No new production dependency/version; test helpers reuse pinned zip. APK/Android
+  lint/device/instrumentation, codegen reproducibility, standalone index/Python,
+  release/reboot/process-death, tablet/dark and physical arm64 not rerun. Nostr/Q188 unchanged.

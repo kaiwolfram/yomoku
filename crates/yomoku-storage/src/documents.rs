@@ -30,13 +30,26 @@ impl Storage {
     /// Stable allocation order until Library sorting is implemented.
     pub fn list_documents(&self) -> Result<Vec<LibraryDocument>, StorageError> {
         let mut statement = self.connection.prepare(
-            "SELECT d.id, d.title, length(CAST(t.text AS BLOB)),
-                             p.chapter_id, p.byte_offset, c.id, d.finished_at_least_once
-                      FROM documents d
-                      LEFT JOIN chapters c ON c.source_id = d.source_id AND c.chapter_index = 0
-                      LEFT JOIN chapter_texts t ON t.chapter_id = c.id
-                      LEFT JOIN reading_positions p ON p.document_id = d.id
-                      ORDER BY d.id",
+            "WITH chapter_lengths AS (
+                SELECT c.id, c.source_id, c.chapter_index,
+                       length(CAST(t.text AS BLOB)) AS bytes
+                FROM chapters c LEFT JOIN chapter_texts t ON t.chapter_id = c.id
+              ), totals AS (
+                SELECT source_id, SUM(bytes) AS bytes,
+                       COUNT(*) = COUNT(bytes) AND MIN(chapter_index) = 0
+                         AND MAX(chapter_index) = COUNT(*) - 1 AS complete
+                FROM chapter_lengths GROUP BY source_id
+              )
+              SELECT d.id, d.title, totals.bytes, p.chapter_id, p.byte_offset,
+                     c.bytes, d.finished_at_least_once, d.source_id, c.source_id,
+                     totals.complete,
+                     (SELECT COALESCE(SUM(prior.bytes), 0) FROM chapter_lengths prior
+                      WHERE prior.source_id = d.source_id AND prior.chapter_index < c.chapter_index)
+              FROM documents d
+              LEFT JOIN totals ON totals.source_id = d.source_id
+              LEFT JOIN reading_positions p ON p.document_id = d.id
+              LEFT JOIN chapter_lengths c ON c.id = p.chapter_id
+              ORDER BY d.id",
         )?;
         let rows = statement.query_map([], |row| {
             Ok((
@@ -47,20 +60,42 @@ impl Storage {
                 row.get::<_, Option<i64>>(4)?,
                 row.get::<_, Option<i64>>(5)?,
                 row.get::<_, bool>(6)?,
+                row.get::<_, i64>(7)?,
+                row.get::<_, Option<i64>>(8)?,
+                row.get::<_, Option<bool>>(9)?,
+                row.get::<_, i64>(10)?,
             ))
         })?;
         rows.map(|row| {
-            let (id, title, total_bytes, position_chapter, offset, chapter, finished_at_least_once) = row?;
+            let (
+                id,
+                title,
+                total_bytes,
+                position_chapter,
+                offset,
+                chapter_bytes,
+                finished_at_least_once,
+                source,
+                position_source,
+                complete,
+                preceding_bytes,
+            ) = row?;
             let total_bytes = total_bytes.ok_or(StorageError::InvalidDocument)?;
-            let chapter = chapter.ok_or(StorageError::InvalidDocument)?;
-            if position_chapter.is_some_and(|id| id != chapter) {
+            if complete != Some(true)
+                || position_chapter.is_some()
+                    && (position_source != Some(source)
+                        || !matches!((offset, chapter_bytes), (Some(offset), Some(bytes)) if (0..=bytes).contains(&offset)))
+            {
                 return Err(StorageError::InvalidDocument);
             }
+            let offset = preceding_bytes
+                .checked_add(offset.unwrap_or(0))
+                .ok_or(StorageError::InvalidDocument)?;
             Ok(LibraryDocument {
                 document_id: DocumentId::try_from(id).map_err(|_| StorageError::InvalidDocument)?,
                 title,
                 finished_at_least_once,
-                progress_percent: progress_percent(offset.unwrap_or(0), total_bytes)
+                progress_percent: progress_percent(offset, total_bytes)
                     .map_err(|_| StorageError::InvalidDocument)?,
             })
         })

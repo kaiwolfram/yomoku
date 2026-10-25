@@ -8,6 +8,9 @@ use yomoku_core::{
     document::ChapterText,
 };
 
+#[path = "../../yomoku-import/tests/support/epub.rs"]
+mod epub_fixture;
+
 fn analyzer() -> &'static Analyzer {
     static ANALYZER: OnceLock<Analyzer> = OnceLock::new();
     ANALYZER.get_or_init(|| {
@@ -804,6 +807,122 @@ fn real_srt_import_analyzes_only_canonical_text_and_completes_with_original_anch
             .offset,
         page.range.start
     );
+    drop(storage);
+    std::fs::remove_dir_all(directory).unwrap();
+}
+
+#[test]
+#[ignore = "requires pinned Sudachi Full; run tools/test-sudachi.sh"]
+fn real_epub_import_analyzes_every_canonical_chapter_and_reopens_without_rescan() {
+    use std::collections::BTreeSet;
+    use yomoku_core::{
+        pagination::{LogicalPages, PageLength},
+        vocabulary::{Surface, VocabularyStatus},
+    };
+    use yomoku_storage::{EpubImportOutcome, Storage};
+
+    let directory = std::env::temp_dir().join(format!(
+        "yomoku-real-epub-{}-{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    ));
+    std::fs::create_dir(&directory).unwrap();
+    let path = directory.join("epub.sqlite3");
+    let mut storage = Storage::open(&path).unwrap();
+    let cat = Surface::new("猫").unwrap();
+    storage
+        .register_vocabulary(std::slice::from_ref(&cat), 1)
+        .unwrap();
+    let entry = storage.vocabulary_entry(&cat).unwrap().unwrap();
+    storage
+        .set_vocabulary_status(entry.id, VocabularyStatus::Learning, 2)
+        .unwrap();
+    let bytes = epub_fixture::book(
+        true,
+        "<p>猫と猫が食べた。</p><p><ruby>東京<rt>ソースルビ</rt></ruby> 𠮷 English 📖</p>",
+    );
+    let engine = analyzer();
+    let mut analyses = Vec::new();
+    let EpubImportOutcome::Created(imported) = storage
+        .import_analyzed_epub(&bytes, "本.epub", 100, |chapter| {
+            assert!(!chapter.text.contains("ソースルビ"));
+            let analysis = engine.analyze(chapter)?;
+            analyses.push(analysis.clone());
+            Ok::<_, yomoku_analysis::AnalysisError>(analysis)
+        })
+        .unwrap()
+    else {
+        panic!("expected new EPUB")
+    };
+    assert_eq!(analyses.len(), 2);
+    let mut unique = BTreeSet::new();
+    for ((chapter, id), expected) in imported
+        .document
+        .chapters
+        .iter()
+        .zip(&imported.analysis_ids)
+        .zip(&analyses)
+    {
+        expected.validate(&chapter.chapter).unwrap();
+        assert_eq!(expected.mode, SplitMode::B);
+        assert_eq!(
+            storage.chapter_analysis(*id).unwrap(),
+            Some(expected.clone())
+        );
+        unique.extend(
+            expected
+                .tokens
+                .iter()
+                .filter(|token| token.is_japanese)
+                .map(|token| Surface::new(&token.surface).unwrap()),
+        );
+    }
+    assert!(unique.contains(&cat));
+    assert_eq!(imported.registered_surfaces, unique.len() - 1);
+    for surface in &unique {
+        assert_eq!(
+            storage.vocabulary_entry(surface).unwrap().unwrap().status,
+            if surface == &cat {
+                VocabularyStatus::Learning
+            } else {
+                VocabularyStatus::New
+            }
+        );
+    }
+    assert!(storage
+        .vocabulary_entry(&Surface::new("ソースルビ").unwrap())
+        .unwrap()
+        .is_none());
+    let chapters: Vec<_> = imported
+        .document
+        .chapters
+        .iter()
+        .map(|chapter| chapter.chapter.clone())
+        .collect();
+    for preset in PageLength::ALL {
+        assert_eq!(
+            LogicalPages::new(&chapters, preset).unwrap().pages().len(),
+            2
+        );
+    }
+    assert_eq!(storage.list_documents().unwrap()[0].progress_percent, 0);
+    drop(storage);
+    let mut storage = Storage::open(&path).unwrap();
+    assert_eq!(
+        storage
+            .load_epub_document(imported.document.document_id)
+            .unwrap(),
+        Some(imported.document.clone())
+    );
+    assert!(
+        matches!(storage.import_analyzed_epub(&bytes, "renamed.epub", 200, |_| -> Result<ChapterAnalysis, yomoku_analysis::AnalysisError> { panic!("duplicate must not analyze") }).unwrap(), EpubImportOutcome::Existing(id) if id == imported.document.document_id)
+    );
+    for (id, expected) in imported.analysis_ids.iter().zip(analyses) {
+        assert_eq!(storage.chapter_analysis(*id).unwrap(), Some(expected));
+    }
     drop(storage);
     std::fs::remove_dir_all(directory).unwrap();
 }

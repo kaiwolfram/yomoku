@@ -67,8 +67,11 @@ show placeholders.
 
 The pure [EPUB parser](crates/yomoku-import/src/epub.rs) extracts spine-ordered
 chapters, title, headings/emphasis, source ruby, positioned images/covers and
-links while ignoring CSS. Host fixtures cover malformed archives and pagination;
-EPUB app import/rendering wiring remains planned.
+links while ignoring CSS. Its [atomic repository](crates/yomoku-storage/src/epub.rs)
+now saves original-file identity, ordered chapters/formatting/ruby, image bytes and
+per-chapter Mode B with unique vocabulary registrations. Host fixtures verify
+rollback, cancellation, duplicates, read-only reopen and multi-chapter Library
+progress; both real Full loaders pass. EPUB runtime/reader/app wiring remains planned.
 The pure [SRT parser](crates/yomoku-import/src/srt.rs) has host fixtures for cue
 boundaries, formatting, speakers and malformed input. Its atomic repository now
 persists original bytes/encoding, canonical cues, Mode B and vocabulary registrations
