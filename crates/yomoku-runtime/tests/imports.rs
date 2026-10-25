@@ -214,9 +214,10 @@ fn finish_worker(
     trace: &mpsc::Receiver<Trace>,
 ) {
     drop(router);
-    // A retained lifecycle handle cannot keep the factory or worker alive.
-    assert!(lifecycle.set_foreground(true).is_err());
+    // The last callback may still be returning after the test receives its result.
+    // Factory disconnection proves the worker drained and released its sender.
     drain_trace(trace);
+    assert!(lifecycle.set_foreground(true).is_err());
 }
 
 fn drain_trace(trace: &mpsc::Receiver<Trace>) -> Vec<Trace> {
@@ -261,8 +262,8 @@ fn reader_open_restores_stored_identity_and_legacy_missing_without_loading_analy
         assert_eq!(totals(&database.path()), before);
         assert!(trace.try_recv().is_err());
         drop(router);
-        assert!(lifecycle.set_foreground(true).is_err());
         assert!(drain_trace(&trace).is_empty());
+        assert!(lifecycle.set_foreground(true).is_err());
     }
 }
 

@@ -1477,3 +1477,27 @@
 - Updated architecture/data model/decisions/plan/development/handoff. Next: Android
   Cancel/remaining-URI disposal/summary, then background notifications and actual
   process-death/no-resume acceptance. Nostr empty; Q188 before forwarding.
+
+## 2026-10-25 — Android transaction-aware TXT batch Cancel
+
+- Added Cancel/Cancelling to retained TXT progress/encoding dialogs. Stop URI
+  submissions immediately, clear remaining/encoding input, ignore late provider
+  callbacks by generation and retire blocked URI executors for fresh batches.
+  Keep earlier results and a winning commit in the summary, without opening reader.
+- CoreSession owns a separate cancellation executor and retains its native handle
+  until both direct Cancel and current-file result finish, including teardown.
+  Keep current filename/number fixed while cancellation settles; progress counts
+  completed outcomes only. No persisted queue or new schema/permission/dependency.
+- PASS: 304 Rust tests, strict Clippy/fmt/Kotlin fmt/diff, both-ABI app/test builds,
+  strict Android lint and fourteen final API-36 x86_64 phone/light tests. Three new
+  picker/JNI tests cover blocked reads/load, encoding/recreation/background, both
+  callback orders, duplicate cancellation, commit retention, fresh retries and
+  draining native close. Existing clock/navigation/picker regressions pass.
+- Fixed the existing host teardown fixture's premature closure assertion with its
+  channel-disconnect signal and a new ambiguous-input fixture with a UTF-8 BOM.
+  Gradle/ADB/AVD needed sandbox escalation. Final reports in
+  `.local/test-reports/txt-cancel/phone-final/`; no open failure/blocker.
+- Updated plan/architecture/data/decisions/development/handoff. Next: permitted
+  background notifications and actual process-death/no-auto-resume acceptance;
+  EPUB/SRT and CI independent. Host JNI/Full/release/tablet/dark/physical arm64 not
+  rerun. Airplane mode restored off; AVD running. Nostr empty/Q188 unchanged.

@@ -2283,3 +2283,59 @@ fixtures, Python/full-index scans, release, process-death/reboot, tablet/dark an
 physical arm64 were not rerun. Android still has no Cancel control; wire it off main
 and await both the native return and current-file outcome before settling a batch.
 Notifications and process-death/no-auto-resume acceptance remain unchecked.
+
+## Android transaction-aware TXT batch Cancel
+
+Run from the repository root with the Rust PATH/JDK/SDK/Gradle variables above:
+
+```sh
+cargo test --workspace --all-features --locked --offline --quiet
+cargo clippy --workspace --all-targets --all-features --locked --offline -- -D warnings
+cargo fmt --all -- --check
+tools/format-kotlin.sh --check
+./android/gradlew -p android :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug --offline --console=plain
+./android/gradlew -p android :app:connectedDebugAndroidTest :app:lintDebug -Pandroid.testInstrumentationRunnerArguments.class=app.yomoku.TxtPickerTest,app.yomoku.TxtCancellationSessionTest,app.yomoku.CoreSessionTest,app.yomoku.ReaderClockSessionTest,app.yomoku.NavigationTest --offline --console=plain
+git diff --check
+```
+
+The new picker fixture cancels while a real provider pipe blocks, retains an
+earlier Created result through recreation, starts a fresh batch before the old
+provider returns, ignores its late bytes, cancels retained encoding selection
+after recreation/background and explicitly retries an exact-source duplicate.
+Cancelled/unsubmitted files never appear in Library; cancellation adds no fake
+error, skipped result or completion count. Existing multi-file encoding/error/
+duplicate/progress/summary and system-picker-cancel fixtures remain included.
+
+Two new isolated production-JNI session tests gate the real dictionary callback
+and the dedicated cancellation executor. They prove native Cancel returns while
+FIFO remains blocked, the batch still awaits its outcome, double Cancel and fresh
+start cannot replace the attempt, and explicit retry succeeds. The opposite order
+lets a completed commit win before native Cancel executes: retain its outcome,
+filename/current number/progress, discard remaining URIs and keep the native handle
+alive through owner teardown until Cancel returns. A fresh session sees only that
+completed document and no in-process batch. Repository/runtime tests continue to
+cover blocked analysis, transaction rollback/ID preservation and commit arbitration.
+
+Initial failures corrected: the Rust fixture asserted weak-lifecycle closure before
+the final callback necessarily returned; await its existing factory-disconnect
+signal first. A new UI fixture without a BOM was legitimately ambiguous UTF-8/
+Shift-JIS and waited at encoding selection rather than reaching the gated read;
+give cancellation-only fixtures an explicit UTF-8 BOM. No production decoding
+change. Gradle wildcard-IP/local socket setup and AVD/ADB require escalation in
+this sandbox. Emulator tests use API-36 x86_64 phone/light, airplane mode.
+
+PASS: 304 data-free Rust tests, strict Clippy/Rust fmt/Kotlin fmt/diff checks,
+both-ABI app/test APK builds, strict Android lint and all fourteen final connected
+picker/cancellation/core/reader-clock/navigation tests. Three new Android tests;
+no new Rust test count. Saved final reports:
+`.local/test-reports/txt-cancel/phone-final/{report,results}/`. Earlier reports:
+`phone-fixture-failure/` (one corrected ambiguous-input timeout; six tests passed)
+and `phone-before-count-fix/` (all seven tests passed). Final Cancel keeps the
+current file number fixed even when a winning commit increments processed count
+before native cancellation returns; the new JNI assertion verifies it.
+
+No new dependency/version, wire type, schema, permission or production Rust change;
+no open failure/blocker. Restored airplane mode off; AVD remains running. Separate
+host Kotlin/JNI, standalone Full/Python/index scans, release, tablet/dark, actual
+process-death/reboot and physical arm64 were not rerun. Background notifications
+and actual process-death/no-auto-resume acceptance remain unchecked.

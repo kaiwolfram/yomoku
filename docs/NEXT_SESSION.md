@@ -1,5 +1,5 @@
 # Resume here
-Updated: 2026-10-25. Verified direct TXT runtime/JNI cancellation.
+Updated: 2026-10-25. Verified Android TXT batch Cancel.
 Read AGENTS.md, plan phases 2–4 and PRODUCT_SPEC.md sections 3–4.
 ## Working
 - Pure Crux owns routes/Library/Settings; only Render reaches UI. FIFO owns SQLite/analysis. Fresh sessions start Library. No I/O/SQL in core.
@@ -34,7 +34,7 @@ Read AGENTS.md, plan phases 2–4 and PRODUCT_SPEC.md sections 3–4.
 - CoreSession uses elapsedRealtime + 15s Handler checkpoints, Activity resume/pause,
   scrolling and restore-before-Resume. Actions Pause/drain first. Retry in reader/
   Settings; pending saves disable presets. close retains callbacks until busy/BOTH
-  pending flags clear; retries each second after onCleared. Abrupt kill can lose pending.
+  pending flags/direct cancellation clear; retries after onCleared. Abrupt kill can lose pending.
 - Completion freezes page/position/preset/AnalysisId/timestamp, drains final time,
   then FIFO reserves ID + whole-page duration for exact retries. One transaction
   commits occurrences/New-only Known/history/time/position/finish. Missing blocks.
@@ -62,18 +62,18 @@ Read AGENTS.md, plan phases 2–4 and PRODUCT_SPEC.md sections 3–4.
   wait). Cancelled clears core busy without error/summary. Completed commits stay.
   Registry clears before callbacks; weak control survives accepted closing work
   without retaining worker. Queued/load/analysis/close/retry/JNI fixtures pass.
-  Android still has no Cancel control: stop URI submissions immediately, use a
-  separate cancellation executor, await BOTH return + current result, preserve a
-  winning commit, discard remaining URIs, guard stale provider callbacks by generation.
+  Android Cancel stops submissions, clears remaining/encoding input, invalidates
+  provider callbacks and retires blocked readers. Dedicated executor waits BOTH
+  native return + outcome; winning commits stay. Current name/number and completed
+  summary survive recreation. Native close also waits queued/direct cancellation.
 ## Next tasks (ordered)
-1. Wire Android Cancel to the verified runtime/JNI method; test URI-read/encoding/
-   analysis/commit races, recreation, retained completed outcomes and fresh batches.
-2. Permitted background progress/completion notifications + process-death/no-resume
-   acceptance. EPUB/SRT parsers/original-file imports and CI are independent next work.
+1. Permitted background progress/completion notifications + actual process-death/
+   no-resume acceptance. Verify committed files survive; no unfinished auto-resume.
+2. EPUB/SRT parsers/original-file imports; mixed-format picker. CI is independent.
 3. User-run physical arm64 validation once usable.
 ## Verification
-- PASS: 304 Rust tests (five new), strict Clippy/fmt/diff; real-Full/word-index host
-  Kotlin/JNI including direct cancellation; reproducible Crux/native generation.
-- Both-ABI app/test APKs + strict Android lint/Kotlin fmt pass. Commands/failures:
-  DEVELOPMENT.md last section. No Android UI/process-death rerun or new package/schema.
-  Nostr empty; ask Q188 before forwarding. Physical arm64 remains unverified.
+- PASS: 304 Rust tests, strict Clippy/fmt/diff; both-ABI app/test APK builds, strict
+  Android lint/Kotlin fmt; 14 API-36 x86_64 phone/light picker/cancellation/core/
+  clock/navigation tests. Reports: .local/test-reports/txt-cancel/phone-final/.
+- Commands/fixed failures: DEVELOPMENT.md last section. No blocker/new schema or permission.
+  Host JNI/Full not rerun; process-death/arm64 unverified. Nostr empty; Q188 before forwarding.

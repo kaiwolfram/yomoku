@@ -1924,3 +1924,34 @@ the summary or starting another batch. Preserve a successful commit even when
 Cancel was pressed, discard unsubmitted URIs and guard late provider callbacks
 with a batch/read generation. Android control wiring, notifications and actual
 process-death acceptance remain subsequent slices.
+
+## 2026-10-25 — Android TXT batch cancellation and native lifetime
+
+Keep Cancel sequencing in the retained `TxtImports` helper. Clear the remaining
+URI queue and current encoding input immediately; invalidate provider callbacks
+with a volatile read generation on Cancel and close. Retire the URI executor on
+Cancel so a provider ignoring thread interruption cannot hold up a fresh batch.
+The old provider may still return, but its name/error/bytes cannot mutate the new
+batch or reach Rust. No URI grants, queue, progress or cancellation are persisted.
+
+Run direct native cancellation on a separate CoreSession-owned executor. While
+submitted work is outstanding, keep the modal Cancelling state until BOTH native
+return and current-file result arrive, in either order. Disable repeated Cancel
+and encoding actions; reject another batch until settlement. Preserve a winning
+Created/Existing commit and every earlier terminal result; cancelled partial and
+unsubmitted files add no result. Refresh Library after settlement, without opening
+a reader or manufacturing a storage error. Processed progress remains completed
+outcomes / original selection count, so cancellation need not reach 100%.
+
+Include queued/running cancellation in CoreSession's draining-close obligations:
+a storage callback can arrive before its direct cancellation call returns. Keep
+the native handle alive until both finish, then shut down the cancellation
+executor. A closed helper ignores the return and does not dispatch another event.
+No Rust production, wire, schema, permission or dependency change. Notifications
+and actual process-death acceptance remain separate work.
+
+The host runtime fixture must observe its factory's channel disconnection before
+asserting a retained weak lifecycle handle reports closure. Receiving the last
+result can precede the callback returning and dropping its middleware references;
+an immediate closure assertion was a test race. Use the existing bounded drain
+signal rather than changing production teardown or adding a sleep.

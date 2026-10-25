@@ -29,15 +29,21 @@ internal data class TxtFileResult(
 internal class TxtImports(private val resolver: ContentResolver, private val core: CoreSession) :
     AutoCloseable {
     private val handler = Handler(Looper.getMainLooper())
-    private val reader = Executors.newSingleThreadExecutor()
+    private var reader = Executors.newSingleThreadExecutor()
+    @Volatile private var readGeneration = 0L
     private val queue = ArrayDeque<Uri>()
     private var closed = false
     private var waitingForCore = false
+    private var cancellationReturned = false
+    private var cancellingFileNumber = 0
     private var input: TxtImport? = null
     var active by mutableStateOf(false)
         private set
 
     var choosingEncoding by mutableStateOf(false)
+        private set
+
+    var cancelling by mutableStateOf(false)
         private set
 
     var filename by mutableStateOf("")
@@ -47,7 +53,7 @@ internal class TxtImports(private val resolver: ContentResolver, private val cor
         private set
 
     val currentFileNumber: Int
-        get() = if (active) results.size + 1 else 0
+        get() = if (!active) 0 else if (cancelling) cancellingFileNumber else results.size + 1
 
     // Count terminal outcomes, including errors, duplicates and skips. Never estimate
     // byte/analyzer progress or count an encoding prompt/retry as a completed file.
@@ -91,12 +97,10 @@ internal class TxtImports(private val resolver: ContentResolver, private val cor
         choosingEncoding = false
         encodingError = null
         if (queue.isEmpty()) {
-            active = false
-            filename = ""
-            // Clear the last file's transient error; each result remains in the batch summary.
-            core.dispatch(Event.RefreshLibrary)
+            completeBatch()
             return
         }
+        val generation = ++readGeneration
         val uri = queue.removeFirst()
         filename = uri.lastPathSegment.orEmpty()
         reader.execute {
@@ -110,26 +114,30 @@ internal class TxtImports(private val resolver: ContentResolver, private val cor
                                 if (cursor.moveToFirst()) cursor.getString(0) else null
                             }
                             ?.takeIf { it.isNotBlank() } ?: error("Missing display name")
+                    if (generation != readGeneration) return@execute
                     // Publish the display name before a potentially slow provider read.
                     val displayName = name
-                    handler.post { if (!closed) filename = displayName }
+                    handler.post {
+                        if (generation == readGeneration) filename = displayName
+                    }
                     if (!name.endsWith(".txt", ignoreCase = true)) {
                         null
                     } else {
                         val bytes =
                             resolver.openInputStream(uri)?.use { it.readBytes() }
                                 ?: error("Cannot open document")
+                        if (generation != readGeneration) return@execute
                         TxtImport(bytes.map { it.toUByte() }, name)
                     }
                 } catch (_: Exception) {
                     handler.post {
-                        if (!closed)
+                        if (generation == readGeneration)
                             finish(TxtFileResult(name, message = R.string.import_file_unreadable))
                     }
                     return@execute
                 }
             handler.post {
-                if (!closed) {
+                if (generation == readGeneration) {
                     if (loaded == null) {
                         finish(TxtFileResult(name, message = R.string.import_txt_only))
                     } else {
@@ -151,6 +159,15 @@ internal class TxtImports(private val resolver: ContentResolver, private val cor
         if (closed || !waitingForCore || core.view.storageBusy) return
         waitingForCore = false
         val error = core.view.documentError
+        val summary = core.view.importSummary
+        if (cancelling) {
+            // A completed COMMIT wins cancellation. A rolled-back/encoding attempt adds no row.
+            if (summary != null)
+                results = results + TxtFileResult(filename, summary.outcome, summary.title)
+            core.dispatch(Event.DismissImportSummary)
+            settleCancellation()
+            return
+        }
         if (
             error == DocumentError.TXTENCODINGREQUIRED ||
                 (input?.encoding != null &&
@@ -161,7 +178,7 @@ internal class TxtImports(private val resolver: ContentResolver, private val cor
             choosingEncoding = true
             return
         }
-        val summary = core.view.importSummary
+        core.dispatch(Event.DismissImportSummary)
         finish(
             TxtFileResult(
                 filename,
@@ -173,12 +190,11 @@ internal class TxtImports(private val resolver: ContentResolver, private val cor
                     else null,
             )
         )
-        core.dispatch(Event.DismissImportSummary)
     }
 
     fun selectEncoding(encoding: TextEncoding) {
         checkMainThread()
-        if (closed || !choosingEncoding) return
+        if (closed || cancelling || !choosingEncoding) return
         input = checkNotNull(input).copy(encoding = encoding)
         choosingEncoding = false
         submit()
@@ -186,13 +202,50 @@ internal class TxtImports(private val resolver: ContentResolver, private val cor
 
     fun skipEncoding() {
         checkMainThread()
-        if (!closed && choosingEncoding)
+        if (!closed && !cancelling && choosingEncoding)
             finish(TxtFileResult(filename, message = R.string.import_file_skipped))
     }
 
     private fun finish(result: TxtFileResult) {
         results = results + result
         next()
+    }
+
+    fun cancel() {
+        checkMainThread()
+        if (closed || !active || cancelling) return
+        cancellingFileNumber = currentFileNumber
+        cancelling = true
+        choosingEncoding = false
+        encodingError = null
+        queue.clear()
+        input = null
+        ++readGeneration
+        // A provider can ignore interruption. Retire its executor and ignore all late callbacks;
+        // a fresh batch must not wait behind that provider's blocked read/query.
+        reader.shutdownNow()
+        reader = Executors.newSingleThreadExecutor()
+        cancellationReturned = !waitingForCore
+        if (waitingForCore) {
+            core.cancelTxtImport {
+                cancellationReturned = true
+                if (!closed) settleCancellation()
+            }
+        }
+        settleCancellation()
+    }
+
+    private fun settleCancellation() {
+        if (cancellationReturned && !waitingForCore) completeBatch()
+    }
+
+    private fun completeBatch() {
+        active = false
+        cancelling = false
+        filename = ""
+        input = null
+        // Clear transient errors; completed outcomes stay in the retained batch summary.
+        core.dispatch(Event.RefreshLibrary)
     }
 
     fun dismissSummary() {
@@ -206,6 +259,7 @@ internal class TxtImports(private val resolver: ContentResolver, private val cor
     override fun close() {
         checkMainThread()
         closed = true
+        ++readGeneration
         core.onViewChanged = null
         queue.clear()
         input = null

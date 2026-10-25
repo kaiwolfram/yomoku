@@ -29,7 +29,10 @@ commit to begin. A successful commit already holding the gate remains completed.
 Cancellation does not undo completed files or persist resume state. Production
 runtime/JNI shares a fresh handle before each accepted FIFO import and projects
 rollback as `StorageResult::ImportCancelled`, without an error/summary or new
-durable state. Android Cancel/remaining-URI disposal is still pending; no schema change.
+durable state. Android Cancel clears unsubmitted URIs, ignores stale provider data
+and awaits both the direct native return and current result. It retains completed
+outcomes in the in-process summary; no queue or cancellation state is persisted.
+No schema change.
 
 Migration 0012 rebuilds `sources` to permit `kind IN ('paste', 'txt')`, preserving
 all IDs, provenance and the autoincrement high-water mark. The migration runner
@@ -723,9 +726,10 @@ both pending flags and storage_busy before destroying the native session. Core
 does not queue arbitrary busy operations or read a clock itself.
 Android CoreSession supplies elapsedRealtime samples after successful restore,
 15-second Handler checkpoints, interactions and final Pause observations before
-settings/background/departure/completion. It waits for storage and both pending flags
-before native close, retaining exact failed obligations for retry. No platform clock
-timestamps enter SQLite. Checkpoint operations create no completion, encounter
+settings/background/departure/completion. It waits for storage, both pending flags
+and any direct TXT cancellation call before native close, retaining exact failed
+save obligations for retry. Cancellation state remains in process only. No platform
+clock timestamps enter SQLite. Checkpoint operations create no completion, encounter
 or status events. Analyzed completion intents are connected below; post identity
 remains open.
 

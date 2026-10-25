@@ -16,6 +16,8 @@ import app.yomoku.shared.ReaderClockSample
 import app.yomoku.shared.Requests
 import app.yomoku.shared.ShellEffect
 import app.yomoku.shared.ViewModel
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
 
 /** Owns a native handle and a render snapshot; application state stays in Rust. */
 internal class CoreSession(
@@ -23,12 +25,14 @@ internal class CoreSession(
     dictionary: DictionaryProvider,
     private val monotonicMs: () -> Long = SystemClock::elapsedRealtime,
     private val checkpointIntervalMs: Long = 15_000L,
+    private val cancellationExecutor: ExecutorService = Executors.newSingleThreadExecutor(),
 ) : AutoCloseable {
     private val mainHandler = Handler(Looper.getMainLooper())
     var isClosed = false
         private set
 
     private var closing = false
+    private var cancellationPending = false
     private var readerActive = false
     private var clockRunning = false
     private var tickScheduled = false
@@ -113,6 +117,25 @@ internal class CoreSession(
         bridge.setForeground(foreground)
     }
 
+    /** The native commit gate may wait. Keep the handle alive until this direct call returns. */
+    fun cancelTxtImport(onComplete: () -> Unit) {
+        requireMainThread()
+        check(!closing && !cancellationPending)
+        cancellationPending = true
+        cancellationExecutor.execute {
+            val result = runCatching { bridge.cancelTxtImport() }
+            mainHandler.post {
+                cancellationPending = false
+                try {
+                    result.getOrThrow()
+                    onComplete()
+                } finally {
+                    driveReaderClock()
+                }
+            }
+        }
+    }
+
     /** Activity resume/pause, separate from the retained analyzer's start/stop policy. */
     fun setReaderActive(active: Boolean) {
         requireMainThread()
@@ -148,10 +171,16 @@ internal class CoreSession(
 
     private fun driveReaderClock() {
         if (closing) {
-            if (!view.storageBusy && !view.readingTimeSavePending && !view.completionSavePending) {
+            if (
+                !view.storageBusy &&
+                    !view.readingTimeSavePending &&
+                    !view.completionSavePending &&
+                    !cancellationPending
+            ) {
                 cancelTick()
                 isClosed = true
                 bridge.close()
+                cancellationExecutor.shutdown()
             } else if (!view.storageBusy) {
                 // onCleared has no UI left for Retry. Keep the exact core obligation alive.
                 scheduleTick(1_000L)

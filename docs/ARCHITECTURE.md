@@ -49,9 +49,11 @@ lifecycle ownership permits cancelling accepted work while a closed router drain
 without keeping its worker alive. Idle calls do not poison future attempts.
 `StorageResult::ImportCancelled` clears core busy state without an error or summary;
 Created/Existing and typed failures keep their existing behavior. Cancellation
-does not forcibly stop a dictionary loader already running. Android must invoke
-the native method off main and await both its return and the import outcome before
-submitting another file; its batch helper has not connected this control yet.
+does not forcibly stop a dictionary loader already running. Android invokes the
+native method on a dedicated cancellation executor, outside the URI reader and
+FIFO, and awaits both its return and the import outcome before settling a batch.
+CoreSession keeps the native handle alive through queued/running cancellation,
+including owner teardown, and shuts down that executor after draining close.
 `Event::ImportTxt(TxtImport)` carries original bytes, display name and optional
 UTF-8/Shift-JIS choice through generated Kotlin/JNI to the same FIFO worker.
 A read-only hash/exact-byte preflight returns existing snapshots without Full;
@@ -71,10 +73,17 @@ returning to Library without opening a reader. Current filename and File X of N
 remain visible during reads/imports/encoding choices. Batch progress is terminal
 outcomes / selected URIs (including errors, duplicates and skips); prompts/retries
 do not advance it. Display names publish before potentially blocked provider reads.
+Cancel immediately clears unsubmitted URIs and encoding input, disables repeated
+Cancel/encoding actions and shows Cancelling while native work settles. A winning
+Created/Existing result is copied into the retained summary; cancelled partial
+work adds no outcome. Earlier terminal results remain. Every provider name/error/
+byte callback checks a read generation invalidated on Cancel/close. Cancel retires
+the reader executor so a provider ignoring interruption cannot block a fresh batch;
+its late data is discarded. Progress continues to count only terminal results.
 No URI queue/results/progress are persisted;
 final owner teardown stops unsubmitted work while core drains accepted transactions.
-No new permission, dependency or schema. Android batch cancellation, background
-notifications, EPUB/SRT and source-ruby rendering remain separate.
+No new permission, dependency or schema. Background notifications, EPUB/SRT and
+source-ruby rendering remain separate.
 
 Pure document values define positive i64 identities, immutable chapter snapshots,
 UTF-8 byte anchors, checked UTF-16 conversions and literal first-line paste titles.
@@ -561,9 +570,9 @@ Restore failures require visible Retry. Failed checkpoint/completion obligations
 offer Retry in reader/Settings; unresolved saves disable preset changes.
 
 Close rejects new UI dispatch immediately, pauses once and keeps callbacks alive until
-storage_busy and both save-pending flags clear. Only then does it release the native
-handle. If an obligation fails after onCleared, a one-second Handler retry resubmits
-the exact core payload; a persistent failure retains the session while the process
+storage_busy, both save-pending flags and direct TXT cancellation clear. Only then
+does it release the native handle. If a save fails after onCleared, a one-second
+Handler retry resubmits the exact core payload; a persistent failure retains the session while the process
 survives. This never joins the UI thread or fabricates a successful save. Android can
 still kill a process before a final callback; only committed durations survive, and
 abrupt death can lose time since the latest periodic checkpoint. No OS guarantee is made.
@@ -600,7 +609,7 @@ unique Japanese surfaces without encounters, deduplicate exact bytes and deliver
 Created/Existing summaries. Native descriptor delivery and retained/background
 lifecycle are connected. TXT parsing, atomic storage and the Android multiple-file
 picker/encoding/summary path are connected. EPUB/SRT parsing, metadata, mixed-format
-batches, Android cancellation and background notifications remain unchecked. Legacy imports
+batches and background notifications remain unchecked. Legacy imports
 are not automatically rescanned.
 Explicit core/worker/FFI pending-time checkpoints coalesce during unresolved saves
 and drain before reader movement/exit or analyzed completion. Completion preparation/

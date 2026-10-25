@@ -44,6 +44,80 @@ class TxtPickerTest {
         compose.waitForIdle()
     }
 
+    private fun fixture(name: String, bytes: ByteArray, gate: String? = null): Uri =
+        Uri.Builder()
+            .scheme("content")
+            .authority("app.yomoku.test.txt-fixtures")
+            .appendPath(name)
+            .appendQueryParameter("bytes", Base64.encodeToString(bytes, Base64.NO_WRAP))
+            .apply { if (gate != null) appendQueryParameter("gate", gate) }
+            .build()
+
+    @Test
+    fun cancelBlockedReadRetainsCompletedFilesAndFreshBatchIgnoresLateProviderResult() {
+        awaitIdle()
+        val prefix = "cancel-read-${System.nanoTime()}"
+        val first = fixture("$prefix-first.txt", "\uFEFF$prefix first 猫".toByteArray())
+        val blocked =
+            fixture("$prefix-blocked.txt", "\uFEFF$prefix partial 犬".toByteArray(), prefix)
+        val remaining = fixture("$prefix-remaining.txt", "$prefix remaining".toByteArray())
+        val fresh = fixture("$prefix-fresh.txt", byteArrayOf(0xc2.toByte(), 0xa9.toByte()))
+        val resolver = instrumentation.targetContext.contentResolver
+        try {
+            compose.runOnIdle { owner().txtImports.start(listOf(first, blocked, remaining)) }
+            compose.waitUntil(90_000) {
+                owner().txtImports.filename == "$prefix-blocked.txt" &&
+                    owner().txtImports.results.size == 1
+            }
+            val retained = owner().txtImports
+            compose.onNodeWithText("Cancel").performClick()
+            compose.waitUntil(30_000) { !retained.active }
+            awaitIdle()
+            assertEquals(listOf(ImportOutcome.CREATED), retained.results.map { it.outcome })
+            assertEquals(3, retained.totalFiles)
+            assertEquals(1f / 3f, retained.progress)
+            compose.activityRule.scenario.recreate()
+            assertSame(retained, owner().txtImports)
+            compose.onNodeWithTag("txt_import_summary").assertIsDisplayed()
+            compose.onNodeWithText("Close").performClick()
+            // This must reach encoding selection while the old provider read is still blocked.
+            compose.runOnIdle { retained.start(listOf(fresh, remaining)) }
+            compose.waitUntil(30_000) { retained.choosingEncoding }
+            resolver.call(blocked, "release", prefix, null)
+            compose.waitUntil(30_000) {
+                resolver.call(blocked, "finished", prefix, null)?.getBoolean("finished") == true
+            }
+            compose.waitForIdle()
+            assertEquals("$prefix-fresh.txt", retained.filename)
+            assertTrue(retained.results.isEmpty())
+            compose.activityRule.scenario.recreate()
+            compose.activityRule.scenario.moveToState(Lifecycle.State.CREATED)
+            compose.activityRule.scenario.moveToState(Lifecycle.State.RESUMED)
+            compose.onNodeWithText("Cancel").performClick()
+            compose.waitUntil(30_000) { !retained.active }
+            awaitIdle()
+            assertTrue(retained.results.isEmpty())
+            compose.onNodeWithTag("txt_import_summary").assertDoesNotExist()
+            assertTrue(
+                owner().session.view.documents.none {
+                    it.title in
+                        listOf("$prefix-blocked.txt", "$prefix-remaining.txt", "$prefix-fresh.txt")
+                }
+            )
+            // A later explicit batch is independent, including exact-source duplicate detection.
+            compose.runOnIdle { retained.start(listOf(first)) }
+            compose.waitUntil(30_000) { !retained.active && retained.results.isNotEmpty() }
+            awaitIdle()
+            assertEquals(ImportOutcome.EXISTING, retained.results.single().outcome)
+            assertEquals(1, retained.totalFiles)
+            assertNull(owner().session.view.documentError)
+            assertNull(owner().session.view.reader)
+            compose.onNodeWithText("Close").performClick()
+        } finally {
+            resolver.call(blocked, "release", prefix, null)
+        }
+    }
+
     @Test
     fun pickerBatchRetainsEncodingAndSummarizesEveryFileWithoutOpeningReader() {
         awaitIdle()

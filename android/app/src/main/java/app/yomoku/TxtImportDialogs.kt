@@ -37,6 +37,7 @@ internal fun TxtImportDialogs(imports: TxtImports) {
                         )
                     )
                     Text(imports.filename)
+                    if (imports.cancelling) Text(stringResource(R.string.import_cancelling))
                     Text(
                         stringResource(
                             R.string.import_files_processed,
@@ -64,6 +65,11 @@ internal fun TxtImportDialogs(imports: TxtImports) {
                     TextButton(onClick = imports::skipEncoding) {
                         Text(stringResource(R.string.import_skip_file))
                     }
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = imports::cancel, enabled = !imports.cancelling) {
+                    Text(stringResource(R.string.cancel))
                 }
             },
         )

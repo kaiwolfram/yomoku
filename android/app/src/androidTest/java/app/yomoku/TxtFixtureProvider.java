@@ -19,6 +19,7 @@ import java.util.concurrent.TimeUnit;
 /** Test APK providers run without the target APK's Kotlin runtime. Keep this fixture standalone. */
 public final class TxtFixtureProvider extends ContentProvider {
     private final ConcurrentHashMap<String, CountDownLatch> gates = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, Boolean> finished = new ConcurrentHashMap<>();
 
     @Override
     public boolean onCreate() {
@@ -50,16 +51,18 @@ public final class TxtFixtureProvider extends ContentProvider {
         try {
             ParcelFileDescriptor[] pipe = ParcelFileDescriptor.createPipe();
             new Thread(() -> {
+                String gate = uri.getQueryParameter("gate");
                 try (ParcelFileDescriptor.AutoCloseOutputStream output =
                         new ParcelFileDescriptor.AutoCloseOutputStream(pipe[1])) {
-                    String gate = uri.getQueryParameter("gate");
                     if (gate != null && !gates.computeIfAbsent(gate, key -> new CountDownLatch(1))
-                            .await(30, TimeUnit.SECONDS)) {
+                            .await(90, TimeUnit.SECONDS)) {
                         throw new IOException("Test read gate timed out");
                     }
                     output.write(bytes);
                 } catch (IOException | InterruptedException error) {
                     throw new IllegalStateException(error);
+                } finally {
+                    if (gate != null) finished.put(gate, true);
                 }
             }).start();
             return pipe[0];
@@ -70,6 +73,11 @@ public final class TxtFixtureProvider extends ContentProvider {
 
     @Override
     public Bundle call(String method, String arg, Bundle extras) {
+        if ("finished".equals(method) && arg != null) {
+            Bundle result = new Bundle();
+            result.putBoolean("finished", finished.containsKey(arg));
+            return result;
+        }
         if (!"release".equals(method) || arg == null) {
             throw new UnsupportedOperationException("Unknown fixture operation");
         }
