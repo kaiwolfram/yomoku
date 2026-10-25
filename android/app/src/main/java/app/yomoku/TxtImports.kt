@@ -26,8 +26,11 @@ internal data class TxtFileResult(
 )
 
 /** Only platform URI reads and sequencing live here. Rust owns every per-file transaction. */
-internal class TxtImports(private val resolver: ContentResolver, private val core: CoreSession) :
-    AutoCloseable {
+internal class TxtImports(
+    private val resolver: ContentResolver,
+    private val core: CoreSession,
+    private val observer: TxtImportObserver? = null,
+) : AutoCloseable {
     private val handler = Handler(Looper.getMainLooper())
     private var reader = Executors.newSingleThreadExecutor()
     @Volatile private var readGeneration = 0L
@@ -103,6 +106,7 @@ internal class TxtImports(private val resolver: ContentResolver, private val cor
         val generation = ++readGeneration
         val uri = queue.removeFirst()
         filename = uri.lastPathSegment.orEmpty()
+        refreshNotifications()
         reader.execute {
             var name = uri.lastPathSegment.orEmpty()
             val loaded =
@@ -118,7 +122,10 @@ internal class TxtImports(private val resolver: ContentResolver, private val cor
                     // Publish the display name before a potentially slow provider read.
                     val displayName = name
                     handler.post {
-                        if (generation == readGeneration) filename = displayName
+                        if (generation == readGeneration) {
+                            filename = displayName
+                            refreshNotifications()
+                        }
                     }
                     if (!name.endsWith(".txt", ignoreCase = true)) {
                         null
@@ -165,6 +172,7 @@ internal class TxtImports(private val resolver: ContentResolver, private val cor
             if (summary != null)
                 results = results + TxtFileResult(filename, summary.outcome, summary.title)
             core.dispatch(Event.DismissImportSummary)
+            refreshNotifications()
             settleCancellation()
             return
         }
@@ -176,6 +184,7 @@ internal class TxtImports(private val resolver: ContentResolver, private val cor
         ) {
             encodingError = error
             choosingEncoding = true
+            refreshNotifications()
             return
         }
         core.dispatch(Event.DismissImportSummary)
@@ -197,6 +206,7 @@ internal class TxtImports(private val resolver: ContentResolver, private val cor
         if (closed || cancelling || !choosingEncoding) return
         input = checkNotNull(input).copy(encoding = encoding)
         choosingEncoding = false
+        refreshNotifications()
         submit()
     }
 
@@ -220,6 +230,7 @@ internal class TxtImports(private val resolver: ContentResolver, private val cor
         encodingError = null
         queue.clear()
         input = null
+        refreshNotifications()
         ++readGeneration
         // A provider can ignore interruption. Retire its executor and ignore all late callbacks;
         // a fresh batch must not wait behind that provider's blocked read/query.
@@ -240,6 +251,7 @@ internal class TxtImports(private val resolver: ContentResolver, private val cor
     }
 
     private fun completeBatch() {
+        observer?.finished(results.size, totalFiles, cancelling)
         active = false
         cancelling = false
         filename = ""
@@ -256,6 +268,21 @@ internal class TxtImports(private val resolver: ContentResolver, private val cor
         }
     }
 
+    fun refreshNotifications() {
+        checkMainThread()
+        if (!closed && active)
+            observer?.update(
+                TxtImportProgress(
+                    filename,
+                    currentFileNumber,
+                    results.size,
+                    totalFiles,
+                    choosingEncoding,
+                    cancelling,
+                )
+            )
+    }
+
     override fun close() {
         checkMainThread()
         closed = true
@@ -264,6 +291,7 @@ internal class TxtImports(private val resolver: ContentResolver, private val cor
         queue.clear()
         input = null
         reader.shutdownNow()
+        observer?.close()
         // Already accepted Rust work still drains through CoreSession.close(). No batch is
         // persisted.
     }

@@ -20,7 +20,11 @@ import app.yomoku.shared.ImportOutcome
 import app.yomoku.shared.TextEncoding
 
 @Composable
-internal fun TxtImportDialogs(imports: TxtImports) {
+internal fun TxtImportDialogs(
+    imports: TxtImports,
+    canRequestNotifications: Boolean = false,
+    requestNotifications: () -> Unit = {},
+) {
     if (imports.active) {
         AlertDialog(
             onDismissRequest = {},
@@ -56,6 +60,12 @@ internal fun TxtImportDialogs(imports: TxtImports) {
                         }
                         TextButton(onClick = { imports.selectEncoding(TextEncoding.SHIFTJIS) }) {
                             Text("Shift-JIS")
+                        }
+                    }
+                    Text(stringResource(R.string.import_background_limits))
+                    if (canRequestNotifications) {
+                        TextButton(onClick = requestNotifications) {
+                            Text(stringResource(R.string.import_enable_notifications))
                         }
                     }
                 }

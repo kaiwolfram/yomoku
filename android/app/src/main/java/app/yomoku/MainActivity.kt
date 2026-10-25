@@ -1,5 +1,8 @@
 package app.yomoku
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import android.view.MotionEvent
 import androidx.activity.ComponentActivity
@@ -7,6 +10,9 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModelProvider
 import app.yomoku.shared.ContentRoute
 import app.yomoku.shared.Event
@@ -15,6 +21,12 @@ import app.yomoku.theme.YomokuTheme
 class MainActivity : ComponentActivity() {
     private lateinit var core: CoreSession
     private lateinit var txtImports: TxtImports
+    private var notificationPermission by mutableStateOf(true)
+    private val notificationRequest =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+            notificationPermission = granted
+            txtImports.refreshNotifications()
+        }
     private val txtPicker =
         registerForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
             txtImports.start(uris)
@@ -38,7 +50,10 @@ class MainActivity : ComponentActivity() {
                 YomokuApp(core.view, core::dispatch, core::onReaderInteraction) {
                     txtPicker.launch(arrayOf("text/plain"))
                 }
-                TxtImportDialogs(txtImports)
+                TxtImportDialogs(txtImports, !notificationPermission) {
+                    if (Build.VERSION.SDK_INT >= 33)
+                        notificationRequest.launch(Manifest.permission.POST_NOTIFICATIONS)
+                }
             }
         }
     }
@@ -46,6 +61,11 @@ class MainActivity : ComponentActivity() {
     override fun onStart() {
         super.onStart()
         core.setForeground(true)
+        notificationPermission =
+            Build.VERSION.SDK_INT < 33 ||
+                checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) ==
+                    PackageManager.PERMISSION_GRANTED
+        txtImports.refreshNotifications()
     }
 
     override fun onResume() {

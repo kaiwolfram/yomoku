@@ -1955,3 +1955,48 @@ asserting a retained weak lifecycle handle reports closure. Receiving the last
 result can precede the callback returning and dropping its middleware references;
 an immediate closure assertion was a test race. Use the existing bounded drain
 signal rather than changing production teardown or adding a sleep.
+
+## 2026-10-25 — Permitted TXT background execution and notifications
+
+Use the platform `dataSync` foreground service type for user-initiated imports/
+local file processing, verified against Android's [service types documentation](https://developer.android.com/develop/background-work/services/fgs/service-types#data-sync)
+and [foreground launch rules](https://developer.android.com/develop/background-work/services/fgs/launch).
+Use existing Android APIs/minSdk 29/targetSdk 36; add no library/version. Declare
+FOREGROUND_SERVICE, FOREGROUND_SERVICE_DATA_SYNC and POST_NOTIFICATIONS. Per the
+[notification permission documentation](https://developer.android.com/develop/ui/compose/notifications/notification-permission),
+notification denial does not prevent foreground service startup. Offer the runtime
+permission only on explicit Enable import notifications in the batch modal; do not
+block selection/import or repeatedly prompt automatically.
+
+Keep all work in the existing retained helper/FIFO. A local binder carries only
+current filename/number and processed/selected counts to the nonexported service;
+its interrupt callback uses the existing Cancel path. Service intents carry no
+work/URIs. Start only for user-started batches or explicit encoding decisions,
+return START_NOT_STICKY, stop with the task and store no queue or resume token.
+Release the service while waiting for encoding and use a separate input-needed
+notification, so waiting for the user consumes no foreground execution budget.
+Service rejection falls back to ordinary OS process limits and permitted progress
+notifications, with no automatic restart. The UI explains possible process loss
+and retained completed files without promising background survival.
+
+Progress is terminal outcomes / original selection size; do not call errors,
+duplicates or skips newly imported documents. Completion/cancellation notifications
+retain these counts and use a separate ID so foreground teardown cannot remove
+them. Input-needed notifications also need their own ID because service removal
+can complete asynchronously. Tapping reuses the existing Activity without opening
+a reader; in-process summary remains in the helper. No summary is reconstructed
+after process death.
+
+Implement [Service.onTimeout](https://developer.android.com/develop/background-work/services/fgs/timeout)
+by stopping foreground execution/service immediately, then requesting cooperative
+cancellation. Never wait for native/SQLite arbitration before satisfying Android's
+deadline. Existing native lifetime/commit rules preserve a winning commit. Owner
+teardown drops unsubmitted work and removes progress while accepted native work
+drains. Do not add a boot receiver, WorkManager queue or service redelivery.
+
+The debug-only DUMP-protected recovery Activity uses an isolated SQLite database
+and the test APK's gated provider. The host runner sends HOME then same-UID SIGKILL
+with one committed, one blocked and one remaining file; fresh-process checks require
+the committed document and an empty helper/no service. Exercise both notification
+permission states and restore the previous grant. This demonstrates abrupt process
+death, without claiming low-memory-killer, device/release or cache-flush coverage.

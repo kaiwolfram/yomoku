@@ -82,8 +82,25 @@ the reader executor so a provider ignoring interruption cannot block a fresh bat
 its late data is discarded. Progress continues to count only terminal results.
 No URI queue/results/progress are persisted;
 final owner teardown stops unsubmitted work while core drains accepted transactions.
-No new permission, dependency or schema. Background notifications, EPUB/SRT and
-source-ruby rendering remain separate.
+`ImportNotifications` observes only filename/current/processed/total and encoding/
+cancellation state. A nonexported `dataSync` foreground service holds a process-only
+lease while the existing helper/FIFO imports. A local binder delivers updates and
+timeout cancellation; the service receives no URI, bytes, SQL or persistent queue.
+Start the service for a user-started batch or encoding choice; never restart it on
+background updates, boot or process launch. `START_NOT_STICKY` and no saved queue
+prevent unfinished-batch auto-resume. Android still controls process survival.
+Release the lease during encoding selection and post a separate input-needed
+notification; resume only after explicit selection/Skip. Progress notifications
+show actual processed files, including failures/duplicates/skips. Completion and
+cancellation use a separate notification ID, retaining the same processed/total
+semantics. Tapping returns to the retained app without opening a reader. A denied
+notification permission never blocks import; the modal offers an explicit enable
+action. Manifest permissions are POST_NOTIFICATIONS, FOREGROUND_SERVICE and
+FOREGROUND_SERVICE_DATA_SYNC; no new dependency/schema. If Android rejects a service
+start, continue subject to ordinary process limits without retrying it automatically.
+Timeout stops foreground execution/service immediately, then uses existing off-main
+cancellation/draining; a winning commit stays. Normal owner teardown removes the
+lease and unfinished progress notice. EPUB/SRT and source-ruby rendering remain.
 
 Pure document values define positive i64 identities, immutable chapter snapshots,
 UTF-8 byte anchors, checked UTF-16 conversions and literal first-line paste titles.
@@ -609,7 +626,8 @@ unique Japanese surfaces without encounters, deduplicate exact bytes and deliver
 Created/Existing summaries. Native descriptor delivery and retained/background
 lifecycle are connected. TXT parsing, atomic storage and the Android multiple-file
 picker/encoding/summary path are connected. EPUB/SRT parsing, metadata, mixed-format
-batches and background notifications remain unchecked. Legacy imports
+batches remain unchecked. TXT background notifications use the platform-only
+foreground lease described above. Legacy imports
 are not automatically rescanned.
 Explicit core/worker/FFI pending-time checkpoints coalesce during unresolved saves
 and drain before reader movement/exit or analyzed completion. Completion preparation/

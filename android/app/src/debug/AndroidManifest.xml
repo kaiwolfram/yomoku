@@ -6,5 +6,9 @@
             android:name=".SudachiRecoveryProbeActivity"
             android:exported="true"
             android:permission="android.permission.DUMP" />
+        <activity
+            android:name=".TxtImportRecoveryProbeActivity"
+            android:exported="true"
+            android:permission="android.permission.DUMP" />
     </application>
 </manifest>

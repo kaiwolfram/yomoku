@@ -1,5 +1,5 @@
 # Resume here
-Updated: 2026-10-25. Verified Android TXT batch Cancel.
+Updated: 2026-10-25. Verified TXT background notifications and process-death/no-resume.
 Read AGENTS.md, plan phases 2–4 and PRODUCT_SPEC.md sections 3–4.
 ## Working
 - Pure Crux owns routes/Library/Settings; only Render reaches UI. FIFO owns SQLite/analysis. Fresh sessions start Library. No I/O/SQL in core.
@@ -58,22 +58,22 @@ Read AGENTS.md, plan phases 2–4 and PRODUCT_SPEC.md sections 3–4.
   Scrollable Library summary retains results. Teardown drops unsubmitted work;
   no persisted queue/progress or reader ruby. Display name publishes before bytes.
 - TXT cancellation shares a fresh repository handle before FIFO submission;
-  AnalyzerLifecycle/native cancelTxtImport() bypass FIFO, off main (COMMIT can
-  wait). Cancelled clears core busy without error/summary. Completed commits stay.
-  Registry clears before callbacks; weak control survives accepted closing work
-  without retaining worker. Queued/load/analysis/close/retry/JNI fixtures pass.
-  Android Cancel stops submissions, clears remaining/encoding input, invalidates
-  provider callbacks and retires blocked readers. Dedicated executor waits BOTH
-  native return + outcome; winning commits stay. Current name/number and completed
-  summary survive recreation. Native close also waits queued/direct cancellation.
+  cancelTxtImport() bypasses FIFO off main (COMMIT may wait). Silent rollback;
+  winning commits stay. Android clears remaining/input, invalidates late reads and
+  retires executors; waits BOTH native return + outcome, including draining close.
+  Registry clears before callbacks; name/number/summary retain on recreation.
+- Platform-only dataSync lease: counts/name, nonexported/nonsticky, no queue/restart; OS limits apply.
+  Encoding releases lease; separate input notice. Explicit enable asks permission;
+  denial never blocks. Timeout stops service before Cancel/drain. Notices count
+  processed/total; taps no reader. HOME/SIGKILL pairs pass granted/denied: committed
+  file remains; no unfinished/remaining/summary/count/service resume. Isolated DBs.
 ## Next tasks (ordered)
-1. Permitted background progress/completion notifications + actual process-death/
-   no-resume acceptance. Verify committed files survive; no unfinished auto-resume.
-2. EPUB/SRT parsers/original-file imports; mixed-format picker. CI is independent.
+1. EPUB/SRT parsers (pure fixtures), then original-file repository/runtime imports.
+2. Mixed-format picker/summary and reader source ruby; CI is independent.
 3. User-run physical arm64 validation once usable.
 ## Verification
-- PASS: 304 Rust tests, strict Clippy/fmt/diff; both-ABI app/test APK builds, strict
-  Android lint/Kotlin fmt; 14 API-36 x86_64 phone/light picker/cancellation/core/
-  clock/navigation tests. Reports: .local/test-reports/txt-cancel/phone-final/.
-- Commands/fixed failures: DEVELOPMENT.md last section. No blocker/new schema or permission.
-  Host JNI/Full not rerun; process-death/arm64 unverified. Nostr empty; Q188 before forwarding.
+- PASS: both-ABI debug/test builds, strict lint/Kotlin fmt/diff; ten API-36 x86_64
+  tests + two death pairs. Reports: .local/test-reports/txt-background/ and
+  txt-process-death/20261025T212646351293Z.json. Prior Rust baseline: 304 tests.
+- Commands/fixed failures/three Android permissions: DEVELOPMENT.md last section. No blocker/schema.
+  Rust/host JNI/Full/release/reboot not rerun; arm64 unverified. Nostr empty/Q188 before forwarding.

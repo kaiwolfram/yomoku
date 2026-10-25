@@ -2339,3 +2339,55 @@ no open failure/blocker. Restored airplane mode off; AVD remains running. Separa
 host Kotlin/JNI, standalone Full/Python/index scans, release, tablet/dark, actual
 process-death/reboot and physical arm64 were not rerun. Background notifications
 and actual process-death/no-auto-resume acceptance remain unchecked.
+
+## Permitted TXT background notifications and abrupt process death
+
+Verified 2026-10-25 with the Rust PATH/JDK/SDK/Gradle variables above:
+
+```sh
+tools/format-kotlin.sh --check
+./android/gradlew -p android :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug --offline --console=plain
+./android/gradlew -p android :app:connectedDebugAndroidTest :app:lintDebug -Pandroid.testInstrumentationRunnerArguments.class=app.yomoku.ImportNotificationsTest,app.yomoku.TxtPickerTest,app.yomoku.TxtCancellationSessionTest,app.yomoku.NavigationTest --offline --console=plain
+./android/gradlew -p android :app:connectedDebugAndroidTest :app:lintDebug -Pandroid.testInstrumentationRunnerArguments.class=app.yomoku.ImportNotificationsTest --offline --console=plain
+/home/kai/Android/Sdk/platform-tools/adb -s emulator-5554 install -r android/app/build/outputs/apk/debug/app-debug.apk
+/home/kai/Android/Sdk/platform-tools/adb -s emulator-5554 install -r android/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+python3 tools/test-txt-import-process-death.py --serial emulator-5554
+git diff --check
+```
+
+PASS: both-ABI debug/test APK builds, strict Android lint, Kotlin formatting/diff,
+and ten distinct API-36 x86_64 phone/light tests across the final focused run and
+the preceding regression run. The focused two-notification group passes entirely;
+the eight existing picker/native cancellation/navigation tests pass in the broader
+run. Its only failure was the subsequently corrected notification removal wait.
+Reports: `.local/test-reports/txt-background/notifications-final/{report,results}/`
+and `removal-wait-failure/{report,results}/` (eight passing existing regressions).
+The first run's notification publication wait failure is also preserved under
+`notification-wait-failure/`. Both intermediate failures were test assertions made
+before Android finished asynchronous notification publication/removal; await the
+actual NotificationManager state along with helper/service state. Final tests pass.
+
+New coverage: real three-file continuation with stopped Activity and live dataSync
+service; filename/processed progress, recreation, completion counts and PendingIntent
+return without opening reader; separate encoding-needed notification with no lease;
+Cancel/new batch and direct timeout callback stopping the lease before cooperative
+cancellation; no fake result/remaining submission or background service restart.
+
+The host process runner requires both installed APKs (UTP can uninstall them) and
+API 33+. Its debug-only DUMP-protected Activity uses an isolated database and the
+test APK's gated provider. In each permission state, import one BOM TXT with real
+Full, block the second read with the third queued, send HOME then same-UID SIGKILL.
+Check no graceful close/service restart; a fresh process must see exactly the
+committed document, empty batch/counts and no service/progress notification.
+Both granted/denied runs pass with different before/after PIDs. Report:
+`.local/test-reports/txt-process-death/20261025T212646351293Z.json`.
+Permission is restored and the ordinary Library relaunched. Isolated probe DBs
+remain under `no_backup/txt-recovery-<run>` for inspection; normal Library is not
+cleared. This is abrupt process death, not LMK pressure, reboot or storage-cache
+testing. Timeout coverage invokes the framework callback, not a six-hour OS run.
+
+Three new manifest permissions: POST_NOTIFICATIONS, FOREGROUND_SERVICE and
+FOREGROUND_SERVICE_DATA_SYNC. No new dependency/version, Rust/wire or migration.
+Gradle wildcard-IP/local sockets and AVD/KVM needed sandbox escalation. No open
+failure/blocker; emulator remains running. Rust/Clippy/host JNI/codegen, standalone
+Full/Python/index suites, tablet/dark, release/reboot and physical arm64 not rerun.

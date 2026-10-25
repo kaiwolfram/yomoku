@@ -10,7 +10,12 @@ internal class CoreSessionOwner(application: Application) : AndroidViewModel(app
             java.io.File(application.filesDir, "yomoku.sqlite3").absolutePath,
             sudachiDictionaryProvider(application),
         )
-    val txtImports = TxtImports(application.contentResolver, session)
+    val txtImports: TxtImports =
+        TxtImports(
+            application.contentResolver,
+            session,
+            ImportNotifications(application) { txtImports.cancel() },
+        )
 
     override fun onCleared() {
         txtImports.close()

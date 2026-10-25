@@ -16,7 +16,9 @@ Yomoku is under active development. The working app supports:
   unique Japanese word surfaces without changing existing vocabulary statuses.
 - Selecting multiple TXT files with UTF-8/Shift-JIS encoding choices, per-file
   failures/duplicates, current-file/batch progress and a retained import summary
-  returning to Library.
+  returning to Library. Cancel retains completed files. Background imports use a
+  foreground service with permitted progress/completion notifications; unfinished
+  batches never automatically resume after process death.
 - Opening imported text in a centered, scrollable reader, with saved text
   positions and Library progress percentages.
 - Five persisted logical page-length presets: 250, 500, 750, 1,000 and 1,500
@@ -63,8 +65,7 @@ on each newly recorded completion, including rereads with zero new words.
 Nostr, Statistics and Vocabulary tabs currently
 show placeholders.
 
-Planned v1 features include EPUB/SRT imports, batch cancellation/background
-notifications, custom missing-word definitions,
+Planned v1 features include EPUB/SRT imports, custom missing-word definitions,
 reading statistics, optional AnkiDroid integration, curated Nostr reading and
 manual encrypted backups. See the [product specification](docs/PRODUCT_SPEC.md)
 for scope and the [implementation checklist](docs/IMPLEMENTATION_PLAN.md) for
@@ -77,8 +78,10 @@ Aozora ruby/directive handling. Original-file SHA-256 deduplication, original by
 canonical text/ruby, Mode B analysis and vocabulary registration commit together.
 Typed errors support encoding retries; duplicates skip analyzer loading even after
 reopen. Android now connects multiple-TXT selection, encoding choices and per-file
-summaries and current-file/batch progress. Cancellation/background notifications
-and reader ruby rendering remain planned.
+summaries, current-file/batch progress, transaction-aware Cancel and permitted
+background notifications. Android may still stop the process; finished files
+remain, and unfinished files require a new explicit selection. Reader ruby
+rendering remains planned.
 
 ## Repository layout
 

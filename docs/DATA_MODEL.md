@@ -51,7 +51,11 @@ and rejects corruption without repair or reanalysis. Existing single-text snapsh
 token, progress, completion and finished-reopen repositories now accept paste/TXT;
 their historical PastedDocument name/wire format is retained. No ruby reader payload
 exists yet. Typed per-file runtime/JNI imports and the retained Android TXT picker,
-encoding choices, progress and summary are connected. Deleting live content removes file identity/ruby;
+encoding choices, progress, Cancel and summary are connected. The Android foreground
+lease/notifications persist no queue, URI, current-file bytes, progress or summary.
+Process death preserves only committed per-file data; a fresh helper starts empty
+and never automatically resumes unfinished selections. No schema change.
+Deleting live content removes file identity/ruby;
 retained source/chapter/history and global vocabulary survive, and reimport starts
 with fresh IDs, position and finish state. Production deletion is still planned.
 

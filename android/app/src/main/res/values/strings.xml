@@ -2,6 +2,12 @@
     <string name="import_txt">Import TXT files</string>
     <string name="cancel">Cancel</string>
     <string name="import_cancelling">Cancelling…</string>
+    <string name="import_cancelled">Import cancelled</string>
+    <string name="import_complete">Import complete</string>
+    <string name="import_choose_encoding">Choose an encoding in Yomoku</string>
+    <string name="import_notifications">File imports</string>
+    <string name="import_enable_notifications">Enable import notifications</string>
+    <string name="import_background_limits">Android may stop imports in the background. Finished files are kept; unfinished files will not resume after the app closes.</string>
     <string name="import_current_file">File %1$d of %2$d</string>
     <string name="import_files_processed">Processed: %1$d of %2$d</string>
     <string name="import_summary_title">Import summary</string>

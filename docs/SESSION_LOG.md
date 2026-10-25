@@ -1501,3 +1501,29 @@
   background notifications and actual process-death/no-auto-resume acceptance;
   EPUB/SRT and CI independent. Host JNI/Full/release/tablet/dark/physical arm64 not
   rerun. Airplane mode restored off; AVD running. Nostr empty/Q188 unchanged.
+
+## 2026-10-25 — Permitted TXT background notifications and process death
+
+- Added a platform-only nonexported dataSync foreground lease around the existing
+  helper/FIFO, processed/current-file progress and completion/cancellation notices.
+  Release the lease while encoding needs input; use a separate notification ID.
+  Explicit notification enable action; denial never blocks import. Timeout stops
+  the service immediately, then cooperatively cancels/drains. No persisted queue,
+  restart or process-survival guarantee. No Rust/wire/schema/dependency changes.
+- PASS: both-ABI debug/test builds, strict lint/Kotlin fmt/diff, ten distinct API-36
+  x86_64 phone/light notification/picker/native-cancel/navigation tests across the
+  final focused group and earlier regressions. Corrected two test races by waiting
+  for Android notification publication/removal as well as helper/service state.
+- Added a DUMP-protected debug-only isolated recovery Activity and host runner.
+  Two actual HOME/SIGKILL/fresh-process pairs with notification permission granted/
+  denied keep one committed file and discard the blocked/remaining selections;
+  no graceful close, batch counts/summary, service or queue resumes. Permission
+  restored and ordinary Library relaunched; normal Library never cleared by probe.
+- Reports: `.local/test-reports/txt-background/notifications-final/` plus passing
+  regressions in `removal-wait-failure/`; process report
+  `.local/test-reports/txt-process-death/20261025T212646351293Z.json`. Gradle/AVD
+  sockets/KVM needed escalation; no open failure/blocker. Timeout callback tested
+  directly; no LMK/reboot/release/physical-arm64 claim. Emulator left running.
+- Updated README/architecture/data/decisions/plan/development/handoff. Next: pure
+  EPUB/SRT parsers, repository/runtime/mixed-picker wiring. CI independent. Rust/
+  Clippy/host JNI/codegen/Full/index/tablet/dark not rerun; Nostr empty/Q188 unchanged.
