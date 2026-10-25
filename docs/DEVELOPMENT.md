@@ -22,6 +22,33 @@ with 1.99.1. Current host baseline: 256 data-free Rust tests (130 storage, eight
 runtime). Eleven analysis fixtures and one runtime fixture run separately with
 each Full loader via tools/test-sudachi.sh (see below).
 
+## Pure TXT import checks
+
+Verified 2026-10-25, using the Rust PATH workaround above:
+
+```sh
+cargo test -p yomoku-import --locked --offline
+cargo test --workspace --all-features --locked --offline --quiet
+cargo fmt --all -- --check
+cargo clippy --workspace --all-targets --all-features --locked --offline -- -D warnings
+git diff --check
+```
+
+PASS: 13 new TXT tests plus the existing 262 data-free Rust tests, strict Clippy
+and formatting. Fixtures cover strict UTF-8/Shift-JIS/Windows-31J, both-valid
+ambiguity and explicit choice, leading/interior/unsupported BOMs, invalid/empty
+input, exact LF/CRLF/CR and supplementary/decomposed Unicode, Aozora explicit/
+implicit kanji ruby and canonical byte ranges, common typography, preserved unknown/
+semantic/gaiji/malformed/nested notation, large inputs and all five page presets.
+One initial test assumed empty canonical text could be checked before uncertain
+decoding; fix it to explicitly select UTF-8. Review added malformed-quote cases
+and preserves such content as a unit. All final tests pass. Offline Cargo cache
+unpacking needed sandbox escalation; no network download was needed.
+
+This crate is not yet linked into runtime/Android. No Android APK/lint/device,
+Kotlin/JNI/generation, full-index scans, standalone Full fixtures, release or
+physical-arm64 checks were rerun for this parser-only step. No open blocker.
+
 ## Pure logical pagination checks
 `cargo test -p yomoku-core --test pagination --all-features --locked --offline`
 runs the chapter/page/reflow fixtures without Android or SQL. All five presets

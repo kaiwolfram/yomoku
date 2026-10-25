@@ -16,6 +16,16 @@ Successful paste creation returns to Library without opening the reader.
 StorageFinished is internal: both Serde and Facet skip it, so hosts cannot inject
 storage results. No SQL, paths, threads or platform I/O enter core.
 
+`yomoku-import` is a separate pure byte-to-content boundary, currently with TXT
+only. Strict UTF-8/Shift-JIS decoding returns explicit uncertainty before any
+canonicalization; a selected encoding never silently falls back or replaces errors.
+The Aozora parser produces one canonical text unit plus ordered source-ruby UTF-8
+ranges. It hides common typographic directives, retains unknown/semantic/gaiji
+notations and preserves every hard break without chapter inference. Callers retain
+original bytes for future exact-file SHA-256. The parser does not allocate durable
+IDs or perform I/O/analysis/SQL. File repository transactions, ruby persistence,
+runtime/FFI and Android picker/encoding UI are not connected yet.
+
 Pure document values define positive i64 identities, immutable chapter snapshots,
 UTF-8 byte anchors, checked UTF-16 conversions and literal first-line paste titles.
 Vocabulary values define exact-surface identity, five statuses, registration,

@@ -1,5 +1,18 @@
 # Data model
 
+## TXT canonical content (parser only)
+
+`yomoku-import::txt::TxtDocument` contains the selected UTF-8/Shift-JIS encoding,
+one canonical text string and ordered nonoverlapping `SourceRuby` records. Each
+ruby stores a reading and a half-open UTF-8 byte range into the canonical base text,
+after markup removal and before analysis/ID allocation. Hard LF/CRLF/CR and Unicode
+scalars are preserved; ruby readings do not enter analyzed text. Common layout
+directives do not create chapter boundaries. Unsupported notation stays visible.
+These values are not persisted yet; no user schema or existing paste/hash contract
+changes. The future file transaction must hash original source bytes, use the
+filename for TXT's title, and store canonical text/ruby together with original
+Mode B analysis and unique-surface registration.
+
 ## Immutable word/name dictionary index
 
 Android bundles the independently pinned index and complete source/legal bundle;

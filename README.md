@@ -66,6 +66,10 @@ manual encrypted backups. See the [product specification](docs/PRODUCT_SPEC.md)
 for scope and the [implementation checklist](docs/IMPLEMENTATION_PLAN.md) for
 verified progress.
 
+The pure Rust TXT parser is ready for integration: strict UTF-8/Shift-JIS decoding
+with explicit selection for ambiguous bytes, preserved hard breaks, and common
+Aozora ruby/directive handling. File storage and the Android picker remain planned.
+
 ## Repository layout
 
 | Path | Responsibility |
@@ -75,6 +79,7 @@ verified progress.
 | `crates/yomoku-runtime/` | Rust EffectRouter and FIFO worker for I/O and analysis |
 | `crates/yomoku-storage/` | SQLite repositories and numbered migrations |
 | `crates/yomoku-analysis/` | Sudachi adapter and validated token snapshots |
+| `crates/yomoku-import/` | Pure TXT decoding and Aozora canonical text/ruby parsing |
 | `crates/yomoku-ffi/` | Typed Crux/BoltFFI bridge and Kotlin payload generation |
 | `third_party/sudachi/` | Pinned engine source, Android patch and license records |
 | `third_party/dictionaries/` | JMdict/JMnedict source lock, attribution and index contract |

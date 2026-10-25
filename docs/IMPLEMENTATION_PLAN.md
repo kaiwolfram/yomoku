@@ -96,7 +96,7 @@ position/encounter history. Keep incremental builds green.
 - [ ] Expose A/B/C and manual split/merge, default All occurrences versus This occurrence; persist/reverse overrides and verify anchors/history semantics.
 
 ## 4 — Imports and Library
-- [ ] Implement TXT UTF-8/Shift-JIS detection/manual fallback in `crates/yomoku-import`; test hard breaks, uncertain encoding and common Aozora ruby/directives.
+- [x] Implement TXT UTF-8/Shift-JIS detection/manual fallback in `crates/yomoku-import`; thirteen pure host tests verify strict decoding/BOMs, uncertain encoding and explicit selection, exact hard breaks, common Aozora ruby/directives, canonical UTF-8 ranges, malformed/unknown/gaiji preservation and all-preset pagination without inferred chapters. Storage/analysis and Android selection/picker wiring remain below.
 - [ ] Implement EPUB metadata/chapter/headings/emphasis/ruby/image extraction ignoring CSS; fixtures cover malformed archives and chapter boundaries.
 - [ ] Render EPUB images at source position/ratio, cover cache and external links; verify internal links are noninteractive and no TOC navigation.
 - [ ] Add shared full-screen image zoom/pan component; verify phone/tablet rotation.

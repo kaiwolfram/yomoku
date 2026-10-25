@@ -1746,3 +1746,31 @@ Keep gloss qualifiers, domain/dialect/miscellaneous labels and sense notes. JMne
 readings/categories/translations get their own section; show the committed lifetime
 exact-surface count above both sources. No new dependency, storage schema, lookup
 policy or custom-definition behavior is introduced.
+
+## 2026-10-25 — Pure TXT decoding and Aozora canonicalization
+
+Add the planned `yomoku-import` crate before storage/Android file wiring. Pin
+`encoding_rs` 0.8.35 for strict Shift-JIS (WHATWG/Windows-31J-compatible) decoding.
+Verified the [versioned Encoding API](https://docs.rs/encoding_rs/0.8.35/encoding_rs/struct.Encoding.html)
+on 2026-10-25: `decode_without_bom_handling_and_without_replacement` returns
+`Option<Cow<str>>` and treats malformed bytes as fatal. UTF-8 uses `str::from_utf8`.
+The crate license is `(Apache-2.0 OR MIT) AND BSD-3-Clause`; retain its notices
+when it enters distributed Android binaries. It adds only itself to the lockfile;
+`cfg-if` was already present. No statistical detector: a UTF-8 BOM resolves
+automatic detection; otherwise compare both strict decodes,
+select a sole valid encoding or equivalent output, and require explicit selection
+when both are valid but disagree. Unsupported UTF-16/32 BOMs and invalid bytes
+fail without replacement text; a manual choice stays strict. Identical ASCII
+chooses UTF-8. This is validity-based detection of the two supported encodings,
+not a guarantee about arbitrary bytes from other encodings.
+
+Follow the [official Aozora annotation list](https://www.aozora.gr.jp/annotation/)
+for common explicit/implicit kanji ruby and typographic directives. Preserve ruby
+readings separately with canonical UTF-8 ranges; analyze only base text later.
+Hide a conservative set of layout/emphasis/heading directives, retaining their
+surrounding hard breaks. Preserve unknown/malformed notation and gaiji descriptions
+instead of guessing missing characters. Do not infer chapters, normalize Unicode,
+rewrite CR/LF, extract title/author from body text or strip publication footers.
+One canonical text unit will receive its IDs in the future atomic file import.
+File-byte SHA-256, ruby persistence/rendering, filename titles and picker/manual
+selection UI remain separate wiring steps; no current paste semantics change.

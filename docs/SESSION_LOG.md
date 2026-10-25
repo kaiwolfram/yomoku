@@ -1329,3 +1329,22 @@
   Host Rust/JNI/generation, Python/full scans, release, separate process/reboot and
   physical arm64 were not rerun. No open blocker. Updated plan/handoff and supporting
   docs; next: phase-4 TXT imports, then atomic integration. Nostr empty; ask Q188.
+
+## 2026-10-25 — Pure TXT decoding and Aozora parser
+
+- Started from a clean tree and continued phase 4. Added `yomoku-import` with
+  strict UTF-8/Shift-JIS decoding, conservative both-valid uncertainty and explicit
+  manual selection. Verified/pinned encoding_rs 0.8.35 against primary API docs;
+  only one new locked package, no I/O/SQL/core or Android protocol changes.
+- Canonical TXT preserves hard breaks/Unicode, stores source ruby separately as
+  ordered canonical UTF-8 ranges, hides common typographic directives and preserves
+  unknown/semantic/gaiji/malformed notation. No inferred chapters or body titles.
+- PASS: all 275 data-free workspace Rust tests (13 new TXT), strict Clippy, Rust
+  fmt and diff checks. Corrected one fixture's premature empty-text expectation;
+  review also added nested malformed quote/note preservation. Final tests pass.
+- Cargo unpacking needed approved cache-write escalation, using already cached
+  bytes offline. No open blocker. Android/JNI/Kotlin/generation, real dictionaries,
+  release/process/reboot and physical arm64 were not rerun for this pure parser.
+- Updated plan, architecture/data docs, README, decisions, commands and handoff.
+  Next: original-file SHA-256 plus atomic TXT text/ruby/Mode B/registration storage,
+  then typed runtime/Android picker and encoding selection. Nostr empty; ask Q188.

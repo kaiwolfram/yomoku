@@ -1,6 +1,6 @@
 # Resume here
 
-Updated: 2026-10-25. Verified reader dictionary panel.
+Updated: 2026-10-25. Verified pure TXT decoder/Aozora parser.
 Read AGENTS.md, plan phases 2–4 and PRODUCT_SPEC.md sections 3–4.
 ## Working
 - Pure Crux owns navigation/Library/Settings; only Render reaches UI. FIFO owns
@@ -45,36 +45,36 @@ Read AGENTS.md, plan phases 2–4 and PRODUCT_SPEC.md sections 3–4.
   Reload retries exact command; AlreadyRecorded/zero silent. Positive toast once.
   Final new Recorded returns Library + consumed 1.4s confetti (zero/rereads too).
 - NativeBridge requires owned verified FD+1; Rust rehashes/maps/closes all paths.
-  Lazy FIFO analyzer releases after accepted background work; recreation retains it.
-  Never modify live Full inodes; 138-file pins/loader: SUDACHI_MEASUREMENTS.md.
+  Lazy FIFO analyzer releases after background work; keep live Full inodes immutable.
 - Pinned 2026-10-25 JMdict English/JMnedict SQLite/JSON/BINARY + metadata/sources/
   notices: third_party/dictionaries/README.md. Gradle bundles original .gz.bin sources
   and compiler/notices; complete offline Settings credits survive recreation.
-- storage::dictionary::Dictionary opens existing read-only assets, checks format
-  identity (not checksum), unions exact surface/base candidates with per-form
-  provenance/separate source IDs. Typed payloads retain all fields. Display applicable
-  views enforcing re_restr/re_nokanji/stagk/stagr, with all licensed readings.
-- wordDictionaryFiles verifies pinned size/hash on FIFO-only initial path access;
-  cached immutable connection reuses until close. Query failure retires it for repair.
-- load_reader_word validates original B token + live status/exact lifetime count in
-  one user read transaction; separate word/name candidates keep all applicable views.
+- Verified immutable dictionary path opens lazily on FIFO, reuses connection until
+  close/query failure. load_reader_word validates original B/live status/lifetime
+  count in one user read transaction. Exact surface/base word/name candidates retain
+  all metadata and restriction-aware views. Details: ARCHITECTURE.md/DATA_MODEL.md.
 - LoadReaderWord/DismissReaderWord + details/selection/error now reach typed JNI.
   Current/pending/selected/full token identities gate attach; live statuses refresh
   repetitions. Errors survive clock saves; both outcomes drain time. Compose requests
   once gates clear; close/disposal/recreation dismiss. Late callbacks cannot reopen.
+- yomoku-import::txt::parse(bytes, Option<TextEncoding>) is pure: strict UTF-8/
+  Shift-JIS (encoding_rs 0.8.35), BOM detection, explicit both-valid ambiguity.
+  Canonical text preserves hard breaks; source ruby uses separate UTF-8 ranges.
+  Common typography hidden; unknown/gaiji/malformed kept. One text, no chapter
+  inference. Not connected to storage/runtime/Android; original bytes must be hashed.
 
 ## Next tasks (ordered)
-1. Continue phase-4 TXT imports: UTF-8/Shift-JIS/manual fallback and Aozora fixtures;
-   verify dependency APIs before adoption, then atomic analysis/registration wiring.
-2. CI or missing-match custom definitions remain independent open tasks.
+1. Add original-file SHA-256 dedup + atomic TXT canonical text/ruby/Mode B/unique
+   registration storage; filename title. Preserve paste semantics and source bytes.
+2. Wire typed runtime/FFI and Android multiple-file picker/encoding selection;
+   summary returns to Library. CI/custom definitions are independent open tasks.
 3. User-run physical arm64 validation once usable.
 
 ## Verification / environment
-- PASS this slice: Kotlin fmt/diff, both-ABI debug/test APKs + strict Android lint;
-  14 panel/span/session tests phone/light + wide/dark; 17 reader/clock/paste/nav tests.
-  Two fixture failures corrected; phone movement rerun passes. DEVELOPMENT.md commands.
-- Prior 262 Rust tests/Clippy/host JNI/generation unchanged, not rerun; no release/
-  Python/full scans/standalone Full/process/reboot/physical arm64 rerun.
+- PASS this slice: 275 data-free Rust tests (13 new TXT), strict Clippy/fmt/diff.
+  cargo test -p yomoku-import --locked --offline; full commands: DEVELOPMENT.md.
+- No Android/Kotlin/JNI/generation/Python/full-data/release/process/reboot/arm64
+  rerun this pure parser step. Offline dependency cache unpack required escalation.
 - Reports: .local/test-reports/reader-dictionary-panel/. AVD restored to phone/light.
 - Run host JNI and Android builds sequentially: BoltFFI replaces shared artifacts.
 - No open failure/blocker. Nostr empty; ask Q188 before forwarding.
