@@ -5,6 +5,7 @@ pub mod active_time;
 pub mod analysis;
 pub mod app;
 pub mod completion;
+pub mod dictionary;
 pub mod document;
 pub mod pagination;
 pub mod reader;

@@ -4,6 +4,7 @@
 
 mod analysis;
 mod completions;
+pub mod dictionary;
 mod documents;
 mod encounters;
 mod imports;

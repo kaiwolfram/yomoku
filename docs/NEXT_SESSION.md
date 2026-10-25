@@ -1,6 +1,6 @@
 # Resume here
 
-Updated: 2026-10-25. Reproducible offline JMdict English/JMnedict index verified.
+Updated: 2026-10-25. Typed read-only Rust word/name lookup verified.
 Read AGENTS.md, plan phases 2–4 and PRODUCT_SPEC.md sections 3–4.
 
 ## Working
@@ -52,28 +52,29 @@ Read AGENTS.md, plan phases 2–4 and PRODUCT_SPEC.md sections 3–4.
   Never modify live Full inodes. Sudachi v0.7.0/android-loader-v1 + Full 20261015
   pinned; 138 source files verified; Full outside Git, notices bundled. Measurements:
   SUDACHI_MEASUREMENTS.md. Physical arm64 remains deferred user trial.
-- tools/prepare-dictionaries.py compiles official 2026-10-25 JMdict English/JMnedict
-  into separate immutable SQLite + JSON payloads/BINARY exact forms. Preserves all
-  English senses/readings/restrictions/inherited POS/separate names. Pins checksums/
-  dates/counts; staged read-only publication never replaces prior output. Default
-  offline; explicit --download rejects daily upstream changes. Full source archives,
-  CC BY-SA 4.0 notices/docs and build hashes/tool versions retained in local bundle.
-  Contract/update procedure: third_party/dictionaries/README.md. No APK wiring yet.
+- prepare-dictionaries.py builds pinned 2026-10-25 JMdict English/JMnedict immutable
+  SQLite + JSON/BINARY forms, retaining full metadata, sources, checksums and CC
+  BY-SA 4.0 notices. Offline by default; never replaces published output. Contract:
+  third_party/dictionaries/README.md. No APK wiring yet.
+- storage::dictionary::Dictionary opens existing read-only assets, checks format
+  identity (not checksum), unions exact surface/base candidates with per-form
+  provenance and separate source IDs. Typed core payloads retain all fields;
+  applicable index views enforce re_restr/re_nokanji/stagk/stagr. Display views,
+  not raw senses. Keep all licensed readings, never filter by analyzer reading.
 
 ## Next tasks (ordered)
-1. Add read-only Rust dictionary asset access/typed candidate lookup, preserving
-   surface/base identity, reading/sense restrictions and all matching word/name data.
-2. Bundle verified index/notices; connect definitions/readings/compact POS, separate
-   names and lifetime encounter count to panel via FIFO/FFI; expose Settings credits.
+1. Bundle/verify immutable dictionary index and complete notices; expose Settings
+   credits. Installer must verify bytes before supplying the Rust repository path.
+2. Connect applicable definitions/readings/compact POS, separate names and lifetime
+   encounter count to panel via FIFO/FFI. Retain current reader-key cancellation.
 3. User-run physical arm64 validation once usable. Formats/CI remain open.
 
 ## Verification / environment
-- PASS this slice: nine synthetic/full dictionary tests; both 962,639-entry bundles
-  byte-identical (Python 3.14.8/SQLite 3.51.2), 238 Rust tests, strict Clippy/Rust fmt/
-  Kotlin fmt/diff. Exact commands/index hash: DEVELOPMENT.md, dictionary README.
+- PASS: 248 data-free Rust tests (122 storage), strict Clippy/Rust fmt/diff; five
+  pure + five repository lookup tests; explicit full-index test validates 962,639
+  payloads and real lookups; nine Python tests. Commands: DEVELOPMENT.md/README.
 - Generated data: .local/dictionaries/index-v1-20261025{,-repeat}/ (not in Git).
-  No app dependency/user schema/FFI/UI change; Android/JNI/generation/Full/release/
-  recovery/physical-arm64 not rerun. Prior 24 selected Android tests + wide/dark word
-  matrix passed; reports .local/test-reports/reader-words/. No open failure/blocker.
-  Downloads needed escalation; unclosed SQLite handles fixed. Nostr empty; Q188
-  required before forwarding. Keep immutable index separate from mutable user DB.
+  No user schema/FFI/UI change; existing locked serde_json added directly to storage.
+  Android/JNI/generation/Full/release/recovery/physical-arm64 not rerun. Prior 24
+  Android tests + wide/dark word matrix passed: .local/test-reports/reader-words/.
+  No open failure/blocker. Nostr empty; ask Q188 before forwarding.

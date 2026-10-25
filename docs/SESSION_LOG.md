@@ -1224,3 +1224,22 @@
   filtering, then definitions/names/lifetime count in the existing panel. Android,
   host JNI/generation, standalone Full/release/recovery/physical-arm64 not rerun.
   Nostr configuration remains empty; ask Q188 before forwarding.
+
+## 2026-10-25 — Typed read-only Rust dictionary candidates
+
+- Started clean; added core typed word/name payloads and pure exact-form rules for
+  all licensed readings and combined spelling/reading sense restrictions. Added a
+  separate read-only storage connection with format checks, bound indexed queries,
+  source/base provenance, source-scoped deduplication and separate name results.
+  Complete upstream metadata remains intact; display uses applicable index views.
+  Invalid input fails without partial results, writes or repairs. Installer checksum
+  verification/publication remains future work; no mutable database/FFI/UI change.
+- PASS: 248 data-free Rust tests (ten new), strict Clippy/Rust fmt/diff, nine Python
+  tests and explicit full-index Rust validation of all 962,639 payloads plus real
+  inflected/kana/simultaneous-word-name/no-match lookups. Reused locked serde_json;
+  no new packages. Fixed feature-gated preparation call and relative test data path.
+- Updated plan/handoff (80 lines), architecture/data/decisions/development, index
+  contract and README. No open blocker. Next: verified Android index/notices and
+  Settings credits, then FIFO/FFI definitions/readings/compact POS/names/lifetime
+  count in the existing panel. Android/JNI/generation/Kotlin/Full/release/recovery/
+  physical-arm64 not rerun. Nostr remains empty; Q188 required before forwarding.

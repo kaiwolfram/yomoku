@@ -18,7 +18,7 @@ with functioning rustup can omit the PATH workaround. Do not assume this compile
 is the project's minimum supported version; establish that with dependencies.
 Cargo.lock is retained for reproducible application development.
 Crux 0.20.0 declares Rust 1.90 minimum; the full locked graph has only been tested
-with 1.99.1. Current host baseline: 238 data-free Rust tests (117 storage, eight
+with 1.99.1. Current host baseline: 248 data-free Rust tests (122 storage, eight
 runtime). Eleven analysis fixtures and one runtime fixture run separately with
 each Full loader via tools/test-sudachi.sh (see below).
 
@@ -1787,3 +1787,38 @@ The retired wiki URL returned a closure page; retained its linked complete stati
 project document instead. No open failure/blocker. No app dependency/user schema/
 FFI/UI change; Android APK/lint/device, host JNI/generation, standalone Full,
 release, process/reboot and physical-arm64 checks were not rerun for this tooling.
+
+## Typed read-only Rust dictionary lookup
+
+Verified 2026-10-25 using the Rust PATH workaround above. Run from repository root:
+
+```sh
+cargo test --workspace --all-features --locked --offline --quiet
+cargo fmt --all -- --check
+cargo clippy --workspace --all-targets --all-features --locked --offline -- -D warnings
+YOMOKU_DICTIONARY_INDEX="$PWD/.local/dictionaries/index-v1-20261025/dictionary.sqlite3" cargo test -p yomoku-storage full_index_all --locked --offline -- --ignored --nocapture
+python3 -W error tools/test-prepare-dictionaries.py --full .local/dictionaries/index-v1-20261025 -v
+git diff --check
+```
+
+PASS: 248 data-free Rust tests (122 storage), strict Clippy/fmt, nine Python
+synthetic/full tests, and one explicit full-index Rust test validating all 218,957
+word/743,682 name payloads plus real inflected/kana/simultaneous-word-name lookups.
+The latter took 10.14s locally, which is a validation duration, not a lookup benchmark.
+Without the explicit ignored-test command the downloaded-data test does not run.
+
+Ten new data-free tests cover all licensed readings, combined spelling/reading
+sense restrictions, kana-only/re_nokanji, ambiguous forms, no applicable senses,
+source-scoped overlapping IDs, surface/base provenance and deduplication, all
+payload metadata, supplementary/decomposed Unicode/NUL, bound SQL/no match,
+indexed query plan, read-only rejection/unchanged bytes/reopen, missing/corrupt/
+unsupported assets and malformed/unknown/inconsistent payloads with no repair.
+
+Intermediate failures fixed: `prepare_cached` is unavailable with current
+rusqlite features (use existing `prepare`); the initial relative full-index path
+resolved inside the crate (use the absolute environment path above). Final checks
+pass; no open failure/blocker. Existing locked serde_json 1.0.154 is now a direct
+storage dependency; no new packages, user migrations, generated bridge or UI changes.
+Android build/lint/device, Kotlin formatting, host JNI/generation, standalone
+Sudachi Full, release, process/reboot and physical-arm64 checks were not rerun.
+Android verified installation/notices and dictionary FIFO/FFI/panel/counts remain.

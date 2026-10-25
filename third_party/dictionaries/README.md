@@ -88,9 +88,31 @@ XML entities expand to upstream human-readable labels. An omitted word POS inher
 the previous sense's POS within that entry, including across non-English senses.
 Spelling/reading and sense restrictions remain explicit: exact index matches are
 **candidates**, not permission to show every restricted sense for every spelling.
-Runtime surface/base-form candidate selection, restriction filtering, shorter POS
-labels and typed Rust lookup remain the next slice. No analyzer-based filtering,
-vocabulary mutation, encounter query or application I/O is implemented here.
+Rust lookup is implemented by `yomoku-storage::dictionary::Dictionary`; pure typed
+payloads and restriction rules live in `yomoku-core::dictionary`. The independent
+read-only connection validates format identity, binds exact surface/base forms,
+unions/deduplicates source-scoped entries and retains both query provenances.
+It returns complete raw payloads alongside applicable spelling/reading/sense
+indices. Display only those applicable views: raw payloads can contain senses
+restricted to other spellings/readings. All appropriate readings survive; the
+analyzer's single reading never filters homophones. No normalization/fuzzy lookup,
+vocabulary mutation or encounter query occurs. Android verified publication,
+FIFO/FFI/UI, shorter POS labels and encounter counts remain next. This repository
+checks format identity, not cryptographic integrity; an installer must verify the
+manifest/checksum before supplying a published immutable path.
+
+Rust checks (run from the repository root; the data path must be absolute because
+Cargo runs tests from the package directory):
+
+```sh
+cargo test -p yomoku-core --test dictionary --all-features --locked --offline
+cargo test -p yomoku-storage dictionary --locked --offline
+YOMOKU_DICTIONARY_INDEX="$PWD/.local/dictionaries/index-v1-20261025/dictionary.sqlite3" cargo test -p yomoku-storage full_index_all --locked --offline -- --ignored
+```
+
+The regular checks require no downloaded data. The explicitly ignored full-index
+test decodes/validates every real payload and checks 食べた→食べる, kana, simultaneous
+東京 word/name results and no match. No lookup-performance or APK-size claim.
 
 ## Updates and evidence
 

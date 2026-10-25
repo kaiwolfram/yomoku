@@ -91,8 +91,20 @@ publish by directory rename without replacing existing output. The bundle retain
 sources, complete attribution/licences/docs and reproducibility hashes/tool versions.
 See `third_party/dictionaries/README.md` for the index contract/update procedure.
 This tooling is separate from mutable user SQLite and is not yet bundled or
-opened by Android/runtime. Rust candidate lookup, restriction filtering, dictionary
-FFI/UI and Settings attribution remain the next integration; no I/O enters core.
+opened by Android/runtime. `yomoku-storage::dictionary::Dictionary` opens an existing
+published asset with read-only SQLite flags (no create, URI options or migrations),
+checks application/schema identity and performs bound BINARY indexed lookups.
+It unions exact surface/base candidates, preserving the original surface, both
+query-form provenances and source-scoped IDs in separate word/name collections.
+Typed payloads and pure spelling/reading/sense selection live in core; no I/O does.
+All upstream metadata stays intact. Applicable views reference ordered payload
+indices and enforce re_restr/re_nokanji plus both stagk/stagr restrictions. They
+keep every licensed reading rather than filtering by one analyzer reading.
+Malformed/unknown fields and inconsistent references fail the whole lookup.
+This connection is separate from mutable user Storage; reads never register or
+record encounters. The future Android installer must verify/publish immutable
+bytes before supplying the path; open checks format identity, not a checksum.
+Dictionary FIFO/FFI/UI, compact POS and Settings attribution remain next.
 
 Pure `active_time` accounts pending reading milliseconds using caller-supplied
 monotonic timestamps. Resume/interaction arms a five-minute idle window; dictionary

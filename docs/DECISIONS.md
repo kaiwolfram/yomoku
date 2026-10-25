@@ -1625,3 +1625,35 @@ reproducibility with identical inputs/compiler/toolchain. Two complete builds
 match byte-for-byte on Python 3.14.8/SQLite 3.51.2. Result: 279,109,632-byte index;
 no Android extraction, asset/APK size or lookup-performance claim. App bundling,
 typed Rust lookup, encounter count and panel integration remain separate work.
+
+## 2026-10-25 — Typed read-only exact-form dictionary candidates
+
+Keep dictionary I/O in a separate `yomoku-storage::dictionary::Dictionary`, never
+in core or the mutable user database. Open existing paths with explicit read-only
+SQLite flags, without URI interpretation, creation or migrations; check index
+application/schema identity and bind exact BINARY surface/base queries. The
+installer remains responsible for verifying checksums and immutable publication;
+this API does not claim to verify asset bytes. No Android asset installation yet.
+
+Return the union of every exact surface and optional Sudachi base candidate,
+deduplicated by source/positive ID, keeping the exact vocabulary surface and both
+query-form provenances. Separate word/name lists preserve overlapping source IDs.
+Retain complete ordered typed payloads and supply applicable indices into them.
+Pure core rules pair written forms with all licensed readings, kana forms with all
+licensed spelling pairs, and satisfy both sense spelling/reading restrictions.
+re_nokanji/kana-only matches have no spelling pair. Do not filter with Sudachi's
+single reading: one written spelling intentionally shares all appropriate readings.
+Raw candidate payloads are not authorization to display restricted senses. A pair
+with no applicable senses is omitted from the display view; source data stays intact.
+
+Deserialize strictly, reject missing/unknown structures, non-English translations,
+bad references or mismatched indexed forms, and fail the complete lookup without
+partial output or repair. No registration, status, position or encounter writes.
+Use existing pinned rusqlite 0.40.2 and add the already locked serde_json 1.0.154 as
+a direct storage dependency; no version changes or new packages. Primary API
+evidence: locally installed published crate source/docs (`Connection::open_with_flags`,
+`pragma_query_value`, `prepare`, bound `query`, `is_readonly`, `serde_json::from_str`)
+and the pinned source XML's embedded DTD comments for re_restr/re_nokanji/stagk/stagr.
+`prepare_cached` is feature-gated out by the existing rusqlite configuration; use
+ordinary preparation rather than enabling features. Compact POS and FIFO/FFI/UI
+remain the next integration; no public bridge schema changes in this step.

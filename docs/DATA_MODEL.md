@@ -11,8 +11,18 @@ a BINARY composite primary key for all exact written/reading candidates; no
 normalization or fuzzy matching changes spelling identity. `metadata` stores the
 locked source provenance. Full field definitions are in
 `third_party/dictionaries/README.md`. These tables do not refer to vocabulary IDs,
-statuses, positions or encounter history. Runtime lookup/asset loading is future
-work; opens must remain read-only and apply retained restrictions appropriately.
+statuses, positions or encounter history. The Rust dictionary repository opens
+only existing read-only assets and rejects unsupported format identity. It returns
+typed candidates separately for words/names, ordered by source-scoped entry ID,
+retaining surface/base identity and per-form provenance without duplicate entries.
+Complete payloads preserve original order/metadata; applicable reading/sense views
+use indices into those payloads. Written queries select all permitted readings;
+kana queries select every permitted spelling pair. re_nokanji/kana-only readings
+have no spelling pair; both stagk and stagr must be satisfied for each displayed
+sense. Empty applicable views authorize no displayed senses. No analyzer reading,
+normalization or fuzzy fallback narrows/broadens matches. Index access never changes
+vocabulary, encounters or position. APK verification/loading and FFI remain future
+work; format identity checks alone do not verify the asset checksum.
 
 The build bundle preserves original compressed snapshots, a source/date/checksum
 lock, complete CC BY-SA attribution/legal documentation and a manifest of artifact

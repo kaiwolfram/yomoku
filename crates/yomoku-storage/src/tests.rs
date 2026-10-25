@@ -38,10 +38,10 @@ fn legacy_position(
     })
 }
 
-struct TestDatabase(PathBuf);
+pub(crate) struct TestDatabase(PathBuf);
 
 impl TestDatabase {
-    fn new() -> Self {
+    pub(crate) fn new() -> Self {
         // create_dir, rather than create_dir_all, refuses to reuse another test's files.
         let path = std::env::temp_dir().join(format!(
             "yomoku-storage-{}-{}-{}",
@@ -56,7 +56,7 @@ impl TestDatabase {
         Self(path)
     }
 
-    fn path(&self) -> PathBuf {
+    pub(crate) fn path(&self) -> PathBuf {
         self.0.join("読書.sqlite3")
     }
 }

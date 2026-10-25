@@ -33,6 +33,9 @@ Yomoku is under active development. The working app supports:
 Dictionary definitions and encounter counts remain pending in the app. A
 [pinned offline JMdict/JMnedict compiler](third_party/dictionaries/README.md)
 prepares the English word/name index with complete attribution and lookup fixtures.
+Rust now reads this index through a separate read-only repository, with typed
+surface/base candidates and pure spelling/reading/sense restriction rules.
+Android dictionary installation and panel integration remain pending.
 Compose reads stored Mode B tokens through typed core/FIFO/FFI, validates the
 current page identity and
 converts exact UTF-8 spans to UTF-16 without splitting Unicode scalars. Status
