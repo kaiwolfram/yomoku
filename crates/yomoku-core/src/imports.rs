@@ -28,3 +28,11 @@ pub struct SrtImport {
     pub filename: String,
     pub encoding: Option<TextEncoding>,
 }
+
+/// EPUB is a container with its own XML encoding; no text-decoding choice applies.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
+pub struct EpubImport {
+    pub original_bytes: Vec<u8>,
+    pub filename: String,
+}

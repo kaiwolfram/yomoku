@@ -317,4 +317,5 @@ internal fun DocumentError.messageResource(): Int =
         DocumentError.SRTUNSUPPORTEDENCODING -> R.string.error_srt_unsupported_encoding
         DocumentError.SRTUNDECODABLE -> R.string.error_srt_undecodable
         DocumentError.EMPTYSRT -> R.string.error_empty_srt
+        DocumentError.INVALIDEPUB -> R.string.error_invalid_epub
     }

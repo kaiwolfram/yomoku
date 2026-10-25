@@ -1688,3 +1688,31 @@
   import isolation/cancellation, mixed picker and reader assets. App stays paste/TXT;
   complete EPUB integrity-read cost remains unmeasured. Standalone Full/index/Python,
   release, process-death/reboot/tablet/dark and physical arm64 not rerun. Nostr/Q188 unchanged.
+
+
+## 2026-10-26 — EPUB per-file FIFO and typed JNI imports
+
+- Started clean. Added typed EPUB bytes/name event, pure storage intent and
+  encoding-independent InvalidEpub error; Android pauses its reader clock for the
+  event and renders the error. Mixed picker selection stays a separate task.
+- Wired bounded pre-parse/shared exact-byte preflight to the existing lazy FIFO
+  analyzer and atomic whole-book repository. All chapters share one transaction;
+  Created projects a Library reference without another read or auto-opening.
+  EPUB reuses the direct cancellation registry/commit gate and analyzer lifecycle.
+- Added two core/eight worker fixtures, expanded all-format preflight coverage and
+  a real-Full Kotlin/JNI EPUB suite. Verify full content/analyses/registration,
+  unchanged statuses/no encounters, duplicates/renamed/later-chapter/finished state,
+  invalid containers before Full, every-write/later-chapter/deferred-COMMIT rollback,
+  queued/load/chapter/draining cancellation, prior-file preservation and retry.
+- PASS: 409 data-free Rust tests, strict Clippy/Rust+Kotlin formatting/diff,
+  real-Full Kotlin/JNI/seven Unicode exchanges/repeatable generated bindings, both-ABI APK/strict Android lint and
+  eight API-36 x86_64 persistence/clock regressions. Reports/logs retained under
+  .local/test-reports/epub-worker/. Exact commands/results: DEVELOPMENT.md end.
+- Fixture fixes: refresh a fresh worker's Library, share its archive module for
+  Clippy, use Kotlin unsigned counters and trim the expected-text file's final LF.
+  No production parser change. Gradle's sandbox wildcard-IP lock-service failure
+  required approved outside-sandbox execution. Final checks pass; no open blocker.
+- No dependency/version/migration/new permission. Large-book double-parse/complete
+  saved-content validation costs are unmeasured. Standalone Full/index/Python,
+  release app/process-death/reboot/tablet/dark/physical arm64 were not rerun.
+  Next: mixed EPUB/TXT/SRT picker/summary/Cancel/notifications, then reader assets.

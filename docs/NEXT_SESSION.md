@@ -1,24 +1,21 @@
 # Resume here
-Updated: 2026-10-26. Ordered app/FIFO/typed JNI readers; app imports paste/TXT.
-Read AGENTS.md, plan phases 2–4 and PRODUCT_SPEC.md sections 3–4.
+Updated: 2026-10-26. EPUB FIFO/typed JNI import added; app picker stays paste/TXT.
 ## Working
 - Pure Crux routes/Library/Settings; Render-only UI; FIFO SQLite/analysis. Starts Library.
 - Exact chapter-local UTF-8 position/whole-book Library percentage + five presets
   persist; reflow preserves offset. Scroll resets on movement/reopen; column 720dp.
-  Next/Previous/counter below content; net 48dp swipes need no bottom. Previous
-  saves position only. Busy/pending gates reject duplicates; deliberate rereads count.
+  Next/Previous/counter below content; net 48dp swipes need no bottom. Previous saves
+  position only. Busy/pending gates reject duplicates; deliberate rereads count.
 - Paste atomically deduplicates SHA-256, saves original B + unique registrations.
   Existing preserves title/status/progress without rescan/writes. Created/Existing
   show dismissible Library summary; never auto-open. Nostr config remains empty.
 - Generic read-only load versus explicit open: finished books reset to first
   chapter/page/preset/B atomically only on open. Finish survives movement/time/reflow;
   deletion resets it, preserving history. Missing never rescans.
-- NEW App/FIFO/typed bridge uses ReaderDocument/DocumentReaderSnapshot for loads,
-  opens, saves and completion reloads, retaining all ordered chapters. ViewModel's
-  loaded_document shape changed; generated codecs rebuilt. Legacy single-text
-  repository APIs remain. Core validates one keyed original B/Missing per chapter,
-  freezes map on accepted open, selects current chapter after movement; plain loads
-  cannot replace it. Previous crosses chapters; global page counters/progress.
+- App/FIFO/typed bridge uses ReaderDocument/DocumentReaderSnapshot for loads,
+  opens, saves and completion reloads, retaining all ordered chapters.
+  Core validates/freezes keyed B/Missing per chapter on accepted open and selects
+  current identity on movement; plain loads cannot replace it. Previous crosses chapters; global page counters/progress.
 - Token reads load original B/live statuses/metadata + clipped UTF-8 ranges atomically;
   completion uses token start. Deleted IDs absent. Whole-chapter validation per lookup.
   Loads wait for busy/pending saves; full page/base/result identities gate callbacks.
@@ -64,15 +61,20 @@ Read AGENTS.md, plan phases 2–4 and PRODUCT_SPEC.md sections 3–4.
 - Shared file preflight/Existing outcomes return Library references, validating the
   whole document atomically. Duplicate EPUB via TXT/SRT preserves renamed/later-chapter/
   finished state without Full/reset/writes. Corruption fails; later files continue.
+- EPUB ImportEpub carries bytes/name, no text encoding; bounded parse before Full,
+  atomic repository rechecks. InvalidEpub covers container errors. Shared cancel
+  registry reaches queued/Full/chapter/draining work; cache evicts on engine failure.
+  Cross-format preflight preserves complete first interpretation before name/parse.
 ## Next tasks (ordered)
-1. EPUB FIFO/typed JNI import using shared preflight: duplicates, encoding-independent
-   errors, later-chapter/commit rollback, Cancel and failed-file isolation. No truncation.
-2. Mixed EPUB/TXT/SRT picker/summary/Cancel; reader images/ruby. CI independent.
+1. Mixed EPUB/TXT/SRT picker/summary/Cancel, including format-specific failures and
+   background notifications; never auto-open reader. Retain existing TXT behavior.
+2. Reader formatting/ruby/images + external links/shared viewer. CI independent.
 3. User-run physical arm64 validation once usable (still deferred).
 ## Verification
-- 399 data-free Rust tests, Clippy/fmt/Kotlin fmt/diff, real-Full Kotlin/JNI + seven
-  Unicode exchanges including ordered payload; both-ABI APK builds/strict Android lint.
-- PASS: 13 focused API-36 x86_64 reader/persistence/timer tests; repeated Crux/native
-  generation matches exactly. Reports: .local/test-reports/ordered-reader/.
-- Exact commands/results: DEVELOPMENT.md end. Standalone Full/index/Python, release,
-  process-death/reboot/tablet/dark/physical arm64 not rerun. No product blocker/Q188.
+- 409 data-free Rust tests, Clippy/fmt/Kotlin fmt/diff. EPUB worker fixtures cover
+  all write/later-chapter/deferred-COMMIT rollback, cancellation and file isolation.
+- Real-Full Kotlin/JNI EPUB + existing suites/seven Unicode exchanges pass. Both-ABI
+  APK/strict lint and eight API-36 persistence/clock tests pass; reports/logs under
+  .local/test-reports/epub-worker/. Commands/results: DEVELOPMENT.md end.
+- Repeated codegen matches. EPUB double-parse/integrity-read costs unmeasured.
+  No new dependency/migration or open blocker/Q188. Deferred checks: DEVELOPMENT.md.

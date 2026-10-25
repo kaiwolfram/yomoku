@@ -2724,6 +2724,88 @@ fn cancelled_srt_clears_busy_without_an_error_summary_or_reader_movement() {
 }
 
 #[test]
+fn epub_import_waits_for_reader_saves_and_only_committed_success_returns_to_library() {
+    use yomoku_core::{active_time::PendingReadingTime, imports::EpubImport};
+    let input = EpubImport {
+        original_bytes: "猫".as_bytes().to_vec(),
+        filename: "book.epub".into(),
+    };
+    for completion in [false, true] {
+        let (core, _) = analyzed_reader();
+        let before = core.view().reader;
+        let saved = restore_time(&core, 10);
+        let mut effects = if completion {
+            core.process_event(forward(&core, 1234))
+        } else {
+            core.process_event(Event::CheckpointReadingTime(
+                yomoku_core::active_time::ReadingTimeUpdate {
+                    pending: PendingReadingTime::from_millis(100).unwrap(),
+                    ..saved.value
+                },
+            ))
+        };
+        assert!(core
+            .process_event(Event::ImportEpub(input.clone()))
+            .is_empty());
+        finish(
+            &core,
+            &mut effects,
+            StorageResult::Failed(DocumentError::Unavailable),
+        );
+        assert!(core
+            .process_event(Event::ImportEpub(input.clone()))
+            .is_empty());
+        assert_eq!(core.view().reader, before);
+    }
+    let core = Core::<Yomoku>::new();
+    core.process_event(Event::SelectDestination(Destination::Vocabulary));
+    let mut effects = core.process_event(Event::ImportEpub(input.clone()));
+    assert_eq!(
+        storage_operation(&effects),
+        StorageOperation::ImportEpub(input.clone())
+    );
+    assert!(core.view().import_summary.is_none());
+    finish(
+        &core,
+        &mut effects,
+        StorageResult::Failed(DocumentError::InvalidEpub),
+    );
+    assert_eq!(core.view().destination, Destination::Vocabulary);
+    assert!(core.view().import_summary.is_none());
+    let mut effects = core.process_event(Event::ImportEpub(input));
+    let mut imported = document("猫");
+    imported.title = "book.epub".into();
+    finish(
+        &core,
+        &mut effects,
+        StorageResult::Created(imported.library_summary().unwrap()),
+    );
+    assert_eq!(core.view().destination, Destination::Library);
+    assert_eq!(core.view().content_route, ContentRoute::Main);
+    assert_eq!(core.view().import_summary.unwrap().title, "book.epub");
+    assert!(core.view().reader.is_none() && core.view().loaded_document.is_none());
+}
+
+#[test]
+fn cancelled_epub_clears_busy_without_an_error_summary_or_reader_movement() {
+    let (core, _) = analyzed_reader();
+    let before = core.view();
+    let mut effects = core.process_event(Event::ImportEpub(yomoku_core::imports::EpubImport {
+        original_bytes: b"cancelled".to_vec(),
+        filename: "cancelled.epub".into(),
+    }));
+    assert!(core.view().storage_busy);
+    finish(&core, &mut effects, StorageResult::ImportCancelled);
+    let after = core.view();
+    assert!(!after.storage_busy);
+    assert!(after.document_error.is_none() && after.import_summary.is_none());
+    assert_eq!(after.documents, before.documents);
+    assert_eq!(after.reader, before.reader);
+    assert_eq!(after.destination, before.destination);
+    assert_eq!(after.content_route, before.content_route);
+}
+
+#[test]
 fn ordered_snapshot_rejects_missing_duplicate_and_foreign_chapter_analysis() {
     use yomoku_core::document::ReaderDocument;
     let mut document: ReaderDocument = document("猫").into();

@@ -84,10 +84,13 @@ with duplicate detection and cancellation. Typed FIFO/JNI imports, encoding retr
 duplicate-no-Full and direct cancellation are verified; Android picker wiring is pending.
 Import results now use format-independent Library references. TXT/SRT duplicate
 attempts can reference an existing EPUB while preserving its whole-book progress,
-title and finish marker without decoding or loading Full. EPUB per-file worker
-imports, Android selection and reader formatting/images/ruby remain planned;
+title and finish marker without decoding or loading Full. EPUB FIFO/typed JNI
+imports now validate containers before Full, persist/analyze every chapter atomically,
+and share direct cancellation. Host fixtures cover later-chapter/write/commit
+rollback, duplicates, original analysis/status/progress and failed-file recovery.
+Android mixed selection and reader formatting/images/ruby remain planned;
 selectable app formats are still paste/TXT.
-Planned v1 features include EPUB/SRT imports, custom missing-word definitions,
+Planned v1 features include Android EPUB/SRT selection, custom missing-word definitions,
 reading statistics, optional AnkiDroid integration, curated Nostr reading and
 manual encrypted backups. See the [product specification](docs/PRODUCT_SPEC.md)
 for scope and the [implementation checklist](docs/IMPLEMENTATION_PLAN.md) for

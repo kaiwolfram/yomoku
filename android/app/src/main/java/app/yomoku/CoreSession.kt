@@ -103,7 +103,8 @@ internal class CoreSession(
             is Event.LoadPaste,
             is Event.CreatePaste,
             is Event.ImportTxt,
-            is Event.ImportSrt -> pauseClock()
+            is Event.ImportSrt,
+            is Event.ImportEpub -> pauseClock()
             is Event.SaveReadingPosition -> if (event.value != view.reader?.position) pauseClock()
             else -> Unit
         }

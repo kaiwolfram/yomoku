@@ -2232,3 +2232,30 @@ parser's U+FFFC placeholder and complete without Japanese occurrences. Do not
 special-case them as empty text. Android picker stays paste/TXT until EPUB FIFO
 imports and mixed-file behavior are verified. Complete saved-content validation
 still reads EPUB assets on every reader operation; performance remains unmeasured.
+
+
+## 2026-10-26 — EPUB per-file FIFO and typed JNI imports
+
+Add `EpubImport` (original bytes, literal display name) and `ImportEpub` to the
+existing pure event/storage protocols. EPUB XML/container encoding is independent
+of TXT/SRT's optional text encoding; expose one `InvalidEpub` container error for
+invalid, unsupported, empty or over-budget archives. Keep the bounded parser's
+specific diagnostics inside the import boundary. No new production dependency,
+version, migration, permissions or data-destructive behavior.
+
+Use shared read-only exact-byte preflight before filename/container validation or
+Full loading, including duplicates whose first interpretation was TXT/SRT. The
+repository repeats lookup/parse under its whole-book transaction. Validate/drop a
+bounded parsed projection before loading Full; this follows TXT/SRT preflight and
+avoids dictionary extraction for invalid containers. The extra parse has unmeasured
+large-book cost. Reuse one worker-owned analyzer across chapters/files; evict after
+engine/invalid-analysis failure and release while backgrounded. Return a Library
+summary from the committed ordered document, without a second database read or
+automatically opening the reader.
+
+Publish EPUB's cancellation attempt synchronously before enqueue, reusing the
+existing direct cancel registry and repository commit gate. A later chapter's
+failure/cancellation rolls back earlier chapters/assets/registrations/provisional
+IDs, while committed earlier files stay. No persisted queue or automatic resume.
+Android recognizes the new event for clock pausing and the error for rendering;
+the mixed-format picker and source formatting/ruby/images remain separate slices.

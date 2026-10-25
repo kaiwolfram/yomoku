@@ -2,12 +2,11 @@ use super::*;
 use yomoku_core::{app::ImportOutcome, pagination::ReadingPosition};
 use yomoku_storage::EpubImportOutcome;
 
-#[path = "../../../yomoku-import/tests/support/epub.rs"]
-mod epub_fixture;
-
-fn import_event(bytes: &[u8], srt: bool) -> Event {
+fn import_event(bytes: &[u8], format: u8) -> Event {
     // Existing bytes must win before blank-name/invalid-encoding validation.
-    if srt {
+    if format == 2 {
+        super::epub::event(bytes)
+    } else if format == 1 {
         Event::ImportSrt(SrtImport {
             original_bytes: bytes.to_vec(),
             filename: String::new(),
@@ -59,7 +58,7 @@ fn txt_and_srt_reference_complete_epub_without_loading_full_or_resetting_progres
     let file_before = std::fs::read(database.path()).unwrap();
 
     // Separate fresh workers, with no preceding List and no usable analyzer.
-    for srt in [false, true] {
+    for format in 0..3 {
         let calls = Arc::new(AtomicUsize::new(0));
         let called = calls.clone();
         let loader: AnalyzerLoader = Box::new(move || {
@@ -68,7 +67,7 @@ fn txt_and_srt_reference_complete_epub_without_loading_full_or_resetting_progres
         });
         let (router, lifecycle) =
             effect_router_with_analyzed_imports(database.path(), loader).unwrap();
-        let view = dispatch(&router, import_event(&bytes, srt));
+        let view = dispatch(&router, import_event(&bytes, format));
         assert_eq!(view.document_error, None);
         assert_eq!(view.documents, expected);
         let summary = view.import_summary.unwrap();
@@ -107,8 +106,8 @@ fn corrupt_existing_epub_fails_without_analysis_and_later_file_still_imports() {
     let counts = totals(&database.path());
     let Factory { loader, trace, .. } = Factory::new(false, None);
     let (router, lifecycle) = effect_router_with_analyzed_imports(database.path(), loader).unwrap();
-    for srt in [false, true] {
-        let rejected = dispatch(&router, import_event(&bytes, srt));
+    for format in 0..3 {
+        let rejected = dispatch(&router, import_event(&bytes, format));
         assert_eq!(
             rejected.document_error,
             Some(DocumentError::InvalidDocument)

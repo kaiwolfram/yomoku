@@ -7,17 +7,17 @@ use std::{
 
 use yomoku_core::{
     analysis::ChapterAnalysis,
-    document::{ChapterText, PasteText},
-    imports::{SrtImport, TextEncoding, TxtImport},
+    document::{ChapterText, PasteText, ReaderDocument},
+    imports::{EpubImport, SrtImport, TextEncoding, TxtImport},
     storage::{DocumentError, StorageResult},
 };
 use yomoku_import::{
-    srt,
+    epub, srt,
     txt::{self, TextEncoding as Decoding, TxtError},
 };
 use yomoku_storage::{
-    ImportCancellation, PasteImportError, PasteImportOutcome, SrtImportError, SrtImportOutcome,
-    Storage, StorageError, TxtImportError, TxtImportOutcome,
+    EpubImportError, EpubImportOutcome, ImportCancellation, PasteImportError, PasteImportOutcome,
+    SrtImportError, SrtImportOutcome, Storage, StorageError, TxtImportError, TxtImportOutcome,
 };
 
 use crate::storage::{map_error, Job};
@@ -55,7 +55,7 @@ impl AnalyzerLifecycle {
         self.cancel_file_import()
     }
 
-    /// Cancel the currently accepted TXT/SRT attempt directly, never through FIFO.
+    /// Cancel the currently accepted EPUB/TXT/SRT attempt directly, never through FIFO.
     /// Call off the UI thread: an in-flight COMMIT can hold the per-file gate.
     /// Stop batch submission until this call and the import result both finish.
     /// A successful commit remains Created/Existing; idle calls are harmless.
@@ -279,6 +279,81 @@ impl Imports {
                 Err(DocumentError::InvalidDocument)
             }
             Err(SrtImportError::Storage(error)) => Err(map_error(error)),
+        }
+    }
+
+    pub(crate) fn import_epub(
+        &mut self,
+        storage: &mut Storage,
+        input: &EpubImport,
+        cancellation: &ImportCancellation,
+    ) -> Result<StorageResult, DocumentError> {
+        if cancellation.is_cancelled() {
+            return Ok(StorageResult::ImportCancelled);
+        }
+        // Exact original bytes win before filename/container validation or Full.
+        if let Some(document) = storage
+            .find_imported_file(&input.original_bytes)
+            .map_err(map_error)?
+        {
+            return Ok(if cancellation.is_cancelled() {
+                StorageResult::ImportCancelled
+            } else {
+                StorageResult::Existing(document)
+            });
+        }
+        if input.filename.trim().is_empty() {
+            return Err(DocumentError::InvalidDocument);
+        }
+        // Bound and validate the container before loading Full/taking the write
+        // lock. Drop this projection; the repository repeats its authoritative
+        // duplicate check and parse inside the whole-book transaction.
+        epub::parse(&input.original_bytes).map_err(|_| DocumentError::InvalidEpub)?;
+        if cancellation.is_cancelled() {
+            return Ok(StorageResult::ImportCancelled);
+        }
+        if self.analyzer.is_none() {
+            self.analyzer = Some((self.loader)()?);
+        }
+        let analyzer = self.analyzer.as_mut().expect("loaded analyzer");
+        match storage.import_analyzed_epub_cancellable(
+            &input.original_bytes,
+            &input.filename,
+            registration_timestamp()?,
+            cancellation,
+            |chapter| analyzer.analyze(chapter),
+        ) {
+            Ok(None) => Ok(StorageResult::ImportCancelled),
+            Ok(Some(EpubImportOutcome::Created(imported))) => {
+                let stored = imported.document;
+                ReaderDocument {
+                    document_id: stored.document_id,
+                    title: stored.title,
+                    finished_at_least_once: stored.finished_at_least_once,
+                    reading_position: stored.reading_position,
+                    chapters: stored
+                        .chapters
+                        .into_iter()
+                        .map(|item| item.chapter)
+                        .collect(),
+                }
+                .library_summary()
+                .map(StorageResult::Created)
+                .map_err(|_| DocumentError::InvalidDocument)
+            }
+            Ok(Some(EpubImportOutcome::Existing(document))) => {
+                Ok(StorageResult::Existing(document))
+            }
+            Err(EpubImportError::Parse(_)) => Err(DocumentError::InvalidEpub),
+            Err(EpubImportError::Analysis(error)) => {
+                self.analyzer = None;
+                Err(error)
+            }
+            Err(EpubImportError::Storage(StorageError::InvalidAnalysis)) => {
+                self.analyzer = None;
+                Err(DocumentError::InvalidDocument)
+            }
+            Err(EpubImportError::Storage(error)) => Err(map_error(error)),
         }
     }
 

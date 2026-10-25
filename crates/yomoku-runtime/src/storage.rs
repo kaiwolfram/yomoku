@@ -135,7 +135,9 @@ impl EffectMiddleware for StorageEffects {
         // attempt before enqueue; a busy/rejected core event never replaces it.
         let cancellation = matches!(
             operation,
-            StorageOperation::ImportTxt(_) | StorageOperation::ImportSrt(_)
+            StorageOperation::ImportTxt(_)
+                | StorageOperation::ImportSrt(_)
+                | StorageOperation::ImportEpub(_)
         )
         .then(|| self.file.begin());
         // The worker exits only when all senders are dropped. No detached task
@@ -204,6 +206,14 @@ fn execute(
                 storage,
                 &input,
                 cancellation.expect("SRT attempt published before enqueue"),
+            ),
+        StorageOperation::ImportEpub(input) => imports
+            .as_mut()
+            .ok_or(DocumentError::Unavailable)?
+            .import_epub(
+                storage,
+                &input,
+                cancellation.expect("EPUB attempt published before enqueue"),
             ),
         StorageOperation::LoadPaste(id) => storage
             .load_document_reader_snapshot(id)

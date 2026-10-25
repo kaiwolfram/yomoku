@@ -88,4 +88,5 @@
     <string name="error_srt_undecodable">This SRT file cannot be decoded as UTF-8 or Shift-JIS.</string>
     <string name="error_empty_srt">This SRT file has no readable text.</string>
     <string name="error_empty_txt">This TXT file has no readable text.</string>
+    <string name="error_invalid_epub">This EPUB is invalid, unsupported, or exceeds import limits.</string>
 </resources>

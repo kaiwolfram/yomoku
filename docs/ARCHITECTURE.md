@@ -12,7 +12,7 @@ OpenReader has a separate storage operation that atomically resets finished book
 to page 1, retaining the permanent marker and pending durations. It tracks the
 requested document until its callback; leaving the route cancels opening without
 cancelling submitted I/O, including an accepted reset. LoadPaste stays read-only.
-Successful paste, TXT or SRT import returns to Library without opening the reader.
+Successful paste, EPUB, TXT or SRT import returns to Library without opening the reader.
 StorageFinished is internal: both Serde and Facet skip it, so hosts cannot inject
 storage results. No SQL, paths, threads or platform I/O enter core.
 
@@ -65,8 +65,18 @@ Core validates one keyed original-analysis state per chapter, retains those iden
 for the reader session and selects the visible chapter's identity on movement.
 Previous uses whole-document page order; reflow preserves exact chapter/offset.
 Only the last chapter's final completion returns to Library/celebrates. Invalid
-content fails without truncating to chapter zero or loading Full. EPUB per-file
-FIFO import and Android selection/rendering of assets remain open.
+content fails without truncating to chapter zero or loading Full.
+`Event::ImportEpub(EpubImport)` carries original bytes and display name through the
+same reader-save gates/FIFO/JNI as TXT/SRT, without a text-encoding choice. Shared
+preflight references any earlier format before name/container checks or Full loading.
+New containers pass the bounded parser before loading the worker-owned analyzer;
+the atomic repository repeats the duplicate lookup/parse, analyzing every chapter.
+Invalid/unsupported/over-budget containers produce `InvalidEpub`; engine/storage
+failures retain their existing errors. Created projects the committed whole book
+into a Library summary; no reader auto-opens. Direct per-file cancellation reaches
+queued/load/chapter work and uses the existing commit gate. Background release,
+engine-failure eviction and later-file retries share the existing analyzer cache.
+Android mixed selection and reader formatting/ruby/images remain open.
 
 Its SRT parser
 accepts decoded text and returns canonical LF text plus ordered UTF-8 cue ranges.
@@ -89,7 +99,7 @@ encoding through the same reader-save gates and FIFO/JNI worker as TXT. Its
 read-only shared-file preflight bypasses Full for duplicates; new input is decoded
 and parsed before loading Full, then checked again in the authoritative transaction.
 SRT-specific errors distinguish uncertain/invalid/unsupported/undecodable/empty
-input; malformed timing with retained dialogue remains valid. Both paths reuse
+input; malformed timing with retained dialogue remains valid. All file formats reuse
 one worker-owned analyzer cache and one published per-file cancellation registry.
 Android selection remains open; the picker still accepts TXT only.
 
@@ -706,8 +716,8 @@ Created/Existing summaries. Native descriptor delivery and retained/background
 lifecycle are connected. TXT parsing, atomic storage and the Android multiple-file
 picker/encoding/summary path are connected. SRT extraction and atomic analyzed
 repository/FIFO/typed JNI imports are verified. EPUB persistence and ordered-chapter
-reader repositories are verified; application/worker/typed JNI migration, EPUB
-runtime imports and Android mixed-format batches remain open.
+reader/application/FIFO/typed JNI imports are verified. Android mixed-format
+batches and reader formatting/ruby/images remain open.
 TXT background notifications use the platform-only
 foreground lease described above. Legacy imports
 are not automatically rescanned.

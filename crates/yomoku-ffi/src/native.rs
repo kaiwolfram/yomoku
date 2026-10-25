@@ -101,7 +101,7 @@ impl NativeBridge {
             .map_err(|_| FfiError::WorkerUnavailable)
     }
 
-    /// Cancel the current TXT/SRT attempt outside FIFO. As with cancel_txt_import,
+    /// Cancel the current EPUB/TXT/SRT attempt outside FIFO. As with cancel_txt_import,
     /// call off main and await both this return and the asynchronous outcome.
     pub fn cancel_file_import(&self) -> Result<(), FfiError> {
         self.lifecycle

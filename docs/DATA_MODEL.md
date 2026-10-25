@@ -77,15 +77,21 @@ chapter text drops source ruby, while provenance/analyses/global vocabulary surv
 Reimport allocates fresh IDs/position/finish state. Production deletion remains planned.
 
 Ordered-chapter reader repositories now support the saved EPUB content; see below.
-EPUB runtime/FFI and mixed Android selection remain open. Shared file preflight and
-TXT/SRT/EPUB Existing results now return `LibraryDocument`, preserving the first
+EPUB runtime/FFI imports are connected; mixed Android selection remains open.
+Shared file preflight and TXT/SRT/EPUB Existing results now return `LibraryDocument`, preserving the first
 interpretation's title, whole-book progress and finish marker without a content
 payload. Identity and complete document validation occur in the same read/import
 transaction; inconsistent saved content fails without writes or analysis. Core
 Created/Existing results also carry Library references. Private StorageFinished
 changes did not alter exported event/request/view schemas. The subsequent ordered
 reader migration changes ViewModel.loaded_document to ReaderDocument. Current app
-imports stay paste/TXT; EPUB per-file FIFO import/Android selection remain open.
+imports stay paste/TXT; mixed Android selection remains open.
+The typed `EpubImport` transports original bytes/display name without text encoding.
+Its FIFO adapter validates a bounded container before Full, then invokes the atomic
+whole-book repository with a fresh published cancellation attempt. Container errors
+use `InvalidEpub`; storage/engine errors keep their existing categories. Created
+projects the committed ordered document to a Library reference without reloading
+or auto-opening; all three file types share the direct cancellation/commit gate.
 
 ## Ordered-chapter reader repositories (no migration)
 
@@ -176,7 +182,7 @@ a winning commit and earlier files stay. Statement/commit/analysis failures also
 roll back. The typed FIFO/JNI adapter now carries `SrtImport` and SRT-specific
 encoding/empty outcomes. It preflights exact duplicates and decoding before Full,
 then invokes the authoritative cancellable repository. Shared `cancelFileImport()`
-bypasses FIFO for either TXT/SRT; `cancelTxtImport()` remains a compatibility alias.
+bypasses FIFO for EPUB/TXT/SRT; `cancelTxtImport()` remains a compatibility alias.
 The current app picker still accepts TXT only; Android SRT selection remains open.
 
 ## TXT canonical content and atomic file repository (migration 0012)

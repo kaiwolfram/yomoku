@@ -1412,3 +1412,9 @@ mod srt;
 
 #[path = "imports/file_references.rs"]
 mod file_references;
+
+#[path = "imports/epub.rs"]
+mod epub;
+
+#[path = "../../yomoku-import/tests/support/epub.rs"]
+mod epub_fixture;

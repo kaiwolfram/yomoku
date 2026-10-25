@@ -18,7 +18,7 @@ with functioning rustup can omit the PATH workaround. Do not assume this compile
 is the project's minimum supported version; establish that with dependencies.
 Cargo.lock is retained for reproducible application development.
 Crux 0.20.0 declares Rust 1.90 minimum; the full locked graph has only been tested
-with 1.99.1. Current host baseline: 399 data-free Rust tests (183 storage, 32
+with 1.99.1. Current host baseline: 409 data-free Rust tests (183 storage, 40
 runtime). Fourteen analysis fixtures and one runtime fixture run separately with
 each Full loader via tools/test-sudachi.sh (see below).
 
@@ -2744,3 +2744,62 @@ App picker remains paste/TXT; EPUB per-file FIFO import, mixed selection and rea
 formatting/ruby/images remain open. Complete EPUB integrity reads still repeat per
 reader operation; large-book performance is unmeasured. Standalone Full/index/Python,
 release, process-death/reboot, tablet/dark and physical arm64 were not rerun.
+
+## EPUB per-file FIFO and typed JNI imports
+
+Run 2026-10-26 with the Rust PATH/JDK/SDK/Gradle setup above:
+
+```sh
+cargo test --workspace --all-features --locked --offline --quiet
+cargo test -p yomoku-runtime --test imports --all-features --locked --offline --quiet
+cargo clippy --workspace --all-targets --all-features --locked --offline -- -D warnings
+cargo fmt --all -- --check
+tools/test-kotlin-bridge.sh
+tools/format-kotlin.sh --check
+cargo run -p yomoku-ffi --bin generate-kotlin --features facet_typegen --locked --offline -- target/generated/kotlin-repeat
+diff -r target/generated/kotlin target/generated/kotlin-repeat
+(cd crates/yomoku-ffi && CARGO_NET_OFFLINE=true ../../.local/bin/boltffi generate kotlin --deny-skipped --output ../../target/generated/native-repeat)
+diff -r target/generated/native target/generated/native-repeat
+./android/gradlew -p android :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug --offline --console=plain
+./android/gradlew -p android :app:connectedDebugAndroidTest :app:lintDebug -Pandroid.testInstrumentationRunnerArguments.class=app.yomoku.DocumentSessionTest,app.yomoku.ReaderClockSessionTest --offline --console=plain
+git diff --check
+```
+
+PASS: 409 data-free Rust tests (two new core/eight worker), strict Clippy/Rust and
+Kotlin formatting/diff, both-ABI debug/test APK builds and strict Android lint.
+PASS: real-Full Kotlin/JNI (new EPUB import/reopen/status/duplicate/cancellation
+fixtures plus existing TXT/SRT/dictionary/lifecycle suites) and seven Unicode
+exchanges. All eight API-36 x86_64 emulator regressions pass (three DocumentSession,
+five ReaderClockSession). Reports/logs: `.local/test-reports/epub-worker/`.
+Repeated Crux/native generation matches exactly. Existing benign Crux close diagnostics persist. No open failure/blocker.
+Sixteen external-data fixtures remain ignored in ordinary workspace tests.
+The worker suite also passes after sharing the archive fixture at its test root.
+
+New fixtures import actual two-chapter EPUBs through the production FIFO/core;
+assert complete stored bytes/metadata/assets/formatting/ruby, original chapter-local
+Mode B, immediate unique registration, unchanged existing status and no encounters.
+Whole-book Library summaries never auto-open a reader. Invalid archives/XML and
+blank names fail before Full; filename fallback works. Exact-byte EPUB/TXT/SRT
+preflight preserves the complete first interpretation (including renamed title,
+later-chapter progress and finished marker), skips Full/name/container/encoding
+validation and performs no writes. Corrupt saved content fails without truncation.
+
+Loader/later-chapter engine/invalid-analysis failures, each EPUB write stage,
+later-chapter SQL and deferred-COMMIT failures roll back the entire current file,
+registrations and provisional IDs. Previously committed files survive and a later
+file/retry succeeds. Second-chapter cancellation bypasses FIFO, rolls back earlier
+chapters/assets/registration, ignores rejected busy events and permits a fresh
+retry. Queued and closed-router cancellation also pass. No dependency/version,
+migration or new platform permission.
+
+Initial fixtures needed Library refresh on a fresh worker, one shared archive
+module for strict Clippy, generated unsigned Kotlin counters and removal of the
+expected-text fixture's final newline. Corrected them; no production parser change.
+The initial Android build hit Gradle's sandbox wildcard-IP/lock-service restriction;
+the approved outside-sandbox offline build passes.
+
+Android picker remains paste/TXT; mixed EPUB/TXT/SRT selection/notifications and
+reader formatting/ruby/images remain open. Complete saved EPUB verification repeats
+per operation and container preflight parses twice; large-book costs are unmeasured.
+Standalone Full/index/Python suites, release app, process-death/reboot/tablet/dark
+and physical arm64 were not rerun.

@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use crate::active_time::{ReadingTimeUpdate, SavedReadingTime};
 use crate::completion::{AnalyzedCompletionOutcome, AnalyzedPageCompletion, PageCompletionIntent};
 use crate::document::{DocumentId, LibraryDocument, ReaderDocument};
-use crate::imports::{SrtImport, TxtImport};
+use crate::imports::{EpubImport, SrtImport, TxtImport};
 use crate::pagination::{PageLength, ReadingPosition};
 use crate::reader::{
     DocumentReaderSnapshot, ReaderStatusChange, ReaderTokenKey, ReaderTokenSnapshot,
@@ -43,6 +43,7 @@ pub enum StorageOperation {
     LoadReaderWord(ReaderWordSelection),
     ImportTxt(TxtImport),
     ImportSrt(SrtImport),
+    ImportEpub(EpubImport),
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -68,6 +69,7 @@ pub enum DocumentError {
     SrtUnsupportedEncoding,
     SrtUndecodable,
     EmptySrt,
+    InvalidEpub,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]

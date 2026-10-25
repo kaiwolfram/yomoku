@@ -47,6 +47,7 @@ fun main(args: Array<String>) {
     verifyDocumentBridge()
     verifyTxtImportBridge()
     verifySrtImportBridge()
+    verifyEpubImportBridge()
     verifyReaderWordBridge()
     val deadline = System.nanoTime() + 10_000_000_000L
     while (listenerCount() != 0 && System.nanoTime() < deadline) Thread.sleep(5)
