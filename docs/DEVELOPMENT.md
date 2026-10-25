@@ -18,7 +18,7 @@ with functioning rustup can omit the PATH workaround. Do not assume this compile
 is the project's minimum supported version; establish that with dependencies.
 Cargo.lock is retained for reproducible application development.
 Crux 0.20.0 declares Rust 1.90 minimum; the full locked graph has only been tested
-with 1.99.1. Current host baseline: 248 data-free Rust tests (122 storage, eight
+with 1.99.1. Current host baseline: 256 data-free Rust tests (130 storage, eight
 runtime). Eleven analysis fixtures and one runtime fixture run separately with
 each Full loader via tools/test-sudachi.sh (see below).
 
@@ -1879,3 +1879,33 @@ Gradle/ADB sockets and emulator startup required sandbox escalation. No open
 failure/blocker. Rust runtime lookup provider, panel definitions/names/POS/counts
 remain next. Host JNI, standalone Full fixtures, full reader matrix, release,
 process/reboot recovery and physical arm64 were not rerun.
+
+## Selected reader word dictionary/count repository
+
+Verified 2026-10-25 using the Rust PATH workaround above. From repository root:
+
+```sh
+cargo test -p yomoku-storage reader_words --locked --offline
+cargo test --workspace --all-features --locked --offline --quiet
+cargo fmt --all -- --check
+cargo clippy --workspace --all-targets --all-features --locked --offline -- -D warnings
+git diff --check
+```
+
+PASS: 256 data-free Rust tests (130 storage), strict Clippy/fmt/diff. Eight new
+repository tests cover separate simultaneous word/name matches, all applicable
+readings/senses and original inflected identity; exact lifetime counts across
+repetitions/rereads/duplicate completions/documents/statuses with base-form isolation;
+no counts for pending time; document-deletion preservation, vocabulary-deletion
+reset and later registration; stale/foreign/missing/non-Japanese/off-page selection;
+all-presets full crossing-token identity; supplementary/decomposed/NUL exactness;
+query-only/unchanged user/index bytes; dictionary failure without partial results
+and explicit retry; existing covering-index use. Existing reader-token regressions
+also pass after factoring their shared read-transaction helper.
+
+Initial test compilation required correcting fixture module placement/imports and
+using the existing TextOffset conversion/PageLength default APIs. No new package,
+migration or core/FFI/UI protocol. No open failure or blocker. Android/JNI/Kotlin,
+payload generation, Python/full-index/Sudachi fixtures, release/process/reboot and
+physical arm64 checks were not rerun for this repository-only step. Next: lazy
+verified dictionary FIFO/typed FFI and panel details/count rendering.

@@ -177,6 +177,24 @@ lookups. This correctness-first implementation validates/loads the whole chapter
 analysis per request; large-document lookup performance remains unmeasured. No
 schema change or new dependency is required.
 
+`load_reader_word(dictionary, key, token_index)` reuses that validation inside a
+single user-state read transaction and returns the selected full token/status,
+echoed key, lifetime occurrence count and exact surface/base dictionary candidates.
+The request cannot supply arbitrary lookup text or a vocabulary ID. It must match
+the original analysis and a Japanese token intersecting the supplied page. Missing
+document is None; missing/stale analysis or an invalid index is InvalidSelection.
+Dictionary errors remain distinct from empty successful matches, without partial
+results or mutation. No new schema or bridge payload is introduced yet.
+
+Lifetime counts use `COUNT(*) WHERE vocabulary_id = ?` through the existing
+`reading_occurrences_by_entry` covering index. They include every completed
+occurrence/repetition/reread across documents, retain history after document
+deletion, exclude registrations/manual choices/pending time and never aggregate
+the linked base form. Vocabulary deletion cascades those occurrences, so an
+absent entry has zero; actual later registration starts a new ID/count. Full
+crossing-token identity is retained under reflow, without multiplying encounters
+for its display fragments. The immutable dictionary connection stays separate.
+
 `ReaderStatusChange` carries the current token key, existing VocabularyId, one of
 five statuses and a nonnegative Unix millisecond timestamp through core/FIFO/FFI.
 It is accepted only for vocabulary present in the loaded current snapshot. The

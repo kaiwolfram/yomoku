@@ -1265,3 +1265,20 @@
   escalation. No open blocker. Next: verified FIFO/FFI lookup/count provider and
   dictionary panel. Host JNI/Full/release/recovery/reader matrix/physical arm64
   not rerun. Nostr remains empty; ask Q188 before forwarding.
+
+## 2026-10-25 — Selected reader word dictionary/count repository
+
+- Started clean; composed validated original Mode B page/token selection, live
+  status and indexed lifetime exact-surface count in one read transaction, with
+  separate immutable dictionary word/name candidates and applicable views.
+  Echoed identity supports later cancellation. Typed selection/storage/dictionary
+  errors distinguish failure from no match; lookup never writes or re-registers.
+- PASS: 256 data-free Rust tests (eight new), strict Clippy/Rust fmt/diff. Coverage
+  includes repetitions/rereads/duplicate completions/cross-document counts, base
+  isolation, deletion/re-registration, all-presets clipped Unicode, no match,
+  failure/retry, indexed counting and query-only unchanged-byte checks.
+- Updated plan/handoff, architecture/data/decisions/development. No migration,
+  dependency or FFI/UI change; Android/JNI/Kotlin/generation/Python/real data/
+  release/recovery/physical arm64 not rerun. No open blocker. Next: verified lazy
+  FIFO/FFI selected-word transport, then panel senses/readings/POS/names/count.
+  Nostr remains empty; ask Q188 before forwarding.

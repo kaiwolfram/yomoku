@@ -18,6 +18,7 @@ mod import_dedup;
 mod imports;
 mod positions;
 mod reader_tokens;
+mod reader_words;
 mod reading_time;
 mod settings;
 mod vocabulary;

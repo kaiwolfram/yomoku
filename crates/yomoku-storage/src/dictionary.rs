@@ -86,7 +86,7 @@ pub struct DictionaryCandidates {
 /// One connection for the I/O worker, separate from mutable `Storage`.
 /// The caller supplies a published immutable asset path and owns verification/
 /// publication. Opening validates format identity, not a cryptographic checksum;
-/// future Android installation must verify bytes before providing this path.
+/// Android installation must verify bytes before providing this path.
 pub struct Dictionary {
     connection: Connection,
 }

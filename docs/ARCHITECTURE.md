@@ -111,8 +111,22 @@ before supplying a read-only path; Rust open checks format identity, not a check
 Repair atomically replaces inodes without modifying held readers. Library/Settings
 never extract the index. Settings exposes complete offline credits/legal/project
 documents through the shared notice dialog; HTML documents render as text, without
-web requests. Visibility survives recreation. Dictionary FIFO/FFI/UI and compact
-POS/counts remain next; production Rust does not yet receive this path.
+web requests. Visibility survives recreation. Production Rust does not yet receive
+this path; dictionary FIFO/FFI/UI and compact POS remain next.
+
+`Storage::load_reader_word(dictionary, key, token_index)` composes the existing
+page-token validation/status projection with an indexed lifetime occurrence count
+in one deferred user-state read transaction. It selects only a visible original
+Mode B Japanese token and derives surface/base queries from that stored token.
+`ReaderWordDetails` echoes the page/base key, full token, count and separate typed
+word/name candidates with applicable views. Missing document returns None;
+stale/missing analysis or invalid token selection errors. Dictionary failures
+return a distinct typed error without partial details; empty matches are success.
+Counts use the live exact-surface vocabulary ID, keeping inflections separate,
+including repetitions/rereads/history from deleted documents and excluding
+registration/pending time. Vocabulary deletion removes its counts; lookup never
+re-registers it. This is repository-only preparation for the FIFO/FFI integration,
+with no shell protocol/UI changes or large-document performance claim.
 
 Pure `active_time` accounts pending reading milliseconds using caller-supplied
 monotonic timestamps. Resume/interaction arms a five-minute idle window; dictionary

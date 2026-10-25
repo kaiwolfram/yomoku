@@ -9,6 +9,7 @@ mod documents;
 mod encounters;
 mod imports;
 mod reader_tokens;
+pub mod reader_words;
 mod reading_time;
 mod settings;
 mod vocabulary;

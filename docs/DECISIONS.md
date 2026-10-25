@@ -1684,3 +1684,24 @@ Primary platform APIs checked against Android AssetManager.open and Html.fromHtm
 
 - https://developer.android.com/reference/android/content/res/AssetManager
 - https://developer.android.com/reference/android/text/Html
+
+## 2026-10-25 — Selected reader word and lifetime count repository
+
+Build the read-only repository composition before FIFO/FFI/panel integration.
+Reuse the original Mode B/page projection through `load_reader_tokens_in`, taking
+a page/base key and original token index rather than trusting caller-supplied
+surface/base/vocabulary values. Resolve the selected full token and live status,
+then count completed occurrences for its current exact-surface vocabulary ID in
+the same deferred transaction. The existing entry index is covering; no migration
+or new dependency is needed. Dictionary lookup uses its separate immutable
+read-only connection and preserves all metadata/applicable views/source sections.
+
+Echo key/full token in `ReaderWordDetails` so later asynchronous callers can
+discard departed selections. Missing document returns None; stale base or a
+nonvisible/non-Japanese index is InvalidSelection. Distinguish dictionary and user
+storage errors from empty matches and return no partial details on either failure.
+Lookup never loads an analyzer, registers vocabulary, changes status, counts a
+partial page or updates position/time. Preserve counts after document deletion;
+vocabulary deletion erases them and absent entries remain absent during lookup.
+This step adds no public shell schema/UI behavior. Whole-chapter validation remains
+the existing correctness-first approach; performance remains unmeasured.
