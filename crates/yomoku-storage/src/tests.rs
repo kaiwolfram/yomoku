@@ -14,10 +14,13 @@ mod completions;
 mod documents;
 mod encounters;
 mod epub;
+#[path = "../../yomoku-import/tests/support/epub.rs"]
+mod epub_fixture;
 mod finished;
 mod import_dedup;
 mod imports;
 mod positions;
+mod reader_documents;
 mod reader_tokens;
 mod reader_words;
 mod reading_time;

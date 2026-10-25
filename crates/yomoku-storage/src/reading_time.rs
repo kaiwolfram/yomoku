@@ -1,11 +1,11 @@
 use rusqlite::{Connection, OptionalExtension, TransactionBehavior};
 use yomoku_core::{
     active_time::{PendingReadingTime, ReadingTimeUpdate},
-    document::{DocumentId, PastedDocument, TextAnchor, TextOffset},
+    document::{DocumentId, ReaderDocument, TextAnchor, TextOffset},
     pagination::{LogicalPages, PageLength, ReadingPosition},
 };
 
-use crate::{documents::load_paste_in, Storage, StorageError};
+use crate::{reader_documents::load_reader_document_in, Storage, StorageError};
 
 pub use yomoku_core::active_time::SavedReadingTime;
 
@@ -20,10 +20,14 @@ impl Storage {
         let transaction = self
             .connection
             .transaction_with_behavior(TransactionBehavior::Immediate)?;
-        let document =
-            load_paste_in(&transaction, document_id)?.ok_or(StorageError::InvalidReadingTime)?;
+        let document = load_reader_document_in(&transaction, document_id)?
+            .ok_or(StorageError::InvalidReadingTime)?;
         position
-            .validate(&document.chapter)
+            .validate(
+                document
+                    .chapter(position.chapter_id)
+                    .map_err(|_| StorageError::InvalidReadingTime)?,
+            )
             .map_err(|_| StorageError::InvalidReadingTime)?;
         transaction.execute(
             "INSERT INTO pending_reading_time
@@ -52,13 +56,11 @@ impl Storage {
         let transaction = self
             .connection
             .transaction_with_behavior(TransactionBehavior::Immediate)?;
-        let document = load_paste_in(&transaction, previous.value.document_id)?
+        let document = load_reader_document_in(&transaction, previous.value.document_id)?
             .ok_or(StorageError::InvalidReadingTime)?;
-        let current = document.reading_position.unwrap_or(ReadingPosition {
-            source_id: document.chapter.source_id,
-            chapter_id: document.chapter.chapter_id,
-            offset: TextOffset::START,
-        });
+        let current = document
+            .current_position()
+            .map_err(|_| StorageError::InvalidReadingTime)?;
         if previous.revision <= 0
             || current != previous.value.position
             || pending.milliseconds() < previous.value.pending.milliseconds()
@@ -116,9 +118,9 @@ impl Storage {
         page_length: PageLength,
     ) -> Result<PendingReadingTime, StorageError> {
         let transaction = self.connection.transaction()?;
-        let document =
-            load_paste_in(&transaction, document_id)?.ok_or(StorageError::InvalidReadingTime)?;
-        let pages = LogicalPages::new(std::slice::from_ref(&document.chapter), page_length)
+        let document = load_reader_document_in(&transaction, document_id)?
+            .ok_or(StorageError::InvalidReadingTime)?;
+        let pages = LogicalPages::new(&document.chapters, page_length)
             .map_err(|_| StorageError::InvalidReadingTime)?;
         if !pages.pages().contains(&page) {
             return Err(StorageError::InvalidReadingTime);
@@ -165,11 +167,15 @@ fn read_anchor_in(
 
 pub(crate) fn page_time_in(
     connection: &Connection,
-    document: &PastedDocument,
+    document: &ReaderDocument,
     page: TextAnchor,
 ) -> Result<(PendingReadingTime, Vec<SavedReadingTime>), StorageError> {
-    let eof =
-        i64::try_from(document.chapter.text.len()).map_err(|_| StorageError::InvalidReadingTime)?;
+    let chapter = document
+        .chapter(page.chapter_id)
+        .map_err(|_| StorageError::InvalidReadingTime)?;
+    page.slice(chapter)
+        .map_err(|_| StorageError::InvalidReadingTime)?;
+    let eof = i64::try_from(chapter.text.len()).map_err(|_| StorageError::InvalidReadingTime)?;
     let mut statement = connection.prepare(
         "SELECT byte_offset, milliseconds, revision FROM pending_reading_time
          WHERE document_id = ?1 AND chapter_id = ?2 AND byte_offset >= ?3
@@ -197,7 +203,7 @@ pub(crate) fn page_time_in(
         let (offset, milliseconds, revision) = row?;
         let offset = TextOffset::try_from(offset).map_err(|_| StorageError::InvalidReadingTime)?;
         offset
-            .byte_index(&document.chapter.text)
+            .byte_index(&chapter.text)
             .map_err(|_| StorageError::InvalidReadingTime)?;
         let pending = PendingReadingTime::from_millis(milliseconds)
             .map_err(|_| StorageError::InvalidReadingTime)?;

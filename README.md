@@ -71,7 +71,10 @@ links while ignoring CSS. Its [atomic repository](crates/yomoku-storage/src/epub
 now saves original-file identity, ordered chapters/formatting/ruby, image bytes and
 per-chapter Mode B with unique vocabulary registrations. Host fixtures verify
 rollback, cancellation, duplicates, read-only reopen and multi-chapter Library
-progress; both real Full loaders pass. EPUB runtime/reader/app wiring remains planned.
+progress; both real Full loaders pass. Whole-document Rust reader repositories now
+support ordered chapters, original per-chapter analysis, exact positions/time,
+tokens/dictionary details and atomic completion with whole-book finish semantics.
+EPUB runtime/typed bridge and Android reader/picker wiring remain planned.
 The pure [SRT parser](crates/yomoku-import/src/srt.rs) has host fixtures for cue
 boundaries, formatting, speakers and malformed input. Its atomic repository now
 persists original bytes/encoding, canonical cues, Mode B and vocabulary registrations

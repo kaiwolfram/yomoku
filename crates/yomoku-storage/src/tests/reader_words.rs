@@ -55,6 +55,122 @@ fn dictionary() -> TestDatabase {
     file
 }
 
+#[test]
+fn epub_selected_word_keeps_chapter_analysis_dictionary_live_status_and_lifetime_count() {
+    use super::epub_fixture;
+    use crate::EpubImportOutcome;
+    use yomoku_core::{
+        completion::PageCompletionIntent, pagination::ReadingPosition, reader::ReaderPage,
+    };
+
+    let database = TestDatabase::new();
+    let index = dictionary();
+    let dictionary = Dictionary::open(index.path()).unwrap();
+    let mut storage = Storage::open(database.path()).unwrap();
+    let imported = match storage
+        .import_analyzed_epub(
+            &epub_fixture::book(true, "<p>試験語だった 試験語だった</p>"),
+            "本.epub",
+            1,
+            |chapter| {
+                let mut analysis = fixture(chapter)?;
+                for token in &mut analysis.tokens {
+                    if token.surface == "試験語だった" {
+                        token.dictionary_form = Some(Surface::new("試験語").unwrap());
+                    }
+                }
+                Ok::<_, Infallible>(analysis)
+            },
+        )
+        .unwrap()
+    {
+        EpubImportOutcome::Created(result) => *result,
+        _ => panic!("expected EPUB"),
+    };
+    let id = imported.document.document_id;
+    let chapter = &imported.document.chapters[1].chapter;
+    let position = ReadingPosition {
+        source_id: chapter.source_id,
+        chapter_id: chapter.chapter_id,
+        offset: TextOffset::START,
+    };
+    let document = storage
+        .save_document_reading_position(id, position)
+        .unwrap()
+        .unwrap();
+    let page = ReaderPage::open_document(&document, PageLength::default()).unwrap();
+    let key = ReaderTokenKey {
+        document_id: id,
+        page: page.anchor,
+        analysis: ReaderAnalysis::Available(imported.analysis_ids[1]),
+    };
+    let before = fs::read(database.path()).unwrap();
+    let details = storage
+        .load_reader_word(&dictionary, key, 0)
+        .unwrap()
+        .unwrap();
+    assert_eq!(details.encountered, 0);
+    assert_eq!(details.candidates.words.len(), 1);
+    assert_eq!(details.candidates.names.len(), 1);
+    assert_eq!(
+        details.token.vocabulary.unwrap().status,
+        VocabularyStatus::New
+    );
+    assert_eq!(fs::read(database.path()).unwrap(), before);
+    assert!(matches!(
+        storage.load_reader_word(
+            &dictionary,
+            ReaderTokenKey {
+                analysis: ReaderAnalysis::Available(imported.analysis_ids[0]),
+                ..key
+            },
+            0
+        ),
+        Err(ReaderWordError::InvalidSelection)
+    ));
+    let command = storage
+        .prepare_page_completion(PageCompletionIntent {
+            document_id: id,
+            page: page.anchor,
+            page_length: PageLength::default(),
+            departing_position: position,
+            completed_at_unix_ms: 100,
+            analysis_id: imported.analysis_ids[1],
+        })
+        .unwrap();
+    assert_eq!(
+        storage
+            .record_analyzed_page_completion(command.completion, command.analysis_id)
+            .unwrap(),
+        AnalyzedCompletionOutcome::Recorded { newly_known: 1 }
+    );
+    let details = storage
+        .load_reader_word(&dictionary, key, 0)
+        .unwrap()
+        .unwrap();
+    assert_eq!(details.encountered, 2);
+    assert_eq!(
+        details.token.vocabulary.unwrap().status,
+        VocabularyStatus::Known
+    );
+    storage
+        .set_vocabulary_status(
+            details.token.vocabulary.unwrap().id,
+            VocabularyStatus::Familiar,
+            101,
+        )
+        .unwrap();
+    let updated = storage
+        .load_reader_word(&dictionary, key, 1)
+        .unwrap()
+        .unwrap();
+    assert_eq!(updated.encountered, 2);
+    assert_eq!(
+        updated.token.vocabulary.unwrap().status,
+        VocabularyStatus::Familiar
+    );
+}
+
 fn import(storage: &mut Storage, text: &str) -> AnalyzedPaste {
     storage
         .create_analyzed_paste(&PasteText::new(text.into()).unwrap(), 100, |chapter| {

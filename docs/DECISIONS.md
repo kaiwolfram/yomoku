@@ -2154,3 +2154,32 @@ chapter bytes with preceding-chapter offsets and rejects incomplete/foreign chap
 No new production dependency/version or wire/UI behavior. Shared test archives
 reuse the already pinned zip 8.6.0 as a dev dependency in storage/analysis; no new
 lockfile packages. No permission, queue, rendering or data-destructive semantic change.
+
+
+## 2026-10-26 — Whole-document reader repositories before bridge migration
+
+Introduce pure `ReaderDocument` with ordered canonical chapters, exact saved
+position and live title/finish state. `DocumentReaderSnapshot` pairs it with the
+persisted preset and explicit chapter-keyed original Mode B identities. Keep the
+historical `PastedDocument`/`ReaderSnapshot` APIs and wire payloads intact until
+application, FIFO and Kotlin adapters can migrate together. The generic snapshot
+is a text projection; source ruby/formatting/images remain in EPUB persistence
+for the later reader rendering slice.
+
+Reuse the authoritative EPUB loader inside the generic transaction rather than
+create another partial or less strict content loader. It validates all saved
+source/assets/annotations for every reader operation. Large-book performance is
+unmeasured; optimize only with evidence while retaining integrity checks. Single-
+text documents must have exactly one chapter; corrupt extras never truncate.
+
+Generalize the existing time/completion/token/selected-word repositories through
+that loader. Chapter-end forward completion goes to the next chapter's start;
+only completion of the last logical page of the whole book sets its marker.
+Pending durations and analysis identities remain chapter-local; preserve command
+replay, New-only promotion, occurrence identity and transaction rollback. Ordinary
+loads never reset a finished book. Only explicit open atomically resets to the
+first chapter; later analysis validation or COMMIT failure rolls back the reset.
+
+No migration, new dependency/version, data-destructive semantic change, application
+capability or publishing step. EPUB/import-reference/application/worker/typed JNI
+migration remains the next slice; Android selection stays paste/TXT.

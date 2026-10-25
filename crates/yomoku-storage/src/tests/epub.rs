@@ -10,9 +10,7 @@ use yomoku_import::epub::{self, EpubChapter};
 
 use super::{imports::fixture, *};
 
-#[path = "../../../yomoku-import/tests/support/epub.rs"]
-mod epub_fixture;
-use epub_fixture::book;
+use super::epub_fixture::book;
 
 fn bytes() -> Vec<u8> {
     book(true, "<p>猫 猫 犬 English</p>")

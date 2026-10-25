@@ -38,10 +38,23 @@ Migration 0014 preserves existing source IDs/high-water marks/file identities.
 Read-only multi-chapter loading validates digests, counts, indexes, ownership and
 UTF-8 anchors without parsing or analyzing. Library progress sums earlier chapter
 lengths plus the current chapter offset against total book bytes.
+The pure `ReaderDocument` now retains every canonical chapter in source order.
+`DocumentReaderSnapshot` adds the saved preset and each chapter's original Mode B
+identity. Generic read/open/position repositories use the authoritative saved-content
+loader; ordinary reads never parse/analyze or reset a finished book. Explicit
+opening atomically resets a finished book to its first chapter. Logical page
+projections count all pages while keeping anchors and time chapter-local.
+Existing completion/time/token/selected-word repositories now use the whole-document
+loader. Forward completion moves to the next page/chapter or the last chapter's
+EOF. Only the last page of the entire document marks it finished; transaction,
+replay, original-token ownership and New-only status semantics remain unchanged.
+The loader currently verifies all EPUB content/assets on every reader operation;
+large-book performance is unmeasured. Text snapshots omit asset/formatting payloads.
+
 The generic file-ID preflight and EPUB Existing result support references to the
 first interpretation without a single-text payload. The historical TXT/SRT/reader
-payloads deliberately reject EPUB; extend those and the FIFO/typed JNI before
-making EPUB selectable. No EPUB runtime/reader/Android adapter exists yet.
+bridge payloads still reject EPUB; migrate application/worker/typed JNI payloads
+before making EPUB selectable. No EPUB runtime/import or Android adapter exists yet.
 
 Its SRT parser
 accepts decoded text and returns canonical LF text plus ordered UTF-8 cue ranges.
@@ -679,8 +692,9 @@ unique Japanese surfaces without encounters, deduplicate exact bytes and deliver
 Created/Existing summaries. Native descriptor delivery and retained/background
 lifecycle are connected. TXT parsing, atomic storage and the Android multiple-file
 picker/encoding/summary path are connected. SRT extraction and atomic analyzed
-repository/FIFO/typed JNI imports are verified; EPUB repository/runtime imports
-and Android mixed-format batches remain open.
+repository/FIFO/typed JNI imports are verified. EPUB persistence and ordered-chapter
+reader repositories are verified; application/worker/typed JNI migration, EPUB
+runtime imports and Android mixed-format batches remain open.
 TXT background notifications use the platform-only
 foreground lease described above. Legacy imports
 are not automatically rescanned.

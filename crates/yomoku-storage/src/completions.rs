@@ -8,8 +8,9 @@ use yomoku_core::{
 };
 
 use crate::{
-    documents::{load_paste_in, write_position_in},
+    documents::write_position_in,
     encounters::record_occurrences_in,
+    reader_documents::load_reader_document_in,
     reading_time::{consume_time_in, page_time_in},
     settings::read_page_length,
     Storage, StorageError,
@@ -25,7 +26,7 @@ impl Storage {
         let transaction = self
             .connection
             .transaction_with_behavior(TransactionBehavior::Immediate)?;
-        let document = load_paste_in(&transaction, intent.document_id)?
+        let document = load_reader_document_in(&transaction, intent.document_id)?
             .ok_or(StorageError::InvalidCompletion)?;
         if read_page_length(&transaction)? != intent.page_length {
             return Err(StorageError::InvalidCompletion);
@@ -43,7 +44,7 @@ impl Storage {
             pending_time,
         };
         completion
-            .next_position(&document)
+            .next_document_position(&document)
             .map_err(|_| StorageError::InvalidCompletion)?;
         transaction.commit()?;
         Ok(AnalyzedPageCompletion {
@@ -150,10 +151,10 @@ impl Storage {
         if !issued || read_page_length(&transaction)? != completion.page_length {
             return Err(StorageError::InvalidCompletion);
         }
-        let document = load_paste_in(&transaction, completion.document_id)?
+        let document = load_reader_document_in(&transaction, completion.document_id)?
             .ok_or(StorageError::InvalidCompletion)?;
         let next = completion
-            .next_position(&document)
+            .next_document_position(&document)
             .map_err(|_| StorageError::InvalidCompletion)?;
         let (pending, anchors) = page_time_in(&transaction, &document, completion.page)?;
         if pending != completion.pending_time {
@@ -167,20 +168,32 @@ impl Storage {
             values,
         )?;
         let newly_known = if let Some(analysis_id) = analysis_id {
-            record_occurrences_in(&transaction, &document.chapter, completion, analysis_id)?
+            record_occurrences_in(
+                &transaction,
+                document
+                    .chapter(completion.page.chapter_id)
+                    .map_err(|_| StorageError::InvalidCompletion)?,
+                completion,
+                analysis_id,
+            )?
         } else {
             0
         };
         consume_time_in(&transaction, &anchors)?;
         write_position_in(&transaction, completion.document_id, next)?;
-        // The only supported document is a single-chapter paste. Only a newly
-        // recorded final page sets this permanent marker; position-only saves
-        // and duplicate command delivery cannot finish or unfinish a document.
-        if next
-            .offset
-            .byte_index(&document.chapter.text)
-            .map_err(|_| StorageError::InvalidCompletion)?
-            == document.chapter.text.len()
+        // Only the whole document's final page sets the permanent marker.
+        // Intermediate chapter EOF, position-only movement and retries do not.
+        let last = document
+            .chapters
+            .last()
+            .ok_or(StorageError::InvalidCompletion)?;
+        if completion.page.chapter_id == last.chapter_id
+            && next.chapter_id == last.chapter_id
+            && next
+                .offset
+                .byte_index(&last.text)
+                .map_err(|_| StorageError::InvalidCompletion)?
+                == last.text.len()
         {
             transaction.execute(
                 "UPDATE documents SET finished_at_least_once = 1

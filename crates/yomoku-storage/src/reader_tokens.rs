@@ -7,7 +7,7 @@ use yomoku_core::{
 
 use crate::{
     analysis::{read_analysis, read_reader_analysis},
-    documents::load_paste_in,
+    reader_documents::load_reader_document_in,
     vocabulary::decode_status,
     Storage, StorageError,
 };
@@ -35,21 +35,24 @@ pub(crate) fn load_reader_tokens_in(
     document_id: DocumentId,
     page: TextAnchor,
 ) -> Result<Option<ReaderTokenSnapshot>, StorageError> {
-    let Some(document) = load_paste_in(connection, document_id)? else {
+    let Some(document) = load_reader_document_in(connection, document_id)? else {
         return Ok(None);
     };
+    let chapter = document
+        .chapter(page.chapter_id)
+        .map_err(|_| StorageError::InvalidAnalysis)?;
     if page
-        .slice(&document.chapter)
+        .slice(chapter)
         .map_err(|_| StorageError::InvalidAnalysis)?
         .is_empty()
     {
         return Err(StorageError::InvalidAnalysis);
     }
-    let analysis = read_reader_analysis(connection, document.chapter.chapter_id)?;
+    let analysis = read_reader_analysis(connection, chapter.chapter_id)?;
     let mut tokens = Vec::new();
     if let ReaderAnalysis::Available(id) = analysis {
         let stored = read_analysis(connection, id)?.ok_or(StorageError::InvalidAnalysis)?;
-        tokens = reader_tokens_on_page(&document.chapter, &stored, page)
+        tokens = reader_tokens_on_page(chapter, &stored, page)
             .map_err(|_| StorageError::InvalidAnalysis)?;
         // One exact-surface join for the visible page, including repeated
         // spellings. Analysis has no vocabulary FK: deletion leaves tokens

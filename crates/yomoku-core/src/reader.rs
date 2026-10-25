@@ -1,12 +1,12 @@
-//! Typed page and current-progress projections over immutable pasted text.
+//! Typed page and current-progress projections over immutable canonical chapters.
 
 use serde::{Deserialize, Serialize};
 
 use crate::{
     analysis::{ChapterAnalysis, InvalidAnalysis, SplitMode},
     document::{
-        AnalysisId, ChapterText, DocumentId, InvalidTextValue, LibraryDocument, PastedDocument,
-        TextAnchor, TextOffset, TextRange, VocabularyId,
+        AnalysisId, ChapterId, ChapterText, DocumentId, InvalidTextValue, LibraryDocument,
+        PastedDocument, ReaderDocument, TextAnchor, TextOffset, TextRange, VocabularyId,
     },
     pagination::{LogicalPages, PageLength, ReadingPosition},
     vocabulary::VocabularyStatus,
@@ -28,6 +28,24 @@ pub enum ReaderAnalysis {
 pub struct ReaderSnapshot {
     pub document: PastedDocument,
     pub page_length: PageLength,
+    pub analysis: ReaderAnalysis,
+}
+
+/// Ordered whole-document text and every chapter's original Mode B identity.
+/// The legacy ReaderSnapshot remains the single-text bridge payload until the
+/// application and platform adapters migrate together.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
+pub struct DocumentReaderSnapshot {
+    pub document: ReaderDocument,
+    pub page_length: PageLength,
+    pub analyses: Vec<ReaderChapterAnalysis>,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
+pub struct ReaderChapterAnalysis {
+    pub chapter_id: ChapterId,
     pub analysis: ReaderAnalysis,
 }
 
@@ -156,6 +174,36 @@ pub struct ReaderPage {
 }
 
 impl ReaderPage {
+    pub fn open_document(
+        document: &ReaderDocument,
+        length: PageLength,
+    ) -> Result<Self, InvalidTextValue> {
+        Self::at_document(document, document.current_position()?, length)
+    }
+
+    pub fn at_document(
+        document: &ReaderDocument,
+        position: ReadingPosition,
+        length: PageLength,
+    ) -> Result<Self, InvalidTextValue> {
+        document.validate()?;
+        let pages = LogicalPages::new(&document.chapters, length)?;
+        let page_index = pages.page_at(position)?;
+        let anchor = pages.pages()[page_index];
+        Ok(Self {
+            document_id: document.document_id,
+            title: document.title.clone(),
+            finished_at_least_once: document.finished_at_least_once,
+            text: anchor
+                .slice(document.chapter(anchor.chapter_id)?)?
+                .to_owned(),
+            anchor,
+            position,
+            page_number: page_index as u64 + 1,
+            total_pages: pages.pages().len() as u64,
+        })
+    }
+
     /// Project the supplied exact position. Explicit finished-book reopening is
     /// a separate storage operation; reflow/completion reloads must not reset it.
     pub fn open(document: &PastedDocument, length: PageLength) -> Result<Self, InvalidTextValue> {
@@ -187,6 +235,31 @@ impl ReaderPage {
             position,
             page_number: page_index as u64 + 1,
             total_pages: pages.pages().len() as u64,
+        })
+    }
+}
+
+impl ReaderDocument {
+    pub fn library_summary(&self) -> Result<LibraryDocument, InvalidTextValue> {
+        let position = self.current_position()?;
+        let mut total = 0_i64;
+        let mut preceding = 0_i64;
+        for chapter in &self.chapters {
+            if chapter.chapter_id == position.chapter_id {
+                preceding = total;
+            }
+            total = total
+                .checked_add(i64::try_from(chapter.text.len()).map_err(|_| InvalidTextValue)?)
+                .ok_or(InvalidTextValue)?;
+        }
+        let offset = preceding
+            .checked_add(position.offset.into())
+            .ok_or(InvalidTextValue)?;
+        Ok(LibraryDocument {
+            document_id: self.document_id,
+            title: self.title.clone(),
+            progress_percent: progress_percent(offset, total)?,
+            finished_at_least_once: self.finished_at_least_once,
         })
     }
 }

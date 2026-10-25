@@ -75,10 +75,47 @@ movement can decrease it. Live deletion cascades EPUB metadata/assets; deleting
 chapter text drops source ruby, while provenance/analyses/global vocabulary survive.
 Reimport allocates fresh IDs/position/finish state. Production deletion remains planned.
 
-EPUB runtime/FFI, multi-chapter reader snapshots/completion/time/token operations and
-mixed Android selection remain open. The historical single-text `find_imported_file`,
-TXT/SRT duplicate results and reader payloads reject EPUB rather than truncate it;
-generalize these before exposing EPUB in production. Current app imports stay paste/TXT.
+Ordered-chapter reader repositories now support the saved EPUB content; see below.
+EPUB runtime/FFI and mixed Android selection remain open. The historical single-text
+`find_imported_file`, TXT/SRT duplicate results and application reader payloads
+reject EPUB rather than truncate it; migrate these before exposing EPUB in
+production. Current app imports stay paste/TXT.
+
+## Ordered-chapter reader repositories (no migration)
+
+Pure `ReaderDocument` carries live title/finish/position plus every `ChapterText` in
+source order. Validate a nonempty chapter list, unique chapter IDs, common source,
+UTF-8 offset bounds and saved-position ownership. `ReaderPage::open_document` and
+`at_document` project one chapter-bounded page with a whole-document page counter.
+`library_summary` sums preceding chapter bytes and current offset over total bytes.
+`PageCompletion::next_document_position` validates the exact departing position/page,
+then advances to the next page's chapter/start or the final chapter EOF.
+
+`load_document_reader_snapshot` atomically returns `DocumentReaderSnapshot` with
+the document, global preset and ordered `ReaderChapterAnalysis` identities. Each
+identity explicitly includes its chapter ID and original Mode B or Missing; no
+analyzer, source parsing, token rescan or registration runs. The text projection
+omits source bytes/assets/formatting, while its EPUB loader still verifies all saved
+content/digests/annotations/assets. This repeats on each reader repository operation;
+large-book performance has not been measured or optimized.
+
+`open_document_reader_snapshot` alone resets finished books to the first chapter's
+start. Snapshot/analysis/settings validation and reset share one immediate
+transaction; any failure rolls back the reset. `save_document_reading_position`
+accepts any owned chapter/scalar boundary and creates no reading history.
+
+Existing time/prepare/record/token/selected-word repositories use this same complete
+document loader. Pending durations remain keyed by chapter and exact offset; page
+time reads/consumption never reach another chapter, including at chapter EOF.
+Completion uses the departing chapter's analysis/occurrences and advances across
+the boundary atomically. Only completion of the whole book's final page sets the
+permanent finish marker. Replay checks still precede live-content validation;
+rereads allocate fresh IDs. Image-only final chapters complete with zero new words.
+
+Legacy `PastedDocument`/`ReaderSnapshot` and their single-text read/open/position
+APIs remain for the existing application/typed bridge. They still reject EPUB.
+No migration, serialized bridge change, Android reader capability or parser change
+is implied by these repository/domain additions.
 
 ## SRT canonical content and atomic file repository (migration 0013)
 

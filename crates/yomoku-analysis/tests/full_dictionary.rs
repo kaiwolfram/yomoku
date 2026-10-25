@@ -920,9 +920,98 @@ fn real_epub_import_analyzes_every_canonical_chapter_and_reopens_without_rescan(
     assert!(
         matches!(storage.import_analyzed_epub(&bytes, "renamed.epub", 200, |_| -> Result<ChapterAnalysis, yomoku_analysis::AnalysisError> { panic!("duplicate must not analyze") }).unwrap(), EpubImportOutcome::Existing(id) if id == imported.document.document_id)
     );
-    for (id, expected) in imported.analysis_ids.iter().zip(analyses) {
-        assert_eq!(storage.chapter_analysis(*id).unwrap(), Some(expected));
+    for (id, expected) in imported.analysis_ids.iter().zip(&analyses) {
+        assert_eq!(
+            storage.chapter_analysis(*id).unwrap().as_ref(),
+            Some(expected)
+        );
     }
+    // Exercise the same original real Mode B chapters through the generic reader
+    // repositories, without parsing again or keeping an analyzer in the reader.
+    use yomoku_core::{
+        active_time::PendingReadingTime,
+        completion::{AnalyzedCompletionOutcome, PageCompletionIntent},
+        reader::{ReaderAnalysis, ReaderPage},
+    };
+    let id = imported.document.document_id;
+    for (index, expected) in analyses.iter().enumerate() {
+        let snapshot = storage.load_document_reader_snapshot(id).unwrap().unwrap();
+        let page = ReaderPage::open_document(&snapshot.document, snapshot.page_length).unwrap();
+        assert_eq!(page.page_number, index as u64 + 1);
+        assert_eq!(page.total_pages, 2);
+        let tokens = storage
+            .load_reader_tokens(id, page.anchor)
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            tokens.analysis,
+            ReaderAnalysis::Available(imported.analysis_ids[index])
+        );
+        assert_eq!(
+            tokens
+                .tokens
+                .iter()
+                .map(|token| token.surface.as_str())
+                .collect::<Vec<_>>(),
+            expected
+                .tokens
+                .iter()
+                .filter(|token| token.is_japanese)
+                .map(|token| token.surface.as_str())
+                .collect::<Vec<_>>()
+        );
+        let saved = storage
+            .load_pending_reading_time(id, page.position)
+            .unwrap();
+        storage
+            .save_pending_reading_time(saved, PendingReadingTime::from_millis(75).unwrap())
+            .unwrap();
+        let command = storage
+            .prepare_page_completion(PageCompletionIntent {
+                document_id: id,
+                page: page.anchor,
+                page_length: snapshot.page_length,
+                departing_position: page.position,
+                completed_at_unix_ms: 300,
+                analysis_id: imported.analysis_ids[index],
+            })
+            .unwrap();
+        assert_eq!(command.completion.pending_time.milliseconds(), 75);
+        assert!(matches!(
+            storage
+                .record_analyzed_page_completion(command.completion, command.analysis_id)
+                .unwrap(),
+            AnalyzedCompletionOutcome::Recorded { .. }
+        ));
+        assert_eq!(
+            storage.finished_at_least_once(id).unwrap(),
+            Some(index == 1)
+        );
+        let after = storage.load_document_reader_snapshot(id).unwrap();
+        assert_eq!(
+            storage
+                .record_analyzed_page_completion(command.completion, command.analysis_id)
+                .unwrap(),
+            AnalyzedCompletionOutcome::AlreadyRecorded
+        );
+        assert_eq!(storage.load_document_reader_snapshot(id).unwrap(), after);
+    }
+    assert_eq!(storage.list_documents().unwrap()[0].progress_percent, 100);
+    assert_eq!(
+        storage.vocabulary_entry(&cat).unwrap().unwrap().status,
+        VocabularyStatus::Learning
+    );
+    drop(storage);
+    let mut storage = Storage::open(&path).unwrap();
+    let opened = storage.open_document_reader_snapshot(id).unwrap().unwrap();
+    assert_eq!(
+        ReaderPage::open_document(&opened.document, opened.page_length)
+            .unwrap()
+            .page_number,
+        1
+    );
+    assert!(opened.document.finished_at_least_once);
+    assert_eq!(storage.list_documents().unwrap()[0].progress_percent, 0);
     drop(storage);
     std::fs::remove_dir_all(directory).unwrap();
 }

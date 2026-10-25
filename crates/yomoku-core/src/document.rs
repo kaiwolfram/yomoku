@@ -104,7 +104,7 @@ impl PasteText {
     }
 }
 
-/// A persisted single-text document (paste or TXT), with an independent title.
+/// A persisted single-text document (paste, TXT or SRT), with an independent title.
 /// The historical type name remains stable at the typed bridge boundary.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
@@ -114,6 +114,67 @@ pub struct PastedDocument {
     pub finished_at_least_once: bool,
     pub chapter: ChapterText,
     pub reading_position: Option<crate::pagination::ReadingPosition>,
+}
+
+/// Complete canonical text in source order, including single-chapter documents.
+/// Chapter-local offsets retain their identity across page reflow and movement.
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
+pub struct ReaderDocument {
+    pub document_id: DocumentId,
+    pub title: String,
+    pub finished_at_least_once: bool,
+    pub chapters: Vec<ChapterText>,
+    pub reading_position: Option<crate::pagination::ReadingPosition>,
+}
+
+impl From<PastedDocument> for ReaderDocument {
+    fn from(document: PastedDocument) -> Self {
+        Self {
+            document_id: document.document_id,
+            title: document.title,
+            finished_at_least_once: document.finished_at_least_once,
+            chapters: vec![document.chapter],
+            reading_position: document.reading_position,
+        }
+    }
+}
+
+impl ReaderDocument {
+    /// Validate source ownership, unique chapter identities and the saved scalar
+    /// boundary. Empty text units are allowed; an empty chapter list is invalid.
+    pub fn validate(&self) -> Result<(), InvalidTextValue> {
+        let first = self.chapters.first().ok_or(InvalidTextValue)?;
+        let mut seen = std::collections::HashSet::new();
+        for chapter in &self.chapters {
+            if chapter.source_id != first.source_id || !seen.insert(chapter.chapter_id) {
+                return Err(InvalidTextValue);
+            }
+            i64::try_from(chapter.text.len()).map_err(|_| InvalidTextValue)?;
+        }
+        if let Some(position) = self.reading_position {
+            position.validate(self.chapter(position.chapter_id)?)?;
+        }
+        Ok(())
+    }
+
+    pub fn chapter(&self, chapter_id: ChapterId) -> Result<&ChapterText, InvalidTextValue> {
+        self.chapters
+            .iter()
+            .find(|chapter| chapter.chapter_id == chapter_id)
+            .ok_or(InvalidTextValue)
+    }
+
+    pub fn current_position(&self) -> Result<crate::pagination::ReadingPosition, InvalidTextValue> {
+        self.validate()?;
+        Ok(self
+            .reading_position
+            .unwrap_or(crate::pagination::ReadingPosition {
+                source_id: self.chapters[0].source_id,
+                chapter_id: self.chapters[0].chapter_id,
+                offset: TextOffset::START,
+            }))
+    }
 }
 
 /// Nonnegative UTF-8 byte offset within one canonical chapter, including EOF.

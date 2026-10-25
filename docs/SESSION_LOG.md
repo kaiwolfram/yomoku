@@ -1626,3 +1626,23 @@
   No new production dependency/version; test helpers reuse pinned zip. APK/Android
   lint/device/instrumentation, codegen reproducibility, standalone index/Python,
   release/reboot/process-death, tablet/dark and physical arm64 not rerun. Nostr/Q188 unchanged.
+
+
+## 2026-10-26 — Ordered-chapter reader repositories
+
+- Added pure ReaderDocument/DocumentReaderSnapshot, complete chapter-bound pages,
+  global counters/progress and generic read/open/position repositories. Existing
+  completion/time/token/selected-word repositories now accept complete books.
+  Chapter EOF advances to the next chapter; only whole-book final completion
+  finishes. Original B IDs, time buckets, replay and rollback remain chapter-safe.
+- PASS: 393 data-free Rust tests, strict Clippy/fmt/diff, both Android storage
+  targets, fourteen real-Full analysis + one worker fixture per owned/mapped loader,
+  real-Full Kotlin/JNI and seven Unicode exchanges. Five new pure/nine repository
+  fixtures plus expanded real EPUB coverage. Corrected uncertain-encoding fixture
+  and consolidated shared test imports after Clippy feedback; final checks pass.
+- Updated README/plan/architecture/data/decisions/development/handoff. No migration,
+  new dependency, download/escalation or open blocker. Next: migrate application/
+  worker/import-reference/typed JNI payloads, wire EPUB FIFO, mixed picker and assets.
+  Android app remains paste/TXT. Complete EPUB integrity reads repeat per operation;
+  performance unmeasured. APK/lint/device, codegen repeat, index/Python, release/
+  reboot/process-death/tablet/dark and physical arm64 not rerun. Nostr/Q188 unchanged.

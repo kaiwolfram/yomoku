@@ -297,7 +297,7 @@ fn store_content(
     Ok(())
 }
 
-fn load_epub_in(
+pub(crate) fn load_epub_in(
     connection: &Connection,
     document_id: DocumentId,
 ) -> Result<Option<StoredEpubDocument>, StorageError> {

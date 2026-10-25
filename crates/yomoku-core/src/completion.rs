@@ -5,7 +5,8 @@ use serde::{Deserialize, Serialize};
 use crate::{
     active_time::PendingReadingTime,
     document::{
-        AnalysisId, CompletionCommandId, DocumentId, InvalidTextValue, PastedDocument, TextAnchor,
+        AnalysisId, CompletionCommandId, DocumentId, InvalidTextValue, PastedDocument,
+        ReaderDocument, TextAnchor,
     },
     pagination::{LogicalPages, PageLength, ReadingPosition},
 };
@@ -54,6 +55,32 @@ pub struct CompletionNotice {
 }
 
 impl PageCompletion {
+    /// A chapter's final page advances to the next chapter's start. Only the last
+    /// page of the whole document advances to its own chapter EOF.
+    pub fn next_document_position(
+        self,
+        document: &ReaderDocument,
+    ) -> Result<ReadingPosition, InvalidTextValue> {
+        if self.document_id != document.document_id || self.completed_at_unix_ms < 0 {
+            return Err(InvalidTextValue);
+        }
+        let current = document.current_position()?;
+        if self.departing_position != current {
+            return Err(InvalidTextValue);
+        }
+        let pages = LogicalPages::new(&document.chapters, self.page_length)?;
+        let index = pages.page_at(current)?;
+        if pages.pages()[index] != self.page {
+            return Err(InvalidTextValue);
+        }
+        let next = pages.pages().get(index + 1);
+        Ok(ReadingPosition {
+            source_id: self.page.source_id,
+            chapter_id: next.map_or(self.page.chapter_id, |page| page.chapter_id),
+            offset: next.map_or(self.page.range.end, |page| page.range.start),
+        })
+    }
+
     /// Validate the exact departing page/position against a single-unit paste.
     /// The final page advances to EOF before the core returns to Library.
     pub fn next_position(

@@ -18,7 +18,7 @@ with functioning rustup can omit the PATH workaround. Do not assume this compile
 is the project's minimum supported version; establish that with dependencies.
 Cargo.lock is retained for reproducible application development.
 Crux 0.20.0 declares Rust 1.90 minimum; the full locked graph has only been tested
-with 1.99.1. Current host baseline: 379 data-free Rust tests (174 storage, 27
+with 1.99.1. Current host baseline: 393 data-free Rust tests (183 storage, 27
 runtime). Fourteen analysis fixtures and one runtime fixture run separately with
 each Full loader via tools/test-sudachi.sh (see below).
 
@@ -2601,3 +2601,48 @@ No escalation/download needed. APK/Android lint/instrumentation/device, repeated
 codegen reproducibility, standalone word-index/Python, release, process-death/reboot,
 tablet/dark and physical arm64 were not rerun. App remains paste/TXT; generalize
 single-text duplicate/reader payloads before exposing EPUB through FIFO/JNI/picker.
+
+
+## Ordered-chapter reader repository checks
+
+Verified 2026-10-26 from the repository root with the Rust PATH/JDK setup above:
+
+```sh
+cargo test --workspace --all-features --locked --offline --quiet
+cargo clippy --workspace --all-targets --all-features --locked --offline -- -D warnings
+cargo fmt --all -- --check
+tools/test-sudachi.sh
+tools/test-kotlin-bridge.sh
+git diff --check
+```
+
+The existing two-ABI `cargo check -p yomoku-storage` command in the preceding
+section also passes with NDK r30/API 29 and bundled SQLite.
+
+PASS: 393 data-free Rust tests (five new domain, nine repository), strict Clippy/
+fmt/diff, fourteen real-Full analysis plus one worker fixture per owned/mapped
+loader, existing real-Full Kotlin/JNI and seven Unicode payload exchanges. Sixteen
+data-dependent fixtures remain ignored in ordinary workspace tests. The expanded
+real EPUB fixture completes both original Mode B chapters with exact pending time,
+validates chapter-local token identity, New-only Known versus preserved Learning,
+whole-book finish, duplicate replay and explicit finished-book reset after reopen.
+
+Fixtures cover every preset and 25 reflow pairs, authoritative chapter order,
+whole-book counters/progress, next-chapter transitions, backward position-only saves,
+independent chapter/EOF time, live dictionary/status/counts, repeats/rereads, replay
+including after deletion, missing/wrong analysis, foreign chapters/scalar splits,
+corrupt saved content/assets/positions, extra single-text chapters and image-only
+zero-new-word final completion. Statement and deferred-COMMIT failures preserve
+history/status/time/position/finish; reset also rolls back on later analysis failure.
+
+The initial all-format fixture correctly encountered uncertain TXT decoding; added
+explicit UTF-8 selection. Clippy caught duplicate shared EPUB test modules; moved
+one shared import to the storage test root. Final checks pass. Existing benign Crux
+close diagnostics persist. No open failure/blocker or new dependency/migration.
+
+Legacy application/worker/typed bridge payloads still use single-text snapshots;
+EPUB selection is not enabled. Generic readers currently verify the complete saved
+EPUB source/assets on every operation; large-book performance is unmeasured.
+APK/Android lint/instrumentation/device, repeated-codegen reproducibility, standalone
+index/Python suites, release/process-death/reboot/tablet/dark and physical arm64 were
+not rerun. No download/escalation was needed.
