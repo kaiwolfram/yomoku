@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 use crate::active_time::{ReadingTimeUpdate, SavedReadingTime};
 use crate::completion::{AnalyzedCompletionOutcome, AnalyzedPageCompletion, PageCompletionIntent};
 use crate::document::{DocumentId, LibraryDocument, PastedDocument};
+use crate::imports::TxtImport;
 use crate::pagination::{PageLength, ReadingPosition};
 use crate::reader::{
     ReaderSnapshot, ReaderStatusChange, ReaderTokenKey, ReaderTokenSnapshot, ReaderVocabulary,
@@ -40,6 +41,7 @@ pub enum StorageOperation {
     LoadReaderTokens(ReaderTokenKey),
     SetReaderStatus(ReaderStatusChange),
     LoadReaderWord(ReaderWordSelection),
+    ImportTxt(TxtImport),
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -53,6 +55,12 @@ pub enum DocumentError {
     NotFound,
     InvalidSettings,
     MissingAnalysis,
+    TxtEncodingRequired,
+    TxtInvalidUtf8,
+    TxtInvalidShiftJis,
+    TxtUnsupportedEncoding,
+    TxtUndecodable,
+    EmptyTxt,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]

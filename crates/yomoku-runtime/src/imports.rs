@@ -8,9 +8,13 @@ use std::{
 use yomoku_core::{
     analysis::ChapterAnalysis,
     document::{ChapterText, PasteText},
+    imports::{TextEncoding, TxtImport},
     storage::{DocumentError, StorageResult},
 };
-use yomoku_storage::{PasteImportError, PasteImportOutcome, Storage, StorageError};
+use yomoku_import::txt::{self, TextEncoding as Decoding, TxtError};
+use yomoku_storage::{
+    PasteImportError, PasteImportOutcome, Storage, StorageError, TxtImportError, TxtImportOutcome,
+};
 
 use crate::storage::{map_error, Job};
 
@@ -83,6 +87,58 @@ impl Imports {
         }
     }
 
+    pub(crate) fn import_txt(
+        &mut self,
+        storage: &mut Storage,
+        input: &TxtImport,
+    ) -> Result<StorageResult, DocumentError> {
+        // Avoid dictionary extraction/loading for an existing file, including
+        // after background release or a fresh session. No title/encoding changes.
+        if let Some(document) = storage
+            .find_imported_txt(&input.original_bytes)
+            .map_err(map_error)?
+        {
+            return Ok(StorageResult::Existing(document));
+        }
+        if input.filename.trim().is_empty() {
+            return Err(DocumentError::InvalidDocument);
+        }
+        let selection = input.encoding.map(|encoding| match encoding {
+            TextEncoding::Utf8 => Decoding::Utf8,
+            TextEncoding::ShiftJis => Decoding::ShiftJis,
+        });
+        // Validate before loading Full and before acquiring the write lock.
+        // The repository parses again under its authoritative atomic lookup so
+        // concurrent creators cannot overwrite an existing interpretation.
+        txt::parse(&input.original_bytes, selection).map_err(map_txt_error)?;
+        if self.analyzer.is_none() {
+            self.analyzer = Some((self.loader)()?);
+        }
+        let analyzer = self.analyzer.as_mut().expect("loaded analyzer");
+        match storage.import_analyzed_txt(
+            &input.original_bytes,
+            &input.filename,
+            selection,
+            registration_timestamp()?,
+            |chapter| analyzer.analyze(chapter),
+        ) {
+            Ok(TxtImportOutcome::Created(imported)) => {
+                Ok(StorageResult::Created(imported.document))
+            }
+            Ok(TxtImportOutcome::Existing(document)) => Ok(StorageResult::Existing(document)),
+            Err(TxtImportError::Parse(error)) => Err(map_txt_error(error)),
+            Err(TxtImportError::Analysis(error)) => {
+                self.analyzer = None;
+                Err(error)
+            }
+            Err(TxtImportError::Storage(StorageError::InvalidAnalysis)) => {
+                self.analyzer = None;
+                Err(DocumentError::InvalidDocument)
+            }
+            Err(TxtImportError::Storage(error)) => Err(map_error(error)),
+        }
+    }
+
     pub(crate) fn import(
         &mut self,
         storage: &mut Storage,
@@ -93,11 +149,7 @@ impl Imports {
         }
         // Wall time dates registration history; active reading uses a separate
         // monotonic clock and is never started/committed by an import.
-        let timestamp = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .ok()
-            .and_then(|duration| i64::try_from(duration.as_millis()).ok())
-            .ok_or(DocumentError::Unavailable)?;
+        let timestamp = registration_timestamp()?;
         let analyzer = self.analyzer.as_mut().expect("loaded analyzer");
         let result =
             storage.import_analyzed_paste(paste, timestamp, |chapter| analyzer.analyze(chapter));
@@ -117,5 +169,24 @@ impl Imports {
             }
             Err(PasteImportError::Storage(error)) => Err(map_error(error)),
         }
+    }
+}
+
+fn registration_timestamp() -> Result<i64, DocumentError> {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .ok()
+        .and_then(|duration| i64::try_from(duration.as_millis()).ok())
+        .ok_or(DocumentError::Unavailable)
+}
+
+fn map_txt_error(error: TxtError) -> DocumentError {
+    match error {
+        TxtError::EncodingRequired => DocumentError::TxtEncodingRequired,
+        TxtError::InvalidEncoding(Decoding::Utf8) => DocumentError::TxtInvalidUtf8,
+        TxtError::InvalidEncoding(Decoding::ShiftJis) => DocumentError::TxtInvalidShiftJis,
+        TxtError::UnsupportedEncoding => DocumentError::TxtUnsupportedEncoding,
+        TxtError::Undecodable => DocumentError::TxtUndecodable,
+        TxtError::EmptyText => DocumentError::EmptyTxt,
     }
 }

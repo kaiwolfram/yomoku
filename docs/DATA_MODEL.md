@@ -15,6 +15,9 @@ unique Japanese registrations together. It returns Created/Existing only after
 commit; failures discard this file and preserve earlier imports. Duplicate titles,
 selection changes or equal canonical text do not change original-byte identity.
 An exact byte comparison rejects a false digest match. Paste identity is separate.
+`find_imported_txt` is a read-only transaction using the same verified lookup; the
+worker uses it to skip Full on duplicates. A miss never reserves an ID or changes
+the authoritative immediate import transaction; concurrent creators still deduplicate.
 
 Migration 0012 rebuilds `sources` to permit `kind IN ('paste', 'txt')`, preserving
 all IDs, provenance and the autoincrement high-water mark. The migration runner
@@ -32,7 +35,8 @@ one transaction, verifies digest, ordered nonoverlapping scalar ranges and readi
 and rejects corruption without repair or reanalysis. Existing single-text snapshot,
 token, progress, completion and finished-reopen repositories now accept paste/TXT;
 their historical PastedDocument name/wire format is retained. No ruby reader payload
-or Android file flow exists yet. Deleting live content removes file identity/ruby;
+exists yet. Typed per-file runtime/JNI imports are connected; Android picker and
+encoding choice UI remain planned. Deleting live content removes file identity/ruby;
 retained source/chapter/history and global vocabulary survive, and reimport starts
 with fresh IDs, position and finish state. Production deletion is still planned.
 

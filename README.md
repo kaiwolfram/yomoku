@@ -66,11 +66,13 @@ manual encrypted backups. See the [product specification](docs/PRODUCT_SPEC.md)
 for scope and the [implementation checklist](docs/IMPLEMENTATION_PLAN.md) for
 verified progress.
 
-The Rust TXT parser and atomic storage repository are ready for runtime integration: strict UTF-8/Shift-JIS decoding
-with explicit selection for ambiguous bytes, preserved hard breaks, and common
+The Rust TXT parser, atomic repository and typed worker/JNI path support strict
+UTF-8/Shift-JIS decoding with explicit selection for ambiguous bytes, preserved hard
+breaks, and common
 Aozora ruby/directive handling. Original-file SHA-256 deduplication, original bytes,
 canonical text/ruby, Mode B analysis and vocabulary registration commit together.
-The runtime/FFI file flow and Android picker remain planned.
+Typed errors support encoding retries; duplicates skip analyzer loading even after
+reopen. The Android picker and encoding selection UI remain planned.
 
 ## Repository layout
 

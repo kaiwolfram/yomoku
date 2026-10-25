@@ -15,6 +15,7 @@ use yomoku_core::{
     analysis::{AnalysisProfile, AnalyzedToken, ChapterAnalysis, SplitMode},
     app::{ContentRoute, Destination, Event, ViewModel},
     document::{ChapterText, PasteText, TextAnchor, TextOffset, TextRange},
+    imports::{TextEncoding, TxtImport},
     reader::ReaderAnalysis,
     storage::DocumentError,
     vocabulary::{Surface, VocabularyStatus},
@@ -612,6 +613,327 @@ struct FullAnalyzer {
     analyzer: yomoku_analysis::Analyzer,
     trace: mpsc::Sender<Trace>,
     worker: ThreadId,
+}
+
+fn txt_event(bytes: &[u8], encoding: Option<TextEncoding>) -> Event {
+    Event::ImportTxt(TxtImport {
+        original_bytes: bytes.to_vec(),
+        filename: "本𠮷.txt".into(),
+        encoding,
+    })
+}
+
+fn file_totals(path: &PathBuf) -> Vec<i64> {
+    let connection = Connection::open(path).unwrap();
+    let mut counts = totals(path);
+    for table in ["imported_files", "source_ruby"] {
+        counts.push(
+            connection
+                .query_row(&format!("SELECT COUNT(*) FROM {table}"), [], |row| {
+                    row.get(0)
+                })
+                .unwrap(),
+        );
+    }
+    counts
+}
+
+#[test]
+fn txt_typed_decoding_errors_skip_full_and_manual_choices_retry_without_partial_files() {
+    let database = Database::new();
+    let Factory { loader, trace, .. } = Factory::new(false, None);
+    let (router, lifecycle) = effect_router_with_analyzed_imports(database.path(), loader).unwrap();
+    dispatch(&router, Event::RefreshLibrary);
+    let before = file_totals(&database.path());
+    for (bytes, encoding, error) in [
+        (&[0xC2, 0xA9][..], None, DocumentError::TxtEncodingRequired),
+        (
+            &[0x82, 0xA0],
+            Some(TextEncoding::Utf8),
+            DocumentError::TxtInvalidUtf8,
+        ),
+        (
+            &[0xFF],
+            Some(TextEncoding::ShiftJis),
+            DocumentError::TxtInvalidShiftJis,
+        ),
+        (
+            &[0xFF, 0xFE, 0x41, 0],
+            None,
+            DocumentError::TxtUnsupportedEncoding,
+        ),
+        (&[0xFF], None, DocumentError::TxtUndecodable),
+        (b" \r\n", None, DocumentError::EmptyTxt),
+    ] {
+        let rejected = dispatch(&router, txt_event(bytes, encoding));
+        assert_eq!(rejected.document_error, Some(error));
+        assert!(rejected.documents.is_empty() && rejected.import_summary.is_none());
+        assert_eq!(file_totals(&database.path()), before);
+    }
+    let mut blank = match txt_event(b"valid", None) {
+        Event::ImportTxt(input) => input,
+        _ => unreachable!(),
+    };
+    blank.filename = " \r\n".into();
+    assert_eq!(
+        dispatch(&router, Event::ImportTxt(blank)).document_error,
+        Some(DocumentError::InvalidDocument)
+    );
+    assert!(trace.try_recv().is_err());
+    let selected = dispatch(
+        &router,
+        txt_event(&[0xC2, 0xA9], Some(TextEncoding::ShiftJis)),
+    );
+    assert_eq!(
+        selected.import_summary.as_ref().unwrap().outcome,
+        yomoku_core::app::ImportOutcome::Created
+    );
+    let mut storage = Storage::open(database.path()).unwrap();
+    let id = selected.documents[0].document_id;
+    assert_eq!(storage.load_paste(id).unwrap().unwrap().chapter.text, "ﾂｩ");
+    assert_eq!(
+        storage.load_txt_source(id).unwrap().unwrap().encoding,
+        yomoku_import::txt::TextEncoding::ShiftJis
+    );
+    let unicode = dispatch(
+        &router,
+        txt_event("猫".as_bytes(), Some(TextEncoding::Utf8)),
+    );
+    assert!(unicode.document_error.is_none());
+    let legacy = dispatch(&router, txt_event(&[0x82, 0xA0], None));
+    assert!(legacy.document_error.is_none());
+    assert_eq!(
+        storage
+            .load_paste(legacy.import_summary.unwrap().document_id)
+            .unwrap()
+            .unwrap()
+            .chapter
+            .text,
+        "あ"
+    );
+    finish_worker(router, lifecycle, &trace);
+}
+
+#[test]
+fn txt_duplicates_after_reopen_preserve_source_status_progress_and_skip_unavailable_full() {
+    let database = Database::new();
+    let bytes = "｜𠮷《よし》 猫 猫\r\nか\u{3099} English 。 📖 \0".as_bytes();
+    let Factory { loader, trace, .. } = Factory::new(false, None);
+    let (router, lifecycle) = effect_router_with_analyzed_imports(database.path(), loader).unwrap();
+    router.update(
+        Event::SelectDestination(Destination::Vocabulary),
+        |_| unreachable!(),
+    );
+    let created = dispatch(&router, txt_event(bytes, Some(TextEncoding::Utf8)));
+    assert_eq!(created.destination, Destination::Library);
+    assert_eq!(created.content_route, ContentRoute::Main);
+    assert!(created.reader.is_none() && created.loaded_document.is_none());
+    let id = created.import_summary.as_ref().unwrap().document_id;
+    assert_eq!(created.documents[0].title, "本𠮷.txt");
+    let worker = match trace.recv_timeout(TIMEOUT).unwrap() {
+        Trace::Load(id) => id,
+        other => panic!("{other:?}"),
+    };
+    assert_ne!(worker, thread::current().id());
+    assert_eq!(trace.recv_timeout(TIMEOUT).unwrap(), Trace::Analyze(worker));
+    let opened = dispatch(&router, Event::OpenReader(id));
+    assert!(matches!(
+        opened.reader_analysis,
+        Some(ReaderAnalysis::Available(_))
+    ));
+    let position = yomoku_core::pagination::ReadingPosition {
+        offset: TextOffset::try_from(5).unwrap(),
+        ..opened.reader.unwrap().position
+    };
+    let saved = dispatch(&router, Event::SaveReadingPosition(position));
+    let mut storage = Storage::open(database.path()).unwrap();
+    let cat = Surface::new("猫").unwrap();
+    let cat_entry = storage.vocabulary_entry(&cat).unwrap().unwrap();
+    let known = storage
+        .set_vocabulary_status(cat_entry.id, VocabularyStatus::Known, 123)
+        .unwrap()
+        .unwrap();
+    let source = storage.load_txt_source(id).unwrap().unwrap();
+    assert_eq!(source.ruby[0].reading, "よし");
+    assert_eq!(source.original_bytes, bytes);
+    let before = file_totals(&database.path());
+    lifecycle.set_foreground(false).unwrap();
+    assert_eq!(trace.recv_timeout(TIMEOUT).unwrap(), Trace::Drop(worker));
+    let mut duplicate = match txt_event(bytes, Some(TextEncoding::ShiftJis)) {
+        Event::ImportTxt(input) => input,
+        _ => unreachable!(),
+    };
+    duplicate.filename.clear(); // existing identity takes priority over all new-file metadata
+    let existing = dispatch(&router, Event::ImportTxt(duplicate.clone()));
+    assert_eq!(
+        existing.import_summary.as_ref().unwrap().outcome,
+        yomoku_core::app::ImportOutcome::Existing
+    );
+    assert_eq!(existing.documents, saved.documents);
+    assert!(trace.try_recv().is_err());
+    finish_worker(router, lifecycle, &trace);
+    let Factory { loader, trace, .. } = Factory::new(true, None);
+    let (router, lifecycle) = effect_router_with_analyzed_imports(database.path(), loader).unwrap();
+    let existing = dispatch(&router, Event::ImportTxt(duplicate));
+    assert_eq!(existing.import_summary.as_ref().unwrap().document_id, id);
+    assert_eq!(existing.documents, saved.documents);
+    assert_eq!(file_totals(&database.path()), before);
+    assert_eq!(
+        storage.load_paste(id).unwrap().unwrap().reading_position,
+        Some(position)
+    );
+    assert_eq!(storage.load_txt_source(id).unwrap(), Some(source));
+    assert_eq!(storage.vocabulary_entry(&cat).unwrap(), Some(known));
+    assert!(trace.try_recv().is_err());
+    finish_worker(router, lifecycle, &trace);
+}
+
+#[test]
+fn txt_loader_analysis_and_invalid_output_failures_preserve_completed_files_and_retry() {
+    let database = Database::new();
+    let Factory {
+        loader,
+        trace,
+        failure,
+    } = Factory::new(true, None);
+    let (router, lifecycle) = effect_router_with_analyzed_imports(database.path(), loader).unwrap();
+    for mode in [0, 1, 2] {
+        failure.store(mode, Ordering::Relaxed);
+        let failed = dispatch(
+            &router,
+            txt_event("猫 𠮷".as_bytes(), Some(TextEncoding::Utf8)),
+        );
+        assert_eq!(
+            failed.document_error,
+            Some(if mode == 2 {
+                DocumentError::InvalidDocument
+            } else {
+                DocumentError::Unavailable
+            })
+        );
+        assert_eq!(file_totals(&database.path()), vec![0; 14]);
+    }
+    failure.store(0, Ordering::Relaxed);
+    let created = dispatch(
+        &router,
+        txt_event("猫 𠮷".as_bytes(), Some(TextEncoding::Utf8)),
+    );
+    assert!(created.document_error.is_none());
+    let before = file_totals(&database.path());
+    failure.store(1, Ordering::Relaxed);
+    let rejected = dispatch(
+        &router,
+        txt_event("犬".as_bytes(), Some(TextEncoding::Utf8)),
+    );
+    assert_eq!(rejected.documents, created.documents);
+    assert!(rejected.import_summary.is_none());
+    assert_eq!(file_totals(&database.path()), before);
+    failure.store(0, Ordering::Relaxed);
+    assert_eq!(
+        dispatch(
+            &router,
+            txt_event("犬".as_bytes(), Some(TextEncoding::Utf8))
+        )
+        .documents
+        .len(),
+        2
+    );
+    finish_worker(router, lifecycle, &trace);
+}
+
+#[test]
+fn txt_each_write_and_commit_failure_is_atomic_through_worker() {
+    for table in [
+        "sources",
+        "chapters",
+        "documents",
+        "chapter_texts",
+        "imported_files",
+        "source_ruby",
+        "chapter_analyses",
+        "analyzed_tokens",
+        "vocabulary",
+        "vocabulary_status_events",
+        "commit",
+    ] {
+        let database = Database::new();
+        let Factory { loader, trace, .. } = Factory::new(false, None);
+        let (router, lifecycle) =
+            effect_router_with_analyzed_imports(database.path(), loader).unwrap();
+        let created = dispatch(&router, txt_event(b"English", None));
+        let before = file_totals(&database.path());
+        let connection = Connection::open(database.path()).unwrap();
+        if table == "commit" {
+            connection.execute_batch("CREATE TABLE deferred_parent (id INTEGER PRIMARY KEY);
+                CREATE TABLE deferred_child (id INTEGER REFERENCES deferred_parent(id) DEFERRABLE INITIALLY DEFERRED);
+                CREATE TRIGGER reject_import AFTER INSERT ON vocabulary_status_events
+                BEGIN INSERT INTO deferred_child VALUES (99); END;").unwrap();
+        } else {
+            connection.execute_batch(&format!("CREATE TRIGGER reject_import AFTER INSERT ON {table} BEGIN SELECT RAISE(ABORT, 'fixture'); END;")).unwrap();
+        }
+        let bytes = "｜猫《ねこ》 𠮷".as_bytes();
+        let failed = dispatch(&router, txt_event(bytes, Some(TextEncoding::Utf8)));
+        assert_eq!(
+            failed.document_error,
+            Some(DocumentError::Unavailable),
+            "{table}"
+        );
+        assert_eq!(failed.documents, created.documents);
+        assert_eq!(file_totals(&database.path()), before, "{table}");
+        connection
+            .execute_batch("DROP TRIGGER reject_import")
+            .unwrap();
+        assert_eq!(
+            dispatch(&router, txt_event(bytes, Some(TextEncoding::Utf8)))
+                .documents
+                .len(),
+            2
+        );
+        finish_worker(router, lifecycle, &trace);
+    }
+}
+
+#[test]
+fn txt_background_and_close_drain_atomic_import_and_reject_duplicate_callbacks() {
+    for close in [false, true] {
+        let database = Database::new();
+        let (release, gate) = mpsc::channel();
+        let Factory { loader, trace, .. } = Factory::new(false, Some(gate));
+        let (router, lifecycle) =
+            effect_router_with_analyzed_imports(database.path(), loader).unwrap();
+        let event = txt_event("猫 𠮷".as_bytes(), Some(TextEncoding::Utf8));
+        let (sender, receiver) = mpsc::channel();
+        router.update(event.clone(), move |_| {
+            let _ = sender.send(());
+        });
+        let worker = match trace.recv_timeout(TIMEOUT).unwrap() {
+            Trace::Load(id) => id,
+            other => panic!("{other:?}"),
+        };
+        assert_eq!(trace.recv_timeout(TIMEOUT).unwrap(), Trace::Analyze(worker));
+        assert_eq!(file_totals(&database.path()), vec![0; 14]);
+        assert!(router.update(event, |_| unreachable!()).is_empty());
+        lifecycle.set_foreground(false).unwrap();
+        let router = if close {
+            drop(router);
+            None
+        } else {
+            Some(router)
+        };
+        release.send(()).unwrap();
+        assert_eq!(trace.recv_timeout(TIMEOUT).unwrap(), Trace::Drop(worker));
+        if let Some(router) = router {
+            receiver.recv_timeout(TIMEOUT).unwrap();
+            assert_eq!(router.view().documents.len(), 1);
+            assert!(router.view().reader.is_none());
+            finish_worker(router, lifecycle, &trace);
+        } else {
+            assert!(drain_trace(&trace).is_empty());
+            assert!(lifecycle.set_foreground(true).is_err());
+        }
+        assert_eq!(file_totals(&database.path())[0], 1);
+        assert_eq!(file_totals(&database.path())[12], 1);
+    }
 }
 impl PasteAnalyzer for FullAnalyzer {
     fn analyze(&mut self, chapter: &ChapterText) -> Result<ChapterAnalysis, DocumentError> {

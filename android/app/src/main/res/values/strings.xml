@@ -59,4 +59,10 @@
     <string name="word_dictionary_attribution">JMdict English and JMnedict, 25 October 2026, from the Electronic Dictionary Research and Development Group. Dictionary data and the derived index are licensed under Creative Commons Attribution-ShareAlike 4.0. Complete attribution, license and project documentation follow.</string>
     <string name="notices_unavailable">Notices could not be loaded. Close and try again.</string>
     <string name="close">Close</string>
+    <string name="error_txt_encoding_required">Select UTF-8 or Shift-JIS for this TXT file.</string>
+    <string name="error_txt_invalid_utf8">This TXT file is not valid UTF-8.</string>
+    <string name="error_txt_invalid_shift_jis">This TXT file is not valid Shift-JIS.</string>
+    <string name="error_txt_unsupported_encoding">This TXT file uses an unsupported encoding.</string>
+    <string name="error_txt_undecodable">This TXT file cannot be decoded as UTF-8 or Shift-JIS.</string>
+    <string name="error_empty_txt">This TXT file has no readable text.</string>
 </resources>

@@ -18,7 +18,7 @@ with functioning rustup can omit the PATH workaround. Do not assume this compile
 is the project's minimum supported version; establish that with dependencies.
 Cargo.lock is retained for reproducible application development.
 Crux 0.20.0 declares Rust 1.90 minimum; the full locked graph has only been tested
-with 1.99.1. Current host baseline: 287 data-free Rust tests (142 storage, eight
+with 1.99.1. Current host baseline: 293 data-free Rust tests (142 storage, thirteen
 runtime). Twelve analysis fixtures and one runtime fixture run separately with
 each Full loader via tools/test-sudachi.sh (see below).
 
@@ -45,7 +45,8 @@ decoding; fix it to explicitly select UTF-8. Review added malformed-quote cases
 and preserves such content as a unit. All final tests pass. Offline Cargo cache
 unpacking needed sandbox escalation; no network download was needed.
 
-This crate is not yet linked into runtime/Android. No Android APK/lint/device,
+At this parser-only checkpoint the crate was not linked into runtime/Android;
+current typed TXT integration is recorded below. No Android APK/lint/device,
 Kotlin/JNI/generation, full-index scans, standalone Full fixtures, release or
 physical-arm64 checks were rerun for this parser-only step. No open blocker.
 
@@ -2074,3 +2075,51 @@ remove it when the old sequence was absent. All final checks pass. No sandbox
 escalation/download, new wire payload, Android or UI change. Android/Kotlin/JNI/
 generation, Python/full-index scans, release/process/reboot and physical arm64
 were not rerun for this storage slice. No open failure/blocker.
+
+## Typed TXT FIFO/JNI import bridge
+
+Verified 2026-10-25 with the Rust PATH and Android/JDK environment above. Host JNI
+and Android native generation/builds ran sequentially; no new package or migration:
+
+```sh
+cargo test --workspace --all-features --locked --offline --quiet
+cargo fmt --all -- --check
+cargo clippy --workspace --all-targets --all-features --locked --offline -- -D warnings
+tools/test-kotlin-bridge.sh
+cargo run -p yomoku-ffi --bin generate-kotlin --features facet_typegen --locked --offline -- target/generated/kotlin-repeat
+diff -r target/generated/kotlin target/generated/kotlin-repeat
+tools/format-kotlin.sh --check
+./android/gradlew -p android :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug --offline --console=plain
+./android/gradlew -p android :app:connectedDebugAndroidTest :app:lintDebug -Pandroid.testInstrumentationRunnerArguments.class=app.yomoku.DocumentSessionTest,app.yomoku.AnalyzedImportSessionTest,app.yomoku.CoreSessionTest --offline --console=plain
+git diff --check
+```
+
+PASS: 293 data-free Rust tests (142 storage, thirteen runtime), strict Clippy/Rust
+fmt/Kotlin fmt/diff, reproducible payload generation, real-Full/real-index Kotlin/JNI
+and seven bidirectional Unicode fixtures, both-ABI app/test APK builds and strict
+Android lint. All five selected API-36 x86_64 tests pass, including the new TXT
+session fixture and existing paste/status/position/bridge regressions. Reports:
+`.local/test-reports/txt-import-bridge/{report,results}/`. Existing AVD cold-booted
+without data reset using the documented swangle command; left running.
+
+Five new worker fixtures and one core fixture cover typed encoding-required/all
+strict decoding errors, manual choices, exact bytes/filename/Aozora source ruby,
+original Mode B, duplicate preservation of encoding/status/position after background
+release/fresh session with an unavailable Full provider, analyzer/load/invalid-output
+retry, every write and deferred commit rollback with earlier imports retained,
+busy/pending reader-save gates and atomic background/close draining. Existing
+storage fixtures now verify query-only unchanged-byte preflight and corrupt-digest
+rejection. New Kotlin/JNI and Android fixtures exercise production Full, payloads,
+original-source/ruby storage, read-only reopening and no automatic reader open.
+APK inspection confirms all five encoding_rs copyright/license files match their
+checked-in asset bytes. New-file parsing repeats around preflight; performance
+on large files is unmeasured.
+
+Intermediate strict Kotlin warnings (redundant safe calls/non-null assertion) were
+fixed before passing reruns. ADB socket and .git write denials required escalation;
+no download.
+Existing benign Crux JNI close diagnostics persist. No open failure/blocker.
+Standalone Full fixtures/probes, Python/full-index scans, release app, separate
+process/reboot, tablet/dark and physical arm64 were not rerun. Next: Android picker,
+encoding choice and per-file summary; batch progress/cancel/background notifications
+and source-ruby reader transport/rendering remain separate tasks.

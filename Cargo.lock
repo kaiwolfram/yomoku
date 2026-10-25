@@ -1657,6 +1657,7 @@ dependencies = [
  "serde",
  "yomoku-analysis",
  "yomoku-core",
+ "yomoku-import",
  "yomoku-storage",
 ]
 

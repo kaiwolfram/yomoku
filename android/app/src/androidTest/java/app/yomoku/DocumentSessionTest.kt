@@ -2,15 +2,20 @@ package app.yomoku
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import app.yomoku.nativebridge.DictionaryProvider
 import app.yomoku.shared.DocumentError
 import app.yomoku.shared.Event
+import app.yomoku.shared.ImportOutcome
 import app.yomoku.shared.PageLength
 import app.yomoku.shared.ReaderStatusChange
 import app.yomoku.shared.ReaderTokenKey
+import app.yomoku.shared.TextEncoding
 import app.yomoku.shared.TextOffset
+import app.yomoku.shared.TxtImport
 import app.yomoku.shared.ViewModel
 import app.yomoku.shared.VocabularyStatus
 import java.io.File
+import java.util.concurrent.atomic.AtomicInteger
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -39,6 +44,126 @@ class DocumentSessionTest {
     private fun dispatch(core: CoreSession, event: Event): ViewModel {
         instrumentation.runOnMainSync { core.dispatch(event) }
         return awaitIdle(core)
+    }
+
+    @Test
+    fun txtBytesEncodingRetryAtomicSourceAndDuplicateReopenUseProductionJni() {
+        val context = instrumentation.targetContext
+        val directory = File(context.noBackupFilesDir, "txt-bridge-${System.nanoTime()}")
+        assertTrue(directory.mkdir())
+        val database = File(directory, "reader.sqlite3")
+        val calls = AtomicInteger()
+        val actual = sudachiDictionaryProvider(context)
+        val provider =
+            object : DictionaryProvider {
+                override fun verifiedWordDictionaryPath(): String = ""
+
+                override fun openVerifiedDictionary(): Long {
+                    calls.incrementAndGet()
+                    return actual.openVerifiedDictionary()
+                }
+            }
+        fun event(bytes: ByteArray, encoding: TextEncoding? = null, filename: String = "本𠮷.txt") =
+            Event.ImportTxt(TxtImport(bytes.map { it.toUByte() }, filename, encoding))
+        lateinit var core: CoreSession
+        instrumentation.runOnMainSync { core = CoreSession(database.path, provider) }
+        try {
+            awaitIdle(core)
+            val ambiguous = byteArrayOf(0xC2.toByte(), 0xA9.toByte())
+            assertEquals(
+                DocumentError.TXTENCODINGREQUIRED,
+                dispatch(core, event(ambiguous)).documentError,
+            )
+            assertEquals(
+                DocumentError.TXTINVALIDUTF8,
+                dispatch(core, event(byteArrayOf(0x82.toByte()), TextEncoding.UTF8)).documentError,
+            )
+            assertEquals(0, calls.get())
+            val bytes = "\uFEFF｜猫《ねこ》と猫。\r\n𠮷😀\u0000終".toByteArray(Charsets.UTF_8)
+            val created = dispatch(core, event(bytes))
+            assertNull(created.documentError)
+            assertEquals(ImportOutcome.CREATED, created.importSummary!!.outcome)
+            assertEquals("本𠮷.txt", created.documents.single().title)
+            assertNull(created.reader)
+            val id = created.documents.single().documentId
+            val loaded = dispatch(core, Event.LoadPaste(id)).loadedDocument!!
+            assertEquals("猫と猫。\r\n𠮷😀\u0000終", loaded.chapter.text)
+            val opened = dispatch(core, Event.OpenReader(id))
+            val page = opened.reader!!
+            val key = ReaderTokenKey(id, page.anchor, opened.readerAnalysis!!)
+            val tokens = dispatch(core, Event.LoadReaderTokens(key)).readerTokens!!
+            val cats = tokens.tokens.filter { it.surface == "猫" }
+            assertEquals(2, cats.size)
+            dispatch(
+                core,
+                Event.SetReaderStatus(
+                    ReaderStatusChange(
+                        key,
+                        cats.first().vocabulary!!.id,
+                        VocabularyStatus.FAMILIAR,
+                        1234,
+                    )
+                ),
+            )
+            val position = page.position.copy(offset = TextOffset(3))
+            dispatch(core, Event.SaveReadingPosition(position))
+            dispatch(core, Event.CloseDocument)
+            instrumentation.runOnMainSync { core.setForeground(false) }
+            dispatch(core, Event.RefreshLibrary)
+            val duplicate = dispatch(core, event(bytes, TextEncoding.SHIFTJIS, ""))
+            assertEquals(ImportOutcome.EXISTING, duplicate.importSummary!!.outcome)
+            assertEquals(id, duplicate.importSummary.documentId)
+            assertEquals(1, calls.get())
+            android.database.sqlite.SQLiteDatabase.openDatabase(
+                    database.path,
+                    null,
+                    android.database.sqlite.SQLiteDatabase.OPEN_READONLY,
+                )
+                .use { db ->
+                    db.rawQuery("SELECT original_bytes, text_encoding FROM imported_files", null)
+                        .use {
+                            assertTrue(it.moveToFirst())
+                            assertTrue(bytes.contentEquals(it.getBlob(0)))
+                            assertEquals("utf8", it.getString(1))
+                            assertFalse(it.moveToNext())
+                        }
+                    db.rawQuery("SELECT start_byte, end_byte, reading FROM source_ruby", null).use {
+                        assertTrue(it.moveToFirst())
+                        assertEquals(0, it.getInt(0))
+                        assertEquals(3, it.getInt(1))
+                        assertEquals("ねこ", it.getString(2))
+                    }
+                    db.rawQuery("SELECT count(*) FROM reading_completions", null).use {
+                        assertTrue(it.moveToFirst())
+                        assertEquals(0, it.getInt(0))
+                    }
+                }
+            instrumentation.runOnMainSync { core.close() }
+            instrumentation.runOnMainSync { core = CoreSession(database.path, provider) }
+            awaitIdle(core)
+            assertEquals(
+                ImportOutcome.EXISTING,
+                dispatch(core, event(bytes)).importSummary!!.outcome,
+            )
+            assertEquals(position, dispatch(core, Event.OpenReader(id)).reader!!.position)
+            val restored = dispatch(core, Event.LoadReaderTokens(key)).readerTokens!!
+            assertTrue(
+                restored.tokens
+                    .filter { it.surface == "猫" }
+                    .all { it.vocabulary!!.status == VocabularyStatus.FAMILIAR }
+            )
+            assertEquals(1, calls.get())
+            dispatch(core, Event.CloseDocument)
+            val selected = dispatch(core, event(ambiguous, TextEncoding.SHIFTJIS))
+            val legacyId = selected.importSummary!!.documentId
+            assertEquals(
+                "ﾂｩ",
+                dispatch(core, Event.LoadPaste(legacyId)).loadedDocument!!.chapter.text,
+            )
+        } finally {
+            instrumentation.runOnMainSync { core.close() }
+            assertTrue(directory.deleteRecursively())
+        }
     }
 
     @Test

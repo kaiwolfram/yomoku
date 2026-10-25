@@ -283,6 +283,12 @@ internal fun StorageStatus(view: ViewModel) {
                     DocumentError.NOTFOUND -> R.string.error_document_not_found
                     DocumentError.INVALIDSETTINGS -> R.string.error_invalid_settings
                     DocumentError.MISSINGANALYSIS -> R.string.error_missing_analysis
+                    DocumentError.TXTENCODINGREQUIRED -> R.string.error_txt_encoding_required
+                    DocumentError.TXTINVALIDUTF8 -> R.string.error_txt_invalid_utf8
+                    DocumentError.TXTINVALIDSHIFTJIS -> R.string.error_txt_invalid_shift_jis
+                    DocumentError.TXTUNSUPPORTEDENCODING -> R.string.error_txt_unsupported_encoding
+                    DocumentError.TXTUNDECODABLE -> R.string.error_txt_undecodable
+                    DocumentError.EMPTYTXT -> R.string.error_empty_txt
                 }
             ),
             color = MaterialTheme.colorScheme.error,

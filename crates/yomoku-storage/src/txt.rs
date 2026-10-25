@@ -64,6 +64,19 @@ pub struct StoredTxtSource {
 }
 
 impl Storage {
+    /// Read-only worker preflight: exact live duplicates need no decoder/analyzer.
+    /// New files still require the authoritative lookup in the import transaction.
+    pub fn find_imported_txt(
+        &mut self,
+        original_bytes: &[u8],
+    ) -> Result<Option<PastedDocument>, StorageError> {
+        let digest = Sha256::digest(original_bytes);
+        let transaction = self.connection.transaction()?;
+        let document = find_imported_in(&transaction, original_bytes, digest.as_slice())?;
+        transaction.commit()?;
+        Ok(document)
+    }
+
     /// Hash original bytes before decoding; existing live files bypass parsing,
     /// analysis and registration, preserving their title, encoding and progress.
     /// For a new file, filename is its literal display name (not a URI/path).
@@ -85,21 +98,9 @@ impl Storage {
             .connection
             .transaction_with_behavior(TransactionBehavior::Immediate)
             .map_err(StorageError::from)?;
-        let existing: Option<(i64, Vec<u8>)> = transaction
-            .query_row(
-                "SELECT document_id, original_bytes FROM imported_files WHERE sha256 = ?1",
-                [digest.as_slice()],
-                |row| Ok((row.get(0)?, row.get(1)?)),
-            )
-            .optional()
-            .map_err(StorageError::from)?;
-        let outcome = if let Some((id, stored_bytes)) = existing {
-            // Fail closed on a stale/corrupt key or digest collision.
-            if stored_bytes != original_bytes {
-                return Err(StorageError::InvalidDocument.into());
-            }
-            let id = DocumentId::try_from(id).map_err(|_| StorageError::InvalidDocument)?;
-            let document = load_paste_in(&transaction, id)?.ok_or(StorageError::InvalidDocument)?;
+        let outcome = if let Some(document) =
+            find_imported_in(&transaction, original_bytes, digest.as_slice())?
+        {
             TxtImportOutcome::Existing(document)
         } else {
             if filename.trim().is_empty() {
@@ -208,6 +209,31 @@ impl Storage {
             ruby,
         }))
     }
+}
+
+fn find_imported_in(
+    connection: &rusqlite::Connection,
+    original_bytes: &[u8],
+    digest: &[u8],
+) -> Result<Option<PastedDocument>, StorageError> {
+    let existing: Option<(i64, Vec<u8>)> = connection
+        .query_row(
+            "SELECT document_id, original_bytes FROM imported_files WHERE sha256 = ?1",
+            [digest],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )
+        .optional()?;
+    let Some((id, stored_bytes)) = existing else {
+        return Ok(None);
+    };
+    // Fail closed on a stale/corrupt key or digest collision.
+    if stored_bytes != original_bytes {
+        return Err(StorageError::InvalidDocument);
+    }
+    let id = DocumentId::try_from(id).map_err(|_| StorageError::InvalidDocument)?;
+    load_paste_in(connection, id)?.map_or(Err(StorageError::InvalidDocument), |document| {
+        Ok(Some(document))
+    })
 }
 
 fn validate_ruby(text: &str, ruby: &[SourceRuby]) -> Result<(), StorageError> {

@@ -7,6 +7,7 @@ pub mod app;
 pub mod completion;
 pub mod dictionary;
 pub mod document;
+pub mod imports;
 pub mod pagination;
 pub mod reader;
 pub mod storage;

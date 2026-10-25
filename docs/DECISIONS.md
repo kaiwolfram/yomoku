@@ -1798,3 +1798,26 @@ AUTOINCREMENT high-water mark, including deleted IDs and the absent sequence in 
 fresh database. Migration failure restores original schema/data/history; normal
 connections retain FK enforcement. No writable_schema shortcut, new package/version,
 platform I/O in core, production deletion or Android import behavior is introduced.
+
+## 2026-10-25 — Typed per-file TXT worker imports
+
+Add `TxtImport` (original bytes, literal display name, optional UTF-8/Shift-JIS)
+to the existing generated Crux event/effect protocol. Append event/error variants
+to retain current discriminants. Map strict parser errors to explicit typed
+DocumentError variants, retaining the bridge's simple enum shape. Reuse committed
+Created/Existing and Library summaries; no automatic reader open or batch policy.
+Core keeps existing busy/pending-save gates and invalidates word selection; Android
+pauses the reader clock before TXT dispatch like paste.
+
+Keep Full publication/loading outside SQLite's write transaction. A shared read-only
+original-byte/digest lookup skips decoding and analyzer loading for live duplicates,
+including hidden/fresh workers or an unavailable provider. Validate new-file name
+and parsing before loading Full, then let the repository repeat its authoritative
+lookup/parse and atomic import. This deliberately duplicates new-file parsing
+rather than caching provisional IDs or loading assets inside a write transaction;
+large-file performance remains unmeasured. No new dependency/version or migration.
+Existing worker cache/failure/background/close policies apply unchanged. Bundle
+encoding_rs 0.8.35's complete upstream copyright and three license texts under
+Android `assets/licenses/encoding_rs/` now that TXT is reachable via production JNI.
+The Android picker, batch progress/cancel/background notifications, EPUB/SRT and
+source-ruby reader transport/rendering remain independent plan tasks.

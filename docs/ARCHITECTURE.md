@@ -12,7 +12,7 @@ OpenReader has a separate storage operation that atomically resets finished book
 to page 1, retaining the permanent marker and pending durations. It tracks the
 requested document until its callback; leaving the route cancels opening without
 cancelling submitted I/O, including an accepted reset. LoadPaste stays read-only.
-Successful paste creation returns to Library without opening the reader.
+Successful paste or TXT import returns to Library without opening the reader.
 StorageFinished is internal: both Serde and Facet skip it, so hosts cannot inject
 storage results. No SQL, paths, threads or platform I/O enter core.
 
@@ -30,7 +30,16 @@ decoding/analysis and preserves its chosen encoding/statuses/progress. The analy
 callback obeys the same ready-worker/no-I/O/provisional-ID contract as paste. Shared
 single-text readers load paste or TXT with the historical PastedDocument wire type;
 source ruby has a separate read-only repository, awaiting reader transport/rendering.
-Runtime/FFI file imports and Android picker/encoding UI are not connected yet.
+`Event::ImportTxt(TxtImport)` carries original bytes, display name and optional
+UTF-8/Shift-JIS choice through generated Kotlin/JNI to the same FIFO worker.
+A read-only hash/exact-byte preflight returns existing snapshots without Full;
+new input is validated before loading Full outside the write transaction. The
+repository repeats parsing and its authoritative duplicate lookup atomically.
+Typed errors distinguish encoding choice, invalid selected encoding, unsupported
+BOM, undecodable input and empty text. Successful Created/Existing use the same
+Library summary without auto-opening. Busy/pending saves gate submissions; imports
+invalidate selected words and Android pauses the reader clock before dispatch.
+Android picker/encoding UI, batching, progress and cancellation remain separate.
 
 Pure document values define positive i64 identities, immutable chapter snapshots,
 UTF-8 byte anchors, checked UTF-16 conversions and literal first-line paste titles.
@@ -384,7 +393,7 @@ The weak `AnalyzerLifecycle` handle queues foreground/background policy alongsid
 storage work without extending worker lifetime. Hidden/background releases after
 earlier atomic work, and imports accepted while hidden release before resolving.
 Foreground permits lazy reuse without initialization. Final close drains accepted
-work and drops both analyzer and loader. Eight data-free tests use a deliberately
+work and drops both analyzer and loader. Thirteen data-free tests use a deliberately
 non-Send analyzer; an explicit real Full fixture tests both loaders and lazy reopen.
 NativeBridge requires this router. The original text-only `effect_router` and
 `YomokuBridge::new` remain low-level Rust storage fixtures, never Android fallbacks.
@@ -553,7 +562,7 @@ Production paste imports now atomically persist Mode B analyses and register all
 unique Japanese surfaces without encounters, deduplicate exact bytes and deliver
 Created/Existing summaries. Native descriptor delivery and retained/background
 lifecycle are connected. TXT parsing and atomic file storage are verified separately;
-file runtime/Android, EPUB/SRT parsing, metadata and multi-file import semantics
+Android picker/encoding UI, EPUB/SRT parsing, metadata and multi-file import semantics
 remain unchecked. Legacy imports are not automatically rescanned.
 Explicit core/worker/FFI pending-time checkpoints coalesce during unresolved saves
 and drain before reader movement/exit or analyzed completion. Completion preparation/

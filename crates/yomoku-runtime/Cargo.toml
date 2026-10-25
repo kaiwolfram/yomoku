@@ -13,6 +13,7 @@ crux_core = "=0.20.0"
 yomoku-core = { path = "../yomoku-core" }
 serde = { version = "=1.0.228", features = ["derive"] }
 yomoku-storage = { path = "../yomoku-storage" }
+yomoku-import = { path = "../yomoku-import" }
 
 [dev-dependencies]
 yomoku-analysis = { path = "../yomoku-analysis" }

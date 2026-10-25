@@ -113,6 +113,11 @@ fn txt_atomic_canonical_ruby_original_bytes_analysis_and_filename_survive_reopen
             .unwrap(),
         Some(source)
     );
+    assert_eq!(
+        storage.find_imported_txt(bytes).unwrap(),
+        Some(imported.document.clone())
+    );
+    assert!(storage.find_imported_txt(b"missing").unwrap().is_none());
     let snapshot = storage
         .load_reader_snapshot(imported.document.document_id)
         .unwrap()
@@ -534,6 +539,10 @@ fn txt_corrupt_digest_or_ruby_fails_closed_without_repair_or_reanalysis() {
             Err(StorageError::InvalidDocument)
         ));
         if corruption.contains("original_bytes") {
+            assert!(matches!(
+                storage.find_imported_txt(bytes),
+                Err(StorageError::InvalidDocument)
+            ));
             assert!(matches!(
                 storage.import_analyzed_txt(bytes, "retry.txt", None, 2, no_analysis),
                 Err(TxtImportError::Storage(StorageError::InvalidDocument))

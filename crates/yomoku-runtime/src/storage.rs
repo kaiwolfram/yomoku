@@ -155,6 +155,10 @@ fn execute(
                     .map_err(map_error)
             }
         }
+        StorageOperation::ImportTxt(input) => imports
+            .as_mut()
+            .ok_or(DocumentError::Unavailable)?
+            .import_txt(storage, &input),
         StorageOperation::LoadPaste(id) => storage
             .load_reader_snapshot(id)
             .map_err(map_error)?

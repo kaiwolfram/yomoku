@@ -14,6 +14,7 @@ use crate::{
     },
     completion::{AnalyzedCompletionOutcome, CompletionNotice, PageCompletionIntent},
     document::{CompletionCommandId, DocumentId, LibraryDocument, PastedDocument, TextAnchor},
+    imports::TxtImport,
     pagination::{LogicalPages, PageLength, ReadingPosition},
     reader::{ReaderAnalysis, ReaderPage, ReaderStatusChange, ReaderTokenKey, ReaderTokenSnapshot},
     reader::{ReaderWordDetails, ReaderWordSelection},
@@ -147,6 +148,8 @@ pub enum Event {
     /// Explicit selection/refresh; rejected until current page tokens are loaded.
     LoadReaderWord(ReaderWordSelection),
     DismissReaderWord,
+    /// Per-file atomic import; success returns to Library with a summary.
+    ImportTxt(TxtImport),
     #[serde(skip)]
     #[cfg_attr(feature = "facet_typegen", facet(skip))]
     StorageFinished(StorageResult),
@@ -398,6 +401,7 @@ impl App for Yomoku {
             }
             Event::RefreshLibrary => Some(StorageOperation::List),
             Event::CreatePaste(text) => Some(StorageOperation::CreatePaste(text.clone())),
+            Event::ImportTxt(input) => Some(StorageOperation::ImportTxt(input.clone())),
             Event::LoadPaste(id) => Some(StorageOperation::LoadPaste(*id)),
             Event::OpenReader(id) => Some(StorageOperation::OpenReader(*id)),
             Event::LoadReaderTokens(key) => {
@@ -531,6 +535,7 @@ impl App for Yomoku {
                     | StorageOperation::LoadPaste(_)
                     | StorageOperation::OpenReader(_)
                     | StorageOperation::CreatePaste(_)
+                    | StorageOperation::ImportTxt(_)
                     | StorageOperation::SavePageLength(_)
                     | StorageOperation::SaveReadingPosition { .. }
                     | StorageOperation::PreparePageCompletion(_)
@@ -545,14 +550,20 @@ impl App for Yomoku {
             if let StorageOperation::SetReaderStatus(change) = operation {
                 model.pending_status_change = Some(change);
             }
-            if matches!(event, Event::CreatePaste(_) | Event::OpenReader(_)) {
+            if matches!(
+                event,
+                Event::CreatePaste(_) | Event::ImportTxt(_) | Event::OpenReader(_)
+            ) {
                 model.import_summary = None;
                 model.completion_notice = None;
                 model.book_completion_notice = None;
             }
             if matches!(
                 event,
-                Event::CreatePaste(_) | Event::LoadPaste(_) | Event::OpenReader(_)
+                Event::CreatePaste(_)
+                    | Event::ImportTxt(_)
+                    | Event::LoadPaste(_)
+                    | Event::OpenReader(_)
             ) {
                 model.loaded_document = None;
             }
@@ -871,6 +882,7 @@ impl App for Yomoku {
             }
             Event::RefreshLibrary
             | Event::CreatePaste(_)
+            | Event::ImportTxt(_)
             | Event::LoadPaste(_)
             | Event::OpenReader(_)
             | Event::LoadReaderWord(_)

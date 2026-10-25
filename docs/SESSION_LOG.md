@@ -1372,3 +1372,29 @@
   JNI/generation/Python/full-index/release/process/reboot/physical arm64 not rerun.
   Next: lazy FIFO/typed file import with encoding uncertainty, then Android picker/
   encoding choice and Library summary. Nostr stays empty; ask Q188 before forwarding.
+
+## 2026-10-25 — Typed TXT FIFO/JNI imports
+
+- Continued phase 4 from a clean tree. Added typed original bytes/display name/
+  optional encoding to the core event/effect protocol, explicit strict TXT errors
+  and lazy FIFO repository dispatch. Created/Existing reuse Library summaries
+  without auto-opening; pending saves gate imports and Android pauses its clock.
+- Added a shared read-only exact-file preflight: duplicates skip decoding/Full
+  even after hidden release or reopen with an unavailable provider. New files
+  validate before loading Full outside the write transaction, then repeat the
+  authoritative atomic lookup/parse. No new package/version or migration.
+- Five new worker fixtures and one core fixture verify encoding/retries, duplicate
+  preservation, failed-file/write/deferred-commit isolation, analyzer failures,
+  save gates and background/close draining. Extended storage query-only/corruption
+  coverage; new real-Full Kotlin/JNI and Android session fixtures pass. Bundled
+  encoding_rs upstream copyright/licenses and verified exact APK bytes.
+- PASS: 293 data-free Rust tests, strict Clippy/Rust/Kotlin fmt/diff, reproducible
+  payloads, real-Full/real-index host JNI and seven Unicode exchanges, both-ABI APK
+  builds/strict lint, all five selected API-36 x86_64 import/session tests. Fixed
+  intermediate Kotlin warnings; ADB/.git sandbox escalation and cold AVD start required.
+  Reports: `.local/test-reports/txt-import-bridge/`; AVD remains running.
+- Updated plan/architecture/data/decisions/README/commands/handoff. No open blocker.
+  Standalone Full/Python/full-index/release app/process/reboot/tablet/dark/physical
+  arm64 not rerun. Next: Android multi-file TXT picker/encoding choice and summary;
+  progress/cancel/background notifications, EPUB/SRT and ruby rendering remain.
+  Nostr empty; ask Q188 before forwarding.

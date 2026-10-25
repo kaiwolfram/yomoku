@@ -1,6 +1,6 @@
 # Resume here
 
-Updated: 2026-10-25. Verified atomic TXT original-file repository.
+Updated: 2026-10-25. Verified typed TXT FIFO/JNI imports.
 Read AGENTS.md, plan phases 2–4 and PRODUCT_SPEC.md sections 3–4.
 ## Working
 - Pure Crux owns navigation/Library/Settings; only Render reaches UI. FIFO owns
@@ -57,23 +57,24 @@ Read AGENTS.md, plan phases 2–4 and PRODUCT_SPEC.md sections 3–4.
   Current/pending/selected/full token identities gate attach; live statuses refresh
   repetitions. Errors survive clock saves; both outcomes drain time. Compose requests
   once gates clear; close/disposal/recreation dismiss. Late callbacks cannot reopen.
-- TXT pure strict UTF-8/Shift-JIS/Aozora parser now composes with atomic storage.
-  Migration 0012 widens sources.kind preserving IDs/history/FK enforcement. File
-  SHA-256 covers original BLOB, separate from paste; duplicate skips decoding/analysis
-  and preserves encoding/title/status/progress/finish. Filename title + original
-  bytes/encoding + canonical text/ruby + B/unique registrations commit together.
-  load_txt_source verifies bytes/ruby read-only; single-text reader/completion accepts
-  TXT. No runtime/FFI file path, picker or reader ruby payload/rendering yet.
+- TXT strict UTF-8/Shift-JIS/Aozora composes with atomic storage (migration 0012).
+  Separate original-file SHA-256 preserves bytes/encoding/title/progress/finish;
+  new filename/text/ruby/original B/unique registrations commit together.
+  ImportTxt(bytes, display name, optional encoding) reaches lazy FIFO/typed JNI.
+  Read-only exact-byte preflight skips decode/Full for duplicates even after reopen;
+  new parsing validates before Full load, repeats under authoritative transaction.
+  Typed encoding-required/strict errors retry explicitly; Created/Existing return
+  Library summary. Reader-save gates/clock pause apply. No picker or reader ruby yet.
 ## Next tasks (ordered)
-1. Wire TXT import through lazy FIFO runtime/typed FFI: original bytes/display name,
-   encoding-required/error outcomes, Created/Existing and existing analyzer lifecycle.
-2. Android multiple-file picker/encoding choice, per-file summary returning Library;
-   progress/cancel/background semantics remain separate. CI/custom entries independent.
+1. Android multiple-TXT picker/encoding choice and per-file summary returning Library;
+   progress/cancel/background semantics remain separate. ImportTxt transport is ready.
+2. EPUB/SRT parsers and original-file runtime imports; CI/custom entries independent.
 3. User-run physical arm64 validation once usable.
 ## Verification
-- PASS: 287 data-free Rust tests (12 new TXT storage/migration), strict Clippy/fmt/diff;
-  all 12 real Full + 1 runtime fixtures per owned/mapped loader. DEVELOPMENT.md commands.
-- No Android/Kotlin/JNI/generation/Python/full-index/release/process/reboot/arm64
-  rerun this storage slice. No new package/version or escalation required.
-- Host JNI/Android builds must run sequentially: BoltFFI replaces shared artifacts.
-- No open failure/blocker. Nostr empty; ask Q188 before forwarding.
+- PASS: 293 data-free Rust tests, strict Clippy/Rust/Kotlin fmt/diff; real-Full/index
+  host Kotlin/JNI + seven Unicode fixtures; reproducible Kotlin payload generation.
+- PASS: both-ABI app/test APKs, strict lint, five API-36 x86_64 import/session tests;
+  exact decoder licenses in APK. Commands/reports: DEVELOPMENT.md last section.
+- No standalone Full/Python/full-index/release app/process/reboot/tablet/arm64 rerun.
+- Host JNI/Android builds run sequentially. AVD running; no open failure/blocker.
+- No new package/version/migration. Nostr empty; ask Q188 before forwarding.

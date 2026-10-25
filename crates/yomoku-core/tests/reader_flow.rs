@@ -543,6 +543,11 @@ fn leaving_library_or_starting_another_import_clears_the_previous_summary() {
         Event::OpenPaste,
         Event::OpenReader(document("本文").document_id),
         Event::CreatePaste("次の本文".into()),
+        Event::ImportTxt(yomoku_core::imports::TxtImport {
+            original_bytes: b"text".to_vec(),
+            filename: "new.txt".into(),
+            encoding: None,
+        }),
     ] {
         let core = Core::<Yomoku>::new();
         let mut effects = core.process_event(Event::CreatePaste("本文".into()));
@@ -817,6 +822,69 @@ fn restore_time(
     );
     finish(core, &mut effects, StorageResult::ReadingTimeLoaded(saved));
     saved
+}
+
+#[test]
+fn txt_import_waits_for_reader_saves_and_only_committed_success_returns_to_library() {
+    use yomoku_core::{
+        active_time::PendingReadingTime,
+        imports::{TextEncoding, TxtImport},
+    };
+    let input = TxtImport {
+        original_bytes: "猫".as_bytes().to_vec(),
+        filename: "book.txt".into(),
+        encoding: Some(TextEncoding::Utf8),
+    };
+    for completion in [false, true] {
+        let (core, _) = analyzed_reader();
+        let before = core.view().reader;
+        let saved = restore_time(&core, 10);
+        let mut effects = if completion {
+            core.process_event(forward(&core, 1234))
+        } else {
+            core.process_event(Event::CheckpointReadingTime(
+                yomoku_core::active_time::ReadingTimeUpdate {
+                    pending: PendingReadingTime::from_millis(100).unwrap(),
+                    ..saved.value
+                },
+            ))
+        };
+        assert!(core
+            .process_event(Event::ImportTxt(input.clone()))
+            .is_empty());
+        finish(
+            &core,
+            &mut effects,
+            StorageResult::Failed(DocumentError::Unavailable),
+        );
+        assert!(core
+            .process_event(Event::ImportTxt(input.clone()))
+            .is_empty());
+        assert_eq!(core.view().reader, before);
+    }
+    let core = Core::<Yomoku>::new();
+    core.process_event(Event::SelectDestination(Destination::Vocabulary));
+    let mut effects = core.process_event(Event::ImportTxt(input.clone()));
+    assert_eq!(
+        storage_operation(&effects),
+        StorageOperation::ImportTxt(input.clone())
+    );
+    assert!(core.view().import_summary.is_none());
+    finish(
+        &core,
+        &mut effects,
+        StorageResult::Failed(DocumentError::TxtEncodingRequired),
+    );
+    assert_eq!(core.view().destination, Destination::Vocabulary);
+    assert!(core.view().import_summary.is_none());
+    let mut effects = core.process_event(Event::ImportTxt(input));
+    let mut imported = document("猫");
+    imported.title = "book.txt".into();
+    finish(&core, &mut effects, StorageResult::Created(imported));
+    assert_eq!(core.view().destination, Destination::Library);
+    assert_eq!(core.view().content_route, ContentRoute::Main);
+    assert_eq!(core.view().import_summary.unwrap().title, "book.txt");
+    assert!(core.view().reader.is_none() && core.view().loaded_document.is_none());
 }
 
 fn storage_operation(effects: &[Effect]) -> StorageOperation {
