@@ -2,10 +2,10 @@
 
 use rusqlite::OptionalExtension;
 use sha2::{Digest, Sha256};
-use yomoku_core::document::{DocumentId, PastedDocument};
+use yomoku_core::document::{DocumentId, LibraryDocument};
 use yomoku_import::txt::TextEncoding;
 
-use crate::{documents::load_paste_in, Storage, StorageError};
+use crate::{reader_documents::load_reader_document_in, Storage, StorageError};
 
 impl Storage {
     /// Format-independent read-only preflight. A duplicate's identity is enough
@@ -21,13 +21,13 @@ impl Storage {
         Ok(id)
     }
 
-    /// Single-text preflight across TXT/SRT. Existing bytes retain the first
-    /// interpretation. Multi-chapter adapters must use find_imported_file_id;
-    /// this historical payload rejects EPUB rather than truncating its chapters.
+    /// Format-independent read-only reference across TXT/SRT/EPUB. Read the
+    /// persisted title, whole-book progress and finish marker atomically with
+    /// exact-byte identity, without decoding, analysis or resetting progress.
     pub fn find_imported_file(
         &mut self,
         original_bytes: &[u8],
-    ) -> Result<Option<PastedDocument>, StorageError> {
+    ) -> Result<Option<LibraryDocument>, StorageError> {
         let digest = Sha256::digest(original_bytes);
         let transaction = self.connection.transaction()?;
         let document = find_imported_in(&transaction, original_bytes, digest.as_slice())?;
@@ -40,17 +40,19 @@ pub(crate) fn find_imported_in(
     connection: &rusqlite::Connection,
     original_bytes: &[u8],
     digest: &[u8],
-) -> Result<Option<PastedDocument>, StorageError> {
+) -> Result<Option<LibraryDocument>, StorageError> {
     let Some(id) = find_imported_id_in(connection, original_bytes, digest)? else {
         return Ok(None);
     };
-    load_paste_in(connection, id)?.map_or(Err(StorageError::InvalidDocument), |document| {
-        Ok(Some(document))
-    })
+    let document = load_reader_document_in(connection, id)?.ok_or(StorageError::InvalidDocument)?;
+    document
+        .library_summary()
+        .map(Some)
+        .map_err(|_| StorageError::InvalidDocument)
 }
 
-/// Format-independent identity for multi-chapter adapters. Single-text callers
-/// continue to load their complete historical payload through find_imported_in.
+/// Exact live file identity; callers may load a format-independent reference in
+/// the same transaction through find_imported_in.
 pub(crate) fn find_imported_id_in(
     connection: &rusqlite::Connection,
     original_bytes: &[u8],

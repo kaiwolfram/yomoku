@@ -6,7 +6,7 @@ use rusqlite::{OptionalExtension, TransactionBehavior};
 use sha2::{Digest, Sha256};
 use yomoku_core::{
     analysis::ChapterAnalysis,
-    document::{ChapterText, DocumentId, PastedDocument},
+    document::{ChapterText, DocumentId, LibraryDocument},
 };
 use yomoku_import::txt::{self, SourceRuby, TextEncoding, TxtError};
 
@@ -20,7 +20,7 @@ use crate::{
 #[derive(Debug)]
 pub enum TxtImportOutcome {
     Created(AnalyzedPaste),
-    Existing(PastedDocument),
+    Existing(LibraryDocument),
 }
 
 #[derive(Debug)]
@@ -65,12 +65,13 @@ pub struct StoredTxtSource {
 }
 
 impl Storage {
-    /// Read-only worker preflight: exact live duplicates need no decoder/analyzer.
+    /// Compatibility preflight: references any supported live file format.
+    /// Exact duplicates need no decoder/analyzer.
     /// New files still require the authoritative lookup in the import transaction.
     pub fn find_imported_txt(
         &mut self,
         original_bytes: &[u8],
-    ) -> Result<Option<PastedDocument>, StorageError> {
+    ) -> Result<Option<LibraryDocument>, StorageError> {
         self.find_imported_file(original_bytes)
     }
 

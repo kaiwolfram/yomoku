@@ -18,7 +18,7 @@ with functioning rustup can omit the PATH workaround. Do not assume this compile
 is the project's minimum supported version; establish that with dependencies.
 Cargo.lock is retained for reproducible application development.
 Crux 0.20.0 declares Rust 1.90 minimum; the full locked graph has only been tested
-with 1.99.1. Current host baseline: 393 data-free Rust tests (183 storage, 27
+with 1.99.1. Current host baseline: 395 data-free Rust tests (183 storage, 29
 runtime). Fourteen analysis fixtures and one runtime fixture run separately with
 each Full loader via tools/test-sudachi.sh (see below).
 
@@ -2646,3 +2646,45 @@ EPUB source/assets on every operation; large-book performance is unmeasured.
 APK/Android lint/instrumentation/device, repeated-codegen reproducibility, standalone
 index/Python suites, release/process-death/reboot/tablet/dark and physical arm64 were
 not rerun. No download/escalation was needed.
+
+
+## Format-independent import reference checks
+
+Verified 2026-10-26 with the Rust PATH/JDK setup above:
+
+```sh
+cargo test --workspace --all-features --locked --offline --quiet
+cargo clippy --workspace --all-targets --all-features --locked --offline -- -D warnings
+cargo fmt --all -- --check
+tools/test-sudachi.sh
+tools/test-kotlin-bridge.sh
+tools/format-kotlin.sh --check
+git diff --check
+```
+
+The existing two-ABI `cargo check -p yomoku-storage` command above also passes
+with NDK r30/API 29 and bundled SQLite.
+
+PASS: 395 data-free Rust tests (two new FIFO fixtures), strict Clippy/Rust+Kotlin
+formatting/diff, both Android storage targets, fourteen real-Full analysis plus
+one worker fixture for each owned/mapped loader, existing real-Full Kotlin/JNI
+and seven Unicode exchanges. Sixteen data-dependent fixtures remain ignored in
+the ordinary workspace run. Existing benign Crux close diagnostics persist.
+
+New worker tests seed an actual stored two-chapter EPUB, then submit identical
+bytes through separate fresh TXT/SRT workers with unusable analyzer loaders and
+blank filename/wrong encoding. Each returns the complete book's Library reference
+with renamed title/later-chapter progress/permanent finish intact, no Full or writes
+and no automatic reader. Corrupt saved EPUB metadata fails before Full; a later
+independent TXT still imports. Expanded repository fixtures exercise all three
+format adapters, read-only preflight and all existing EPUB corruption schedules.
+Existing duplicate/concurrency/cancellation/rollback and Full fixtures now assert
+Library references instead of single-text import payloads.
+
+No open failure/blocker, migration, production dependency/version, permission or
+exported event/request/view schema change. Runtime fixtures reuse the already pinned
+ZIP dev dependency; no new lockfile package/download/escalation. Android app remains
+paste/TXT. App/worker/typed JNI reader migration and EPUB FIFO/import wiring remain
+open. Complete EPUB integrity reads repeat per reference; performance is unmeasured.
+APK/Android lint/device, codegen-repeat, standalone index/Python suites, release,
+process-death/reboot/tablet/dark and physical arm64 were not rerun.

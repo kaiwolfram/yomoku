@@ -1,5 +1,5 @@
 # Resume here
-Updated: 2026-10-26. Ordered-chapter Rust reader repositories verified; app paste/TXT.
+Updated: 2026-10-26. Format-independent import references verified; app paste/TXT.
 Read AGENTS.md, plan phases 2–4 and PRODUCT_SPEC.md sections 3–4.
 ## Working
 - Pure Crux routes/Library/Settings; Render-only UI; FIFO SQLite/analysis. Starts Library.
@@ -58,14 +58,19 @@ Read AGENTS.md, plan phases 2–4 and PRODUCT_SPEC.md sections 3–4.
   token/selected-word repositories now use complete documents; next chapter starts at 0,
   only whole-book final page finishes. Time stays chapter-local; global progress/counters.
   New reader loads currently verify all EPUB source/assets per operation (unmeasured).
-  Legacy app/worker/import-reference wire shapes still single-text and reject EPUB.
+  App/worker reader payloads still single-text and reject EPUB.
+- File preflight + TXT/SRT/EPUB Existing outcomes now return Library references,
+  validating the complete saved document atomically. Core import results also use
+  Library references; exported event/view schemas unchanged. TXT/SRT duplicate EPUB
+  references keep renamed title/later-chapter progress/finish without Full or writes;
+  corrupt content fails without rescan, and later files can still import.
 ## Next tasks (ordered)
-1. Migrate app/worker/typed JNI reader + import-reference payloads to ordered documents;
-   wire EPUB FIFO/JNI. Use generic file-ID preflight, never truncate duplicate chapters.
+1. Migrate app/worker/typed JNI reader payloads to ordered documents; wire EPUB
+   FIFO/JNI using shared format-independent preflight. Never truncate chapters.
 2. Mixed EPUB/TXT/SRT picker/summary/Cancel, reader images/ruby; CI independent.
 3. User-run physical arm64 validation once usable.
 ## Verification
-- PASS: 393 data-free Rust tests, Clippy/fmt/diff, both Android storage targets;
+- PASS: 395 data-free Rust tests, Clippy/fmt/Kotlin fmt/diff, both storage targets;
   fourteen real-Full analysis + one worker fixture per owned/mapped loader;
   real-Full Kotlin/JNI + seven Unicode exchanges. Commands: DEVELOPMENT.md end.
 - No blocker. APK/Android lint/device/codegen-repeat/index/Python/release/reboot/

@@ -51,10 +51,16 @@ replay, original-token ownership and New-only status semantics remain unchanged.
 The loader currently verifies all EPUB content/assets on every reader operation;
 large-book performance is unmeasured. Text snapshots omit asset/formatting payloads.
 
-The generic file-ID preflight and EPUB Existing result support references to the
-first interpretation without a single-text payload. The historical TXT/SRT/reader
-bridge payloads still reject EPUB; migrate application/worker/typed JNI payloads
-before making EPUB selectable. No EPUB runtime/import or Android adapter exists yet.
+Shared file preflight and TXT/SRT/EPUB Existing results now carry `LibraryDocument`
+references (ID, title, whole-book progress, permanent finish marker). Exact-byte
+identity and complete saved-document validation share one read transaction; the
+import transaction repeats that authoritative lookup before parsing or analysis.
+TXT/SRT can reference an existing EPUB without truncating chapters, loading Full,
+resetting a finished book or modifying its first interpretation. Core Created/Existing
+results also carry only Library references; imports never need reader content.
+StorageFinished stays private, so exported event/request/view schemas are unchanged.
+Application/worker reader payloads still reject EPUB; migrate those before making
+EPUB selectable. No EPUB runtime/import or Android adapter exists yet.
 
 Its SRT parser
 accepts decoded text and returns canonical LF text plus ordered UTF-8 cue ranges.

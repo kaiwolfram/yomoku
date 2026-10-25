@@ -183,8 +183,10 @@ fn execute(
                 // an analyzed loader and cannot select this text-only branch.
                 storage
                     .create_paste(&paste)
+                    .map_err(map_error)?
+                    .library_summary()
                     .map(StorageResult::Created)
-                    .map_err(map_error)
+                    .map_err(|_| DocumentError::InvalidDocument)
             }
         }
         StorageOperation::ImportTxt(input) => imports

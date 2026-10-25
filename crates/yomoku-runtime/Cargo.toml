@@ -18,3 +18,4 @@ yomoku-import = { path = "../yomoku-import" }
 [dev-dependencies]
 yomoku-analysis = { path = "../yomoku-analysis" }
 rusqlite = { version = "=0.40.2", default-features = false, features = ["bundled"] }
+zip = { version = "=8.6.0", default-features = false, features = ["deflate-flate2"] }

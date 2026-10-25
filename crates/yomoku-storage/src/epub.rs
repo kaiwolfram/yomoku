@@ -6,7 +6,9 @@ use rusqlite::{Connection, OptionalExtension, TransactionBehavior};
 use sha2::{Digest, Sha256};
 use yomoku_core::{
     analysis::ChapterAnalysis,
-    document::{AnalysisId, ChapterId, ChapterText, DocumentId, SourceId, TextOffset},
+    document::{
+        AnalysisId, ChapterId, ChapterText, DocumentId, LibraryDocument, SourceId, TextOffset,
+    },
     pagination::ReadingPosition,
 };
 use yomoku_import::{
@@ -15,7 +17,7 @@ use yomoku_import::{
 };
 
 use crate::{
-    files::find_imported_id_in, imports::store_analyzed_chapter_in, txt::validate_ruby,
+    files::find_imported_in, imports::store_analyzed_chapter_in, txt::validate_ruby,
     ImportCancellation, Storage, StorageError,
 };
 
@@ -55,8 +57,8 @@ pub struct AnalyzedEpub {
 pub enum EpubImportOutcome {
     Created(Box<AnalyzedEpub>),
     /// Exact bytes retain the first live interpretation, including TXT/SRT.
-    /// Loading the document is separate and never requires analysis or parsing.
-    Existing(DocumentId),
+    /// Reference includes whole-book progress without analysis or parsing.
+    Existing(LibraryDocument),
 }
 
 #[derive(Debug)]
@@ -137,10 +139,10 @@ impl Storage {
         if cancellation.is_cancelled() {
             return Ok(None);
         }
-        let outcome = if let Some(id) =
-            find_imported_id_in(&transaction, original_bytes, digest.as_slice())?
+        let outcome = if let Some(reference) =
+            find_imported_in(&transaction, original_bytes, digest.as_slice())?
         {
-            EpubImportOutcome::Existing(id)
+            EpubImportOutcome::Existing(reference)
         } else {
             if filename.trim().is_empty() {
                 return Err(StorageError::InvalidDocument.into());

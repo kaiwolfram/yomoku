@@ -38,8 +38,9 @@ Parser budgets are operational limits, not peak-memory/performance measurements.
 `import_analyzed_epub[_cancellable]` uses the bounded default parser and one
 immediate transaction. Shared `imported_files` identity hashes original container
 bytes, independent of canonical text/paste identity. Duplicates reference the first
-live DocumentId before parsing/analysis, including an earlier TXT/SRT interpretation.
-The new `find_imported_file_id` reads that identity without a single-text payload.
+live document before parsing/analysis, including an earlier TXT/SRT interpretation.
+`find_imported_file_id` reads just that identity; `find_imported_file` atomically
+adds a Library reference validated against the complete saved document.
 SHA matches require exact byte equality. Different bytes with equal canonical
 content remain new documents. Title uses metadata when present, otherwise the
 literal display filename; retain both filename and optional original metadata title.
@@ -76,10 +77,14 @@ chapter text drops source ruby, while provenance/analyses/global vocabulary surv
 Reimport allocates fresh IDs/position/finish state. Production deletion remains planned.
 
 Ordered-chapter reader repositories now support the saved EPUB content; see below.
-EPUB runtime/FFI and mixed Android selection remain open. The historical single-text
-`find_imported_file`, TXT/SRT duplicate results and application reader payloads
-reject EPUB rather than truncate it; migrate these before exposing EPUB in
-production. Current app imports stay paste/TXT.
+EPUB runtime/FFI and mixed Android selection remain open. Shared file preflight and
+TXT/SRT/EPUB Existing results now return `LibraryDocument`, preserving the first
+interpretation's title, whole-book progress and finish marker without a content
+payload. Identity and complete document validation occur in the same read/import
+transaction; inconsistent saved content fails without writes or analysis. Core
+Created/Existing results also carry Library references. Private StorageFinished
+changes do not alter exported event/request/view schemas. Application reader
+payloads remain single-text and reject EPUB. Current app imports stay paste/TXT.
 
 ## Ordered-chapter reader repositories (no migration)
 

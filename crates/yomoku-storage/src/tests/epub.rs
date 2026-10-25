@@ -222,13 +222,34 @@ fn epub_duplicates_preserve_live_state_skip_parser_and_share_original_file_ident
         )
         .unwrap();
     let before = storage.load_epub_document(id).unwrap();
+    let reference = storage.list_documents().unwrap().remove(0);
     let counts = totals(&storage);
     let seq = sequences(&storage);
     for filename in ["other.epub", "", "other.txt"] {
         assert!(
-            matches!(storage.import_analyzed_epub(&bytes, filename, 2, no_analysis).unwrap(), EpubImportOutcome::Existing(existing) if existing == id)
+            matches!(storage.import_analyzed_epub(&bytes, filename, 2, no_analysis).unwrap(), EpubImportOutcome::Existing(existing) if existing == reference)
+        );
+        assert!(
+            matches!(storage.import_analyzed_txt(&bytes, filename, None, 2, no_analysis).unwrap(), TxtImportOutcome::Existing(existing) if existing == reference)
+        );
+        assert!(
+            matches!(storage.import_analyzed_srt(&bytes, filename, None, 2, no_analysis).unwrap(), crate::SrtImportOutcome::Existing(existing) if existing == reference)
         );
     }
+    // Reference lookup itself remains read-only even for a finished book.
+    storage
+        .connection
+        .pragma_update(None, "query_only", true)
+        .unwrap();
+    assert_eq!(
+        storage.find_imported_file(&bytes).unwrap(),
+        Some(reference.clone())
+    );
+    assert_eq!(storage.find_imported_txt(&bytes).unwrap(), Some(reference));
+    storage
+        .connection
+        .pragma_update(None, "query_only", false)
+        .unwrap();
     assert_eq!(storage.load_epub_document(id).unwrap(), before);
     assert_eq!(totals(&storage), counts);
     assert_eq!(sequences(&storage), seq);
@@ -240,7 +261,7 @@ fn epub_duplicates_preserve_live_state_skip_parser_and_share_original_file_ident
         panic!()
     };
     assert!(
-        matches!(storage.import_analyzed_epub(b"English", "", 4, no_analysis).unwrap(), EpubImportOutcome::Existing(existing) if existing == txt.document.document_id)
+        matches!(storage.import_analyzed_epub(b"English", "", 4, no_analysis).unwrap(), EpubImportOutcome::Existing(existing) if existing == txt.document.library_summary().unwrap())
     );
     let paste = storage
         .create_paste(&PasteText::new("English".into()).unwrap())
@@ -530,7 +551,7 @@ fn epub_concurrent_creators_commit_one_complete_book() {
                 creates += 1;
                 imported.document.document_id
             }
-            EpubImportOutcome::Existing(id) => id,
+            EpubImportOutcome::Existing(document) => document.document_id,
         })
         .collect();
     assert_eq!(creates, 1);
@@ -582,6 +603,14 @@ fn epub_corrupt_saved_content_assets_identity_or_ranges_fail_without_repair() {
                 Err(StorageError::InvalidDocument)
             ),
             "{corruption}"
+        );
+        assert_eq!(fs::read(database.path()).unwrap(), before);
+        assert!(
+            matches!(
+                storage.find_imported_file(&bytes),
+                Err(StorageError::InvalidDocument)
+            ),
+            "reference: {corruption}"
         );
         assert_eq!(fs::read(database.path()).unwrap(), before);
         if corruption.contains("original_bytes") {

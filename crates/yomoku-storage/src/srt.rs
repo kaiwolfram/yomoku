@@ -6,7 +6,7 @@ use rusqlite::{OptionalExtension, TransactionBehavior};
 use sha2::{Digest, Sha256};
 use yomoku_core::{
     analysis::ChapterAnalysis,
-    document::{ChapterText, DocumentId, PastedDocument},
+    document::{ChapterText, DocumentId, LibraryDocument},
 };
 use yomoku_import::{
     srt::{self, EmptySrt},
@@ -23,7 +23,7 @@ use crate::{
 #[derive(Debug)]
 pub enum SrtImportOutcome {
     Created(AnalyzedPaste),
-    Existing(PastedDocument),
+    Existing(LibraryDocument),
 }
 
 #[derive(Debug)]

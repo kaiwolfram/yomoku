@@ -75,9 +75,10 @@ pub enum DocumentError {
 #[repr(C)]
 pub enum StorageResult {
     Listed(Vec<LibraryDocument>, PageLength),
-    Created(PastedDocument),
+    /// Import results reference Library state; content is loaded separately.
+    Created(LibraryDocument),
     /// Exact duplicate: preserve persisted title/position and reference it once.
-    Existing(PastedDocument),
+    Existing(LibraryDocument),
     Loaded(ReaderSnapshot),
     PositionSaved(PastedDocument),
     PageLengthSaved(PageLength),

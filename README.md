@@ -80,6 +80,10 @@ boundaries, formatting, speakers and malformed input. Its atomic repository now
 persists original bytes/encoding, canonical cues, Mode B and vocabulary registrations
 with duplicate detection and cancellation. Typed FIFO/JNI imports, encoding retries,
 duplicate-no-Full and direct cancellation are verified; Android picker wiring is pending.
+Import results now use format-independent Library references. TXT/SRT duplicate
+attempts can reference an existing EPUB while preserving its whole-book progress,
+title and finish marker without decoding or loading Full. EPUB reader/worker
+integration remains pending.
 Planned v1 features include EPUB/SRT imports, custom missing-word definitions,
 reading statistics, optional AnkiDroid integration, curated Nostr reading and
 manual encrypted backups. See the [product specification](docs/PRODUCT_SPEC.md)

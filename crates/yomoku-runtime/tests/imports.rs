@@ -1409,3 +1409,6 @@ fn real_full_worker_import_and_lazy_reopen_preserve_mode_b_unicode_and_vocabular
 
 #[path = "imports/srt.rs"]
 mod srt;
+
+#[path = "imports/file_references.rs"]
+mod file_references;

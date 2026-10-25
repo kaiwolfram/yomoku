@@ -2183,3 +2183,27 @@ first chapter; later analysis validation or COMMIT failure rolls back the reset.
 No migration, new dependency/version, data-destructive semantic change, application
 capability or publishing step. EPUB/import-reference/application/worker/typed JNI
 migration remains the next slice; Android selection stays paste/TXT.
+
+
+## 2026-10-26 — Format-independent import references before reader transport
+
+Use `LibraryDocument` for TXT/SRT/EPUB Existing outcomes and core Created/Existing
+results. Imports return only the ID/title/progress/finish information used by the
+Library and summary; reader content is a separate load. This avoids carrying or
+truncating a multi-chapter book merely to reference a duplicate. Keep legacy
+single-text reader payloads until their application/FIFO migration; EPUB selection
+is still disabled. StorageFinished is private/skipped by Serde and Facet, so this
+internal protocol change does not change exported event/request/view schemas.
+
+Use shared exact-byte preflight for both TXT/SRT workers. Atomically load/validate
+the complete saved document and project its Library reference with the hash lookup,
+then repeat the authoritative lookup inside each file import transaction. Return
+an existing interpretation before filename/encoding checks, ZIP parsing or Full
+loading, preserving renamed titles, later-chapter position and permanent finish
+state. Ordinary duplicate reads never reset a finished book. Corrupt saved EPUBs
+fail closed without repair/reanalysis; later independent files can still import.
+The complete-content integrity loader also checks assets; cost remains unmeasured.
+
+No migration, new production dependency/version, permission or destructive semantic
+change. Runtime tests reuse the existing pinned ZIP dev dependency/shared readable
+EPUB archive builder; no new lockfile package or download.

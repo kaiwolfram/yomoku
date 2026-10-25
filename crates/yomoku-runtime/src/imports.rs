@@ -153,7 +153,7 @@ impl Imports {
         // Avoid dictionary extraction/loading for an existing file, including
         // after background release or a fresh session. No title/encoding changes.
         if let Some(document) = storage
-            .find_imported_txt(&input.original_bytes)
+            .find_imported_file(&input.original_bytes)
             .map_err(map_error)?
         {
             return Ok(if cancellation.is_cancelled() {
@@ -189,9 +189,12 @@ impl Imports {
             |chapter| analyzer.analyze(chapter),
         ) {
             Ok(None) => Ok(StorageResult::ImportCancelled),
-            Ok(Some(TxtImportOutcome::Created(imported))) => {
-                Ok(StorageResult::Created(imported.document))
-            }
+            Ok(Some(TxtImportOutcome::Created(imported))) => Ok(StorageResult::Created(
+                imported
+                    .document
+                    .library_summary()
+                    .map_err(|_| DocumentError::InvalidDocument)?,
+            )),
             Ok(Some(TxtImportOutcome::Existing(document))) => Ok(StorageResult::Existing(document)),
             Err(TxtImportError::Parse(error)) => Err(map_txt_error(error)),
             Err(TxtImportError::Analysis(error)) => {
@@ -258,9 +261,12 @@ impl Imports {
             |chapter| analyzer.analyze(chapter),
         ) {
             Ok(None) => Ok(StorageResult::ImportCancelled),
-            Ok(Some(SrtImportOutcome::Created(imported))) => {
-                Ok(StorageResult::Created(imported.document))
-            }
+            Ok(Some(SrtImportOutcome::Created(imported))) => Ok(StorageResult::Created(
+                imported
+                    .document
+                    .library_summary()
+                    .map_err(|_| DocumentError::InvalidDocument)?,
+            )),
             Ok(Some(SrtImportOutcome::Existing(document))) => Ok(StorageResult::Existing(document)),
             Err(SrtImportError::Decode(error)) => Err(map_srt_decode_error(error)),
             Err(SrtImportError::Empty(_)) => Err(DocumentError::EmptySrt),
@@ -291,10 +297,17 @@ impl Imports {
         let result =
             storage.import_analyzed_paste(paste, timestamp, |chapter| analyzer.analyze(chapter));
         match result {
-            Ok(PasteImportOutcome::Created(imported)) => {
-                Ok(StorageResult::Created(imported.document))
-            }
-            Ok(PasteImportOutcome::Existing(document)) => Ok(StorageResult::Existing(document)),
+            Ok(PasteImportOutcome::Created(imported)) => Ok(StorageResult::Created(
+                imported
+                    .document
+                    .library_summary()
+                    .map_err(|_| DocumentError::InvalidDocument)?,
+            )),
+            Ok(PasteImportOutcome::Existing(document)) => Ok(StorageResult::Existing(
+                document
+                    .library_summary()
+                    .map_err(|_| DocumentError::InvalidDocument)?,
+            )),
             Err(PasteImportError::Analysis(error)) => {
                 // A later attempt loads fresh state after any engine failure.
                 self.analyzer = None;

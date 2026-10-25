@@ -811,25 +811,20 @@ impl App for Yomoku {
                         }
                     }
                     StorageResult::Created(document) | StorageResult::Existing(document) => {
-                        match document.library_summary() {
-                            Ok(summary) => {
-                                model.import_summary = Some(ImportSummary {
-                                    document_id: summary.document_id,
-                                    title: summary.title.clone(),
-                                    outcome: import_outcome.expect("import result"),
-                                });
-                                if let Some(entry) = model
-                                    .documents
-                                    .iter_mut()
-                                    .find(|entry| entry.document_id == summary.document_id)
-                                {
-                                    *entry = summary;
-                                } else {
-                                    model.documents.push(summary);
-                                    model.documents.sort_by_key(|entry| entry.document_id);
-                                }
-                            }
-                            Err(_) => model.document_error = Some(DocumentError::InvalidDocument),
+                        model.import_summary = Some(ImportSummary {
+                            document_id: document.document_id,
+                            title: document.title.clone(),
+                            outcome: import_outcome.expect("import result"),
+                        });
+                        if let Some(entry) = model
+                            .documents
+                            .iter_mut()
+                            .find(|entry| entry.document_id == document.document_id)
+                        {
+                            *entry = document;
+                        } else {
+                            model.documents.push(document);
+                            model.documents.sort_by_key(|entry| entry.document_id);
                         }
                         model.destination = Destination::Library;
                         model.settings_open = false;

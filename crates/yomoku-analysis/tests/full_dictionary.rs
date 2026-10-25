@@ -638,7 +638,7 @@ fn real_txt_import_analyzes_only_canonical_text_and_completes_with_original_anch
     else {
         panic!("expected existing TXT")
     };
-    assert_eq!(existing, completed);
+    assert_eq!(existing, completed.library_summary().unwrap());
     assert_eq!(
         storage
             .record_analyzed_page_completion(completion, imported.analysis_id)
@@ -789,7 +789,7 @@ fn real_srt_import_analyzes_only_canonical_text_and_completes_with_original_anch
     else {
         panic!("expected existing SRT")
     };
-    assert_eq!(existing, completed);
+    assert_eq!(existing, completed.library_summary().unwrap());
     assert_eq!(
         storage
             .record_analyzed_page_completion(completion, imported.analysis_id)
@@ -918,7 +918,7 @@ fn real_epub_import_analyzes_every_canonical_chapter_and_reopens_without_rescan(
         Some(imported.document.clone())
     );
     assert!(
-        matches!(storage.import_analyzed_epub(&bytes, "renamed.epub", 200, |_| -> Result<ChapterAnalysis, yomoku_analysis::AnalysisError> { panic!("duplicate must not analyze") }).unwrap(), EpubImportOutcome::Existing(id) if id == imported.document.document_id)
+        matches!(storage.import_analyzed_epub(&bytes, "renamed.epub", 200, |_| -> Result<ChapterAnalysis, yomoku_analysis::AnalysisError> { panic!("duplicate must not analyze") }).unwrap(), EpubImportOutcome::Existing(id) if id.document_id == imported.document.document_id)
     );
     for (id, expected) in imported.analysis_ids.iter().zip(&analyses) {
         assert_eq!(

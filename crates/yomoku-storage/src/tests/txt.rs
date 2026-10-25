@@ -211,7 +211,9 @@ fn txt_cancel_after_commit_retains_completed_outcome_and_does_not_cancel_other_f
         .unwrap()
         .unwrap()
     {
-        TxtImportOutcome::Existing(document) => assert_eq!(document, first.document),
+        TxtImportOutcome::Existing(document) => {
+            assert_eq!(document, first.document.library_summary().unwrap())
+        }
         _ => panic!("expected existing"),
     }
     let second = created(
@@ -349,7 +351,7 @@ fn txt_atomic_canonical_ruby_original_bytes_analysis_and_filename_survive_reopen
     );
     assert_eq!(
         storage.find_imported_txt(bytes).unwrap(),
-        Some(imported.document.clone())
+        Some(imported.document.library_summary().unwrap())
     );
     assert!(storage.find_imported_txt(b"missing").unwrap().is_none());
     let snapshot = storage
@@ -411,7 +413,9 @@ fn txt_existing_bypasses_decoding_and_preserves_title_progress_analysis_and_stat
             .import_analyzed_txt(bytes, "second.txt", selection, 500, no_analysis)
             .unwrap()
         {
-            TxtImportOutcome::Existing(document) => assert_eq!(document, expected),
+            TxtImportOutcome::Existing(document) => {
+                assert_eq!(document, expected.library_summary().unwrap())
+            }
             _ => panic!("expected existing"),
         }
     }
@@ -677,7 +681,7 @@ fn txt_concurrent_identical_files_commit_once_and_reference_same_document() {
         .map(|handle| match handle.join().unwrap() {
             TxtImportOutcome::Created(imported) => {
                 creates += 1;
-                imported.document
+                imported.document.library_summary().unwrap()
             }
             TxtImportOutcome::Existing(document) => document,
         })

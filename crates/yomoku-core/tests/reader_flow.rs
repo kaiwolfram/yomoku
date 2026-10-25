@@ -362,7 +362,7 @@ fn position_save_keeps_committed_view_until_success_and_late_results_only_update
         finish(
             &core,
             &mut effects,
-            StorageResult::Created(document.clone()),
+            StorageResult::Created(document.clone().library_summary().unwrap()),
         );
         let mut effects = core.process_event(Event::OpenReader(document.document_id));
         finish(
@@ -472,7 +472,7 @@ fn paste_success_returns_to_library_without_opening_reader_and_failures_keep_for
     finish(
         &core,
         &mut effects,
-        StorageResult::Created(document("題𠮷")),
+        StorageResult::Created(document("題𠮷").library_summary().unwrap()),
     );
     let view = core.view();
     assert_eq!(view.content_route, ContentRoute::Main);
@@ -504,7 +504,7 @@ fn duplicate_summary_preserves_progress_survives_settings_and_refresh_and_can_be
     finish(
         &core,
         &mut effects,
-        StorageResult::Existing(document.clone()),
+        StorageResult::Existing(document.clone().library_summary().unwrap()),
     );
     let summary = core.view().import_summary.unwrap();
     assert_eq!(summary.outcome, ImportOutcome::Existing);
@@ -559,7 +559,7 @@ fn leaving_library_or_starting_another_import_clears_the_previous_summary() {
         finish(
             &core,
             &mut effects,
-            StorageResult::Created(document("本文")),
+            StorageResult::Created(document("本文").library_summary().unwrap()),
         );
         assert!(core.view().import_summary.is_some());
         let mut effects = core.process_event(next);
@@ -885,7 +885,11 @@ fn txt_import_waits_for_reader_saves_and_only_committed_success_returns_to_libra
     let mut effects = core.process_event(Event::ImportTxt(input));
     let mut imported = document("猫");
     imported.title = "book.txt".into();
-    finish(&core, &mut effects, StorageResult::Created(imported));
+    finish(
+        &core,
+        &mut effects,
+        StorageResult::Created(imported.library_summary().unwrap()),
+    );
     assert_eq!(core.view().destination, Destination::Library);
     assert_eq!(core.view().content_route, ContentRoute::Main);
     assert_eq!(core.view().import_summary.unwrap().title, "book.txt");
@@ -1311,7 +1315,7 @@ fn analyzed_reader() -> (Core<Yomoku>, PastedDocument) {
     finish(
         &core,
         &mut effects,
-        StorageResult::Created(document.clone()),
+        StorageResult::Created(document.clone().library_summary().unwrap()),
     );
     let mut effects = core.process_event(Event::OpenReader(document.document_id));
     finish(
@@ -2112,7 +2116,7 @@ fn finished_snapshots_keep_exact_position_until_explicit_reader_entry_and_reflow
     finish(
         &core,
         &mut effects,
-        StorageResult::Created(document.clone()),
+        StorageResult::Created(document.clone().library_summary().unwrap()),
     );
     assert!(!core.view().documents[0].finished_at_least_once);
     document.finished_at_least_once = true;
@@ -2648,7 +2652,11 @@ fn srt_import_waits_for_reader_saves_and_only_committed_success_returns_to_libra
     let mut effects = core.process_event(Event::ImportSrt(input));
     let mut imported = document("猫");
     imported.title = "book.srt".into();
-    finish(&core, &mut effects, StorageResult::Created(imported));
+    finish(
+        &core,
+        &mut effects,
+        StorageResult::Created(imported.library_summary().unwrap()),
+    );
     assert_eq!(core.view().destination, Destination::Library);
     assert_eq!(core.view().content_route, ContentRoute::Main);
     assert_eq!(core.view().import_summary.unwrap().title, "book.srt");

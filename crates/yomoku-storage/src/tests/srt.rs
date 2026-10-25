@@ -107,7 +107,7 @@ fn srt_original_bytes_cues_analysis_and_title_survive_read_only_reopen() {
     );
     assert_eq!(
         storage.find_imported_file(bytes).unwrap(),
-        Some(imported.document.clone())
+        Some(imported.document.library_summary().unwrap())
     );
     assert!(storage
         .load_txt_source(imported.document.document_id)
@@ -162,7 +162,7 @@ fn srt_duplicate_bypasses_decoding_and_preserves_progress_and_status() {
         else {
             panic!("expected duplicate")
         };
-        assert_eq!(document, saved);
+        assert_eq!(document, saved.library_summary().unwrap());
         assert_eq!(totals(&storage), before);
     }
     assert_eq!(
@@ -198,7 +198,7 @@ fn srt_identity_is_original_bytes_shared_with_txt_and_separate_from_paste() {
     else {
         panic!("shared file hash")
     };
-    assert_eq!(duplicate, first.document);
+    assert_eq!(duplicate, first.document.library_summary().unwrap());
     let TxtImportOutcome::Created(txt) = storage
         .import_analyzed_txt(b"English", "first.txt", None, 3, fixture)
         .unwrap()
@@ -211,7 +211,7 @@ fn srt_identity_is_original_bytes_shared_with_txt_and_separate_from_paste() {
     else {
         panic!("shared file hash")
     };
-    assert_eq!(duplicate, txt.document);
+    assert_eq!(duplicate, txt.document.library_summary().unwrap());
     let other = created(
         storage
             .import_analyzed_srt(b"\xEF\xBB\xBFEnglish", "bom.srt", None, 5, fixture)
@@ -554,7 +554,7 @@ fn srt_cancellation_skips_start_and_rolls_back_blocked_analysis_only() {
         .unwrap();
     late.cancel();
     assert!(
-        matches!(result, Some(SrtImportOutcome::Existing(document)) if document == new.document)
+        matches!(result, Some(SrtImportOutcome::Existing(document)) if document == new.document.library_summary().unwrap())
     );
 }
 
@@ -589,7 +589,7 @@ fn srt_concurrent_creators_reference_one_committed_document() {
         .map(|handle| match handle.join().unwrap() {
             SrtImportOutcome::Created(imported) => {
                 creates += 1;
-                imported.document
+                imported.document.library_summary().unwrap()
             }
             SrtImportOutcome::Existing(document) => document,
         })

@@ -1646,3 +1646,24 @@
   Android app remains paste/TXT. Complete EPUB integrity reads repeat per operation;
   performance unmeasured. APK/lint/device, codegen repeat, index/Python, release/
   reboot/process-death/tablet/dark and physical arm64 not rerun. Nostr/Q188 unchanged.
+
+
+## 2026-10-26 — Format-independent import references
+
+- File preflight and TXT/SRT/EPUB duplicate results now return Library references
+  with complete saved-document validation in the identity transaction. Core import
+  results also carry only Library state; exported event/request/view schemas stay
+  unchanged. No single-chapter payload/truncation or finished-book reset on duplicate.
+- PASS: 395 data-free Rust tests, Clippy/Rust+Kotlin fmt/diff, both Android storage
+  targets, fourteen real-Full analysis + one worker fixture per owned/mapped loader,
+  real-Full Kotlin/JNI and seven Unicode exchanges. Two new FIFO fixtures verify
+  duplicate EPUB title/progress/finish without Full/decoding/writes/auto-opening,
+  corrupt-content rejection and later-file continuation; expanded repository tests
+  cover all format adapters/read-only/corruption. No new failure or blocker.
+- Updated README/plan/architecture/data/decisions/development/handoff. No migration,
+  production dependency/version, permission, download or escalation. Shared runtime
+  test archives reuse the existing pinned ZIP dev dependency. Next: app/worker/
+  typed JNI ordered-chapter readers and EPUB FIFO/import wiring, then mixed picker
+  and reader assets. App stays paste/TXT; duplicate integrity-read cost unmeasured.
+  APK/Android lint/device, codegen repeat, standalone index/Python, release/reboot/
+  process-death/tablet/dark and physical arm64 not rerun. Nostr/Q188 unchanged.
