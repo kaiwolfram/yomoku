@@ -1243,3 +1243,25 @@
   Settings credits, then FIFO/FFI definitions/readings/compact POS/names/lifetime
   count in the existing panel. Android/JNI/generation/Kotlin/Full/release/recovery/
   physical-arm64 not rerun. Nostr remains empty; Q188 required before forwarding.
+
+## 2026-10-25 — Verified Android word/name dictionary assets
+
+- Started clean; added an offline Gradle bundler with pinned build/index identity,
+  verified immutable staged output, exact compressed sources/compiler/manifests
+  and complete legal/project notices. Added lazy worker-only private read-only
+  SQLite publication via the existing checksum/recovery publisher; no user
+  migration/dependency/FFI change. Library/Settings do not extract the index.
+  Added complete selectable offline Settings credits with retained dialog state.
+- PASS: 248 Rust tests, strict Clippy/Rust/Kotlin fmt/diff, four bundler + eight
+  compiler tests, both-ABI debug/test APK builds, strict Android lint, 14 selected
+  API-36 x86_64 phone tests + two wide/dark credits/recreation checks in airplane
+  mode. Every installed dictionary/source/compiler/notice hash matches; real
+  read-only index opens/東京 lookup/reverification pass. Reports and measurements:
+  DEVELOPMENT.md and `.local/test-reports/dictionary-assets/`.
+- Fixed lint's numeric-date warning and Android's automatic `.gz` expansion;
+  `.gz.bin` preserves exact compressed source bytes. Preserved old generated output
+  before fresh immutable publication. Restored AVD size/density/theme/network.
+  Updated plan/handoff and architecture/data/index docs. Gradle/ADB/emulator needed
+  escalation. No open blocker. Next: verified FIFO/FFI lookup/count provider and
+  dictionary panel. Host JNI/Full/release/recovery/reader matrix/physical arm64
+  not rerun. Nostr remains empty; ask Q188 before forwarding.

@@ -1822,3 +1822,60 @@ storage dependency; no new packages, user migrations, generated bridge or UI cha
 Android build/lint/device, Kotlin formatting, host JNI/generation, standalone
 Sudachi Full, release, process/reboot and physical-arm64 checks were not rerun.
 Android verified installation/notices and dictionary FIFO/FFI/panel/counts remain.
+
+## Verified Android word/name assets and credits
+
+Verified 2026-10-25. Prepare the pinned index explicitly before Android builds;
+Gradle never downloads data. `third_party/dictionaries/README.md` documents the
+build/index lock, full legal/source bundle and immutable installation contract.
+Run with the Rust PATH/JDK/SDK/Gradle variables from the Android section above:
+
+```sh
+python3 -W error tools/test-bundle-dictionaries.py -v
+python3 -W error tools/test-prepare-dictionaries.py -v
+python3 tools/bundle-dictionaries.py
+# Repeat bundling verifies unchanged output, without replacing it.
+python3 tools/bundle-dictionaries.py
+cargo test --workspace --all-features --locked --offline
+cargo fmt --all -- --check
+cargo clippy --workspace --all-targets --all-features --locked --offline -- -D warnings
+tools/format-kotlin.sh --check
+./android/gradlew -p android :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug --offline --console=plain
+/home/kai/Android/Sdk/platform-tools/adb -s emulator-5554 shell cmd connectivity airplane-mode enable
+./android/gradlew -p android :app:connectedDebugAndroidTest :app:lintDebug -Pandroid.testInstrumentationRunnerArguments.class=app.yomoku.WordDictionaryAssetsTest,app.yomoku.SudachiDictionaryFilesTest,app.yomoku.SudachiAssetsTest --offline --console=plain
+```
+
+PASS: 248 data-free Rust tests, strict Clippy/Rust/Kotlin formatting, four bundler
+tests, eight compiler tests (the real-data compiler test is explicitly skipped),
+both-ABI debug/test APK compilation and strict lint. All 14 selected API-36 x86_64
+phone/light tests pass: every installed index/source/compiler/notice checksum;
+lazy worker-only private extraction, SQLite read-only format/東京 word+name lookup,
+inode-preserving verified reopen; existing interruption/corruption/rename/concurrent
+publication tests; path verification failure/repair with a held old reader; both
+offline credit dialogs/recreation. No mutable user migration or FFI change.
+
+Both credit/recreation tests also pass at 2560x1600/240dpi in dark mode and airplane
+mode, using the reversible overrides documented above and this selected command:
+
+```sh
+./android/gradlew -p android :app:connectedDebugAndroidTest '-Pandroid.testInstrumentationRunnerArguments.class=app.yomoku.WordDictionaryAssetsTest#settingsShowsAllOfflineCreditsAcrossRecreation,app.yomoku.SudachiAssetsTest#settingsShowsCompleteOfflineNoticesAcrossRecreation' --offline --console=plain
+```
+
+Reports: `.local/test-reports/dictionary-assets/{phone,wide-dark}/`. Restored
+1080x2400/420dpi, light mode and original airplane-mode-off state. AVD remains running.
+Real index extraction: 1,392–1,433ms; query + complete cache reverification:
+579–582ms in two instrumented emulator processes. These are warm host/emulator
+measurements, not physical-device/cold-storage/lookup performance claims.
+Index size: 279,109,632 bytes. All 12 dictionary assets: 302,244,976 raw bytes,
+79,055,035 ZIP bytes. Final debug APK: 281,673,762 bytes, including existing Full
+and debug analyzer probe. Compressed inputs account for ~22 MiB of raw assets.
+
+Intermediate failures fixed: numeric date triggered TypographyDashes lint (spell
+out the month); Android's asset merger expanded `.gz` inputs and removed their
+suffix (retain exact archives as `.gz.bin`). The installed-byte test caught this;
+all final tests pass. Preserved the initial generated directory under ignored
+`target/generated/dictionary-assets-before-gzip-fix/` before fresh publication.
+Gradle/ADB sockets and emulator startup required sandbox escalation. No open
+failure/blocker. Rust runtime lookup provider, panel definitions/names/POS/counts
+remain next. Host JNI, standalone Full fixtures, full reader matrix, release,
+process/reboot recovery and physical arm64 were not rerun.

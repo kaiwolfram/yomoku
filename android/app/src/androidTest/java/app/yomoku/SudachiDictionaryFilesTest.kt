@@ -37,6 +37,42 @@ class SudachiDictionaryFilesTest {
     private val checksum = sha256(bytes)
 
     @Test
+    fun verifiedPathNeverReturnsCorruptBytesAndRepairsWithoutChangingHeldReader() =
+        withDirectory { directory ->
+            val store =
+                VerifiedDictionaryFiles(
+                    directory,
+                    bytes.size.toLong(),
+                    checksum,
+                    publishedName = "index-$checksum.sqlite3",
+                ) {
+                    ByteArrayInputStream(bytes)
+                }
+            assertTrue(directory.mkdirs())
+            val published = File(directory, "index-$checksum.sqlite3")
+            published.writeBytes(ByteArray(bytes.size))
+            Os.chmod(published.path, 0b100000000)
+            FileInputStream(published).use { old ->
+                val broken =
+                    VerifiedDictionaryFiles(
+                        directory,
+                        bytes.size.toLong(),
+                        checksum,
+                        publishedName = published.name,
+                    ) {
+                        ByteArrayInputStream(ByteArray(bytes.size))
+                    }
+                assertThrows(IOException::class.java) { broken.verifiedPath() }
+                assertEquals(Os.fstat(old.fd).st_ino, Os.stat(published.path).st_ino)
+                assertEquals(published, store.verifiedPath())
+                assertTrue(Os.fstat(old.fd).st_ino != Os.stat(published.path).st_ino)
+                assertArrayEquals(bytes, published.readBytes())
+                assertArrayEquals(ByteArray(bytes.size), old.readBytes())
+                assertEquals(published, store.verifiedPath())
+            }
+        }
+
+    @Test
     fun constructionIsLazyAndMainThreadOpenIsRejected() = withDirectory { directory ->
         val store = store(directory) { error("Must not read the asset") }
         assertFalse(directory.exists())
@@ -241,7 +277,7 @@ class SudachiDictionaryFilesTest {
     private fun store(
         directory: File,
         openAsset: () -> InputStream = { ByteArrayInputStream(bytes) },
-    ) = VerifiedDictionaryFiles(directory, bytes.size.toLong(), checksum, openAsset)
+    ) = VerifiedDictionaryFiles(directory, bytes.size.toLong(), checksum, openAsset = openAsset)
 
     private fun published(directory: File) = File(directory, "full-$checksum.dic")
 

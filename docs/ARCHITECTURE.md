@@ -90,8 +90,10 @@ Compressed inputs/notices are hashed before parsing; staged transactional builds
 publish by directory rename without replacing existing output. The bundle retains
 sources, complete attribution/licences/docs and reproducibility hashes/tool versions.
 See `third_party/dictionaries/README.md` for the index contract/update procedure.
-This tooling is separate from mutable user SQLite and is not yet bundled or
-opened by Android/runtime. `yomoku-storage::dictionary::Dictionary` opens an existing
+This tooling is separate from mutable user SQLite. Gradle bundles the index, all
+notices and reproducible inputs through `tools/bundle-dictionaries.py`, verifying
+the pinned build manifest and every staged file before immutable publication.
+`yomoku-storage::dictionary::Dictionary` opens an existing
 published asset with read-only SQLite flags (no create, URI options or migrations),
 checks application/schema identity and performs bound BINARY indexed lookups.
 It unions exact surface/base candidates, preserving the original surface, both
@@ -102,9 +104,15 @@ indices and enforce re_restr/re_nokanji plus both stagk/stagr restrictions. They
 keep every licensed reading rather than filtering by one analyzer reading.
 Malformed/unknown fields and inconsistent references fail the whole lookup.
 This connection is separate from mutable user Storage; reads never register or
-record encounters. The future Android installer must verify/publish immutable
-bytes before supplying the path; open checks format identity, not a checksum.
-Dictionary FIFO/FFI/UI, compact POS and Settings attribution remain next.
+record encounters. Android's lazy `wordDictionaryFiles` reuses the worker-only
+`VerifiedDictionaryFiles` publisher with a separate no-backup directory and
+content-addressed SQLite filename. `verifiedPath()` checks pinned size/SHA-256
+before supplying a read-only path; Rust open checks format identity, not a checksum.
+Repair atomically replaces inodes without modifying held readers. Library/Settings
+never extract the index. Settings exposes complete offline credits/legal/project
+documents through the shared notice dialog; HTML documents render as text, without
+web requests. Visibility survives recreation. Dictionary FIFO/FFI/UI and compact
+POS/counts remain next; production Rust does not yet receive this path.
 
 Pure `active_time` accounts pending reading milliseconds using caller-supplied
 monotonic timestamps. Resume/interaction arms a five-minute idle window; dictionary
@@ -467,7 +475,7 @@ dispatch once after 48dp net movement, alongside ordinary vertical scrolling.
 An app-level keyed Compose effect consumes positive CompletionNotice and displays
 a short Android Toast once; zero stays silent and recreation does not replay it.
 Settings exposes five radio choices, disabled while unknown/busy, and offline
-Sudachi licenses/notices. Dialog visibility survives Activity recreation.
+Sudachi licenses/notices and JMdict/JMnedict credits. Dialog visibility survives Activity recreation.
 Nostr/Statistics/Vocabulary remain placeholders. Busy/error/retry state comes from
 Rust; the unsaved form draft and notice dialog visibility use rememberSaveable.
 The draft is retained through Settings/recreation.

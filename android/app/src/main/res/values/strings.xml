@@ -49,6 +49,8 @@
     <string name="sudachi_notices_title">Sudachi licenses and notices</string>
     <string name="sudachi_attribution">Sudachi.rs v0.7.0 (Android loader patch) and Sudachi Full 20261015. The complete dictionary notices and Apache License 2.0 follow.</string>
     <string name="notices_loading">Loading notices…</string>
+    <string name="word_dictionary_notices_title">Word and name dictionary credits</string>
+    <string name="word_dictionary_attribution">JMdict English and JMnedict, 25 October 2026, from the Electronic Dictionary Research and Development Group. Dictionary data and the derived index are licensed under Creative Commons Attribution-ShareAlike 4.0. Complete attribution, license and project documentation follow.</string>
     <string name="notices_unavailable">Notices could not be loaded. Close and try again.</string>
     <string name="close">Close</string>
 </resources>

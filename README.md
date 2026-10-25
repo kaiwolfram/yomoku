@@ -35,7 +35,9 @@ Dictionary definitions and encounter counts remain pending in the app. A
 prepares the English word/name index with complete attribution and lookup fixtures.
 Rust now reads this index through a separate read-only repository, with typed
 surface/base candidates and pure spelling/reading/sense restriction rules.
-Android dictionary installation and panel integration remain pending.
+Android bundles the pinned index, reproducible source inputs and complete offline
+Settings credits. Lazy private installation verifies size/SHA-256 before exposing
+a read-only path; runtime and word-panel integration remain pending.
 Compose reads stored Mode B tokens through typed core/FIFO/FFI, validates the
 current page identity and
 converts exact UTF-8 spans to UTF-16 without splitting Unicode scalars. Status
@@ -123,6 +125,9 @@ Install JDK 17, Python 3.11+, the Android SDK platform 36, build tools 36.0.0,
 platform-tools, and NDK r30 (`30.0.16248370`). The Gradle wrapper pins the remaining
 Android build dependencies. Prepare Sudachi Full as above before building; Android
 builds bundle already verified dictionary data and never download it implicitly.
+Also prepare the pinned word/name index before Android builds (see the
+[dictionary setup](third_party/dictionaries/README.md)); Gradle verifies its locked
+manifest, index, source archives and notices without network access.
 
 ```sh
 export JAVA_HOME=/path/to/jdk-17

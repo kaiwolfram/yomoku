@@ -6,6 +6,21 @@ plugins {
 val repoDirectory = rootProject.layout.projectDirectory.dir("..")
 val nativeOutput = repoDirectory.dir("target/generated")
 val sudachiAssets = nativeOutput.dir("sudachi-assets")
+val dictionaryAssets = nativeOutput.dir("dictionary-assets")
+val bundleDictionaries by
+    tasks.registering(Exec::class) {
+        group = "build"
+        description = "Verify and bundle prepared JMdict/JMnedict index, sources and notices"
+        workingDir(repoDirectory)
+        commandLine("python3", repoDirectory.file("tools/bundle-dictionaries.py").asFile)
+        inputs.files(
+            repoDirectory.file("tools/bundle-dictionaries.py"),
+            repoDirectory.file("tools/prepare-dictionaries.py"),
+            repoDirectory.file("third_party/dictionaries/android.lock.json"),
+        )
+        inputs.dir(repoDirectory.dir(".local/dictionaries/index-v1-20261025"))
+        outputs.dir(dictionaryAssets)
+    }
 val bundleSudachi by
     tasks.registering(Exec::class) {
         group = "build"
@@ -83,6 +98,7 @@ android {
 
     sourceSets.named("main") {
         assets.directories += sudachiAssets.asFile.absolutePath
+        assets.directories += dictionaryAssets.asFile.absolutePath
         kotlin.directories +=
             listOf(
                 nativeOutput.dir("kotlin/app").asFile.absolutePath,
@@ -113,7 +129,7 @@ android {
     }
 }
 
-tasks.named("preBuild") { dependsOn(buildRustBridge, bundleSudachi) }
+tasks.named("preBuild") { dependsOn(buildRustBridge, bundleSudachi, bundleDictionaries) }
 
 tasks.matching { it.name == "preDebugBuild" }.configureEach { dependsOn(buildSudachiAppProbe) }
 

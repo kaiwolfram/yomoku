@@ -2,6 +2,13 @@
 
 ## Immutable word/name dictionary index
 
+Android bundles the independently pinned index and complete source/legal bundle;
+`third_party/dictionaries/android.lock.json` pins build-manifest SHA-256 and index
+size/SHA-256. Lazy worker installation verifies the same independently compiled-in
+index identity before returning a private read-only content-addressed path. Cached
+bytes are reverified; repair uses a fresh inode. This adds no user migration or
+mutable database state. FIFO/FFI lookup integration remains separate.
+
 The independently prepared JMdict English/JMnedict asset uses schema version 1
 (`application_id = 0x594f4449`), separate from all user-database migrations.
 `entries(source, entry_id, payload)` retains ordered English senses, readings,

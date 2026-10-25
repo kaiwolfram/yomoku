@@ -4,8 +4,9 @@ Yomoku uses EDRDG's Japanese/English word dictionary and Japanese names dictiona
 Source data and the derived index are **CC BY-SA 4.0**; Yomoku code remains MIT.
 See [attribution](ATTRIBUTION.txt), the complete [EDRDG statement](edrdg-licence.html)
 and [CC legal code](CC-BY-SA-4.0.txt). These notices and complete project documents
-are copied beside every prepared index. Data is not yet bundled in the APK or
-connected to the word panel; that integration must expose attribution in Settings.
+are copied beside every prepared index and bundled in Android assets. Settings
+exposes the complete attribution, legal code and project documentation offline.
+Definitions are not yet connected to the word panel.
 
 ## Pinned sources
 
@@ -96,10 +97,41 @@ It returns complete raw payloads alongside applicable spelling/reading/sense
 indices. Display only those applicable views: raw payloads can contain senses
 restricted to other spellings/readings. All appropriate readings survive; the
 analyzer's single reading never filters homophones. No normalization/fuzzy lookup,
-vocabulary mutation or encounter query occurs. Android verified publication,
-FIFO/FFI/UI, shorter POS labels and encounter counts remain next. This repository
+vocabulary mutation or encounter query occurs. Android verified publication is
+available; FIFO/FFI/UI, shorter POS labels and encounter counts remain next. This repository
 checks format identity, not cryptographic integrity; an installer must verify the
 manifest/checksum before supplying a published immutable path.
+
+## Android assets and private installation
+
+After preparing the exact index above, Gradle's `bundleDictionaries` runs
+`python3 tools/bundle-dictionaries.py` offline. [android.lock.json](android.lock.json)
+pins the complete build manifest plus the index size/hash. Every copied file is
+verified before the asset directory is published; changed/corrupt inputs leave
+existing output intact. Reviewed data updates require a fresh generated output.
+The APK includes the immutable index, build/source manifests, all notices, exact
+compressed XML inputs and exact compiler for future reproduction with this repo.
+The APK uses `upstream/*.gz.bin` names to prevent Android's asset merger from
+expanding `.gz` inputs. Remove only the final `.bin` when recovering source files;
+their original compressed bytes still match `build.json` and `sources.lock.json`.
+No generated dictionary bytes are committed to Git.
+
+`wordDictionaryFiles(context)` is lazy and worker-only. Its `verifiedPath()`
+rehashes cached bytes, or stages/fsyncs/checks size and SHA-256 before atomic
+publication into private no-backup storage. The content-addressed `.sqlite3` file
+is read-only. Corrupt/unsafe cache repair replaces the inode, preserving held
+readers; interrupted staging is discarded on retry. Never open published inodes
+for writing. The Rust repository must receive only this verified path when its
+FIFO provider is connected. Library and Settings do not extract the index.
+
+The raw index is 279,109,632 bytes; the APK also retains both compressed XML
+inputs. Installed APK size/extraction results belong in `docs/DEVELOPMENT.md`.
+No physical arm64 or lookup performance claim is made.
+
+```sh
+python3 -W error tools/test-bundle-dictionaries.py -v
+python3 tools/bundle-dictionaries.py
+```
 
 Rust checks (run from the repository root; the data path must be absolute because
 Cargo runs tests from the package directory):

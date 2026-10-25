@@ -1,5 +1,7 @@
 package app.yomoku
 
+import android.content.res.AssetManager
+import android.text.Html
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.heightIn
@@ -22,17 +24,63 @@ import kotlinx.coroutines.withContext
 
 @Composable
 internal fun SudachiNotices(onDismiss: () -> Unit) {
+    OfflineNotices(
+        title = stringResource(R.string.sudachi_notices_title),
+        attribution = stringResource(R.string.sudachi_attribution),
+        root = "sudachi",
+        names = listOf("LEGAL", "LICENSE-2.0.txt"),
+        tag = "sudachi_notices_text",
+        onDismiss = onDismiss,
+    )
+}
+
+internal val wordDictionaryNoticeNames =
+    listOf(
+        "ATTRIBUTION.txt",
+        "CC-BY-SA-4.0.txt",
+        "edrdg-licence.html",
+        "jmdict-project.html",
+        "jmnedict.html",
+    )
+
+@Composable
+internal fun WordDictionaryNotices(onDismiss: () -> Unit) {
+    OfflineNotices(
+        title = stringResource(R.string.word_dictionary_notices_title),
+        attribution = stringResource(R.string.word_dictionary_attribution),
+        root = "dictionaries/notices",
+        names = wordDictionaryNoticeNames,
+        tag = "word_dictionary_notices_text",
+        onDismiss = onDismiss,
+    )
+}
+
+internal fun loadOfflineNotices(assets: AssetManager, root: String, names: List<String>): String =
+    names.joinToString("\n\n") { name ->
+        val source = assets.open("$root/$name").bufferedReader().use { it.readText() }
+        val text =
+            if (name.endsWith(".html")) Html.fromHtml(source, Html.FROM_HTML_MODE_LEGACY).toString()
+            else source
+        "$name\n\n$text"
+    }
+
+@Composable
+private fun OfflineNotices(
+    title: String,
+    attribution: String,
+    root: String,
+    names: List<String>,
+    tag: String,
+    onDismiss: () -> Unit,
+) {
     val assets = LocalContext.current.applicationContext.assets
     val unavailable = stringResource(R.string.notices_unavailable)
     val notices by
-        produceState<String?>(initialValue = null, assets, unavailable) {
+        produceState<String?>(initialValue = null, assets, unavailable, root, names) {
             val loaded =
                 withContext(Dispatchers.IO) {
                     try {
-                        listOf("LEGAL", "LICENSE-2.0.txt").joinToString("\n\n") { name ->
-                            "$name\n\n" +
-                                assets.open("sudachi/$name").bufferedReader().use { it.readText() }
-                        }
+                        loadOfflineNotices(assets, root, names)
                     } catch (_: java.io.IOException) {
                         unavailable
                     }
@@ -43,17 +91,17 @@ internal fun SudachiNotices(onDismiss: () -> Unit) {
         }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.sudachi_notices_title)) },
+        title = { Text(title) },
         text = {
             Column(
                 Modifier.heightIn(max = 480.dp).verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                Text(stringResource(R.string.sudachi_attribution))
+                Text(attribution)
                 SelectionContainer {
                     Text(
                         notices ?: stringResource(R.string.notices_loading),
-                        Modifier.testTag("sudachi_notices_text"),
+                        Modifier.testTag(tag),
                     )
                 }
             }

@@ -1657,3 +1657,30 @@ and the pinned source XML's embedded DTD comments for re_restr/re_nokanji/stagk/
 `prepare_cached` is feature-gated out by the existing rusqlite configuration; use
 ordinary preparation rather than enabling features. Compact POS and FIFO/FFI/UI
 remain the next integration; no public bridge schema changes in this step.
+
+## 2026-10-25 — Verified Android word/name assets and offline credits
+
+Pin the reproducible index/build manifest separately in `android.lock.json`.
+Gradle bundles only explicitly prepared local data, verifies the exact manifest,
+compiler and every staged file, then publishes an immutable asset directory.
+Retain the original compressed sources, compiler, build/source manifests and all
+five legal/project documents in the APK. Android's asset merger was observed to
+expand `.gz` inputs and remove their suffix, breaking exact-byte provenance;
+package those files as `.gz.bin`, restoring the original name only when recovering
+source data. Installed-asset tests hash every file against the original manifest.
+
+Reuse `VerifiedDictionaryFiles` with a separate private no-backup directory and
+content-addressed `.sqlite3` filename. Require worker access, verify pinned
+size/SHA-256 even for cached bytes, stage/fsync/chmod/rename atomically and preserve
+held readers during repair. `verifiedPath()` exposes only verified immutable
+read-only publication, for the later Rust FIFO provider. No eager extraction in
+Library/Settings; no mutable user schema or FFI change and no dependency addition.
+
+Share the existing offline notice dialog between Sudachi and word/name credits.
+Keep exact original notice bytes bundled; render HTML project documents as plain
+text using Android `Html.fromHtml`, with no WebView or remote resource loading.
+All text is selectable/scrollable and visibility survives Activity recreation.
+Primary platform APIs checked against Android AssetManager.open and Html.fromHtml:
+
+- https://developer.android.com/reference/android/content/res/AssetManager
+- https://developer.android.com/reference/android/text/Html

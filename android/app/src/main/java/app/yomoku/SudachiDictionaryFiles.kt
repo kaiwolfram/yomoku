@@ -55,11 +55,23 @@ internal class VerifiedDictionaryFiles(
     private val directory: File,
     private val expectedSize: Long,
     private val expectedSha256: String,
+    private val publishedName: String = "full-$expectedSha256.dic",
     private val openAsset: () -> InputStream,
 ) {
     init {
         require(expectedSize > 0)
         require(expectedSha256.matches(Regex("[0-9a-f]{64}")))
+        require(publishedName.matches(Regex("[A-Za-z0-9][A-Za-z0-9._-]*")))
+    }
+
+    /**
+     * For read-only SQLite consumers. Fully verifies before returning; every publisher must
+     * preserve immutable inodes. Replacement at this content-addressed path always has the same
+     * pinned bytes.
+     */
+    fun verifiedPath(): File {
+        open().use { /* Verify on this worker, including a previously published cache. */ }
+        return File(directory, publishedName)
     }
 
     /** Returns the verified read-only descriptor, positioned at zero. The caller must close it. */
@@ -88,7 +100,7 @@ internal class VerifiedDictionaryFiles(
                                     )
                             }
                         }
-                        val published = File(directory, "full-$expectedSha256.dic")
+                        val published = File(directory, publishedName)
                         verified(published, requireReadOnly = true)?.let {
                             return it
                         }
