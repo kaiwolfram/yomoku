@@ -1,5 +1,5 @@
 # Resume here
-Updated: 2026-10-26. Bounded off-main raster EPUB images now render in the reader.
+Updated: 2026-10-26. Shared full-screen image zoom/pan verified on phone/tablet.
 ## Working
 - Pure Crux routes/Library/Settings; Render-only UI; FIFO SQLite/analysis; Library start.
 - Chapter-local UTF-8 position/whole-book percentage/five presets persist; reflow
@@ -10,10 +10,9 @@ Updated: 2026-10-26. Bounded off-main raster EPUB images now render in the reade
 - Generic loads are read-only; explicit finished-book open alone resets first
   chapter/page/preset/B atomically. Finish survives movement/time/reflow; deletion
   resets it while preserving history. Missing analysis never rescans.
-- App/FIFO/typed bridge uses ReaderDocument/DocumentReaderSnapshot for loads,
-  opens, saves and completion reloads, retaining all ordered chapters. Core freezes
-  keyed original B/Missing per chapter on accepted open, selects on movement;
-  plain loads cannot replace it. Previous crosses chapters; global counters/progress.
+- App/FIFO/typed bridge retains ordered ReaderDocument snapshots on loads/opens/saves.
+  Accepted opens freeze keyed original B/Missing per chapter; plain loads cannot
+  replace it. Previous crosses chapters; whole-book counters/progress.
 - Token reads atomically load original B/live statuses/metadata + clipped UTF-8
   ranges; completion owns token start. Deleted IDs absent. Whole-chapter validation.
   Full page/base/result identities gate callbacks; movement/reflow/refresh invalidate.
@@ -48,9 +47,8 @@ Updated: 2026-10-26. Bounded off-main raster EPUB images now render in the reade
   source/assets without parsing; large-book costs remain unmeasured.
 - ReaderDocument carries keyed validated heading/emphasis/strong/HTTP(S) spans;
   ReaderPage clips to page-local UTF-8; generated JNI/Compose preserve exact text.
-  Website tap areas open browser, retain vocabulary backgrounds; remaining token
-  fragments keep full dictionary identity. Internal/other source links stay inert.
-  Recreation/chapter navigation retain styles. No CSS/TOC; ruby not transported.
+  Website tap areas open browser, retain vocabulary backgrounds/full token identity.
+  Internal/other links stay inert. No CSS/TOC; ruby not transported.
 - ReaderDocument carries validated page-local image placeholders/alt/asset metadata;
   no image BLOBs in state. One-shot FIFO asset reads verify live document ownership,
   expected media/SHA-256 and 32 MiB cap without dictionaries or core/state writes.
@@ -58,23 +56,24 @@ Updated: 2026-10-26. Bounded off-main raster EPUB images now render in the reade
   BitmapFactory rejects >32768-edge/100 MP sources, samples to <=2048-edge and each
   distinct asset's share of 16 MiB page pixels. Repeated assets share one bitmap.
   Disposed/reflow/recreation requests cancel delivery; accepted callbacks drain.
-- Compose splits existing annotated text at exact U+FFFC scalars; raster images keep
-  source position/ratio (extreme tall images shrink within 8192px). Offsets/styles/
-  word/link identities stay intact. Local text-only zero minimum touch targets stop
-  short links capturing adjacent inert text. Other controls retain normal targets.
-  Alt/loading/failure + explicit Retry; SVG/platform-unsupported images fall back.
-  No persistent cache/dimensions, cover UI or full-screen viewer yet.
+- Compose replaces exact U+FFFC scalars with source-position/ratio raster images;
+  tall frames cap at 8192px. Text/styles/word/link identities stay intact; local zero
+  text targets stop adjacent-link capture. Alt/loading/failure + Retry; SVG fallback.
+- Image taps open source-agnostic full-window Dialog with 1–8x fit zoom/clamped pan,
+  Zoom in/out/Reset/Close and Back. Reuses page bitmap; sampled detail stays bounded.
+  Selection/zoom/normalized focus survive rotation/recreation; close/page change resets.
+  Modal gestures cannot complete pages; pointer/key input resets reader idle policy.
 ## Next tasks (ordered)
 1. Complete SVG rendering and EPUB cover cache (review any new dependency first).
-2. Add shared full-screen image zoom/pan; verify phone/tablet rotation.
-3. Bundle Noto Serif JP/font/line/default-off furigana; CI host/unsigned builds is
-   independent. Physical arm64 remains user-deferred; Nostr empty, Q188 unresolved.
+2. Bundle Noto Serif JP/font/line/default-off furigana (source ruby preferred).
+3. CI host/unsigned builds is independent. Physical arm64 remains user-deferred;
+   Nostr configuration empty, Q188 unresolved.
 ## Verification
-- Both-ABI debug/test APKs, strict lint, Kotlin formatting/diff pass. API-36 x86_64:
-  final 20 image/word/formatting tests + earlier 13 navigation/asset tests pass
-  (26 distinct cases). Fixed adjacent-link hit-area failure; no open blocker.
-- Reports: .local/test-reports/epub-image-rendering/. Exact commands, failure/fix,
-  remaining limits and unrun checks: DEVELOPMENT.md end. Prior 425 Rust tests,
-  strict Clippy/host JNI/repeat bindings remain the unchanged Rust/FFI baseline.
-- Gradle/adb needed approved outside-sandbox sockets. Existing AVD was started
-  without a wipe and remains running. No dependency/schema/permission change.
+- Both-ABI debug/test APKs, strict lint, Kotlin formatting/diff pass. Six new viewer
+  tests pass on API-36 x86_64 phone/light + tablet/dark (both rotations/recreation);
+  eight image/formatting/navigation regressions pass. No open blocker.
+- Reports: .local/test-reports/image-viewer/. Exact commands, corrected test-input/
+  inset-measurement assumptions, limits/unrun checks: DEVELOPMENT.md end. Prior
+  425 Rust tests/strict Clippy/host JNI/repeat bindings remain unchanged baseline.
+- Gradle/adb needed approved outside-sandbox sockets. AVD remains running; size,
+  density/night/rotation restored. No dependency/schema/permission change.

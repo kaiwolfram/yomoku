@@ -1,6 +1,7 @@
 package app.yomoku
 
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -13,9 +14,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -28,6 +31,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.DpSize
+import androidx.compose.ui.unit.IntSize
 import app.yomoku.shared.ReaderInlineImage
 import app.yomoku.shared.ReaderPage
 
@@ -94,6 +98,7 @@ internal fun ReaderImageContent(
             mutableStateMapOf<app.yomoku.shared.ReaderImageAsset, DecodedEpubImage?>()
         }
     var retry by remember(page.documentId, page.anchor) { mutableIntStateOf(0) }
+    var selectedImage by rememberSaveable(page.documentId, page.anchor) { mutableIntStateOf(-1) }
     DisposableEffect(loader, page.documentId, page.anchor, assets, retry) {
         results.clear()
         val requests = assets.map { asset ->
@@ -144,6 +149,13 @@ internal fun ReaderImageContent(
                                 modifier =
                                     Modifier.width(width)
                                         .height(height)
+                                        .clickable(
+                                            onClickLabel =
+                                                stringResource(R.string.image_viewer_open)
+                                        ) {
+                                            onInteraction()
+                                            selectedImage = part.index
+                                        }
                                         .testTag("reader_image_${part.index}"),
                             )
                         }
@@ -174,6 +186,20 @@ internal fun ReaderImageContent(
                     }
                 }
             }
+        }
+    }
+    page.images.getOrNull(selectedImage)?.let { reference ->
+        val image = results[reference.asset]
+        key(page.documentId, page.anchor, selectedImage) {
+            ImageViewer(
+                bitmap = remember(image) { image?.bitmap?.asImageBitmap() },
+                sourceSize = image?.let { IntSize(it.width, it.height) } ?: IntSize.Zero,
+                description = reference.alt.ifBlank { stringResource(R.string.reader_image) },
+                loading = !results.containsKey(reference.asset),
+                onRetry = if (loader == null) null else ({ retry++ }),
+                onClose = { selectedImage = -1 },
+                onInteraction = onInteraction,
+            )
         }
     }
 }

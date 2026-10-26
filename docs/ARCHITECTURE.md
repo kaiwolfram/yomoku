@@ -104,8 +104,23 @@ Normal images fill the text column at source ratio; extremely tall images shrink
 within an 8192-physical-pixel frame while retaining ratio. Canonical text/anchors,
 pagination, time and counts do not change. Unsupported/corrupt raster or SVG bytes
 show source alt text and an explicit Retry without changing reader storage errors.
-Platform BitmapFactory raster formats are supported; SVG rendering, cover caching,
-source ruby and the shared zoom/pan viewer remain unfinished.
+Platform BitmapFactory raster formats are supported. Tapping a decoded image opens
+the source-agnostic Compose ImageViewer, reusing the same bounded bitmap without
+another asset read/decode or a larger allocation. A separate full-window Dialog
+isolates pinch/pan from reader completion swipes and routes Back to modal dismissal.
+Image taps inside source website links open the viewer; text links retain their
+browser behavior. Controls respect safe drawing insets; the canvas clips drawing
+at source ratio. Zoom is bounded to 1–8 times fit; pan clamps each oversized axis
+to its edges, centering axes smaller than the viewport.
+
+Compose saves the selected placement plus zoom and normalized source focus through
+Activity recreation/rotation, holding the modal while page assets reload. The
+document/page anchor and selected placement key that state; changing page anchors,
+leaving the reader or closing the viewer disposes it. Closing/reopening starts at
+fit. Canvas/button/key input in the separate window resets reader idle accounting.
+The shared viewer accepts an ImageBitmap, source dimensions and loading/error/retry
+callbacks, with no EPUB, storage, networking or core dependency. Future displayed
+Nostr images can use it. SVG rendering, cover caching and source ruby remain open.
 
 Shared file preflight and TXT/SRT/EPUB Existing results now carry `LibraryDocument`
 references (ID, title, whole-book progress, permanent finish marker). Exact-byte
@@ -132,8 +147,8 @@ failures retain their existing errors. Created projects the committed whole book
 into a Library summary; no reader auto-opens. Direct per-file cancellation reaches
 queued/load/chapter work and uses the existing commit gate. Background release,
 engine-failure eviction and later-file retries share the existing analyzer cache.
-Android mixed selection and reader text formatting/website links are connected;
-reader ruby/images remain open.
+Android mixed selection, reader text formatting/website links and raster images
+with the shared viewer are connected; ruby, SVG rendering and covers remain open.
 
 Its SRT parser
 accepts decoded text and returns canonical LF text plus ordered UTF-8 cue ranges.
@@ -778,7 +793,8 @@ picker/encoding/summary path are connected. SRT extraction and atomic analyzed
 repository/FIFO/typed JNI imports are verified. EPUB persistence and ordered-chapter
 reader/application/FIFO/typed JNI imports are verified. Android mixed-format
 batches use the shared retained picker/encoding/progress/Cancel/summary helper;
-reader text formatting/website links are connected; ruby/images remain open.
+reader text formatting/website links and raster images/shared viewer are connected;
+ruby, SVG rendering and covers remain open.
 All file background notifications use the platform-only
 foreground lease described above. Legacy imports
 are not automatically rescanned.

@@ -2389,3 +2389,30 @@ controls retain their usual targets. Android documents the [default expanded
 click targets](https://developer.android.com/develop/ui/compose/accessibility/api-defaults#minimum-touch-target-sizes).
 A real browser-monitor test taps both link and adjacent inert text around an image;
 word-span/dictionary regressions cover the narrower inline text hit areas.
+
+## 2026-10-26 — Shared full-screen image viewer
+
+Deliver the independent planned image viewer slice before SVG/cover work. Reuse
+the existing Compose foundation/UI APIs without a dependency/version change.
+Use a separate full-window [Dialog](https://developer.android.com/develop/ui/compose/components/dialog)
+and [detectTransformGestures](https://developer.android.com/develop/ui/compose/touch-input/pointer-input/multi-touch)
+for pinch zoom/drag, with accessible Zoom in/Zoom out/Reset/Close controls and safe
+drawing insets. Keep images upright. Bound zoom to 1–8 times fit and clamp panning
+so no enlarged axis can move beyond its edges; center smaller axes. Use original
+source dimensions for the ratio, independently of decoded sampling rounding.
+
+Keep the component source-agnostic: callers supply ImageBitmap/source dimensions,
+description and loading/retry callbacks. EPUB uses the already decoded current-page
+bitmap; opening/zooming adds no asset read, decode, cache or larger pixel allocation.
+Fine detail remains limited to the page's bounded sampled resolution. A future
+Nostr caller can use the same viewer without changing reader/core/storage types.
+
+Save selection/zoom/normalized source focus in Compose instance state through
+configuration changes, keeping a loading/error modal if assets must reload. Key
+state by document/page anchor/placement; close or page change discards it. Do not
+persist reader scroll or viewer state to SQLite. Source image taps always open
+the viewer, including inside website anchors; neighboring text links keep their
+existing behavior. The modal owns system Back and gesture input, preventing pans
+from reaching reader completion swipes. Observe its pointer/key/control input for
+the existing five-minute reader idle policy because Activity does not see dialog
+input. No schema, permission, core/FFI or destructive-semantics change.

@@ -84,7 +84,10 @@ formatting, page movement and recreation. A bounded one-shot image-byte API read
 verified saved assets on the Rust FIFO without dictionary loading or reader-state
 changes. Android decodes supported raster images off main with page memory bounds
 and renders at source position/ratio, preserving text/link/word identities and
-discarding disposed requests. SVG images, covers/viewer and source ruby remain pending.
+discarding disposed requests. Tapping an image opens the shared full-screen viewer
+with bounded pinch zoom/pan, accessible controls and rotation/recreation recovery.
+It reuses the page bitmap and isolates gestures from reader completion swipes.
+SVG images, covers and source ruby remain pending.
 The pure [SRT parser](crates/yomoku-import/src/srt.rs) has host fixtures for cue
 boundaries, formatting, speakers and malformed input. Its atomic repository now
 persists original bytes/encoding, canonical cues, Mode B and vocabulary registrations
@@ -98,7 +101,7 @@ and share direct cancellation. Host fixtures cover later-chapter/write/commit
 rollback, duplicates, original analysis/status/progress and failed-file recovery.
 Android supports mixed EPUB/TXT/SRT batches, per-file encoding/errors, progress,
 Cancel and completion summaries. Imports return to Library without opening a reader.
-Planned v1 features include the image viewer/covers/ruby, custom missing-word definitions,
+Planned v1 features include SVG images/covers/ruby, custom missing-word definitions,
 reading statistics, optional AnkiDroid integration, curated Nostr reading and
 manual encrypted backups. See the [product specification](docs/PRODUCT_SPEC.md)
 for scope and the [implementation checklist](docs/IMPLEMENTATION_PLAN.md) for

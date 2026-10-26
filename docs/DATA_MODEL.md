@@ -150,8 +150,11 @@ document ID prevents old requests from addressing the replacement. Runtime
 enqueues reads on the existing FIFO and delivers one-shot typed JNI callbacks
 outside core state. Android now performs bounds-first sampled raster decoding and
 source-position rendering outside persisted/core data. Per-page shared bitmaps and
-dimensions are transient; covers, SVG rendering and viewer remain unfinished.
-No schema migration is needed.
+dimensions are transient. The full-screen viewer shares those bitmaps and stores
+only its placement selection, zoom and normalized source focus in Compose saved
+instance state for configuration changes. It makes no progress/history/vocabulary
+writes or additional asset reads; page changes/close dispose viewer state.
+Covers and SVG rendering remain unfinished. No schema migration is needed.
 
 `open_document_reader_snapshot` alone resets finished books to the first chapter's
 start. Snapshot/analysis/settings validation and reset share one immediate

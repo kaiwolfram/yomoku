@@ -1824,3 +1824,24 @@
 - Updated plan/architecture/data/decisions/README/handoff. SVG rendering, cover cache,
   shared zoom/pan viewer, font/furigana and CI remain. No Rust/host JNI/release/
   process-death/tablet/dark rerun; physical arm64 remains user-deferred.
+
+## 2026-10-26 — Shared full-screen image viewer
+
+- Added a source-agnostic full-window Compose viewer and connected EPUB image taps,
+  including images inside source website links. Reuses bounded page bitmaps with
+  source-ratio drawing, centroid pinch zoom, clamped pan and accessible controls.
+- Save placement/zoom/normalized source focus through rotation/recreation; loading
+  stays modal, Back/Close dismiss, page changes dispose. Dialog pointer/key input
+  resets reader idle accounting and cannot reach reader completion swipes.
+- PASS: six new geometry/Compose cases on API-36 x86_64 phone/light and tablet/dark,
+  including actual pixels/pinch/hardware Back/full-window sizing/rotation/chapter
+  replacement. Eight existing image/formatting/navigation regressions also pass
+  (14 distinct cases). Both-ABI debug/test APKs, strict lint and formatting/diff pass.
+- Corrected test-only Back-dispatch and safe-inset measurement assumptions; final
+  suites pass. Reports: .local/test-reports/image-viewer/; commands/limits/failures:
+  DEVELOPMENT.md end. Gradle/ADB needed approved outside-sandbox sockets. Restored
+  emulator size/density/light/free rotation; existing AVD remains running.
+- Updated plan/architecture/data/decisions/README/handoff. SVG/cover cache remains
+  next, then Noto/font/furigana and CI. No dependency/schema/FFI/permission change
+  or open blocker. Zoom detail stays at sampled page resolution; unrun checks in
+  DEVELOPMENT.md. Physical arm64 remains user-deferred.

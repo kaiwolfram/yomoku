@@ -3074,3 +3074,59 @@ tablet/dark and physical arm64 were not rerun for this Android-only slice;
 physical arm64 remains user-deferred. SVG rendering, cover caching, viewer and
 source ruby remain open. Ordinary reader operations still repeat complete EPUB
 integrity reads; large-book costs and total process heap remain unmeasured.
+
+## Shared full-screen image zoom/pan viewer
+
+Verified 2026-10-26. Use the Rust PATH/JDK/SDK/Gradle environment above. Commands:
+
+```sh
+tools/format-kotlin.sh --check
+git diff --check
+./android/gradlew -p android :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=app.yomoku.ImageViewerGeometryTest,app.yomoku.ImageViewerTest,app.yomoku.ReaderImagesTest,app.yomoku.ReaderFormattingTest,app.yomoku.ReaderNavigationTest --offline --console=plain
+./android/gradlew -p android :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=app.yomoku.ImageViewerGeometryTest,app.yomoku.ImageViewerTest --offline --console=plain
+# Repeat the six-test command above between these reversible tablet/dark overrides.
+/home/kai/Android/Sdk/platform-tools/adb -s emulator-5554 shell wm size 2560x1600
+/home/kai/Android/Sdk/platform-tools/adb -s emulator-5554 shell wm density 240
+/home/kai/Android/Sdk/platform-tools/adb -s emulator-5554 shell cmd uimode night yes
+# Run the six-test command above, then restore the original phone/light settings.
+/home/kai/Android/Sdk/platform-tools/adb -s emulator-5554 shell wm size reset
+/home/kai/Android/Sdk/platform-tools/adb -s emulator-5554 shell wm density reset
+/home/kai/Android/Sdk/platform-tools/adb -s emulator-5554 shell cmd uimode night no
+/home/kai/Android/Sdk/platform-tools/adb -s emulator-5554 shell wm user-rotation
+```
+
+PASS: both-ABI debug/test APKs, strict Android lint, Kotlin formatting/diff, six
+new image-viewer tests on API-36 x86_64 phone/light and tablet/dark (six cases in
+each final run). Eight existing reader-image/formatting/navigation regressions
+also passed in the initial broader run: 14 distinct passing cases overall.
+Reports/results: `.local/test-reports/image-viewer/{initial-phone,inset-measurement,phone-final,tablet-dark}/`;
+final lint XML is alongside them. The existing unrelated FileImports autoboxing
+hint remains informational; no lint warning/error blocks the build.
+
+Geometry cases verify source aspect/letterboxing/extreme tall images, centroid
+anchoring, bounds on both pan axes, 1–8x zoom, invalid gestures and normalized focus
+through phone/tablet viewport changes. Actual EPUB tests verify full-window bounds,
+alt semantics, pinch/drag and blue/red pixels, accessible zoom/reset/close, hardware
+Back dismissing only the modal, no browser launch for image taps inside links,
+unchanged reader position/statuses/finish and reopening at fit. Rotation tests use
+`wm user-rotation lock 0/1` (works with target-36 large screens), restore the original
+mode in finally, and verify selection/zoom/panned pixels through actual rotation,
+explicit recreation and chapter replacement. The source-agnostic fixture checks
+loading/failure/retry, disabled/bounded controls and dialog interaction callbacks.
+
+Two test assumptions were corrected: calling the Activity Back dispatcher directly
+bypasses a dialog's separate window (initial 13/14 passed); actual injected Back
+works. A strengthened size check initially measured only the safe inset content
+(4/6 passed); its tag now measures the full-window black Surface. Final phone
+(1m18s) and tablet/dark (1m) six-test runs both pass, with all pixels/rotation checks.
+No open verification failure. Gradle's sandbox wildcard-IP/lock sockets and ADB
+sockets needed approved outside-sandbox access. The existing AVD was reused without
+a wipe and remains running. Original 1080x2400/420dpi, light mode and free rotation
+were restored; no dependency/version, schema, native API or permission change.
+
+The viewer reuses the current page's bounded bitmap; zoom does not decode extra
+detail. SVG rendering/cover caching/source ruby remain open. No Rust/Clippy/host
+JNI/binding repeat/standalone dictionary/Python/release/process-death/reboot or
+physical-arm64 checks were rerun for this Android-only slice; physical arm64 remains
+user-deferred. Complete EPUB integrity reads and total process-heap costs retain
+their earlier limitations.
