@@ -64,12 +64,12 @@ class ImportNotificationsTest {
     @Test
     fun backgroundBatchUpdatesProgressAndCompletionAndTapKeepsReaderClosed() {
         val prefix = "notifications-${System.nanoTime()}"
-        fun file(suffix: String, gate: String? = null) =
-            fixture("$prefix-$suffix.txt", "\uFEFF$prefix $suffix 猫。".toByteArray(), gate)
-        val blocked = file("second", prefix)
-        val imports = owner().txtImports
+        val first = FileImportFixtures.uri("$prefix-first.epub", FileImportFixtures.epub(prefix))
+        val blocked = fixture("$prefix-second.srt", "\uFEFF$prefix second 猫。".toByteArray(), prefix)
+        val third = fixture("$prefix-third.txt", "\uFEFF$prefix third 猫。".toByteArray())
+        val imports = owner().fileImports
         try {
-            compose.runOnIdle { imports.start(listOf(file("first"), blocked, file("third"))) }
+            compose.runOnIdle { imports.start(listOf(first, blocked, third)) }
             compose.waitUntil(90_000) {
                 imports.results.size == 1 &&
                     notice(ImportNotifications.PROGRESS_ID)
@@ -79,10 +79,10 @@ class ImportNotificationsTest {
             assertTrue(foregroundService())
             val progress = checkNotNull(notice(ImportNotifications.PROGRESS_ID))
             assertEquals("File 2 of 3", progress.extras.getString(Notification.EXTRA_TITLE))
-            assertTrue(progress.extras.getString(Notification.EXTRA_TEXT)!!.contains("second.txt"))
+            assertTrue(progress.extras.getString(Notification.EXTRA_TEXT)!!.contains("second.srt"))
             assertEquals(3, progress.extras.getInt(Notification.EXTRA_PROGRESS_MAX))
             compose.activityRule.scenario.recreate()
-            assertSame(imports, owner().txtImports)
+            assertSame(imports, owner().fileImports)
             compose.activityRule.scenario.moveToState(Lifecycle.State.CREATED)
             assertTrue(foregroundService())
             context.contentResolver.call(blocked, "release", prefix, null)
@@ -101,7 +101,7 @@ class ImportNotificationsTest {
                 compose.activity.lifecycle.currentState == Lifecycle.State.RESUMED
             }
             assertNull(owner().session.view.reader)
-            assertEquals(3, owner().txtImports.results.size)
+            assertEquals(3, owner().fileImports.results.size)
             compose.runOnIdle { imports.dismissSummary() }
         } finally {
             context.contentResolver.call(blocked, "release", prefix, null)
@@ -111,9 +111,10 @@ class ImportNotificationsTest {
     @Test
     fun encodingReleasesLeaseAndTimeoutCancelsUnfinishedReadWithoutRestart() {
         val prefix = "notification-timeout-${System.nanoTime()}"
-        val ambiguous = fixture("$prefix-choice.txt", byteArrayOf(0xc2.toByte(), 0xa9.toByte()))
-        val blocked = fixture("$prefix-blocked.txt", "\uFEFF猫。".toByteArray(), prefix)
-        val imports = owner().txtImports
+        val ambiguous = fixture("$prefix-choice.srt", byteArrayOf(0xc2.toByte(), 0xa9.toByte()))
+        val blocked =
+            FileImportFixtures.uri("$prefix-blocked.epub", FileImportFixtures.epub(prefix), prefix)
+        val imports = owner().fileImports
         var boundService: ImportService? = null
         var bound = false
         val connection =

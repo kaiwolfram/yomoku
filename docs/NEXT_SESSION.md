@@ -1,5 +1,5 @@
 # Resume here
-Updated: 2026-10-26. EPUB FIFO/typed JNI import added; app picker stays paste/TXT.
+Updated: 2026-10-26. Mixed EPUB/TXT/SRT Android batches connected; reader assets next.
 ## Working
 - Pure Crux routes/Library/Settings; Render-only UI; FIFO SQLite/analysis. Starts Library.
 - Exact chapter-local UTF-8 position/whole-book Library percentage + five presets
@@ -43,10 +43,12 @@ Updated: 2026-10-26. EPUB FIFO/typed JNI import added; app picker stays paste/TX
 - TXT strict UTF-8/Shift-JIS/Aozora atomic original-byte hash, filename/encoding/ruby/
   Mode B/unique registrations. Duplicate skips decode/Full. SRT FIFO/JNI shares
   decoder (no Aozora), original hash/filename/LF/cues/B. First interpretation wins.
-- Retained multiple-TXT helper reads one URI off main; sequences encoding/Skip/import.
+- Retained FileImports reads one mixed EPUB/TXT/SRT URI off main; routes literal
+  case-insensitive extensions to typed events. Wildcard picker tolerates generic MIME.
+  TXT/SRT have separate encoding/Skip/errors; EPUB never asks for text encoding.
   Filename/X-of-N/processed bar + summary survive recreation/background. Name before
   bytes. No persisted queue; teardown drops unsubmitted files, SIGKILL keeps commits.
-- cancelFileImport bypasses FIFO off main (COMMIT may wait); TXT alias retained.
+- cancelFileImport bypasses FIFO off main for all files (COMMIT may wait).
   Fresh attempt before submission; silent full-file rollback; winning/prior commits
   stay. Android clears inputs/remaining, ignores late reads and awaits BOTH native
   return + current outcome, including draining close. Dedicated cancellation executor.
@@ -64,17 +66,15 @@ Updated: 2026-10-26. EPUB FIFO/typed JNI import added; app picker stays paste/TX
 - EPUB ImportEpub carries bytes/name, no text encoding; bounded parse before Full,
   atomic repository rechecks. InvalidEpub covers container errors. Shared cancel
   registry reaches queued/Full/chapter/draining work; cache evicts on engine failure.
-  Cross-format preflight preserves complete first interpretation before name/parse.
 ## Next tasks (ordered)
-1. Mixed EPUB/TXT/SRT picker/summary/Cancel, including format-specific failures and
-   background notifications; never auto-open reader. Retain existing TXT behavior.
-2. Reader formatting/ruby/images + external links/shared viewer. CI independent.
+1. Reader formatting/ruby/images + external links/shared viewer; assets lack transport.
+2. Add CI host Rust/Kotlin checks and unsigned Android builds (independent).
 3. User-run physical arm64 validation once usable (still deferred).
 ## Verification
-- 409 data-free Rust tests, Clippy/fmt/Kotlin fmt/diff. EPUB worker fixtures cover
-  all write/later-chapter/deferred-COMMIT rollback, cancellation and file isolation.
-- Real-Full Kotlin/JNI EPUB + existing suites/seven Unicode exchanges pass. Both-ABI
-  APK/strict lint and eight API-36 persistence/clock tests pass; reports/logs under
-  .local/test-reports/epub-worker/. Commands/results: DEVELOPMENT.md end.
-- Repeated codegen matches. EPUB double-parse/integrity-read costs unmeasured.
-  No new dependency/migration or open blocker/Q188. Deferred checks: DEVELOPMENT.md.
+- 409 data-free Rust tests; Kotlin formatting, both-ABI debug/test APKs and strict
+  Android lint pass. Eleven focused API-36 mixed-picker/TXT/Cancel/notifications/
+  navigation tests pass. Reports: .local/test-reports/mixed-file-picker/. Commands:
+  DEVELOPMENT.md end. Initial ambiguous test selector fixed; no open blocker.
+- Prior real-Full JNI/Unicode/codegen and EPUB worker rollback/cancellation checks
+  pass (not rerun for Android-only changes). Double-parse/integrity-read costs remain
+  unmeasured. No dependency/migration/Q188 change. Deferred checks: DEVELOPMENT.md.

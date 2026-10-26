@@ -20,8 +20,8 @@ import app.yomoku.shared.ImportOutcome
 import app.yomoku.shared.TextEncoding
 
 @Composable
-internal fun TxtImportDialogs(
-    imports: TxtImports,
+internal fun FileImportDialogs(
+    imports: FileImports,
     canRequestNotifications: Boolean = false,
     requestNotifications: () -> Unit = {},
 ) {
@@ -30,7 +30,7 @@ internal fun TxtImportDialogs(
             onDismissRequest = {},
             properties =
                 DialogProperties(dismissOnBackPress = false, dismissOnClickOutside = false),
-            title = { Text(stringResource(R.string.import_txt)) },
+            title = { Text(stringResource(R.string.import_files)) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text(
@@ -51,7 +51,7 @@ internal fun TxtImportDialogs(
                     )
                     LinearProgressIndicator(
                         progress = { imports.progress },
-                        modifier = Modifier.fillMaxWidth().testTag("txt_import_progress"),
+                        modifier = Modifier.fillMaxWidth().testTag("file_import_progress"),
                     )
                     if (imports.choosingEncoding) {
                         Text(stringResource(checkNotNull(imports.encodingError).messageResource()))
@@ -89,7 +89,7 @@ internal fun TxtImportDialogs(
             title = { Text(stringResource(R.string.import_summary_title)) },
             text = {
                 LazyColumn(
-                    Modifier.heightIn(max = 400.dp).testTag("txt_import_summary"),
+                    Modifier.heightIn(max = 400.dp).testTag("file_import_summary"),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     items(imports.results) { result ->

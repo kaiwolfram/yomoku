@@ -2803,3 +2803,53 @@ reader formatting/ruby/images remain open. Complete saved EPUB verification repe
 per operation and container preflight parses twice; large-book costs are unmeasured.
 Standalone Full/index/Python suites, release app, process-death/reboot/tablet/dark
 and physical arm64 were not rerun.
+
+
+## Mixed EPUB/TXT/SRT Android batches
+
+Verified 2026-10-26 with the Rust PATH/JDK/SDK/Gradle environment above:
+
+```sh
+cargo test --workspace --all-features --locked --offline --quiet
+tools/format-kotlin.sh --check
+./android/gradlew -p android :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug --offline --console=plain
+./android/gradlew -p android :app:connectedDebugAndroidTest :app:lintDebug -Pandroid.testInstrumentationRunnerArguments.class=app.yomoku.MixedFilePickerTest,app.yomoku.TxtPickerTest,app.yomoku.ImportNotificationsTest,app.yomoku.TxtCancellationSessionTest,app.yomoku.NavigationTest --offline --console=plain
+./android/gradlew -p android :app:connectedDebugAndroidTest :app:lintDebug -Pandroid.testInstrumentationRunnerArguments.class=app.yomoku.MixedFilePickerTest --offline --console=plain
+git diff --check
+git diff --cached --check
+```
+
+PASS: 409 data-free Rust tests (sixteen external-data fixtures ignored), Kotlin
+formatting, both-ABI debug/test APK builds and strict Android lint. All eleven
+distinct API-36 x86_64 focused tests pass across the initial regression run (ten
+passed) and the corrected mixed-picker rerun (one passed). The initial mixed test
+used a text selector matching both Library error and modal error; assert the unique
+encoding control instead. The rerun also checks all saved chapter Mode B analyses,
+immediate registration of every Japanese surface and no reading completions. No
+production fix was needed after the initial build. Reports/results retained under
+`.local/test-reports/mixed-file-picker/{initial,final}/`.
+
+The mixed picker fixture verifies metadata EPUB titles/two persisted chapters,
+case-insensitive extensions, identical EPUB bytes selected as TXT referencing the
+whole first interpretation, SRT timestamp/tag removal and cue breaks, invalid EPUB,
+undecodable SRT, excluded ASS rejection, explicit SRT UTF-8/Shift-JIS/Skip, later TXT
+continuation, exact saved encodings/source kinds, recreation/summary dismissal and
+no reader auto-open. The fixture provider labels even EPUB/SRT as text/plain.
+Existing TXT fixtures retain read/decode/unsupported/duplicate failures and progress,
+blocked-reader cancellation/generation disposal and fresh retries.
+
+Notification tests now exercise an EPUB/SRT/TXT batch continuing with Activity
+stopped, progress/completion/tap, SRT encoding lease release and timeout cancellation
+of an EPUB URI read. Native cancellation tests exercise SRT blocked-Full rollback and
+fresh retry, and a winning EPUB COMMIT while direct cancellation/native-close await
+their return; remaining files never import. Navigation/recreation regressions pass.
+The AVD was cold-started with documented swangle/KVM flags, without wiping data,
+and remains running. Gradle device runs required approved outside-sandbox execution
+because the sandbox blocks its wildcard-IP lock service. No open failure/blocker.
+
+No Rust/wire/schema/dependency/version/permission change. Host JNI, standalone Full,
+Clippy/Rust fmt/codegen, index/Python, release, actual process-death/reboot, tablet/dark
+and physical arm64 were not rerun for this Android-only change; prior checks remain
+recorded above. No persisted queue or process-survival guarantee was added. EPUB
+reader formatting/ruby/images/external links/viewer and CI remain next work. Complete
+EPUB integrity reads and duplicate container parsing retain their unmeasured costs.

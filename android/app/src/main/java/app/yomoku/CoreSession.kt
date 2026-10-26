@@ -120,12 +120,12 @@ internal class CoreSession(
     }
 
     /** The native commit gate may wait. Keep the handle alive until this direct call returns. */
-    fun cancelTxtImport(onComplete: () -> Unit) {
+    fun cancelFileImport(onComplete: () -> Unit) {
         requireMainThread()
         check(!closing && !cancellationPending)
         cancellationPending = true
         cancellationExecutor.execute {
-            val result = runCatching { bridge.cancelTxtImport() }
+            val result = runCatching { bridge.cancelFileImport() }
             mainHandler.post {
                 cancellationPending = false
                 try {

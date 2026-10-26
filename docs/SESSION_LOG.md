@@ -1716,3 +1716,26 @@
   saved-content validation costs are unmeasured. Standalone Full/index/Python,
   release app/process-death/reboot/tablet/dark/physical arm64 were not rerun.
   Next: mixed EPUB/TXT/SRT picker/summary/Cancel/notifications, then reader assets.
+
+
+## 2026-10-26 — Mixed Android EPUB/TXT/SRT batches
+
+- Generalized retained FileImports/dialogs/progress/notification observer and wired
+  wildcard multiple selection to case-insensitive literal filename routing. Reuse
+  typed per-file events; SRT has its own encoding errors/choices, EPUB none.
+- Reused direct off-main cancelFileImport and existing commit/outcome drain; no
+  persisted queue, schema, dependency, permission or destructive behavior change.
+- Added real mixed-picker fixture with complete EPUB duplicate references, invalid
+  EPUB/SRT/excluded format isolation, encoding/Skip, exact stored formats/chapters,
+  per-chapter Mode B, immediate registration/no encounters and no reader auto-open.
+  Extended notifications and cancellation fixtures to SRT/EPUB; TXT regressions stay.
+- PASS: 409 data-free Rust tests, Kotlin formatting, both-ABI debug/test APKs and
+  strict lint; eleven distinct focused API-36 x86_64 tests pass. Initial mixed-test
+  ambiguous text selector corrected; other ten passed unchanged, final mixed rerun
+  passes. Reports: .local/test-reports/mixed-file-picker/{initial,final}/. Exact
+  commands/limits: DEVELOPMENT.md end. Gradle device tests needed approved execution
+  outside sandbox for its lock service. No open failure/blocker.
+- Updated architecture/data/decisions/progress notes. Host JNI/standalone Full, Rust
+  lint/fmt/codegen, index/Python, release/process-death/reboot/tablet/dark/physical
+  arm64 were not rerun. Next: reader source formatting/ruby/images/links/viewer; CI
+  independent. Large EPUB parse/integrity-read costs remain unmeasured.

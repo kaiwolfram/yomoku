@@ -70,7 +70,7 @@ class TxtCancellationSessionTest {
         val release = CountDownLatch(1)
         val executor = Executors.newSingleThreadExecutor()
         lateinit var core: CoreSession
-        lateinit var imports: TxtImports
+        lateinit var imports: FileImports
         main {
             core =
                 CoreSession(
@@ -78,9 +78,9 @@ class TxtCancellationSessionTest {
                     gatedProvider(entered, release),
                     cancellationExecutor = executor,
                 )
-            imports = TxtImports(context.contentResolver, core)
+            imports = FileImports(context.contentResolver, core)
         }
-        val first = fixture("cancelled.txt", "猫と犬。")
+        val first = fixture("cancelled.srt", "猫と犬。")
         val remaining = fixture("remaining.txt", "残りの本。")
         try {
             await { !core.view.storageBusy }
@@ -112,7 +112,7 @@ class TxtCancellationSessionTest {
             await { !imports.active && !core.view.storageBusy }
             main {
                 assertEquals(ImportOutcome.CREATED, imports.results.single().outcome)
-                assertEquals("cancelled.txt", core.view.documents.single().title)
+                assertEquals("cancelled.srt", core.view.documents.single().title)
                 assertNull(core.view.reader)
             }
         } finally {
@@ -137,7 +137,7 @@ class TxtCancellationSessionTest {
         val executor = Executors.newSingleThreadExecutor()
         executor.execute { check(cancelRelease.await(90, TimeUnit.SECONDS)) }
         lateinit var core: CoreSession
-        lateinit var imports: TxtImports
+        lateinit var imports: FileImports
         main {
             core =
                 CoreSession(
@@ -145,13 +145,19 @@ class TxtCancellationSessionTest {
                     gatedProvider(entered, loadRelease),
                     cancellationExecutor = executor,
                 )
-            imports = TxtImports(context.contentResolver, core)
+            imports = FileImports(context.contentResolver, core)
         }
         try {
             await { !core.view.storageBusy }
             main {
                 imports.start(
-                    listOf(fixture("completed.txt", "猫。"), fixture("discarded.txt", "犬。"))
+                    listOf(
+                        FileImportFixtures.uri(
+                            "completed.epub",
+                            FileImportFixtures.epub("completed EPUB"),
+                        ),
+                        fixture("discarded.srt", "犬。"),
+                    )
                 )
             }
             assertTrue(entered.await(30, TimeUnit.SECONDS))
@@ -163,7 +169,7 @@ class TxtCancellationSessionTest {
                 assertTrue(imports.active)
                 assertTrue(imports.cancelling)
                 assertEquals(ImportOutcome.CREATED, imports.results.single().outcome)
-                assertEquals("completed.txt", core.view.documents.single().title)
+                assertEquals("completed EPUB", core.view.documents.single().title)
                 assertEquals(1, imports.currentFileNumber) // Still settling the first file.
                 assertEquals(0.5f, imports.progress)
                 assertNull(core.view.importSummary)
@@ -179,17 +185,17 @@ class TxtCancellationSessionTest {
                 ->
                 db.rawQuery("SELECT title FROM documents", null).use {
                     assertTrue(it.moveToFirst())
-                    assertEquals("completed.txt", it.getString(0))
+                    assertEquals("completed EPUB", it.getString(0))
                     assertFalse(it.moveToNext())
                 }
             }
             main {
                 core = CoreSession(database.path, sudachiDictionaryProvider(context))
-                imports = TxtImports(context.contentResolver, core)
+                imports = FileImports(context.contentResolver, core)
             }
             await { !core.view.storageBusy }
             main {
-                assertEquals("completed.txt", core.view.documents.single().title)
+                assertEquals("completed EPUB", core.view.documents.single().title)
                 assertFalse(imports.active)
                 assertTrue(imports.results.isEmpty())
                 assertEquals(0, imports.totalFiles)

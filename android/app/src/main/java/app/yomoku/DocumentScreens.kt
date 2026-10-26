@@ -40,21 +40,21 @@ import app.yomoku.shared.ViewModel
 internal fun LibraryScreen(
     view: ViewModel,
     dispatch: (Event) -> Unit,
-    onImportTxt: (() -> Unit)? = null,
+    onImportFiles: (() -> Unit)? = null,
 ) {
     Column(Modifier.fillMaxSize().padding(16.dp)) {
         Button(onClick = { dispatch(Event.OpenPaste) }, enabled = !view.storageBusy) {
             Text(stringResource(R.string.paste_title))
         }
-        if (onImportTxt != null) {
+        if (onImportFiles != null) {
             Button(
-                onClick = onImportTxt,
+                onClick = onImportFiles,
                 enabled =
                     !view.storageBusy &&
                         !view.readingTimeSavePending &&
                         !view.completionSavePending,
             ) {
-                Text(stringResource(R.string.import_txt))
+                Text(stringResource(R.string.import_files))
             }
         }
         StorageStatus(view)

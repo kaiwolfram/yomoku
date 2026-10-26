@@ -1,5 +1,5 @@
 <resources>
-    <string name="import_txt">Import TXT files</string>
+    <string name="import_files">Import files</string>
     <string name="cancel">Cancel</string>
     <string name="import_cancelling">Cancelling…</string>
     <string name="import_cancelled">Import cancelled</string>
@@ -13,7 +13,7 @@
     <string name="import_summary_title">Import summary</string>
     <string name="import_file_created">Imported</string>
     <string name="import_file_unreadable">Could not read this file. Select it again to retry.</string>
-    <string name="import_txt_only">Select a TXT (.txt) file.</string>
+    <string name="import_supported_files">Select an EPUB (.epub), TXT (.txt), or SRT (.srt) file.</string>
     <string name="import_skip_file">Skip file</string>
     <string name="import_file_skipped">Skipped</string>
     <string name="app_name">Yomoku</string>

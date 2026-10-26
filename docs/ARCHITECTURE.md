@@ -76,7 +76,7 @@ failures retain their existing errors. Created projects the committed whole book
 into a Library summary; no reader auto-opens. Direct per-file cancellation reaches
 queued/load/chapter work and uses the existing commit gate. Background release,
 engine-failure eviction and later-file retries share the existing analyzer cache.
-Android mixed selection and reader formatting/ruby/images remain open.
+Android mixed selection is connected; reader formatting/ruby/images remain open.
 
 Its SRT parser
 accepts decoded text and returns canonical LF text plus ordered UTF-8 cue ranges.
@@ -101,7 +101,7 @@ and parsed before loading Full, then checked again in the authoritative transact
 SRT-specific errors distinguish uncertain/invalid/unsupported/undecodable/empty
 input; malformed timing with retained dialogue remains valid. All file formats reuse
 one worker-owned analyzer cache and one published per-file cancellation registry.
-Android selection remains open; the picker still accepts TXT only.
+Android mixed-format selection uses the retained FileImports helper described below.
 
 TXT strict UTF-8/Shift-JIS decoding returns explicit uncertainty before any
 canonicalization; a selected encoding never silently falls back or replaces errors.
@@ -135,7 +135,7 @@ The registry lock is never held during COMMIT, cancellation or callbacks. Weak
 lifecycle ownership permits cancelling accepted work while a closed router drains
 without keeping its worker alive. Idle calls do not poison future attempts.
 The existing `cancel_txt_import`/`cancelTxtImport()` delegate to this shared control
-for compatibility with the current Android TXT helper.
+for compatibility with older callers. Android uses the shared file control.
 `StorageResult::ImportCancelled` clears core busy state without an error or summary;
 Created/Existing and typed failures keep their existing behavior. Cancellation
 does not forcibly stop a dictionary loader already running. Android invokes the
@@ -152,11 +152,14 @@ Typed errors distinguish encoding choice, invalid selected encoding, unsupported
 BOM, undecodable input and empty text. Successful Created/Existing use the same
 Library summary without auto-opening. Busy/pending saves gate submissions; imports
 invalidate selected words and Android pauses the reader clock before dispatch.
-Android's retained `TxtImports` sequences multiple picker URIs and consumes committed
-per-file outcomes. `OpenMultipleDocuments(text/plain)` supplies read grants; one
-platform executor queries literal display names and reads original bytes, rejecting
-non-TXT extensions with a per-file result. Only current-file bytes are retained.
-Uncertain encoding offers UTF-8/Shift-JIS or Skip; errors never abort later files.
+Android's retained `FileImports` sequences mixed EPUB/TXT/SRT picker URIs and
+consumes committed per-file outcomes. `OpenMultipleDocuments(*/*)` supplies read
+grants, including providers with generic SRT MIME types. One platform executor
+queries literal display names and reads original bytes; case-insensitive extensions
+select the typed ImportEpub/ImportTxt/ImportSrt event. Unsupported extensions produce
+a per-file result before reading bytes. Only current-file bytes are retained.
+TXT/SRT uncertain encoding offers UTF-8/Shift-JIS or Skip with format-specific
+errors; EPUB never offers a text-encoding choice. Errors never abort later files.
 Modal encoding/import state and scrollable batch summaries survive recreation,
 returning to Library without opening a reader. Current filename and File X of N
 remain visible during reads/imports/encoding choices. Batch progress is terminal
@@ -655,7 +658,7 @@ arm64-v8a/x86_64 using NDK r30/API 29. CoreSession projects Render snapshots on
 Android's main thread and ignores callbacks after native close. CoreSessionOwner is an
 Activity-scoped AndroidViewModel: it supplies Application.filesDir/yomoku.sqlite3,
 retains the native session across recreation, and requests draining close onCleared.
-It retains no Activity or independent domain state; its TXT platform helper retains
+It retains no Activity or independent domain state; its file platform helper retains
 only the in-process URI queue, current encoding input and copied per-file outcomes.
 Each new session requests Library data;
 the database and page-length setting are first loaded on the Rust worker. A fresh
@@ -676,7 +679,7 @@ Restore failures require visible Retry. Failed checkpoint/completion obligations
 offer Retry in reader/Settings; unresolved saves disable preset changes.
 
 Close rejects new UI dispatch immediately, pauses once and keeps callbacks alive until
-storage_busy, both save-pending flags and direct TXT cancellation clear. Only then
+storage_busy, both save-pending flags and direct file cancellation clear. Only then
 does it release the native handle. If a save fails after onCleared, a one-second
 Handler retry resubmits the exact core payload; a persistent failure retains the session while the process
 survives. This never joins the UI thread or fabricates a successful save. Android can
@@ -717,8 +720,9 @@ lifecycle are connected. TXT parsing, atomic storage and the Android multiple-fi
 picker/encoding/summary path are connected. SRT extraction and atomic analyzed
 repository/FIFO/typed JNI imports are verified. EPUB persistence and ordered-chapter
 reader/application/FIFO/typed JNI imports are verified. Android mixed-format
-batches and reader formatting/ruby/images remain open.
-TXT background notifications use the platform-only
+batches use the shared retained picker/encoding/progress/Cancel/summary helper;
+reader formatting/ruby/images remain open.
+All file background notifications use the platform-only
 foreground lease described above. Legacy imports
 are not automatically rescanned.
 Explicit core/worker/FFI pending-time checkpoints coalesce during unresolved saves

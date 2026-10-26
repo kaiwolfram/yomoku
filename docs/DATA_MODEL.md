@@ -77,7 +77,7 @@ chapter text drops source ruby, while provenance/analyses/global vocabulary surv
 Reimport allocates fresh IDs/position/finish state. Production deletion remains planned.
 
 Ordered-chapter reader repositories now support the saved EPUB content; see below.
-EPUB runtime/FFI imports are connected; mixed Android selection remains open.
+EPUB runtime/FFI imports and mixed Android selection are connected.
 Shared file preflight and TXT/SRT/EPUB Existing results now return `LibraryDocument`, preserving the first
 interpretation's title, whole-book progress and finish marker without a content
 payload. Identity and complete document validation occur in the same read/import
@@ -85,7 +85,7 @@ transaction; inconsistent saved content fails without writes or analysis. Core
 Created/Existing results also carry Library references. Private StorageFinished
 changes did not alter exported event/request/view schemas. The subsequent ordered
 reader migration changes ViewModel.loaded_document to ReaderDocument. Current app
-imports stay paste/TXT; mixed Android selection remains open.
+imports accept paste and mixed EPUB/TXT/SRT selections.
 The typed `EpubImport` transports original bytes/display name without text encoding.
 Its FIFO adapter validates a bounded container before Full, then invokes the atomic
 whole-book repository with a fresh published cancellation attempt. Container errors
@@ -139,7 +139,7 @@ Legacy PastedDocument/ReaderSnapshot and their single-text read/open/position AP
 remain for repository callers and still reject EPUB. Their historical protocol
 names LoadPaste/OpenReader remain stable; only the loaded-document view field's
 serialized shape changes. No database migration or parser change. EPUB assets/ruby
-are not yet reader payloads, and Android selection stays paste/TXT.
+are not yet reader payloads; Android selection accepts EPUB/TXT/SRT.
 
 ## SRT canonical content and atomic file repository (migration 0013)
 
@@ -183,7 +183,8 @@ roll back. The typed FIFO/JNI adapter now carries `SrtImport` and SRT-specific
 encoding/empty outcomes. It preflights exact duplicates and decoding before Full,
 then invokes the authoritative cancellable repository. Shared `cancelFileImport()`
 bypasses FIFO for EPUB/TXT/SRT; `cancelTxtImport()` remains a compatibility alias.
-The current app picker still accepts TXT only; Android SRT selection remains open.
+The retained Android mixed picker routes SRT through this typed adapter, including
+format-specific encoding choices and terminal errors.
 
 ## TXT canonical content and atomic file repository (migration 0012)
 
@@ -235,7 +236,7 @@ one transaction, verifies digest, ordered nonoverlapping scalar ranges and readi
 and rejects corruption without repair or reanalysis. Historical single-text
 snapshot APIs accept paste/TXT/SRT; application/bridge readers now use ReaderDocument
 and the generic ordered repositories above. No ruby reader payload
-exists yet. Typed per-file runtime/JNI imports and the retained Android TXT picker,
+exists yet. Typed per-file runtime/JNI imports and the retained Android mixed-format picker,
 encoding choices, progress, Cancel and summary are connected. The Android foreground
 lease/notifications persist no queue, URI, current-file bytes, progress or summary.
 Process death preserves only committed per-file data; a fresh helper starts empty
@@ -917,7 +918,7 @@ does not queue arbitrary busy operations or read a clock itself.
 Android CoreSession supplies elapsedRealtime samples after successful restore,
 15-second Handler checkpoints, interactions and final Pause observations before
 settings/background/departure/completion. It waits for storage, both pending flags
-and any direct TXT cancellation call before native close, retaining exact failed
+and any direct file cancellation call before native close, retaining exact failed
 save obligations for retry. Cancellation state remains in process only. No platform
 clock timestamps enter SQLite. Checkpoint operations create no completion, encounter
 or status events. Analyzed completion intents are connected below; post identity

@@ -2259,3 +2259,24 @@ failure/cancellation rolls back earlier chapters/assets/registrations/provisiona
 IDs, while committed earlier files stay. No persisted queue or automatic resume.
 Android recognizes the new event for clock pausing and the error for rendering;
 the mixed-format picker and source formatting/ruby/images remain separate slices.
+
+
+## 2026-10-26 — Mixed Android file batches
+
+Generalize the existing retained TXT platform helper to FileImports, keeping one
+URI reader, one current-file input and the existing per-file Rust transaction/FIFO.
+Use OpenMultipleDocuments with */* so SRT providers with text/plain or generic
+binary MIME types remain selectable. Route the literal display-name extension
+case-insensitively to EPUB/TXT/SRT; reject other extensions before reading bytes.
+MIME does not choose interpretation. No content sniffing or excluded format is added.
+
+TXT and SRT use their existing distinct encoding errors and retain the selected
+encoding on retries. EPUB carries bytes/name only and never offers text encoding.
+Keep ordered per-file outcomes (Created/Existing/error/Skip) in the shared summary
+and continue after each failure. Preserve Library return without reader auto-open.
+
+Reuse the notification observer/foreground lease and generation-based URI disposal
+for every format. Call shared native cancelFileImport off main and outside FIFO;
+await both the native return and current result so a winning COMMIT is retained.
+No persisted queue, restart behavior, dependency, permission, schema or destructive
+semantics change. EPUB reader formatting/ruby/images remain a separate slice.

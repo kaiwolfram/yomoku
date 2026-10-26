@@ -11,13 +11,15 @@ import androidx.compose.runtime.setValue
 import app.yomoku.shared.ContentRoute
 import app.yomoku.shared.Destination
 import app.yomoku.shared.DocumentError
+import app.yomoku.shared.EpubImport
 import app.yomoku.shared.Event
 import app.yomoku.shared.ImportOutcome
+import app.yomoku.shared.SrtImport
 import app.yomoku.shared.TextEncoding
 import app.yomoku.shared.TxtImport
 import java.util.concurrent.Executors
 
-internal data class TxtFileResult(
+internal data class FileImportResult(
     val filename: String,
     val outcome: ImportOutcome? = null,
     val title: String? = null,
@@ -25,11 +27,52 @@ internal data class TxtFileResult(
     val message: Int? = null,
 )
 
+private enum class FileFormat {
+    TXT,
+    SRT,
+    EPUB;
+
+    companion object {
+        fun fromFilename(name: String): FileFormat? = entries.firstOrNull {
+            name.endsWith(".${it.name}", ignoreCase = true)
+        }
+    }
+}
+
+private data class FileInput(
+    val bytes: List<UByte>,
+    val filename: String,
+    val format: FileFormat,
+    val encoding: TextEncoding? = null,
+) {
+    fun event(): Event =
+        when (format) {
+            FileFormat.TXT -> Event.ImportTxt(TxtImport(bytes, filename, encoding))
+            FileFormat.SRT -> Event.ImportSrt(SrtImport(bytes, filename, encoding))
+            FileFormat.EPUB -> Event.ImportEpub(EpubImport(bytes, filename))
+        }
+
+    fun needsEncoding(error: DocumentError?): Boolean =
+        when (format) {
+            FileFormat.TXT ->
+                error == DocumentError.TXTENCODINGREQUIRED ||
+                    (encoding != null &&
+                        (error == DocumentError.TXTINVALIDUTF8 ||
+                            error == DocumentError.TXTINVALIDSHIFTJIS))
+            FileFormat.SRT ->
+                error == DocumentError.SRTENCODINGREQUIRED ||
+                    (encoding != null &&
+                        (error == DocumentError.SRTINVALIDUTF8 ||
+                            error == DocumentError.SRTINVALIDSHIFTJIS))
+            FileFormat.EPUB -> false
+        }
+}
+
 /** Only platform URI reads and sequencing live here. Rust owns every per-file transaction. */
-internal class TxtImports(
+internal class FileImports(
     private val resolver: ContentResolver,
     private val core: CoreSession,
-    private val observer: TxtImportObserver? = null,
+    private val observer: FileImportObserver? = null,
 ) : AutoCloseable {
     private val handler = Handler(Looper.getMainLooper())
     private var reader = Executors.newSingleThreadExecutor()
@@ -39,7 +82,7 @@ internal class TxtImports(
     private var waitingForCore = false
     private var cancellationReturned = false
     private var cancellingFileNumber = 0
-    private var input: TxtImport? = null
+    private var input: FileInput? = null
     var active by mutableStateOf(false)
         private set
 
@@ -66,7 +109,7 @@ internal class TxtImports(
     var encodingError: DocumentError? by mutableStateOf(null)
         private set
 
-    var results: List<TxtFileResult> by mutableStateOf(emptyList())
+    var results: List<FileImportResult> by mutableStateOf(emptyList())
         private set
 
     init {
@@ -127,26 +170,29 @@ internal class TxtImports(
                             refreshNotifications()
                         }
                     }
-                    if (!name.endsWith(".txt", ignoreCase = true)) {
+                    val format = FileFormat.fromFilename(name)
+                    if (format == null) {
                         null
                     } else {
                         val bytes =
                             resolver.openInputStream(uri)?.use { it.readBytes() }
                                 ?: error("Cannot open document")
                         if (generation != readGeneration) return@execute
-                        TxtImport(bytes.map { it.toUByte() }, name)
+                        FileInput(bytes.map { it.toUByte() }, name, format)
                     }
                 } catch (_: Exception) {
                     handler.post {
                         if (generation == readGeneration)
-                            finish(TxtFileResult(name, message = R.string.import_file_unreadable))
+                            finish(
+                                FileImportResult(name, message = R.string.import_file_unreadable)
+                            )
                     }
                     return@execute
                 }
             handler.post {
                 if (generation == readGeneration) {
                     if (loaded == null) {
-                        finish(TxtFileResult(name, message = R.string.import_txt_only))
+                        finish(FileImportResult(name, message = R.string.import_supported_files))
                     } else {
                         input = loaded
                         filename = loaded.filename
@@ -159,7 +205,7 @@ internal class TxtImports(
 
     private fun submit() {
         waitingForCore = true
-        core.dispatch(Event.ImportTxt(checkNotNull(input)))
+        core.dispatch(checkNotNull(input).event())
     }
 
     private fun receive() {
@@ -170,18 +216,13 @@ internal class TxtImports(
         if (cancelling) {
             // A completed COMMIT wins cancellation. A rolled-back/encoding attempt adds no row.
             if (summary != null)
-                results = results + TxtFileResult(filename, summary.outcome, summary.title)
+                results = results + FileImportResult(filename, summary.outcome, summary.title)
             core.dispatch(Event.DismissImportSummary)
             refreshNotifications()
             settleCancellation()
             return
         }
-        if (
-            error == DocumentError.TXTENCODINGREQUIRED ||
-                (input?.encoding != null &&
-                    (error == DocumentError.TXTINVALIDUTF8 ||
-                        error == DocumentError.TXTINVALIDSHIFTJIS))
-        ) {
+        if (input?.needsEncoding(error) == true) {
             encodingError = error
             choosingEncoding = true
             refreshNotifications()
@@ -189,7 +230,7 @@ internal class TxtImports(
         }
         core.dispatch(Event.DismissImportSummary)
         finish(
-            TxtFileResult(
+            FileImportResult(
                 filename,
                 outcome = summary?.outcome,
                 title = summary?.title,
@@ -213,10 +254,10 @@ internal class TxtImports(
     fun skipEncoding() {
         checkMainThread()
         if (!closed && !cancelling && choosingEncoding)
-            finish(TxtFileResult(filename, message = R.string.import_file_skipped))
+            finish(FileImportResult(filename, message = R.string.import_file_skipped))
     }
 
-    private fun finish(result: TxtFileResult) {
+    private fun finish(result: FileImportResult) {
         results = results + result
         next()
     }
@@ -238,7 +279,7 @@ internal class TxtImports(
         reader = Executors.newSingleThreadExecutor()
         cancellationReturned = !waitingForCore
         if (waitingForCore) {
-            core.cancelTxtImport {
+            core.cancelFileImport {
                 cancellationReturned = true
                 if (!closed) settleCancellation()
             }
@@ -272,7 +313,7 @@ internal class TxtImports(
         checkMainThread()
         if (!closed && active)
             observer?.update(
-                TxtImportProgress(
+                FileImportProgress(
                     filename,
                     currentFileNumber,
                     results.size,

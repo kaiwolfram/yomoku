@@ -23,7 +23,7 @@ class TxtImportRecoveryProbeActivity : ComponentActivity() {
     private lateinit var directory: File
     private lateinit var phase: String
     private lateinit var core: CoreSession
-    private lateinit var imports: TxtImports
+    private lateinit var imports: FileImports
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -34,7 +34,7 @@ class TxtImportRecoveryProbeActivity : ComponentActivity() {
         directory = File(noBackupFilesDir, "txt-recovery-$run")
         check(directory.isDirectory || directory.mkdir())
         core = CoreSession(File(directory, "reader.sqlite3").path, sudachiDictionaryProvider(this))
-        imports = TxtImports(contentResolver, core, ImportNotifications(this) { imports.cancel() })
+        imports = FileImports(contentResolver, core, ImportNotifications(this) { imports.cancel() })
         setContent { Text("TXT process-death acceptance: $phase") }
         val deadline = SystemClock.elapsedRealtime() + 90_000
         var started = false

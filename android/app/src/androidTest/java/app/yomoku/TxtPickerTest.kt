@@ -64,12 +64,12 @@ class TxtPickerTest {
         val fresh = fixture("$prefix-fresh.txt", byteArrayOf(0xc2.toByte(), 0xa9.toByte()))
         val resolver = instrumentation.targetContext.contentResolver
         try {
-            compose.runOnIdle { owner().txtImports.start(listOf(first, blocked, remaining)) }
+            compose.runOnIdle { owner().fileImports.start(listOf(first, blocked, remaining)) }
             compose.waitUntil(90_000) {
-                owner().txtImports.filename == "$prefix-blocked.txt" &&
-                    owner().txtImports.results.size == 1
+                owner().fileImports.filename == "$prefix-blocked.txt" &&
+                    owner().fileImports.results.size == 1
             }
-            val retained = owner().txtImports
+            val retained = owner().fileImports
             compose.onNodeWithText("Cancel").performClick()
             compose.waitUntil(30_000) { !retained.active }
             awaitIdle()
@@ -77,8 +77,8 @@ class TxtPickerTest {
             assertEquals(3, retained.totalFiles)
             assertEquals(1f / 3f, retained.progress)
             compose.activityRule.scenario.recreate()
-            assertSame(retained, owner().txtImports)
-            compose.onNodeWithTag("txt_import_summary").assertIsDisplayed()
+            assertSame(retained, owner().fileImports)
+            compose.onNodeWithTag("file_import_summary").assertIsDisplayed()
             compose.onNodeWithText("Close").performClick()
             // This must reach encoding selection while the old provider read is still blocked.
             compose.runOnIdle { retained.start(listOf(fresh, remaining)) }
@@ -97,7 +97,7 @@ class TxtPickerTest {
             compose.waitUntil(30_000) { !retained.active }
             awaitIdle()
             assertTrue(retained.results.isEmpty())
-            compose.onNodeWithTag("txt_import_summary").assertDoesNotExist()
+            compose.onNodeWithTag("file_import_summary").assertDoesNotExist()
             assertTrue(
                 owner().session.view.documents.none {
                     it.title in
@@ -139,7 +139,7 @@ class TxtPickerTest {
                 fixture("first.txt", original),
                 fixture("duplicate.txt", original),
                 fixture("unreadable.txt", null),
-                fixture("unsupported.srt", "1\n00:00:01 --> 00:00:02\n猫".toByteArray()),
+                fixture("unsupported.vtt", "WEBVTT\n猫".toByteArray()),
                 fixture("invalid.txt", byteArrayOf(0xff.toByte())),
                 fixture(
                     "choice.txt",
@@ -174,36 +174,36 @@ class TxtPickerTest {
                     it.readBytes()
                 },
             )
-            compose.onNodeWithText("Import TXT files").performClick()
+            compose.onNodeWithText("Import files").performClick()
             try {
-                compose.waitUntil(90_000) { owner().txtImports.choosingEncoding }
+                compose.waitUntil(90_000) { owner().fileImports.choosingEncoding }
             } catch (error: Throwable) {
-                val imports = owner().txtImports
+                val imports = owner().fileImports
                 throw AssertionError(
                     "Picker hits=${monitor.hits}, active=${imports.active}, file=${imports.filename}, results=${imports.results}, busy=${owner().session.view.storageBusy}, error=${owner().session.view.documentError}",
                     error,
                 )
             }
             assertEquals(1, monitor.hits)
-            val retained = owner().txtImports
+            val retained = owner().fileImports
             assertEquals("$prefix-choice.txt", retained.filename)
             assertEquals(
                 listOf(ImportOutcome.CREATED, ImportOutcome.EXISTING),
                 retained.results.take(2).map { it.outcome },
             )
             assertEquals(R.string.import_file_unreadable, retained.results[2].message)
-            assertEquals(R.string.import_txt_only, retained.results[3].message)
+            assertEquals(R.string.import_supported_files, retained.results[3].message)
             assertEquals(DocumentError.TXTUNDECODABLE, retained.results[4].error)
             assertEquals(9, retained.totalFiles)
             assertEquals(6, retained.currentFileNumber)
             compose.onNodeWithText("File 6 of 9").assertIsDisplayed()
             compose.onNodeWithText("Processed: 5 of 9").assertIsDisplayed()
             compose
-                .onNodeWithTag("txt_import_progress")
+                .onNodeWithTag("file_import_progress")
                 .assertRangeInfoEquals(ProgressBarRangeInfo(5f / 9f, 0f..1f))
             compose.onNodeWithText("UTF-8").assertIsDisplayed()
             compose.activityRule.scenario.recreate()
-            assertSame(retained, owner().txtImports)
+            assertSame(retained, owner().fileImports)
             compose.activityRule.scenario.moveToState(Lifecycle.State.CREATED)
             compose.activityRule.scenario.moveToState(Lifecycle.State.RESUMED)
             compose.onNodeWithText("File 6 of 9").assertIsDisplayed()
@@ -257,31 +257,32 @@ class TxtPickerTest {
                             }
                     }
                 }
-            compose.onNodeWithTag("txt_import_summary").assertIsDisplayed()
+            compose.onNodeWithTag("file_import_summary").assertIsDisplayed()
             compose.onNodeWithText("Already in Library: $prefix-first.txt").assertIsDisplayed()
             compose
-                .onNodeWithTag("txt_import_summary")
+                .onNodeWithTag("file_import_summary")
                 .performScrollToNode(hasText("$prefix-unreadable.txt"))
             compose
                 .onNodeWithText("Could not read this file. Select it again to retry.")
                 .assertIsDisplayed()
             compose
-                .onNodeWithTag("txt_import_summary")
+                .onNodeWithTag("file_import_summary")
                 .performScrollToNode(hasText("$prefix-last.TXT"))
             compose
                 .onNode(
-                    hasText("$prefix-last.TXT") and hasAnyAncestor(hasTestTag("txt_import_summary"))
+                    hasText("$prefix-last.TXT") and
+                        hasAnyAncestor(hasTestTag("file_import_summary"))
                 )
                 .assertIsDisplayed()
             compose.onNodeWithTag("reader_text").assertDoesNotExist()
             compose.activityRule.scenario.recreate()
-            assertEquals(9, owner().txtImports.results.size)
-            compose.onNodeWithTag("txt_import_summary").assertIsDisplayed()
+            assertEquals(9, owner().fileImports.results.size)
+            compose.onNodeWithTag("file_import_summary").assertIsDisplayed()
             compose.onNodeWithText("Close").performClick()
             assertEquals(0, retained.totalFiles)
             assertEquals(0f, retained.progress)
             compose.activityRule.scenario.recreate()
-            compose.onNodeWithTag("txt_import_summary").assertDoesNotExist()
+            compose.onNodeWithTag("file_import_summary").assertDoesNotExist()
         } finally {
             instrumentation.removeMonitor(monitor)
         }
@@ -305,19 +306,19 @@ class TxtPickerTest {
                 .build()
         val resolver = instrumentation.targetContext.contentResolver
         try {
-            compose.runOnIdle { owner().txtImports.start(listOf(uri)) }
-            compose.waitUntil(30_000) { owner().txtImports.filename == "$token.txt" }
-            val retained = owner().txtImports
+            compose.runOnIdle { owner().fileImports.start(listOf(uri)) }
+            compose.waitUntil(30_000) { owner().fileImports.filename == "$token.txt" }
+            val retained = owner().fileImports
             assertTrue(retained.active)
             assertFalse(retained.choosingEncoding)
             compose.onNodeWithText("$token.txt").assertIsDisplayed()
             compose.onNodeWithText("File 1 of 1").assertIsDisplayed()
             compose.onNodeWithText("Processed: 0 of 1").assertIsDisplayed()
             compose
-                .onNodeWithTag("txt_import_progress")
+                .onNodeWithTag("file_import_progress")
                 .assertRangeInfoEquals(ProgressBarRangeInfo(0f, 0f..1f))
             compose.activityRule.scenario.recreate()
-            assertSame(retained, owner().txtImports)
+            assertSame(retained, owner().fileImports)
             compose.onNodeWithText("$token.txt").assertIsDisplayed()
             compose.onNodeWithText("Processed: 0 of 1").assertIsDisplayed()
             resolver.call(uri, "release", token, null)
@@ -352,13 +353,13 @@ class TxtPickerTest {
                 true,
             )
         try {
-            compose.onNodeWithText("Import TXT files").performClick()
+            compose.onNodeWithText("Import files").performClick()
             compose.waitForIdle()
             assertEquals(1, monitor.hits)
-            assertFalse(owner().txtImports.active)
-            assertTrue(owner().txtImports.results.isEmpty())
+            assertFalse(owner().fileImports.active)
+            assertTrue(owner().fileImports.results.isEmpty())
             assertEquals(documents, owner().session.view.documents)
-            compose.onNodeWithTag("txt_import_summary").assertDoesNotExist()
+            compose.onNodeWithTag("file_import_summary").assertDoesNotExist()
             compose.onNodeWithTag("reader_text").assertDoesNotExist()
         } finally {
             instrumentation.removeMonitor(monitor)

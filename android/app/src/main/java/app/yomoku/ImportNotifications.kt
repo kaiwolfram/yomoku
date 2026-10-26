@@ -13,7 +13,7 @@ import android.content.pm.ServiceInfo
 import android.os.Binder
 import android.os.IBinder
 
-internal data class TxtImportProgress(
+internal data class FileImportProgress(
     val filename: String,
     val current: Int,
     val processed: Int,
@@ -23,18 +23,18 @@ internal data class TxtImportProgress(
 )
 
 /** Main-thread platform observer. It never receives bytes, URIs or database work. */
-internal interface TxtImportObserver : AutoCloseable {
-    fun update(progress: TxtImportProgress)
+internal interface FileImportObserver : AutoCloseable {
+    fun update(progress: FileImportProgress)
 
     fun finished(processed: Int, total: Int, cancelled: Boolean)
 }
 
 /** The lease and callbacks exist only in this process; there is no restartable work. */
 internal class ImportNotifications(context: Context, private val interrupt: () -> Unit) :
-    TxtImportObserver {
+    FileImportObserver {
     private val context = context.applicationContext
     private val manager = this.context.getSystemService(NotificationManager::class.java)
-    private var progress: TxtImportProgress? = null
+    private var progress: FileImportProgress? = null
     private var service: ImportService? = null
     private var bound = false
     private var started = false
@@ -67,7 +67,7 @@ internal class ImportNotifications(context: Context, private val interrupt: () -
         )
     }
 
-    override fun update(progress: TxtImportProgress) {
+    override fun update(progress: FileImportProgress) {
         val previous = this.progress
         this.progress = progress
         if (previous == null) manager.cancel(COMPLETE_ID)
@@ -169,7 +169,7 @@ class ImportService : Service() {
         super.onCreate()
         startForeground(
             ImportNotifications.PROGRESS_ID,
-            notification(this).setContentTitle(getString(R.string.import_txt)).build(),
+            notification(this).setContentTitle(getString(R.string.import_files)).build(),
             ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC,
         )
     }
@@ -178,7 +178,7 @@ class ImportService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int = START_NOT_STICKY
 
-    internal fun show(progress: TxtImportProgress) {
+    internal fun show(progress: FileImportProgress) {
         getSystemService(NotificationManager::class.java)
             .notify(ImportNotifications.PROGRESS_ID, progressNotification(this, progress))
     }
@@ -208,7 +208,7 @@ private fun notification(context: Context): Notification.Builder =
             )
         )
 
-private fun progressNotification(context: Context, progress: TxtImportProgress): Notification {
+private fun progressNotification(context: Context, progress: FileImportProgress): Notification {
     val title =
         when {
             progress.cancelling -> context.getString(R.string.import_cancelling)

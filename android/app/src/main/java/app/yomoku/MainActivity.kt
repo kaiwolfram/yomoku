@@ -20,16 +20,16 @@ import app.yomoku.theme.YomokuTheme
 
 class MainActivity : ComponentActivity() {
     private lateinit var core: CoreSession
-    private lateinit var txtImports: TxtImports
+    private lateinit var fileImports: FileImports
     private var notificationPermission by mutableStateOf(true)
     private val notificationRequest =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
             notificationPermission = granted
-            txtImports.refreshNotifications()
+            fileImports.refreshNotifications()
         }
-    private val txtPicker =
+    private val filePicker =
         registerForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
-            txtImports.start(uris)
+            fileImports.start(uris)
         }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -37,7 +37,7 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         val owner = ViewModelProvider(this)[CoreSessionOwner::class.java]
         core = owner.session
-        txtImports = owner.txtImports
+        fileImports = owner.fileImports
         setContent {
             YomokuTheme {
                 BackHandler(
@@ -48,9 +48,11 @@ class MainActivity : ComponentActivity() {
                     )
                 }
                 YomokuApp(core.view, core::dispatch, core::onReaderInteraction) {
-                    txtPicker.launch(arrayOf("text/plain"))
+                    // Providers frequently label SRT as text/plain or application/octet-stream.
+                    // Validate the literal display-name extension in FileImports.
+                    filePicker.launch(arrayOf("*/*"))
                 }
-                TxtImportDialogs(txtImports, !notificationPermission) {
+                FileImportDialogs(fileImports, !notificationPermission) {
                     if (Build.VERSION.SDK_INT >= 33)
                         notificationRequest.launch(Manifest.permission.POST_NOTIFICATIONS)
                 }
@@ -65,7 +67,7 @@ class MainActivity : ComponentActivity() {
             Build.VERSION.SDK_INT < 33 ||
                 checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) ==
                     PackageManager.PERMISSION_GRANTED
-        txtImports.refreshNotifications()
+        fileImports.refreshNotifications()
     }
 
     override fun onResume() {

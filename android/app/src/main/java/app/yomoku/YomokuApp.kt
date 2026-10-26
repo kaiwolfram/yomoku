@@ -46,7 +46,7 @@ internal fun YomokuApp(
     view: ViewModel,
     dispatch: (Event) -> Unit,
     onReaderInteraction: () -> Unit = {},
-    onImportTxt: (() -> Unit)? = null,
+    onImportFiles: (() -> Unit)? = null,
 ) {
     val context = LocalContext.current
     ReaderCompletionToast(view, dispatch) { message ->
@@ -143,7 +143,7 @@ internal fun YomokuApp(
                         view.contentRoute == ContentRoute.READER ->
                             ReaderScreen(view, dispatch, onReaderInteraction)
                         view.destination == Destination.LIBRARY ->
-                            LibraryScreen(view, dispatch, onImportTxt)
+                            LibraryScreen(view, dispatch, onImportFiles)
                         else ->
                             Text(
                                 stringResource(view.destination.emptyResource()),
