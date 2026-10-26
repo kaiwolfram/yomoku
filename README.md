@@ -77,20 +77,24 @@ tokens/dictionary details and atomic completion with whole-book finish semantics
 Core/FIFO/generated bridge readers now retain ordered chapters and select each
 chapter's original analysis. Worker fixtures verify transitions, backward progress,
 exact reflow/time and whole-book finish without Full.
+Reader pages now carry validated headings/emphasis/strong styles and website links
+through generated Kotlin/JNI into Compose. External links open the browser; internal
+links stay inert. Canonical offsets, word highlighting and dictionary taps survive
+formatting, page movement and recreation. Source ruby/images remain pending.
 The pure [SRT parser](crates/yomoku-import/src/srt.rs) has host fixtures for cue
 boundaries, formatting, speakers and malformed input. Its atomic repository now
 persists original bytes/encoding, canonical cues, Mode B and vocabulary registrations
 with duplicate detection and cancellation. Typed FIFO/JNI imports, encoding retries,
-duplicate-no-Full and direct cancellation are verified; Android picker wiring is pending.
+duplicate-no-Full and direct cancellation are verified; Android mixed selection is connected.
 Import results now use format-independent Library references. TXT/SRT duplicate
 attempts can reference an existing EPUB while preserving its whole-book progress,
 title and finish marker without decoding or loading Full. EPUB FIFO/typed JNI
 imports now validate containers before Full, persist/analyze every chapter atomically,
 and share direct cancellation. Host fixtures cover later-chapter/write/commit
 rollback, duplicates, original analysis/status/progress and failed-file recovery.
-Android mixed selection and reader formatting/images/ruby remain planned;
-selectable app formats are still paste/TXT.
-Planned v1 features include Android EPUB/SRT selection, custom missing-word definitions,
+Android supports mixed EPUB/TXT/SRT batches, per-file encoding/errors, progress,
+Cancel and completion summaries. Imports return to Library without opening a reader.
+Planned v1 features include reader images/ruby, custom missing-word definitions,
 reading statistics, optional AnkiDroid integration, curated Nostr reading and
 manual encrypted backups. See the [product specification](docs/PRODUCT_SPEC.md)
 for scope and the [implementation checklist](docs/IMPLEMENTATION_PLAN.md) for

@@ -1739,3 +1739,23 @@
   lint/fmt/codegen, index/Python, release/process-death/reboot/tablet/dark/physical
   arm64 were not rerun. Next: reader source formatting/ruby/images/links/viewer; CI
   independent. Large EPUB parse/integrity-read costs remain unmeasured.
+
+## 2026-10-26 — EPUB reader text formatting and website links
+
+- Added validated keyed chapter formatting and page-local scalar clipping to pure
+  core; the repository now transports stored headings/emphasis/strong/website links
+  through typed JNI to Compose without changing canonical text or saved anchors.
+- Rendered styles and external browser links. Website tap areas preserve vocabulary
+  highlighting; remaining token fragments retain full dictionary identity. Internal/
+  other links stay inert; nested website targets remain disjoint. No CSS/TOC added.
+- PASS: 412 Rust tests, strict Clippy/Rust+Kotlin formatting/diff, real-Full Kotlin/JNI,
+  Unicode/formatting exchanges, repeatable Kotlin payloads, both-ABI debug/test APKs,
+  strict Android lint and eleven distinct focused API-36 x86_64 tests. Reports:
+  .local/test-reports/reader-formatting/. Exact commands/limits: DEVELOPMENT.md end.
+- Fixed explicit Facet representation and lint's KTX URI helper. New UI test initially
+  closed the reader through Activity Back; changed it to the dictionary sheet's Close
+  button and readiness wait. Initial ten regressions and final single rerun pass.
+- Updated architecture/data/progress/handoff. No migration/dependency/permission/
+  destructive behavior change. No open blocker. Next: images/covers/shared viewer,
+  then Noto/font/furigana/source-ruby rendering; CI independent. Large EPUB costs
+  unmeasured; physical arm64 still deferred, other unrun checks in DEVELOPMENT.md.

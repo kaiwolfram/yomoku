@@ -10,5 +10,6 @@ pub mod document;
 pub mod imports;
 pub mod pagination;
 pub mod reader;
+pub mod reader_formatting;
 pub mod storage;
 pub mod vocabulary;

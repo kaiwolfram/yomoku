@@ -331,6 +331,7 @@ impl Imports {
                     title: stored.title,
                     finished_at_least_once: stored.finished_at_least_once,
                     reading_position: stored.reading_position,
+                    formatting: Vec::new(),
                     chapters: stored
                         .chapters
                         .into_iter()

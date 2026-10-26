@@ -107,9 +107,19 @@ then advances to the next page's chapter/start or the final chapter EOF.
 the document, global preset and ordered `ReaderChapterAnalysis` identities. Each
 identity explicitly includes its chapter ID and original Mode B or Missing; no
 analyzer, source parsing, token rescan or registration runs. The text projection
-omits source bytes/assets/formatting, while its EPUB loader still verifies all saved
+omits source bytes/image payloads, while its EPUB loader still verifies all saved
 content/digests/annotations/assets. This repeats on each reader repository operation;
 large-book performance has not been measured or optimized.
+
+`ReaderDocument.formatting` carries sparse keyed `ReaderChapterFormatting` entries.
+Each chapter key is owned and unique; `ReaderTextSpan` has a nonempty scalar-aligned
+chapter-local `TextRange` and Heading(1–6), Emphasis, Strong or ExternalLink(HTTP(S))
+style. Nested formatting is valid. Stored inert links stay in SQLite and are omitted
+from this display projection. `ReaderPage.formatting` clips intersections into
+page-local UTF-8 ranges, preserving the canonical text and all durable identities.
+Plain/single-text documents have no formatting entries. No migration or source
+rewrite is required; source ruby and image bytes/references remain outside this
+transport until their rendering slices.
 
 `open_document_reader_snapshot` alone resets finished books to the first chapter's
 start. Snapshot/analysis/settings validation and reset share one immediate

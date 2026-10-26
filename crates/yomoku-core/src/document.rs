@@ -125,6 +125,7 @@ pub struct ReaderDocument {
     pub title: String,
     pub finished_at_least_once: bool,
     pub chapters: Vec<ChapterText>,
+    pub formatting: Vec<crate::reader_formatting::ReaderChapterFormatting>,
     pub reading_position: Option<crate::pagination::ReadingPosition>,
 }
 
@@ -135,6 +136,7 @@ impl From<PastedDocument> for ReaderDocument {
             title: document.title,
             finished_at_least_once: document.finished_at_least_once,
             chapters: vec![document.chapter],
+            formatting: Vec::new(),
             reading_position: document.reading_position,
         }
     }
@@ -151,6 +153,13 @@ impl ReaderDocument {
                 return Err(InvalidTextValue);
             }
             i64::try_from(chapter.text.len()).map_err(|_| InvalidTextValue)?;
+        }
+        let mut formatted = std::collections::HashSet::new();
+        for formatting in &self.formatting {
+            if !formatted.insert(formatting.chapter_id) {
+                return Err(InvalidTextValue);
+            }
+            formatting.validate(self.chapter(formatting.chapter_id)?)?;
         }
         if let Some(position) = self.reading_position {
             position.validate(self.chapter(position.chapter_id)?)?;

@@ -88,10 +88,24 @@ internal fun verifyEpubImportBridge() {
             check(loaded.chapters[0].text == File("crates/yomoku-import/tests/fixtures/epub/first-expected.txt").readText().trimEnd('\n'))
             val opened = listener.dispatch(bridge, Event.OpenReader(id))
             check(checkNotNull(opened.reader).totalPages == 2uL)
+            val formatted = checkNotNull(opened.reader)
+            check(formatted.formatting == loaded.formatting[0].spans)
+            check(formatted.formatting.size == 4)
+            for ((style, expected) in listOf(
+                ReaderTextStyle.Heading(1u) to "第一章 出会い",
+                ReaderTextStyle.Emphasis to "出会い",
+                ReaderTextStyle.Strong to "𠮷😀",
+                ReaderTextStyle.ExternalLink("https://example.org/book?q=1&x=2") to "外部",
+            )) {
+                val span = formatted.formatting.single { it.style == style }
+                val utf8 = formatted.text.toByteArray(Charsets.UTF_8)
+                check(utf8.copyOfRange(span.range.start.value.toInt(), span.range.end.value.toInt()).toString(Charsets.UTF_8) == expected)
+            }
             val second = loaded.chapters[1]
             val position = ReadingPosition(second.sourceId, second.chapterId, TextOffset(0L))
             val moved = listener.dispatch(bridge, Event.SaveReadingPosition(position))
             check(checkNotNull(moved.reader).pageNumber == 2uL)
+            check(checkNotNull(moved.reader).formatting.isEmpty())
             val analysis = checkNotNull(moved.readerAnalysis) as ReaderAnalysis.Available
             check(analysis != opened.readerAnalysis)
             val key = ReaderTokenKey(id, checkNotNull(moved.reader).anchor, analysis)

@@ -2,10 +2,12 @@
 
 use rusqlite::{Connection, OptionalExtension, TransactionBehavior};
 use yomoku_core::{
-    document::{DocumentId, ReaderDocument, TextOffset},
+    document::{DocumentId, ReaderDocument, TextOffset, TextRange},
     pagination::ReadingPosition,
     reader::{DocumentReaderSnapshot, ReaderChapterAnalysis},
+    reader_formatting::{ReaderChapterFormatting, ReaderTextSpan, ReaderTextStyle},
 };
+use yomoku_import::epub::SpanKind;
 
 use crate::{
     analysis::read_reader_analysis,
@@ -127,14 +129,54 @@ pub(crate) fn load_reader_document_in(
         Some("epub") => {
             // Reuse the authoritative read-only integrity checks for the saved
             // container, chapter counts/order, annotations and assets. Source
-            // bytes and image payloads are not part of the text projection.
+            // bytes and image payloads are not part of the reader projection.
             let stored =
                 load_epub_in(connection, document_id)?.ok_or(StorageError::InvalidDocument)?;
+            let formatting = stored
+                .chapters
+                .iter()
+                .map(|item| {
+                    let spans = item
+                        .spans
+                        .iter()
+                        .filter_map(|span| {
+                            let style = match &span.kind {
+                                SpanKind::Heading(level) => ReaderTextStyle::Heading(*level),
+                                SpanKind::Emphasis => ReaderTextStyle::Emphasis,
+                                SpanKind::Strong => ReaderTextStyle::Strong,
+                                SpanKind::ExternalLink(target) => {
+                                    ReaderTextStyle::ExternalLink(target.clone())
+                                }
+                                // Internal/other links do not acquire navigation or styling.
+                                SpanKind::InertLink(_) => return None,
+                            };
+                            Some((|| {
+                                Ok(ReaderTextSpan {
+                                    range: TextRange {
+                                        start: TextOffset::at(
+                                            &item.chapter.text,
+                                            span.range.start,
+                                        )?,
+                                        end: TextOffset::at(&item.chapter.text, span.range.end)?,
+                                    },
+                                    style,
+                                })
+                            })())
+                        })
+                        .collect::<Result<Vec<_>, yomoku_core::document::InvalidTextValue>>()
+                        .map_err(|_| StorageError::InvalidDocument)?;
+                    Ok(ReaderChapterFormatting {
+                        chapter_id: item.chapter.chapter_id,
+                        spans,
+                    })
+                })
+                .collect::<Result<_, StorageError>>()?;
             ReaderDocument {
                 document_id,
                 title: stored.title,
                 finished_at_least_once: stored.finished_at_least_once,
                 reading_position: stored.reading_position,
+                formatting,
                 chapters: stored
                     .chapters
                     .into_iter()

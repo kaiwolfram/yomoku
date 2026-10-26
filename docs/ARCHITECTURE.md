@@ -49,7 +49,19 @@ loader. Forward completion moves to the next page/chapter or the last chapter's
 EOF. Only the last page of the entire document marks it finished; transaction,
 replay, original-token ownership and New-only status semantics remain unchanged.
 The loader currently verifies all EPUB content/assets on every reader operation;
-large-book performance is unmeasured. Text snapshots omit asset/formatting payloads.
+large-book performance is unmeasured. Reader snapshots omit source bytes/image
+payloads; keyed chapter formatting now travels with canonical text.
+Pure `ReaderChapterFormatting` validates owned chapter keys, scalar ranges, heading
+levels and HTTP(S) targets. `ReaderPage` clips these spans to page-local UTF-8
+ranges without changing text, token anchors, pagination or saved positions.
+The storage adapter omits inert internal/other links from the display projection.
+Compose converts scalar boundaries strictly to UTF-16, renders heading/emphasis/
+strong styles and sends website links through the external URI handler. Website
+tap areas take precedence over dictionary taps while preserving vocabulary
+backgrounds; the remaining word fragments retain the full token identity.
+Malformed nested source links are split into disjoint click targets in source-span
+order. CSS, internal navigation and TOC jumps remain absent. Ruby, image transport,
+rendering/covers and the shared image viewer remain next work.
 
 Shared file preflight and TXT/SRT/EPUB Existing results now carry `LibraryDocument`
 references (ID, title, whole-book progress, permanent finish marker). Exact-byte
@@ -76,7 +88,8 @@ failures retain their existing errors. Created projects the committed whole book
 into a Library summary; no reader auto-opens. Direct per-file cancellation reaches
 queued/load/chapter work and uses the existing commit gate. Background release,
 engine-failure eviction and later-file retries share the existing analyzer cache.
-Android mixed selection is connected; reader formatting/ruby/images remain open.
+Android mixed selection and reader text formatting/website links are connected;
+reader ruby/images remain open.
 
 Its SRT parser
 accepts decoded text and returns canonical LF text plus ordered UTF-8 cue ranges.
@@ -721,7 +734,7 @@ picker/encoding/summary path are connected. SRT extraction and atomic analyzed
 repository/FIFO/typed JNI imports are verified. EPUB persistence and ordered-chapter
 reader/application/FIFO/typed JNI imports are verified. Android mixed-format
 batches use the shared retained picker/encoding/progress/Cancel/summary helper;
-reader formatting/ruby/images remain open.
+reader text formatting/website links are connected; ruby/images remain open.
 All file background notifications use the platform-only
 foreground lease described above. Legacy imports
 are not automatically rescanned.

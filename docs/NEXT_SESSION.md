@@ -1,80 +1,72 @@
 # Resume here
-Updated: 2026-10-26. Mixed EPUB/TXT/SRT Android batches connected; reader assets next.
+Updated: 2026-10-26. EPUB reader text formatting/website links connected.
 ## Working
 - Pure Crux routes/Library/Settings; Render-only UI; FIFO SQLite/analysis. Starts Library.
 - Exact chapter-local UTF-8 position/whole-book Library percentage + five presets
   persist; reflow preserves offset. Scroll resets on movement/reopen; column 720dp.
   Next/Previous/counter below content; net 48dp swipes need no bottom. Previous saves
   position only. Busy/pending gates reject duplicates; deliberate rereads count.
-- Paste atomically deduplicates SHA-256, saves original B + unique registrations.
-  Existing preserves title/status/progress without rescan/writes. Created/Existing
-  show dismissible Library summary; never auto-open. Nostr config remains empty.
-- Generic read-only load versus explicit open: finished books reset to first
-  chapter/page/preset/B atomically only on open. Finish survives movement/time/reflow;
-  deletion resets it, preserving history. Missing never rescans.
+- Imports atomically deduplicate original-byte SHA-256, store original B + unique
+  registrations. Existing preserves title/status/progress without Full/rescan/writes.
+  Created/Existing show dismissible Library summary; never auto-open. Nostr empty.
+- Generic loads are read-only; explicit finished-book open alone resets first
+  chapter/page/preset/B atomically. Finish survives movement/time/reflow; deletion
+  resets it while preserving history. Missing analysis never rescans.
 - App/FIFO/typed bridge uses ReaderDocument/DocumentReaderSnapshot for loads,
-  opens, saves and completion reloads, retaining all ordered chapters.
-  Core validates/freezes keyed B/Missing per chapter on accepted open and selects
-  current identity on movement; plain loads cannot replace it. Previous crosses chapters; global page counters/progress.
-- Token reads load original B/live statuses/metadata + clipped UTF-8 ranges atomically;
-  completion uses token start. Deleted IDs absent. Whole-chapter validation per lookup.
-  Loads wait for busy/pending saves; full page/base/result identities gate callbacks.
-  Movement/reflow/refresh invalidate. Strict UTF-8→UTF-16 failure renders plain text.
-- Five manual choices atomically update status/history; same-status no-op. Deleted
-  entries never register. Reads/choices require explicit retry after failure.
-  Phone sheet/wide panel shows readings/base, expanded restriction-aware English
-  senses/compact POS, separate names/categories/lifetime counts. Opening read-only;
-  navigation/recreation dismisses; errors survive timer saves; busy/pending gates.
+  opens, saves and completion reloads, retaining all ordered chapters. Core freezes
+  keyed original B/Missing per chapter on accepted open, selects on movement;
+  plain loads cannot replace it. Previous crosses chapters; global counters/progress.
+- Token reads atomically load original B/live statuses/metadata + clipped UTF-8
+  ranges; completion owns token start. Deleted IDs absent. Whole-chapter validation.
+  Full page/base/result identities gate callbacks; movement/reflow/refresh invalidate.
+  Strict UTF-8→UTF-16 failure falls back to plain text. Loads wait for pending saves.
+- Five manual statuses atomically update history; same-status no-op. Deleted entries
+  never register. Reads/choices need explicit retry. Phone sheet/wide panel shows
+  original reading/base, expanded restriction-aware English senses/compact POS,
+  separate names/categories/lifetime counts. Opening read-only; navigation dismisses.
 - Clock uses elapsedRealtime/15s checkpoints, restore-before-Resume, five-minute
-  idle/pause/background cap, reflow deadlines and movement epochs. Absolute revisions
-  freeze retries, coalesce maxima and drain before movement/exit. CoreSession close
-  retains callbacks until busy/BOTH pending/direct Cancel clear; retries on teardown.
-  Abrupt kill can lose pending. Time stays chapter-local, including EOF.
-- Completion freezes page/position/preset/AnalysisId/time, drains final time then
-  FIFO reserves ID + whole-page duration. One transaction commits occurrences,
-  New-only Known/history/time/position/finish. Exact retries; AlreadyRecorded/zero
-  silent, positive toast once. Chapter end advances to next chapter at 0; only new
-  whole-book final completion returns Library + 1.4s confetti. Image placeholders
-  complete without words. Fresh finished-book open resets to first chapter.
-- NativeBridge consumes owned verified FD+1; Rust rehashes/maps/closes all paths.
-  FIFO releases Full in background; live mapped inodes immutable. Pinned 2026-10-25
-  JMdict English/JMnedict + notices/credits bundled. Word index lazy until close/query
-  failure; full token/selection identities gate attach.
-- TXT strict UTF-8/Shift-JIS/Aozora atomic original-byte hash, filename/encoding/ruby/
-  Mode B/unique registrations. Duplicate skips decode/Full. SRT FIFO/JNI shares
-  decoder (no Aozora), original hash/filename/LF/cues/B. First interpretation wins.
-- Retained FileImports reads one mixed EPUB/TXT/SRT URI off main; routes literal
-  case-insensitive extensions to typed events. Wildcard picker tolerates generic MIME.
-  TXT/SRT have separate encoding/Skip/errors; EPUB never asks for text encoding.
-  Filename/X-of-N/processed bar + summary survive recreation/background. Name before
-  bytes. No persisted queue; teardown drops unsubmitted files, SIGKILL keeps commits.
-- cancelFileImport bypasses FIFO off main for all files (COMMIT may wait).
-  Fresh attempt before submission; silent full-file rollback; winning/prior commits
-  stay. Android clears inputs/remaining, ignores late reads and awaits BOTH native
-  return + current outcome, including draining close. Dedicated cancellation executor.
+  idle/background cap and movement epochs. Absolute revisions freeze retries,
+  coalesce maxima and drain before movement/exit. CoreSession close retains callbacks
+  until busy/BOTH pending/direct Cancel clear; retries teardown. Kill may lose pending.
+- Completion freezes page/position/preset/B/time, drains final time then FIFO reserves
+  ID + duration. One transaction writes occurrences, New-only Known/history/time/
+  position/finish. Exact retries; AlreadyRecorded/zero silent, positive toast once.
+  Only new final-book completion returns Library + 1.4s confetti. Images count no words.
+- NativeBridge consumes owned verified FD+1; Rust rehashes/maps/closes every path.
+  FIFO releases Full in background; mapped inodes immutable. Pinned 2026-10-25
+  JMdict English/JMnedict + notices bundled; word index lazy until close/query failure.
+- TXT strict UTF-8/Shift-JIS/Aozora and SRT shared decoder (no Aozora) preserve
+  original bytes/filename/encoding/canonical ruby or cues/B. First interpretation wins.
+- Retained FileImports reads one mixed EPUB/TXT/SRT URI off main, routes literal
+  case-insensitive extensions; wildcard picker accepts generic MIME. TXT/SRT have
+  separate encoding/Skip/errors; EPUB none. Filename/X-of-N/progress/summary survive
+  recreation/background. Name before bytes. No persisted queue/process restart.
+- Direct off-main cancelFileImport bypasses FIFO; COMMIT may wait. Silent full-file
+  rollback; winning/prior commits stay. Android ignores late reads and awaits BOTH
+  native return + outcome before clearing/draining. Dedicated cancellation executor.
 - dataSync lease tracks counts/name only; OS limits apply. Encoding releases it;
-  notification permission never blocks. Timeout stops lease before Cancel. Notification
-  taps never open reader. No background queue/service restart after process death.
-- EPUB bounded parser ignores CSS. Migration 0014 atomically saves source bytes/hash/
-  metadata/ordered chapter formatting/ruby/links/shared images + chapter B/registration.
-  Any failure/Cancel rolls back all rows/IDs. Loader validates saved digests/counts/
-  anchors/ownership without parsing. Every reader operation verifies complete EPUB
-  source/assets; large-book performance unmeasured. Reader asset payload still absent.
-- Shared file preflight/Existing outcomes return Library references, validating the
-  whole document atomically. Duplicate EPUB via TXT/SRT preserves renamed/later-chapter/
-  finished state without Full/reset/writes. Corruption fails; later files continue.
-- EPUB ImportEpub carries bytes/name, no text encoding; bounded parse before Full,
-  atomic repository rechecks. InvalidEpub covers container errors. Shared cancel
-  registry reaches queued/Full/chapter/draining work; cache evicts on engine failure.
+  permission never blocks. Timeout stops lease then Cancel. Notification tap opens Library.
+- EPUB bounded parser ignores CSS. Migration 0014 stores original bytes/hash/metadata,
+  ordered chapter formatting/ruby/links/shared images + B/registration atomically.
+  Loader verifies digests/counts/anchors/ownership without parsing. Every reader
+  operation still verifies full source/assets; large-book cost is unmeasured.
+- ReaderDocument carries keyed validated heading/emphasis/strong/HTTP(S) spans;
+  ReaderPage clips to page-local UTF-8; generated JNI/Compose preserve exact text.
+  Website tap areas open browser, retain vocabulary backgrounds; remaining token
+  fragments keep full dictionary identity. Internal/other source links stay inert.
+  Recreation/chapter navigation retain styles. No CSS/TOC; ruby/images not transported.
 ## Next tasks (ordered)
-1. Reader formatting/ruby/images + external links/shared viewer; assets lack transport.
-2. Add CI host Rust/Kotlin checks and unsigned Android builds (independent).
-3. User-run physical arm64 validation once usable (still deferred).
+1. Reader image asset transport/rendering + cover cache/shared pinch-zoom/pan viewer.
+2. Bundle Noto Serif JP; font/line settings and default-off source/analyzer furigana.
+3. Add CI host Rust/Kotlin checks and unsigned Android builds (independent).
 ## Verification
-- 409 data-free Rust tests; Kotlin formatting, both-ABI debug/test APKs and strict
-  Android lint pass. Eleven focused API-36 mixed-picker/TXT/Cancel/notifications/
-  navigation tests pass. Reports: .local/test-reports/mixed-file-picker/. Commands:
-  DEVELOPMENT.md end. Initial ambiguous test selector fixed; no open blocker.
-- Prior real-Full JNI/Unicode/codegen and EPUB worker rollback/cancellation checks
-  pass (not rerun for Android-only changes). Double-parse/integrity-read costs remain
-  unmeasured. No dependency/migration/Q188 change. Deferred checks: DEVELOPMENT.md.
+- 412 data-free Rust tests, strict Clippy/Rust+Kotlin formatting/diff, real-Full
+  Kotlin/JNI + Unicode/formatting exchanges and repeatable Kotlin generation pass.
+- Both-ABI debug/test APKs + strict lint pass. Eleven focused API-36 x86_64 formatting/
+  word-span/navigation tests pass across initial ten + final corrected single rerun.
+  Test initially invoked Activity Back instead of sheet Close; fixed test only.
+  Lint KTX URI helper fixed. Reports: .local/test-reports/reader-formatting/.
+- Commands/failures/limits: DEVELOPMENT.md end. Gradle/ADB need approved outside-
+  sandbox sockets. No open blocker. Large EPUB costs remain unmeasured. No dependency/
+  migration/Q188 change. Physical arm64 remains user-deferred; other deferred checks
+  are recorded in DEVELOPMENT.md. Emulator remains running.

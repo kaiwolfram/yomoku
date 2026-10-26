@@ -2280,3 +2280,28 @@ for every format. Call shared native cancelFileImport off main and outside FIFO;
 await both the native return and current result so a winning COMMIT is retained.
 No persisted queue, restart behavior, dependency, permission, schema or destructive
 semantics change. EPUB reader formatting/ruby/images remain a separate slice.
+
+## 2026-10-26 — Reader text formatting and website links
+
+Extend ReaderDocument with keyed chapter formatting and ReaderPage with clipped
+page-local spans. Carry headings/emphasis/strong and HTTP(S) website targets from
+the existing validated EPUB repository through generated payloads. Keep core pure;
+no EPUB parser types, SQL, CSS or platform calls enter it. Validate chapter ownership,
+unique formatting keys, scalar ranges, heading levels and website targets. Leave
+source ruby and image bytes/references for the next independently testable slices.
+No migration, dependency/version or data-destructive semantics change.
+
+Compose uses relative heading sizes/bold and emphasis/strong styles over unchanged
+canonical text. Use the existing Compose LinkAnnotation APIs, verified against the
+[official Url reference](https://developer.android.com/reference/kotlin/androidx/compose/ui/text/LinkAnnotation.Url).
+Website ranges own taps inside their source anchors, keeping vocabulary backgrounds;
+dictionary clicks on remaining token fragments keep the complete original token
+identity. This resolves overlapping source links and Japanese token click targets.
+Nested source website spans become disjoint targets in stored order. Internal/other
+source links acquire no navigation or special styling; Japanese words within them
+retain ordinary dictionary taps. No TOC/seek behavior is introduced.
+
+Normalize website URI schemes before the external handler; an unavailable browser
+does not crash the reader. Invalid source formatting at the display boundary falls
+back to canonical text with ordinary valid word interactions. Font/furigana settings,
+image transport/rendering, cover cache and shared viewer remain separate tasks.

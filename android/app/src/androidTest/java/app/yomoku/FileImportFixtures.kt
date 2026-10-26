@@ -16,7 +16,7 @@ internal object FileImportFixtures {
             .apply { if (gate != null) appendQueryParameter("gate", gate) }
             .build()
 
-    fun epub(title: String): ByteArray {
+    fun epub(title: String, firstBody: String = "<h1>猫</h1><p>猫と犬。</p>"): ByteArray {
         val output = ByteArrayOutputStream()
         ZipOutputStream(output).use { zip ->
             fun entry(path: String, text: String) {
@@ -43,7 +43,7 @@ internal object FileImportFixtures {
             )
             entry(
                 "one.xhtml",
-                """<html xmlns="http://www.w3.org/1999/xhtml"><body><h1>猫</h1><p>猫と犬。</p></body></html>""",
+                """<html xmlns="http://www.w3.org/1999/xhtml"><body>$firstBody</body></html>""",
             )
             entry(
                 "two.xhtml",

@@ -18,7 +18,7 @@ with functioning rustup can omit the PATH workaround. Do not assume this compile
 is the project's minimum supported version; establish that with dependencies.
 Cargo.lock is retained for reproducible application development.
 Crux 0.20.0 declares Rust 1.90 minimum; the full locked graph has only been tested
-with 1.99.1. Current host baseline: 409 data-free Rust tests (183 storage, 40
+with 1.99.1. Current host baseline: 412 data-free Rust tests (183 storage, 40
 runtime). Fourteen analysis fixtures and one runtime fixture run separately with
 each Full loader via tools/test-sudachi.sh (see below).
 
@@ -2853,3 +2853,58 @@ and physical arm64 were not rerun for this Android-only change; prior checks rem
 recorded above. No persisted queue or process-survival guarantee was added. EPUB
 reader formatting/ruby/images/external links/viewer and CI remain next work. Complete
 EPUB integrity reads and duplicate container parsing retain their unmeasured costs.
+
+## EPUB reader text formatting and website links
+
+Verified 2026-10-26 using the Rust PATH/JDK/SDK/Gradle environment above:
+
+```sh
+cargo test --workspace --all-features --locked --offline --quiet
+cargo clippy --workspace --all-targets --all-features --locked --offline -- -D warnings
+cargo fmt --all -- --check
+tools/test-kotlin-bridge.sh
+tools/format-kotlin.sh --check
+cargo run -p yomoku-ffi --bin generate-kotlin --features facet_typegen --locked --offline -- target/generated/kotlin-repeat
+diff -r target/generated/kotlin target/generated/kotlin-repeat
+./android/gradlew -p android :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug --offline --console=plain
+./android/gradlew -p android :app:connectedDebugAndroidTest :app:lintDebug -Pandroid.testInstrumentationRunnerArguments.class=app.yomoku.ReaderFormattingTest,app.yomoku.ReaderWordSpansTest,app.yomoku.ReaderNavigationTest --offline --console=plain
+./android/gradlew -p android :app:connectedDebugAndroidTest :app:lintDebug -Pandroid.testInstrumentationRunnerArguments.class=app.yomoku.ReaderFormattingTest --offline --console=plain
+git diff --check
+```
+
+PASS: 412 data-free Rust tests (three new pure formatting tests), strict Clippy,
+Rust/Kotlin formatting, real-Full Kotlin/JNI, seven Unicode exchanges including
+all four formatting variants, repeatable Kotlin codecs and both-ABI debug/test
+APKs with strict Android lint. Sixteen external-data fixtures remain ignored by
+the ordinary workspace suite. Existing benign Crux close diagnostics persist.
+The repository read-only fixture now checks exact stored heading/emphasis/strong/
+website ranges and omission of inert links. Pure tests cover every preset/page,
+Unicode/combining/NUL text, crossing spans, exact offsets, chapter ownership and
+malformed ranges/targets. JNI verifies actual imported EPUB annotations and
+unformatted later chapters alongside all existing import/persistence suites.
+
+All eleven distinct API-36 x86_64 focused tests pass across initial ten + final
+corrected single rerun. The new UI test imports an actual EPUB, verifies styled
+Compose text, intercepts a real external-browser ACTION_VIEW, taps inert internal/
+other links without navigating, recreates, opens dictionary UI, closes it and
+moves to the next chapter/back with original text/anchors/styles intact. Two added
+word-span tests check overlapping website/dictionary tap targets, preserved status
+backgrounds/full token identity, nested links and invalid UTF-8/UTF-16 inputs.
+
+Initial compile needed the new Facet enum's explicit repr(C). Initial Android lint
+rejected Uri.parse in favor of the existing KTX toUri helper; fixed. The first UI
+run timed out after calling the Activity Back dispatcher rather than the dialog's
+Close button. An initial wait-only test correction confirmed it had closed the
+reader; using the actual sheet Close control and waiting for lookup readiness
+passes. No production reader fix was needed for these test failures. Reports/logs:
+`.local/test-reports/reader-formatting/{initial,dialog-test-failure,final}/`.
+Gradle's sandbox wildcard-IP lock service failed; approved outside-sandbox offline
+build/device runs pass. ADB log reads also needed its outside-sandbox local socket.
+No open blocker, dependency/version, migration or permission change.
+
+Source ruby/images, cover cache, image viewer and font/furigana settings remain
+open. Complete EPUB integrity reads still repeat per repository operation; large-
+book costs are unmeasured. Standalone Full/index/Python suites, native-binding
+repeat generation, release/process-death/reboot/tablet/dark and physical arm64 were
+not rerun. The generated payload codecs were repeat-checked; native ABI signatures
+are unchanged. Physical arm64 validation remains deferred by the user.

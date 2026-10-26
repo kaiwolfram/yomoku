@@ -34,6 +34,7 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -43,14 +44,20 @@ import androidx.compose.ui.text.LinkAnnotation
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextLinkStyles
 import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.em
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupProperties
+import androidx.core.net.toUri
 import app.yomoku.shared.Event
 import app.yomoku.shared.ReaderPage
 import app.yomoku.shared.ReaderStatusChange
+import app.yomoku.shared.ReaderTextSpan
+import app.yomoku.shared.ReaderTextStyle
 import app.yomoku.shared.ReaderToken
 import app.yomoku.shared.ReaderTokenKey
 import app.yomoku.shared.ReaderTokenSnapshot
@@ -61,7 +68,7 @@ import app.yomoku.shared.VocabularyStatus
 internal data class ReaderDisplayToken(val token: ReaderToken, val start: Int, val end: Int)
 
 /** Reject malformed UTF-16 and byte offsets inside a scalar, never round them. */
-private fun utf8Boundaries(text: String): Map<Long, Int>? {
+internal fun utf8Boundaries(text: String): Map<Long, Int>? {
     val boundaries = mutableMapOf(0L to 0)
     var utf16 = 0
     var bytes = 0L
@@ -165,27 +172,78 @@ internal fun readerAnnotatedText(
     tokens: List<ReaderDisplayToken>,
     dark: Boolean,
     foreground: Color,
+    formatting: List<ReaderTextSpan> = emptyList(),
+    linkColor: Color = foreground,
+    onExternalLink: (String) -> Unit = {},
     onToken: (ULong) -> Unit,
 ): AnnotatedString = buildAnnotatedString {
     append(text)
-    for ((token, start, end) in tokens) {
-        addLink(
-            LinkAnnotation.Clickable(
-                tag = "reader_token_${token.tokenIndex}",
-                styles =
-                    TextLinkStyles(
-                        style =
-                            SpanStyle(
-                                color = foreground,
-                                background = vocabularyBackground(token.vocabulary?.status, dark),
-                                textDecoration = TextDecoration.None,
-                            )
+    val spans = readerDisplayFormatting(text, formatting).orEmpty()
+    val external = mutableListOf<IntRange>()
+    for ((style, start, end) in spans) {
+        when (style) {
+            is ReaderTextStyle.Heading ->
+                addStyle(
+                    SpanStyle(
+                        fontWeight = FontWeight.Bold,
+                        fontSize = (1.75f - style.value.toInt() * 0.125f).em,
                     ),
-                linkInteractionListener = { onToken(token.tokenIndex) },
-            ),
+                    start,
+                    end,
+                )
+            ReaderTextStyle.Emphasis ->
+                addStyle(SpanStyle(fontStyle = FontStyle.Italic), start, end)
+            ReaderTextStyle.Strong -> addStyle(SpanStyle(fontWeight = FontWeight.Bold), start, end)
+            is ReaderTextStyle.ExternalLink -> {
+                // Malformed nested source links still produce disjoint click targets.
+                for (range in readerUncoveredRanges(start, end, external)) {
+                    addLink(
+                        LinkAnnotation.Url(
+                            style.value,
+                            TextLinkStyles(
+                                SpanStyle(
+                                    color = linkColor,
+                                    textDecoration = TextDecoration.Underline,
+                                )
+                            ),
+                            linkInteractionListener = { onExternalLink(style.value) },
+                        ),
+                        range.first,
+                        range.last + 1,
+                    )
+                    external.add(range)
+                }
+            }
+        }
+    }
+    for ((token, start, end) in tokens) {
+        addStyle(
+            SpanStyle(background = vocabularyBackground(token.vocabulary?.status, dark)),
             start,
             end,
         )
+        // Source website links own their tap area; the remaining token fragments
+        // retain the full original dictionary identity and vocabulary highlight.
+        for (range in readerUncoveredRanges(start, end, external)) {
+            addLink(
+                LinkAnnotation.Clickable(
+                    tag = "reader_token_${token.tokenIndex}",
+                    styles =
+                        TextLinkStyles(
+                            style =
+                                SpanStyle(
+                                    color = foreground,
+                                    background =
+                                        vocabularyBackground(token.vocabulary?.status, dark),
+                                    textDecoration = TextDecoration.None,
+                                )
+                        ),
+                    linkInteractionListener = { onToken(token.tokenIndex) },
+                ),
+                range.first,
+                range.last + 1,
+            )
+        }
     }
 }
 
@@ -228,9 +286,26 @@ internal fun ReaderWords(view: ViewModel, dispatch: (Event) -> Unit, onInteracti
     val currentInteraction by rememberUpdatedState(onInteraction)
     val dark = isSystemInDarkTheme()
     val foreground = MaterialTheme.colorScheme.onSurface
+    val linkColor = MaterialTheme.colorScheme.primary
+    val uriHandler = LocalUriHandler.current
     val text =
-        remember(key, page.text, tokens, dark, foreground) {
-            readerAnnotatedText(page.text, tokens.orEmpty(), dark, foreground) { index ->
+        remember(key, page, tokens, dark, foreground, linkColor, uriHandler) {
+            readerAnnotatedText(
+                page.text,
+                tokens.orEmpty(),
+                dark,
+                foreground,
+                page.formatting,
+                linkColor,
+                onExternalLink = { target ->
+                    currentInteraction()
+                    try {
+                        uriHandler.openUri(target.toUri().normalizeScheme().toString())
+                    } catch (_: IllegalArgumentException) {
+                        // No external browser can handle this source URL.
+                    }
+                },
+            ) { index ->
                 currentInteraction()
                 selectedIndex = index
             }

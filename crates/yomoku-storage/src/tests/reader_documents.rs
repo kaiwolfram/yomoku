@@ -4,6 +4,7 @@ use yomoku_core::{
     document::{DocumentId, PasteText, ReaderDocument, TextOffset},
     pagination::{LogicalPages, PageLength, ReadingPosition},
     reader::{DocumentReaderSnapshot, ReaderAnalysis, ReaderPage},
+    reader_formatting::ReaderTextStyle,
     vocabulary::{Surface, VocabularyStatus},
 };
 
@@ -165,6 +166,30 @@ fn all_formats_have_complete_read_only_snapshots_with_original_analysis_ids() {
         );
     }
     let snapshot = snapshot(&mut storage, epub.document.document_id);
+    snapshot.validate().unwrap();
+    let first = &snapshot.document.chapters[0];
+    let styles = &snapshot.document.formatting[0];
+    assert_eq!(styles.chapter_id, first.chapter_id);
+    assert_eq!(styles.spans.len(), 4); // Inert internal link has no reader annotation.
+    for (style, expected) in [
+        (ReaderTextStyle::Heading(1), "第一章 出会い"),
+        (ReaderTextStyle::Emphasis, "出会い"),
+        (ReaderTextStyle::Strong, "𠮷😀"),
+        (
+            ReaderTextStyle::ExternalLink("https://example.org/book?q=1&x=2".into()),
+            "外部",
+        ),
+    ] {
+        let span = styles
+            .spans
+            .iter()
+            .find(|span| span.style == style)
+            .unwrap();
+        assert_eq!(span.range.slice(&first.text).unwrap(), expected);
+    }
+    let page = ReaderPage::open_document(&snapshot.document, snapshot.page_length).unwrap();
+    assert_eq!(page.formatting, styles.spans);
+    assert!(snapshot.document.formatting[1].spans.is_empty());
     assert_eq!(
         snapshot.document.chapters,
         epub.document

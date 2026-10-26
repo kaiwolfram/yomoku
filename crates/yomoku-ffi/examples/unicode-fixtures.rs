@@ -73,6 +73,26 @@ fn main() -> Result<(), Box<dyn Error>> {
     let ordered = ReaderDocument {
         document_id: DocumentId::try_from(i64::MAX)?,
         title: "章 📖".into(),
+        formatting: vec![yomoku_core::reader_formatting::ReaderChapterFormatting {
+            chapter_id: ChapterId::try_from(i64::MAX - 2)?,
+            spans: [
+                yomoku_core::reader_formatting::ReaderTextStyle::Heading(2),
+                yomoku_core::reader_formatting::ReaderTextStyle::Emphasis,
+                yomoku_core::reader_formatting::ReaderTextStyle::Strong,
+                yomoku_core::reader_formatting::ReaderTextStyle::ExternalLink(
+                    "https://example.org/本".into(),
+                ),
+            ]
+            .into_iter()
+            .map(|style| yomoku_core::reader_formatting::ReaderTextSpan {
+                range: yomoku_core::document::TextRange {
+                    start: TextOffset::START,
+                    end: TextOffset::at(CASES[2].0, CASES[2].0.len()).unwrap(),
+                },
+                style,
+            })
+            .collect(),
+        }],
         finished_at_least_once: true,
         chapters: CASES
             .iter()
