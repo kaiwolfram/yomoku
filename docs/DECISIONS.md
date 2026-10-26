@@ -2345,3 +2345,47 @@ Future Android callers must offload bounded decoding from the FIFO callback and
 discard results for disposed requests. This step adds no production Android image
 caller, decoder, cache, rendering, dimensions or viewer. No new dependency,
 migration, permission or data-destructive behavior.
+
+
+## 2026-10-26 — Bounded Android EPUB raster presentation
+
+Use the existing Android BitmapFactory API rather than adding a dependency for
+this raster slice. Follow Android's [bounds-first sampled decoding guidance](https://developer.android.com/topic/performance/graphics/load-bitmap)
+and [BitmapFactory.Options contract](https://developer.android.com/reference/android/graphics/BitmapFactory.Options):
+read dimensions without allocating the bitmap, use power-of-two inSampleSize,
+disable density scaling and request ARGB_8888. Bound source edges to 32768 and
+source pixels to 100 million before decoding. Bound sampled edges to 2048 and
+actual allocated pixels to each asset's share of a 4,194,304-pixel current-page
+budget (16 MiB ARGB); check actual allocation afterward and fall back on failure.
+This bounds retained pixels without an unbounded cache on image-heavy pages.
+Published bitmap reclamation remains GC/RenderThread-owned, so this is not a total
+process-heap cap. A single CoreSession-owned executor serializes the complete
+read/decode pipeline, including across rapidly disposed pages, to avoid accumulating
+encoded BLOBs or concurrent decoders. One-shot FIFO callbacks only submit work.
+
+Share one decoded image per distinct current-page asset. DisposableEffect cancels
+queued reads and delivery closures on movement/reflow/settings/recreation; accepted
+native reads drain but disposed results never update UI. Explicit Retry reloads the
+current page's assets. Session close shuts down the decoder; only unpublished stale
+bitmaps recycle explicitly. Do not touch progress, vocabulary, time or core errors.
+
+Split the existing AnnotatedString at strictly validated U+FFFC scalar ranges and
+render full-column images between its slices. Existing token closures retain full
+identities after clipping. Keep source width/height separate from sampled bitmap
+rounding and draw at the source ratio. Pathological tall images shrink within an
+8192-physical-pixel frame, preserving ratio and safe Compose constraints. Alt text
+remains available on images and on loading/failure placeholders. Static platform
+raster decoding is the delivered slice; unsupported codecs, SVGs and corrupt data
+show a retryable fallback. SVG support, cover cache and shared viewer stay unchecked;
+no dependency/version, schema, permission or destructive-semantics change.
+
+
+The image/link regression exposed default Compose minimum touch-target expansion:
+tapping the adjacent inert `note` after a short `site` link also launched the
+browser. Scope a delegated LocalViewConfiguration with zero minimum touch-target
+size to reader AnnotatedString Text blocks only, keeping exact source link/word
+hit areas and accessibility link semantics. Buttons, status choices and other
+controls retain their usual targets. Android documents the [default expanded
+click targets](https://developer.android.com/develop/ui/compose/accessibility/api-defaults#minimum-touch-target-sizes).
+A real browser-monitor test taps both link and adjacent inert text around an image;
+word-span/dictionary regressions cover the narrower inline text hit areas.

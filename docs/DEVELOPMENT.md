@@ -3027,3 +3027,50 @@ semantics or permission change. Complete reader snapshot integrity reads still
 repeat; large-book costs remain unmeasured. Standalone Full/index/Python fixtures,
 release, process-death/reboot, tablet/dark and physical arm64 were not rerun;
 physical arm64 remains user-deferred.
+
+
+## Bounded inline EPUB raster decoding and rendering
+
+2026-10-26; use the Rust PATH/JDK/SDK/Gradle environment above. Commands:
+
+```sh
+tools/format-kotlin.sh --check
+git diff --check
+./android/gradlew -p android :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug --offline --console=plain
+./android/gradlew -p android :app:connectedDebugAndroidTest :app:lintDebug -Pandroid.testInstrumentationRunnerArguments.class=app.yomoku.EpubImageDecodeTest,app.yomoku.EpubImageLoaderTest,app.yomoku.ReaderImagesTest,app.yomoku.ReaderFormattingTest,app.yomoku.ReaderNavigationTest,app.yomoku.EpubAssetBridgeTest --offline --console=plain
+./android/gradlew -p android :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=app.yomoku.EpubImageDecodeTest,app.yomoku.EpubImageLoaderTest,app.yomoku.ReaderImagesTest --offline --console=plain
+./android/gradlew -p android :app:connectedDebugAndroidTest :app:lintDebug -Pandroid.testInstrumentationRunnerArguments.class=app.yomoku.EpubImageDecodeTest,app.yomoku.EpubImageLoaderTest,app.yomoku.ReaderImagesTest,app.yomoku.ReaderFormattingTest,app.yomoku.ReaderWordsTest,app.yomoku.ReaderWordSpansTest --offline --console=plain
+```
+
+The initial 13-test API-36 x86_64 run passed (six new image cases, formatting,
+asset JNI and five navigation/completion regressions). The strengthened six-test
+run caught a real neighboring-link hit-area issue: tapping inert text beside a
+short website link launched the browser through Compose's expanded target. A
+local text-only ViewConfiguration disables that expansion while preserving link
+semantics and normal targets elsewhere. The final expanded 20-test run passed,
+including all six image cases, formatting and thirteen word/span regressions
+(26 distinct passing cases across both successful runs).
+Both-ABI debug/test APK packaging, strict lint and Kotlin formatting/diff passed.
+Reports/results: `.local/test-reports/epub-image-rendering/`.
+
+Decoder fixtures check PNG/JPEG, source dimensions versus sampled rounding,
+pixel/edge budgets, one-pixel sampling, CRC-valid excessive dimensions, malformed,
+empty, SVG and >32 MiB data. Controlled callback/decode fixtures verify off-main
+decoding, main delivery, one read/decode at a time, queue cancellation, late
+results/close, mismatched media/errors/explicit retry and safe unpublished-bitmap
+recycling. UTF-8/UTF-16 fixtures include emoji, supplementary kanji, adjacent and
+image-only placements and malformed/overlapping ranges. Actual EPUB Compose tests
+check source order, visible image pixels, source ratio, shared assets, clipping of
+strong/link annotations, browser launch versus adjacent inert text, dictionary
+identity, recreation, chapter navigation, image-only chapters, reflow and
+unsupported-image fallback/retry without moving position.
+
+Gradle/adb sandbox sockets failed; approved outside-sandbox offline commands
+accessed the emulator; both final suites passed. Started the existing AVD with
+documented swangle/KVM flags without wiping data. No dependency/version, native
+payload/API, schema, permission or destructive-semantics changes. Rust/host JNI/
+binding-repeat/standalone Full/index/Python, release, process-death/reboot,
+tablet/dark and physical arm64 were not rerun for this Android-only slice;
+physical arm64 remains user-deferred. SVG rendering, cover caching, viewer and
+source ruby remain open. Ordinary reader operations still repeat complete EPUB
+integrity reads; large-book costs and total process heap remain unmeasured.

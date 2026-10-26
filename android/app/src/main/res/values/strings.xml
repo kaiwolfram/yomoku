@@ -89,4 +89,7 @@
     <string name="error_empty_srt">This SRT file has no readable text.</string>
     <string name="error_empty_txt">This TXT file has no readable text.</string>
     <string name="error_invalid_epub">This EPUB is invalid, unsupported, or exceeds import limits.</string>
+    <string name="reader_image">Book image</string>
+    <string name="reader_image_loading">Loading image…</string>
+    <string name="reader_image_unavailable">Image unavailable.</string>
 </resources>

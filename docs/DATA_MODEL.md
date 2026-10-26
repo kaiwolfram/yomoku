@@ -23,7 +23,8 @@ range, resolved container path and separate alt text. Alt/ruby readings are neve
 analyzed as body text. Preserve repeated placements, storing bytes once per path.
 SVG image wrappers resolve `href`/`xlink:href`; SVG spine items become image-only
 chapters. EPUB 3 cover-image and EPUB 2 cover metadata resolve to the image map.
-No image dimensions, bitmap decoding, cover cache or reader rendering yet.
+Image dimensions/bitmaps are transient Android presentation data; no dimensions or
+cover cache are persisted. Platform raster images now render at source positions.
 
 Stored/Deflate ZIP reading is memory-only. Resolve relative/percent-encoded paths
 once, reject traversal outside the container, aliases/duplicate entries, symlinks,
@@ -147,8 +148,10 @@ or unrelated assets; ordinary reader loads retain their full integrity checks.
 No cache, write, reanalysis, history or progress change occurs. Reimport's new
 document ID prevents old requests from addressing the replacement. Runtime
 enqueues reads on the existing FIFO and delivers one-shot typed JNI callbacks
-outside core state. Decoding, rendering, covers and viewer remain separate work;
-no schema migration is needed.
+outside core state. Android now performs bounds-first sampled raster decoding and
+source-position rendering outside persisted/core data. Per-page shared bitmaps and
+dimensions are transient; covers, SVG rendering and viewer remain unfinished.
+No schema migration is needed.
 
 `open_document_reader_snapshot` alone resets finished books to the first chapter's
 start. Snapshot/analysis/settings validation and reset share one immediate

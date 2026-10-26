@@ -47,7 +47,7 @@ class MainActivity : ComponentActivity() {
                         if (core.view.settingsOpen) Event.CloseSettings else Event.CloseDocument
                     )
                 }
-                YomokuApp(core.view, core::dispatch, core::onReaderInteraction) {
+                YomokuApp(core.view, core::dispatch, core::onReaderInteraction, core.images) {
                     // Providers frequently label SRT as text/plain or application/octet-stream.
                     // Validate the literal display-name extension in FileImports.
                     filePicker.launch(arrayOf("*/*"))

@@ -1,14 +1,12 @@
 # Resume here
-Updated: 2026-10-26. Bounded verified EPUB image reads now reach typed JNI.
+Updated: 2026-10-26. Bounded off-main raster EPUB images now render in the reader.
 ## Working
-- Pure Crux routes/Library/Settings; Render-only UI; FIFO SQLite/analysis. Starts Library.
-- Exact chapter-local UTF-8 position/whole-book Library percentage + five presets
-  persist; reflow preserves offset. Scroll resets on movement/reopen; column 720dp.
-  Next/Previous/counter below content; net 48dp swipes need no bottom. Previous saves
-  position only. Busy/pending gates reject duplicates; deliberate rereads count.
-- Imports atomically deduplicate original-byte SHA-256, store original B + unique
-  registrations. Existing preserves title/status/progress without Full/rescan/writes.
-  Created/Existing show dismissible Library summary; never auto-open. Nostr empty.
+- Pure Crux routes/Library/Settings; Render-only UI; FIFO SQLite/analysis; Library start.
+- Chapter-local UTF-8 position/whole-book percentage/five presets persist; reflow
+  preserves offsets. Scroll resets; 720dp column; controls below content; 48dp swipes.
+  Previous only saves position; busy gates reject doubles; deliberate rereads count.
+- Atomic SHA-256 imports store original B/unique registrations. Existing preserves
+  title/status/progress without Full/rescan/writes. Summary returns Library; no auto-open.
 - Generic loads are read-only; explicit finished-book open alone resets first
   chapter/page/preset/B atomically. Finish survives movement/time/reflow; deletion
   resets it while preserving history. Missing analysis never rescans.
@@ -32,11 +30,10 @@ Updated: 2026-10-26. Bounded verified EPUB image reads now reach typed JNI.
   ID + duration. One transaction writes occurrences, New-only Known/history/time/
   position/finish. Exact retries; AlreadyRecorded/zero silent, positive toast once.
   Only new final-book completion returns Library + 1.4s confetti. Images count no words.
-- NativeBridge consumes owned verified FD+1; Rust rehashes/maps/closes every path.
-  FIFO releases Full in background; mapped inodes immutable. Pinned 2026-10-25
-  JMdict English/JMnedict + notices bundled; word index lazy until close/query failure.
-- TXT strict UTF-8/Shift-JIS/Aozora and SRT shared decoder (no Aozora) preserve
-  original bytes/filename/encoding/canonical ruby or cues/B. First interpretation wins.
+- Verified FD+1/mapped Full releases in background; pinned 2026-10-25 English
+  JMdict/JMnedict/notices bundled. Word index stays lazy until close/query failure.
+- TXT/SRT strict UTF-8/Shift-JIS preserve original bytes/filename/encoding/B and
+  canonical Aozora ruby or SRT cues; exact duplicate's first interpretation wins.
 - Retained FileImports reads one mixed EPUB/TXT/SRT URI off main, routes literal
   case-insensitive extensions; wildcard picker accepts generic MIME. TXT/SRT have
   separate encoding/Skip/errors; EPUB none. Filename/X-of-N/progress/summary survive
@@ -46,33 +43,38 @@ Updated: 2026-10-26. Bounded verified EPUB image reads now reach typed JNI.
   native return + outcome before clearing/draining. Dedicated cancellation executor.
 - dataSync lease tracks counts/name only; OS limits apply. Encoding releases it;
   permission never blocks. Timeout stops lease then Cancel. Notification tap opens Library.
-- EPUB bounded parser ignores CSS. Migration 0014 stores original bytes/hash/metadata,
-  ordered chapter formatting/ruby/links/shared images + B/registration atomically.
-  Loader verifies digests/counts/anchors/ownership without parsing. Every reader
-  snapshot operation still verifies full source/assets; large-book cost unmeasured.
+- Bounded EPUB parser ignores CSS; migration 0014 atomically saves original source,
+  ordered content/formatting/ruby/images/B/registration. Snapshot loads verify all
+  source/assets without parsing; large-book costs remain unmeasured.
 - ReaderDocument carries keyed validated heading/emphasis/strong/HTTP(S) spans;
   ReaderPage clips to page-local UTF-8; generated JNI/Compose preserve exact text.
   Website tap areas open browser, retain vocabulary backgrounds; remaining token
   fragments keep full dictionary identity. Internal/other source links stay inert.
   Recreation/chapter navigation retain styles. No CSS/TOC; ruby not transported.
-- ReaderDocument carries keyed image placeholder ranges/alt/container keys/media;
-  ReaderPage selects/rebases whole placeholders. Shared assets retain identity;
-  scalar/order/ownership validation rejects bad references. No image BLOBs in state.
-  NativeBridge.loadEpubImageAsset reads one live document-scoped key on FIFO,
-  validates expected media/SHA-256 and gates SQL BLOB copy at 32 MiB. One-shot typed
-  callbacks drain after close; no dictionary/Render/state writes or unrelated BLOBs.
-  No production Android caller, decoding/rendering, dimensions, covers or viewer yet.
+- ReaderDocument carries validated page-local image placeholders/alt/asset metadata;
+  no image BLOBs in state. One-shot FIFO asset reads verify live document ownership,
+  expected media/SHA-256 and 32 MiB cap without dictionaries or core/state writes.
+- CoreSession-owned decoder serializes asset read/decode across pages. Bounds-first
+  BitmapFactory rejects >32768-edge/100 MP sources, samples to <=2048-edge and each
+  distinct asset's share of 16 MiB page pixels. Repeated assets share one bitmap.
+  Disposed/reflow/recreation requests cancel delivery; accepted callbacks drain.
+- Compose splits existing annotated text at exact U+FFFC scalars; raster images keep
+  source position/ratio (extreme tall images shrink within 8192px). Offsets/styles/
+  word/link identities stay intact. Local text-only zero minimum touch targets stop
+  short links capturing adjacent inert text. Other controls retain normal targets.
+  Alt/loading/failure + explicit Retry; SVG/platform-unsupported images fall back.
+  No persistent cache/dimensions, cover UI or full-screen viewer yet.
 ## Next tasks (ordered)
-1. Off-main bounded EPUB decoding + source-position/ratio rendering using the new
-   callback API; discard disposed requests. Then cover cache/shared zoom/pan viewer.
-2. Bundle Noto Serif JP; font/line settings and default-off source/analyzer furigana.
-3. Add CI host Rust/Kotlin checks and unsigned Android builds (independent).
+1. Complete SVG rendering and EPUB cover cache (review any new dependency first).
+2. Add shared full-screen image zoom/pan; verify phone/tablet rotation.
+3. Bundle Noto Serif JP/font/line/default-off furigana; CI host/unsigned builds is
+   independent. Physical arm64 remains user-deferred; Nostr empty, Q188 unresolved.
 ## Verification
-- 425 data-free Rust tests, strict Clippy/Rust+Kotlin formatting/diff, real-Full
-  Kotlin/JNI + seven Unicode exchanges and repeatable native bindings pass.
-- Both-ABI debug/test APKs + strict lint pass. Five focused API-36 x86_64 asset/
-  document/formatting tests pass. Reports: .local/test-reports/epub-image-assets/;
-  exact commands/fixed test assumptions/unrun checks: DEVELOPMENT.md end.
-- Gradle needed approved outside-sandbox lock-service sockets. Existing AVD remains
-  running; no wipe. No open blocker or dependency/migration/Q188 change. Decode/
-  render/covers/viewer remain next. Large EPUB costs unmeasured; arm64 deferred.
+- Both-ABI debug/test APKs, strict lint, Kotlin formatting/diff pass. API-36 x86_64:
+  final 20 image/word/formatting tests + earlier 13 navigation/asset tests pass
+  (26 distinct cases). Fixed adjacent-link hit-area failure; no open blocker.
+- Reports: .local/test-reports/epub-image-rendering/. Exact commands, failure/fix,
+  remaining limits and unrun checks: DEVELOPMENT.md end. Prior 425 Rust tests,
+  strict Clippy/host JNI/repeat bindings remain the unchanged Rust/FFI baseline.
+- Gradle/adb needed approved outside-sandbox sockets. Existing AVD was started
+  without a wipe and remains running. No dependency/schema/permission change.

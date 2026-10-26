@@ -16,7 +16,12 @@ internal object FileImportFixtures {
             .apply { if (gate != null) appendQueryParameter("gate", gate) }
             .build()
 
-    fun epub(title: String, firstBody: String = "<h1>猫</h1><p>猫と犬。</p>"): ByteArray {
+    fun epub(
+        title: String,
+        firstBody: String = "<h1>猫</h1><p>猫と犬。</p>",
+        images: Map<String, Pair<String, ByteArray>> = emptyMap(),
+        secondBody: String = "<p>鳥と魚。</p>",
+    ): ByteArray {
         val output = ByteArrayOutputStream()
         ZipOutputStream(output).use { zip ->
             fun entry(path: String, text: String) {
@@ -39,6 +44,7 @@ internal object FileImportFixtures {
                 </metadata><manifest>
                 <item id="one" href="one.xhtml" media-type="application/xhtml+xml"/>
                 <item id="two" href="two.xhtml" media-type="application/xhtml+xml"/>
+                ${images.entries.mapIndexed { index, (path, image) -> "<item id='image$index' href='$path' media-type='${image.first}'/>" }.joinToString("")}
                 </manifest><spine><itemref idref="one"/><itemref idref="two"/></spine></package>""",
             )
             entry(
@@ -47,8 +53,13 @@ internal object FileImportFixtures {
             )
             entry(
                 "two.xhtml",
-                """<html xmlns="http://www.w3.org/1999/xhtml"><body><p>鳥と魚。</p></body></html>""",
+                """<html xmlns="http://www.w3.org/1999/xhtml"><body>$secondBody</body></html>""",
             )
+            for ((path, image) in images) {
+                zip.putNextEntry(ZipEntry(path))
+                zip.write(image.second)
+                zip.closeEntry()
+            }
         }
         return output.toByteArray()
     }

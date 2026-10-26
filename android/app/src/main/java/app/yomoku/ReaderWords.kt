@@ -248,7 +248,12 @@ internal fun readerAnnotatedText(
 }
 
 @Composable
-internal fun ReaderWords(view: ViewModel, dispatch: (Event) -> Unit, onInteraction: () -> Unit) {
+internal fun ReaderWords(
+    view: ViewModel,
+    dispatch: (Event) -> Unit,
+    onInteraction: () -> Unit,
+    imageLoader: EpubImageLoader? = null,
+) {
     val page = view.reader ?: return
     val key = view.readerAnalysis?.let { ReaderTokenKey(page.documentId, page.anchor, it) }
     val snapshot = view.readerTokens
@@ -310,11 +315,7 @@ internal fun ReaderWords(view: ViewModel, dispatch: (Event) -> Unit, onInteracti
                 selectedIndex = index
             }
         }
-    Text(
-        text,
-        style = MaterialTheme.typography.bodyLarge,
-        modifier = Modifier.testTag("reader_text"),
-    )
+    ReaderImageContent(page, text, imageLoader, onInteraction)
     if (
         key != null &&
             snapshot == null &&

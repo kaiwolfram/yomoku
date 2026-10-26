@@ -151,7 +151,12 @@ internal fun PasteScreen(
 }
 
 @Composable
-internal fun ReaderScreen(view: ViewModel, dispatch: (Event) -> Unit, onInteraction: () -> Unit) {
+internal fun ReaderScreen(
+    view: ViewModel,
+    dispatch: (Event) -> Unit,
+    onInteraction: () -> Unit,
+    imageLoader: EpubImageLoader? = null,
+) {
     val scroll = remember(view.reader?.documentId, view.reader?.anchor) { ScrollState(0) }
     val page = view.reader
     val canNavigate =
@@ -211,7 +216,7 @@ internal fun ReaderScreen(view: ViewModel, dispatch: (Event) -> Unit, onInteract
             if (page.finishedAtLeastOnce) {
                 FinishedCheckmark(Modifier.testTag("reader_finished"))
             }
-            ReaderWords(view, dispatch, onInteraction)
+            ReaderWords(view, dispatch, onInteraction, imageLoader)
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,

@@ -82,6 +82,18 @@ internal class CoreSession(
     // Platform import sequencing observes committed core outcomes, on the main thread.
     var onViewChanged: (() -> Unit)? = null
 
+    val images =
+        EpubImageLoader(
+            read = { key, listener ->
+                bridge.loadEpubImageAsset(
+                    key.documentId,
+                    key.asset.path,
+                    key.asset.mediaType,
+                    listener,
+                )
+            }
+        )
+
     init {
         dispatch(Event.RefreshLibrary)
     }
@@ -233,6 +245,7 @@ internal class CoreSession(
     override fun close() {
         requireMainThread()
         if (!closing) {
+            images.close()
             pauseClock()
             closing = true
             readerActive = false

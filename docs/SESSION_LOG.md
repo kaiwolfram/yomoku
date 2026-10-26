@@ -1801,3 +1801,26 @@
   bounded Android decoding/stale-result disposal/source-position rendering, covers
   and shared viewer; Noto/font/furigana and CI remain next. Large-book costs and
   physical arm64 remain unmeasured/deferred; other unrun checks in DEVELOPMENT.md.
+
+
+## 2026-10-26 — Bounded inline EPUB raster images
+
+- Added CoreSession-owned single-asset read/decode pipeline, bounds-first sampled
+  BitmapFactory decoding, 16 MiB page pixel budget and shared current-page assets.
+  Disposed/closed requests suppress late results; unpublished bitmaps recycle.
+- Rendered verified U+FFFC source placements between existing annotated text slices,
+  retaining source ratio, offsets, styles, word identities and website links.
+  Added alt/loading/error/explicit retry; SVG remains a supported-data fallback.
+- Six new image tests cover decoding/limits, Unicode placement, pipeline disposal,
+  actual pixels/source order/ratio, links/words, reflow/recreation and image-only
+  chapters. A stronger inert-text tap test caught Compose link target expansion;
+  fixed with a reader-text-only minimum-target override and reran word regressions.
+- PASS: both-ABI debug/test APKs, strict lint, Kotlin formatting/diff, initial 13
+  and final 20 API-36 x86_64 tests (26 distinct). Reports/commands/failure details:
+  .local/test-reports/epub-image-rendering/ and DEVELOPMENT.md end.
+- Gradle/adb sandbox socket failures required approved outside-sandbox runs. Started
+  existing AVD without wiping data; remains running. No open verification blocker,
+  dependency/version, native API, schema, permission or destructive-semantics change.
+- Updated plan/architecture/data/decisions/README/handoff. SVG rendering, cover cache,
+  shared zoom/pan viewer, font/furigana and CI remain. No Rust/host JNI/release/
+  process-death/tablet/dark rerun; physical arm64 remains user-deferred.

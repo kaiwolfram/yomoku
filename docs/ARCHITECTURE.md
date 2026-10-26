@@ -83,9 +83,29 @@ before enqueue. Reads do not repair or write anything.
 
 The per-request listener runs once on the FIFO worker and drops after delivery;
 accepted reads drain even after bridge closure. Callbacks must remain nonblocking.
-The platform must decode on another worker and discard responses for disposed
-document/page requests. No Android production caller/decoder is connected yet.
-Decoding/rendering, cover cache, source ruby and the shared viewer remain next.
+Android's retained CoreSession owns an EpubImageLoader with one decode executor.
+Its pipeline allows one encoded asset read/decode at a time across page changes;
+callbacks only hand off work, leaving the Rust FIFO free for persistence. Each
+page decodes distinct assets once and shares bitmaps across repeated placements.
+The 4,194,304-pixel page budget is divided among distinct assets (16 MiB ARGB),
+with a 2048-pixel sampled edge limit. BitmapFactory reads bounds first, rejects
+sources above 32768 pixels per edge/100 megapixels and power-of-two samples before
+allocation; actual allocation is checked too. Dimensions retain the source ratio.
+Disposed page requests release their delivery closures, remove queued work and
+suppress late decode/delivery. Close cancels the queue and shuts down the executor;
+accepted native callbacks still drain. Only unpublished discarded bitmaps recycle
+explicitly; Compose/RenderThread may retain already published images until GC.
+Compose replaces verified whole U+FFFC scalars with images between slices of the
+existing AnnotatedString, retaining clipped styles and full dictionary identities.
+Inline annotated text disables minimum-target expansion locally, preventing short
+website links from capturing nearby inert text or other vocabulary glyphs. Link
+semantics remain available for accessibility; other controls retain normal targets.
+Normal images fill the text column at source ratio; extremely tall images shrink
+within an 8192-physical-pixel frame while retaining ratio. Canonical text/anchors,
+pagination, time and counts do not change. Unsupported/corrupt raster or SVG bytes
+show source alt text and an explicit Retry without changing reader storage errors.
+Platform BitmapFactory raster formats are supported; SVG rendering, cover caching,
+source ruby and the shared zoom/pan viewer remain unfinished.
 
 Shared file preflight and TXT/SRT/EPUB Existing results now carry `LibraryDocument`
 references (ID, title, whole-book progress, permanent finish marker). Exact-byte
