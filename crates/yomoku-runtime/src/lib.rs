@@ -8,6 +8,7 @@ use crux_core::{
 };
 use yomoku_core::app::{Effect, Yomoku};
 
+mod epub_assets;
 mod storage;
 use storage::StorageEffects;
 pub use storage::WordDictionaryLoader;

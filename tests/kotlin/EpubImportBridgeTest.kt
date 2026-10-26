@@ -83,6 +83,7 @@ internal fun verifyEpubImportBridge() {
             val summary = checkNotNull(imported.importSummary)
             check(summary.outcome == ImportOutcome.CREATED && summary.title == "日本語の本 & EPUB")
             val id = summary.documentId
+            verifyEpubAssetReads(bridge, id)
             val loaded = checkNotNull(listener.dispatch(bridge, Event.LoadPaste(id)).loadedDocument)
             check(loaded.chapters.size == 2 && loaded.chapters[1].text == text)
             check(loaded.chapters[0].text == File("crates/yomoku-import/tests/fixtures/epub/first-expected.txt").readText().trimEnd('\n'))
@@ -137,6 +138,7 @@ internal fun verifyEpubImportBridge() {
         }
         val fresh = HostDictionary().also { it.fail = true }
         NativeBridge(database.path, listener, fresh).use { bridge ->
+            verifyEpubAssetReads(bridge, id)
             val duplicate = listener.dispatch(bridge, epubEvent(bytes, ""))
             check(duplicate.importSummary?.documentId == id && duplicate.importSummary.outcome == ImportOutcome.EXISTING)
             val loaded = checkNotNull(listener.dispatch(bridge, Event.LoadPaste(id)).loadedDocument)
@@ -162,11 +164,37 @@ internal fun verifyEpubImportBridge() {
             val cross = listener.dispatch(bridge, epubEvent(plain, ""))
             check(cross.importSummary?.documentId == imported.importSummary?.documentId && cross.importSummary?.outcome == ImportOutcome.EXISTING)
         }
+        verifyEpubAssetAfterClose(database, id)
         verifyEpubCancellationBridge()
         println("PASS: typed EPUB whole-book import, real Full per-chapter Mode B, container errors, duplicates/status/progress/reopen and direct Cancel JNI")
     } finally {
         directory.deleteRecursively()
     }
+}
+
+private fun verifyEpubAssetAfterClose(database: File, id: DocumentId) {
+    val entered = CountDownLatch(1)
+    val release = CountDownLatch(1)
+    val provider = object : DictionaryProvider {
+        override fun verifiedWordDictionaryPath(): String = error("no word lookup")
+        override fun openVerifiedDictionary(): Long {
+            entered.countDown()
+            check(release.await(60, TimeUnit.SECONDS))
+            return 0L
+        }
+    }
+    val bridge = NativeBridge(database.path, EpubListener(), provider)
+    val response = AssetResponse()
+    try {
+        bridge.update(Event.CreatePaste("new queued paste".repeat(2)).bincodeSerialize())
+        check(entered.await(60, TimeUnit.SECONDS))
+        bridge.loadEpubImageAsset(id.value, "OPS/images/挿絵.png", "image/png", response)
+        bridge.close()
+    } finally {
+        release.countDown()
+        bridge.close()
+    }
+    response.awaitBytes("fixture image bytes".toByteArray())
 }
 
 private fun verifyEpubCancellationBridge() {

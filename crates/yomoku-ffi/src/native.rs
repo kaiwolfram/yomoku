@@ -3,7 +3,11 @@
 use crate::{FfiError, YomokuBridge};
 use std::{fs::File, os::fd::FromRawFd, sync::Arc};
 use yomoku_analysis::Analyzer;
-use yomoku_core::{document::ChapterText, storage::DocumentError};
+use yomoku_core::{
+    document::{ChapterText, DocumentId},
+    reader_images::ReaderImageAsset,
+    storage::DocumentError,
+};
 use yomoku_runtime::{AnalyzerLifecycle, PasteAnalyzer};
 
 /// Trusted platform descriptor publisher, called only on the storage worker.
@@ -31,6 +35,24 @@ pub trait EffectsListener: Send + Sync {
     fn on_error(&self, error: FfiError);
 }
 
+#[boltffi::error]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum EpubAssetError {
+    InvalidRequest,
+    NotFound,
+    InvalidDocument,
+    Unavailable,
+}
+
+/// One-shot asset response on the Rust FIFO worker. Keep callbacks nonblocking;
+/// decode images on a separate platform worker and publish only to a still-current
+/// document/page. Accepted callbacks can arrive after NativeBridge.close().
+#[boltffi::export]
+pub trait EpubAssetListener: Send + Sync {
+    fn on_asset(&self, media_type: String, bytes: Vec<u8>);
+    fn on_error(&self, error: EpubAssetError);
+}
+
 /// Each native handle owns an independent application instance.
 pub struct NativeBridge {
     bridge: YomokuBridge,
@@ -39,6 +61,34 @@ pub struct NativeBridge {
 
 #[boltffi::export]
 impl NativeBridge {
+    /// Enqueue one verified image read. This never loads an analyzer or puts
+    /// image bytes into Crux state. Invalid identities fail before enqueue; all
+    /// other outcomes use the per-request listener, retained only until delivery.
+    pub fn load_epub_image_asset(
+        &self,
+        document_id: i64,
+        path: String,
+        media_type: String,
+        listener: Box<dyn EpubAssetListener>,
+    ) -> Result<(), EpubAssetError> {
+        let document_id =
+            DocumentId::try_from(document_id).map_err(|_| EpubAssetError::InvalidRequest)?;
+        let asset = ReaderImageAsset { path, media_type };
+        asset
+            .validate()
+            .map_err(|_| EpubAssetError::InvalidRequest)?;
+        self.lifecycle
+            .load_epub_image_asset(document_id, asset, move |result| match result {
+                Ok(image) => listener.on_asset(image.media_type, image.bytes),
+                Err(error) => listener.on_error(match error {
+                    DocumentError::NotFound => EpubAssetError::NotFound,
+                    DocumentError::InvalidDocument => EpubAssetError::InvalidDocument,
+                    _ => EpubAssetError::Unavailable,
+                }),
+            })
+            .map_err(|_| EpubAssetError::Unavailable)
+    }
+
     pub fn new(
         database_path: String,
         listener: Box<dyn EffectsListener>,

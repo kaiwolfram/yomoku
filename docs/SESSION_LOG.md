@@ -1780,3 +1780,24 @@
   retrieval/decoding and source-position/ratio rendering, covers/shared viewer;
   Noto/font/furigana and CI remain next independent work. Large EPUB costs unmeasured;
   physical arm64 remains user-deferred. Other unrun checks: DEVELOPMENT.md end.
+
+## 2026-10-26 — Bounded EPUB image asset retrieval
+
+- Added read-only single-asset repository checks for live EPUB ownership, opaque
+  key, expected media and SHA-256. SQL caps BLOB copies at the existing 32 MiB
+  import-entry budget; source/unrelated BLOBs stay outside this narrow read.
+- Added one-shot typed JNI asset callbacks on the existing Rust SQLite FIFO,
+  outside pure core state. No dictionary/Render/history/position changes. Accepted
+  reads drain after close; per-request listeners release after delivery/rejection.
+- PASS: 425 data-free Rust tests, strict Clippy/Rust+Kotlin formatting/diff,
+  real-Full host JNI/seven Unicode exchanges, repeatable native bindings, both-ABI
+  debug/test APKs, strict lint and five API-36 x86_64 asset/document/formatting tests.
+  Reports: .local/test-reports/epub-image-assets/; commands/limits: DEVELOPMENT.md end.
+- Fixed only test assumptions about core renders after close, generated error
+  names and Java Thread wrappers. Gradle required approved outside-sandbox socket
+  access; final suites pass. Existing AVD remains running, without a wipe.
+- Updated plan/architecture/data/decisions/README/handoff. No open blocker,
+  dependency/version, schema, permission or destructive-semantics change. Next:
+  bounded Android decoding/stale-result disposal/source-position rendering, covers
+  and shared viewer; Noto/font/furigana and CI remain next. Large-book costs and
+  physical arm64 remain unmeasured/deferred; other unrun checks in DEVELOPMENT.md.

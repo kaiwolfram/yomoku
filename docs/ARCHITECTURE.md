@@ -70,8 +70,22 @@ for shared assets. `ReaderPage.images` selects whole placeholders and translates
 their ranges into page-local UTF-8 without changing text or position. Storage
 resolves metadata from the fully verified saved asset map; image BLOBs stay out
 of core/ViewModel/JNI snapshots. Paths are opaque container keys, never platform
-filenames or URLs. Asset retrieval/decoding/rendering, cover cache, source ruby and
-the shared image viewer remain next work.
+filenames or URLs. `NativeBridge.loadEpubImageAsset` accepts a positive document
+ID plus the path/expected media type and a one-shot typed listener. It enqueues
+a read on the existing SQLite FIFO without a core event, Render or dictionary
+load. Image bytes never enter core state. The repository checks live EPUB
+ownership/metadata, the selected BLOB's SHA-256 and expected media type in one
+read transaction. SQL gates its copy at 32 MiB (the import per-entry budget).
+Unlike ordinary reader loads, this narrow read does not copy/rehash original
+source bytes or unrelated assets. Missing keys/deleted documents, corruption and
+unavailable storage remain distinct responses; invalid request identities fail
+before enqueue. Reads do not repair or write anything.
+
+The per-request listener runs once on the FIFO worker and drops after delivery;
+accepted reads drain even after bridge closure. Callbacks must remain nonblocking.
+The platform must decode on another worker and discard responses for disposed
+document/page requests. No Android production caller/decoder is connected yet.
+Decoding/rendering, cover cache, source ruby and the shared viewer remain next.
 
 Shared file preflight and TXT/SRT/EPUB Existing results now carry `LibraryDocument`
 references (ID, title, whole-book progress, permanent finish marker). Exact-byte

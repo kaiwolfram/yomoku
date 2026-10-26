@@ -9,8 +9,9 @@ use std::{
 
 use crux_core::middleware::{EffectMiddleware, EffectResolver};
 use yomoku_core::{
-    document::PasteText,
+    document::{DocumentId, PasteText},
     reader::ReaderVocabulary,
+    reader_images::ReaderImageAsset,
     storage::{DocumentError, StorageOperation, StorageResult},
 };
 use yomoku_storage::{
@@ -25,6 +26,11 @@ pub type WordDictionaryLoader = Box<dyn FnMut() -> Result<PathBuf, DocumentError
 use crate::imports::{AnalyzerLifecycle, AnalyzerLoader, FileImportControl, Imports};
 
 pub(crate) enum Job {
+    EpubAsset(
+        DocumentId,
+        ReaderImageAsset,
+        crate::epub_assets::AssetCallback,
+    ),
     Storage(
         StorageOperation,
         EffectResolver<StorageResult>,
@@ -84,6 +90,23 @@ impl StorageEffects {
                 let mut imports = loader.map(Imports::new);
                 while let Ok(job) = receiver.recv() {
                     match job {
+                        Job::EpubAsset(document_id, asset, callback) => {
+                            let result = (|| {
+                                asset
+                                    .validate()
+                                    .map_err(|_| DocumentError::InvalidDocument)?;
+                                if storage.is_none() {
+                                    storage = Some(Storage::open(&path).map_err(map_error)?);
+                                }
+                                storage
+                                    .as_mut()
+                                    .expect("opened storage")
+                                    .load_epub_image_asset(document_id, &asset)
+                                    .map_err(map_error)?
+                                    .ok_or(DocumentError::NotFound)
+                            })();
+                            callback(result);
+                        }
                         Job::Storage(operation, mut resolver, cancellation) => {
                             let output = if cancellation
                                 .as_ref()

@@ -18,7 +18,7 @@ with functioning rustup can omit the PATH workaround. Do not assume this compile
 is the project's minimum supported version; establish that with dependencies.
 Cargo.lock is retained for reproducible application development.
 Crux 0.20.0 declares Rust 1.90 minimum; the full locked graph has only been tested
-with 1.99.1. Current host baseline: 417 data-free Rust tests (184 storage, 40
+with 1.99.1. Current host baseline: 425 data-free Rust tests (188 storage, 43
 runtime). Fourteen analysis fixtures and one runtime fixture run separately with
 each Full loader via tools/test-sudachi.sh (see below).
 
@@ -2965,3 +2965,65 @@ integrity reads repeat per operation; large-book costs remain unmeasured. Standa
 Full/index/Python, native-binding repeat generation, release/process-death/reboot,
 tablet/dark and physical arm64 were not rerun. Native ABI signatures are unchanged;
 generated payload codecs were repeat-checked. Physical arm64 remains user-deferred.
+
+## Bounded EPUB image asset retrieval
+
+Verified 2026-10-26 using the Rust PATH/JDK/SDK/Gradle environment above:
+
+```sh
+cargo test -p yomoku-storage epub_asset --locked --offline
+cargo test --workspace --all-features --locked --offline --quiet
+cargo clippy --workspace --all-targets --all-features --locked --offline -- -D warnings
+cargo fmt --all -- --check
+tools/test-kotlin-bridge.sh
+tools/format-kotlin.sh --check
+.local/jdk-17/jdk-17.0.21+9/bin/java -jar .local/ktfmt-0.64.jar --kotlinlang-style --dry-run --set-exit-if-changed tests/kotlin/EpubAssetBridgeTest.kt
+(cd crates/yomoku-ffi && CARGO_NET_OFFLINE=true ../../.local/bin/boltffi generate kotlin --deny-skipped --output ../../target/generated/native-repeat)
+diff -r target/generated/native target/generated/native-repeat
+./android/gradlew -p android :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug --offline --console=plain
+./android/gradlew -p android :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=app.yomoku.EpubAssetBridgeTest,app.yomoku.DocumentSessionTest,app.yomoku.ReaderFormattingTest --offline --console=plain
+git diff --check
+```
+
+PASS: 425 data-free Rust tests (four new repository, three worker and one native
+test), strict Clippy/Rust+Kotlin formatting/diff, real-Full Kotlin/JNI and seven
+Unicode exchanges, repeatable native bindings, both-ABI debug/test APKs and strict
+Android lint. Sixteen external-data fixtures remain ignored by the ordinary
+workspace suite. Existing benign Crux close diagnostics remain in host JNI tests.
+Generated payload codecs are unchanged; the native API adds a one-shot asset
+listener/error and asynchronous request. No dependency/version or schema change.
+
+Repository fixtures verify exact inline/shared/cover bytes, opaque Unicode keys,
+media/digest corruption, absent/deleted/non-EPUB identities, deletion/reimport,
+read-only reopen and no history/position writes. Tests accept exactly 32 MiB and
+reject a larger BLOB, then repair fixture data and retry. A narrow asset read
+intentionally ignores unrelated BLOB/source corruption; ordinary document loads
+retain full integrity checks. Worker fixtures verify no analyzer/index load or
+Render/state change, queued import-before-read, one native thread, lazy-open
+failure/retry, invalid-key rejection before opening and accepted reads draining
+after router closure. Native tests verify invalid requests fail synchronously and
+one-shot listeners release on both rejected and delivered requests.
+
+Host JNI exercises actual imported Unicode asset keys/cover bytes, error objects,
+reopen without Full, unchanged views and a queued asset callback after bridge
+close. All five API-36 x86_64 tests pass: the new asset test submits from Android
+main and checks off-main callbacks, all 256 byte values, analyzer-free reopen,
+media/absent-ID errors and persistent corruption without repairs/state changes;
+three document/session and one EPUB formatting/browser/recreation regressions pass.
+Logs, device reports/results and lint reports: `.local/test-reports/epub-image-assets/`.
+
+Fixed test-only assumptions: a closed core suppresses Render callbacks even as
+queued asset reads drain; native error objects use PascalCase; JNI may create
+different Java Thread wrappers for callbacks on the same Rust FIFO thread. The
+Rust fixture still verifies exact native thread identity; JNI checks off-caller
+delivery. Corrected suites pass. Gradle's sandbox wildcard-IP/lock-service socket
+failed; approved outside-sandbox offline build/device runs pass. The existing
+AVD remained running without a wipe. No open failure/blocker.
+
+No production Android image caller/decoder, dimensions, rendering, cache or viewer
+is added. Next: bounded decoding off the FIFO callback, stale-request disposal and
+source-position/ratio rendering, then covers/shared viewer. No destructive
+semantics or permission change. Complete reader snapshot integrity reads still
+repeat; large-book costs remain unmeasured. Standalone Full/index/Python fixtures,
+release, process-death/reboot, tablet/dark and physical arm64 were not rerun;
+physical arm64 remains user-deferred.

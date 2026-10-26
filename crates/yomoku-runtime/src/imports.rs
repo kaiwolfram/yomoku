@@ -42,7 +42,7 @@ where
 /// A failed load is retryable. The factory is lazy even when Library is refreshed.
 pub type AnalyzerLoader = Box<dyn FnMut() -> Result<Box<dyn PasteAnalyzer>, DocumentError> + Send>;
 
-/// Import worker controls: queued cache policy and direct per-file cancellation.
+/// FIFO worker handle: queued cache policy/image reads and direct file cancellation.
 /// Keeping this handle alive does not retain a closed bridge's worker or callback.
 pub struct AnalyzerLifecycle {
     pub(crate) sender: Weak<mpsc::Sender<Job>>,
@@ -111,7 +111,7 @@ impl FileImportControl {
     }
 }
 
-fn worker_closed() -> std::io::Error {
+pub(crate) fn worker_closed() -> std::io::Error {
     std::io::Error::new(std::io::ErrorKind::BrokenPipe, "import worker closed")
 }
 

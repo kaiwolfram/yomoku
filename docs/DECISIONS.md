@@ -2322,3 +2322,26 @@ placeholders and rebases their UTF-8 ranges without changing canonical text,
 pagination, exact positions or vocabulary/completion/time behavior. Plain documents
 keep empty image metadata. No migration, dependency/version, permission or data-
 destructive semantics change. Rendering/ratio, covers and shared viewer remain open.
+
+## 2026-10-26 — Bounded EPUB asset reads outside reader state
+
+Add a narrow `load_epub_image_asset` repository and native request using the
+existing SQLite FIFO. Keep image bytes out of pure core events/ViewModel: a
+document ID plus validated opaque path/expected media type identifies one asset;
+a per-request typed listener delivers the bytes or a categorized error off main.
+No second database connection, parser pass, analyzer load or Render is required.
+
+Read live EPUB ownership/metadata and the selected asset in one read transaction.
+SQL gates the BLOB copy at 32 MiB, matching the current import-entry budget; verify
+the exact expected media type and saved SHA-256 before delivery. Do not copy or
+rehash the full original container or unrelated images for this narrow operation.
+Normal reader/document loads retain their full integrity checks. Missing/deleted/
+non-EPUB documents or missing keys are distinct from corruption/unavailable I/O;
+invalid native identities fail before enqueue. Reads never repair or write data.
+
+Retain each listener only through its single worker response. Accepted requests
+drain after native close; a weak worker handle alone cannot keep the FIFO alive.
+Future Android callers must offload bounded decoding from the FIFO callback and
+discard results for disposed requests. This step adds no production Android image
+caller, decoder, cache, rendering, dimensions or viewer. No new dependency,
+migration, permission or data-destructive behavior.

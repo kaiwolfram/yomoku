@@ -134,8 +134,21 @@ map. `ReaderPage.images` selects whole placeholders for the current chapter/page
 and translates their ranges into page-local UTF-8. Text, pagination, positions,
 token anchors and completion semantics remain unchanged; images do not add word
 occurrences. Plain documents have no image references. No original source/image
-BLOB, bitmap or dimensions enter reader snapshots. Asset retrieval/decoding,
-rendering, covers and viewer remain separate work; no schema migration is needed.
+BLOB, bitmap or dimensions enter reader snapshots.
+
+`load_epub_image_asset(document_id, ReaderImageAsset)` reads one exact asset key
+in a read transaction, requiring a live EPUB document, EPUB metadata and imported-
+file kind. It validates the opaque key, expected image media type and selected
+asset SHA-256. SQL returns no BLOB above the 32 MiB import-entry budget, before
+copying into Rust/JNI. Missing/deleted/non-EPUB documents and missing keys yield
+None; damaged live metadata, size/media/digest mismatch yield InvalidDocument.
+This narrow read intentionally does not verify/copy source bytes, chapter text
+or unrelated assets; ordinary reader loads retain their full integrity checks.
+No cache, write, reanalysis, history or progress change occurs. Reimport's new
+document ID prevents old requests from addressing the replacement. Runtime
+enqueues reads on the existing FIFO and delivers one-shot typed JNI callbacks
+outside core state. Decoding, rendering, covers and viewer remain separate work;
+no schema migration is needed.
 
 `open_document_reader_snapshot` alone resets finished books to the first chapter's
 start. Snapshot/analysis/settings validation and reset share one immediate

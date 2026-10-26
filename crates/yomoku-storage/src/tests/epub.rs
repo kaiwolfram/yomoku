@@ -864,3 +864,254 @@ fn epub_preserves_repeated_placements_and_case_insensitive_external_link_scheme(
         Some(imported.document)
     );
 }
+
+fn image_asset(path: &str) -> yomoku_core::reader_images::ReaderImageAsset {
+    yomoku_core::reader_images::ReaderImageAsset {
+        path: path.into(),
+        media_type: "image/png".into(),
+    }
+}
+
+#[test]
+fn epub_asset_reads_exact_shared_and_cover_bytes_after_read_only_reopen() {
+    let database = TestDatabase::new();
+    let mut storage = Storage::open(database.path()).unwrap();
+    let imported = created(
+        storage
+            .import_analyzed_epub(&bytes(), "assets.epub", 1, fixture)
+            .unwrap(),
+    );
+    let id = imported.document.document_id;
+    drop(storage);
+    let before = fs::read(database.path()).unwrap();
+    let mut storage = Storage::open(database.path()).unwrap();
+    storage
+        .connection
+        .pragma_update(None, "query_only", true)
+        .unwrap();
+    for _ in 0..2 {
+        for (path, expected) in &imported.document.images {
+            assert_eq!(
+                storage
+                    .load_epub_image_asset(id, &image_asset(path))
+                    .unwrap(),
+                Some(expected.clone())
+            );
+        }
+    }
+    assert_eq!(fs::read(database.path()).unwrap(), before);
+    assert_eq!(totals(&storage)[15..], [0, 0, 0]);
+}
+
+#[test]
+fn epub_asset_keys_are_document_scoped_and_deleted_documents_stay_missing() {
+    let database = TestDatabase::new();
+    let mut storage = Storage::open(database.path()).unwrap();
+    let first = created(
+        storage
+            .import_analyzed_epub(&bytes(), "first.epub", 1, fixture)
+            .unwrap(),
+    );
+    let second = created(
+        storage
+            .import_analyzed_epub(&book(false, "<p>other</p>"), "second.epub", 1, fixture)
+            .unwrap(),
+    );
+    let plain = storage
+        .create_paste(&PasteText::new("plain".into()).unwrap())
+        .unwrap();
+    let asset = image_asset("OPS/images/挿絵.png");
+    // Same key in another book must not supply bytes for the requested book.
+    storage
+        .connection
+        .execute(
+            "UPDATE epub_assets SET bytes = X'00' WHERE document_id = ?1 AND path = ?2",
+            (i64::from(first.document.document_id), &asset.path),
+        )
+        .unwrap();
+    assert!(matches!(
+        storage.load_epub_image_asset(first.document.document_id, &asset),
+        Err(StorageError::InvalidDocument)
+    ));
+    assert!(storage
+        .load_epub_image_asset(second.document.document_id, &asset)
+        .unwrap()
+        .is_some());
+    for id in [
+        plain.document_id,
+        yomoku_core::document::DocumentId::try_from(i64::MAX).unwrap(),
+    ] {
+        assert!(storage.load_epub_image_asset(id, &asset).unwrap().is_none());
+    }
+    assert!(storage
+        .load_epub_image_asset(second.document.document_id, &image_asset("OPS/missing.png"))
+        .unwrap()
+        .is_none());
+    storage
+        .connection
+        .execute(
+            "DELETE FROM documents WHERE id = ?1",
+            [i64::from(first.document.document_id)],
+        )
+        .unwrap();
+    assert!(storage
+        .load_epub_image_asset(first.document.document_id, &asset)
+        .unwrap()
+        .is_none());
+    // Reimport allocates a different live identity; old callbacks cannot address it.
+    let reimported = created(
+        storage
+            .import_analyzed_epub(&bytes(), "again.epub", 2, fixture)
+            .unwrap(),
+    );
+    assert_ne!(first.document.document_id, reimported.document.document_id);
+    assert!(storage
+        .load_epub_image_asset(first.document.document_id, &asset)
+        .unwrap()
+        .is_none());
+    assert!(storage
+        .load_epub_image_asset(reimported.document.document_id, &asset)
+        .unwrap()
+        .is_some());
+}
+
+#[test]
+fn epub_asset_corruption_invalid_keys_and_media_mismatch_fail_without_writes() {
+    for corruption in [
+        "UPDATE epub_assets SET bytes = X'00'",
+        "UPDATE epub_assets SET sha256 = zeroblob(32)",
+        "UPDATE epub_assets SET media_type = 'image/jpeg'",
+        "UPDATE imported_files SET text_encoding = 'utf8'",
+        "DELETE FROM epub_documents",
+    ] {
+        let database = TestDatabase::new();
+        let mut storage = Storage::open(database.path()).unwrap();
+        let imported = created(
+            storage
+                .import_analyzed_epub(&bytes(), "bad.epub", 1, fixture)
+                .unwrap(),
+        );
+        storage.connection.execute_batch(corruption).unwrap();
+        let before = fs::read(database.path()).unwrap();
+        assert!(
+            matches!(
+                storage.load_epub_image_asset(
+                    imported.document.document_id,
+                    &image_asset("OPS/images/挿絵.png")
+                ),
+                Err(StorageError::InvalidDocument)
+            ),
+            "{corruption}"
+        );
+        assert_eq!(fs::read(database.path()).unwrap(), before);
+    }
+    let database = TestDatabase::new();
+    let mut storage = Storage::open(database.path()).unwrap();
+    let id = created(
+        storage
+            .import_analyzed_epub(&bytes(), "keys.epub", 1, fixture)
+            .unwrap(),
+    )
+    .document
+    .document_id;
+    for path in [
+        "",
+        "/OPS/images/挿絵.png",
+        "OPS/../images/挿絵.png",
+        "OPS/./images/挿絵.png",
+        "file:OPS/images/挿絵.png",
+        "OPS\\images\\挿絵.png",
+        "OPS/\0.png",
+    ] {
+        assert!(
+            matches!(
+                storage.load_epub_image_asset(id, &image_asset(path)),
+                Err(StorageError::InvalidDocument)
+            ),
+            "{path:?}"
+        );
+    }
+    let mut wrong_media = image_asset("OPS/images/挿絵.png");
+    wrong_media.media_type = "image/jpeg".into();
+    assert!(matches!(
+        storage.load_epub_image_asset(id, &wrong_media),
+        Err(StorageError::InvalidDocument)
+    ));
+}
+
+#[test]
+fn epub_asset_budget_is_checked_before_copy_and_other_blobs_are_not_loaded() {
+    use sha2::{Digest, Sha256};
+    let database = TestDatabase::new();
+    let mut storage = Storage::open(database.path()).unwrap();
+    let id = created(
+        storage
+            .import_analyzed_epub(&bytes(), "bounded.epub", 1, fixture)
+            .unwrap(),
+    )
+    .document
+    .document_id;
+    let asset = image_asset("OPS/images/挿絵.png");
+    assert_eq!(
+        MAX_EPUB_ASSET_BYTES,
+        epub::EpubLimits::default().entry_bytes
+    );
+    let max_bytes = vec![0; MAX_EPUB_ASSET_BYTES];
+    storage
+        .connection
+        .execute(
+            "UPDATE epub_assets SET bytes = ?1, sha256 = ?2 WHERE path = ?3",
+            (
+                &max_bytes,
+                Sha256::digest(&max_bytes).as_slice(),
+                &asset.path,
+            ),
+        )
+        .unwrap();
+    assert_eq!(
+        storage
+            .load_epub_image_asset(id, &asset)
+            .unwrap()
+            .unwrap()
+            .bytes,
+        max_bytes
+    );
+    storage
+        .connection
+        .execute(
+            "UPDATE epub_assets SET bytes = zeroblob(?1) WHERE path = ?2",
+            (MAX_EPUB_ASSET_BYTES as i64 + 1, &asset.path),
+        )
+        .unwrap();
+    assert!(matches!(
+        storage.load_epub_image_asset(id, &asset),
+        Err(StorageError::InvalidDocument)
+    ));
+    let saved = b"fixture image bytes";
+    storage
+        .connection
+        .execute(
+            "UPDATE epub_assets SET bytes = ?1, sha256 = ?2 WHERE path = ?3",
+            (
+                saved.as_slice(),
+                Sha256::digest(saved).as_slice(),
+                &asset.path,
+            ),
+        )
+        .unwrap();
+    // A narrow image read intentionally does not rehash the full source or
+    // unrelated assets. Ordinary document loads retain their stronger checks.
+    storage.connection.execute_batch("UPDATE imported_files SET original_bytes = zeroblob(1); UPDATE epub_assets SET bytes = zeroblob(33554433) WHERE path = 'OPS/images/cover.png'").unwrap();
+    assert_eq!(
+        storage
+            .load_epub_image_asset(id, &asset)
+            .unwrap()
+            .unwrap()
+            .bytes,
+        saved
+    );
+    assert!(matches!(
+        storage.load_epub_document(id),
+        Err(StorageError::InvalidDocument)
+    ));
+}

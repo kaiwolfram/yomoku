@@ -1416,5 +1416,8 @@ mod file_references;
 #[path = "imports/epub.rs"]
 mod epub;
 
+#[path = "imports/epub_assets.rs"]
+mod epub_assets;
+
 #[path = "../../yomoku-import/tests/support/epub.rs"]
 mod epub_fixture;

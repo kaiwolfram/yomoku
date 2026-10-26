@@ -146,3 +146,74 @@ fn native_imports_require_a_dictionary_and_never_fall_back_to_text_only() {
     }
     assert_eq!(calls.load(Ordering::SeqCst), 2);
 }
+
+#[test]
+fn native_asset_requests_validate_before_enqueue_and_release_one_shot_listeners() {
+    use std::{sync::mpsc, thread, time::Duration};
+    use yomoku_ffi::native::{EpubAssetError, EpubAssetListener};
+    struct AssetListener {
+        result: mpsc::Sender<(thread::ThreadId, EpubAssetError)>,
+        dropped: mpsc::Sender<()>,
+    }
+    impl EpubAssetListener for AssetListener {
+        fn on_asset(&self, _: String, _: Vec<u8>) {
+            panic!("no saved image");
+        }
+        fn on_error(&self, error: EpubAssetError) {
+            self.result.send((thread::current().id(), error)).unwrap();
+        }
+    }
+    impl Drop for AssetListener {
+        fn drop(&mut self) {
+            self.dropped.send(()).unwrap();
+        }
+    }
+    let (native, _) = bridge();
+    for (id, path, media) in [
+        (0, "OPS/image.png", "image/png"),
+        (-1, "OPS/image.png", "image/png"),
+        (1, "../image.png", "image/png"),
+        (1, "OPS/image.png", "text/plain"),
+    ] {
+        let (send, receive) = mpsc::channel();
+        let (dropped, drop_receive) = mpsc::channel();
+        assert_eq!(
+            native.load_epub_image_asset(
+                id,
+                path.into(),
+                media.into(),
+                Box::new(AssetListener {
+                    result: send,
+                    dropped
+                })
+            ),
+            Err(EpubAssetError::InvalidRequest)
+        );
+        drop_receive.recv_timeout(Duration::from_secs(10)).unwrap();
+        assert!(matches!(
+            receive.try_recv(),
+            Err(mpsc::TryRecvError::Disconnected)
+        ));
+    }
+    let (send, receive) = mpsc::channel();
+    let (dropped, drop_receive) = mpsc::channel();
+    native
+        .load_epub_image_asset(
+            1,
+            "OPS/image.png".into(),
+            "image/png".into(),
+            Box::new(AssetListener {
+                result: send,
+                dropped,
+            }),
+        )
+        .unwrap();
+    let (worker, error) = receive.recv_timeout(Duration::from_secs(10)).unwrap();
+    assert_ne!(worker, thread::current().id());
+    assert_eq!(error, EpubAssetError::NotFound);
+    drop_receive.recv_timeout(Duration::from_secs(10)).unwrap();
+    assert!(matches!(
+        receive.try_recv(),
+        Err(mpsc::TryRecvError::Disconnected)
+    ));
+}

@@ -80,7 +80,9 @@ exact reflow/time and whole-book finish without Full.
 Reader pages now carry validated headings/emphasis/strong styles and website links
 through generated Kotlin/JNI into Compose. External links open the browser; internal
 links stay inert. Canonical offsets, word highlighting and dictionary taps survive
-formatting, page movement and recreation. Source ruby/images remain pending.
+formatting, page movement and recreation. A bounded one-shot image-byte API reads
+verified saved assets on the Rust FIFO without dictionary loading or reader-state
+changes. Android image decoding/rendering, covers/viewer and source ruby remain pending.
 The pure [SRT parser](crates/yomoku-import/src/srt.rs) has host fixtures for cue
 boundaries, formatting, speakers and malformed input. Its atomic repository now
 persists original bytes/encoding, canonical cues, Mode B and vocabulary registrations

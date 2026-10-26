@@ -8,6 +8,7 @@ pub mod dictionary;
 mod documents;
 mod encounters;
 mod epub;
+mod epub_assets;
 mod files;
 mod import_cancellation;
 mod imports;
@@ -23,6 +24,7 @@ mod vocabulary;
 pub use epub::{
     AnalyzedEpub, EpubImportError, EpubImportOutcome, StoredEpubChapter, StoredEpubDocument,
 };
+pub use epub_assets::MAX_EPUB_ASSET_BYTES;
 pub use import_cancellation::ImportCancellation;
 pub use imports::{AnalyzedPaste, PasteImportError, PasteImportOutcome};
 pub use reading_time::SavedReadingTime;
