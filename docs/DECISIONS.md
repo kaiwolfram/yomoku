@@ -2305,3 +2305,20 @@ Normalize website URI schemes before the external handler; an unavailable browse
 does not crash the reader. Invalid source formatting at the display boundary falls
 back to canonical text with ordinary valid word interactions. Font/furigana settings,
 image transport/rendering, cover cache and shared viewer remain separate tasks.
+
+## 2026-10-26 — Reader image reference transport
+
+Carry source image placements as sparse keyed ReaderChapterImages, each with an
+exact canonical U+FFFC range, alt text and ReaderImageAsset path/media type. The
+enclosing document ID plus immutable container-relative path identifies an asset;
+repeated placements share that identity. Resolve metadata from the authoritative
+saved EPUB asset map. Do not copy image BLOBs into core or generated reader state;
+bounded off-main asset retrieval/decoding remains the next implementation slice.
+
+Validate chapter ownership/key uniqueness, placeholder/scalar boundaries, ordered
+nonoverlap, normalized container keys and consistent media types for shared paths.
+Treat paths as opaque keys, never filenames/URLs. Page projection selects whole
+placeholders and rebases their UTF-8 ranges without changing canonical text,
+pagination, exact positions or vocabulary/completion/time behavior. Plain documents
+keep empty image metadata. No migration, dependency/version, permission or data-
+destructive semantics change. Rendering/ratio, covers and shared viewer remain open.

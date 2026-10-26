@@ -4,6 +4,7 @@ import app.yomoku.shared.ChapterText
 import app.yomoku.shared.DocumentId
 import app.yomoku.shared.ReaderDocument
 import app.yomoku.shared.ReaderAnalysis
+import app.yomoku.shared.ReaderPage
 import app.yomoku.shared.TextAnchor
 import app.yomoku.shared.TextOffset
 import app.yomoku.shared.TextRange
@@ -41,6 +42,24 @@ fun verifyTextBoundaries(directory: String) {
     check(ordered.readingPosition.offset.value == "A𠮷".toByteArray(Charsets.UTF_8).size.toLong())
     check(ordered.bincodeSerialize().contentEquals(orderedBytes))
     File(dir, "ordered-return.bin").writeBytes(ordered.bincodeSerialize())
+
+    val illustratedBytes = File(dir, "illustrated.bin").readBytes()
+    val illustrated = ReaderDocument.bincodeDeserialize(illustratedBytes)
+    val chapterImages = illustrated.images.single()
+    check(chapterImages.chapterId == illustrated.chapters.single().chapterId)
+    val image = chapterImages.images.single()
+    check(image.asset.path == "OPS/images/挿絵😀.png" && image.asset.mediaType == "image/png")
+    check(image.alt == "説明𠮷か\u3099\u0000")
+    check(image.range.start.value == "😀𠮷か\u3099\u0000".toByteArray(Charsets.UTF_8).size.toLong())
+    check(image.range.end.value - image.range.start.value == 3L)
+    check(illustrated.bincodeSerialize().contentEquals(illustratedBytes))
+    File(dir, "illustrated-return.bin").writeBytes(illustrated.bincodeSerialize())
+    val pageBytes = File(dir, "illustrated-page.bin").readBytes()
+    val illustratedPage = ReaderPage.bincodeDeserialize(pageBytes)
+    check(illustratedPage.images == chapterImages.images)
+    check(illustratedPage.text == illustrated.chapters.single().text)
+    check(illustratedPage.bincodeSerialize().contentEquals(pageBytes))
+    File(dir, "illustrated-page-return.bin").writeBytes(illustratedPage.bincodeSerialize())
 
     val selections = listOf("", "日本語", "𠮷野家😀", "か\u3099", "👩‍👩‍👧‍👦", "第二行\n\n", "端")
     for ((index, selected) in selections.withIndex()) {

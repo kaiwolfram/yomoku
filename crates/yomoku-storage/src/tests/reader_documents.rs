@@ -189,6 +189,16 @@ fn all_formats_have_complete_read_only_snapshots_with_original_analysis_ids() {
     }
     let page = ReaderPage::open_document(&snapshot.document, snapshot.page_length).unwrap();
     assert_eq!(page.formatting, styles.spans);
+    let illustrations = &snapshot.document.images;
+    assert_eq!(illustrations.len(), 1);
+    assert_eq!(illustrations[0].chapter_id, first.chapter_id);
+    assert_eq!(illustrations[0].images.len(), 1);
+    let image = &illustrations[0].images[0];
+    assert_eq!(image.range.slice(&first.text).unwrap(), "\u{fffc}");
+    assert_eq!(image.asset.path, "OPS/images/挿絵.png");
+    assert_eq!(image.asset.media_type, "image/png");
+    assert_eq!(image.alt, "挿絵");
+    assert_eq!(page.images, illustrations[0].images);
     assert!(snapshot.document.formatting[1].spans.is_empty());
     assert_eq!(
         snapshot.document.chapters,
@@ -229,6 +239,60 @@ fn all_formats_have_complete_read_only_snapshots_with_original_analysis_ids() {
         storage.load_reader_snapshot(epub.document.document_id),
         Err(StorageError::InvalidDocument)
     ));
+}
+
+#[test]
+fn shared_image_references_survive_chapter_movement_reflow_and_reopen() {
+    let database = TestDatabase::new();
+    let mut storage = Storage::open(database.path()).unwrap();
+    let imported = import(&mut storage, "<p>😀前<img src='../images/挿絵.png' alt='別の説明 𠮷'/>後</p><p><img src='../images/挿絵.png'/></p>");
+    let id = imported.document.document_id;
+    let document = snapshot(&mut storage, id).document;
+    assert_eq!(document.images.len(), 2);
+    let before_counts = counts(&storage);
+    let second = &document.images[1];
+    assert_eq!(second.chapter_id, document.chapters[1].chapter_id);
+    assert_eq!(second.images.len(), 2);
+    assert_eq!(second.images[0].asset, document.images[0].images[0].asset);
+    assert_eq!(second.images[1].asset, second.images[0].asset);
+    assert_eq!(second.images[0].alt, "別の説明 𠮷");
+    assert_eq!(second.images[1].alt, "");
+    let exact = ReadingPosition {
+        offset: second.images[0].range.start,
+        ..position(&document, 1, 0)
+    };
+    let saved = storage
+        .save_document_reading_position(id, exact)
+        .unwrap()
+        .unwrap();
+    assert_eq!(saved.images, document.images);
+    assert_eq!(saved.formatting, document.formatting);
+    drop(storage);
+    let mut storage = Storage::open(database.path()).unwrap();
+    for length in PageLength::ALL {
+        storage.save_page_length(length).unwrap();
+        let before = fs::read(database.path()).unwrap();
+        storage
+            .connection
+            .pragma_update(None, "query_only", true)
+            .unwrap();
+        let loaded = snapshot(&mut storage, id);
+        assert_eq!(loaded.document, saved);
+        let page = ReaderPage::open_document(&loaded.document, loaded.page_length).unwrap();
+        assert_eq!(page.position, exact);
+        assert_eq!(page.images, second.images);
+        for image in &page.images {
+            assert_eq!(image.range.slice(&page.text).unwrap(), "\u{fffc}");
+        }
+        assert_eq!(fs::read(database.path()).unwrap(), before);
+        storage
+            .connection
+            .pragma_update(None, "query_only", false)
+            .unwrap();
+    }
+    let reopened = storage.open_document_reader_snapshot(id).unwrap().unwrap();
+    assert_eq!(reopened.document, saved);
+    assert_eq!(counts(&storage), before_counts);
 }
 
 #[test]
@@ -614,7 +678,15 @@ fn explicit_finished_open_rolls_back_on_reset_analysis_or_commit_failure_then_re
 
 #[test]
 fn invalid_saved_book_content_or_extra_single_text_chapters_never_truncate_or_repair() {
-    for damage in ["chapter", "text", "position", "asset", "extra"] {
+    for damage in [
+        "chapter",
+        "text",
+        "position",
+        "asset",
+        "image_range",
+        "image_asset",
+        "extra",
+    ] {
         let database = TestDatabase::new();
         let mut storage = Storage::open(database.path()).unwrap();
         let imported = import(&mut storage, "<p>犬</p>");
@@ -658,6 +730,20 @@ fn invalid_saved_book_content_or_extra_single_text_chapters_never_truncate_or_re
                         [i64::from(id)],
                     )
                     .unwrap();
+            }
+            "image_range" => {
+                storage.connection.execute(
+                    "UPDATE epub_inline_images SET start_byte = start_byte + 1 WHERE document_id = ?1",
+                    [i64::from(id)],
+                ).unwrap();
+            }
+            "image_asset" => {
+                // A valid FK may still reference a different asset's corrupt
+                // metadata. The complete reader load must reject the book.
+                storage.connection.execute(
+                    "UPDATE epub_assets SET media_type = 'text/html' WHERE document_id = ?1 AND path = 'OPS/images/挿絵.png'",
+                    [i64::from(id)],
+                ).unwrap();
             }
             _ => {
                 let paste = storage

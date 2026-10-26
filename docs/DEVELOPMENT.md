@@ -18,7 +18,7 @@ with functioning rustup can omit the PATH workaround. Do not assume this compile
 is the project's minimum supported version; establish that with dependencies.
 Cargo.lock is retained for reproducible application development.
 Crux 0.20.0 declares Rust 1.90 minimum; the full locked graph has only been tested
-with 1.99.1. Current host baseline: 412 data-free Rust tests (183 storage, 40
+with 1.99.1. Current host baseline: 417 data-free Rust tests (184 storage, 40
 runtime). Fourteen analysis fixtures and one runtime fixture run separately with
 each Full loader via tools/test-sudachi.sh (see below).
 
@@ -2908,3 +2908,60 @@ book costs are unmeasured. Standalone Full/index/Python suites, native-binding
 repeat generation, release/process-death/reboot/tablet/dark and physical arm64 were
 not rerun. The generated payload codecs were repeat-checked; native ABI signatures
 are unchanged. Physical arm64 validation remains deferred by the user.
+
+## EPUB reader image reference transport
+
+Verified 2026-10-26 using the Rust PATH/JDK/SDK/Gradle environment above:
+
+```sh
+cargo test -p yomoku-core --test reader_images --all-features --locked --offline
+cargo test --workspace --all-features --locked --offline --quiet
+cargo test -p yomoku-runtime --test imports --all-features --locked --offline --quiet
+cargo clippy --workspace --all-targets --all-features --locked --offline -- -D warnings
+cargo fmt --all -- --check
+tools/test-kotlin-bridge.sh
+tools/format-kotlin.sh --check
+cargo run -p yomoku-ffi --bin generate-kotlin --features facet_typegen --locked --offline -- target/generated/kotlin-repeat
+diff -r target/generated/kotlin target/generated/kotlin-repeat
+./android/gradlew -p android :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug --offline --console=plain
+./android/gradlew -p android :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=app.yomoku.DocumentSessionTest,app.yomoku.ReaderFormattingTest,app.yomoku.ReaderWordSpansTest,app.yomoku.ReaderNavigationTest --offline --console=plain
+git diff --check
+```
+
+PASS: 417 data-free Rust tests (four new pure image tests/one new repository test),
+strict Clippy/Rust+Kotlin formatting/diff, real-Full Kotlin/JNI, Unicode image
+document/page round trips, repeatable generated Kotlin payloads and both-ABI
+debug/test APKs with strict Android lint. Sixteen external-data fixtures remain
+ignored in the ordinary workspace run. Existing benign Crux close diagnostics
+persist in host JNI tests. One Kotlin Android ReaderPage fixture needed its new
+empty image list; no production UI behavior changed.
+
+All 14 API-36 x86_64 emulator regressions pass (three DocumentSession, one
+ReaderFormatting, five ReaderWordSpans, five ReaderNavigation). These retain actual
+SQLite/JNI persistence/statuses/TXT encodings, website browser launches/inert links,
+dictionary interactions, recreation, page controls/swipes/scroll reset/rereads and
+completion retries/toasts/confetti. Reports/results and lint reports are retained
+under `.local/test-reports/reader-image-references/`. The existing AVD was cold-
+started with documented swangle/KVM flags, without wiping data, and remains running.
+The APK/lint build passed in the sandbox; the device command failed Gradle's
+wildcard-IP/lock-service socket check there, then passed on the approved outside-
+sandbox retry. No open failure/blocker.
+
+Pure fixtures cover source order, adjacent/shared images, image-only chapters,
+all five presets/25 reflow pairs, exact scalar positions/EOF and rejection of
+foreign/duplicate keys, overlap, invalid ranges/paths/media and inconsistent shared
+metadata. Repository fixtures check verified stored references/alt/media, read-only
+reopen, shared assets across chapters and unchanged registration/history/position.
+Extended corruption fixtures reject damaged image ranges and non-image asset
+metadata without writes. FIFO regression retains images on Previous and omits them
+from unrelated chapters/reflow. Actual imported EPUB JNI snapshots/pages expose
+the same metadata; a separate Unicode exchange includes emoji, supplementary kanji,
+combining marks and NUL in surrounding text/alt, with exact UTF-8 byte ranges.
+
+Image bytes/dimensions, bounded off-main asset retrieval/decoding, source-position/
+ratio rendering, cover cache and zoom/pan viewer remain open. No dependency/version,
+migration, permission or data-destructive behavior change. Complete saved EPUB
+integrity reads repeat per operation; large-book costs remain unmeasured. Standalone
+Full/index/Python, native-binding repeat generation, release/process-death/reboot,
+tablet/dark and physical arm64 were not rerun. Native ABI signatures are unchanged;
+generated payload codecs were repeat-checked. Physical arm64 remains user-deferred.

@@ -191,6 +191,7 @@ pub struct ReaderPage {
     pub page_number: u64,
     pub total_pages: u64,
     pub formatting: Vec<crate::reader_formatting::ReaderTextSpan>,
+    pub images: Vec<crate::reader_images::ReaderInlineImage>,
 }
 
 impl ReaderPage {
@@ -223,6 +224,13 @@ impl ReaderPage {
             total_pages: pages.pages().len() as u64,
             formatting: document
                 .formatting
+                .iter()
+                .find(|item| item.chapter_id == anchor.chapter_id)
+                .map(|item| item.on_page(document.chapter(anchor.chapter_id)?, anchor.range))
+                .transpose()?
+                .unwrap_or_default(),
+            images: document
+                .images
                 .iter()
                 .find(|item| item.chapter_id == anchor.chapter_id)
                 .map(|item| item.on_page(document.chapter(anchor.chapter_id)?, anchor.range))
@@ -263,6 +271,7 @@ impl ReaderPage {
             page_number: page_index as u64 + 1,
             total_pages: pages.pages().len() as u64,
             formatting: Vec::new(),
+            images: Vec::new(),
         })
     }
 }

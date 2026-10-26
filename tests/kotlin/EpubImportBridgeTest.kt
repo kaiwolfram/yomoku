@@ -91,6 +91,13 @@ internal fun verifyEpubImportBridge() {
             val formatted = checkNotNull(opened.reader)
             check(formatted.formatting == loaded.formatting[0].spans)
             check(formatted.formatting.size == 4)
+            check(loaded.images.single().chapterId == loaded.chapters[0].chapterId)
+            check(formatted.images == loaded.images.single().images)
+            val image = formatted.images.single()
+            check(image.asset.path == "OPS/images/挿絵.png" && image.asset.mediaType == "image/png")
+            check(image.alt == "挿絵")
+            val imageText = formatted.text.toByteArray(Charsets.UTF_8)
+            check(imageText.copyOfRange(image.range.start.value.toInt(), image.range.end.value.toInt()).toString(Charsets.UTF_8) == "\uFFFC")
             for ((style, expected) in listOf(
                 ReaderTextStyle.Heading(1u) to "第一章 出会い",
                 ReaderTextStyle.Emphasis to "出会い",
@@ -106,6 +113,7 @@ internal fun verifyEpubImportBridge() {
             val moved = listener.dispatch(bridge, Event.SaveReadingPosition(position))
             check(checkNotNull(moved.reader).pageNumber == 2uL)
             check(checkNotNull(moved.reader).formatting.isEmpty())
+            check(checkNotNull(moved.reader).images.isEmpty())
             val analysis = checkNotNull(moved.readerAnalysis) as ReaderAnalysis.Available
             check(analysis != opened.readerAnalysis)
             val key = ReaderTokenKey(id, checkNotNull(moved.reader).anchor, analysis)
@@ -133,6 +141,7 @@ internal fun verifyEpubImportBridge() {
             check(duplicate.importSummary?.documentId == id && duplicate.importSummary.outcome == ImportOutcome.EXISTING)
             val loaded = checkNotNull(listener.dispatch(bridge, Event.LoadPaste(id)).loadedDocument)
             check(loaded.chapters.size == 2 && loaded.readingPosition == savedPosition)
+            check(loaded.images.single().images.single().asset.path == "OPS/images/挿絵.png")
             val opened = listener.dispatch(bridge, Event.OpenReader(id))
             check(opened.readerAnalysis == originalAnalysis && checkNotNull(opened.reader).pageNumber == 2uL)
             val key = ReaderTokenKey(id, checkNotNull(opened.reader).anchor, originalAnalysis)

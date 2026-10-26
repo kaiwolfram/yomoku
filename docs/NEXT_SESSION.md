@@ -1,5 +1,5 @@
 # Resume here
-Updated: 2026-10-26. EPUB reader text formatting/website links connected.
+Updated: 2026-10-26. EPUB image references now reach reader pages/JNI.
 ## Working
 - Pure Crux routes/Library/Settings; Render-only UI; FIFO SQLite/analysis. Starts Library.
 - Exact chapter-local UTF-8 position/whole-book Library percentage + five presets
@@ -54,19 +54,23 @@ Updated: 2026-10-26. EPUB reader text formatting/website links connected.
   ReaderPage clips to page-local UTF-8; generated JNI/Compose preserve exact text.
   Website tap areas open browser, retain vocabulary backgrounds; remaining token
   fragments keep full dictionary identity. Internal/other source links stay inert.
-  Recreation/chapter navigation retain styles. No CSS/TOC; ruby/images not transported.
+  Recreation/chapter navigation retain styles. No CSS/TOC; ruby not transported.
+- ReaderDocument carries keyed image placeholder ranges/alt/container keys/media;
+  ReaderPage selects/rebases whole placeholders. Shared assets retain identity;
+  scalar/order/ownership validation rejects bad references. No image BLOBs in state.
+  No asset-fetch API, image decoding/rendering, dimensions, covers or viewer yet.
 ## Next tasks (ordered)
-1. Reader image asset transport/rendering + cover cache/shared pinch-zoom/pan viewer.
+1. Off-main EPUB asset retrieval/decoding + source-position/ratio rendering; cover
+   cache/shared pinch-zoom/pan viewer. Image reference transport is complete.
 2. Bundle Noto Serif JP; font/line settings and default-off source/analyzer furigana.
 3. Add CI host Rust/Kotlin checks and unsigned Android builds (independent).
 ## Verification
-- 412 data-free Rust tests, strict Clippy/Rust+Kotlin formatting/diff, real-Full
-  Kotlin/JNI + Unicode/formatting exchanges and repeatable Kotlin generation pass.
-- Both-ABI debug/test APKs + strict lint pass. Eleven focused API-36 x86_64 formatting/
-  word-span/navigation tests pass across initial ten + final corrected single rerun.
-  Test initially invoked Activity Back instead of sheet Close; fixed test only.
-  Lint KTX URI helper fixed. Reports: .local/test-reports/reader-formatting/.
-- Commands/failures/limits: DEVELOPMENT.md end. Gradle/ADB need approved outside-
-  sandbox sockets. No open blocker. Large EPUB costs remain unmeasured. No dependency/
-  migration/Q188 change. Physical arm64 remains user-deferred; other deferred checks
-  are recorded in DEVELOPMENT.md. Emulator remains running.
+- 417 data-free Rust tests, strict Clippy/Rust+Kotlin formatting/diff, real-Full
+  Kotlin/JNI + Unicode/image-reference exchanges and repeatable Kotlin codecs pass.
+- Both-ABI debug/test APKs + strict lint pass. All 14 focused API-36 x86_64 document/
+  formatting/word-span/navigation regressions pass. Reports retained under
+  .local/test-reports/reader-image-references/; commands/limits: DEVELOPMENT.md end.
+- Device Gradle initially failed its sandbox wildcard-IP/lock socket; approved
+  outside-sandbox retry passes. Existing AVD cold-started without data wipe and
+  remains running. No open blocker or dependency/migration/Q188 change. Large EPUB
+  costs remain unmeasured; physical arm64 remains user-deferred.

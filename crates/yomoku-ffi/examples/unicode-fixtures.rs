@@ -8,6 +8,12 @@ use yomoku_core::document::{
     AnalysisId, ChapterId, ChapterText, DocumentId, ReaderDocument, SourceId, TextAnchor,
     TextOffset, TextRange,
 };
+use yomoku_core::{
+    document::PastedDocument,
+    pagination::PageLength,
+    reader::ReaderPage,
+    reader_images::{ReaderChapterImages, ReaderImageAsset, ReaderInlineImage},
+};
 use yomoku_core::{pagination::ReadingPosition, reader::ReaderAnalysis};
 
 const CASES: &[(&str, &str)] = &[
@@ -73,6 +79,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let ordered = ReaderDocument {
         document_id: DocumentId::try_from(i64::MAX)?,
         title: "章 📖".into(),
+        images: Vec::new(),
         formatting: vec![yomoku_core::reader_formatting::ReaderChapterFormatting {
             chapter_id: ChapterId::try_from(i64::MAX - 2)?,
             spans: [
@@ -117,6 +124,48 @@ fn main() -> Result<(), Box<dyn Error>> {
             BincodeFfiFormat::deserialize(&fs::read(dir.join("ordered-return.bin"))?)?;
         assert_eq!(returned, ordered);
         returned.validate()?;
+    }
+    let image_text = "😀𠮷か\u{3099}\0\u{fffc}後";
+    let mut illustrated: ReaderDocument = PastedDocument {
+        document_id: DocumentId::try_from(i64::MAX)?,
+        title: "挿絵 📖".into(),
+        finished_at_least_once: false,
+        chapter: ChapterText {
+            source_id: SourceId::try_from((1 << 53) + 1)?,
+            chapter_id: ChapterId::try_from(i64::MAX)?,
+            text: image_text.into(),
+        },
+        reading_position: None,
+    }
+    .into();
+    let start = image_text.find('\u{fffc}').unwrap();
+    illustrated.images = vec![ReaderChapterImages {
+        chapter_id: illustrated.chapters[0].chapter_id,
+        images: vec![ReaderInlineImage {
+            range: TextRange {
+                start: TextOffset::at(image_text, start)?,
+                end: TextOffset::at(image_text, start + 3)?,
+            },
+            asset: ReaderImageAsset {
+                path: "OPS/images/挿絵😀.png".into(),
+                media_type: "image/png".into(),
+            },
+            alt: "説明𠮷か\u{3099}\0".into(),
+        }],
+    }];
+    illustrated.validate()?;
+    let illustrated_page = ReaderPage::open_document(&illustrated, PageLength::default())?;
+    if writing {
+        fs::write(dir.join("illustrated.bin"), encode(&illustrated))?;
+        fs::write(dir.join("illustrated-page.bin"), encode(&illustrated_page))?;
+    } else {
+        let returned: ReaderDocument =
+            BincodeFfiFormat::deserialize(&fs::read(dir.join("illustrated-return.bin"))?)?;
+        assert_eq!(returned, illustrated);
+        returned.validate()?;
+        let returned: ReaderPage =
+            BincodeFfiFormat::deserialize(&fs::read(dir.join("illustrated-page-return.bin"))?)?;
+        assert_eq!(returned, illustrated_page);
     }
     for (index, &(text, selected)) in CASES.iter().enumerate() {
         let chapter = ChapterText {

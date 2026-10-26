@@ -60,8 +60,18 @@ strong styles and sends website links through the external URI handler. Website
 tap areas take precedence over dictionary taps while preserving vocabulary
 backgrounds; the remaining word fragments retain the full token identity.
 Malformed nested source links are split into disjoint click targets in source-span
-order. CSS, internal navigation and TOC jumps remain absent. Ruby, image transport,
-rendering/covers and the shared image viewer remain next work.
+order. CSS, internal navigation and TOC jumps remain absent.
+
+`ReaderDocument.images` carries keyed `ReaderChapterImages` with source-ordered
+placeholder ranges, alt text and document-scoped `ReaderImageAsset` paths/media
+types. Core validates unique owned chapter keys, exact U+FFFC scalar ranges,
+nonoverlapping source order, canonical container keys and consistent media types
+for shared assets. `ReaderPage.images` selects whole placeholders and translates
+their ranges into page-local UTF-8 without changing text or position. Storage
+resolves metadata from the fully verified saved asset map; image BLOBs stay out
+of core/ViewModel/JNI snapshots. Paths are opaque container keys, never platform
+filenames or URLs. Asset retrieval/decoding/rendering, cover cache, source ruby and
+the shared image viewer remain next work.
 
 Shared file preflight and TXT/SRT/EPUB Existing results now carry `LibraryDocument`
 references (ID, title, whole-book progress, permanent finish marker). Exact-byte

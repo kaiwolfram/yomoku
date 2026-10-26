@@ -126,6 +126,7 @@ pub struct ReaderDocument {
     pub finished_at_least_once: bool,
     pub chapters: Vec<ChapterText>,
     pub formatting: Vec<crate::reader_formatting::ReaderChapterFormatting>,
+    pub images: Vec<crate::reader_images::ReaderChapterImages>,
     pub reading_position: Option<crate::pagination::ReadingPosition>,
 }
 
@@ -137,6 +138,7 @@ impl From<PastedDocument> for ReaderDocument {
             finished_at_least_once: document.finished_at_least_once,
             chapters: vec![document.chapter],
             formatting: Vec::new(),
+            images: Vec::new(),
             reading_position: document.reading_position,
         }
     }
@@ -160,6 +162,22 @@ impl ReaderDocument {
                 return Err(InvalidTextValue);
             }
             formatting.validate(self.chapter(formatting.chapter_id)?)?;
+        }
+        let mut illustrated = std::collections::HashSet::new();
+        let mut assets = std::collections::HashMap::new();
+        for images in &self.images {
+            if !illustrated.insert(images.chapter_id) {
+                return Err(InvalidTextValue);
+            }
+            images.validate(self.chapter(images.chapter_id)?)?;
+            for image in &images.images {
+                if assets
+                    .insert(&image.asset.path, &image.asset.media_type)
+                    .is_some_and(|previous| previous != &image.asset.media_type)
+                {
+                    return Err(InvalidTextValue);
+                }
+            }
         }
         if let Some(position) = self.reading_position {
             position.validate(self.chapter(position.chapter_id)?)?;

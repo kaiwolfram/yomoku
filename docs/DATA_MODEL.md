@@ -118,8 +118,24 @@ style. Nested formatting is valid. Stored inert links stay in SQLite and are omi
 from this display projection. `ReaderPage.formatting` clips intersections into
 page-local UTF-8 ranges, preserving the canonical text and all durable identities.
 Plain/single-text documents have no formatting entries. No migration or source
-rewrite is required; source ruby and image bytes/references remain outside this
-transport until their rendering slices.
+rewrite is required; source ruby remains outside this transport.
+
+`ReaderDocument.images` carries sparse, unique owned `ReaderChapterImages` keys.
+Each source-ordered `ReaderInlineImage` holds one exact U+FFFC `TextRange`, literal
+alt text and a `ReaderImageAsset` (canonical container-relative path + media type).
+The enclosing document ID scopes asset identity. Repeated placements may share
+one asset; its media type must agree throughout a document. Paths cannot contain
+empty/dot/parent components, backslashes, colons or controls; media types have a
+nonempty image/ subtype without whitespace/controls. Paths stay opaque and are
+never resolved against the platform filesystem or fetched as URLs.
+
+The repository resolves each reference against the already verified saved asset
+map. `ReaderPage.images` selects whole placeholders for the current chapter/page
+and translates their ranges into page-local UTF-8. Text, pagination, positions,
+token anchors and completion semantics remain unchanged; images do not add word
+occurrences. Plain documents have no image references. No original source/image
+BLOB, bitmap or dimensions enter reader snapshots. Asset retrieval/decoding,
+rendering, covers and viewer remain separate work; no schema migration is needed.
 
 `open_document_reader_snapshot` alone resets finished books to the first chapter's
 start. Snapshot/analysis/settings validation and reset share one immediate

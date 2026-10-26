@@ -205,6 +205,8 @@ fn ordered_reader_worker_crosses_chapters_with_original_analysis_time_and_whole_
     assert_eq!(opened.reader.as_ref().unwrap().page_number, 1);
     assert_eq!(opened.reader.as_ref().unwrap().total_pages, 2);
     let first = opened.reader.unwrap();
+    assert_eq!(first.images, original.document.images[0].images);
+    assert_eq!(first.images[0].asset.path, "OPS/images/挿絵.png");
     let first_key = ReaderTokenKey {
         document_id: id,
         page: first.anchor,
@@ -227,6 +229,7 @@ fn ordered_reader_worker_crosses_chapters_with_original_analysis_time_and_whole_
     );
     let moved = complete(&router, 10);
     let second = moved.reader.unwrap();
+    assert!(second.images.is_empty());
     assert_eq!(moved.content_route, ContentRoute::Reader);
     assert!(moved.book_completion_notice.is_none());
     assert_eq!(second.page_number, 2);
@@ -249,6 +252,7 @@ fn ordered_reader_worker_crosses_chapters_with_original_analysis_time_and_whole_
         },
     );
     assert_eq!(back.reader.as_ref().unwrap().position, first.position);
+    assert_eq!(back.reader.as_ref().unwrap().images, first.images);
     assert_eq!(back.reader_analysis, Some(original.analyses[0].analysis));
     assert_eq!(back.documents[0].progress_percent, 0);
     assert_eq!(totals(&database.path()), before_previous);
@@ -272,6 +276,7 @@ fn ordered_reader_worker_crosses_chapters_with_original_analysis_time_and_whole_
         let reflowed = dispatch(&router, Event::SetPageLength(length));
         assert_eq!(reflowed.reader.as_ref().unwrap().position, position);
         assert_eq!(reflowed.reader.as_ref().unwrap().total_pages, 2);
+        assert!(reflowed.reader.as_ref().unwrap().images.is_empty());
         assert_eq!(
             reflowed.reader_analysis,
             Some(original.analyses[1].analysis)

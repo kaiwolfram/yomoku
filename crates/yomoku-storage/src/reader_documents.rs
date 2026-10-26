@@ -6,6 +6,7 @@ use yomoku_core::{
     pagination::ReadingPosition,
     reader::{DocumentReaderSnapshot, ReaderChapterAnalysis},
     reader_formatting::{ReaderChapterFormatting, ReaderTextSpan, ReaderTextStyle},
+    reader_images::{ReaderChapterImages, ReaderImageAsset, ReaderInlineImage},
 };
 use yomoku_import::epub::SpanKind;
 
@@ -171,12 +172,47 @@ pub(crate) fn load_reader_document_in(
                     })
                 })
                 .collect::<Result<_, StorageError>>()?;
+            let images = stored
+                .chapters
+                .iter()
+                .filter(|item| !item.images.is_empty())
+                .map(|item| {
+                    let images = item
+                        .images
+                        .iter()
+                        .map(|image| {
+                            let asset = stored
+                                .images
+                                .get(&image.path)
+                                .ok_or(StorageError::InvalidDocument)?;
+                            Ok(ReaderInlineImage {
+                                range: TextRange {
+                                    start: TextOffset::at(&item.chapter.text, image.range.start)
+                                        .map_err(|_| StorageError::InvalidDocument)?,
+                                    end: TextOffset::at(&item.chapter.text, image.range.end)
+                                        .map_err(|_| StorageError::InvalidDocument)?,
+                                },
+                                asset: ReaderImageAsset {
+                                    path: image.path.clone(),
+                                    media_type: asset.media_type.clone(),
+                                },
+                                alt: image.alt.clone(),
+                            })
+                        })
+                        .collect::<Result<_, StorageError>>()?;
+                    Ok(ReaderChapterImages {
+                        chapter_id: item.chapter.chapter_id,
+                        images,
+                    })
+                })
+                .collect::<Result<_, StorageError>>()?;
             ReaderDocument {
                 document_id,
                 title: stored.title,
                 finished_at_least_once: stored.finished_at_least_once,
                 reading_position: stored.reading_position,
                 formatting,
+                images,
                 chapters: stored
                     .chapters
                     .into_iter()

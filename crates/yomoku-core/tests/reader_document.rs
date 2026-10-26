@@ -23,6 +23,7 @@ fn document() -> ReaderDocument {
         .into(),
         reading_position: None,
         formatting: Vec::new(),
+        images: Vec::new(),
     }
 }
 

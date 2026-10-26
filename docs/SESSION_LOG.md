@@ -1759,3 +1759,24 @@
   destructive behavior change. No open blocker. Next: images/covers/shared viewer,
   then Noto/font/furigana/source-ruby rendering; CI independent. Large EPUB costs
   unmeasured; physical arm64 still deferred, other unrun checks in DEVELOPMENT.md.
+
+## 2026-10-26 — EPUB reader image references
+
+- Added pure keyed chapter image references and page-local placeholder projection;
+  carry source order/alt/document-scoped asset paths/media through storage and typed
+  JNI without image BLOBs. Validate ownership, scalar ranges, overlap, canonical
+  keys and consistent shared metadata. Preserve text, positions and completion rules.
+- Added four pure tests and one repository fixture; extended read-only/corruption,
+  FIFO movement/reflow and actual EPUB/Unicode Kotlin-JNI exchanges. Android's
+  synthetic ReaderPage fixture now supplies an empty image list.
+- PASS: 417 data-free Rust tests, strict Clippy/Rust+Kotlin formatting/diff, real-Full
+  JNI, repeatable Kotlin codecs, both-ABI debug/test APKs, strict lint and all 14
+  focused API-36 x86_64 document/formatting/word-span/navigation regressions. Reports:
+  .local/test-reports/reader-image-references/. Commands/limits: DEVELOPMENT.md end.
+- Device Gradle's sandbox socket failed; approved outside-sandbox retry passes.
+  Cold-started existing AVD without wiping data; it remains running. No open blocker,
+  dependency/version, migration, permission or destructive-semantics change.
+- Updated plan/architecture/data/decisions/handoff. Next: bounded off-main asset
+  retrieval/decoding and source-position/ratio rendering, covers/shared viewer;
+  Noto/font/furigana and CI remain next independent work. Large EPUB costs unmeasured;
+  physical arm64 remains user-deferred. Other unrun checks: DEVELOPMENT.md end.

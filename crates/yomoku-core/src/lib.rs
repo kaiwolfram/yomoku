@@ -11,5 +11,6 @@ pub mod imports;
 pub mod pagination;
 pub mod reader;
 pub mod reader_formatting;
+pub mod reader_images;
 pub mod storage;
 pub mod vocabulary;
