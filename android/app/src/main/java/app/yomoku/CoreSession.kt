@@ -94,6 +94,8 @@ internal class CoreSession(
             }
         )
 
+    val covers = EpubCoverLoader(bridge::loadEpubCoverReference, images)
+
     init {
         dispatch(Event.RefreshLibrary)
     }
@@ -245,6 +247,7 @@ internal class CoreSession(
     override fun close() {
         requireMainThread()
         if (!closing) {
+            covers.close()
             images.close()
             pauseClock()
             closing = true

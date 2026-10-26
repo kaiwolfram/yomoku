@@ -8,6 +8,7 @@ import androidx.compose.ui.geometry.Size
 import app.yomoku.nativebridge.EpubAssetError
 import app.yomoku.nativebridge.EpubAssetListener
 import app.yomoku.shared.ReaderImageAsset
+import java.security.MessageDigest
 import java.util.ArrayDeque
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
@@ -85,6 +86,7 @@ internal class EpubImageLoader(
     private class Request(
         val key: EpubImageKey,
         val pixelBudget: Int,
+        val expectedSha256: ByteArray?,
         var deliver: ((DecodedEpubImage?) -> Unit)?,
     ) {
         val cancelled = AtomicBoolean(false)
@@ -99,10 +101,11 @@ internal class EpubImageLoader(
     fun load(
         key: EpubImageKey,
         pixelBudget: Int,
+        expectedSha256: ByteArray? = null,
         deliver: (DecodedEpubImage?) -> Unit,
     ): AutoCloseable {
         check(Looper.myLooper() == Looper.getMainLooper())
-        val request = Request(key, pixelBudget, deliver)
+        val request = Request(key, pixelBudget, expectedSha256?.copyOf(), deliver)
         if (closed) {
             deliver(null)
             request.cancel()
@@ -134,7 +137,15 @@ internal class EpubImageLoader(
                     try {
                         executor.execute {
                             val image =
-                                if (request.cancelled.get()) null
+                                if (
+                                    request.cancelled.get() ||
+                                        (request.expectedSha256 != null &&
+                                            !MessageDigest.isEqual(
+                                                request.expectedSha256,
+                                                MessageDigest.getInstance("SHA-256").digest(bytes),
+                                            ))
+                                )
+                                    null
                                 else decode(bytes, request.pixelBudget, mediaType)
                             main.post { finish(request, image) }
                         }

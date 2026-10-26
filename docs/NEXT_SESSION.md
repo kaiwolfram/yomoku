@@ -1,5 +1,5 @@
 # Resume here
-Updated: 2026-10-26. Metadata-only cover FIFO/JNI lookup added; results below.
+Updated: 2026-10-26. Library cover thumbnails/cache added; results below.
 ## Working
 - Pure Crux routes/Library/Settings; Render-only UI; FIFO SQLite/analysis; Library start.
 - Chapter-local UTF-8 position/whole-book percentage/five presets persist; reflow
@@ -46,8 +46,7 @@ Updated: 2026-10-26. Metadata-only cover FIFO/JNI lookup added; results below.
   source/assets without parsing; large-book costs remain unmeasured.
 - ReaderDocument carries keyed validated heading/emphasis/strong/HTTP(S) spans;
   ReaderPage clips to page-local UTF-8; generated JNI/Compose preserve exact text.
-  Website tap areas open browser, retain vocabulary backgrounds/full token identity.
-  Internal/other links stay inert. No CSS/TOC; ruby not transported.
+  Website taps open browser with token identity; other links inert. No CSS/TOC/ruby.
 - ReaderDocument carries validated page-local image placeholders/alt/asset metadata;
   no image BLOBs in state. One-shot FIFO asset reads verify live document ownership,
   expected media/SHA-256 and 32 MiB cap without dictionaries or core/state writes.
@@ -65,16 +64,16 @@ Updated: 2026-10-26. Metadata-only cover FIFO/JNI lookup added; results below.
 - Reviewed AndroidSVG 1.4 renders static vectors on the same executor/pixel budget.
   Fractional layout/viewer; preflight <=2 MiB/4096 nodes/64 levels/32768 expansions.
   No DTD/entities/resource I/O/cycles. Compound resources retain alt/Retry; credits ship.
-- Cover FIFO/JNI reads path/media/SHA-256, validates EPUB/metadata/32 MiB; no BLOBs/Full.
-  Normal no-cover/corruption errors; cache/display open. Cache needs verified bytes.
+- Library covers resolve live path/media/SHA-256 metadata without book BLOBs/Full.
+  Media+digest LRU <=4 MiB/64 entries; misses verify bytes/digest and decode <=64 KiB.
+  Shared serial decoder; source ratio/generic fallback; disposed callbacks suppressed.
+  Recreation retains pixels; process restart rebuilds. No disk/negative cache.
 ## Next tasks (ordered)
-1. Add bounded EPUB thumbnail cache/Library covers via load_epub_cover_reference
-   + verified asset reads; then remaining SVG resources. Preserve decode budgets.
+1. Remaining SVG compound images/patterns/masks/markers/stylesheet resource rules.
 2. Bundle Noto Serif JP/font/line/default-off furigana (source ruby preferred).
 3. CI host/unsigned builds independent; arm64 deferred. Nostr empty/Q188 unresolved.
 ## Verification
-- 432 Rust tests/Clippy, full real-Full host JNI/7 Unicode exchanges, repeatable
-  native bindings, both-ABI APKs/lint/formatting/diff and five phone tests pass.
-  Commands/limits: DEVELOPMENT.md end; reports: .local/test-reports/epub-cover-reference/.
-  No blocker; Gradle sockets approved. No schema/core/dependency/permission change.
-  Tablet/dark/release/process-death/standalone dictionaries/physical arm64 not rerun.
+- PASS: both-ABI APKs, lint/formatting/diff; six new cover cases on phone + tablet/dark,
+  eight phone image/navigation regressions. DEVELOPMENT.md end has commands/failures;
+  reports: .local/test-reports/epub-cover-thumbnails/. No open blocker; sockets approved.
+  No core/FFI/schema/dependency change. Rust/JNI/release/process-death/arm64 not rerun.

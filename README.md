@@ -88,9 +88,10 @@ discarding disposed requests. Tapping an image opens the shared full-screen view
 with bounded pinch zoom/pan, accessible controls and rotation/recreation recovery.
 It reuses the page bitmap and isolates gestures from reader completion swipes.
 The typed cover-reference API reads stored path/media/SHA-256 metadata without
-copying book or image BLOBs; thumbnail caching and Library display remain open.
+copying book or image BLOBs. Library displays bounded cover thumbnails with a
+4 MiB memory LRU, verified asset bytes, source ratios and generic fallback icons.
 Bounded static SVGs also render off main with fractional source ratios and offline
-renderer credits. Compound SVG image resources, covers and source ruby remain
+renderer credits. Compound SVG image resources and source ruby remain
 pending.
 The pure [SRT parser](crates/yomoku-import/src/srt.rs) has host fixtures for cue
 boundaries, formatting, speakers and malformed input. Its atomic repository now
@@ -105,7 +106,7 @@ and share direct cancellation. Host fixtures cover later-chapter/write/commit
 rollback, duplicates, original analysis/status/progress and failed-file recovery.
 Android supports mixed EPUB/TXT/SRT batches, per-file encoding/errors, progress,
 Cancel and completion summaries. Imports return to Library without opening a reader.
-Planned v1 features include compound SVG resources/covers/ruby, custom missing-word
+Planned v1 features include compound SVG resources/ruby, custom missing-word
 definitions,
 reading statistics, optional AnkiDroid integration, curated Nostr reading and
 manual encrypted backups. See the [product specification](docs/PRODUCT_SPEC.md)

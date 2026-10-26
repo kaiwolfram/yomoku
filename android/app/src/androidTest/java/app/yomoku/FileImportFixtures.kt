@@ -21,6 +21,7 @@ internal object FileImportFixtures {
         firstBody: String = "<h1>猫</h1><p>猫と犬。</p>",
         images: Map<String, Pair<String, ByteArray>> = emptyMap(),
         secondBody: String = "<p>鳥と魚。</p>",
+        coverPath: String? = null,
     ): ByteArray {
         val output = ByteArrayOutputStream()
         ZipOutputStream(output).use { zip ->
@@ -44,7 +45,7 @@ internal object FileImportFixtures {
                 </metadata><manifest>
                 <item id="one" href="one.xhtml" media-type="application/xhtml+xml"/>
                 <item id="two" href="two.xhtml" media-type="application/xhtml+xml"/>
-                ${images.entries.mapIndexed { index, (path, image) -> "<item id='image$index' href='$path' media-type='${image.first}'/>" }.joinToString("")}
+                ${images.entries.mapIndexed { index, (path, image) -> "<item id='image$index' href='$path' media-type='${image.first}'${if (path == coverPath) " properties='cover-image'" else ""}/>" }.joinToString("")}
                 </manifest><spine><itemref idref="one"/><itemref idref="two"/></spine></package>""",
             )
             entry(

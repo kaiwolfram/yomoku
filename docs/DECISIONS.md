@@ -2475,3 +2475,32 @@ thumbnail key across recreation and avoids relying on document IDs after databas
 replacement. It is not content verification: new cached pixels must come through
 the existing digest-verified asset read and bounded decoder. Cache implementation,
 eviction and Library presentation remain the next slice.
+
+## 2026-10-26 — Library cover thumbnails
+
+Use the existing metadata-only FIFO/JNI lookup plus verified asset pipeline for
+lazy Library rows, without expanding core/Library payloads or loading dictionaries.
+Resolve live ownership and digest before every new display request, including cache
+hits. Key an Android memory LRU by exact media type plus SHA-256, sharing successful
+pixels across paths/documents while avoiding stale document-ID keys after database
+replacement. Cache misses additionally hash the returned verified asset bytes
+against the frozen reference on the decode executor; metadata and asset reads are
+separate transactions, so a changed asset must never publish under the old key.
+
+Keep <=16,384 decoded pixels (64 KiB ARGB) per cover, the existing source/edge/SVG
+limits and one shared serial encoded-read/decode pipeline across reader and covers.
+The LRU retains <=4 MiB and <=64 entries; no new image framework/dependency or disk
+cache. This routine cache policy satisfies the cover-cache slice while avoiding
+another persisted representation; process restart rebuilds thumbnails from saved
+assets. CoreSession retains it across Activity recreation. Visible/evicted bitmaps
+awaiting GC and temporary decoder allocations are outside its retained-byte cap.
+Never recycle published pixels during eviction/close.
+
+Fit covers at source ratio in a 48x64dp frame, retaining compact title/progress/
+finish rows. Use one decorative document icon for loading, missing/no-cover and
+unsupported/damaged images, without hiding the title or interfering with the row's
+OpenReader action. Do not add a cover viewer or mutate core storage errors.
+Failures are not cached and retry when the row is redisplayed or Library reentered.
+Disposal removes queued requests, suppresses late image delivery and drains
+accepted metadata callbacks. No schema, native API, permissions or destructive
+semantics change. Remaining compound SVG resources stay a separate unfinished task.

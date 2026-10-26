@@ -47,6 +47,7 @@ internal fun YomokuApp(
     dispatch: (Event) -> Unit,
     onReaderInteraction: () -> Unit = {},
     imageLoader: EpubImageLoader? = null,
+    coverLoader: EpubCoverLoader? = null,
     onImportFiles: (() -> Unit)? = null,
 ) {
     val context = LocalContext.current
@@ -144,7 +145,7 @@ internal fun YomokuApp(
                         view.contentRoute == ContentRoute.READER ->
                             ReaderScreen(view, dispatch, onReaderInteraction, imageLoader)
                         view.destination == Destination.LIBRARY ->
-                            LibraryScreen(view, dispatch, onImportFiles)
+                            LibraryScreen(view, dispatch, onImportFiles, coverLoader)
                         else ->
                             Text(
                                 stringResource(view.destination.emptyResource()),

@@ -41,6 +41,7 @@ internal fun LibraryScreen(
     view: ViewModel,
     dispatch: (Event) -> Unit,
     onImportFiles: (() -> Unit)? = null,
+    coverLoader: EpubCoverLoader? = null,
 ) {
     Column(Modifier.fillMaxSize().padding(16.dp)) {
         Button(onClick = { dispatch(Event.OpenPaste) }, enabled = !view.storageBusy) {
@@ -85,37 +86,42 @@ internal fun LibraryScreen(
         }
         LazyColumn(modifier = Modifier.weight(1f).testTag("library_documents")) {
             items(view.documents, key = { it.documentId.value }) { document ->
-                Column(
+                Row(
                     modifier =
                         Modifier.fillMaxWidth()
                             .clickable(enabled = !view.storageBusy) {
                                 dispatch(Event.OpenReader(document.documentId))
                             }
-                            .padding(vertical = 20.dp)
-                            .testTag("document_${document.documentId.value}")
+                            .padding(vertical = 8.dp)
+                            .testTag("document_${document.documentId.value}"),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text(
-                            document.title,
-                            style = MaterialTheme.typography.titleMedium,
-                            modifier = Modifier.weight(1f),
-                        )
-                        if (document.finishedAtLeastOnce) {
-                            FinishedCheckmark(
-                                Modifier.testTag("finished_${document.documentId.value}")
+                    LibraryCover(document.documentId.value, coverLoader)
+                    Column(Modifier.weight(1f)) {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                document.title,
+                                style = MaterialTheme.typography.titleMedium,
+                                modifier = Modifier.weight(1f),
                             )
+                            if (document.finishedAtLeastOnce) {
+                                FinishedCheckmark(
+                                    Modifier.testTag("finished_${document.documentId.value}")
+                                )
+                            }
                         }
+                        Text(
+                            stringResource(
+                                R.string.reading_progress,
+                                document.progressPercent.toLong(),
+                            ),
+                            modifier = Modifier.testTag("progress_${document.documentId.value}"),
+                        )
                     }
-                    Text(
-                        stringResource(
-                            R.string.reading_progress,
-                            document.progressPercent.toLong(),
-                        ),
-                        modifier = Modifier.testTag("progress_${document.documentId.value}"),
-                    )
                 }
             }
         }

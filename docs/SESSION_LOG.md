@@ -1882,3 +1882,21 @@
   Updated plan/architecture/data/decisions/README/handoff. Next: bounded thumbnail
   cache and Library display using metadata keys plus verified asset bytes. Remaining
   SVG resources/ruby stay open; physical arm64 remains user-deferred.
+
+
+## 2026-10-26 — Library cover thumbnails
+
+- Added lazy raster/static-SVG EPUB thumbnails and decorative generic fallback
+  icons in compact Library rows. CoreSession retains a 4 MiB/64-entry content LRU
+  across recreation; live metadata precedes hits, verified bytes plus frozen-digest
+  comparison precede new decodes. Each cover uses <=64 KiB pixels on the shared
+  serial reader decoder. No negative/disk cache or core/FFI/schema change.
+- PASS: both-ABI APKs, strict lint/formatting/diff; six new cache/Compose cases on
+  phone/light and tablet/dark, plus eight phone image/navigation regressions.
+  Reports: .local/test-reports/epub-cover-thumbnails/; DEVELOPMENT.md end has exact
+  commands, corrected test assertions, socket approval and emulator restart details.
+- Restored phone/light/free rotation; no open blocker. Updated plan, architecture,
+  data model, decisions, README and handoff. Remaining SVG compound resources stay
+  unchecked; Noto/font/furigana and CI follow. Cache cap excludes visible/evicted
+  bitmaps awaiting GC; process restart rebuilds. Rust/JNI/release/process-death and
+  physical arm64 not rerun; arm64 remains user-deferred.

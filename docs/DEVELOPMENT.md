@@ -3246,3 +3246,64 @@ must fetch hash-verified bytes through the existing asset API before bounded
 decoding/publication. Thumbnail cache/Library display, remaining SVG resources and
 source ruby stay open. No release, tablet/dark, process-death/reboot, standalone
 dictionary benchmarks or physical-arm64 checks were rerun; arm64 remains deferred.
+
+
+## Bounded Library EPUB cover thumbnails
+
+Verified 2026-10-26 using the Rust PATH/JDK/SDK/Gradle environment above:
+
+```sh
+tools/format-kotlin.sh --check
+git diff --check
+./android/gradlew -p android :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=app.yomoku.EpubCoverLoaderTest,app.yomoku.LibraryCoversTest,app.yomoku.EpubImageLoaderTest,app.yomoku.EpubImageDecodeTest,app.yomoku.ReaderImagesTest,app.yomoku.NavigationTest --offline --console=plain
+# Final six-test rerun after correcting the offset assertion; also repeat for tablet/dark.
+./android/gradlew -p android :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=app.yomoku.EpubCoverLoaderTest,app.yomoku.LibraryCoversTest --offline --console=plain
+/home/kai/Android/Sdk/platform-tools/adb -s emulator-5554 shell wm size 2560x1600
+/home/kai/Android/Sdk/platform-tools/adb -s emulator-5554 shell wm density 240
+/home/kai/Android/Sdk/platform-tools/adb -s emulator-5554 shell cmd uimode night yes
+# Repeat the six-test command, then restore the original phone/light settings.
+/home/kai/Android/Sdk/platform-tools/adb -s emulator-5554 shell wm size reset
+/home/kai/Android/Sdk/platform-tools/adb -s emulator-5554 shell wm density reset
+/home/kai/Android/Sdk/platform-tools/adb -s emulator-5554 shell cmd uimode night no
+```
+
+PASS: both-ABI debug/test APKs, strict Android lint, Kotlin formatting/diff, six
+new cover tests on API-36 x86_64 phone/light (52s including build/lint) and six on
+tablet/dark (51s). All eight existing image decode/loader/reader/navigation
+regressions passed in the initial broader run: 14 distinct passing cases overall.
+APK inspection confirms arm64-v8a/x86_64 libyomoku_jni.so. Results/reports and lint
+XML: `.local/test-reports/epub-cover-thumbnails/{initial-phone,phone-final,tablet-dark}/`
+(lint XML is in the parent directory). The existing unrelated FileImports
+AutoboxingStateValue hint remains informational; no lint warnings/errors.
+
+Four new cache/pipeline fixtures verify exact SHA-256/media keys, metadata lookup
+before hits, cross-document/path sharing without another BLOB, changed bytes
+between metadata/asset reads, invalid digest length, no-cover/corruption responses,
+retry, byte/entry LRU bounds, replacement/clear without recycling published pixels,
+queued/active cancellation, accepted-callback drain and late results after close.
+They check main-thread delivery, actual source dimensions and <=64 KiB pixels.
+Two real imported EPUB/Compose cases verify PNG and SVG blue pixels/source ratios,
+Activity recreation, row opening/return, unchanged progress/finish and generic
+fallback for absent/undecodable covers. Existing reader fixtures retain website/
+word identity, shared viewer, image-only completion, reflow and chapter navigation.
+
+The first expanded compilation caught use of unavailable DpRect width/height
+properties in the new test; switched to edge differences. Gradle/ADB sandbox
+sockets needed approved outside-sandbox execution. One attempt found no connected
+device and ran zero tests; restarted the existing AVD with documented swangle/KVM
+flags, without wiping data, and waited for sys.boot_completed=1. The initial
+14-case run passed 13 and caught a test assertion comparing TextOffset to Long;
+compare its numeric value instead. Both final six-case runs pass. No open failure
+or blocker. Restored/verified 1080x2400, 420dpi, light mode and free rotation; the
+AVD remains running.
+
+Cache is transient: <=4 MiB/64 successful entries, <=16,384 pixels per cover,
+shared serial encoded-read/decode pipeline with reader images and an off-main
+comparison against the frozen metadata digest before new publication. Metadata
+hits revalidate live ownership. No negative/disk cache; process restart rebuilds
+from saved assets. Visible/evicted bitmaps awaiting GC and temporary decoder
+allocations remain outside the retained-cache cap; no total-heap/CPU/large-library
+benchmark claim. No core/FFI/schema/dependency/permission/destructive-semantics
+change. Rust/Clippy/host JNI/codegen, standalone Full/index/Python, release,
+process-death/reboot and physical arm64 were not rerun for this Android-only slice;
+arm64 remains user-deferred. Compound SVG resources and source ruby remain open.

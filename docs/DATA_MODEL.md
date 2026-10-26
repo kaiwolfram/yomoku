@@ -146,7 +146,13 @@ reference syntax, existence and nonempty <=32 MiB size must validate; damaged
 declared metadata fails. No declaration, non-EPUB and missing/deleted IDs yield
 None. The stored digest is an advertised cache identity; it is not rehashed here.
 New cached pixels must use the verified asset read below. No migration, write or
-core payload change; one-shot FIFO/JNI transport only, thumbnail cache still open.
+core payload change. Android keys a transient 4 MiB/64-entry thumbnail LRU by
+media type plus SHA-256 after resolving live metadata. Each miss uses the verified
+asset read and compares its bytes with that frozen digest off main before decoding
+within 16,384 pixels. Published thumbnails retain source geometry, share content
+across document IDs/paths and survive Activity recreation through CoreSession.
+No thumbnail bytes/negative results are persisted; process restart rebuilds the
+cache. Eviction drops references without recycling published pixels.
 
 `load_epub_image_asset(document_id, ReaderImageAsset)` reads one exact asset key
 in a read transaction, requiring a live EPUB document, EPUB metadata and imported-
@@ -168,7 +174,9 @@ writes or additional asset reads; page changes/close dispose viewer state.
 Static SVG assets now use the same verified bytes/pixel-bounded Android decoder,
 with XML/reference preflight and no resource I/O. Fractional SVG source dimensions
 are presentation-only, never stored or used for text positions. Compound SVG
-resources and covers remain unfinished. No schema migration is needed.
+resources remain unfinished. Library covers use the same bounded decoder with a
+smaller pixel budget; all cache/bitmap data stays outside SQLite/core state.
+No schema migration is needed.
 
 `open_document_reader_snapshot` alone resets finished books to the first chapter's
 start. Snapshot/analysis/settings validation and reset share one immediate

@@ -87,9 +87,30 @@ media type and 32-byte SHA-256 without copying source/chapter/image BLOBs or
 loading dictionaries. The read checks live EPUB metadata, declared-asset presence,
 path/media/digest shape and the 32 MiB asset limit. Absent/deleted/non-EPUB IDs and
 books without covers return `on_no_cover`; damaged live cover metadata returns an
-error. The digest advertises a future thumbnail cache key; it does not verify
+error. The digest advertises a thumbnail cache key; it does not verify
 pixels. A cache miss must fetch bytes through the verified asset API before
-decoding/publication. Android thumbnail caching/display remain unimplemented.
+decoding/publication.
+
+CoreSession also owns a main-thread EpubCoverLoader and a 4 MiB/64-entry memory
+LRU keyed by exact media type plus SHA-256. Lazy Library rows resolve live cover
+metadata on every new display request, including hits, so missing/deleted/non-EPUB
+documents cannot reuse an old document-ID entry. Misses use the same serial image
+pipeline as reader pages, with <=16,384 pixels (64 KiB ARGB) per cover and an
+additional off-main SHA-256 check against the frozen reference before decoding.
+This closes a metadata/asset-read race; new bytes never populate an old digest key.
+Only successful decodes enter the LRU. Content can share pixels across document
+IDs/paths; there is no negative cache or disk cache. Recreation retains the LRU;
+process restart rebuilds it from verified saved assets. Eviction/close drop
+references without recycling published bitmaps, which Compose may still hold.
+The retained-cache budget excludes visible/evicted images awaiting GC.
+
+Library covers fit a 48x64dp frame at their source ratio. Loading, absence and
+failure use a decorative generic document icon; title/progress/finish and the
+whole-row OpenReader action remain available. Errors do not become core storage
+errors or mutate progress/history. Disposing a row removes queued work, cancels
+image delivery and drains accepted metadata callbacks; returning to Library or
+redisplaying a disposed row retries failures. Cover metadata and image work share
+the existing native FIFO and load no dictionaries. No new core/FFI/schema API.
 
 The per-request listener runs once on the FIFO worker and drops after delivery;
 accepted reads drain even after bridge closure. Callbacks must remain nonblocking.
@@ -145,7 +166,7 @@ leaving the reader or closing the viewer disposes it. Closing/reopening starts a
 fit. Canvas/button/key input in the separate window resets reader idle accounting.
 The shared viewer accepts an ImageBitmap, source dimensions and loading/error/retry
 callbacks, with no EPUB, storage, networking or core dependency. Future displayed
-Nostr images can use it. SVG compound resources, cover caching and source ruby
+Nostr images can use it. SVG compound resources and source ruby
 remain open. Settings ships AndroidSVG attribution and its full license offline.
 
 Shared file preflight and TXT/SRT/EPUB Existing results now carry `LibraryDocument`
@@ -174,8 +195,8 @@ into a Library summary; no reader auto-opens. Direct per-file cancellation reach
 queued/load/chapter work and uses the existing commit gate. Background release,
 engine-failure eviction and later-file retries share the existing analyzer cache.
 Android mixed selection, reader text formatting/website links and raster/static
-SVG images with the shared viewer are connected; ruby, SVG compound resources
-and covers remain open.
+SVG images with the shared viewer and Library cover thumbnails are connected;
+ruby and SVG compound resources remain open.
 
 Its SRT parser
 accepts decoded text and returns canonical LF text plus ordered UTF-8 cue ranges.
@@ -821,7 +842,7 @@ repository/FIFO/typed JNI imports are verified. EPUB persistence and ordered-cha
 reader/application/FIFO/typed JNI imports are verified. Android mixed-format
 batches use the shared retained picker/encoding/progress/Cancel/summary helper;
 reader text formatting/website links and raster/static SVG images/shared viewer
-are connected; ruby, SVG compound resources and covers remain open.
+are connected, including Library covers; ruby and SVG compound resources remain open.
 All file background notifications use the platform-only
 foreground lease described above. Legacy imports
 are not automatically rescanned.
