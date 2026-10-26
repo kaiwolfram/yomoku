@@ -37,13 +37,13 @@ class EpubImageLoaderTest {
         val loader =
             EpubImageLoader(
                 read = { key, listener -> reads.add(key to listener) },
-                decode = { bytes, budget ->
+                decode = { bytes, budget, mediaType ->
                     check(Looper.myLooper() != Looper.getMainLooper())
                     if (decodeCount.incrementAndGet() == 1) {
                         entered.countDown()
                         check(release.await(10, TimeUnit.SECONDS))
                         DecodedEpubImage(staleBitmap, 2, 1)
-                    } else decodeEpubImage(bytes, budget)
+                    } else decodeEpubImage(bytes, budget, mediaType)
                 },
             )
         try {
@@ -87,7 +87,7 @@ class EpubImageLoaderTest {
         val loader =
             EpubImageLoader(
                 read = { _, listener -> reads.add(listener) },
-                decode = { _, _ ->
+                decode = { _, _, _ ->
                     decodeCount.incrementAndGet()
                     error("cancelled decode")
                 },

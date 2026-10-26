@@ -141,6 +141,7 @@ kotlin {
 }
 
 dependencies {
+    implementation(libs.androidsvg)
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.lifecycle.viewmodel)

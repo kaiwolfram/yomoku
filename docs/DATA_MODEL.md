@@ -24,7 +24,8 @@ analyzed as body text. Preserve repeated placements, storing bytes once per path
 SVG image wrappers resolve `href`/`xlink:href`; SVG spine items become image-only
 chapters. EPUB 3 cover-image and EPUB 2 cover metadata resolve to the image map.
 Image dimensions/bitmaps are transient Android presentation data; no dimensions or
-cover cache are persisted. Platform raster images now render at source positions.
+cover cache are persisted. Raster and bounded static SVG images render at source
+positions through the Android loader.
 
 Stored/Deflate ZIP reading is memory-only. Resolve relative/percent-encoded paths
 once, reject traversal outside the container, aliases/duplicate entries, symlinks,
@@ -154,7 +155,10 @@ dimensions are transient. The full-screen viewer shares those bitmaps and stores
 only its placement selection, zoom and normalized source focus in Compose saved
 instance state for configuration changes. It makes no progress/history/vocabulary
 writes or additional asset reads; page changes/close dispose viewer state.
-Covers and SVG rendering remain unfinished. No schema migration is needed.
+Static SVG assets now use the same verified bytes/pixel-bounded Android decoder,
+with XML/reference preflight and no resource I/O. Fractional SVG source dimensions
+are presentation-only, never stored or used for text positions. Compound SVG
+resources and covers remain unfinished. No schema migration is needed.
 
 `open_document_reader_snapshot` alone resets finished books to the first chapter's
 start. Snapshot/analysis/settings validation and reset share one immediate

@@ -10,12 +10,12 @@ import android.view.KeyEvent
 import androidx.activity.compose.setContent
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
-import androidx.compose.ui.unit.IntSize
 import androidx.lifecycle.ViewModelProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -235,7 +235,7 @@ class ImageViewerTest {
             compose.activity.setContent {
                 ImageViewer(
                     image.value,
-                    IntSize(64, 32),
+                    Size(64f, 32f),
                     "shared image",
                     loading.value,
                     { retries++ },

@@ -35,11 +35,15 @@ import app.yomoku.shared.ViewModel
 internal fun SettingsScreen(view: ViewModel, dispatch: (Event) -> Unit) {
     var showNotices by rememberSaveable { mutableStateOf(false) }
     var showWordNotices by rememberSaveable { mutableStateOf(false) }
+    var showSvgNotices by rememberSaveable { mutableStateOf(false) }
     if (showNotices) {
         SudachiNotices(onDismiss = { showNotices = false })
     }
     if (showWordNotices) {
         WordDictionaryNotices(onDismiss = { showWordNotices = false })
+    }
+    if (showSvgNotices) {
+        SvgNotices(onDismiss = { showSvgNotices = false })
     }
     Column(
         modifier =
@@ -100,6 +104,9 @@ internal fun SettingsScreen(view: ViewModel, dispatch: (Event) -> Unit) {
         }
         TextButton(onClick = { showWordNotices = true }) {
             Text(stringResource(R.string.word_dictionary_notices_title))
+        }
+        TextButton(onClick = { showSvgNotices = true }) {
+            Text(stringResource(R.string.svg_notices_title))
         }
     }
 }

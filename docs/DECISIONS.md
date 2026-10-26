@@ -2416,3 +2416,42 @@ existing behavior. The modal owns system Back and gesture input, preventing pans
 from reaching reader completion swipes. Observe its pointer/key/control input for
 the existing five-minute reader idle policy because Activity does not see dialog
 input. No schema, permission, core/FFI or destructive-semantics change.
+
+## 2026-10-26 — Bounded static SVG decoding
+
+Use the unmodified `com.caverock:androidsvg-aar:1.4` library, pinned after reviewing
+the [upstream release/API documentation](https://bigbadaboom.github.io/androidsvg/download.html)
+and published 1.4 source archive. It adds a roughly 200 KiB AAR, no transitive
+dependencies/native code, and Apache-2.0 attribution/license shipped offline in
+Settings. This is a routine renderer dependency within the planned SVG slice;
+it adds no new platform, image framework or browser. Provenance is recorded in
+`third_party/androidsvg/README.md`.
+
+Select SVG only from the already verified exact media type and keep parsing and
+software Canvas rendering on the existing serial decode executor. Reuse page
+sharing, disposal/cancellation, Retry, pixel budgets and the viewer. Validate
+dimensions/viewBox and render directly into a <=2048-edge bitmap within the
+asset's share of the 16 MiB page budget. Preserve fractional source dimensions in
+Compose `Size`, independently of bitmap rounding, including viewer fit/zoom/pan.
+
+Preflight untrusted XML before AndroidSVG constructs its tree: <=2 MiB, <=4096
+elements, <=64 nested/reference levels and <=32768 expanded nodes, rejecting
+duplicate/missing/local-reference cycles and exponential `<use>` expansion.
+Reject DTDs/processing instructions and disable internal entities (enabled by
+default upstream). Install no external resource resolver. In SVG styles support
+color/class rules and inline local paint/clip references; reject resource-valued
+stylesheet rules whose owning node cannot be established for the reference graph.
+Handle the renderer's permissive unclosed `url(` syntax too.
+
+Do not pass compound `<image>` assets to this renderer: its embedded data-URI
+rasters bypass BitmapFactory sampling. Keep these, active/unsupported elements,
+invalid/over-budget inputs and rendering failures on the existing alt/Retry
+fallback. Compound local/data-URI image support remains an explicit continuation,
+alongside cover caching. SVG anchors are inert bitmap pixels; EPUB text links
+retain browser behavior, internal links remain inert, and image taps open the
+shared viewer. Patterns/masks/markers also retain fallback: inherited paint on
+their rendered descendants can recurse through resources outside the explicit
+reference graph. A bounded resource renderer must handle those before enabling them.
+Pixel bounds are not a total heap/CPU guarantee; temporary Canvas
+layers and library structures remain bounded by input/structure rather than a
+measured process cap. No core/FFI/schema/permission/destructive-semantics change.

@@ -1,5 +1,5 @@
 # Resume here
-Updated: 2026-10-26. Shared full-screen image zoom/pan verified on phone/tablet.
+Updated: 2026-10-26. Bounded static SVG decoding/rendering added; results below.
 ## Working
 - Pure Crux routes/Library/Settings; Render-only UI; FIFO SQLite/analysis; Library start.
 - Chapter-local UTF-8 position/whole-book percentage/five presets persist; reflow
@@ -10,9 +10,8 @@ Updated: 2026-10-26. Shared full-screen image zoom/pan verified on phone/tablet.
 - Generic loads are read-only; explicit finished-book open alone resets first
   chapter/page/preset/B atomically. Finish survives movement/time/reflow; deletion
   resets it while preserving history. Missing analysis never rescans.
-- App/FIFO/typed bridge retains ordered ReaderDocument snapshots on loads/opens/saves.
-  Accepted opens freeze keyed original B/Missing per chapter; plain loads cannot
-  replace it. Previous crosses chapters; whole-book counters/progress.
+- App/FIFO/JNI retains ordered ReaderDocument snapshots and frozen keyed original
+  B/Missing per chapter. Plain loads preserve it; Previous crosses chapters.
 - Token reads atomically load original B/live statuses/metadata + clipped UTF-8
   ranges; completion owns token start. Deleted IDs absent. Whole-chapter validation.
   Full page/base/result identities gate callbacks; movement/reflow/refresh invalidate.
@@ -56,24 +55,25 @@ Updated: 2026-10-26. Shared full-screen image zoom/pan verified on phone/tablet.
   BitmapFactory rejects >32768-edge/100 MP sources, samples to <=2048-edge and each
   distinct asset's share of 16 MiB page pixels. Repeated assets share one bitmap.
   Disposed/reflow/recreation requests cancel delivery; accepted callbacks drain.
-- Compose replaces exact U+FFFC scalars with source-position/ratio raster images;
-  tall frames cap at 8192px. Text/styles/word/link identities stay intact; local zero
-  text targets stop adjacent-link capture. Alt/loading/failure + Retry; SVG fallback.
+- Compose replaces exact U+FFFC scalars with source-position/ratio images;
+  tall frames cap at 8192px; styles/word/link identities stay intact. Local zero text
+  targets stop adjacent-link capture. Alt/loading/failure + Retry for unsupported data.
 - Image taps open source-agnostic full-window Dialog with 1–8x fit zoom/clamped pan,
   Zoom in/out/Reset/Close and Back. Reuses page bitmap; sampled detail stays bounded.
   Selection/zoom/normalized focus survive rotation/recreation; close/page change resets.
   Modal gestures cannot complete pages; pointer/key input resets reader idle policy.
+- Reviewed AndroidSVG 1.4 renders static vectors on the same executor/pixel budget.
+  Fractional geometry survives layout/viewer. Preflight <=2 MiB/4096 nodes/64 levels/
+  32768 expansions; no DTD/entities/resource I/O/cycles. Paths/uses/gradients/color
+  CSS work; nested images, patterns/masks/markers and resource-valued stylesheet
+  rules retain alt/Retry. Attribution/full license ship offline in Settings.
 ## Next tasks (ordered)
-1. Complete SVG rendering and EPUB cover cache (review any new dependency first).
+1. Complete remaining SVG resources and EPUB cover cache; preserve bounded decoding.
 2. Bundle Noto Serif JP/font/line/default-off furigana (source ruby preferred).
 3. CI host/unsigned builds is independent. Physical arm64 remains user-deferred;
    Nostr configuration empty, Q188 unresolved.
 ## Verification
-- Both-ABI debug/test APKs, strict lint, Kotlin formatting/diff pass. Six new viewer
-  tests pass on API-36 x86_64 phone/light + tablet/dark (both rotations/recreation);
-  eight image/formatting/navigation regressions pass. No open blocker.
-- Reports: .local/test-reports/image-viewer/. Exact commands, corrected test-input/
-  inset-measurement assumptions, limits/unrun checks: DEVELOPMENT.md end. Prior
-  425 Rust tests/strict Clippy/host JNI/repeat bindings remain unchanged baseline.
-- Gradle/adb needed approved outside-sandbox sockets. AVD remains running; size,
-  density/night/rotation restored. No dependency/schema/permission change.
+- Both-ABI APKs/lint/formatting/diff, 21 phone tests + final three SVG fixtures pass;
+  11 tablet/dark cases pass. Exact commands/results/limits: DEVELOPMENT.md end.
+  Reports: .local/test-reports/epub-svg/. Prior 425 Rust/Clippy/JNI/bindings baseline
+  unchanged, not rerun. No schema/FFI/permission change; phone overrides restored.

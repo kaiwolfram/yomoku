@@ -2,6 +2,7 @@ package app.yomoku
 
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.unit.IntSize
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import org.junit.Assert.*
@@ -11,7 +12,7 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class ImageViewerGeometryTest {
     private val viewport = IntSize(400, 600)
-    private val source = IntSize(800, 400)
+    private val source = Size(800f, 400f)
 
     @Test
     fun fitUsesSourceRatioAndCentersLetterboxingIncludingExtremeImages() {
@@ -19,12 +20,15 @@ class ImageViewerGeometryTest {
             Rect(0f, 200f, 400f, 400f),
             imageViewerRect(viewport, source, ImageViewerTransform()),
         )
-        val tall =
-            checkNotNull(imageViewerRect(viewport, IntSize(1, 32768), ImageViewerTransform()))
+        val tall = checkNotNull(imageViewerRect(viewport, Size(1f, 32768f), ImageViewerTransform()))
         assertEquals(600f, tall.height, 0.001f)
         assertEquals(32768f, tall.height / tall.width, 20f) // Float rounding at centered subpixels.
         assertNull(imageViewerRect(IntSize.Zero, source, ImageViewerTransform()))
-        assertNull(imageViewerRect(viewport, IntSize(1, 0), ImageViewerTransform()))
+        assertNull(imageViewerRect(viewport, Size(1f, 0f), ImageViewerTransform()))
+        assertNull(imageViewerRect(viewport, Size(Float.NaN, 1f), ImageViewerTransform()))
+        val fractional =
+            checkNotNull(imageViewerRect(viewport, Size(160.5f, 80.25f), ImageViewerTransform()))
+        assertEquals(2f, fractional.width / fractional.height, 0.0001f)
     }
 
     @Test
@@ -76,7 +80,7 @@ class ImageViewerGeometryTest {
 
     @Test
     fun normalizedFocusRetainsSourceLocationAcrossRotationAndViewportChanges() {
-        val source = IntSize(800, 800)
+        val source = Size(800f, 800f)
         val transform = ImageViewerTransform(4f, 0.6f, 0.4f)
         for (size in
             listOf(

@@ -15,6 +15,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.ImageBitmap
@@ -52,10 +53,17 @@ internal data class ImageViewerTransform(
 
 internal fun imageViewerRect(
     viewport: IntSize,
-    source: IntSize,
+    source: Size,
     transform: ImageViewerTransform,
 ): Rect? {
-    if (viewport.width <= 0 || viewport.height <= 0 || source.width <= 0 || source.height <= 0)
+    if (
+        viewport.width <= 0 ||
+            viewport.height <= 0 ||
+            !source.width.isFinite() ||
+            !source.height.isFinite() ||
+            source.width <= 0 ||
+            source.height <= 0
+    )
         return null
     val fit =
         minOf(viewport.width.toFloat() / source.width, viewport.height.toFloat() / source.height)
@@ -72,7 +80,7 @@ internal fun imageViewerRect(
 /** Zoom about the gesture centroid, then clamp panning so the image cannot be lost offscreen. */
 internal fun transformImageViewer(
     viewport: IntSize,
-    source: IntSize,
+    source: Size,
     transform: ImageViewerTransform,
     centroid: Offset,
     pan: Offset,
@@ -105,7 +113,7 @@ internal fun transformImageViewer(
 @Composable
 internal fun ImageViewer(
     bitmap: ImageBitmap?,
-    sourceSize: IntSize,
+    sourceSize: Size,
     description: String,
     loading: Boolean,
     onRetry: (() -> Unit)?,

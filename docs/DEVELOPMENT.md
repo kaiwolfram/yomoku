@@ -3130,3 +3130,68 @@ JNI/binding repeat/standalone dictionary/Python/release/process-death/reboot or
 physical-arm64 checks were rerun for this Android-only slice; physical arm64 remains
 user-deferred. Complete EPUB integrity reads and total process-heap costs retain
 their earlier limitations.
+
+## Bounded static EPUB SVG images
+
+Verified 2026-10-26 using the Rust PATH/JDK/SDK/Gradle environment above:
+
+```sh
+./android/gradlew -p android :app:dependencies --configuration debugRuntimeClasspath --console=plain
+tools/format-kotlin.sh --check
+git diff --check
+./android/gradlew -p android :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug --console=plain
+./android/gradlew -p android :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=app.yomoku.EpubSvgDecodeTest,app.yomoku.EpubImageDecodeTest,app.yomoku.EpubImageLoaderTest,app.yomoku.ReaderImagesTest,app.yomoku.ImageViewerGeometryTest,app.yomoku.ImageViewerTest,app.yomoku.ReaderFormattingTest,app.yomoku.ReaderNavigationTest --offline --console=plain
+# Final additional inherited-paint guard: rebuild/lint and rerun the SVG fixtures.
+./android/gradlew -p android :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=app.yomoku.EpubSvgDecodeTest --offline --console=plain
+/home/kai/Android/Sdk/platform-tools/adb -s emulator-5554 shell wm size 2560x1600
+/home/kai/Android/Sdk/platform-tools/adb -s emulator-5554 shell wm density 240
+/home/kai/Android/Sdk/platform-tools/adb -s emulator-5554 shell cmd uimode night yes
+./android/gradlew -p android :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=app.yomoku.EpubSvgDecodeTest,app.yomoku.ReaderImagesTest,app.yomoku.ImageViewerGeometryTest,app.yomoku.ImageViewerTest --offline --console=plain
+/home/kai/Android/Sdk/platform-tools/adb -s emulator-5554 shell wm size reset
+/home/kai/Android/Sdk/platform-tools/adb -s emulator-5554 shell wm density reset
+/home/kai/Android/Sdk/platform-tools/adb -s emulator-5554 shell cmd uimode night no
+/home/kai/Android/Sdk/platform-tools/adb -s emulator-5554 shell wm user-rotation
+```
+
+PASS: both-ABI debug/test APKs, strict Android lint, Kotlin formatting/diff, 21
+API-36 x86_64 phone/light tests (5m55s), final three SVG fixtures after adding the
+inherited-paint fallback guard (17s including build/lint), and 11 tablet/dark cases
+(1m44s). The three SVG cases are new; reader-image/geometry fixtures now cover SVG,
+fractional source sizes and offline notices. The broader phone run retains raster,
+loader cancellation/serialization, viewer, website formatting and navigation/
+completion regressions. Reports/logs: `.local/test-reports/epub-svg/{phone,final-phone,tablet-dark}/`.
+
+Fixtures verify actual blue/gradient/transparent pixels, paths/transforms/local
+uses/color CSS, UTF-16 XML, physical units/viewBox/fractional sizes, byte/dimension/
+pixel/edge bounds down to one pixel and wrong media types. Rejected inputs include
+DTD/entities, stylesheet imports, nested/data/file/remote image resources,
+malformed XML, duplicate/missing references, direct/indirect/unclosed-IRI cycles,
+deep/large/exponential graphs and inherited pattern paint. A later valid decode
+still succeeds. Actual imported EPUB tests verify source order/ratio, repeated
+asset identity, style/word taps, external browser versus inert internal text,
+SVG/EPUB image anchors opening only the viewer, zoomed pixels, recreation/reflow/
+chapter disposal, image-only completion and full offline credits after recreation.
+Viewer rotation/Back/pan/idle/retry regressions pass in both display configurations.
+
+AndroidSVG 1.4 AAR/source APIs, embedded-raster behavior and entity defaults were
+reviewed against upstream documentation and the published source archive before
+adoption. Maven POM/dependency report confirms no transitive dependencies; exact
+artifact/source SHA-256 and license provenance are in `third_party/androidsvg/`.
+APK inspection confirms both native ABIs and the complete bundled SVG notices.
+
+Initial strict lint flagged platform `Bitmap.createBitmap` (UseKtx); switched to
+the already available KTX API, and final lint passes. The existing unrelated
+FileImports autoboxing hint remains informational. Gradle's sandbox wildcard-IP
+socket failed; approved outside-sandbox runs/downloads pass. The emulator was
+disconnected; restarted the existing AVD with documented swangle/KVM flags without
+wiping data. One install attempt raced boot and ran zero tests; after checking
+`sys.boot_completed=1`, the complete suite passed. No open verification blocker.
+Restored/verified 1080x2400, 420dpi, light mode and free rotation; AVD remains running.
+
+Only bounded static SVG is delivered. Nested image resources, patterns/masks/
+markers and resource-valued stylesheet rules retain alt/Retry until bounded
+resource rendering exists; cover caching and source ruby remain open. Canvas may
+allocate temporary layers beyond the retained page pixel budget; no total heap/
+CPU or large-book benchmark claim. No core/FFI/schema/permission change. Rust/
+Clippy/host JNI/bindings, standalone dictionaries/Python, release, process-death/
+reboot and physical arm64 were not rerun; arm64 remains user-deferred.

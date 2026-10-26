@@ -67,16 +67,16 @@ class ReaderImagesTest {
     }
 
     @Test
-    fun realEpubImagesKeepSourceOrderRatioStylesWordIdentityRecreationAndChapterNavigation() {
+    fun realEpubSvgImagesKeepSourceOrderRatioStylesWordIdentityRecreationAndChapterNavigation() {
         compose.waitUntil(30_000) { !core().view.storageBusy }
         val title = "inline-images-${System.nanoTime()}"
-        val path = "images/挿絵.png"
+        val path = "images/挿絵.svg"
         val bytes =
             FileImportFixtures.epub(
                 title,
                 """<p><strong>😀𠮷前<img src='$path' alt='一枚目'/>後</strong> 猫。</p>
             <p><a href='https://example.org/'>外部<img src='$path' alt='二枚目'/>site</a> <a href='two.xhtml'>note</a></p>""",
-                images = mapOf(path to ("image/png" to rasterImageBytes(64, 16))),
+                images = mapOf(path to ("image/svg+xml" to svgImageBytes())),
                 secondBody = "<img src='$path' alt='絵だけの章'/>",
             )
         compose.runOnUiThread {
@@ -139,6 +139,14 @@ class ReaderImagesTest {
                 true,
             )
         try {
+            // An SVG's own anchor and the surrounding EPUB anchor stay inert on image taps.
+            compose.onNodeWithTag("reader_image_1").performScrollTo().performClick()
+            compose.onNodeWithTag("image_viewer_canvas").assertContentDescriptionEquals("二枚目")
+            compose.onNodeWithTag("image_viewer_zoom_in").performClick()
+            val pixels = compose.onNodeWithTag("image_viewer_canvas").captureToImage().toPixelMap()
+            assertEquals(1f, pixels[pixels.width / 2, pixels.height / 2].blue, 0.01f)
+            assertEquals(0, monitor.hits)
+            compose.onNodeWithTag("image_viewer_close").performClick()
             tapWord("site")
             assertEquals(1, monitor.hits)
             tapWord("note")
@@ -172,6 +180,25 @@ class ReaderImagesTest {
         }
         compose.onNodeWithTag("page_length_250").performClick()
         compose.waitUntil(30_000) { !core().view.storageBusy }
+        compose.onNodeWithText("SVG renderer credits").performScrollTo().performClick()
+        compose.waitUntil(30_000) {
+            compose.onAllNodesWithTag("svg_notices_text").fetchSemanticsNodes().any {
+                it.config[SemanticsProperties.Text]
+                    .single()
+                    .text
+                    .contains("END OF TERMS AND CONDITIONS")
+            }
+        }
+        compose.activityRule.scenario.recreate()
+        compose.waitUntil(30_000) {
+            compose.onAllNodesWithTag("svg_notices_text").fetchSemanticsNodes().any {
+                it.config[SemanticsProperties.Text]
+                    .single()
+                    .text
+                    .contains("Copyright 2013 Paul LeBeau")
+            }
+        }
+        compose.onNodeWithText("Close").performClick()
         compose.runOnUiThread { core().dispatch(Event.CloseSettings) }
         awaitReader()
         awaitImages(2)

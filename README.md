@@ -87,7 +87,9 @@ and renders at source position/ratio, preserving text/link/word identities and
 discarding disposed requests. Tapping an image opens the shared full-screen viewer
 with bounded pinch zoom/pan, accessible controls and rotation/recreation recovery.
 It reuses the page bitmap and isolates gestures from reader completion swipes.
-SVG images, covers and source ruby remain pending.
+Bounded static SVGs also render off main with fractional source ratios and offline
+renderer credits. Compound SVG image resources, covers and source ruby remain
+pending.
 The pure [SRT parser](crates/yomoku-import/src/srt.rs) has host fixtures for cue
 boundaries, formatting, speakers and malformed input. Its atomic repository now
 persists original bytes/encoding, canonical cues, Mode B and vocabulary registrations
@@ -101,7 +103,8 @@ and share direct cancellation. Host fixtures cover later-chapter/write/commit
 rollback, duplicates, original analysis/status/progress and failed-file recovery.
 Android supports mixed EPUB/TXT/SRT batches, per-file encoding/errors, progress,
 Cancel and completion summaries. Imports return to Library without opening a reader.
-Planned v1 features include SVG images/covers/ruby, custom missing-word definitions,
+Planned v1 features include compound SVG resources/covers/ruby, custom missing-word
+definitions,
 reading statistics, optional AnkiDroid integration, curated Nostr reading and
 manual encrypted backups. See the [product specification](docs/PRODUCT_SPEC.md)
 for scope and the [implementation checklist](docs/IMPLEMENTATION_PLAN.md) for
@@ -229,4 +232,5 @@ specification is the source of truth; record routine technical choices in
 Original Yomoku code is licensed under the [MIT License](LICENSE). Third-party
 engine code and dictionary data retain their own licenses and attribution
 requirements; see the [Sudachi notices](third_party/sudachi/README.md) and
-[JMdict/JMnedict notices](third_party/dictionaries/README.md).
+[JMdict/JMnedict notices](third_party/dictionaries/README.md), and
+[AndroidSVG notices](third_party/androidsvg/README.md).

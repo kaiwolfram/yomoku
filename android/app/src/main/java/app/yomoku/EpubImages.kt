@@ -4,6 +4,7 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.os.Handler
 import android.os.Looper
+import androidx.compose.ui.geometry.Size
 import app.yomoku.nativebridge.EpubAssetError
 import app.yomoku.nativebridge.EpubAssetListener
 import app.yomoku.shared.ReaderImageAsset
@@ -18,12 +19,22 @@ internal const val EPUB_IMAGE_EDGE = 2048
 
 internal data class EpubImageKey(val documentId: Long, val asset: ReaderImageAsset)
 
-internal data class DecodedEpubImage(val bitmap: Bitmap, val width: Int, val height: Int)
+internal data class DecodedEpubImage(
+    val bitmap: Bitmap,
+    val width: Int,
+    val height: Int,
+    val sourceSize: Size = Size(width.toFloat(), height.toFloat()),
+)
 
-/** Bounds-first platform decode. The source ratio is independent of sample-size rounding. */
-internal fun decodeEpubImage(bytes: ByteArray, pixelBudget: Int): DecodedEpubImage? {
+/** Bounds-first raster or preflighted SVG decode; source geometry stays separate from pixels. */
+internal fun decodeEpubImage(
+    bytes: ByteArray,
+    pixelBudget: Int,
+    mediaType: String = "image/png",
+): DecodedEpubImage? {
     check(Looper.myLooper() != Looper.getMainLooper())
     if (bytes.isEmpty() || bytes.size > 32 * 1024 * 1024 || pixelBudget < 1) return null
+    if (mediaType == "image/svg+xml") return decodeEpubSvg(bytes, pixelBudget)
     return try {
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
@@ -64,7 +75,7 @@ internal fun decodeEpubImage(bytes: ByteArray, pixelBudget: Int): DecodedEpubIma
 internal class EpubImageLoader(
     private val read: (EpubImageKey, EpubAssetListener) -> Unit,
     private val executor: ExecutorService = Executors.newSingleThreadExecutor(),
-    private val decode: (ByteArray, Int) -> DecodedEpubImage? = ::decodeEpubImage,
+    private val decode: (ByteArray, Int, String) -> DecodedEpubImage? = ::decodeEpubImage,
 ) : AutoCloseable {
     private val main = Handler(Looper.getMainLooper())
     private val queue = ArrayDeque<Request>()
@@ -124,7 +135,7 @@ internal class EpubImageLoader(
                         executor.execute {
                             val image =
                                 if (request.cancelled.get()) null
-                                else decode(bytes, request.pixelBudget)
+                                else decode(bytes, request.pixelBudget, mediaType)
                             main.post { finish(request, image) }
                         }
                     } catch (_: java.util.concurrent.RejectedExecutionException) {

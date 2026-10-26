@@ -1845,3 +1845,24 @@
   next, then Noto/font/furigana and CI. No dependency/schema/FFI/permission change
   or open blocker. Zoom detail stays at sampled page resolution; unrun checks in
   DEVELOPMENT.md. Physical arm64 remains user-deferred.
+
+## 2026-10-26 — Bounded static SVG images
+
+- Added reviewed/pinned AndroidSVG 1.4 to the existing serial asset/decode pipeline,
+  sharing page pixels, cancellation, Retry and the viewer. Streaming XML/reference
+  preflight rejects excessive/recursive input and unbounded compound paint/image
+  resources; no external resolver/entities. Fractional source geometry stays exact
+  through inline layout and viewer fit/zoom/pan. Offline Settings ships full credits.
+- PASS: both-ABI APKs, strict lint, Kotlin formatting/diff, 21 phone/light tests,
+  final three SVG guard fixtures and 11 tablet/dark tests. Pixel/geometry/UTF-16/
+  bounds/cycle fixtures and actual EPUB word/link/recreation/chapter/credits checks
+  pass with existing raster/loader/viewer/navigation regressions. Reports:
+  .local/test-reports/epub-svg/; commands/failures/limits in DEVELOPMENT.md end.
+- Corrected UseKtx lint; restarted disconnected AVD without wipe and retried one
+  pre-boot install failure. Final checks pass; original phone/light/free-rotation
+  overrides restored. Approved sockets/downloads needed; no open blocker.
+- Updated plan/architecture/data/decisions/README/handoff and renderer provenance.
+  Remaining SVG compound resources/complex paint/stylesheet references and EPUB
+  cover cache stay unchecked; font/furigana and CI follow. No core/FFI/schema/
+  permission change. Total heap/large-book performance unmeasured; host/Rust/
+  release/process-death checks not rerun, physical arm64 remains user-deferred.

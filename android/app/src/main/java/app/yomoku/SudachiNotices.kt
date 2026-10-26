@@ -44,6 +44,18 @@ internal val wordDictionaryNoticeNames =
     )
 
 @Composable
+internal fun SvgNotices(onDismiss: () -> Unit) {
+    OfflineNotices(
+        title = stringResource(R.string.svg_notices_title),
+        attribution = stringResource(R.string.svg_attribution),
+        root = "androidsvg",
+        names = listOf("ATTRIBUTION.txt", "LICENSE-2.0.txt"),
+        tag = "svg_notices_text",
+        onDismiss = onDismiss,
+    )
+}
+
+@Composable
 internal fun WordDictionaryNotices(onDismiss: () -> Unit) {
     OfflineNotices(
         title = stringResource(R.string.word_dictionary_notices_title),

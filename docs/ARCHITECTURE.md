@@ -91,6 +91,20 @@ The 4,194,304-pixel page budget is divided among distinct assets (16 MiB ARGB),
 with a 2048-pixel sampled edge limit. BitmapFactory reads bounds first, rejects
 sources above 32768 pixels per edge/100 megapixels and power-of-two samples before
 allocation; actual allocation is checked too. Dimensions retain the source ratio.
+Verified `image/svg+xml` assets select AndroidSVG 1.4 on that same executor.
+Before library parsing, a streaming XML preflight caps input at 2 MiB, 4096
+elements, 64 nested/reference levels and 32768 expanded nodes. It rejects DTDs,
+processing instructions, compound `<image>` resources, active/unsupported
+elements, patterns/masks/markers, duplicate IDs, missing/nonlocal references and
+recursive/explosive
+reference graphs. Color/class SVG styles are supported; resource-valued rules
+must be inline so the owning element participates in the reference graph.
+Entities are disabled and no external file/font/CSS resolver is installed.
+Validated intrinsic dimensions or the viewBox determine the source ratio, with
+the raster source-dimension limits; Canvas renders directly into a bitmap within
+the same edge/page-pixel bounds. Fractional source sizes stay separate from
+integer bitmap sizes, through inline layout and viewer geometry. Bitmap budgets
+bound retained page pixels, not temporary renderer layers or total process heap.
 Disposed page requests release their delivery closures, remove queued work and
 suppress late decode/delivery. Close cancels the queue and shuts down the executor;
 accepted native callbacks still drain. Only unpublished discarded bitmaps recycle
@@ -104,7 +118,8 @@ Normal images fill the text column at source ratio; extremely tall images shrink
 within an 8192-physical-pixel frame while retaining ratio. Canonical text/anchors,
 pagination, time and counts do not change. Unsupported/corrupt raster or SVG bytes
 show source alt text and an explicit Retry without changing reader storage errors.
-Platform BitmapFactory raster formats are supported. Tapping a decoded image opens
+Platform BitmapFactory raster formats and bounded static SVGs are supported.
+Tapping a decoded image opens
 the source-agnostic Compose ImageViewer, reusing the same bounded bitmap without
 another asset read/decode or a larger allocation. A separate full-window Dialog
 isolates pinch/pan from reader completion swipes and routes Back to modal dismissal.
@@ -120,7 +135,8 @@ leaving the reader or closing the viewer disposes it. Closing/reopening starts a
 fit. Canvas/button/key input in the separate window resets reader idle accounting.
 The shared viewer accepts an ImageBitmap, source dimensions and loading/error/retry
 callbacks, with no EPUB, storage, networking or core dependency. Future displayed
-Nostr images can use it. SVG rendering, cover caching and source ruby remain open.
+Nostr images can use it. SVG compound resources, cover caching and source ruby
+remain open. Settings ships AndroidSVG attribution and its full license offline.
 
 Shared file preflight and TXT/SRT/EPUB Existing results now carry `LibraryDocument`
 references (ID, title, whole-book progress, permanent finish marker). Exact-byte
@@ -147,8 +163,9 @@ failures retain their existing errors. Created projects the committed whole book
 into a Library summary; no reader auto-opens. Direct per-file cancellation reaches
 queued/load/chapter work and uses the existing commit gate. Background release,
 engine-failure eviction and later-file retries share the existing analyzer cache.
-Android mixed selection, reader text formatting/website links and raster images
-with the shared viewer are connected; ruby, SVG rendering and covers remain open.
+Android mixed selection, reader text formatting/website links and raster/static
+SVG images with the shared viewer are connected; ruby, SVG compound resources
+and covers remain open.
 
 Its SRT parser
 accepts decoded text and returns canonical LF text plus ordered UTF-8 cue ranges.
@@ -793,8 +810,8 @@ picker/encoding/summary path are connected. SRT extraction and atomic analyzed
 repository/FIFO/typed JNI imports are verified. EPUB persistence and ordered-chapter
 reader/application/FIFO/typed JNI imports are verified. Android mixed-format
 batches use the shared retained picker/encoding/progress/Cancel/summary helper;
-reader text formatting/website links and raster images/shared viewer are connected;
-ruby, SVG rendering and covers remain open.
+reader text formatting/website links and raster/static SVG images/shared viewer
+are connected; ruby, SVG compound resources and covers remain open.
 All file background notifications use the platform-only
 foreground lease described above. Legacy imports
 are not automatically rescanned.

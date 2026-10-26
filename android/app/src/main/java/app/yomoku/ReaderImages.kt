@@ -22,6 +22,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
@@ -31,7 +32,6 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.DpSize
-import androidx.compose.ui.unit.IntSize
 import app.yomoku.shared.ReaderInlineImage
 import app.yomoku.shared.ReaderPage
 
@@ -137,10 +137,14 @@ internal fun ReaderImageContent(
                             // frame.
                             val height =
                                 with(density) {
-                                    minOf(maxWidth.toPx() * image.height / image.width, 8192f)
+                                    minOf(
+                                            maxWidth.toPx() * image.sourceSize.height /
+                                                image.sourceSize.width,
+                                            8192f,
+                                        )
                                         .toDp()
                                 }
-                            val width = height * image.width.toFloat() / image.height
+                            val width = height * image.sourceSize.width / image.sourceSize.height
                             Image(
                                 bitmap,
                                 contentDescription =
@@ -193,7 +197,7 @@ internal fun ReaderImageContent(
         key(page.documentId, page.anchor, selectedImage) {
             ImageViewer(
                 bitmap = remember(image) { image?.bitmap?.asImageBitmap() },
-                sourceSize = image?.let { IntSize(it.width, it.height) } ?: IntSize.Zero,
+                sourceSize = image?.sourceSize ?: Size.Zero,
                 description = reference.alt.ifBlank { stringResource(R.string.reader_image) },
                 loading = !results.containsKey(reference.asset),
                 onRetry = if (loader == null) null else ({ retry++ }),
