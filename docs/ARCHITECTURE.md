@@ -81,6 +81,16 @@ source bytes or unrelated assets. Missing keys/deleted documents, corruption and
 unavailable storage remain distinct responses; invalid request identities fail
 before enqueue. Reads do not repair or write anything.
 
+`NativeBridge.load_epub_cover_reference` uses a separate one-shot
+`EpubCoverListener` on the same FIFO. It returns the stored cover's opaque path,
+media type and 32-byte SHA-256 without copying source/chapter/image BLOBs or
+loading dictionaries. The read checks live EPUB metadata, declared-asset presence,
+path/media/digest shape and the 32 MiB asset limit. Absent/deleted/non-EPUB IDs and
+books without covers return `on_no_cover`; damaged live cover metadata returns an
+error. The digest advertises a future thumbnail cache key; it does not verify
+pixels. A cache miss must fetch bytes through the verified asset API before
+decoding/publication. Android thumbnail caching/display remain unimplemented.
+
 The per-request listener runs once on the FIFO worker and drops after delivery;
 accepted reads drain even after bridge closure. Callbacks must remain nonblocking.
 Android's retained CoreSession owns an EpubImageLoader with one decode executor.

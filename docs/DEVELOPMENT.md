@@ -3195,3 +3195,54 @@ allocate temporary layers beyond the retained page pixel budget; no total heap/
 CPU or large-book benchmark claim. No core/FFI/schema/permission change. Rust/
 Clippy/host JNI/bindings, standalone dictionaries/Python, release, process-death/
 reboot and physical arm64 were not rerun; arm64 remains user-deferred.
+
+## Metadata-only EPUB cover references
+
+Verified 2026-10-26 using the Rust PATH/JDK/SDK/Gradle environment above:
+
+```sh
+cargo test --workspace --all-features --locked --offline --quiet
+cargo clippy --workspace --all-targets --all-features --locked --offline -- -D warnings
+cargo fmt --all -- --check
+tools/test-kotlin-bridge.sh
+(cd crates/yomoku-ffi && CARGO_NET_OFFLINE=true ../../.local/bin/boltffi generate kotlin --deny-skipped --output ../../target/generated/native-cover-repeat)
+diff -r target/generated/native target/generated/native-cover-repeat
+tools/format-kotlin.sh --check
+.local/jdk-17/jdk-17.0.21+9/bin/java -jar .local/ktfmt-0.64.jar --kotlinlang-style --dry-run --set-exit-if-changed tests/kotlin/EpubAssetBridgeTest.kt
+./android/gradlew -p android :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug --offline --console=plain
+./android/gradlew -p android :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=app.yomoku.EpubAssetBridgeTest,app.yomoku.DocumentSessionTest,app.yomoku.ReaderFormattingTest --offline --console=plain
+git diff --check
+```
+
+PASS: 432 data-free Rust tests (seven new: three repository/three FIFO/one native),
+strict Clippy, Rust/Kotlin formatting and diff checks, complete real-Full host JNI
+suite and seven Unicode exchanges, repeatable native bindings, both-ABI debug/test
+APKs and strict Android lint. Five API-36 x86_64 phone regressions pass (1m41s).
+The normal Rust run still skips sixteen external-data tests; host JNI uses the
+prepared pinned Full/index. APK inspection confirms arm64-v8a/x86_64 JNI libraries.
+Reports/logs: `.local/test-reports/epub-cover-reference/`.
+
+New checks cover stored path/media/32-byte digest including Unicode paths,
+read-only reopen/unchanged DB, no cover/non-EPUB/absent/deleted IDs, fresh reimport
+IDs, missing metadata/assets, malformed digest/media and empty/over-budget images.
+Corrupt source/chapter/image BLOBs do not cause metadata-only reads to load/verify
+book contents; separate asset reads still reject bad bytes. Worker tests verify
+no dictionaries/Render/state/history changes, FIFO after blocked import, accepted
+callbacks draining after close, closed submission rejection and failed-open retry.
+Native tests verify invalid IDs fail before enqueue and one-shot listeners drop;
+host/Android JNI verifies actual references/digests, absence, corruption/retry,
+unchanged view and off-main callbacks. Document persistence and EPUB style/word/
+external-browser/inert-internal-link/recreation regressions pass.
+
+Initial Rust checks caught a missing test import and a corruption fixture blocked
+by schema CHECK constraints; fixed the import and explicitly bypass CHECK only in
+that corruption fixture. Final full suite/Clippy pass. Sandbox Gradle sockets fail
+with unusable wildcard IP; approved outside-sandbox offline build/tests pass.
+The existing booted AVD was reused without overrides/wipe. No open blocker.
+
+No core payload, dependency, schema or permission change. The typed native API is
+additive. A returned digest advertises metadata; future new thumbnail cache entries
+must fetch hash-verified bytes through the existing asset API before bounded
+decoding/publication. Thumbnail cache/Library display, remaining SVG resources and
+source ruby stay open. No release, tablet/dark, process-death/reboot, standalone
+dictionary benchmarks or physical-arm64 checks were rerun; arm64 remains deferred.

@@ -217,3 +217,57 @@ fn native_asset_requests_validate_before_enqueue_and_release_one_shot_listeners(
         Err(mpsc::TryRecvError::Disconnected)
     ));
 }
+
+#[test]
+fn native_cover_requests_validate_and_release_one_shot_listeners() {
+    use std::{sync::mpsc, thread, time::Duration};
+    use yomoku_ffi::native::{EpubAssetError, EpubCoverListener};
+    struct CoverListener {
+        result: mpsc::Sender<thread::ThreadId>,
+        dropped: mpsc::Sender<()>,
+    }
+    impl EpubCoverListener for CoverListener {
+        fn on_cover(&self, _: String, _: String, _: Vec<u8>) {
+            panic!("no saved cover")
+        }
+        fn on_no_cover(&self) {
+            self.result.send(thread::current().id()).unwrap();
+        }
+        fn on_error(&self, error: EpubAssetError) {
+            panic!("unexpected {error:?}")
+        }
+    }
+    impl Drop for CoverListener {
+        fn drop(&mut self) {
+            self.dropped.send(()).unwrap();
+        }
+    }
+    let (native, _) = bridge();
+    let before = native.view().unwrap();
+    for id in [0, -1, 1] {
+        let (send, receive) = mpsc::channel();
+        let (dropped, drop_receive) = mpsc::channel();
+        let result = native.load_epub_cover_reference(
+            id,
+            Box::new(CoverListener {
+                result: send,
+                dropped,
+            }),
+        );
+        if id <= 0 {
+            assert_eq!(result, Err(EpubAssetError::InvalidRequest));
+        } else {
+            result.unwrap();
+            assert_ne!(
+                receive.recv_timeout(Duration::from_secs(10)).unwrap(),
+                thread::current().id()
+            );
+        }
+        drop_receive.recv_timeout(Duration::from_secs(10)).unwrap();
+        assert!(matches!(
+            receive.try_recv(),
+            Err(mpsc::TryRecvError::Disconnected)
+        ));
+    }
+    assert_eq!(native.view().unwrap(), before);
+}

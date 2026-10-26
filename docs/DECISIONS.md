@@ -2455,3 +2455,23 @@ reference graph. A bounded resource renderer must handle those before enabling t
 Pixel bounds are not a total heap/CPU guarantee; temporary Canvas
 layers and library structures remain bounded by input/structure rather than a
 measured process cap. No core/FFI/schema/permission/destructive-semantics change.
+
+## 2026-10-26 — Metadata-only EPUB cover references
+
+Deliver the independent cover lookup before Android thumbnail caching/display.
+Keep the existing core/Library payloads unchanged: a one-shot typed native callback
+uses the SQLite FIFO for document-scoped path/media/SHA-256 metadata. Do not load
+the complete EPUB snapshot or source/chapter/image BLOBs merely to identify a
+cover. Validate live EPUB ownership/import marker, declared asset, reference
+syntax, 32-byte digest shape and nonempty <=32 MiB image length in one read
+transaction; guard the digest copy in SQL too. No schema/dependency change.
+
+Missing/deleted/non-EPUB documents and books with no declared cover share the
+normal no-cover outcome; damaged declared cover metadata is an error, never a
+repair. Invalid native IDs fail synchronously before enqueue. Accepted reads
+drain after close and release their one-shot listener without Render, dictionaries
+or core/history writes. The advertised digest supports a later content-addressed
+thumbnail key across recreation and avoids relying on document IDs after database
+replacement. It is not content verification: new cached pixels must come through
+the existing digest-verified asset read and bounded decoder. Cache implementation,
+eviction and Library presentation remain the next slice.

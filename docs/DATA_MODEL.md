@@ -138,6 +138,16 @@ token anchors and completion semantics remain unchanged; images do not add word
 occurrences. Plain documents have no image references. No original source/image
 BLOB, bitmap or dimensions enter reader snapshots.
 
+`load_epub_cover_reference(document_id)` projects the existing nullable
+`epub_documents.cover_path` and joined asset media type/SHA-256/byte length in a
+read transaction. It copies no source/chapter/image BLOB and guards the digest
+copy at exactly 32 bytes. Live EPUB ownership/import metadata and declared cover
+reference syntax, existence and nonempty <=32 MiB size must validate; damaged
+declared metadata fails. No declaration, non-EPUB and missing/deleted IDs yield
+None. The stored digest is an advertised cache identity; it is not rehashed here.
+New cached pixels must use the verified asset read below. No migration, write or
+core payload change; one-shot FIFO/JNI transport only, thumbnail cache still open.
+
 `load_epub_image_asset(document_id, ReaderImageAsset)` reads one exact asset key
 in a read transaction, requiring a live EPUB document, EPUB metadata and imported-
 file kind. It validates the opaque key, expected image media type and selected

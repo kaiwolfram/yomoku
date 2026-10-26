@@ -1,5 +1,5 @@
 # Resume here
-Updated: 2026-10-26. Bounded static SVG decoding/rendering added; results below.
+Updated: 2026-10-26. Metadata-only cover FIFO/JNI lookup added; results below.
 ## Working
 - Pure Crux routes/Library/Settings; Render-only UI; FIFO SQLite/analysis; Library start.
 - Chapter-local UTF-8 position/whole-book percentage/five presets persist; reflow
@@ -63,17 +63,18 @@ Updated: 2026-10-26. Bounded static SVG decoding/rendering added; results below.
   Selection/zoom/normalized focus survive rotation/recreation; close/page change resets.
   Modal gestures cannot complete pages; pointer/key input resets reader idle policy.
 - Reviewed AndroidSVG 1.4 renders static vectors on the same executor/pixel budget.
-  Fractional geometry survives layout/viewer. Preflight <=2 MiB/4096 nodes/64 levels/
-  32768 expansions; no DTD/entities/resource I/O/cycles. Paths/uses/gradients/color
-  CSS work; nested images, patterns/masks/markers and resource-valued stylesheet
-  rules retain alt/Retry. Attribution/full license ship offline in Settings.
+  Fractional layout/viewer; preflight <=2 MiB/4096 nodes/64 levels/32768 expansions.
+  No DTD/entities/resource I/O/cycles. Compound resources retain alt/Retry; credits ship.
+- Cover FIFO/JNI reads path/media/SHA-256, validates EPUB/metadata/32 MiB; no BLOBs/Full.
+  Normal no-cover/corruption errors; cache/display open. Cache needs verified bytes.
 ## Next tasks (ordered)
-1. Complete remaining SVG resources and EPUB cover cache; preserve bounded decoding.
+1. Add bounded EPUB thumbnail cache/Library covers via load_epub_cover_reference
+   + verified asset reads; then remaining SVG resources. Preserve decode budgets.
 2. Bundle Noto Serif JP/font/line/default-off furigana (source ruby preferred).
-3. CI host/unsigned builds is independent. Physical arm64 remains user-deferred;
-   Nostr configuration empty, Q188 unresolved.
+3. CI host/unsigned builds independent; arm64 deferred. Nostr empty/Q188 unresolved.
 ## Verification
-- Both-ABI APKs/lint/formatting/diff, 21 phone tests + final three SVG fixtures pass;
-  11 tablet/dark cases pass. Exact commands/results/limits: DEVELOPMENT.md end.
-  Reports: .local/test-reports/epub-svg/. Prior 425 Rust/Clippy/JNI/bindings baseline
-  unchanged, not rerun. No schema/FFI/permission change; phone overrides restored.
+- 432 Rust tests/Clippy, full real-Full host JNI/7 Unicode exchanges, repeatable
+  native bindings, both-ABI APKs/lint/formatting/diff and five phone tests pass.
+  Commands/limits: DEVELOPMENT.md end; reports: .local/test-reports/epub-cover-reference/.
+  No blocker; Gradle sockets approved. No schema/core/dependency/permission change.
+  Tablet/dark/release/process-death/standalone dictionaries/physical arm64 not rerun.

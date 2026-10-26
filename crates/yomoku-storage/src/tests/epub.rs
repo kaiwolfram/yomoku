@@ -2,7 +2,7 @@ use std::{convert::Infallible, sync::mpsc, time::Duration};
 
 use yomoku_core::{
     analysis::{ChapterAnalysis, SplitMode},
-    document::{ChapterText, PasteText, TextOffset},
+    document::{ChapterText, DocumentId, PasteText, TextOffset},
     pagination::{LogicalPages, PageLength, ReadingPosition},
     vocabulary::{Surface, VocabularyStatus},
 };
@@ -901,6 +901,143 @@ fn epub_asset_reads_exact_shared_and_cover_bytes_after_read_only_reopen() {
     }
     assert_eq!(fs::read(database.path()).unwrap(), before);
     assert_eq!(totals(&storage)[15..], [0, 0, 0]);
+}
+
+#[test]
+fn epub_cover_reference_is_metadata_only_read_only_and_content_addressed() {
+    use sha2::{Digest, Sha256};
+    let database = TestDatabase::new();
+    let mut storage = Storage::open(database.path()).unwrap();
+    let imported = created(
+        storage
+            .import_analyzed_epub(&bytes(), "cover.epub", 1, fixture)
+            .unwrap(),
+    );
+    let id = imported.document.document_id;
+    let path = imported.document.cover.unwrap();
+    let image = &imported.document.images[&path];
+    let expected = EpubCoverReference {
+        asset: image_asset(&path),
+        sha256: Sha256::digest(&image.bytes).into(),
+    };
+    // Unrelated BLOB corruption must not trigger full-book integrity reads.
+    // The descriptor advertises metadata; the existing asset API verifies bytes.
+    storage.connection.execute_batch("UPDATE imported_files SET original_bytes = X'00'; UPDATE chapter_texts SET text = 'damaged'; UPDATE epub_assets SET bytes = X'00'").unwrap();
+    drop(storage);
+    let before = fs::read(database.path()).unwrap();
+    let mut storage = Storage::open(database.path()).unwrap();
+    storage
+        .connection
+        .pragma_update(None, "query_only", true)
+        .unwrap();
+    for _ in 0..2 {
+        assert_eq!(
+            storage.load_epub_cover_reference(id).unwrap(),
+            Some(expected.clone())
+        );
+    }
+    assert!(matches!(
+        storage.load_epub_image_asset(id, &expected.asset),
+        Err(StorageError::InvalidDocument)
+    ));
+    assert_eq!(fs::read(database.path()).unwrap(), before);
+    assert_eq!(totals(&storage)[15..], [0, 0, 0]);
+}
+
+#[test]
+fn epub_cover_reference_absence_scopes_and_reimport_do_not_reuse_ids() {
+    let database = TestDatabase::new();
+    let mut storage = Storage::open(database.path()).unwrap();
+    let first = created(
+        storage
+            .import_analyzed_epub(&bytes(), "cover.epub", 1, fixture)
+            .unwrap(),
+    );
+    let id = first.document.document_id;
+    let expected = storage.load_epub_cover_reference(id).unwrap().unwrap();
+    let other = created(
+        storage
+            .import_analyzed_epub(&book(false, "<p>other</p>"), "other.epub", 1, fixture)
+            .unwrap(),
+    );
+    let plain = storage
+        .create_paste(&PasteText::new("plain".into()).unwrap())
+        .unwrap();
+    storage
+        .connection
+        .execute(
+            "UPDATE epub_documents SET cover_path = NULL WHERE document_id = ?1",
+            [i64::from(other.document.document_id)],
+        )
+        .unwrap();
+    for absent in [
+        other.document.document_id,
+        plain.document_id,
+        DocumentId::try_from(i64::MAX).unwrap(),
+    ] {
+        assert_eq!(storage.load_epub_cover_reference(absent).unwrap(), None);
+    }
+    assert_eq!(
+        storage.load_epub_cover_reference(id).unwrap(),
+        Some(expected.clone())
+    );
+    storage
+        .connection
+        .execute("DELETE FROM documents WHERE id = ?1", [i64::from(id)])
+        .unwrap();
+    assert_eq!(storage.load_epub_cover_reference(id).unwrap(), None);
+    let reimported = created(
+        storage
+            .import_analyzed_epub(&bytes(), "again.epub", 2, fixture)
+            .unwrap(),
+    );
+    assert_ne!(reimported.document.document_id, id);
+    assert_eq!(storage.load_epub_cover_reference(id).unwrap(), None);
+    assert_eq!(
+        storage
+            .load_epub_cover_reference(reimported.document.document_id)
+            .unwrap(),
+        Some(expected)
+    );
+}
+
+#[test]
+fn epub_cover_reference_rejects_damaged_metadata_without_repairs() {
+    for corruption in [
+        "DELETE FROM epub_documents",
+        "UPDATE imported_files SET text_encoding = 'utf8'",
+        "UPDATE epub_documents SET cover_path = 'missing.png'",
+        "UPDATE epub_assets SET media_type = 'text/plain'",
+        "UPDATE epub_assets SET sha256 = X'00'",
+        "UPDATE epub_assets SET bytes = X''",
+        "UPDATE epub_assets SET bytes = zeroblob(33554433)",
+    ] {
+        let database = TestDatabase::new();
+        let mut storage = Storage::open(database.path()).unwrap();
+        let imported = created(
+            storage
+                .import_analyzed_epub(&bytes(), "cover.epub", 1, fixture)
+                .unwrap(),
+        );
+        storage
+            .connection
+            .pragma_update(None, "ignore_check_constraints", true)
+            .unwrap();
+        storage.connection.execute_batch(corruption).unwrap();
+        storage
+            .connection
+            .pragma_update(None, "query_only", true)
+            .unwrap();
+        for _ in 0..2 {
+            assert!(
+                matches!(
+                    storage.load_epub_cover_reference(imported.document.document_id),
+                    Err(StorageError::InvalidDocument)
+                ),
+                "{corruption}"
+            );
+        }
+    }
 }
 
 #[test]

@@ -53,6 +53,16 @@ pub trait EpubAssetListener: Send + Sync {
     fn on_error(&self, error: EpubAssetError);
 }
 
+/// One-shot metadata response on the FIFO worker, including after bridge close.
+/// The 32-byte digest identifies cached pixels; verify bytes with the asset API
+/// before decoding a new cache entry. No cover also covers absent/non-EPUB IDs.
+#[boltffi::export]
+pub trait EpubCoverListener: Send + Sync {
+    fn on_cover(&self, path: String, media_type: String, sha256: Vec<u8>);
+    fn on_no_cover(&self);
+    fn on_error(&self, error: EpubAssetError);
+}
+
 /// Each native handle owns an independent application instance.
 pub struct NativeBridge {
     bridge: YomokuBridge,
@@ -61,6 +71,30 @@ pub struct NativeBridge {
 
 #[boltffi::export]
 impl NativeBridge {
+    /// Fetch a cover reference without loading book content or image bytes.
+    pub fn load_epub_cover_reference(
+        &self,
+        document_id: i64,
+        listener: Box<dyn EpubCoverListener>,
+    ) -> Result<(), EpubAssetError> {
+        let document_id =
+            DocumentId::try_from(document_id).map_err(|_| EpubAssetError::InvalidRequest)?;
+        self.lifecycle
+            .load_epub_cover_reference(document_id, move |result| match result {
+                Ok(Some(cover)) => listener.on_cover(
+                    cover.asset.path,
+                    cover.asset.media_type,
+                    cover.sha256.to_vec(),
+                ),
+                Ok(None) => listener.on_no_cover(),
+                Err(error) => listener.on_error(match error {
+                    DocumentError::InvalidDocument => EpubAssetError::InvalidDocument,
+                    _ => EpubAssetError::Unavailable,
+                }),
+            })
+            .map_err(|_| EpubAssetError::Unavailable)
+    }
+
     /// Enqueue one verified image read. This never loads an analyzer or puts
     /// image bytes into Crux state. Invalid identities fail before enqueue; all
     /// other outcomes use the per-request listener, retained only until delivery.

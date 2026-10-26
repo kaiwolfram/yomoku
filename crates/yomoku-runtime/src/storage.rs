@@ -26,6 +26,7 @@ pub type WordDictionaryLoader = Box<dyn FnMut() -> Result<PathBuf, DocumentError
 use crate::imports::{AnalyzerLifecycle, AnalyzerLoader, FileImportControl, Imports};
 
 pub(crate) enum Job {
+    EpubCover(DocumentId, crate::epub_assets::CoverCallback),
     EpubAsset(
         DocumentId,
         ReaderImageAsset,
@@ -90,6 +91,19 @@ impl StorageEffects {
                 let mut imports = loader.map(Imports::new);
                 while let Ok(job) = receiver.recv() {
                     match job {
+                        Job::EpubCover(document_id, callback) => {
+                            let result = (|| {
+                                if storage.is_none() {
+                                    storage = Some(Storage::open(&path).map_err(map_error)?);
+                                }
+                                storage
+                                    .as_mut()
+                                    .expect("opened storage")
+                                    .load_epub_cover_reference(document_id)
+                                    .map_err(map_error)
+                            })();
+                            callback(result);
+                        }
                         Job::EpubAsset(document_id, asset, callback) => {
                             let result = (|| {
                                 asset

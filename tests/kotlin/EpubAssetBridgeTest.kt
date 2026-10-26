@@ -2,10 +2,35 @@ package app.yomoku.tests
 
 import app.yomoku.nativebridge.EpubAssetError
 import app.yomoku.nativebridge.EpubAssetListener
+import app.yomoku.nativebridge.EpubCoverListener
 import app.yomoku.nativebridge.NativeBridge
 import app.yomoku.shared.DocumentId
+import java.security.MessageDigest
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.TimeUnit
+
+internal class CoverResponse : EpubCoverListener {
+    private val responses = LinkedBlockingQueue<Pair<Thread, Any>>()
+
+    override fun onCover(path: String, mediaType: String, sha256: ByteArray) {
+        responses.add(Thread.currentThread() to Triple(path, mediaType, sha256))
+    }
+
+    override fun onNoCover() {
+        responses.add(Thread.currentThread() to Unit)
+    }
+
+    override fun onError(error: EpubAssetError) {
+        responses.add(Thread.currentThread() to error)
+    }
+
+    fun await(): Any {
+        val (worker, result) = checkNotNull(responses.poll(60, TimeUnit.SECONDS))
+        check(worker != Thread.currentThread())
+        check(responses.isEmpty())
+        return result
+    }
+}
 
 internal class AssetResponse : EpubAssetListener {
     private val responses = LinkedBlockingQueue<Triple<Thread, String?, Any>>()
@@ -34,6 +59,26 @@ internal class AssetResponse : EpubAssetListener {
 
 internal fun verifyEpubAssetReads(bridge: NativeBridge, id: DocumentId) {
     val before = bridge.view()
+    repeat(2) {
+        val cover = CoverResponse()
+        bridge.loadEpubCoverReference(id.value, cover)
+        val result = cover.await() as Triple<*, *, *>
+        check(result.first == "OPS/images/cover.png" && result.second == "image/png")
+        check(
+            (result.third as ByteArray).contentEquals(
+                MessageDigest.getInstance("SHA-256").digest("fixture cover bytes".toByteArray())
+            )
+        )
+    }
+    val absent = CoverResponse()
+    bridge.loadEpubCoverReference(Long.MAX_VALUE, absent)
+    check(absent.await() == Unit)
+    for (invalid in listOf(0L, -1L)) {
+        check(
+            runCatching { bridge.loadEpubCoverReference(invalid, CoverResponse()) }
+                .exceptionOrNull() == EpubAssetError.InvalidRequest
+        )
+    }
     for ((path, expected) in
         listOf(
             "OPS/images/挿絵.png" to "fixture image bytes",

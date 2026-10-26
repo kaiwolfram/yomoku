@@ -87,6 +87,8 @@ and renders at source position/ratio, preserving text/link/word identities and
 discarding disposed requests. Tapping an image opens the shared full-screen viewer
 with bounded pinch zoom/pan, accessible controls and rotation/recreation recovery.
 It reuses the page bitmap and isolates gestures from reader completion swipes.
+The typed cover-reference API reads stored path/media/SHA-256 metadata without
+copying book or image BLOBs; thumbnail caching and Library display remain open.
 Bounded static SVGs also render off main with fractional source ratios and offline
 renderer credits. Compound SVG image resources, covers and source ruby remain
 pending.

@@ -166,3 +166,114 @@ fn asset_open_failure_is_retryable_and_invalid_keys_do_not_create_database() {
     assert!(trace.try_recv().is_err());
     finish_worker(router, lifecycle, &trace);
 }
+
+#[test]
+fn cover_fifo_reads_metadata_without_dictionaries_renders_or_state_changes() {
+    let database = Database::new();
+    let mut storage = Storage::open(database.path()).unwrap();
+    let yomoku_storage::EpubImportOutcome::Created(imported) = storage
+        .import_analyzed_epub(
+            &epub_fixture::book(true, "<p>English</p>"),
+            "cover.epub",
+            1,
+            |chapter| Ok::<_, std::convert::Infallible>(fixture(chapter)),
+        )
+        .unwrap()
+    else {
+        panic!()
+    };
+    let id = imported.document.document_id;
+    let expected = storage.load_epub_cover_reference(id).unwrap();
+    let before = totals(&database.path());
+    drop(storage);
+    let Factory { loader, trace, .. } = Factory::new(true, None);
+    let (router, lifecycle) = yomoku_runtime::effect_router_with_dictionaries(
+        database.path(),
+        loader,
+        Box::new(|| panic!("cover read loaded index")),
+    )
+    .unwrap();
+    let view = router.view();
+    let (send, receive) = mpsc::channel();
+    for document in [id, DocumentId::try_from(i64::MAX).unwrap(), id] {
+        let send = send.clone();
+        lifecycle
+            .load_epub_cover_reference(document, move |result| {
+                send.send((thread::current().id(), result)).unwrap();
+            })
+            .unwrap();
+    }
+    let mut worker = None;
+    for expected in [expected.clone(), None, expected] {
+        let (current, result) = receive.recv_timeout(TIMEOUT).unwrap();
+        assert_ne!(current, thread::current().id());
+        assert_eq!(*worker.get_or_insert(current), current);
+        assert_eq!(result, Ok(expected));
+    }
+    assert_eq!(router.view(), view);
+    assert_eq!(totals(&database.path()), before);
+    assert!(trace.try_recv().is_err());
+    finish_worker(router, lifecycle, &trace);
+}
+
+#[test]
+fn cover_fifo_waits_for_import_and_drains_after_close() {
+    let database = Database::new();
+    let (release, gate) = mpsc::channel();
+    let Factory { loader, trace, .. } = Factory::new(false, Some(gate));
+    let (router, lifecycle) = effect_router_with_analyzed_imports(database.path(), loader).unwrap();
+    router.update(
+        epub::event(&epub_fixture::book(true, "<p>English</p>")),
+        |_| {},
+    );
+    let worker = match trace.recv_timeout(TIMEOUT).unwrap() {
+        Trace::Load(worker) => worker,
+        other => panic!("{other:?}"),
+    };
+    assert_eq!(trace.recv_timeout(TIMEOUT).unwrap(), Trace::Analyze(worker));
+    let id = DocumentId::try_from(1).unwrap();
+    let (send, receive) = mpsc::channel();
+    lifecycle
+        .load_epub_cover_reference(id, move |result| {
+            assert_eq!(thread::current().id(), worker);
+            send.send(result).unwrap();
+        })
+        .unwrap();
+    assert!(receive.try_recv().is_err());
+    drop(router);
+    assert!(lifecycle
+        .load_epub_cover_reference(id, |_| panic!("closed"))
+        .is_err());
+    release.send(()).unwrap();
+    let cover = receive.recv_timeout(TIMEOUT).unwrap().unwrap().unwrap();
+    assert_eq!(cover.asset, asset("OPS/images/cover.png"));
+    assert_eq!(cover.sha256.len(), 32);
+    drain_trace(&trace);
+}
+
+#[test]
+fn cover_open_failure_can_retry_without_loading_dictionaries() {
+    let directory = Database::new();
+    let path = directory.0.join("missing").join("covers.sqlite3");
+    let Factory { loader, trace, .. } = Factory::new(true, None);
+    let (router, lifecycle) = effect_router_with_analyzed_imports(path.clone(), loader).unwrap();
+    let id = DocumentId::try_from(1).unwrap();
+    let (send, receive) = mpsc::channel();
+    let first = send.clone();
+    lifecycle
+        .load_epub_cover_reference(id, move |result| first.send(result).unwrap())
+        .unwrap();
+    assert_eq!(
+        receive.recv_timeout(TIMEOUT).unwrap(),
+        Err(DocumentError::Unavailable)
+    );
+    assert!(!path.exists());
+    std::fs::create_dir(path.parent().unwrap()).unwrap();
+    lifecycle
+        .load_epub_cover_reference(id, move |result| send.send(result).unwrap())
+        .unwrap();
+    assert_eq!(receive.recv_timeout(TIMEOUT).unwrap(), Ok(None));
+    assert!(path.exists());
+    assert!(trace.try_recv().is_err());
+    finish_worker(router, lifecycle, &trace);
+}

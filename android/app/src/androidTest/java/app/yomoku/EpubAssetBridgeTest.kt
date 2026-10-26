@@ -8,6 +8,7 @@ import app.yomoku.nativebridge.DictionaryProvider
 import app.yomoku.nativebridge.EffectsListener
 import app.yomoku.nativebridge.EpubAssetError
 import app.yomoku.nativebridge.EpubAssetListener
+import app.yomoku.nativebridge.EpubCoverListener
 import app.yomoku.nativebridge.FfiError
 import app.yomoku.nativebridge.NativeBridge
 import app.yomoku.shared.EpubImport
@@ -15,6 +16,7 @@ import app.yomoku.shared.Event
 import app.yomoku.shared.ViewModel
 import java.io.ByteArrayOutputStream
 import java.io.File
+import java.security.MessageDigest
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.TimeUnit
 import java.util.zip.ZipEntry
@@ -57,6 +59,33 @@ class EpubAssetBridgeTest {
         }
 
         fun await(): Any = checkNotNull(ready.poll(60, TimeUnit.SECONDS))
+    }
+
+    private class CoverResponse : EpubCoverListener {
+        val ready = LinkedBlockingQueue<Any>()
+
+        override fun onCover(path: String, mediaType: String, sha256: ByteArray) {
+            check(Looper.myLooper() != Looper.getMainLooper())
+            ready.add(Triple(path, mediaType, sha256))
+        }
+
+        override fun onNoCover() {
+            check(Looper.myLooper() != Looper.getMainLooper())
+            ready.add(Unit)
+        }
+
+        override fun onError(error: EpubAssetError) {
+            check(Looper.myLooper() != Looper.getMainLooper())
+            ready.add(error)
+        }
+
+        fun await(): Any = checkNotNull(ready.poll(60, TimeUnit.SECONDS))
+    }
+
+    private fun cover(bridge: NativeBridge, id: Long): Any {
+        val response = CoverResponse()
+        instrumentation.runOnMainSync { bridge.loadEpubCoverReference(id, response) }
+        return response.await()
     }
 
     private fun epub(): ByteArray {
@@ -126,6 +155,21 @@ class EpubAssetBridgeTest {
                 }
             NativeBridge(database.path, effects, noDictionary).use { bridge ->
                 val before = bridge.view()
+                repeat(2) {
+                    val reference = cover(bridge, id) as Triple<*, *, *>
+                    assertEquals(path, reference.first)
+                    assertEquals("image/png", reference.second)
+                    assertArrayEquals(
+                        MessageDigest.getInstance("SHA-256").digest(payload),
+                        reference.third as ByteArray,
+                    )
+                }
+                assertSame(Unit, cover(bridge, Long.MAX_VALUE))
+                assertSame(
+                    EpubAssetError.InvalidRequest,
+                    runCatching { bridge.loadEpubCoverReference(0, CoverResponse()) }
+                        .exceptionOrNull(),
+                )
                 repeat(2) { assertArrayEquals(payload, read(bridge, id) as ByteArray) }
                 assertSame(EpubAssetError.InvalidDocument, read(bridge, id, "image/jpeg"))
                 assertSame(EpubAssetError.NotFound, read(bridge, Long.MAX_VALUE))
@@ -137,6 +181,13 @@ class EpubAssetBridgeTest {
                 assertSame(EpubAssetError.InvalidDocument, read(bridge, id))
                 // Corrupt reads do not repair the BLOB or change reader state.
                 assertSame(EpubAssetError.InvalidDocument, read(bridge, id))
+                assertArrayEquals(before, bridge.view())
+                SQLiteDatabase.openDatabase(database.path, null, SQLiteDatabase.OPEN_READWRITE)
+                    .use { sql ->
+                        sql.execSQL("UPDATE epub_documents SET cover_path = 'missing.png'")
+                    }
+                assertSame(EpubAssetError.InvalidDocument, cover(bridge, id))
+                assertSame(EpubAssetError.InvalidDocument, cover(bridge, id))
                 assertArrayEquals(before, bridge.view())
                 assertTrue(effects.ready.isEmpty())
             }

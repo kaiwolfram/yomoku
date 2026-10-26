@@ -1866,3 +1866,19 @@
   cover cache stay unchecked; font/furigana and CI follow. No core/FFI/schema/
   permission change. Total heap/large-book performance unmeasured; host/Rust/
   release/process-death checks not rerun, physical arm64 remains user-deferred.
+
+## 2026-10-26 — Metadata-only EPUB cover references
+
+- Added cover path/media/SHA-256 lookup in storage, existing FIFO and one-shot typed
+  JNI; copies no source/chapter/image BLOBs and loads no dictionaries. Normal
+  no-cover outcomes and damaged declared metadata are explicit; accepted callbacks
+  drain after close. No core/schema/dependency/permission changes.
+- PASS: 432 Rust tests (seven new), strict Clippy/formatting/diff, complete real-Full
+  host JNI/Unicode exchanges, repeatable bindings, both-ABI debug/test APKs/strict
+  lint and five API-36 x86_64 bridge/document/EPUB formatting regressions. Reports:
+  `.local/test-reports/epub-cover-reference/`; commands/limits in DEVELOPMENT.md end.
+- Fixed test import and corruption-fixture CHECK bypass; approved Gradle sockets
+  needed outside sandbox. Final checks pass, no open blocker; existing AVD reused.
+  Updated plan/architecture/data/decisions/README/handoff. Next: bounded thumbnail
+  cache and Library display using metadata keys plus verified asset bytes. Remaining
+  SVG resources/ruby stay open; physical arm64 remains user-deferred.
