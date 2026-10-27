@@ -103,7 +103,8 @@ travels through validated chapter/page snapshots and typed JNI, preserving exact
 text positions. A default-off furigana preference persists through SQLite and the
 typed bridge. Pure core now projects source-preferred readings with original
 Mode B analyzer fallback, independent of vocabulary status, through generated JNI.
-The visible switch and ruby layout remain planned.
+Settings exposes the furigana switch; Compose paints readings above canonical
+text while preserving word/link taps, logical pages and saved offsets.
 The pure [SRT parser](crates/yomoku-import/src/srt.rs) has host fixtures for cue
 boundaries, formatting, speakers and malformed input. Its atomic repository now
 persists original bytes/encoding, canonical cues, Mode B and vocabulary registrations
@@ -117,8 +118,7 @@ and share direct cancellation. Host fixtures cover later-chapter/write/commit
 rollback, duplicates, original analysis/status/progress and failed-file recovery.
 Android supports mixed EPUB/TXT/SRT batches, per-file encoding/errors, progress,
 Cancel and completion summaries. Imports return to Library without opening a reader.
-Planned v1 features include source/analyzer furigana, custom missing-word
-definitions,
+Planned v1 features include custom missing-word definitions,
 reading statistics, optional AnkiDroid integration, curated Nostr reading and
 manual encrypted backups. See the [product specification](docs/PRODUCT_SPEC.md)
 for scope and the [implementation checklist](docs/IMPLEMENTATION_PLAN.md) for
@@ -133,8 +133,7 @@ Typed errors support encoding retries; duplicates skip analyzer loading even aft
 reopen. Android now connects multiple-TXT selection, encoding choices and per-file
 summaries, current-file/batch progress, transaction-aware Cancel and permitted
 background notifications. Android may still stop the process; finished files
-remain, and unfinished files require a new explicit selection. Reader ruby
-rendering remains planned.
+remain, and unfinished files require a new explicit selection.
 
 ## Repository layout
 

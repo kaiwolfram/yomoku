@@ -2049,3 +2049,26 @@
 - Updated README/architecture/data/decisions/plan/handoff. Next: visible switch and
   Compose ruby layout from reader_furigana, then anchor/word/link/theme checks.
   Tablet/dark/release/process-death/physical-arm64 not rerun; arm64 deferred.
+
+
+## 2026-10-27 — Furigana switch and Compose layout
+- Started clean. Exposed the persisted default-off Settings switch and wired the
+  source-preferred projection into canonical-text ruby paint, including image fragments.
+- Strict UTF-8/UTF-16 validation; half-size literal readings fit base width above
+  measured styled lines. Visual/page/image splits keep complete readings. Canonical
+  text, anchors, word/link identities, status semantics and I/O remain unchanged.
+- Four new device cases cover projection/Unicode, wrapped heading pixels/bounds,
+  font scaling/themes, switch failure/retry/recreation, all statuses, EPUB word/link/
+  image taps and TXT page crossing/reflow. Existing typography assertion permits
+  enabled headroom; disabled typography remains exact.
+- PASS: 16 distinct phone cases, six tablet/dark cases (1m50s), both-ABI debug/test
+  APKs, strict lint, Kotlin formatting/Rustfmt/diff. Final 11-case phone regression
+  run: 2m42s. Full Rust tests/Clippy/host JNI/codegen unchanged and not rerun.
+- Fixed test TextRange/activity setup and a paragraph-first pagination fixture;
+  no production changes after initial build. Gradle sockets required approved
+  outside-sandbox execution. Cold-started existing swangle/KVM AVD without wipe;
+  restored phone/light after tablet. Reports/commands: DEVELOPMENT.md end and
+  .local/test-reports/reader-furigana-layout/. No blocker.
+- Updated README/architecture/data/decisions/plan/handoff. Next: CI, missing-match
+  custom definitions/readings, then persisted segmentation overrides. Release,
+  process-death and physical-arm64 not rerun; arm64 remains user-deferred.

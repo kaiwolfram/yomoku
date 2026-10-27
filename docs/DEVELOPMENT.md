@@ -3746,3 +3746,60 @@ approved outside-sandbox execution; no downloads. Reused the existing AVD withou
 restart/wipe/display/theme changes; verified 1080x2400/420dpi. No blocker.
 Tablet/dark layout, release, standalone dictionary benchmarks, process-death/reboot
 and physical-arm64 checks were not rerun; physical arm64 remains user-deferred.
+
+
+## Furigana switch and Compose ruby layout
+
+2026-10-27, using the pinned Rust PATH/JDK/SDK/Gradle environment above:
+
+```sh
+# Focused layout/Settings/EPUB/TXT and existing typography cases.
+./android/gradlew -p android :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=app.yomoku.ReaderRubyLayoutTest,app.yomoku.ReaderFuriganaTest,app.yomoku.ReaderTypographySettingsTest --offline --console=plain
+# Corrected TXT crossing-page fixture plus existing formatting/word/image regressions.
+./android/gradlew -p android :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug :app:connectedDebugAndroidTest '-Pandroid.testInstrumentationRunnerArguments.class=app.yomoku.ReaderFuriganaTest#txtCrossingSourceBaseKeepsCompleteReadingThroughLogicalReflowAndMovement,app.yomoku.ReaderFormattingTest,app.yomoku.ReaderWordSpansTest,app.yomoku.ReaderImagesTest' --offline --console=plain
+/home/kai/Android/Sdk/platform-tools/adb -s emulator-5554 shell wm size 2560x1600
+/home/kai/Android/Sdk/platform-tools/adb -s emulator-5554 shell wm density 240
+/home/kai/Android/Sdk/platform-tools/adb -s emulator-5554 shell cmd uimode night yes
+# Repeat the focused six-case command for tablet/dark; restore phone/light afterward.
+/home/kai/Android/Sdk/platform-tools/adb -s emulator-5554 shell wm size reset
+/home/kai/Android/Sdk/platform-tools/adb -s emulator-5554 shell wm density reset
+/home/kai/Android/Sdk/platform-tools/adb -s emulator-5554 shell cmd uimode night no
+tools/format-kotlin.sh --check
+cargo fmt --all -- --check
+git diff --check
+unzip -l android/app/build/outputs/apk/debug/app-debug.apk 'lib/*/libyomoku_jni.so'
+```
+
+Four new device cases cover strict UTF-8/UTF-16 projection validation, supplementary/
+combining/NUL text, clipped bases with complete readings, real measured/pixel ruby
+above wrapped headings, long-reading width fitting, 14sp/24sp and 1.6x system font
+scaling in light/dark palettes, source precedence/analyzer fallback, visible switch
+failure/retry/recreation, all five vocabulary statuses, unchanged word/link/image
+identities and logical reflow/movement. Canonical Text remains the only semantic/
+gesture text. Existing typography assertions now allow measured ruby headroom;
+the disabled image/typography path keeps exact chosen line height.
+
+Phone results: the second focused run passes five cases; the corrected TXT case
+and ten existing formatting/span/image cases all pass in the final 11-case run
+(2m42s), for 16 distinct passing cases. Both-ABI debug/test APKs, strict Android
+lint, Kotlin formatting, Rustfmt and whitespace checks pass; APK inspection confirms
+arm64-v8a/x86_64 JNI. All six focused tablet/dark cases pass (1m50s), zero
+failures/errors/skips. The isolated paint fixture exercises both palettes on each
+viewport. Restored 1080x2400/420dpi/light afterward; the AVD remains running.
+
+Initial compilation caught the new fixture importing Compose TextRange instead of
+the typed bridge value. The first device run exposed a fixture-only missing default
+ComponentActivity; use MainActivity and replace its content for the isolated paint
+fixture. The initial 300-character paragraph stayed whole under the existing
+paragraph-first pagination policy, even after adding sentences (splitting only
+starts above twice the preset). Use a 600-character sentence-bearing source base,
+250 preset and 1500 reflow to exercise a real crossing without changing pagination.
+No production fix was required after the initial successful build.
+
+Gradle's sandbox wildcard-IP/local-socket restriction required approved outside-
+sandbox execution. No emulator was running; cold-started the existing swangle/KVM
+AVD without wiping data, waited for boot and verified 1080x2400/420dpi. Reports,
+initial failures and lint XML: `.local/test-reports/reader-furigana-layout/`.
+No Rust/core/FFI/schema/dependency change; full Rust tests/Clippy/host JNI/codegen,
+release, standalone dictionary benchmarks, process-death and physical-arm64 checks
+were not rerun. Physical arm64 remains user-deferred.

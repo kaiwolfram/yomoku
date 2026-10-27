@@ -32,6 +32,7 @@
     <string name="statistics_empty">No reading history yet.</string>
     <string name="vocabulary_empty">No vocabulary yet.</string>
     <string name="reader_typography_title">Reader text</string>
+    <string name="reader_furigana">Furigana</string>
     <string name="reader_typography_description">Font size and line spacing apply to all documents. Your reading position stays the same.</string>
     <string name="reader_font_size">Font size: %1$d</string>
     <string name="reader_line_spacing">Line spacing: %1$d%%</string>

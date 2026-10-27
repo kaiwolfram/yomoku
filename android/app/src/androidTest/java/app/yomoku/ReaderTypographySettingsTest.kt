@@ -127,7 +127,7 @@ class ReaderTypographySettingsTest {
             assertEquals(tokens, core().view.readerTokens)
             val layout = layout("reader_text")
             assertEquals(20.sp, layout.layoutInput.style.fontSize)
-            assertEquals(35.sp, layout.layoutInput.style.lineHeight)
+            assertTrue(layout.layoutInput.style.lineHeight.value >= 35f)
             assertEquals(page.text, layout.layoutInput.text.text)
             assertTrue(layout.lineCount > oldLines)
             assertFalse(layout.didOverflowWidth)

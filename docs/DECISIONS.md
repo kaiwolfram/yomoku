@@ -2695,3 +2695,27 @@ invalidate the derived fallback automatically. Preference commits only affect
 presentation metadata, never canonical text/anchors/history/time. No schema,
 dependency, I/O protocol or destructive-semantics change. Keep the visible switch
 and Compose layout/tap/theme verification unchecked for the next slice.
+
+## 2026-10-27 — Furigana switch and canonical-text ruby paint
+
+Expose the existing persisted default-off preference as a labeled whole-row
+Settings switch, using the same commit/retry and busy gates as typography.
+Use the enabled core projection directly; no Android reading inference or status
+filter. Validate ordered scalar-aligned UTF-8 ranges again at the UI boundary,
+then clip the converted UTF-16 ranges around verified image placeholders.
+
+Keep Compose Text and its canonical AnnotatedString unchanged. Paint readings
+above its measured base boxes rather than inserting reading characters or inline
+replacement objects. This retains source formatting, link precedence, full token
+identities, accessibility text and exact logical anchors. Use half-size Noto
+readings in the current content color. Reserve their measured height above every
+line, on top of the larger of selected line spacing and natural styled metrics;
+bottom alignment and no first-line trimming prevent heading/first-line clipping.
+Compress long readings horizontally to the base width to avoid adjacent overlap.
+At visual line/image splits, repeat the complete reading, following the existing
+page-clipping decision: Japanese compounds have no reliable proportional mapping.
+No logical boundary moves or partial reading is inferred.
+
+Use existing pinned Compose APIs only; no new dependency, schema or I/O. Primary
+API references: AndroidX [LineHeightStyle](https://github.com/androidx/androidx/blob/androidx-main/compose/ui/ui-text/src/commonMain/kotlin/androidx/compose/ui/text/style/LineHeightStyle.kt)
+and [TextLayoutResult](https://github.com/androidx/androidx/blob/androidx-main/compose/ui/ui-text/src/commonMain/kotlin/androidx/compose/ui/text/TextLayoutResult.kt).

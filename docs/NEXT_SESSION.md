@@ -1,5 +1,5 @@
 # Resume here
-Updated: 2026-10-27. Source-preferred furigana projection ready; switch/layout next.
+Updated: 2026-10-27. Furigana switch/layout verified and complete.
 ## Working
 - Pure Crux routes/Library/Settings; Render-only UI; FIFO SQLite/analysis; Library start.
 - Chapter-local UTF-8 position/whole-book percentage/five presets persist; reflow
@@ -28,7 +28,6 @@ Updated: 2026-10-27. Source-preferred furigana projection ready; switch/layout n
   ID + duration. One transaction writes occurrences, New-only Known/history/time/
   position/finish. Exact retries; AlreadyRecorded/zero silent, positive toast once.
   Only new final-book completion returns Library + 1.4s confetti. Images count no words.
-- FD+1/mapped Full releases in background; bundled English word/name index stays lazy.
 - TXT/SRT strict UTF-8/Shift-JIS preserve original bytes/filename/encoding/B and
   canonical Aozora ruby or SRT cues; exact duplicate's first interpretation wins.
 - Retained FileImports reads one mixed EPUB/TXT/SRT URI off main, routes literal
@@ -55,26 +54,26 @@ Updated: 2026-10-27. Source-preferred furigana projection ready; switch/layout n
 - Compose replaces exact U+FFFC scalars with source-position/ratio images;
   tall frames cap at 8192px; styles/word/link identities stay intact. Local zero text
   targets stop adjacent-link capture. Alt/loading/failure + Retry for unsupported data.
-- Image taps open source-agnostic full-window Dialog with 1–8x fit zoom/clamped pan,
-  Reuses bounded page bitmap; Zoom in/out/Reset/Close and Back.
+- Full-window image viewer reuses bounded bitmaps, 1–8x fit zoom/clamped pan.
   Selection/zoom/focus survive recreation; close/page change resets. Modal gestures
-  cannot complete pages; pointer/key input resets reader idle policy.
+  cannot complete pages; input resets idle. Buttons/Back provide accessible controls.
 - AndroidSVG 1.4 vectors/base64/nested SVG share viewer/covers; bounded/offline; v1 scope met.
 - Library covers resolve live path/media/SHA-256 metadata without book BLOBs/Full.
   Media+digest LRU <=4 MiB/64 entries; misses verify bytes/digest and decode <=64 KiB.
 - Noto Serif JP/credits; global font/spacing (16sp/150% default)/furigana persist (0015/16).
-- ReaderDocument.source_ruby has owned ReaderChapterRuby; ReaderPage.source_ruby
-  clips bases to page-local UTF-8, keeps complete readings; shared read-only TXT/EPUB validator.
-- Enabled ViewModel.reader_furigana merges source ruby with original B readings.
-  Any source overlap suppresses that whole token reading; literal complete readings.
-  Full key/owned anchors/clipped ranges/surface validation; invalid/unavailable tokens
-  retain source only. All statuses/deleted vocabulary work; no I/O/position/history change.
+- Source ruby clips to page-local UTF-8 with complete crossing readings. Enabled
+  reader_furigana prefers source over original B; keyed/validated, status independent.
+- Settings furigana switch commits/retries using existing typography gates.
+  Compose paints half-size readings above unchanged canonical Text/tap identities.
+  Strict UTF-16; complete readings repeat across splits and fit base width; measured headroom.
 ## Next tasks (ordered)
-1. Visible furigana switch + Compose ruby layout using reader_furigana.
-   Preference/projection ready; verify anchors/word/link taps + phone/tablet themes.
-2. CI host/unsigned builds independent; arm64 deferred. Nostr empty/Q188 unresolved.
+1. CI host Rust/Kotlin checks + unsigned Android build; verify commands locally.
+2. Custom English meaning/reading for missing dictionary matches; immutable built-ins.
+3. A/B/C/manual split/merge overrides; start with testable persisted anchors.
+Physical arm64 deferred; Nostr empty; Q188 unresolved before forwarding.
 ## Verification
-- PASS: 453 Rust (16 opt-in ignored), strict Clippy/fmt, host JNI/repeat Kotlin codegen.
-  Both-ABI APKs/lint + ten phone transport/word-span/typography cases pass (3m03s).
-  Commands: DEVELOPMENT.md end; .local/test-reports/reader-furigana-projection/. No blocker.
-  No release/physical-arm64/process-death rerun. Phone/light AVD remains running.
+- PASS: both-ABI debug/test APKs, strict lint, Kotlin formatting/Rustfmt/diff checks;
+  16 distinct phone cases + six tablet/dark cases. Commands/failures: DEVELOPMENT.md end.
+  Reports: .local/test-reports/reader-furigana-layout/. No open blocker.
+- Rust/core/FFI unchanged; prior 453-test/Clippy/host-JNI/codegen baseline not rerun.
+  No release/physical-arm64/process-death rerun. Restored phone/light AVD remains running.

@@ -96,8 +96,16 @@ malformed analyzer snapshots as a whole while retaining independent source ruby.
 Projection performs no I/O, does not change text/positions/history and follows
 existing token refresh/reflow/departure invalidation. Readings stay literal and
 complete across page boundaries; no proportional reading split is inferred.
-The visible switch and Compose ruby layout remain open; no inactive switch is
-exposed yet.
+Settings exposes a labeled, whole-row furigana switch with the same commit/retry
+and busy gates. Compose validates UTF-8 ranges before converting to UTF-16 and
+clipping to text fragments around images. ReaderRubyText keeps the canonical
+AnnotatedString as the sole semantic/gesture text and paints half-size readings
+above the bases. Bottom-aligned, untrimmed line height reserves measured reading
+space plus the larger of chosen spacing and natural styled font metrics. Complete
+readings repeat at visual line/image splits; long readings compress horizontally
+to their base width, preventing adjacent ruby collisions without changing wrapping.
+Layout/paint caches follow text, typography, density, theme and projection changes.
+The disabled/empty path retains the ordinary Text layout.
 
 `ReaderDocument.images` carries keyed `ReaderChapterImages` with source-ordered
 placeholder ranges, alt text and document-scoped `ReaderImageAsset` paths/media
@@ -230,7 +238,7 @@ fit. Canvas/button/key input in the separate window resets reader idle accountin
 The shared viewer accepts an ImageBitmap, source dimensions and loading/error/retry
 callbacks, with no EPUB, storage, networking or core dependency. Future displayed
 Nostr images can use it. Advanced SVG resources are outside v1 scope; source ruby
-transport is connected, while its switch/analyzer fallback/rendering remain open.
+transport, source-preferred analyzer fallback and switch/layout are connected.
 Settings ships AndroidSVG attribution and its full license offline.
 
 Shared file preflight and TXT/SRT/EPUB Existing results now carry `LibraryDocument`
@@ -260,8 +268,8 @@ queued/load/chapter work and uses the existing commit gate. Background release,
 engine-failure eviction and later-file retries share the existing analyzer cache.
 Android mixed selection, reader text formatting/website links and raster/static
 SVG images with the shared viewer and Library cover thumbnails are connected;
-ruby switch/analyzer fallback/rendering remain open; advanced SVG resources are
-outside v1 scope.
+source-preferred furigana and its Settings switch/layout are connected; advanced
+SVG resources are outside v1 scope.
 
 Its SRT parser
 accepts decoded text and returns canonical LF text plus ordered UTF-8 cue ranges.
@@ -310,7 +318,7 @@ keys, scalar boundaries, nonempty readings and ordered nonoverlapping bases are
 validated in pure core. No analysis/vocabulary lookup is needed; Missing analysis,
 deleted vocabulary and all five statuses preserve source readings. Generated JNI
 carries both forms. The default-off setting, source-preferred analyzer fallback
-and visible ruby rendering/tap integration remain the next reader slice.
+and visible ruby rendering share the canonical word/link tap targets.
 `import_analyzed_txt_cancellable` adds a shared per-file `ImportCancellation` handle.
 Checkpoints before/after parsing, ruby writes and analysis can discard provisional
 rows; the last check and COMMIT share a mutex. Cancellation winning that gate rolls
@@ -386,7 +394,7 @@ FOREGROUND_SERVICE_DATA_SYNC; no new dependency/schema. If Android rejects a ser
 start, continue subject to ordinary process limits without retrying it automatically.
 Timeout stops foreground execution/service immediately, then uses existing off-main
 cancellation/draining; a winning commit stays. Normal owner teardown removes the
-lease and unfinished progress notice. EPUB/SRT and source-ruby rendering remain.
+lease and unfinished progress notice. EPUB/SRT share this helper and lease.
 
 Pure document values define positive i64 identities, immutable chapter snapshots,
 UTF-8 byte anchors, checked UTF-16 conversions and literal first-line paste titles.
@@ -916,8 +924,8 @@ repository/FIFO/typed JNI imports are verified. EPUB persistence and ordered-cha
 reader/application/FIFO/typed JNI imports are verified. Android mixed-format
 batches use the shared retained picker/encoding/progress/Cancel/summary helper;
 reader text formatting/website links and raster/static SVG images/shared viewer
-are connected, including Library covers; ruby switch/analyzer fallback/rendering
-remain open; advanced SVG resources are outside v1 scope.
+are connected, including Library covers and source-preferred furigana with its
+Settings switch/layout; advanced SVG resources are outside v1 scope.
 All file background notifications use the platform-only
 foreground lease described above. Legacy imports
 are not automatically rescanned.

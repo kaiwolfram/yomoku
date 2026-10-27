@@ -133,8 +133,8 @@ empty projections. TXT source, EPUB content and TXT reader loads share the same
 read-only ordered-index/range/reading validator. Source readings survive missing
 analysis or deleted vocabulary and are independent of all five statuses. Generated
 Kotlin transports both keyed chapter and clipped page forms. No schema/parser
-change. The enabled source-preferred projection is described below; the visible
-switch and ruby rendering remain open.
+change. The enabled source-preferred projection and Android layout are described
+below.
 
 `ReaderDocument.images` carries sparse, unique owned `ReaderChapterImages` keys.
 Each source-ordered `ReaderInlineImage` holds one exact U+FFFC `TextRange`, literal
@@ -324,8 +324,9 @@ one transaction, verifies digest, ordered nonoverlapping scalar ranges and readi
 and rejects corruption without repair or reanalysis. Historical single-text
 snapshot APIs accept paste/TXT/SRT; application/bridge readers now use ReaderDocument
 and the generic ordered repositories above, including source-ruby projections.
-Ruby rendering remains open. Typed per-file runtime/JNI imports and the retained
-Android mixed-format picker, encoding choices, progress, Cancel and summary are
+Ruby rendering uses the same canonical text. Typed per-file runtime/JNI imports
+and the retained Android mixed-format picker, encoding choices, progress, Cancel
+and summary are
 connected. The Android foreground
 lease/notifications persist no queue, URI, current-file bytes, progress or summary.
 Process death preserves only committed per-file data; a fresh helper starts empty
@@ -828,7 +829,11 @@ readings. Page moves/reflow/departure follow existing snapshot invalidation; lat
 callbacks cannot restore departed readings. The projection does not request I/O,
 reanalysis or writes, and never changes text, logical pages, saved offsets,
 token/link identities or reading/vocabulary/history state. Generated Kotlin
-transports the derived field; visible switch and Compose layout remain pending.
+transports the derived field. The visible Settings switch updates only the existing
+preference. Compose validates ordered UTF-8 ranges, converts them to UTF-16, clips
+around image fragments and paints complete readings above each intersected visual
+line. Paint-only readings never enter annotated text or accessibility/tap offsets;
+no proportional reading split, schema or persistence change is introduced.
 
 ## Reader analysis restoration (no schema change)
 `load_reader_snapshot` reads canonical paste content/current position, persisted

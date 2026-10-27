@@ -33,6 +33,7 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.DpSize
 import app.yomoku.shared.ReaderInlineImage
 import app.yomoku.shared.ReaderPage
+import app.yomoku.shared.ReaderRuby
 import app.yomoku.shared.ReaderTypography
 
 internal sealed interface ReaderImagePart {
@@ -47,6 +48,7 @@ private fun ReaderTextBlock(
     text: AnnotatedString,
     typography: ReaderTypography?,
     modifier: Modifier,
+    ruby: List<ReaderDisplayRuby> = emptyList(),
 ) {
     val original = LocalViewConfiguration.current
     val configuration =
@@ -56,11 +58,7 @@ private fun ReaderTextBlock(
             }
         }
     CompositionLocalProvider(LocalViewConfiguration provides configuration) {
-        Text(
-            text,
-            style = readerTextStyle(typography),
-            modifier = modifier,
-        )
+        ReaderRubyText(text, readerTextStyle(typography), ruby, modifier)
     }
 }
 
@@ -92,13 +90,16 @@ internal fun ReaderImageContent(
     loader: EpubImageLoader?,
     onInteraction: () -> Unit,
     typography: ReaderTypography? = null,
+    furigana: List<ReaderRuby> = emptyList(),
 ) {
     val parts = remember(page.text, page.images) { readerImageParts(page.text, page.images) }
+    val ruby = remember(page.text, furigana) { readerDisplayRuby(page.text, furigana).orEmpty() }
     if (parts == null || page.images.isEmpty()) {
         ReaderTextBlock(
             text,
             typography,
             modifier = Modifier.testTag("reader_text"),
+            ruby = ruby,
         )
         return
     }
@@ -133,6 +134,7 @@ internal fun ReaderImageContent(
                         text.subSequence(part.start, part.end),
                         typography,
                         modifier = Modifier.testTag("reader_text_${part.start}"),
+                        ruby = ruby.mapNotNull { it.clip(part.start, part.end) },
                     )
                 is ReaderImagePart.Image -> {
                     val reference = page.images[part.index]
