@@ -2726,3 +2726,35 @@ User clarification: CI checks are not needed. Remove the GitHub Actions task fro
 the implementation checklist and next-session priorities, and update the product
 specification accordingly. Continue running relevant local tests, lint and builds.
 Next implementation slice: custom meanings/readings for missing dictionary matches.
+
+
+## 2026-10-27 — Missing-match custom dictionary persistence
+
+Start the custom-definition task with a repository-only slice. Keep user meanings
+and readings separate from the immutable JMdict/JMnedict asset and original
+analyzer output. Migration 0017 stores one versioned entry per exact BINARY
+spelling, independent of vocabulary registration and document lifetime. Do not
+normalize Unicode, reuse a custom base-form definition for an inflected surface,
+or change analyzer readings/mappings, source/analyzer furigana, statuses or history.
+Both English meaning and reading are required nonblank fields; preserve literal
+input and use labels rather than guessing language or restricting kana scripts.
+
+Require the validated original reader token key/index for all three repository
+operations. Factor the existing selected-word token resolver so custom operations
+share its owned chapter/page/analysis/Japanese-token gates. Derive surface/base
+from stored Mode B; requery the separately opened read-only dictionary on every
+operation. Any word/name surface/base candidate blocks custom access, matching
+the existing panel's empty-candidate policy. A dictionary failure is never proof
+of absence. Existing custom data stays retained if a later dictionary gains a
+match, but cannot override that match. No custom text is written to built-in tables.
+
+Use immediate transactions for save/delete, validate existing custom values before
+mutation, and skip identical saves/repeated deletes. Corruption fails without
+implicit repair. Missing documents return None/false and deleted vocabulary stays
+absent. Custom entries have no source/vocabulary FK; status/history deletion cannot
+accidentally delete a user-owned dictionary definition. Explicit custom deletion
+only affects that table. No existing destructive operation changes.
+
+No new dependency/version or public bridge schema. Runtime/FIFO/core selection
+lifecycle, typed custom result transport and Android editor/retry controls remain
+the next slice; keep their implementation task unchecked.

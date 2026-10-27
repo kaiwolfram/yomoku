@@ -1,7 +1,61 @@
-//! Immutable dictionary values and exact-form restriction rules. No I/O or
-//! analyzer-reading filter: a written surface may have several valid readings.
+//! Dictionary values and exact-form restriction rules. No I/O or analyzer-reading
+//! filter: a written surface may have several valid readings. User fallbacks stay
+//! separate from immutable built-in payloads.
 
 use serde::{Deserialize, Serialize};
+
+use crate::vocabulary::Surface;
+
+/// User-owned fallback for one exact written surface, separate from immutable
+/// word/name entries and analyzer readings/dictionary-form mappings.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct CustomDictionaryEntry {
+    surface: Surface,
+    english_meaning: String,
+    reading: String,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct InvalidCustomDictionaryEntry;
+
+impl std::fmt::Display for InvalidCustomDictionaryEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("custom English meaning and reading must not be blank")
+    }
+}
+
+impl std::error::Error for InvalidCustomDictionaryEntry {}
+
+impl CustomDictionaryEntry {
+    /// Preserve literal Unicode and whitespace; validation does not guess the
+    /// language, normalize spelling or replace the analyzer's reading.
+    pub fn new(
+        surface: Surface,
+        english_meaning: String,
+        reading: String,
+    ) -> Result<Self, InvalidCustomDictionaryEntry> {
+        if english_meaning.trim().is_empty() || reading.trim().is_empty() {
+            return Err(InvalidCustomDictionaryEntry);
+        }
+        Ok(Self {
+            surface,
+            english_meaning,
+            reading,
+        })
+    }
+
+    pub fn surface(&self) -> &Surface {
+        &self.surface
+    }
+
+    pub fn english_meaning(&self) -> &str {
+        &self.english_meaning
+    }
+
+    pub fn reading(&self) -> &str {
+        &self.reading
+    }
+}
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]

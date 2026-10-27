@@ -1,5 +1,5 @@
 # Resume here
-Updated: 2026-10-27. Furigana switch/layout verified and complete.
+Updated: 2026-10-27. Custom dictionary persistence verified; editor wiring next.
 ## Working
 - Pure Crux routes/Library/Settings; Render-only UI; FIFO SQLite/analysis; Library start.
 - Chapter-local UTF-8 position/whole-book percentage/five presets persist; reflow
@@ -54,25 +54,27 @@ Updated: 2026-10-27. Furigana switch/layout verified and complete.
 - Compose replaces exact U+FFFC scalars with source-position/ratio images;
   tall frames cap at 8192px; styles/word/link identities stay intact. Local zero text
   targets stop adjacent-link capture. Alt/loading/failure + Retry for unsupported data.
-- Full-window image viewer reuses bounded bitmaps, 1–8x fit zoom/clamped pan.
-  Selection/zoom/focus survive recreation; close/page change resets. Modal gestures
-  cannot complete pages; input resets idle. Buttons/Back provide accessible controls.
+- Full-window image viewer: bounded bitmaps, 1–8x fit zoom/clamped pan, accessible
+  buttons/Back. Recreation retains selection/zoom/focus; close/page resets. Modal
+  gestures cannot complete pages; input resets idle.
 - AndroidSVG 1.4 vectors/base64/nested SVG share viewer/covers; bounded/offline; v1 scope met.
 - Library covers resolve live path/media/SHA-256 metadata without book BLOBs/Full.
   Media+digest LRU <=4 MiB/64 entries; misses verify bytes/digest and decode <=64 KiB.
 - Noto Serif JP/credits; global font/spacing (16sp/150% default)/furigana persist (0015/16).
-- Source ruby clips to page-local UTF-8 with complete crossing readings. Enabled
-  reader_furigana prefers source over original B; keyed/validated, status independent.
-- Settings furigana switch commits/retries using existing typography gates.
-  Compose paints half-size readings above unchanged canonical Text/tap identities.
-  Strict UTF-16; complete readings repeat across splits and fit base width; measured headroom.
+- Custom meanings/readings (0017): exact global surface, validated original token;
+  rechecks immutable surface/base word/name index. Atomic CRUD/retries, no history/
+  analysis/status/position changes. Repository only; runtime/FFI/UI still pending.
+- Furigana: persisted switch/retries; keyed source-first/original-B fallback, status
+  independent. Half-size readings above canonical Text; strict UTF-16, complete
+  readings across page/layout splits, fitted base width and measured headroom.
 ## Next tasks (ordered)
-1. Custom English meaning/reading for missing dictionary matches; immutable built-ins.
-2. A/B/C/manual split/merge overrides; start with testable persisted anchors.
+1. Wire custom entry reads/writes through core/FIFO/FFI; keep selection/retry gates.
+2. Add Android missing-match editor/delete; verify persistence and immutable built-ins.
+3. A/B/C/manual split/merge overrides; start with testable persisted anchors.
 Physical arm64 deferred; Nostr empty; Q188 unresolved before forwarding.
 ## Verification
-- PASS: both-ABI debug/test APKs, strict lint, Kotlin formatting/Rustfmt/diff checks;
-  16 distinct phone cases + six tablet/dark cases. Commands/failures: DEVELOPMENT.md end.
-  Reports: .local/test-reports/reader-furigana-layout/. No open blocker.
-- Rust/core/FFI unchanged; prior 453-test/Clippy/host-JNI/codegen baseline not rerun.
-  No release/physical-arm64/process-death rerun. Restored phone/light AVD remains running.
+- PASS: 464 Rust tests (16 opt-in ignored), strict Clippy/Rustfmt/Kotlin format,
+  real-Full host JNI/repeat codegen; 11 new cases. Commands: DEVELOPMENT.md end.
+- PASS: both-ABI debug/test APKs, strict lint and 11 phone regressions (5m52s).
+  Logs/reports: .local/test-reports/custom-dictionary-storage/. No open blocker.
+  No tablet/dark/release/process-death/physical-arm64 rerun; phone AVD unchanged.

@@ -2078,3 +2078,21 @@
   the product specification and recorded the scope decision. Local verification remains.
 - Next: custom meanings/readings for missing dictionary matches, then segmentation overrides.
 - Documentation only; verified the diff and active task lists. No tests run or blockers.
+
+
+## 2026-10-27 — Custom dictionary persistence
+- Started clean. Added pure validated custom meaning/reading values and migration
+  0017 exact-surface storage, separate from built-in dictionaries and registrations.
+- Selected-token CRUD reuses original Mode B/page ownership validation, rechecks
+  immutable surface/base word/name matches, preserves literal Unicode and performs
+  atomic/no-op retries. No analyzer, vocabulary/history, time or position changes.
+- PASS: 11 new Rust cases; 464 workspace tests (16 opt-in ignored), strict Clippy/
+  Rustfmt/Kotlin formatting, real-Full host JNI/repeat codegen, both-ABI debug/test
+  APKs/lint and 11 phone regressions (5m52s). Migration fixtures updated to 17/18.
+- Fixed two test fixture mistakes (chapter slice and distinct-surface count). Gradle
+  sockets required approved outside-sandbox execution. Reports/commands:
+  DEVELOPMENT.md end and .local/test-reports/custom-dictionary-storage/. No blocker.
+- Updated plan/architecture/data/decisions/handoff. Runtime/FFI/editor remains open;
+  next wire typed custom results/mutations with selection/retry gates, then Android
+  missing-match editing/deletion. Existing phone AVD unchanged and running.
+  No tablet/dark/release/process-death/physical-arm64 rerun; hardware deferred.

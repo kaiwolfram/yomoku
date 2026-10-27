@@ -781,6 +781,14 @@ status/event pairs together. These repository APIs accept analyzer-supplied surf
 and explicit timestamps; no SQL or clock enters core. Vocabulary-history FKs cascade
 only on vocabulary deletion; document deletion preserves entries/history. Paste
 imports now register analyzed surfaces atomically; vocabulary UI remains pending.
+Migration 0017 adds a separate exact-surface custom dictionary table, independent
+of vocabulary/source lifetime. Pure `CustomDictionaryEntry` validates nonblank
+meaning/reading; selected-token storage operations reuse original Mode B ownership
+validation and recheck surface/base against the read-only word/name index before
+read/create/edit/delete. No built-in, analyzer, reader position/time or history
+mutation occurs. Immediate writes roll back atomically; identical retries do no
+writes and corruption fails without repair. These repository APIs are not yet
+connected to application effects, FFI or Android editing.
 Migration 0010 adds completion_analyses historical identities, every Japanese
 reading_occurrence and completion-linked New→Known status events in the same
 time/history/position transaction. Pure analysis selects tokens by their start

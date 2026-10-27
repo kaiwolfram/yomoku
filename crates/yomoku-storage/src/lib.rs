@@ -4,6 +4,7 @@
 
 mod analysis;
 mod completions;
+pub mod custom_dictionary;
 pub mod dictionary;
 mod documents;
 mod encounters;
@@ -121,6 +122,11 @@ const MIGRATIONS: &[Migration] = &[
         version: 16,
         name: "0016_reader_furigana",
         sql: include_str!("../migrations/0016_reader_furigana.sql"),
+    },
+    Migration {
+        version: 17,
+        name: "0017_custom_dictionary",
+        sql: include_str!("../migrations/0017_custom_dictionary.sql"),
     },
 ];
 

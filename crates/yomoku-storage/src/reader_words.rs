@@ -3,7 +3,8 @@
 
 use std::{error::Error, fmt};
 
-use yomoku_core::reader::ReaderTokenKey;
+use rusqlite::Connection;
+use yomoku_core::reader::{ReaderToken, ReaderTokenKey};
 
 use crate::{
     dictionary::{Dictionary, DictionaryError},
@@ -72,17 +73,9 @@ impl Storage {
         token_index: u64,
     ) -> Result<Option<ReaderWordDetails>, ReaderWordError> {
         let transaction = self.connection.transaction().map_err(StorageError::from)?;
-        let Some(snapshot) = load_reader_tokens_in(&transaction, key.document_id, key.page)? else {
+        let Some(token) = selected_token_in(&transaction, key, token_index)? else {
             return Ok(None);
         };
-        if snapshot.key() != key {
-            return Err(ReaderWordError::InvalidSelection);
-        }
-        let token = snapshot
-            .tokens
-            .into_iter()
-            .find(|token| token.token_index == token_index)
-            .ok_or(ReaderWordError::InvalidSelection)?;
         let encountered = match token.vocabulary {
             Some(entry) => {
                 let count: i64 = transaction
@@ -101,6 +94,25 @@ impl Storage {
             candidates,
         }))
     }
+}
+
+pub(crate) fn selected_token_in(
+    connection: &Connection,
+    key: ReaderTokenKey,
+    token_index: u64,
+) -> Result<Option<ReaderToken>, ReaderWordError> {
+    let Some(snapshot) = load_reader_tokens_in(connection, key.document_id, key.page)? else {
+        return Ok(None);
+    };
+    if snapshot.key() != key {
+        return Err(ReaderWordError::InvalidSelection);
+    }
+    snapshot
+        .tokens
+        .into_iter()
+        .find(|token| token.token_index == token_index)
+        .map(Some)
+        .ok_or(ReaderWordError::InvalidSelection)
 }
 
 #[cfg(test)]

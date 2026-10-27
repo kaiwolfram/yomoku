@@ -372,6 +372,34 @@ lock, complete CC BY-SA attribution/legal documentation and a manifest of artifa
 hashes/tool versions. New source versions publish to fresh paths without replacing
 an asset that could be open. No mutable user schema or backup format changes.
 
+## Custom dictionary persistence (migration 0017)
+
+`custom_dictionary_entries` is a separate STRICT/WITHOUT ROWID user-state table,
+keyed by exact BINARY `surface`, with `semantics_version = 1`, `english_meaning`
+and `reading`. Both fields must be nonblank; the pure `CustomDictionaryEntry`
+retains literal Unicode/whitespace without language detection or normalization.
+SQL rejects empty byte values and readers revalidate stored values/version.
+The table contains no built-in payloads, analyzer mapping or status/history data.
+It has no document/vocabulary FK: one custom definition belongs to the spelling
+and does not require a live registration or a particular originating document.
+Only explicit custom-entry deletion removes it through this repository.
+
+`load_reader_custom_entry`, `save_reader_custom_entry` and
+`delete_reader_custom_entry` take the original `ReaderTokenKey` plus token index,
+reuse selected-word ownership/whole-chapter validation, and derive surface/base
+from stored original Mode B. Every operation queries the separate read-only index:
+any JMdict/JMnedict surface/base candidate returns `BuiltInMatch`; dictionary errors
+never count as missing matches. No custom base-form fallback is applied. Missing
+documents return None/false; stale/non-Japanese/out-of-page selections fail.
+
+Reads use one consistent user-state transaction. Immediate save/delete transactions
+validate existing custom values and commit atomically; identical saves and repeated
+deletes do no writes. Statement/deferred-COMMIT failure preserves the prior entry;
+corrupt values fail without repair. Vocabulary status/deletion does not influence
+custom identity, and these operations never register words, rewrite analysis,
+change position/time or record encounters/status events. Source/analyzer furigana
+remains unchanged. Runtime/FFI/reader-panel projection and editing are still pending.
+
 ## Implemented domain values
 - `Surface`: nonblank exact written Unicode string; equality/hash/order use exact
   contents. Different readings share one identity; inflected spellings differ.

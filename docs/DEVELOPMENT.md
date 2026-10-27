@@ -3803,3 +3803,65 @@ initial failures and lint XML: `.local/test-reports/reader-furigana-layout/`.
 No Rust/core/FFI/schema/dependency change; full Rust tests/Clippy/host JNI/codegen,
 release, standalone dictionary benchmarks, process-death and physical-arm64 checks
 were not rerun. Physical arm64 remains user-deferred.
+
+
+## Missing-match custom dictionary persistence
+
+2026-10-27, using the pinned local Rust/JDK/SDK environment:
+
+```sh
+export PATH=/home/kai/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin:$PATH
+export JAVA_HOME=/home/kai/repos/yomoku/.local/jdk-17/jdk-17.0.21+9
+export GRADLE_USER_HOME=/home/kai/repos/yomoku/.local/gradle
+export ANDROID_HOME=/home/kai/Android/Sdk
+cargo test -p yomoku-storage custom_dictionary --all-features --locked --offline
+cargo test --workspace --all-features --locked --offline --quiet
+cargo clippy --workspace --all-targets --all-features --locked --offline -- -D warnings
+cargo fmt --all -- --check
+tools/test-kotlin-bridge.sh
+cargo run -p yomoku-ffi --bin generate-kotlin --features facet_typegen --locked --offline -- target/generated/kotlin-repeat
+# Compare after generation exits.
+diff -r target/generated/kotlin target/generated/kotlin-repeat
+tools/format-kotlin.sh --check
+git diff --check
+./android/gradlew -p android :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=app.yomoku.DocumentSessionTest,app.yomoku.ReaderWordsTest --offline --console=plain
+unzip -l android/app/build/outputs/apk/debug/app-debug.apk 'lib/*/libyomoku_jni.so'
+```
+
+Migration 0017 adds an independent versioned exact-surface custom dictionary table.
+The pure domain type requires nonblank English meaning and reading while retaining
+literal Unicode. Selected-token read/create/edit/delete repositories derive surface
+and base from validated original Mode B, checking both against the separate immutable
+word/name index on every operation. Any built-in candidate blocks access; lookup
+failure never permits a custom fallback. No vocabulary/analysis/history/position/
+time changes or custom base-form propagation occur. Runtime/FFI/editor remain open.
+
+PASS: eleven new domain/storage cases; 464 workspace Rust tests (16 opt-in ignored),
+strict Clippy/Rustfmt, Kotlin formatting, real-Full host Kotlin/JNI and identical
+repeat generation. Tests cover exact Unicode/NUL/combining spelling, global reuse,
+edit/delete/reopen/read-only bytes, all statuses/deleted entries, all five logical
+presets and crossing-token identity, invalid/stale/foreign/non-Japanese selections,
+word/name/base protection and dictionary failures, corruption/no implicit repair,
+concurrent writers, identical no-op retries, create/edit/delete statement and
+deferred-COMMIT rollback, migration preservation/failure/retry. Existing migration
+fixtures advance current/future schemas to 17/18.
+
+Initial focused checks caught a fixture passing a chapter instead of a chapter
+slice to LogicalPages and expecting three registrations for two distinct surfaces;
+fixed both before the passing full run. Gradle hit the documented sandbox
+wildcard-IP/local-socket restriction; reran offline outside the sandbox with
+approval. Host JNI log and Android logs: .local/test-reports/custom-dictionary-storage/.
+Final PASS: both arm64-v8a/x86_64 debug/test APKs, strict Android lint (only the
+existing informational FileImports autoboxing hint) and all eleven selected
+API-36 x86_64 phone cases, zero failures/errors/skips (5m52s including native
+build/lint). APK inspection confirms both JNI ABIs. Preserved device reports and
+lint XML alongside logs in .local/test-reports/custom-dictionary-storage/.
+Reused the running 1080x2400/420dpi phone AVD without restart, wipe or display
+changes; it remains running. No open blocker. No dependency/version, permission
+or existing destructive-semantics change.
+
+This is a domain/storage slice: no public bridge schema or Android editor change.
+Next: core/FIFO/FFI custom read/save/delete and selection/retry lifecycle, then
+missing-match Android editor/deletion. Tablet/dark, release, standalone dictionary
+benchmarks, process-death/reboot and physical-arm64 checks were not rerun; hardware
+validation remains user-deferred.

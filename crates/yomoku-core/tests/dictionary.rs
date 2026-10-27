@@ -1,5 +1,31 @@
 use yomoku_core::dictionary::{Reading, Sense, Spelling, Translation, WordEntry};
 
+#[test]
+fn custom_entry_requires_both_fields_and_preserves_literal_unicode() {
+    use yomoku_core::{dictionary::CustomDictionaryEntry, vocabulary::Surface};
+
+    let surface = Surface::new("𠮷か\u{3099}\0").unwrap();
+    for (meaning, reading) in [
+        ("", "かな"),
+        (" \n\t", "かな"),
+        ("meaning", ""),
+        ("meaning", "　\n"),
+    ] {
+        assert!(
+            CustomDictionaryEntry::new(surface.clone(), meaning.into(), reading.into()).is_err()
+        );
+    }
+    let entry = CustomDictionaryEntry::new(
+        surface.clone(),
+        " literal\nmeaning 📖\0 ".into(),
+        " か\u{3099}𠮷\0 ".into(),
+    )
+    .unwrap();
+    assert_eq!(entry.surface(), &surface);
+    assert_eq!(entry.english_meaning(), " literal\nmeaning 📖\0 ");
+    assert_eq!(entry.reading(), " か\u{3099}𠮷\0 ");
+}
+
 fn spelling(text: &str) -> Spelling {
     Spelling {
         text: text.into(),

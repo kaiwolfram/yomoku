@@ -773,7 +773,7 @@ fn srt_migration_preserves_paste_txt_history_and_source_id_high_water() {
         .unwrap();
     drop(storage);
     let mut storage = Storage::open(database.path()).unwrap();
-    assert_eq!(storage.schema_version().unwrap(), 16);
+    assert_eq!(storage.schema_version().unwrap(), 17);
     assert_eq!(totals_before_migration(&storage), before);
     assert_eq!(
         storage.load_txt_source(txt.document.document_id).unwrap(),
