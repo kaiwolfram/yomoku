@@ -2758,3 +2758,27 @@ only affects that table. No existing destructive operation changes.
 No new dependency/version or public bridge schema. Runtime/FIFO/core selection
 lifecycle, typed custom result transport and Android editor/retry controls remain
 the next slice; keep their implementation task unchecked.
+
+
+## 2026-10-27 — Custom dictionary core/FIFO/FFI transport
+
+Include the exact-surface custom fallback in `ReaderWordDetails`, using the same
+user-state read transaction as selected tokens/status/counts, only after immutable
+word/name lookup succeeds with no candidates. Keep a string-only `ReaderCustomEntry`
+transport separate from the validated domain entry and original analyzer metadata.
+No extra automatic read, analyzer load or custom base-form fallback is introduced.
+
+Require the currently loaded missing-match selection for explicit save/delete events;
+reuse shared busy/pending-save gates and recheck built-in surface/base matches in
+storage for every mutation. Return the committed entry (or absence after deletion)
+with the selection key. Attach only while pending/current selection and exact surface
+still match. Dismissing or leaving the reader discards callbacks, but accepted atomic
+writes may finish. This follows existing selected-word/status command lifecycle.
+
+Retain the previous committed entry on failure and expose a separate custom mutation
+error so clock/status saves cannot erase it. Retry only on another explicit save/delete;
+identical repository retries already do no writes. Both outcomes drain waiting final
+time checkpoints/departures. Reuse lazy dictionary connection/error retirement and
+the existing FIFO/Render-only shell; no dependency/schema/architecture or destructive
+semantics change. Android transport tests are part of this slice; visible editor and
+delete/retry controls are the next independently verifiable slice.

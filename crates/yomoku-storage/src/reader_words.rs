@@ -22,6 +22,7 @@ pub enum ReaderWordError {
     Dictionary(DictionaryError),
     /// A stale base identity or an index outside this page's Japanese tokens.
     InvalidSelection,
+    InvalidCustomEntry,
 }
 
 impl fmt::Display for ReaderWordError {
@@ -30,6 +31,7 @@ impl fmt::Display for ReaderWordError {
             Self::Storage(error) => error.fmt(f),
             Self::Dictionary(error) => error.fmt(f),
             Self::InvalidSelection => f.write_str("invalid or stale reader word selection"),
+            Self::InvalidCustomEntry => f.write_str("invalid custom dictionary entry"),
         }
     }
 }
@@ -39,7 +41,7 @@ impl Error for ReaderWordError {
         match self {
             Self::Storage(error) => Some(error),
             Self::Dictionary(error) => Some(error),
-            Self::InvalidSelection => None,
+            Self::InvalidSelection | Self::InvalidCustomEntry => None,
         }
     }
 }
@@ -86,12 +88,29 @@ impl Storage {
             None => 0,
         };
         let candidates = dictionary.lookup(&token.surface, token.dictionary_form.as_deref())?;
+        let custom_entry = if candidates.words.is_empty() && candidates.names.is_empty() {
+            crate::custom_dictionary::read_entry_in(
+                &transaction,
+                yomoku_core::vocabulary::Surface::new(token.surface.clone())
+                    .map_err(|_| ReaderWordError::InvalidSelection)?,
+            )
+            .map_err(|error| match error {
+                crate::custom_dictionary::CustomDictionaryError::Storage(error) => {
+                    ReaderWordError::Storage(error)
+                }
+                _ => ReaderWordError::InvalidCustomEntry,
+            })?
+            .map(Into::into)
+        } else {
+            None
+        };
         transaction.commit().map_err(StorageError::from)?;
         Ok(Some(ReaderWordDetails {
             key,
             token,
             encountered,
             candidates,
+            custom_entry,
         }))
     }
 }

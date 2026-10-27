@@ -82,6 +82,47 @@ internal fun verifyReaderWordBridge() {
             check(fresh.calls.get() == 0 && fresh.wordCalls.get() == 1)
             check(before.contentEquals(database.readBytes()))
         }
+        val customDatabase = directory.resolve("custom.sqlite3")
+        var customSurface = ""
+        val customId = NativeBridge(customDatabase.path, listener, HostDictionary()).use { bridge ->
+            val created = dispatch(bridge, Event.CreatePaste("ヌヌヌヌヌヌ"))
+            val id = created.documents.single().documentId
+            val opened = dispatch(bridge, Event.OpenReader(id))
+            val page = checkNotNull(opened.reader)
+            val key = ReaderTokenKey(id, page.anchor, checkNotNull(opened.readerAnalysis))
+            val tokens = checkNotNull(dispatch(bridge, Event.LoadReaderTokens(key)).readerTokens)
+            val token = tokens.tokens.single()
+            customSurface = token.surface
+            val selection = ReaderWordSelection(key, token.tokenIndex)
+            val missing = checkNotNull(dispatch(bridge, Event.LoadReaderWord(selection)).readerWord)
+            check(missing.candidates.words.isEmpty() && missing.candidates.names.isEmpty())
+            check(missing.customEntry == null)
+            val meaning = " literal meaning 📖\u0000 "
+            val reading = " か\u3099𠮷\u0000 "
+            val saved = dispatch(bridge, Event.SaveReaderCustomEntry(selection, meaning, reading))
+            val entry = checkNotNull(saved.readerWord?.customEntry)
+            check(entry.surface == customSurface && entry.englishMeaning == meaning && entry.reading == reading)
+            check(ViewModel.bincodeDeserialize(saved.bincodeSerialize()) == saved)
+            check(saved.reader == page && saved.readerTokens == tokens && saved.readerTime == null)
+            val failed = dispatch(bridge, Event.SaveReaderCustomEntry(selection, " ", reading))
+            check(failed.readerCustomEntryError != null && failed.readerWord?.customEntry == entry)
+            check(failed.readerWordError == null && failed.documentError == null)
+            val edited = dispatch(bridge, Event.SaveReaderCustomEntry(selection, "edited", reading))
+            check(edited.readerCustomEntryError == null && edited.readerWord?.customEntry?.englishMeaning == "edited")
+            id
+        }
+        NativeBridge(customDatabase.path, listener, HostDictionary()).use { bridge ->
+            val opened = dispatch(bridge, Event.OpenReader(customId))
+            val key = ReaderTokenKey(customId, checkNotNull(opened.reader).anchor, checkNotNull(opened.readerAnalysis))
+            val token = checkNotNull(dispatch(bridge, Event.LoadReaderTokens(key)).readerTokens).tokens.single()
+            val selection = ReaderWordSelection(key, token.tokenIndex)
+            val loaded = dispatch(bridge, Event.LoadReaderWord(selection))
+            val entry = checkNotNull(loaded.readerWord?.customEntry)
+            check(entry.surface == customSurface && entry.englishMeaning == "edited")
+            val deleted = dispatch(bridge, Event.DeleteReaderCustomEntry(selection))
+            check(deleted.readerCustomEntryError == null && deleted.readerWord?.customEntry == null)
+            check(dispatch(bridge, Event.LoadReaderWord(selection)).readerWord?.customEntry == null)
+        }
     } finally { directory.deleteRecursively() }
-    println("PASS: selected-word JNI word/name payloads, base lookup, count, retry, lazy workers and read-only reopen")
+    println("PASS: selected-word JNI word/name payloads, custom CRUD/Unicode/reopen/retry, count and lazy workers")
 }

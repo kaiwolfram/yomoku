@@ -398,7 +398,12 @@ deletes do no writes. Statement/deferred-COMMIT failure preserves the prior entr
 corrupt values fail without repair. Vocabulary status/deletion does not influence
 custom identity, and these operations never register words, rewrite analysis,
 change position/time or record encounters/status events. Source/analyzer furigana
-remains unchanged. Runtime/FFI/reader-panel projection and editing are still pending.
+remains unchanged. `load_reader_word` also reads this exact-surface fallback in its
+existing transaction when both immutable candidate sections are empty. Invalid
+custom values fail the whole lookup; a later built-in match suppresses retained
+custom data. The typed core/FIFO/FFI carries `ReaderCustomEntry` and explicit
+save/delete selection commands, with a separate retryable mutation error. This
+transport adds no schema or persisted UI state. Android editor controls remain pending.
 
 ## Implemented domain values
 - `Surface`: nonblank exact written Unicode string; equality/hash/order use exact

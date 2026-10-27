@@ -2096,3 +2096,27 @@
   next wire typed custom results/mutations with selection/retry gates, then Android
   missing-match editing/deletion. Existing phone AVD unchanged and running.
   No tablet/dark/release/process-death/physical-arm64 rerun; hardware deferred.
+
+
+## 2026-10-27 — Custom dictionary core/FIFO/FFI transport
+- Started clean. Same-transaction selected-word reads now include validated custom
+  entries only for successful empty built-in matches. Added literal string DTO and
+  explicit save/delete core events/effects on the existing FIFO/generated Kotlin/JNI.
+- Current missing-match selection/shared save gates and repository built-in rechecks
+  protect mutations; callbacks reject retired selections and foreign surfaces.
+  Failures preserve committed entries with a separate explicit-retry error; both
+  outcomes drain final clock saves/departures. No schema/dependency/reader semantics change.
+- PASS: six new Rust cases, 470 workspace tests (16 opt-in ignored), strict Clippy/
+  formatting, real-Full host JNI/repeat codegen, both-ABI debug/test APKs and lint.
+  New Android transport verifies Unicode CRUD/retry/reopen and built-in protection.
+- Thirteen distinct phone cases pass: nine before an AVD disconnect, then four
+  continuation cases (2m24s) after restart. Initial post-boot APK install failed for
+  storage; direct retry succeeded without cleanup or wipe. No code/test weakening.
+  Gradle/ADB sockets required approved outside-sandbox execution; no downloads.
+- Updated prior explicit ViewModel/projection fixtures and corrected new dictionary/
+  no-op-callback fixtures before passing checks. Commands/failures: DEVELOPMENT.md
+  end; preserved reports: .local/test-reports/custom-dictionary-transport/.
+- Plan/architecture/data/decisions/handoff updated; next Android missing-match
+  editor/edit/delete + explicit retries, then segmentation overrides. No blocker.
+  AVD running at original phone size; no tablet/dark/release/process-death/physical
+  arm64 rerun; hardware remains user-deferred.

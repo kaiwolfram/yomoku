@@ -2418,6 +2418,7 @@ fn word_details(core: &Core<Yomoku>, token_index: u64) -> yomoku_core::reader::R
     yomoku_core::reader::ReaderWordDetails {
         key: token_key(core),
         encountered: 17,
+        custom_entry: None,
         candidates: yomoku_core::dictionary::DictionaryCandidates {
             surface: token.surface.clone(),
             dictionary_form: token.dictionary_form.clone(),
@@ -3178,4 +3179,199 @@ fn typography_waits_for_failed_time_and_completion_saves_before_accepting_change
         core.view().reader_typography,
         Some(ReaderTypography::default())
     );
+}
+
+fn custom_save(selection: yomoku_core::reader::ReaderWordSelection) -> Event {
+    Event::SaveReaderCustomEntry {
+        selection,
+        english_meaning: " literal meaning 📖\0 ".into(),
+        reading: " か\u{3099}𠮷\0 ".into(),
+    }
+}
+
+fn select_missing_word(core: &Core<Yomoku>) -> yomoku_core::reader::ReaderWordDetails {
+    load_status_tokens(core);
+    let details = word_details(core, 0);
+    let mut effects = core.process_event(Event::LoadReaderWord(details.selection()));
+    finish(
+        core,
+        &mut effects,
+        StorageResult::ReaderWordLoaded(Box::new(details.clone())),
+    );
+    details
+}
+
+#[test]
+fn custom_entry_requires_loaded_missing_match_selection_and_rejects_duplicates_and_wrong_results() {
+    use yomoku_core::reader::{ReaderCustomEntry, ReaderWordSelection};
+    let (core, _) = analyzed_reader();
+    let selection = ReaderWordSelection {
+        key: token_key(&core),
+        token_index: 0,
+    };
+    assert!(core.process_event(custom_save(selection)).is_empty());
+    let details = select_missing_word(&core);
+    let before = core.view();
+    for invalid in [
+        ReaderWordSelection {
+            token_index: 99,
+            ..selection
+        },
+        ReaderWordSelection {
+            key: ReaderTokenKey {
+                analysis: ReaderAnalysis::Missing,
+                ..selection.key
+            },
+            ..selection
+        },
+    ] {
+        assert!(core.process_event(custom_save(invalid)).is_empty());
+        assert!(core
+            .process_event(Event::DeleteReaderCustomEntry(invalid))
+            .is_empty());
+    }
+    let mut effects = core.process_event(custom_save(selection));
+    assert_eq!(
+        storage_operation(&effects),
+        StorageOperation::SaveReaderCustomEntry {
+            selection,
+            english_meaning: " literal meaning 📖\0 ".into(),
+            reading: " か\u{3099}𠮷\0 ".into()
+        }
+    );
+    assert!(core.process_event(custom_save(selection)).is_empty());
+    assert!(core
+        .process_event(Event::DeleteReaderCustomEntry(selection))
+        .is_empty());
+    finish(
+        &core,
+        &mut effects,
+        StorageResult::ReaderCustomEntryChanged(
+            selection,
+            Some(ReaderCustomEntry {
+                surface: details.token.surface.clone(),
+                english_meaning: " literal meaning 📖\0 ".into(),
+                reading: " か\u{3099}𠮷\0 ".into(),
+            }),
+        ),
+    );
+    let committed = core.view().reader_word.unwrap().custom_entry.unwrap();
+    assert_eq!(committed.reading, " か\u{3099}𠮷\0 ");
+    assert_eq!(core.view().reader, before.reader);
+    assert_eq!(core.view().reader_tokens, before.reader_tokens);
+    assert_eq!(core.view().documents, before.documents);
+    for mismatch in 0..4 {
+        let mut entry = committed.clone();
+        let mut result_selection = selection;
+        match mismatch {
+            0 => entry.surface = "foreign".into(),
+            1 => entry.english_meaning = " \n".into(),
+            2 => entry.reading.clear(),
+            _ => result_selection.token_index = 1,
+        }
+        let mut effects = core.process_event(custom_save(selection));
+        finish(
+            &core,
+            &mut effects,
+            StorageResult::ReaderCustomEntryChanged(result_selection, Some(entry)),
+        );
+        assert_eq!(
+            core.view().reader_word.unwrap().custom_entry,
+            Some(committed.clone())
+        );
+    }
+    let mut effects = core.process_event(Event::DeleteReaderCustomEntry(selection));
+    finish(
+        &core,
+        &mut effects,
+        StorageResult::ReaderCustomEntryChanged(selection, None),
+    );
+    assert!(core.view().reader_word.unwrap().custom_entry.is_none());
+}
+
+#[test]
+fn custom_entry_cancellation_discards_success_and_failure_without_restoring_selection() {
+    for exit in [
+        Event::DismissReaderWord,
+        Event::CloseDocument,
+        Event::OpenPaste,
+        Event::SelectDestination(Destination::Nostr),
+        Event::OpenSettings,
+    ] {
+        for failed in [false, true] {
+            let (core, _) = analyzed_reader();
+            let details = select_missing_word(&core);
+            let selection = details.selection();
+            let mut effects = core.process_event(custom_save(selection));
+            core.process_event(exit.clone());
+            core.process_event(Event::CloseSettings);
+            finish(
+                &core,
+                &mut effects,
+                if failed {
+                    StorageResult::Failed(DocumentError::Unavailable)
+                } else {
+                    StorageResult::ReaderCustomEntryChanged(
+                        selection,
+                        Some(yomoku_core::reader::ReaderCustomEntry {
+                            surface: details.token.surface,
+                            english_meaning: "meaning".into(),
+                            reading: "かな".into(),
+                        }),
+                    )
+                },
+            );
+            assert!(core.view().reader_word.is_none());
+            assert!(core.view().reader_word_selection.is_none());
+            assert!(core.view().reader_custom_entry_error.is_none());
+            assert!(core.view().document_error.is_none());
+        }
+    }
+}
+
+#[test]
+fn custom_entry_failures_retain_committed_data_retry_explicitly_and_drain_final_time() {
+    for delete in [false, true] {
+        let (core, _) = analyzed_reader();
+        let details = select_missing_word(&core);
+        let selection = details.selection();
+        let event = if delete {
+            Event::DeleteReaderCustomEntry(selection)
+        } else {
+            custom_save(selection)
+        };
+        restore_time(&core, 10);
+        let mut effects = core.process_event(event.clone());
+        finish(
+            &core,
+            &mut effects,
+            StorageResult::Failed(DocumentError::Unavailable),
+        );
+        assert_eq!(core.view().reader_word, Some(details));
+        assert_eq!(
+            core.view().reader_custom_entry_error,
+            Some(DocumentError::Unavailable)
+        );
+        assert!(core.view().document_error.is_none() && core.view().reader_word_error.is_none());
+        core.process_event(clock(&core, 0, ReaderClockAction::Resume));
+        let mut effects = core.process_event(clock(&core, 500, ReaderClockAction::Checkpoint));
+        save_clock(&core, &mut effects, 510);
+        assert_eq!(
+            core.view().reader_custom_entry_error,
+            Some(DocumentError::Unavailable)
+        );
+        let mut effects = core.process_event(event);
+        assert!(core.view().reader_custom_entry_error.is_none());
+        core.process_event(clock(&core, 900, ReaderClockAction::Pause));
+        core.process_event(Event::CloseDocument);
+        let mut effects = resolve(
+            &core,
+            &mut effects,
+            StorageResult::Failed(DocumentError::Unavailable),
+        );
+        save_clock(&core, &mut effects, 910);
+        assert_eq!(core.view().content_route, ContentRoute::Main);
+        assert!(!core.view().reading_time_save_pending);
+        assert!(core.view().reader_custom_entry_error.is_none());
+    }
 }

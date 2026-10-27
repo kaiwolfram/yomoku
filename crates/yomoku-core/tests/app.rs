@@ -26,6 +26,7 @@ fn starts_in_library() {
             reader_word_selection: None,
             reader_word: None,
             reader_word_error: None,
+            reader_custom_entry_error: None,
             reader_typography: None,
             page_length: None,
             import_summary: None,

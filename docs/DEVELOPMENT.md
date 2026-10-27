@@ -3865,3 +3865,83 @@ Next: core/FIFO/FFI custom read/save/delete and selection/retry lifecycle, then
 missing-match Android editor/deletion. Tablet/dark, release, standalone dictionary
 benchmarks, process-death/reboot and physical-arm64 checks were not rerun; hardware
 validation remains user-deferred.
+
+## Missing-match custom dictionary core/FIFO/FFI transport
+
+2026-10-27, using the pinned Rust/JDK/SDK/Gradle environment above:
+
+```sh
+cargo test -p yomoku-core --test reader_flow custom_entry --all-features --locked --offline
+cargo test -p yomoku-ffi --test reader_words --all-features --locked --offline
+cargo test --workspace --all-features --locked --offline --quiet
+cargo clippy --workspace --all-targets --all-features --locked --offline -- -D warnings
+cargo fmt --all -- --check
+tools/test-kotlin-bridge.sh
+cargo run -p yomoku-ffi --bin generate-kotlin --features facet_typegen --locked --offline -- target/generated/kotlin-repeat
+# Compare after generation exits.
+diff -r target/generated/kotlin target/generated/kotlin-repeat
+tools/format-kotlin.sh --check
+git diff --check
+./android/gradlew -p android :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=app.yomoku.ReaderWordDetailsSessionTest,app.yomoku.ReaderWordsTest,app.yomoku.DocumentSessionTest --offline --console=plain
+unzip -l android/app/build/outputs/apk/debug/app-debug.apk 'lib/*/libyomoku_jni.so'
+```
+
+Selected-word reads carry a typed exact-surface custom entry from the same user-state
+transaction, only after successful empty word/name lookup. Explicit save/delete events
+use the existing shared gates/FIFO and recheck stored original-token selection and
+built-ins. Results attach only to the matching pending/current selection and surface.
+Failures retain committed data with an independent error; explicit retries and final
+clock drains work without an automatic mutation retry loop. No analyzer, schema,
+dependency, canonical text, status/history/time or destructive-semantics change.
+Android editor controls remain the next slice.
+
+PASS: six new Rust cases, 470 workspace tests (16 opt-in ignored), strict Clippy,
+Rustfmt/Kotlin formatting, real-Full host Kotlin/JNI and identical repeat generation.
+Coverage includes literal supplementary/combining/NUL Unicode, create/edit/delete/
+reopen, identical no-op retries, built-in protection and dictionary rechecks, corrupted
+index/custom values, repaired index publication, write failure/explicit retry,
+selection/busy gates, late success/error cancellation and queued final clock saves.
+The host and new Android session fixture use a real Full out-of-vocabulary katakana
+surface; built-in Tokyo word/name definitions remain immutable. The visible editor
+is not part of this transport slice.
+
+Initial checks found the existing explicit Rust ViewModel initializer needing its new
+field, and the prior storage equality fixture needing its now-present custom entry.
+New FFI fixtures needed a genuinely indexed matching payload and an unrelated status
+save instead of a second no-op RestoreReadingTime callback. Corrected all before the
+passing workspace run. Gradle/ADB local sockets required approved outside-sandbox
+execution; no downloads. The initial 13-case phone run passed the new transport,
+existing dictionary transport and seven word-panel cases (nine total), then the
+AVD disappeared during the movement case. The runner reports an empty failure and
+`device not found`, with three document-session cases never started. Preserve that
+incomplete run separately; no application assertion diagnosis is established.
+Restarted the existing swangle/KVM AVD without wiping data or changing display.
+Final continuation results and preserved reports follow below.
+
+Continuation command after AVD boot (`sys.boot_completed=1`), retaining the nine
+completed cases from the initial run:
+
+```sh
+ANDROID_HOME=/home/kai/Android/Sdk tools/start-android-emulator.sh
+./android/gradlew -p android :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug :app:connectedDebugAndroidTest '-Pandroid.testInstrumentationRunnerArguments.class=app.yomoku.ReaderWordsTest#movingBothDirectionsDismissesDetailsAndNeverRestoresTheSelection,app.yomoku.DocumentSessionTest' --offline --console=plain
+```
+
+The first continuation failed before running any tests with
+`INSTALL_FAILED_INSUFFICIENT_STORAGE` during post-boot APK installation. The AVD
+stayed connected, reported 1.4 GiB available and no third-party packages. After the
+failed install session ended, direct `adb -s emulator-5554 install -r -t
+android/app/build/outputs/apk/debug/app-debug.apk` succeeded; reran the same four-case
+command. No data/cache cleanup, uninstall, display change or AVD wipe was performed.
+
+
+Final PASS: all four continuation cases, zero failures/errors/skips (2m24s),
+including the interrupted two-direction navigation case. Together with the nine
+successful initial cases, thirteen distinct API-36 x86_64 phone cases pass, including
+the new custom transport test. Both-ABI debug/test APKs, strict Android lint and APK
+ABI inspection pass; lint contains only the existing informational FileImports
+AutoboxingStateCreation hint. The original incomplete run and failed post-boot
+install are retained alongside final device/lint/host logs and reports under
+`.local/test-reports/custom-dictionary-transport/`. No unresolved application or
+verification blocker. The restarted AVD remains running at 1080x2400/420dpi.
+Tablet/dark, release, standalone dictionary benchmarks, process-death and physical
+arm64 were not rerun; hardware validation remains user-deferred.

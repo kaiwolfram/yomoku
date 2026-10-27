@@ -8,6 +8,7 @@ import app.yomoku.shared.Event
 import app.yomoku.shared.ReaderTokenKey
 import app.yomoku.shared.ReaderWordSelection
 import app.yomoku.shared.ViewModel
+import java.io.File
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 import org.junit.Assert.assertEquals
@@ -116,6 +117,78 @@ class ReaderWordDetailsSessionTest {
             }
         } finally {
             instrumentation.runOnMainSync { core.close() }
+        }
+    }
+
+    @Test
+    fun customEntryTransportPreservesUnicodeRetriesAndReopensWithoutChangingReaderOrBuiltins() {
+        val context = instrumentation.targetContext
+        val directory = File(context.noBackupFilesDir, "custom-word-${System.nanoTime()}")
+        assertTrue(directory.mkdir())
+        val database = File(directory, "reader.sqlite3")
+        val provider = sudachiDictionaryProvider(context)
+        lateinit var core: CoreSession
+        instrumentation.runOnMainSync { core = CoreSession(database.path, provider) }
+        try {
+            awaitIdle(core)
+            val id = dispatch(core, Event.CreatePaste("ヌヌヌヌヌヌ 東京")).documents.single().documentId
+            val opened = dispatch(core, Event.OpenReader(id))
+            val key = ReaderTokenKey(id, opened.reader!!.anchor, opened.readerAnalysis!!)
+            val tokens = dispatch(core, Event.LoadReaderTokens(key)).readerTokens!!
+            val token = tokens.tokens.first { it.surface == "ヌヌヌヌヌヌ" }
+            val selection = ReaderWordSelection(key, token.tokenIndex)
+            val missing = dispatch(core, Event.LoadReaderWord(selection))
+            assertTrue(missing.readerWord!!.candidates.words.isEmpty())
+            assertTrue(missing.readerWord.candidates.names.isEmpty())
+            val meaning = " literal meaning 📖\u0000 "
+            val reading = " か\u3099𠮷\u0000 "
+            val saved = dispatch(core, Event.SaveReaderCustomEntry(selection, meaning, reading))
+            val entry = saved.readerWord!!.customEntry!!
+            assertEquals(token.surface, entry.surface)
+            assertEquals(meaning, entry.englishMeaning)
+            assertEquals(reading, entry.reading)
+            assertEquals(tokens, saved.readerTokens)
+            assertEquals(opened.reader, saved.reader)
+            assertEquals(0UL, saved.readerWord.encountered)
+            val failed = dispatch(core, Event.SaveReaderCustomEntry(selection, " ", reading))
+            assertNotNull(failed.readerCustomEntryError)
+            assertEquals(entry, failed.readerWord!!.customEntry)
+            assertNull(failed.readerWordError)
+            assertNull(failed.documentError)
+            val edited = dispatch(core, Event.SaveReaderCustomEntry(selection, "edited", reading))
+            assertNull(edited.readerCustomEntryError)
+            assertEquals("edited", edited.readerWord!!.customEntry!!.englishMeaning)
+            val builtin =
+                ReaderWordSelection(key, tokens.tokens.first { it.surface == "東京" }.tokenIndex)
+            val builtins = dispatch(core, Event.LoadReaderWord(builtin)).readerWord!!
+            assertTrue(builtins.candidates.words.isNotEmpty())
+            assertTrue(builtins.candidates.names.isNotEmpty())
+            assertNull(builtins.customEntry)
+            assertEquals(
+                builtins,
+                dispatch(core, Event.SaveReaderCustomEntry(builtin, "override", reading)).readerWord,
+            )
+            assertEquals(
+                builtins,
+                dispatch(core, Event.DeleteReaderCustomEntry(builtin)).readerWord,
+            )
+            instrumentation.runOnMainSync { core.close() }
+            instrumentation.runOnMainSync { core = CoreSession(database.path, provider) }
+            awaitIdle(core)
+            val reopened = dispatch(core, Event.OpenReader(id))
+            assertEquals(opened.reader, reopened.reader)
+            val restored = dispatch(core, Event.LoadReaderTokens(key))
+            assertEquals(tokens, restored.readerTokens)
+            val loaded = dispatch(core, Event.LoadReaderWord(selection)).readerWord!!
+            assertEquals("edited", loaded.customEntry!!.englishMeaning)
+            assertEquals(reading, loaded.customEntry.reading)
+            val deleted = dispatch(core, Event.DeleteReaderCustomEntry(selection))
+            assertNull(deleted.readerCustomEntryError)
+            assertNull(deleted.readerWord!!.customEntry)
+            assertNull(dispatch(core, Event.LoadReaderWord(selection)).readerWord!!.customEntry)
+        } finally {
+            instrumentation.runOnMainSync { core.close() }
+            directory.deleteRecursively()
         }
     }
 }

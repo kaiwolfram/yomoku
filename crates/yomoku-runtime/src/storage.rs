@@ -15,8 +15,8 @@ use yomoku_core::{
     storage::{DocumentError, StorageOperation, StorageResult},
 };
 use yomoku_storage::{
-    dictionary::Dictionary, reader_words::ReaderWordError, ImportCancellation, Storage,
-    StorageError,
+    custom_dictionary::CustomDictionaryError, dictionary::Dictionary,
+    reader_words::ReaderWordError, ImportCancellation, Storage, StorageError,
 };
 
 /// Worker-only publisher/open callback. Failed loads remain retryable; the
@@ -269,26 +269,44 @@ fn execute(
             .map(StorageResult::ReaderTokensLoaded)
             .ok_or(DocumentError::NotFound),
         StorageOperation::LoadReaderWord(selection) => {
-            if dictionary.is_none() {
-                let path = word_loader.as_mut().ok_or(DocumentError::Unavailable)?()?;
-                *dictionary = Some(Dictionary::open(path).map_err(|_| DocumentError::Unavailable)?);
-            }
             let result = storage.load_reader_word(
-                dictionary.as_ref().expect("opened dictionary"),
+                word_dictionary(dictionary, word_loader)?,
                 selection.key,
                 selection.token_index,
             );
-            match result {
-                Ok(Some(details)) => Ok(StorageResult::ReaderWordLoaded(Box::new(details))),
-                Ok(None) => Err(DocumentError::NotFound),
-                Err(ReaderWordError::Storage(error)) => Err(map_error(error)),
-                Err(ReaderWordError::InvalidSelection) => Err(DocumentError::InvalidDocument),
-                Err(ReaderWordError::Dictionary(_)) => {
-                    // A repaired atomic publication must be reopened on explicit retry.
-                    *dictionary = None;
-                    Err(DocumentError::Unavailable)
-                }
-            }
+            result
+                .map_err(|error| map_word_error(error, dictionary))?
+                .map(|details| StorageResult::ReaderWordLoaded(Box::new(details)))
+                .ok_or(DocumentError::NotFound)
+        }
+        StorageOperation::SaveReaderCustomEntry {
+            selection,
+            english_meaning,
+            reading,
+        } => {
+            let result = storage.save_reader_custom_entry(
+                word_dictionary(dictionary, word_loader)?,
+                selection.key,
+                selection.token_index,
+                english_meaning,
+                reading,
+            );
+            let entry = result
+                .map_err(|error| map_custom_error(error, dictionary))?
+                .ok_or(DocumentError::NotFound)?;
+            Ok(StorageResult::ReaderCustomEntryChanged(
+                selection,
+                Some(entry.into()),
+            ))
+        }
+        StorageOperation::DeleteReaderCustomEntry(selection) => {
+            let result = storage.delete_reader_custom_entry(
+                word_dictionary(dictionary, word_loader)?,
+                selection.key,
+                selection.token_index,
+            );
+            result.map_err(|error| map_custom_error(error, dictionary))?;
+            Ok(StorageResult::ReaderCustomEntryChanged(selection, None))
         }
         StorageOperation::SetReaderStatus(change) => storage
             .set_vocabulary_status(
@@ -375,5 +393,43 @@ pub(crate) fn map_error(error: StorageError) -> DocumentError {
         | StorageError::InvalidVocabulary
         | StorageError::InvalidAnalysis
         | StorageError::UnrecognizedDatabase => DocumentError::IncompatibleDatabase,
+    }
+}
+
+fn word_dictionary<'a>(
+    dictionary: &'a mut Option<Dictionary>,
+    loader: &mut Option<WordDictionaryLoader>,
+) -> Result<&'a Dictionary, DocumentError> {
+    if dictionary.is_none() {
+        let path = loader.as_mut().ok_or(DocumentError::Unavailable)?()?;
+        *dictionary = Some(Dictionary::open(path).map_err(|_| DocumentError::Unavailable)?);
+    }
+    Ok(dictionary.as_ref().expect("opened dictionary"))
+}
+
+fn map_word_error(error: ReaderWordError, dictionary: &mut Option<Dictionary>) -> DocumentError {
+    match error {
+        ReaderWordError::Storage(error) => map_error(error),
+        ReaderWordError::InvalidSelection | ReaderWordError::InvalidCustomEntry => {
+            DocumentError::InvalidDocument
+        }
+        ReaderWordError::Dictionary(_) => {
+            // Reopen an atomically repaired index only on explicit retry.
+            *dictionary = None;
+            DocumentError::Unavailable
+        }
+    }
+}
+
+fn map_custom_error(
+    error: CustomDictionaryError,
+    dictionary: &mut Option<Dictionary>,
+) -> DocumentError {
+    match error {
+        CustomDictionaryError::Storage(error) => map_error(error),
+        CustomDictionaryError::Selection(error) => map_word_error(error, dictionary),
+        CustomDictionaryError::BuiltInMatch | CustomDictionaryError::InvalidEntry => {
+            DocumentError::InvalidDocument
+        }
     }
 }

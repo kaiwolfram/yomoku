@@ -787,8 +787,20 @@ meaning/reading; selected-token storage operations reuse original Mode B ownersh
 validation and recheck surface/base against the read-only word/name index before
 read/create/edit/delete. No built-in, analyzer, reader position/time or history
 mutation occurs. Immediate writes roll back atomically; identical retries do no
-writes and corruption fails without repair. These repository APIs are not yet
-connected to application effects, FFI or Android editing.
+writes and corruption fails without repair. Selected-word reads now include an
+optional typed `ReaderCustomEntry` from the same read transaction, only after both
+built-in sections are empty. The transport contains literal surface/meaning/reading
+strings; validated domain/storage values remain distinct from wire payloads.
+`SaveReaderCustomEntry`/`DeleteReaderCustomEntry` run on the existing FIFO via typed
+core events/effects. Both core and repository require the current missing-match
+selection; repository rechecks original-token ownership and built-ins on each write.
+Callbacks attach only to the same pending/current selection and matching surface.
+Dismissal/navigation discard late results/errors without cancelling accepted commits.
+Failed mutations retain the committed entry and expose `reader_custom_entry_error`,
+independent of lookup/time errors; explicit submission retries, with no automatic
+write loop or frozen retry obligation. Success/failure drain queued clock saves and
+session teardown uses existing busy gates. Generated Kotlin/JNI and Android session
+transport exercise CRUD/reopen; visible editor/delete controls remain pending.
 Migration 0010 adds completion_analyses historical identities, every Japanese
 reading_occurrence and completion-linked New→Known status events in the same
 time/history/position transaction. Pure analysis selects tokens by their start

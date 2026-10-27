@@ -158,7 +158,7 @@ fn missing_surface_in(
         .map_err(|_| CustomDictionaryError::InvalidEntry)
 }
 
-fn read_entry_in(
+pub(crate) fn read_entry_in(
     connection: &Connection,
     surface: Surface,
 ) -> Result<Option<CustomDictionaryEntry>, CustomDictionaryError> {

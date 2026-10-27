@@ -96,6 +96,8 @@ pub struct Model {
     pending_token_load: Option<ReaderTokenKey>,
     pending_status_change: Option<ReaderStatusChange>,
     pending_word_load: Option<ReaderWordSelection>,
+    pending_custom_change: Option<ReaderWordSelection>,
+    reader_custom_entry_error: Option<DocumentError>,
     reader_word_selection: Option<ReaderWordSelection>,
     reader_word: Option<ReaderWordDetails>,
     reader_word_error: Option<DocumentError>,
@@ -155,6 +157,14 @@ pub enum Event {
     /// Explicit selection/refresh; rejected until current page tokens are loaded.
     LoadReaderWord(ReaderWordSelection),
     DismissReaderWord,
+    /// Explicit create/edit/delete for the currently loaded missing-match selection.
+    /// Failures retain the committed entry and require another explicit submission.
+    SaveReaderCustomEntry {
+        selection: ReaderWordSelection,
+        english_meaning: String,
+        reading: String,
+    },
+    DeleteReaderCustomEntry(ReaderWordSelection),
     /// Per-file atomic import; success returns to Library with a summary.
     ImportTxt(TxtImport),
     ImportSrt(SrtImport),
@@ -197,6 +207,8 @@ pub struct ViewModel {
     pub reader_word: Option<ReaderWordDetails>,
     /// Separate from save errors so timer checkpoints cannot erase a failed lookup.
     pub reader_word_error: Option<DocumentError>,
+    /// A failed explicit custom save/delete; preserves the last committed entry.
+    pub reader_custom_entry_error: Option<DocumentError>,
 }
 
 #[effect]
@@ -438,6 +450,26 @@ impl App for Yomoku {
                 }
                 Some(StorageOperation::LoadReaderWord(*selection))
             }
+            Event::SaveReaderCustomEntry {
+                selection,
+                english_meaning,
+                reading,
+            } => {
+                if !model.can_edit_custom_entry(*selection) {
+                    return Command::done();
+                }
+                Some(StorageOperation::SaveReaderCustomEntry {
+                    selection: *selection,
+                    english_meaning: english_meaning.clone(),
+                    reading: reading.clone(),
+                })
+            }
+            Event::DeleteReaderCustomEntry(selection) => {
+                if !model.can_edit_custom_entry(*selection) {
+                    return Command::done();
+                }
+                Some(StorageOperation::DeleteReaderCustomEntry(*selection))
+            }
             Event::SetReaderStatus(change) => {
                 if model.settings_open
                     || change.occurred_at_unix_ms < 0
@@ -532,6 +564,8 @@ impl App for Yomoku {
                 | StorageOperation::SaveReaderTypography(_)
                 | StorageOperation::LoadReadingTime { .. }
                 | StorageOperation::LoadReaderWord(_)
+                | StorageOperation::SaveReaderCustomEntry { .. }
+                | StorageOperation::DeleteReaderCustomEntry(_)
                 | StorageOperation::LoadReaderTokens(_)
                 | StorageOperation::SetReaderStatus(_)
                 | StorageOperation::SaveReadingTime { .. } => true,
@@ -548,6 +582,15 @@ impl App for Yomoku {
                 model.pending_word_load = Some(selection);
                 model.reader_word = None;
                 model.reader_word_error = None;
+                model.reader_custom_entry_error = None;
+            }
+            match &operation {
+                StorageOperation::SaveReaderCustomEntry { selection, .. }
+                | StorageOperation::DeleteReaderCustomEntry(selection) => {
+                    model.pending_custom_change = Some(*selection);
+                    model.reader_custom_entry_error = None;
+                }
+                _ => {}
             }
             // Every accepted operation that invalidates page tokens also retires
             // its selected-word result, even if the resulting anchor is unchanged.
@@ -671,6 +714,7 @@ impl App for Yomoku {
                 let token_load = model.pending_token_load.take();
                 let status_change = model.pending_status_change.take();
                 let word_load = model.pending_word_load.take();
+                let custom_change = model.pending_custom_change.take();
                 let import_outcome = match &result {
                     StorageResult::Created(_) => Some(ImportOutcome::Created),
                     StorageResult::Existing(_) => Some(ImportOutcome::Existing),
@@ -700,6 +744,24 @@ impl App for Yomoku {
                                 }
                             }
                             model.reader_word = Some(*details);
+                        }
+                    }
+                    StorageResult::ReaderCustomEntryChanged(selection, entry) => {
+                        if custom_change == Some(selection)
+                            && model.can_edit_custom_entry(selection)
+                            && entry.as_ref().is_none_or(|entry| {
+                                model.reader_word.as_ref().is_some_and(|details| {
+                                    entry.surface == details.token.surface
+                                        && !entry.english_meaning.trim().is_empty()
+                                        && !entry.reading.trim().is_empty()
+                                })
+                            })
+                        {
+                            model
+                                .reader_word
+                                .as_mut()
+                                .expect("validated selection")
+                                .custom_entry = entry;
                         }
                     }
                     StorageResult::ReaderStatusChanged(change, entry) => {
@@ -897,7 +959,11 @@ impl App for Yomoku {
                     StorageResult::PositionSaved(document) => model.apply_position(document),
                     StorageResult::Failed(error) => {
                         let key = token_load.or(status_change.map(|change| change.key));
-                        if let Some(selection) = word_load {
+                        if let Some(selection) = custom_change {
+                            if model.can_edit_custom_entry(selection) {
+                                model.reader_custom_entry_error = Some(error);
+                            }
+                        } else if let Some(selection) = word_load {
                             if model.reader_word_selection == Some(selection)
                                 && model.current_token_key() == Some(selection.key)
                             {
@@ -913,7 +979,8 @@ impl App for Yomoku {
                 if (!failed
                     || token_load.is_some()
                     || status_change.is_some()
-                    || word_load.is_some())
+                    || word_load.is_some()
+                    || custom_change.is_some())
                     && model.pending_time_checkpoint.is_none()
                 {
                     if let Some(checkpoint) = model.queued_time_checkpoint {
@@ -929,6 +996,8 @@ impl App for Yomoku {
             | Event::LoadPaste(_)
             | Event::OpenReader(_)
             | Event::LoadReaderWord(_)
+            | Event::SaveReaderCustomEntry { .. }
+            | Event::DeleteReaderCustomEntry(_)
             | Event::LoadReaderTokens(_)
             | Event::SetReaderStatus(_)
             | Event::SetReaderTypography(_)
@@ -981,15 +1050,28 @@ impl App for Yomoku {
             reader_word_selection: model.reader_word_selection,
             reader_word: model.reader_word.clone(),
             reader_word_error: model.reader_word_error,
+            reader_custom_entry_error: model.reader_custom_entry_error,
         }
     }
 }
 
 impl Model {
+    fn can_edit_custom_entry(&self, selection: ReaderWordSelection) -> bool {
+        !self.settings_open
+            && self.current_token_key() == Some(selection.key)
+            && self.reader_word_selection == Some(selection)
+            && self.reader_word.as_ref().is_some_and(|details| {
+                details.selection() == selection
+                    && details.candidates.words.is_empty()
+                    && details.candidates.names.is_empty()
+            })
+    }
+
     fn clear_reader_word(&mut self) {
         self.reader_word_selection = None;
         self.reader_word = None;
         self.reader_word_error = None;
+        self.reader_custom_entry_error = None;
         // Keep the in-flight identity until its callback for clock-save draining.
     }
 

@@ -121,7 +121,7 @@ fn custom_dictionary_create_edit_read_delete_reopen_are_global_without_reader_si
     let snapshot = storage
         .load_document_reader_snapshot(key(&first).document_id)
         .unwrap();
-    let details = storage
+    let mut details = storage
         .load_reader_word(&dictionary, key(&first), 0)
         .unwrap();
     assert_eq!(load(&mut storage, &dictionary, key(&first)), None);
@@ -155,6 +155,7 @@ fn custom_dictionary_create_edit_read_delete_reopen_are_global_without_reader_si
             .unwrap(),
         snapshot
     );
+    details.as_mut().unwrap().custom_entry = Some(edited.clone().into());
     assert_eq!(
         storage
             .load_reader_word(&dictionary, key(&first), 0)
