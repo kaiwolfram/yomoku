@@ -212,6 +212,7 @@ fn execute(
         StorageOperation::List => Ok(StorageResult::Listed(
             storage.list_documents().map_err(map_error)?,
             storage.page_length().map_err(map_error)?,
+            storage.reader_typography().map_err(map_error)?,
         )),
         StorageOperation::CreatePaste(_) => {
             let paste = paste.expect("validated paste");
@@ -304,6 +305,10 @@ fn execute(
                     }),
                 )
             })
+            .map_err(map_error),
+        StorageOperation::SaveReaderTypography(typography) => storage
+            .save_reader_typography(typography)
+            .map(StorageResult::ReaderTypographySaved)
             .map_err(map_error),
         StorageOperation::SavePageLength(length) => storage
             .save_page_length(length)

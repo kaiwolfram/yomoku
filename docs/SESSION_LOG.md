@@ -1973,3 +1973,21 @@
   architecture, decisions, README and font provenance. Persisted size/line spacing
   and source/analyzer furigana remain unchecked. Rust/JNI/release/process-death
   checks not rerun; physical arm64 remains deferred.
+
+
+## 2026-10-27 — Persist global reader font size and line spacing
+- Started clean. Added pure finite typography preferences, migration 0015, atomic
+  SQLite saves/validation, consistent reader snapshot restoration and typed
+  core/FIFO/generated JNI transport. Settings publishes committed choices only.
+- Compose applies size/proportional line height in every reader text fragment;
+  Noto, system theme/status colors, logical pages/offsets, images and taps persist.
+- PASS: eight new Rust cases; 440 workspace tests/strict Clippy/fmt; real-Full
+  Kotlin/JNI all 20 pairs/reopen; repeatable codegen; both-ABI debug/test APKs,
+  strict lint/Kotlin formatting/diff; 12 distinct phone + four tablet/dark cases.
+- Fixed historical schema fixtures and two new Android fixture assumptions
+  (normal reader departure; token identity versus list index). A preexisting
+  worker lifecycle timing assertion passed isolation/final full rerun. Reports
+  and exact commands: DEVELOPMENT.md end and .local/test-reports/reader-typography/.
+- Updated README/architecture/data/decisions/plan/handoff. Restored emulator to
+  phone/light/free rotation. No blocker; release/process-death/physical arm64
+  not rerun. Next: default-off source/analyzer furigana; CI remains independent.

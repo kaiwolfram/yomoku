@@ -12,6 +12,7 @@ use crate::reader::{
     DocumentReaderSnapshot, ReaderStatusChange, ReaderTokenKey, ReaderTokenSnapshot,
     ReaderVocabulary, ReaderWordDetails, ReaderWordSelection,
 };
+use crate::typography::ReaderTypography;
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
@@ -27,6 +28,7 @@ pub enum StorageOperation {
         position: ReadingPosition,
     },
     SavePageLength(PageLength),
+    SaveReaderTypography(ReaderTypography),
     LoadReadingTime {
         document_id: DocumentId,
         position: ReadingPosition,
@@ -76,7 +78,7 @@ pub enum DocumentError {
 #[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
 #[repr(C)]
 pub enum StorageResult {
-    Listed(Vec<LibraryDocument>, PageLength),
+    Listed(Vec<LibraryDocument>, PageLength, ReaderTypography),
     /// Import results reference Library state; content is loaded separately.
     Created(LibraryDocument),
     /// Exact duplicate: preserve persisted title/position and reference it once.
@@ -84,6 +86,7 @@ pub enum StorageResult {
     Loaded(DocumentReaderSnapshot),
     PositionSaved(ReaderDocument),
     PageLengthSaved(PageLength),
+    ReaderTypographySaved(ReaderTypography),
     ReadingTimeLoaded(SavedReadingTime),
     ReadingTimeSaved(SavedReadingTime),
     PageCompletionPrepared(AnalyzedPageCompletion),

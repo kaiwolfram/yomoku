@@ -29,6 +29,8 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import app.yomoku.shared.Event
 import app.yomoku.shared.PageLength
+import app.yomoku.shared.ReaderFontSize
+import app.yomoku.shared.ReaderLineSpacing
 import app.yomoku.shared.ViewModel
 
 @Composable
@@ -59,6 +61,49 @@ internal fun SettingsScreen(view: ViewModel, dispatch: (Event) -> Unit) {
     ) {
         StorageStatus(view)
         ReaderSaveRetry(view, dispatch)
+        val typography = view.readerTypography
+        val typographyEnabled =
+            typography != null &&
+                !view.storageBusy &&
+                !view.readingTimeSavePending &&
+                !view.completionSavePending
+        Text(
+            stringResource(R.string.reader_typography_title),
+            style = MaterialTheme.typography.titleMedium,
+        )
+        Text(stringResource(R.string.reader_typography_description))
+        TypographyControl(
+            label = stringResource(R.string.reader_font_size, typography?.fontSize?.spValue ?: 16),
+            tag = "reader_font_size",
+            index = typography?.fontSize?.ordinal ?: 1,
+            count = ReaderFontSize.entries.size,
+            enabled = typographyEnabled,
+        ) { index ->
+            typography?.let {
+                dispatch(
+                    Event.SetReaderTypography(it.copy(fontSize = ReaderFontSize.entries[index]))
+                )
+            }
+        }
+        TypographyControl(
+            label =
+                stringResource(
+                    R.string.reader_line_spacing,
+                    typography?.lineSpacing?.percent ?: 150,
+                ),
+            tag = "reader_line_spacing",
+            index = typography?.lineSpacing?.ordinal ?: 1,
+            count = ReaderLineSpacing.entries.size,
+            enabled = typographyEnabled,
+        ) { index ->
+            typography?.let {
+                dispatch(
+                    Event.SetReaderTypography(
+                        it.copy(lineSpacing = ReaderLineSpacing.entries[index])
+                    )
+                )
+            }
+        }
         Text(
             stringResource(R.string.page_length_title),
             style = MaterialTheme.typography.titleMedium,
@@ -114,6 +159,36 @@ internal fun SettingsScreen(view: ViewModel, dispatch: (Event) -> Unit) {
         }
         TextButton(onClick = { showFontNotices = true }) {
             Text(stringResource(R.string.reader_font_notices_title))
+        }
+    }
+}
+
+@Composable
+private fun TypographyControl(
+    label: String,
+    tag: String,
+    index: Int,
+    count: Int,
+    enabled: Boolean,
+    onChange: (Int) -> Unit,
+) {
+    Column(Modifier.fillMaxWidth()) {
+        Text(label, modifier = Modifier.testTag(tag))
+        Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            TextButton(
+                onClick = { onChange(index - 1) },
+                enabled = enabled && index > 0,
+                modifier = Modifier.testTag("${tag}_decrease"),
+            ) {
+                Text(stringResource(R.string.reader_typography_decrease))
+            }
+            TextButton(
+                onClick = { onChange(index + 1) },
+                enabled = enabled && index < count - 1,
+                modifier = Modifier.testTag("${tag}_increase"),
+            ) {
+                Text(stringResource(R.string.reader_typography_increase))
+            }
         }
     }
 }

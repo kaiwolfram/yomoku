@@ -6,6 +6,9 @@ import app.yomoku.nativebridge.NativeBridge
 import app.yomoku.shared.DocumentError
 import app.yomoku.shared.ContentRoute
 import app.yomoku.shared.DocumentId
+import app.yomoku.shared.ReaderTypography
+import app.yomoku.shared.ReaderFontSize
+import app.yomoku.shared.ReaderLineSpacing
 import app.yomoku.shared.ReaderAnalysis
 import app.yomoku.shared.PageLength
 import app.yomoku.shared.Event
@@ -174,6 +177,21 @@ internal fun verifyDocumentBridge() {
                 check(changed.loadedDocument == saved)
                 check(changed.readerTime == secondCheckpoint)
             }
+            val typographyPage = ViewModel.bincodeDeserialize(bridge.view()).reader
+            for (size in ReaderFontSize.entries) {
+                for (spacing in ReaderLineSpacing.entries) {
+                    val typography = ReaderTypography(size, spacing)
+                    val before = ViewModel.bincodeDeserialize(bridge.view())
+                    if (before.readerTypography == typography) continue
+                    val event = Event.SetReaderTypography(typography)
+                    check(Event.bincodeDeserialize(event.bincodeSerialize()) == event)
+                    val changed = listener.dispatch(bridge, event)
+                    check(changed.readerTypography == typography)
+                    check(changed.reader == typographyPage)
+                    check(changed.loadedDocument == saved && changed.readerAnalysis == analysis)
+                    check(changed.readerTime == secondCheckpoint)
+                }
+            }
             bridge.update(Event.CloseSettings.bincodeSerialize())
             bridge.update(Event.CloseDocument.bincodeSerialize())
             check(ViewModel.bincodeDeserialize(bridge.view()).contentRoute == ContentRoute.MAIN)
@@ -203,9 +221,11 @@ internal fun verifyDocumentBridge() {
             check(initial.importSummary == null)
             check(initial.documents.single().documentId == document.documentId)
             check(initial.pageLength == PageLength.CHARACTERS1500)
+            check(initial.readerTypography == ReaderTypography(ReaderFontSize.SP24, ReaderLineSpacing.PERCENT200))
             check(reopened.dispatch(bridge, Event.LoadPaste(document.documentId)).loadedDocument == document)
             val opened = reopened.dispatch(bridge, Event.OpenReader(document.documentId))
             check(opened.reader?.text == text)
+            check(opened.readerTypography == initial.readerTypography)
             check(opened.readerAnalysis == analysis)
             check(opened.readerTime == null)
             val restored = checkNotNull(reopened.dispatch(bridge, Event.RestoreReadingTime).readerTime)

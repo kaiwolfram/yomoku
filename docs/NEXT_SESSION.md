@@ -1,5 +1,5 @@
 # Resume here
-Updated: 2026-10-27. Noto Serif JP bundled; font/line controls and furigana next.
+Updated: 2026-10-27. Global font/line controls complete; default-off furigana next.
 ## Working
 - Pure Crux routes/Library/Settings; Render-only UI; FIFO SQLite/analysis; Library start.
 - Chapter-local UTF-8 position/whole-book percentage/five presets persist; reflow
@@ -67,14 +67,14 @@ Updated: 2026-10-27. Noto Serif JP bundled; font/line controls and furigana next
   No I/O/DTD/entities; basic SVG accepted for v1; complex resources/styles fallback.
 - Library covers resolve live path/media/SHA-256 metadata without book BLOBs/Full.
   Media+digest LRU <=4 MiB/64 entries; misses verify bytes/digest and decode <=64 KiB.
-- Noto Serif JP 2.003 pinned/bundled; explicit 400/700 axes, synthesized italic and
-  Android glyph fallback in every reader text block. Full offline Settings credits.
+- Noto Serif JP 2.003 bundled; 400/700 axes, synthesized italic/fallback, offline credits.
+- Global 14/16/18/20/24sp + 125/150/175/200% line height; defaults 16sp/150%.
+  Migration 0015/core/FIFO/JNI/Settings persist atomic pairs without changing anchors.
 ## Next tasks (ordered)
-1. Persist global font-size/line-spacing via reader_settings/core/FIFO/JNI/Settings.
-2. Default-off furigana: transport source ruby, else analyzer; preserve anchors/taps.
-3. CI host/unsigned builds independent; arm64 deferred. Nostr empty/Q188 unresolved.
+1. Default-off furigana: transport source ruby, else analyzer; preserve anchors/taps.
+2. CI host/unsigned builds independent; arm64 deferred. Nostr empty/Q188 unresolved.
 ## Verification
-- PASS: both-ABI APKs, strict lint/formatting/diff; 23 distinct phone + 8 tablet/dark cases.
-  DEVELOPMENT.md end has commands/failures; .local/test-reports/reader-font/.
-  Font test fixture assumptions fixed; emulator restarted, phone/light/free rotation restored.
-  No blocker. Rust/host-JNI/release/physical-arm64/process-death checks not rerun.
+- PASS: 440 Rust (16 opt-in ignored), strict Clippy/fmt, host JNI/repeat Kotlin codegen.
+  Both-ABI APKs/lint; 12 distinct phone cases + four tablet/dark cases pass across runs.
+  Commands/fixed fixtures/runtime flake: DEVELOPMENT.md end; .local/test-reports/reader-typography/.
+  Restored phone/light/free rotation; no blocker. Release/physical-arm64/process-death not rerun.

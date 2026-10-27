@@ -37,6 +37,7 @@ pub struct ReaderSnapshot {
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
 pub struct DocumentReaderSnapshot {
+    pub typography: crate::typography::ReaderTypography,
     pub document: ReaderDocument,
     pub page_length: PageLength,
     pub analyses: Vec<ReaderChapterAnalysis>,

@@ -315,7 +315,7 @@ internal fun ReaderWords(
                 selectedIndex = index
             }
         }
-    ReaderImageContent(page, text, imageLoader, onInteraction)
+    ReaderImageContent(page, text, imageLoader, onInteraction, view.readerTypography)
     if (
         key != null &&
             snapshot == null &&

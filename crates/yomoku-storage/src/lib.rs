@@ -112,6 +112,11 @@ const MIGRATIONS: &[Migration] = &[
         name: "0014_epub_imports",
         sql: include_str!("../migrations/0014_epub_imports.sql"),
     },
+    Migration {
+        version: 15,
+        name: "0015_reader_typography",
+        sql: include_str!("../migrations/0015_reader_typography.sql"),
+    },
 ];
 
 /// Failures are returned to the runtime; opening never resets a database.

@@ -50,6 +50,7 @@ fn snapshot(
     analysis: ReaderAnalysis,
 ) -> StorageResult {
     StorageResult::Loaded(DocumentReaderSnapshot {
+        typography: Default::default(),
         analyses: vec![ReaderChapterAnalysis {
             chapter_id: document.chapter.chapter_id,
             analysis,
@@ -158,7 +159,11 @@ fn final_clock_checkpoint_waits_for_unrelated_work_and_drains_before_first_depar
             if failed {
                 StorageResult::Failed(DocumentError::Unavailable)
             } else {
-                StorageResult::Listed(core.view().documents, PageLength::default())
+                StorageResult::Listed(
+                    core.view().documents,
+                    PageLength::default(),
+                    Default::default(),
+                )
             },
         );
         if failed {
@@ -209,7 +214,11 @@ fn clock_checkpoint_queued_behind_unrelated_work_precedes_frozen_completion_even
             if failed {
                 StorageResult::Failed(DocumentError::Unavailable)
             } else {
-                StorageResult::Listed(core.view().documents, PageLength::default())
+                StorageResult::Listed(
+                    core.view().documents,
+                    PageLength::default(),
+                    Default::default(),
+                )
             },
         );
         if failed {
@@ -541,6 +550,7 @@ fn duplicate_summary_preserves_progress_survives_settings_and_refresh_and_can_be
         StorageResult::Listed(
             vec![document.library_summary().unwrap()],
             PageLength::default(),
+            Default::default(),
         ),
     );
     assert_eq!(core.view().import_summary, Some(summary));
@@ -687,7 +697,11 @@ fn settings_reflow_preserves_exact_position_for_all_presets_and_leaves_progress_
             finish(
                 &core,
                 &mut effects,
-                StorageResult::Listed(vec![document.library_summary().unwrap()], old),
+                StorageResult::Listed(
+                    vec![document.library_summary().unwrap()],
+                    old,
+                    Default::default(),
+                ),
             );
             let mut effects = core.process_event(Event::OpenReader(document.document_id));
             finish(&core, &mut effects, loaded(document.clone(), old));
@@ -2838,6 +2852,7 @@ fn ordered_snapshot_rejects_missing_duplicate_and_foreign_chapter_analysis() {
             &core,
             &mut effects,
             StorageResult::Loaded(DocumentReaderSnapshot {
+                typography: Default::default(),
                 document: document.clone(),
                 page_length: PageLength::default(),
                 analyses,
@@ -2861,6 +2876,7 @@ fn ordered_snapshot_rejects_missing_duplicate_and_foreign_chapter_analysis() {
         &core,
         &mut effects,
         StorageResult::Loaded(DocumentReaderSnapshot {
+            typography: Default::default(),
             document: document.clone(),
             page_length: PageLength::default(),
             analyses: vec![
@@ -2879,5 +2895,128 @@ fn ordered_snapshot_rejects_missing_duplicate_and_foreign_chapter_analysis() {
     assert_eq!(
         core.view().document_error,
         Some(DocumentError::MissingAnalysis)
+    );
+}
+
+#[test]
+fn typography_requires_loaded_settings_commits_before_publish_and_preserves_reader() {
+    use yomoku_core::typography::{ReaderFontSize, ReaderLineSpacing, ReaderTypography};
+    let core = Core::<Yomoku>::new();
+    let typography = ReaderTypography {
+        font_size: ReaderFontSize::Sp24,
+        line_spacing: ReaderLineSpacing::Percent200,
+    };
+    core.process_event(Event::OpenSettings);
+    assert!(core
+        .process_event(Event::SetReaderTypography(typography))
+        .is_empty());
+    assert_eq!(core.view().reader_typography, None);
+    core.process_event(Event::CloseSettings);
+    let document = document(&"𠮷猫。\n".repeat(300));
+    let mut effects = core.process_event(Event::OpenReader(document.document_id));
+    finish(&core, &mut effects, loaded(document, PageLength::default()));
+    let previous = core.view();
+    assert_eq!(
+        previous.reader_typography,
+        Some(ReaderTypography::default())
+    );
+    assert!(core
+        .process_event(Event::SetReaderTypography(typography))
+        .is_empty());
+    core.process_event(Event::OpenSettings);
+    let mut effects = core.process_event(Event::SetReaderTypography(typography));
+    assert!(effects.iter().any(|request| matches!(request, Effect::Storage(request) if request.operation == StorageOperation::SaveReaderTypography(typography))));
+    assert!(core
+        .process_event(Event::SetReaderTypography(typography))
+        .is_empty());
+    assert_eq!(core.view().reader_typography, previous.reader_typography);
+    finish(
+        &core,
+        &mut effects,
+        StorageResult::Failed(DocumentError::Unavailable),
+    );
+    assert_eq!(core.view().reader_typography, previous.reader_typography);
+    let mut effects = core.process_event(Event::SetReaderTypography(typography));
+    finish(
+        &core,
+        &mut effects,
+        StorageResult::ReaderTypographySaved(typography),
+    );
+    assert_eq!(core.view().reader_typography, Some(typography));
+    assert_eq!(core.view().reader, previous.reader);
+    assert_eq!(core.view().documents, previous.documents);
+    assert_eq!(core.view().loaded_document, previous.loaded_document);
+    assert_eq!(core.view().reader_analysis, previous.reader_analysis);
+    assert!(core
+        .process_event(Event::SetReaderTypography(typography))
+        .is_empty());
+}
+
+#[test]
+fn typography_list_load_and_late_save_do_not_restore_closed_reader() {
+    use yomoku_core::typography::{ReaderFontSize, ReaderTypography};
+    let core = Core::<Yomoku>::new();
+    let typography = ReaderTypography {
+        font_size: ReaderFontSize::Sp20,
+        ..Default::default()
+    };
+    let mut effects = core.process_event(Event::RefreshLibrary);
+    finish(
+        &core,
+        &mut effects,
+        StorageResult::Listed(vec![], PageLength::default(), typography),
+    );
+    assert_eq!(core.view().reader_typography, Some(typography));
+    core.process_event(Event::OpenSettings);
+    let mut effects = core.process_event(Event::SetReaderTypography(ReaderTypography::default()));
+    core.process_event(Event::CloseSettings);
+    finish(
+        &core,
+        &mut effects,
+        StorageResult::ReaderTypographySaved(ReaderTypography::default()),
+    );
+    assert!(!core.view().settings_open);
+    assert_eq!(core.view().content_route, ContentRoute::Main);
+    assert!(core.view().reader.is_none());
+}
+
+#[test]
+fn typography_waits_for_failed_time_and_completion_saves_before_accepting_changes() {
+    use yomoku_core::typography::{ReaderFontSize, ReaderTypography};
+    let typography = ReaderTypography {
+        font_size: ReaderFontSize::Sp24,
+        ..Default::default()
+    };
+    let (core, _) = analyzed_reader();
+    restore_time(&core, 0);
+    core.process_event(clock(&core, 0, ReaderClockAction::Resume));
+    let mut effects = core.process_event(clock(&core, 100, ReaderClockAction::Pause));
+    finish(
+        &core,
+        &mut effects,
+        StorageResult::Failed(DocumentError::Unavailable),
+    );
+    core.process_event(Event::OpenSettings);
+    assert!(core.view().reading_time_save_pending);
+    assert!(core
+        .process_event(Event::SetReaderTypography(typography))
+        .is_empty());
+    let mut effects = core.process_event(Event::RetryReadingTimeCheckpoint);
+    save_clock(&core, &mut effects, 100);
+    core.process_event(Event::CloseSettings);
+    let mut effects = core.process_event(forward(&core, 123));
+    finish(
+        &core,
+        &mut effects,
+        StorageResult::Failed(DocumentError::Unavailable),
+    );
+    core.process_event(Event::OpenSettings);
+    assert!(core.view().completion_save_pending);
+    assert!(core
+        .process_event(Event::SetReaderTypography(typography))
+        .is_empty());
+    assert_eq!(
+        core.view().reader_typography,
+        Some(ReaderTypography::default())
     );
 }

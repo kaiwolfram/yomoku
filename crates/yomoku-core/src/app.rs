@@ -1,5 +1,6 @@
 //! Pure application state. Hosts execute effects; the core performs no I/O.
 
+use crate::typography::ReaderTypography;
 use crux_core::{
     macros::effect,
     render::{self, RenderOperation},
@@ -79,6 +80,7 @@ pub struct Model {
     reader_document: Option<ReaderDocument>,
     reader_analyses: Vec<ReaderChapterAnalysis>,
     page_length: Option<PageLength>,
+    reader_typography: Option<ReaderTypography>,
     import_summary: Option<ImportSummary>,
     reader_time: Option<SavedReadingTime>,
     restoring_reader_time: bool,
@@ -116,6 +118,7 @@ pub enum Event {
     /// Page completion uses a separate command.
     SaveReadingPosition(ReadingPosition),
     SetPageLength(PageLength),
+    SetReaderTypography(ReaderTypography),
     DismissImportSummary,
     /// Explicit preparation for the platform timer; opening itself stays read-only.
     RestoreReadingTime,
@@ -176,6 +179,7 @@ pub struct ViewModel {
     pub reader_analysis: Option<ReaderAnalysis>,
     /// None until persisted settings have been loaded successfully.
     pub page_length: Option<PageLength>,
+    pub reader_typography: Option<ReaderTypography>,
     pub import_summary: Option<ImportSummary>,
     /// Only the committed duration at the current exact reading offset.
     pub reader_time: Option<ReadingTimeUpdate>,
@@ -449,6 +453,15 @@ impl App for Yomoku {
                 }
                 Some(StorageOperation::SetReaderStatus(*change))
             }
+            Event::SetReaderTypography(typography) => {
+                if !model.settings_open
+                    || model.reader_typography.is_none()
+                    || model.reader_typography == Some(*typography)
+                {
+                    return Command::done();
+                }
+                Some(StorageOperation::SaveReaderTypography(*typography))
+            }
             Event::SetPageLength(length) => {
                 if !model.settings_open
                     || model.page_length.is_none()
@@ -514,6 +527,7 @@ impl App for Yomoku {
                 StorageOperation::List
                 | StorageOperation::LoadPaste(_)
                 | StorageOperation::SavePageLength(_)
+                | StorageOperation::SaveReaderTypography(_)
                 | StorageOperation::LoadReadingTime { .. }
                 | StorageOperation::LoadReaderWord(_)
                 | StorageOperation::LoadReaderTokens(_)
@@ -728,9 +742,13 @@ impl App for Yomoku {
                             model.reader_tokens = Some(snapshot);
                         }
                     }
-                    StorageResult::Listed(documents, length) => {
+                    StorageResult::Listed(documents, length, typography) => {
+                        model.reader_typography = Some(typography);
                         model.documents = documents;
                         model.apply_page_length(length);
+                    }
+                    StorageResult::ReaderTypographySaved(typography) => {
+                        model.reader_typography = Some(typography);
                     }
                     StorageResult::PageLengthSaved(length) => model.apply_page_length(length),
                     StorageResult::ReadingTimeLoaded(saved) => {
@@ -849,6 +867,7 @@ impl App for Yomoku {
                             model.document_error = Some(DocumentError::InvalidDocument);
                             return render::render();
                         }
+                        model.reader_typography = Some(snapshot.typography);
                         let document = snapshot.document;
                         model.update_library(&document);
                         model.apply_page_length(snapshot.page_length);
@@ -910,6 +929,7 @@ impl App for Yomoku {
             | Event::LoadReaderWord(_)
             | Event::LoadReaderTokens(_)
             | Event::SetReaderStatus(_)
+            | Event::SetReaderTypography(_)
             | Event::SetPageLength(_)
             | Event::SaveReadingPosition(_) => unreachable!(),
             Event::RestoreReadingTime
@@ -935,6 +955,7 @@ impl App for Yomoku {
             reader: model.reader.clone(),
             reader_analysis: model.reader_analysis,
             page_length: model.page_length,
+            reader_typography: model.reader_typography,
             import_summary: model.import_summary.clone(),
             reader_time: model.reader_time.map(|saved| saved.value),
             reading_time_save_pending: model.pending_time_checkpoint.is_some()

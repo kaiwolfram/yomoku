@@ -13,4 +13,5 @@ pub mod reader;
 pub mod reader_formatting;
 pub mod reader_images;
 pub mod storage;
+pub mod typography;
 pub mod vocabulary;

@@ -2,11 +2,11 @@
 
 ## Implemented
 `yomoku-core` is a pure Crux 0.20.0 application. It owns Library-default
-navigation, persisted page-length Settings, storage busy/error state, Library
+navigation, persisted page-length/font-size/line-spacing Settings, storage busy/error state, Library
 summaries, an optional ordered-document snapshot and Main/Paste/Reader content routes.
 OpenPaste/CloseDocument and SelectDestination/OpenSettings/CloseSettings
 remain synchronous. RefreshLibrary/CreatePaste/LoadPaste/SaveReadingPosition/
-SetPageLength emit StorageOperation; only one storage command is accepted at a time, while navigation
+SetPageLength/SetReaderTypography emit StorageOperation; only one storage command is accepted at a time, while navigation
 stays available.
 OpenReader has a separate storage operation that atomically resets finished books
 to page 1, retaining the permanent marker and pending durations. It tracks the
@@ -39,7 +39,7 @@ Read-only multi-chapter loading validates digests, counts, indexes, ownership an
 UTF-8 anchors without parsing or analyzing. Library progress sums earlier chapter
 lengths plus the current chapter offset against total book bytes.
 The pure `ReaderDocument` now retains every canonical chapter in source order.
-`DocumentReaderSnapshot` adds the saved preset and each chapter's original Mode B
+`DocumentReaderSnapshot` adds the saved preset, global typography and each chapter's original Mode B
 identity. Generic read/open/position repositories use the authoritative saved-content
 loader; ordinary reads never parse/analyze or reset a finished book. Explicit
 opening atomically resets a finished book to its first chapter. Logical page
@@ -71,8 +71,19 @@ around inline images. Missing glyphs retain Android fallback. Material UI and
 image-decoder SVG text keep their existing fonts. Font metrics affect visual line
 wrapping/scroll height; core logical page boundaries, canonical text/UTF-8 ranges
 and saved positions are unchanged. Settings exposes complete offline attribution
-and SIL OFL 1.1 in the existing retained credit dialog. Adjustable font size/line
-spacing and furigana remain separate work; no settings/schema/FFI change yet.
+and SIL OFL 1.1 in the existing retained credit dialog.
+
+Global `ReaderTypography` carries finite font-size and line-spacing preferences
+through typed Settings events, the FIFO storage protocol and generated Kotlin.
+Migration 0015 adds constrained numeric columns to the singleton `reader_settings`;
+default 16sp/150% preserves the former 16sp/24sp body text. Library startup and
+consistent document snapshots restore committed values. Core rejects unknown,
+unchanged, busy or pending-save changes; failures retain the committed preference
+until an explicit retry. Compose applies the selected font size and proportional
+line height to all reader fragments, preserving system font scaling, Material
+letter spacing, status colors and relative EPUB headings. It never repaginates,
+changes text/position/history, or changes image asset keys/sizing rules. Settings controls stay
+disabled until a successful load and while saves are pending. Furigana remains open.
 
 `ReaderDocument.images` carries keyed `ReaderChapterImages` with source-ordered
 placeholder ranges, alt text and document-scoped `ReaderImageAsset` paths/media

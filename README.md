@@ -23,6 +23,8 @@ Yomoku is under active development. The working app supports:
   positions and Library progress percentages.
 - Bundled Noto Serif JP reader text, with regular/bold weights, EPUB emphasis
   and complete font attribution/license available offline in Settings.
+- Persisted global font size and line spacing, with unchanged logical pages and
+  exact reading positions across typography changes.
 - Five persisted logical page-length presets: 250, 500, 750, 1,000 and 1,500
   non-whitespace characters. Changing the preset preserves the exact text offset.
 - Phone and tablet navigation, retained sessions across Activity recreation,
@@ -110,7 +112,7 @@ and share direct cancellation. Host fixtures cover later-chapter/write/commit
 rollback, duplicates, original analysis/status/progress and failed-file recovery.
 Android supports mixed EPUB/TXT/SRT batches, per-file encoding/errors, progress,
 Cancel and completion summaries. Imports return to Library without opening a reader.
-Planned v1 features include source ruby and font controls, custom missing-word
+Planned v1 features include source/analyzer furigana, custom missing-word
 definitions,
 reading statistics, optional AnkiDroid integration, curated Nostr reading and
 manual encrypted backups. See the [product specification](docs/PRODUCT_SPEC.md)

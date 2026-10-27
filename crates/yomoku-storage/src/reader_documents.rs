@@ -104,6 +104,7 @@ fn snapshot_in(
         })
         .collect::<Result<_, StorageError>>()?;
     Ok(DocumentReaderSnapshot {
+        typography: crate::settings::read_reader_typography(connection)?,
         document,
         page_length: read_page_length(connection)?,
         analyses,

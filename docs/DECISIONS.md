@@ -2612,3 +2612,24 @@ logical pages/positions. Material controls, dictionary panels and SVG asset text
 retain their existing typography. This slice adds no setting/schema/core/FFI
 payload or destructive behavior. Persisted global font-size/line-spacing controls
 and default-off source/analyzer furigana remain unchecked continuation work.
+
+
+## 2026-10-27 — Persist global reader font size and line spacing
+
+Use finite 14/16/18/20/24sp sizes and 125/150/175/200% line heights, with
+16sp/150% defaults matching the existing Material bodyLarge 16sp/24sp metrics.
+These are routine control ranges for the specified adjustable reader typography,
+not another page-length setting. Android system font scaling still applies.
+Store semantic integer values in migration 0015, validate without repair, and
+save the pair atomically through the existing core/FIFO/JNI Settings protocol.
+Controls submit explicit steps and display committed values; failed saves can
+repeat and no value is accepted before loading or while time/completion saves
+remain pending. No new dependencies or destructive semantics.
+
+Apply the global pair in the shared reader text component for plain text and
+all fragments around images. Retain Material letter spacing, Noto Serif JP,
+relative heading sizes, emphasis, system theme/status colors and annotated taps.
+Visual wrapping/height can change; core logical pages, exact reading offsets,
+original analysis, image sizing/decoding and history do not change. Dictionary
+panels and Material controls retain their own typography. Source/analyzer
+furigana remains the next independent slice.

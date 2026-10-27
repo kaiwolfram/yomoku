@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -34,6 +33,7 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.DpSize
 import app.yomoku.shared.ReaderInlineImage
 import app.yomoku.shared.ReaderPage
+import app.yomoku.shared.ReaderTypography
 
 internal sealed interface ReaderImagePart {
     data class Text(val start: Int, val end: Int) : ReaderImagePart
@@ -43,7 +43,11 @@ internal sealed interface ReaderImagePart {
 
 /** Inline links must not expand over adjacent inert text or another word's glyphs. */
 @Composable
-private fun ReaderTextBlock(text: AnnotatedString, modifier: Modifier) {
+private fun ReaderTextBlock(
+    text: AnnotatedString,
+    typography: ReaderTypography?,
+    modifier: Modifier,
+) {
     val original = LocalViewConfiguration.current
     val configuration =
         remember(original) {
@@ -54,7 +58,7 @@ private fun ReaderTextBlock(text: AnnotatedString, modifier: Modifier) {
     CompositionLocalProvider(LocalViewConfiguration provides configuration) {
         Text(
             text,
-            style = MaterialTheme.typography.bodyLarge.copy(fontFamily = readerFontFamily),
+            style = readerTextStyle(typography),
             modifier = modifier,
         )
     }
@@ -87,11 +91,13 @@ internal fun ReaderImageContent(
     text: AnnotatedString,
     loader: EpubImageLoader?,
     onInteraction: () -> Unit,
+    typography: ReaderTypography? = null,
 ) {
     val parts = remember(page.text, page.images) { readerImageParts(page.text, page.images) }
     if (parts == null || page.images.isEmpty()) {
         ReaderTextBlock(
             text,
+            typography,
             modifier = Modifier.testTag("reader_text"),
         )
         return
@@ -125,6 +131,7 @@ internal fun ReaderImageContent(
                 is ReaderImagePart.Text ->
                     ReaderTextBlock(
                         text.subSequence(part.start, part.end),
+                        typography,
                         modifier = Modifier.testTag("reader_text_${part.start}"),
                     )
                 is ReaderImagePart.Image -> {

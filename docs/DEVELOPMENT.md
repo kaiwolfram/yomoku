@@ -3501,3 +3501,77 @@ font-size/line-spacing controls and default-off source/analyzer furigana remain
 unchecked. Rust/Clippy/host JNI/codegen, standalone dictionaries, release,
 process-death/reboot and physical-arm64 checks were not rerun for this Android-only
 slice; physical arm64 remains user-deferred.
+
+## Persisted global reader font size and line spacing
+
+2026-10-27, using the Rust PATH/JDK/SDK/Gradle environment above:
+
+```sh
+cargo test --workspace --all-features --locked --offline --quiet
+cargo clippy --workspace --all-targets --all-features --locked --offline -- -D warnings
+cargo fmt --all -- --check
+tools/test-kotlin-bridge.sh
+cargo run -p yomoku-ffi --bin generate-kotlin --features facet_typegen --locked --offline -- target/generated/kotlin-repeat
+diff -r target/generated/kotlin target/generated/kotlin-repeat
+tools/format-kotlin.sh --check
+git diff --check
+# Initial phone run: eight existing cases pass; two new fixture assertions fixed below.
+./android/gradlew -p android :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=app.yomoku.ReaderTypographySettingsTest,app.yomoku.ReaderTypographyTest,app.yomoku.ReaderFormattingTest,app.yomoku.ReaderImagesTest --offline --console=plain
+# Final corrected controls plus five-status colors and existing page-length interaction.
+./android/gradlew -p android :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug :app:connectedDebugAndroidTest '-Pandroid.testInstrumentationRunnerArguments.class=app.yomoku.ReaderTypographySettingsTest,app.yomoku.ReaderWordsTest#tappingAndFiveChoicesPersistWithoutLookupHistoryAndFailedChoiceCanRepeat,app.yomoku.PasteReaderTest#pageLengthSettingsReflowWithoutMovingTheExactSavedPosition' --offline --console=plain
+/home/kai/Android/Sdk/platform-tools/adb -s emulator-5554 shell wm size 2560x1600
+/home/kai/Android/Sdk/platform-tools/adb -s emulator-5554 shell wm density 240
+/home/kai/Android/Sdk/platform-tools/adb -s emulator-5554 shell cmd uimode night yes
+# Repeat the final four-case Gradle command for tablet/dark, then restore phone/light.
+/home/kai/Android/Sdk/platform-tools/adb -s emulator-5554 shell wm size reset
+/home/kai/Android/Sdk/platform-tools/adb -s emulator-5554 shell wm density reset
+/home/kai/Android/Sdk/platform-tools/adb -s emulator-5554 shell cmd uimode night no
+unzip -l android/app/build/outputs/apk/debug/app-debug.apk 'lib/*/libyomoku_jni.so'
+```
+
+Eight new Rust cases cover migration defaults and partial-ALTER rollback/retry,
+all 20 size/spacing pairs through SQLite reopen and unchanged reader snapshots,
+statement/commit rollback, corrupt/missing settings without repair, core routing/
+busy/no-op/failure gates, late callbacks and failed time/completion obligations.
+The real-Full Kotlin/JNI fixture round-trips every pair through typed events,
+checks unchanged logical page/position/analysis/time and restores the final pair
+through a fresh bridge. Repeat generation is byte-for-byte identical.
+
+Two new device cases exercise actual persisted controls, explicit failed-save
+retry, exact nonzero supplementary-Unicode offsets, Settings/reader recreation,
+visible text layout sizes/line heights/wrapping and global application to another
+document. An imported EPUB checks smallest/largest controls, canonical fragments,
+image ratio and full token identity after word taps. Existing five-status checks
+cover system light/dark highlights; existing page-length checks retain all logical
+presets and exact anchors. The broad run retains Noto outlines/credits, EPUB
+formatting/links, image decoding/viewer and chapter navigation regressions.
+
+The initial Rust run caught a preexisting worker lifecycle timing assertion in
+`load_engine_and_invalid_output_failures_roll_back_and_retry_fresh`; it passes
+alone and in the final full workspace run. Historical schema assertions
+and future/failure-migration fixtures were updated from version 14 to 15/16.
+The initial Android run passed all eight existing cases and caught two new fixture
+mistakes: direct reader-to-reader opening raced the paused clock checkpoint;
+use the normal close-to-Library transition before opening the first book. Token
+indices are original analysis identities, not positions in the filtered Japanese
+page token list; match `tokenIndex` explicitly. No app fix was required for either.
+Initial sandbox Gradle wildcard-IP sockets needed approved outside-sandbox offline
+execution. The existing API-36 AVD was reused without restart/wipe.
+
+
+Final PASS: 440 Rust tests, strict Clippy/Rustfmt, Kotlin formatting/diff, real-Full
+host JNI and reproducible generated payloads. Sixteen data-dependent opt-in Rust
+fixtures remain ignored; their standalone Full/index probes were not rerun.
+Both arm64-v8a/x86_64 debug/test APKs and strict Android lint pass (only the existing
+informational FileImports autoboxing hint). The initial 10-case phone run (4m10s)
+passes all eight existing cases; the corrected four-case phone run (2m01s including
+build/lint) and four-case tablet/dark run (1m41s) have zero failures/errors/skips.
+That is 12 distinct passing phone cases across the initial/final runs plus four
+on tablet/dark. Reports, logs and lint XML, including the initial failures, are
+under `.local/test-reports/reader-typography/`.
+
+Restored and verified 1080x2400, 420dpi, light mode and free rotation; the existing
+AVD remains running. No open blocker. No dependency/version, permission or
+destructive-semantics change. Release, process-death/reboot, standalone dictionary
+benchmarks and physical arm64 checks were not rerun; physical arm64 remains
+user-deferred. Default-off source/analyzer furigana is next.
