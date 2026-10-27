@@ -1,5 +1,5 @@
 # Resume here
-Updated: 2026-10-27. Bounded self-contained nested SVG images; results below.
+Updated: 2026-10-27. User accepts basic SVG support for v1; fonts/furigana next.
 ## Working
 - Pure Crux routes/Library/Settings; Render-only UI; FIFO SQLite/analysis; Library start.
 - Chapter-local UTF-8 position/whole-book percentage/five presets persist; reflow
@@ -66,14 +66,14 @@ Updated: 2026-10-27. Bounded self-contained nested SVG images; results below.
   <=8 resource levels/64 element-reference levels per document; single closed roots.
   <=64 exact URI resources share one extra output-pixel budget, children before parents;
   child IDs/styles isolated; global lock/private resolver/final recycling; no I/O/DTD/entities.
-  Cycles/other resources/styled embedded SVGs fall back; vector CSS works.
+  Basic SVG scope accepted for v1; complex resources/styles stay on fallback.
 - Library covers resolve live path/media/SHA-256 metadata without book BLOBs/Full.
   Media+digest LRU <=4 MiB/64 entries; misses verify bytes/digest and decode <=64 KiB.
 ## Next tasks (ordered)
-1. Remaining SVG local/relative images, patterns/masks/markers and selector-aware resource CSS.
-2. Bundle Noto Serif JP/font/line/default-off furigana (source ruby preferred).
-3. CI host/unsigned builds independent; arm64 deferred. Nostr empty/Q188 unresolved.
+1. Bundle Noto Serif JP/font/line/default-off furigana (source ruby preferred).
+2. CI host/unsigned builds independent; arm64 deferred. Nostr empty/Q188 unresolved.
 ## Verification
-- PASS: both-ABI APKs, strict lint/formatting/diff; 25 cases each phone/light + tablet/dark.
+- Last code slice PASS: both-ABI APKs, strict lint/formatting/diff; 25 cases each phone/light + tablet/dark.
   DEVELOPMENT.md end has commands/failures; .local/test-reports/epub-svg-nested/.
   No blocker; sockets approved; phone/light restored. Rust/JNI/release/arm64 not rerun.
+- Latest scope-only docs: diff check; no app code changes or test reruns.

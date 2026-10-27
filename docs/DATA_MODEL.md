@@ -177,8 +177,9 @@ are presentation-only, never stored or used for text positions. Embedded base64
 PNG/JPEG and nested self-contained SVG resources use transient bounded bitmaps,
 private resolver keys and presentation-only viewport wrappers; original saved
 asset bytes remain unchanged. Nested documents share graph/pixel bounds while
-retaining independent IDs/styles. Relative/local image resources, complex paint
-and embedded-image stylesheets remain unfinished. Library covers use the same
+retaining independent IDs/styles. Additional resource loading, complex paint
+and embedded-image stylesheets are outside v1 scope; unsupported images keep
+their existing fallback (user clarification 2026-10-27). Library covers use the same
 bounded decoder with a smaller pixel budget; all cache/bitmap data stays outside
 SQLite/core state.
 No schema migration is needed.

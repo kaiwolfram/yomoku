@@ -93,8 +93,8 @@ copying book or image BLOBs. Library displays bounded cover thumbnails with a
 Bounded static SVGs also render off main with fractional source ratios and offline
 renderer credits. Embedded base64 PNG/JPEG and nested self-contained SVG resources
 share bounded temporary bitmaps, retain their original aspect ratio and work in
-the same viewer/cover pipeline. Relative/local image resources, complex paint,
-stylesheet-styled embedded images and source ruby remain pending.
+the same viewer/cover pipeline. This basic SVG support satisfies v1 scope;
+complex styles/resources retain the existing fallback. Source ruby remains pending.
 The pure [SRT parser](crates/yomoku-import/src/srt.rs) has host fixtures for cue
 boundaries, formatting, speakers and malformed input. Its atomic repository now
 persists original bytes/encoding, canonical cues, Mode B and vocabulary registrations
@@ -108,7 +108,7 @@ and share direct cancellation. Host fixtures cover later-chapter/write/commit
 rollback, duplicates, original analysis/status/progress and failed-file recovery.
 Android supports mixed EPUB/TXT/SRT batches, per-file encoding/errors, progress,
 Cancel and completion summaries. Imports return to Library without opening a reader.
-Planned v1 features include compound SVG resources/ruby, custom missing-word
+Planned v1 features include source ruby and font controls, custom missing-word
 definitions,
 reading statistics, optional AnkiDroid integration, curated Nostr reading and
 manual encrypted backups. See the [product specification](docs/PRODUCT_SPEC.md)

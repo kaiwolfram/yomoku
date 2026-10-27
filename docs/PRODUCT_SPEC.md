@@ -58,6 +58,7 @@ If a chosen library does not support a required capability or architecture in cu
 - Full-document completion: maintain permanent **finished-at-least-once** checkmark independent of current position. Show brief confetti on each completion; **Finish Book** returns to Library. Reopening a finished book begins at page 1. Deleting and later reimporting resets progress and checkmark, while global history survives.
 - Reader styling: bundled **Noto Serif JP**; adjustable global font size and line spacing; furigana switch **off by default**, when on show available ruby readings (source ruby when provided, else analyzer), irrespective of vocabulary status.
 - EPUB supports chapters, headings, emphasis, inline images, links, and source ruby, **but ignore EPUB CSS**. Inline images keep position/ratio, fit column width; tapping opens full-screen pinch-zoom/pan viewer. Internal footnote/chapter links are **not navigable**; external website links open external browser. No TOC-jump feature.
+- **Basic SVG image support is sufficient for v1** (user clarification 2026-10-27). Keep the existing bounded vectors/basic styles and self-contained embedded images. Complex SVG styling/resources (advanced stylesheet rules, patterns, masks, markers and additional resource loading) are outside v1 scope; unsupported images retain the alt/Retry or generic-cover fallback. EPUB page CSS remains ignored.
 - Clipboard **Copy Sentence** was discussed but explicitly **deferred beyond v1**. Don't implement in first release.
 
 ### 3.2 Vocabulary model and dictionary panel

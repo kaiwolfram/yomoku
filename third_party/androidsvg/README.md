@@ -38,3 +38,6 @@ resource-valued stylesheet rules and stylesheets in embedded-image SVGs
 use the existing alt-text/Retry fallback. Paths, shapes, text,
 transforms, local uses, gradients and vector-only color/class styles remain supported within
 the documented bounds. This introduces no browser/WebView or network loading.
+
+User clarification (2026-10-27): this basic bounded SVG support is sufficient for
+v1. Further complex style/resource support is outside scope; keep the fallbacks.

@@ -1942,3 +1942,13 @@
   renderer provenance. Relative/local/other nested image URI forms, complex paint
   and selector-aware CSS remain unchecked; fonts/furigana and CI follow. Rust/JNI/
   release/process-death not rerun; physical arm64 remains user-deferred.
+
+## 2026-10-27 — Accept basic SVG scope
+
+- Recorded the user's clarification that basic SVG support is sufficient for v1.
+  Removed advanced SVG resources/styles from the active plan without marking
+  them implemented; retained existing decoding and unsupported-image fallbacks.
+- Updated product spec, plan, handoff, README, architecture/data and renderer
+  scope notes; fonts/line spacing/default-off furigana are next.
+- Documentation-only: git diff check passed; app tests/builds were not rerun.
+  No blocker or runtime change; previous verified image results remain recorded.

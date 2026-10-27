@@ -155,7 +155,8 @@ A process-wide SVG decode lock covers every session because the upstream resolve
 and entity settings are static. Relative/local-fragment/file/network references,
 image children, ambiguous hrefs and SVG stylesheets accompanying embedded images
 retain alt/Retry. The last restriction avoids changing selector matching when
-image viewports are rewritten; selector-aware resource styling remains unfinished.
+image viewports are rewritten. Basic SVG support is sufficient for v1; advanced
+resource/style support is outside scope (user clarification 2026-10-27).
 Validated intrinsic dimensions or the viewBox determine the source ratio, with
 the raster source-dimension limits; Canvas renders directly into a bitmap within
 the same edge/page-pixel bounds. Fractional source sizes stay separate from
@@ -191,8 +192,8 @@ leaving the reader or closing the viewer disposes it. Closing/reopening starts a
 fit. Canvas/button/key input in the separate window resets reader idle accounting.
 The shared viewer accepts an ImageBitmap, source dimensions and loading/error/retry
 callbacks, with no EPUB, storage, networking or core dependency. Future displayed
-Nostr images can use it. Other SVG compound resources and source ruby
-remain open. Settings ships AndroidSVG attribution and its full license offline.
+Nostr images can use it. Advanced SVG resources are outside v1 scope; source ruby
+remains open. Settings ships AndroidSVG attribution and its full license offline.
 
 Shared file preflight and TXT/SRT/EPUB Existing results now carry `LibraryDocument`
 references (ID, title, whole-book progress, permanent finish marker). Exact-byte
@@ -221,7 +222,7 @@ queued/load/chapter work and uses the existing commit gate. Background release,
 engine-failure eviction and later-file retries share the existing analyzer cache.
 Android mixed selection, reader text formatting/website links and raster/static
 SVG images with the shared viewer and Library cover thumbnails are connected;
-ruby and SVG compound resources remain open.
+ruby remains open; advanced SVG resources are outside v1 scope.
 
 Its SRT parser
 accepts decoded text and returns canonical LF text plus ordered UTF-8 cue ranges.
@@ -867,7 +868,7 @@ repository/FIFO/typed JNI imports are verified. EPUB persistence and ordered-cha
 reader/application/FIFO/typed JNI imports are verified. Android mixed-format
 batches use the shared retained picker/encoding/progress/Cancel/summary helper;
 reader text formatting/website links and raster/static SVG images/shared viewer
-are connected, including Library covers; ruby and SVG compound resources remain open.
+are connected, including Library covers; ruby remains open; advanced SVG resources are outside v1 scope.
 All file background notifications use the platform-only
 foreground lease described above. Legacy imports
 are not automatically rescanned.

@@ -2571,3 +2571,15 @@ establish a total heap/CPU cap. Relative/local/remote image resources, patterns,
 masks, markers and selector-aware/resource CSS remain separate unfinished work.
 No dependency/version, core/FFI/schema, permission, persisted setting, source-asset
 mutation or destructive-semantics change.
+
+## 2026-10-27 — Basic SVG support is sufficient for v1
+
+User clarified that complex SVG styles are unnecessary and basic support is more
+than enough. Accept the existing verified bounded renderer and self-contained
+PNG/JPEG/SVG images as sufficient for v1. Remove the remaining advanced SVG task
+from the active plan, including additional resource loading, patterns/masks/markers
+and selector-aware/resource stylesheet rules. Preserve existing behavior and
+unsupported alt/Retry/generic-cover fallbacks; EPUB page CSS remains ignored.
+This supersedes earlier notes describing those extensions as unfinished v1 work.
+Fonts, line spacing and default-off furigana are next. Documentation-only scope
+change; no implementation removal, dependency, persistence or runtime changes.
