@@ -424,6 +424,23 @@ fn real_segmentation_choices_resolve_scopes_merges_and_reversal_without_replacin
     assert!(!reopened
         .delete_effective_reader_custom_entry(&dictionary, &frozen_key, manual.segment_index)
         .unwrap());
+    let frozen_completion = reopened
+        .prepare_effective_page_completion(
+            yomoku_core::completion::PageCompletionIntent {
+                document_id: imported.document.document_id,
+                page,
+                page_length: reopened.page_length().unwrap(),
+                departing_position: yomoku_core::pagination::ReadingPosition {
+                    source_id: chapter.source_id,
+                    chapter_id: chapter.chapter_id,
+                    offset: TextOffset::START,
+                },
+                completed_at_unix_ms: 900,
+                analysis_id: imported.analysis_id,
+            },
+            &frozen_key,
+        )
+        .unwrap();
     reopened.reverse_segmentation_override(global_id).unwrap();
     assert!(matches!(
         reopened.save_effective_reader_custom_entry(
@@ -458,6 +475,50 @@ fn real_segmentation_choices_resolve_scopes_merges_and_reversal_without_replacin
             .unwrap()
             .unwrap(),
         original
+    );
+    let newly_known = frozen_completion
+        .occurrences()
+        .iter()
+        .map(|token| token.surface.as_str())
+        .collect::<std::collections::BTreeSet<_>>()
+        .len() as u64;
+    assert_eq!(
+        reopened
+            .record_effective_page_completion(&frozen_completion)
+            .unwrap(),
+        yomoku_core::completion::AnalyzedCompletionOutcome::Recorded { newly_known }
+    );
+    let observer = rusqlite::Connection::open(&path).unwrap();
+    let recorded = observer.prepare(
+        "SELECT token_index, surface, reading, dictionary_form FROM reading_occurrences WHERE command_id = ?1 ORDER BY token_index"
+    ).unwrap().query_map([i64::from(frozen_completion.completion().command_id)], |row| {
+        Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?, row.get::<_, Option<String>>(2)?, row.get::<_, Option<String>>(3)?))
+    }).unwrap().collect::<Result<Vec<_>, _>>().unwrap();
+    assert_eq!(recorded.len(), frozen_completion.occurrences().len());
+    for (recorded, token) in recorded.iter().zip(frozen_completion.occurrences()) {
+        assert_eq!(u64::try_from(recorded.0).unwrap(), token.segment_index);
+        assert_eq!(recorded.1, token.surface);
+        assert_eq!(
+            recorded.2.as_deref(),
+            token.metadata.as_ref().and_then(|m| m.reading.as_deref())
+        );
+        assert_eq!(
+            recorded.3.as_deref(),
+            token
+                .metadata
+                .as_ref()
+                .and_then(|m| m.dictionary_form.as_ref())
+                .map(Surface::as_str)
+        );
+    }
+    drop(observer);
+    drop(reopened);
+    let mut reopened = Storage::open(&path).unwrap();
+    assert_eq!(
+        reopened
+            .record_effective_page_completion(&frozen_completion)
+            .unwrap(),
+        yomoku_core::completion::AnalyzedCompletionOutcome::AlreadyRecorded
     );
     drop(reopened);
     std::fs::remove_dir_all(directory).unwrap();

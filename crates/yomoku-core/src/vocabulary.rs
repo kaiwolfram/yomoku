@@ -29,7 +29,7 @@ pub enum VocabularyStatus {
 ///
 /// This type rejects blank values; it does not attempt Japanese detection.
 /// Reading and dictionary form are deliberately not part of identity.
-#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize)]
 pub struct Surface(String);
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

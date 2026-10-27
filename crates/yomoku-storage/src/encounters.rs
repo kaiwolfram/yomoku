@@ -5,6 +5,7 @@ use yomoku_core::{
     analysis::SplitMode,
     completion::PageCompletion,
     document::{AnalysisId, ChapterText},
+    effective_reader::EffectivePageCompletion,
     vocabulary::{status_after_completion, Surface},
 };
 
@@ -38,11 +39,38 @@ pub(crate) fn record_occurrences_in(
         .map(|(_, token)| Surface::new(&token.surface))
         .collect::<Result<BTreeSet<_>, _>>()
         .map_err(|_| StorageError::InvalidAnalysis)?;
-    // A previously deleted entry starts New on this actual later appearance.
-    // Only departing-page surfaces are registered; existing documents are not rescanned.
-    register_vocabulary_in(connection, &surfaces, completion.completed_at_unix_ms)?;
+    let newly_known = register_completed_surfaces_in(connection, &surfaces, completion)?;
+    let mut insert = connection.prepare(
+        "INSERT INTO reading_occurrences
+         (command_id, token_index, vocabulary_id, start_byte, end_byte, surface, reading, dictionary_form)
+         SELECT ?1, ?2, id, ?3, ?4, ?5, ?6, ?7 FROM vocabulary WHERE surface = ?5",
+    )?;
+    // Enumerate the complete analysis so token_index retains original provenance,
+    // including gaps for non-Japanese tokens and tokens belonging to other pages.
+    for (index, token) in tokens {
+        insert.execute((
+            i64::from(completion.command_id),
+            i64::try_from(index).map_err(|_| StorageError::InvalidAnalysis)?,
+            i64::from(token.anchor.range.start),
+            i64::from(token.anchor.range.end),
+            &token.surface,
+            &token.reading,
+            token.dictionary_form.as_ref().map(Surface::as_str),
+        ))?;
+    }
+    Ok(newly_known)
+}
+
+/// Shares exact-surface registration and New-only transitions with original B.
+fn register_completed_surfaces_in(
+    connection: &Connection,
+    surfaces: &BTreeSet<Surface>,
+    completion: PageCompletion,
+) -> Result<usize, StorageError> {
+    // Only this actual completed page recreates deleted/new spellings. No rescan.
+    register_vocabulary_in(connection, surfaces, completion.completed_at_unix_ms)?;
     let mut newly_known = 0;
-    for surface in &surfaces {
+    for surface in surfaces {
         let entry =
             read_entry_by_surface(connection, surface)?.ok_or(StorageError::InvalidVocabulary)?;
         let status = status_after_completion(entry.status);
@@ -61,22 +89,49 @@ pub(crate) fn record_occurrences_in(
             newly_known += 1;
         }
     }
+    Ok(newly_known)
+}
+
+pub(crate) fn record_effective_occurrences_in(
+    connection: &Connection,
+    frozen: &EffectivePageCompletion,
+) -> Result<usize, StorageError> {
+    let completion = frozen.completion();
+    let segmentation = &frozen.key().segmentation;
+    // This header identifies the immutable B basis. The versioned effective
+    // reservation distinguishes effective segment indices from analyzer indices
+    // and preserves each exact metadata/rule source, including unresolved spans.
+    connection.execute(
+        "INSERT INTO completion_analyses
+         (command_id, semantics_version, analysis_id, engine_revision, dictionary_revision, split_mode)
+         VALUES (?1, 1, ?2, ?3, ?4, 'b')",
+        (i64::from(completion.command_id), i64::from(segmentation.original_analysis_id),
+         &segmentation.profile.engine_revision, &segmentation.profile.dictionary_revision),
+    )?;
+    let surfaces = frozen
+        .occurrences()
+        .iter()
+        .map(|token| Surface::new(&token.surface))
+        .collect::<Result<BTreeSet<_>, _>>()
+        .map_err(|_| StorageError::InvalidAnalysis)?;
+    let newly_known = register_completed_surfaces_in(connection, &surfaces, completion)?;
     let mut insert = connection.prepare(
         "INSERT INTO reading_occurrences
          (command_id, token_index, vocabulary_id, start_byte, end_byte, surface, reading, dictionary_form)
          SELECT ?1, ?2, id, ?3, ?4, ?5, ?6, ?7 FROM vocabulary WHERE surface = ?5",
     )?;
-    // Enumerate the complete analysis so token_index retains original provenance,
-    // including gaps for non-Japanese tokens and tokens belonging to other pages.
-    for (index, token) in tokens {
+    for token in frozen.occurrences() {
+        let metadata = token.metadata.as_ref();
         insert.execute((
             i64::from(completion.command_id),
-            i64::try_from(index).map_err(|_| StorageError::InvalidAnalysis)?,
+            i64::try_from(token.segment_index).map_err(|_| StorageError::InvalidAnalysis)?,
             i64::from(token.anchor.range.start),
             i64::from(token.anchor.range.end),
             &token.surface,
-            &token.reading,
-            token.dictionary_form.as_ref().map(Surface::as_str),
+            metadata.and_then(|metadata| metadata.reading.as_deref()),
+            metadata
+                .and_then(|metadata| metadata.dictionary_form.as_ref())
+                .map(Surface::as_str),
         ))?;
     }
     Ok(newly_known)

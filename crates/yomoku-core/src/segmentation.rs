@@ -3,6 +3,8 @@
 //! These values are not analyzer snapshots or vocabulary identities. In
 //! particular, a manual boundary never fabricates a reading or dictionary form.
 
+use serde::Serialize;
+
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::{
@@ -14,7 +16,7 @@ use crate::{
     vocabulary::Surface,
 };
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 pub struct ResolvedSegment {
     pub anchor: TextAnchor,
     pub surface: String,
@@ -24,7 +26,7 @@ pub struct ResolvedSegment {
     pub override_id: Option<OverrideId>,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 pub struct ChapterSegmentation {
     pub original_analysis_id: AnalysisId,
     pub segments: Vec<ResolvedSegment>,
@@ -32,7 +34,7 @@ pub struct ChapterSegmentation {
 
 /// Analyzer metadata exists only for an exact span in a validated snapshot.
 /// Its source is retained independently of the rule that selected the boundary.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 pub struct SegmentMetadata {
     pub analysis_id: AnalysisId,
     pub mode: SplitMode,
@@ -42,7 +44,7 @@ pub struct SegmentMetadata {
     pub dictionary_form: Option<Surface>,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 pub struct EffectiveSegment {
     pub boundary: ResolvedSegment,
     /// None means unresolved, including classification. It does not mean
@@ -50,7 +52,7 @@ pub struct EffectiveSegment {
     pub metadata: Option<SegmentMetadata>,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 pub struct EffectiveChapterSegmentation {
     pub original_analysis_id: AnalysisId,
     pub profile: AnalysisProfile,

@@ -5,11 +5,13 @@ use yomoku_core::{
         PageCompletionIntent,
     },
     document::{AnalysisId, CompletionCommandId},
+    effective_reader::{EffectivePageCompletion, EffectiveReaderTokenKey},
 };
 
 use crate::{
+    analysis::read_effective_reader_chapter_in,
     documents::write_position_in,
-    encounters::record_occurrences_in,
+    encounters::{record_effective_occurrences_in, record_occurrences_in},
     reader_documents::load_reader_document_in,
     reading_time::{consume_time_in, page_time_in},
     settings::read_page_length,
@@ -53,6 +55,74 @@ impl Storage {
         })
     }
 
+    /// After final-time drain, validate the rendered effective identity and freeze
+    /// its complete provenance/occurrences with a new command ID and durable time.
+    /// Preparation never registers words, consumes time or records encounters.
+    pub fn prepare_effective_page_completion(
+        &mut self,
+        intent: PageCompletionIntent,
+        key: &EffectiveReaderTokenKey,
+    ) -> Result<EffectivePageCompletion, StorageError> {
+        let transaction = self
+            .connection
+            .transaction_with_behavior(TransactionBehavior::Immediate)?;
+        if key.document_id != intent.document_id
+            || key.page != intent.page
+            || key.segmentation.original_analysis_id != intent.analysis_id
+            || read_page_length(&transaction)? != intent.page_length
+        {
+            return Err(StorageError::InvalidCompletion);
+        }
+        let document = load_reader_document_in(&transaction, intent.document_id)?
+            .ok_or(StorageError::InvalidCompletion)?;
+        let chapter = document
+            .chapter(intent.page.chapter_id)
+            .map_err(|_| StorageError::InvalidCompletion)?;
+        let effective = read_effective_reader_chapter_in(&transaction, chapter)?
+            .ok_or(StorageError::InvalidAnalysis)?;
+        if effective.segmentation() != &key.segmentation {
+            return Err(StorageError::InvalidCompletion);
+        }
+        let (pending_time, _) = page_time_in(&transaction, &document, intent.page)?;
+        transaction.execute("INSERT INTO completion_commands DEFAULT VALUES", [])?;
+        let completion = PageCompletion {
+            command_id: CompletionCommandId::try_from(transaction.last_insert_rowid())
+                .map_err(|_| StorageError::InvalidCompletion)?,
+            document_id: intent.document_id,
+            page: intent.page,
+            page_length: intent.page_length,
+            departing_position: intent.departing_position,
+            completed_at_unix_ms: intent.completed_at_unix_ms,
+            pending_time,
+        };
+        completion
+            .next_document_position(&document)
+            .map_err(|_| StorageError::InvalidCompletion)?;
+        let frozen = effective
+            .freeze_completion(completion)
+            .map_err(|_| StorageError::InvalidAnalysis)?;
+        transaction.execute(
+            "INSERT INTO effective_completion_commands (command_id, semantics_version, payload) VALUES (?1, 1, ?2)",
+            (i64::from(completion.command_id), effective_payload(&frozen)?),
+        )?;
+        transaction.commit()?;
+        Ok(frozen)
+    }
+
+    /// Commit the authenticated reservation, including newly partitioned or
+    /// deleted surfaces. Later rule/metadata changes cannot reinterpret a retry.
+    pub fn record_effective_page_completion(
+        &mut self,
+        frozen: &EffectivePageCompletion,
+    ) -> Result<AnalyzedCompletionOutcome, StorageError> {
+        self.record_completion(
+            frozen.completion(),
+            Some(frozen.key().segmentation.original_analysis_id),
+            Some(frozen),
+        )
+        .map(analyzed_outcome)
+    }
+
     /// Allocate once for a forward intent, not once per callback or retry.
     /// Unused IDs are harmless and never automatically completed on reopen.
     pub fn new_completion_command_id(&mut self) -> Result<CompletionCommandId, StorageError> {
@@ -72,7 +142,7 @@ impl Storage {
         &mut self,
         completion: PageCompletion,
     ) -> Result<CompletionOutcome, StorageError> {
-        self.record_completion(completion, None)
+        self.record_completion(completion, None, None)
             .map(|(outcome, _)| outcome)
     }
 
@@ -84,23 +154,30 @@ impl Storage {
         completion: PageCompletion,
         analysis_id: AnalysisId,
     ) -> Result<AnalyzedCompletionOutcome, StorageError> {
-        self.record_completion(completion, Some(analysis_id))
-            .map(|(outcome, newly_known)| match outcome {
-                CompletionOutcome::Recorded => AnalyzedCompletionOutcome::Recorded {
-                    newly_known: newly_known as u64,
-                },
-                CompletionOutcome::AlreadyRecorded => AnalyzedCompletionOutcome::AlreadyRecorded,
-            })
+        self.record_completion(completion, Some(analysis_id), None)
+            .map(analyzed_outcome)
     }
 
     fn record_completion(
         &mut self,
         completion: PageCompletion,
         analysis_id: Option<AnalysisId>,
+        effective: Option<&EffectivePageCompletion>,
     ) -> Result<(CompletionOutcome, usize), StorageError> {
         let transaction = self
             .connection
             .transaction_with_behavior(TransactionBehavior::Immediate)?;
+        // Authenticate the entire frozen command before replay/live checks. Legacy
+        // commands cannot consume an effective ID or bypass its identity on retry.
+        let reserved: Option<(i64, String)> = transaction.query_row(
+            "SELECT semantics_version, payload FROM effective_completion_commands WHERE command_id = ?1",
+            [i64::from(completion.command_id)], |row| Ok((row.get(0)?, row.get(1)?)),
+        ).optional()?;
+        match (effective, reserved) {
+            (Some(frozen), Some((1, payload))) if effective_payload(frozen)? == payload => {}
+            (None, None) => {}
+            _ => return Err(StorageError::InvalidCompletion),
+        }
         let values = named_params! {
             ":command": i64::from(completion.command_id),
             ":document": i64::from(completion.document_id),
@@ -167,7 +244,9 @@ impl Storage {
              VALUES (:command, 1, :document, :source, :chapter, :start, :end, :departing, :length, :date, :time)",
             values,
         )?;
-        let newly_known = if let Some(analysis_id) = analysis_id {
+        let newly_known = if let Some(frozen) = effective {
+            record_effective_occurrences_in(&transaction, frozen)?
+        } else if let Some(analysis_id) = analysis_id {
             record_occurrences_in(
                 &transaction,
                 document
@@ -203,5 +282,20 @@ impl Storage {
         }
         transaction.commit()?;
         Ok((CompletionOutcome::Recorded, newly_known))
+    }
+}
+
+fn effective_payload(frozen: &EffectivePageCompletion) -> Result<String, StorageError> {
+    serde_json::to_string(frozen).map_err(|_| StorageError::InvalidCompletion)
+}
+
+fn analyzed_outcome(
+    (outcome, newly_known): (CompletionOutcome, usize),
+) -> AnalyzedCompletionOutcome {
+    match outcome {
+        CompletionOutcome::Recorded => AnalyzedCompletionOutcome::Recorded {
+            newly_known: newly_known as u64,
+        },
+        CompletionOutcome::AlreadyRecorded => AnalyzedCompletionOutcome::AlreadyRecorded,
     }
 }

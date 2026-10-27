@@ -2932,3 +2932,32 @@ atomic failure rollback and global spelling identity. Custom entries survive
 vocabulary deletion and do not register absent/deleted spellings or supply analyzer
 metadata. Retain live original-B behavior until effective registration, frozen
 future completion identities and reader paths can be integrated together.
+
+
+## 2026-10-27 — Durable frozen effective completion reservations
+
+Add effective completion as a separate domain/storage prerequisite while the live
+reader continues using B. Validate the full rendered effective key after final-time
+drain and reserve one immutable command containing position/preset/time, boundaries,
+rule/metadata provenance and start-owned occurrences. Persist exact versioned JSON
+in additive migration 0018. Authenticate the entire payload before first commit or
+replay; legacy completion APIs cannot consume an effective command ID. Later override
+or metadata changes do not reinterpret an accepted reservation. Normal live page/
+position/preset/time checks still govern its first commit; recorded retries precede
+live-content checks and remain harmless after deletion/reflow/reversal.
+
+Keep the original B/profile header in completion_analyses; the effective reservation
+explicitly identifies the different segment-index semantics and exact metadata sources.
+Share existing exact-surface registration and New-only transitions with original B.
+Register only the departing effective page at actual completion, including deleted
+spellings; do not register from projections/preparation or rescan other pages. Preserve
+all repetitions and unresolved manual metadata, with no guessed readings/lemmas.
+Override-time registration is a separate remaining integration task, not implicit here.
+
+JSON uses existing pinned serde_json/Serde, with Serialize-only domain values; no
+new dependency/version or public bridge schema. Reservations are write/compare only,
+not a recovery queue. Retained commands can retry across storage reopen, but process
+restart does not auto-replay unfinished reservations. Entire chapter payload costs
+remain unmeasured; review before switching live reader/FFI paths. No old history is
+backfilled or modified, and vocabulary deletion still removes actual encounter/status
+rows through existing cascades. No destructive migration or architecture change.

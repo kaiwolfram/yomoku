@@ -1,7 +1,10 @@
 //! Read-only reader projections over validated effective segmentation.
 
+use serde::Serialize;
+
 use crate::{
     analysis::{ChapterAnalysis, InvalidAnalysis, StoredOverride},
+    completion::PageCompletion,
     dictionary::DictionaryCandidates,
     document::{AnalysisId, ChapterText, DocumentId, TextAnchor, TextOffset, TextRange},
     reader::{ReaderCustomEntry, ReaderVocabulary},
@@ -11,13 +14,13 @@ use crate::{
 /// Reading eligibility is distinct from analyzer metadata. A manual partition
 /// inherits the editable Japanese B span; it does not acquire an analyzer lemma,
 /// reading or classification. Exact analyzer output, when available, takes priority.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 pub enum EffectiveTokenEligibility {
     AnalyzerJapanese,
     ManualJapaneseSpan,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 pub struct EffectiveReaderToken {
     /// Whole effective-chapter index, including gaps for non-Japanese segments.
     /// This is never an original analyzer token index.
@@ -44,7 +47,7 @@ pub struct EffectiveReaderTokenSnapshot {
 /// Frozen page and complete resolved provenance, deliberately separate from an
 /// original analyzer identity. Live vocabulary/status changes do not invalidate
 /// it; changed boundaries or metadata do. Not yet part of the public UI bridge.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 pub struct EffectiveReaderTokenKey {
     pub document_id: DocumentId,
     pub page: TextAnchor,
@@ -181,5 +184,46 @@ impl<'a> EffectiveReaderChapter<'a> {
             });
         }
         Ok(tokens)
+    }
+}
+
+/// Frozen effective completion. Only validated chapter projection can construct
+/// occurrences; statuses are deliberately absent and remain live at commit.
+/// This prerequisite is not yet a public UI/FFI payload.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+pub struct EffectivePageCompletion {
+    completion: PageCompletion,
+    key: EffectiveReaderTokenKey,
+    occurrences: Vec<EffectiveReaderToken>,
+}
+
+impl EffectivePageCompletion {
+    pub fn completion(&self) -> PageCompletion {
+        self.completion
+    }
+
+    pub fn key(&self) -> &EffectiveReaderTokenKey {
+        &self.key
+    }
+
+    pub fn occurrences(&self) -> &[EffectiveReaderToken] {
+        &self.occurrences
+    }
+}
+
+impl EffectiveReaderChapter<'_> {
+    pub fn freeze_completion(
+        &self,
+        completion: PageCompletion,
+    ) -> Result<EffectivePageCompletion, InvalidAnalysis> {
+        Ok(EffectivePageCompletion {
+            key: EffectiveReaderTokenKey {
+                document_id: completion.document_id,
+                page: completion.page,
+                segmentation: self.segmentation.clone(),
+            },
+            occurrences: self.completion_tokens_on_page(completion.page)?,
+            completion,
+        })
     }
 }

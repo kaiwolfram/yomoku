@@ -1,5 +1,5 @@
 # Resume here
-Updated: 2026-10-27. Effective custom CRUD verified; registration/completions next.
+Updated: 2026-10-27. Frozen effective completions verified; live integration next.
 ## Working
 - Pure Crux routes/Library/Settings; Render-only UI; FIFO SQLite/analysis; Library start.
 - Chapter-local UTF-8 position/whole-book percentage/five presets persist; reflow
@@ -7,11 +7,10 @@ Updated: 2026-10-27. Effective custom CRUD verified; registration/completions ne
   Previous only saves position; busy gates reject doubles; deliberate rereads count.
 - Atomic SHA-256 imports store original B/unique registrations. Existing preserves
   title/status/progress without Full/rescan/writes. Summary returns Library; no auto-open.
-- Generic loads are read-only; explicit finished-book open alone resets first
-  chapter/page/preset/B atomically. Finish survives movement/time/reflow; deletion
-  resets it while preserving history. Missing analysis never rescans.
-- App/FIFO/JNI retains ordered ReaderDocument snapshots and frozen keyed original
-  B/Missing per chapter. Plain loads preserve it; Previous crosses chapters.
+- Loads are read-only; explicit finished-book open resets to page 1 atomically.
+  Finish survives movement/time/reflow; deletion resets it, preserving history.
+- App/FIFO/JNI retains ordered chapters and frozen original B/Missing identities;
+  plain loads preserve them; Previous crosses chapters.
 - Token reads atomically load original B/live statuses/metadata + clipped UTF-8
   ranges; completion owns token start. Deleted IDs absent. Whole-chapter validation.
   Full page/base/result identities gate callbacks; movement/reflow/refresh invalidate.
@@ -52,8 +51,7 @@ Updated: 2026-10-27. Effective custom CRUD verified; registration/completions ne
 - Full-window viewer: bounded bitmaps, 1–8x fit zoom/clamped pan, accessible controls;
   recreation retains selection/zoom/focus; close/page resets; modal gestures never complete.
 - AndroidSVG 1.4 shares bounded/offline viewer/covers; v1 scope met.
-- Library covers: live path/media/SHA-256; no book BLOBs/Full. Media+digest LRU
-  <=4 MiB/64 entries; misses verify bytes/digest and decode <=64 KiB.
+- Library covers: verified path/media/SHA-256; <=4 MiB/64-entry LRU; <=64 KiB decode.
 - Noto Serif JP/credits; global font/spacing (16sp/150% default)/furigana persist (0015/16).
 - Custom meanings/readings (0017): global exact-surface CRUD through core/FIFO/FFI/
   Android; original-token/built-in gates, literal fields, Cancel/exact retries.
@@ -66,15 +64,17 @@ Updated: 2026-10-27. Effective custom CRUD verified; registration/completions ne
 - Effective APIs: JP-span eligibility distinct from metadata; clipped visibility/
   start-owned occurrences/live statuses. Word reads freeze resolution/provenance;
   exact base only, live counts/customs, surface-only unresolved; query-only.
-  Custom CRUD shares frozen validation/built-in gates/atomic row helpers;
-  no registration/metadata/history writes. Live reader B.
+  Custom CRUD shares frozen validation/built-in gates/atomic row helpers.
+- Effective completion (0018): full key/occurrences/time frozen durably; page-only
+  registration/New-only Known/history/time/position/finish atomic. Exact replay
+  survives reversal/deletion/reopen; legacy calls reject its ID. Live reader uses B.
 ## Next tasks (ordered)
-1. Integrate effective registration and frozen future-completion identities,
-   then switch live token/furigana/word paths together. Reader uses B.
-2. Wire override reads/choices/save/reverse through core/FIFO/FFI, then Android
-   A/B/C/manual controls with default All occurrences versus This occurrence.
+1. Wire effective completion + token/furigana/word/custom paths through core/FIFO/
+   FFI together; review full-chapter payload cost. No restart replay of reservations.
+2. Add atomic override-time registration and typed reads/choices/save/reverse,
+   then Android A/B/C/manual, default All occurrences versus This occurrence.
 Physical arm64 deferred; Nostr empty; Q188 unresolved before forwarding.
 ## Verification
-- PASS: 508 Rust tests (17 ignored), Clippy/format/diff, host Kotlin/JNI/repeat codegen;
+- PASS: 517 Rust tests (17 ignored), Clippy/format/diff, host Kotlin/JNI/repeat codegen;
   15 Full + one runtime pass EACH owned/mapped. DEVELOPMENT.md end.
 - APK/device/lint/release/process-death/arm64 not rerun. No blocker.

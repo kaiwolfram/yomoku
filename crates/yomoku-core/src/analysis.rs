@@ -1,11 +1,13 @@
 //! Validated analyzer output and reversible boundary edits, without tokenization or I/O.
 
+use serde::Serialize;
+
 use crate::{
     document::{ChapterText, OverrideId, TextAnchor, TextOffset, TextRange},
     vocabulary::Surface,
 };
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize)]
 pub enum SplitMode {
     A,
     #[default]
@@ -14,7 +16,7 @@ pub enum SplitMode {
 }
 
 /// Exact engine revision and dictionary artifact identity, not a moving "latest".
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 pub struct AnalysisProfile {
     pub engine_revision: String,
     pub dictionary_revision: String,

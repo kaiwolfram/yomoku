@@ -527,7 +527,7 @@ fn migration_preserves_v9_history_and_status_event_id_high_water_mark() {
         .unwrap();
     drop(storage);
     let mut storage = Storage::open(database.path()).unwrap();
-    assert_eq!(storage.schema_version().unwrap(), 17);
+    assert_eq!(storage.schema_version().unwrap(), 18);
     assert_eq!(count(&storage, "vocabulary_status_events"), old_events);
     assert_eq!(count(&storage, "completion_analyses"), 0);
     assert_eq!(count(&storage, "reading_completions"), 1);
@@ -634,7 +634,7 @@ fn failed_migration_rolls_back_table_rebuild_indexes_and_history_then_retries() 
         .unwrap();
     drop(connection);
     let storage = Storage::open(database.path()).unwrap();
-    assert_eq!(storage.schema_version().unwrap(), 17);
+    assert_eq!(storage.schema_version().unwrap(), 18);
     assert_eq!(entry(&storage, "猫").status, VocabularyStatus::New);
 }
 

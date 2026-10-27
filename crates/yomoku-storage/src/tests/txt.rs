@@ -815,6 +815,9 @@ fn txt_migration_preserves_existing_paste_anchors_history_and_source_id_high_wat
     let mut connection = Connection::open(database.path()).unwrap();
     migrate(&mut connection, &MIGRATIONS[..11]).unwrap();
     let mut storage = Storage { connection };
+    // Current completion code checks effective reservations. An empty TEMP table
+    // lets this historical v11 fixture use it without changing the on-disk schema.
+    storage.connection.execute_batch("CREATE TEMP TABLE effective_completion_commands (command_id INTEGER, semantics_version INTEGER, payload TEXT)").unwrap();
     let saved = storage
         .create_analyzed_paste(&PasteText::new("猫 𠮷".into()).unwrap(), 1, fixture)
         .unwrap();

@@ -128,6 +128,11 @@ const MIGRATIONS: &[Migration] = &[
         name: "0017_custom_dictionary",
         sql: include_str!("../migrations/0017_custom_dictionary.sql"),
     },
+    Migration {
+        version: 18,
+        name: "0018_effective_completions",
+        sql: include_str!("../migrations/0018_effective_completions.sql"),
+    },
 ];
 
 /// Failures are returned to the runtime; opening never resets a database.

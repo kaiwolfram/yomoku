@@ -862,7 +862,8 @@ It shares exact-surface counts, word/name candidate lookup and missing-match cus
 entry loading with the original-B API. Only exact analyzer metadata supplies a base
 form; manual spans remain unresolved. Reversal/replacement/metadata changes reject
 stale selections, while status/count/custom-entry changes stay live. This internal
-domain/repository key is not yet serialized or exposed through the bridge.
+domain/repository key supports serialized completion reservations but is not yet
+exposed through the bridge.
 Effective custom-entry CRUD shares that transaction-local selection validator.
 Save/delete hold an immediate SQLite transaction across validation, dictionary
 gating and mutation; read-only loads use a normal read transaction. Both original
@@ -870,8 +871,16 @@ and effective APIs share exact-surface built-in protection and custom row helper
 Manual spans never inherit an original token's base form. No registration, analyzer
 metadata, historical event, schema or bridge changes are made by these operations.
 Current live reader token/word/furigana/completion paths continue using original B.
-Effective registration, frozen future completion identities and
-core/FIFO/FFI/Android controls remain the next integration steps.
+A separate effective completion repository now prepares an opaque pure-domain
+`EffectivePageCompletion` after checkpoint drain, validating the full rendered key
+and reserving exact page/time/occurrence provenance in migration 0018. Commit authenticates
+that reservation before replay checks; override changes cannot reinterpret it. It uses
+the common position/time/finish transaction and shares original-B exact-surface
+registration/New-only transitions. Effective occurrence indices have explicit versioned
+reservation provenance; prior history remains untouched. No analyzer or SQL enters core.
+The internal JSON reservation is write/compare only; unused IDs never auto-complete.
+Live core/FIFO/FFI integration, override-time registration and Android controls remain
+next. Payload-size/performance and effective bridge schemas still require review.
 
 `Storage::create_analyzed_paste` composes the existing private transaction helpers
 for document creation, validated Mode B analysis and exact-surface registration.

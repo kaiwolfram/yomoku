@@ -4287,3 +4287,64 @@ Final host PASS: real-Full selected-word/custom-entry Kotlin/JNI payloads, liter
 Unicode/reopen/retry, import/direct-cancellation regressions, navigation/codecs and
 100 handle lifecycles; seven cross-language fixtures verify. Known Crux middleware
 teardown messages remain informational. No escalation/download was required.
+
+
+## Frozen effective completion registration and history
+
+2026-10-27, from the repository root with the pinned Rust/JDK environment:
+
+```sh
+export PATH=/home/kai/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin:$PATH
+export JAVA_HOME=/home/kai/repos/yomoku/.local/jdk-17/jdk-17.0.21+9
+cargo test -p yomoku-storage effective_completions --all-features --locked --offline
+cargo test --workspace --all-features --locked --offline --quiet
+tools/test-sudachi.sh
+cargo clippy --workspace --all-targets --all-features --locked --offline -- -D warnings
+cargo fmt --all -- --check
+tools/format-kotlin.sh --check
+tools/test-kotlin-bridge.sh
+cargo run -p yomoku-ffi --bin generate-kotlin --features facet_typegen --locked --offline -- target/generated/kotlin-repeat
+# Compare after both generation commands exit.
+diff -r target/generated/kotlin target/generated/kotlin-repeat
+git diff --check
+```
+
+PASS: nine new effective-completion storage cases, 517 workspace Rust tests (17
+opt-in ignored), strict Clippy/Rustfmt/Kotlin formatting/diff. Fifteen Full analysis
+fixtures plus one runtime fixture pass EACH owned/mapped (32 invocations). The real
+segmentation fixture now freezes effective occurrences, reverses the rule, commits
+exact surfaces/metadata/provenance, and verifies replay after SQLite reopen.
+
+Migration 0018 adds versioned durable effective command payloads without rewriting
+old history. Preparation validates the entire rendered key and drained time, with
+no registration/encounters. Commit authenticates the exact reservation and shares
+original-B page-only registration/New-only transitions, time/position/finish. Later
+rule/metadata changes cannot reinterpret a reserved command. Old APIs reject its ID.
+Unfinished reservations never auto-replay; process-restart recovery is not added.
+
+Coverage includes repetitions, exact A metadata and non-Japanese exclusion, unresolved
+manual spans, absent/deleted spellings, stale/forged/foreign/missing keys, all-preset
+supplementary/combining/NUL crossings, off-page nonregistration, concurrent duplicates,
+fresh zero-New rereads, deletion/reopen replay, corrupt payloads, reservation and
+every-write/deferred-commit rollback/retry, old-history preservation and failed upgrade.
+
+Initial focused compilation caught a borrowed-set loop and test-only snapshot method
+names; corrected. One rollback trigger targeted DELETE while time consumption uses
+UPDATE; corrected the test. The first workspace run caught historical schema version
+assertions and a v11 fixture invoking the current completion repository: use an empty
+TEMP reservation table only in that historical fixture, leaving its on-disk v11 schema
+intact. An integration assertion initially requested rusqlite u64 FromSql; use i64
+with checked conversion. Final workspace/Clippy/Full runs pass with no production
+workaround. Logs: /tmp/yomoku-effective-completions-{tests,full,clippy,bridge,codegen,kotlin-format}.log.
+
+No dependencies/versions, public bridge payloads or live Android behavior changed.
+APK/device/Android lint, release, performance, process-death and physical arm64 were
+not rerun; existing AVD unchanged. Effective live completion/token/furigana/word/custom
+integration, full-chapter payload-cost review, atomic override-time registration and
+core/FIFO/FFI/Android controls remain. No implementation blocker.
+
+
+Final host PASS: real-Full Kotlin/JNI selected-word/custom CRUD, imports/direct
+cancellation, navigation/codecs, seven cross-language fixtures and 100 native handle
+lifecycles. Repeat Kotlin generation is byte-identical. Existing Crux middleware
+teardown messages remain informational. No escalation/download or blocker.

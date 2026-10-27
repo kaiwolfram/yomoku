@@ -2255,3 +2255,25 @@
   were not rerun; AVD untouched. No escalation/download needed.
 - Next: effective registration and frozen future completions, then live reader/
   furigana/word integration and core/FIFO/FFI/Android segmentation controls.
+
+
+## 2026-10-27 — Frozen effective completions
+
+- Added opaque pure effective completion values and migration-0018 durable command
+  reservations. Preparation validates full resolved identity and drained time; commit
+  authenticates exact payloads and preserves frozen occurrences across rule changes.
+- Effective completion shares original-B page-only registration/New-only status changes
+  and atomic history/time/position/finish. Exact replay survives deletion/reopen; legacy
+  calls reject effective IDs. Past histories and live B reader behavior stay intact.
+- PASS: nine new storage cases; 517 workspace tests (17 ignored), strict Clippy,
+  formatting/diff, 15 Full + one runtime fixture EACH owned/mapped. Tests cover stale
+  keys, exact/unresolved metadata, Unicode/all presets, deleted vocabulary, concurrency,
+  rereads, migration, statement/deferred-commit failures and exact retries.
+- Updated plan/decisions/architecture/data model and handoff. DEVELOPMENT.md records
+  commands, logs and corrected fixture failures. No dependency/version/public bridge
+  changes. APK/device/lint/release/performance/process-death/physical arm64 not rerun.
+- Next: live effective completion/token/furigana/word/custom integration, payload-cost
+  review, atomic override-time registration and typed override controls/UI. No blocker.
+- Final host Kotlin/JNI and byte-identical repeat codegen pass; seven cross-language
+  fixtures and 100 handle lifecycles verify. Existing Crux teardown messages remain
+  informational. No escalation/download needed.

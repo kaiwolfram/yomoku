@@ -597,9 +597,43 @@ or deleted vocabulary; these APIs never register it or rewrite readings/history.
 No migration is added.
 
 These remain separate domain/repository APIs: live reader token/word/furigana and
-completion APIs still use original B. Effective registration and frozen
-future-completion identities, core/FIFO/FFI commands and segmentation UI remain
-unimplemented. No projection registers vocabulary, resets position or rewrites history.
+completion commands still use original B. Read projections never register vocabulary,
+reset position or rewrite history. Effective completion storage is described below;
+override-time registration, core/FIFO/FFI integration and segmentation UI remain pending.
+
+## Frozen effective completions (migration 0018)
+
+`EffectivePageCompletion` is an opaque pure-domain value constructed by a validated
+`EffectiveReaderChapter`. It contains the ordinary page completion, complete effective
+selection key/provenance and start-owned eligible occurrences, with no live vocabulary
+IDs/statuses. Exact analyzer metadata retains its source; manual unresolved spans
+have no invented reading/lemma. Only the page owning a token's start counts it.
+
+`prepare_effective_page_completion(intent, key)` holds an immediate transaction:
+check live document/page/position/preset, original B and complete resolved key; read
+the drained durable page time; reserve a command ID; store its exact serialized
+payload in `effective_completion_commands(command_id, semantics_version=1, payload)`.
+Preparation neither registers surfaces nor records history/consumes time/moves position.
+The JSON format is versioned independently from the internal bridge and is currently
+write/compare only: no process-restart replay or automatic recovery of unused commands.
+
+`record_effective_page_completion` first compares the entire command with that durable
+reservation, before replay or live-content checks. Exact successful retries return
+AlreadyRecorded even after deletion/reflow/reversal; legacy APIs reject effective IDs.
+Before a first commit the ordinary live position/preset/time checks still apply.
+Later rule/metadata changes cannot reinterpret the reserved occurrences. Register only
+this page's distinct eligible spellings, preserving existing statuses and re-registering
+deleted ones as New; record every repetition, New-only Known events, time consumption,
+position and finish atomically. Failures retain the original reservation for exact retry.
+
+The existing `completion_analyses` header retains the original B basis/profile. Presence
+of the versioned effective reservation distinguishes its `reading_occurrences.token_index`
+as an effective segment index; original commands retain analyzer indices. The payload
+retains rule IDs and exact per-segment metadata provenance without live analysis/rule/
+document FKs. Historical rows are never rewritten. Vocabulary deletion still cascades
+its actual occurrence/status rows; the reservation is identity/provenance, not a counter.
+Migration 0018 creates an empty additive table and leaves all previous histories intact.
+Full-chapter payload size/cost is unmeasured and must be reviewed during live integration.
 
 ## Read-only reader token/status projection
 
