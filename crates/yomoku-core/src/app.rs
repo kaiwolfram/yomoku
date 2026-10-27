@@ -721,6 +721,11 @@ impl App for Yomoku {
                     _ => None,
                 };
                 match result {
+                    // No live event dispatches the native effective protocol yet.
+                    // Its coordinated reader switch must handle these together.
+                    StorageResult::Effective(_) => {
+                        model.document_error = Some(DocumentError::InvalidDocument);
+                    }
                     StorageResult::ImportCancelled => {}
                     StorageResult::ReaderWordLoaded(details) => {
                         if word_load == Some(details.selection())

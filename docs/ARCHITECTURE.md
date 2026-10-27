@@ -905,8 +905,29 @@ a visible eligible segment. Missing B remains plain and unselectable. Full prove
 still authenticates repository transactions and separately retained accepted commands.
 Prototype generated Kotlin codecs verify 60-byte available-B identities and 68-byte
 selections; no full chapter enters those values. These schemas/state methods are not
-yet wired into live core/FIFO/FFI/Android events/views. The linked payload review defines
+yet wired into live core/FFI/Android events/views. The linked payload review defines
 lifecycle/integration obligations; actual device/real-book performance remains pending.
+
+`effective_storage` now defines the Rust-only protocol for that switch. The nested
+`StorageOperation::Effective`/`StorageResult::Effective` variants are Serde-skipped
+and Facet-skipped (their fields are opaque), so neither full keys nor durable frozen
+completions can acquire a shell codec. The existing `StorageEffects` consumes them on
+its single FIFO/connection; no additional worker, runtime registry or middleware layer
+is introduced. Token reads echo their exact Rust-issued request and verify original B.
+Word/custom operations reuse the existing lazy dictionary/error/reopen policy and
+transaction-local effective selection validation. Preparation and commit use migration
+0018 repositories; completion reloads the document after its atomic commit, as the
+original-B path does. Failures use the existing typed `DocumentError` channel.
+
+The retained page now owns its full key in an immutable `Arc`. `freeze_page` and
+`freeze_selection` authenticate compact callbacks and issue Rust-only accepted command
+values with private fields; retry clones share the same allocation rather than copying
+whole chapters. Invalidation retires future callbacks while accepted commands retain
+their original key through time drains and retries. Prepared completions similarly
+share one frozen reservation. Storage still revalidates every selection/preparation;
+a reserved completion keeps its exact semantics after reversal/deletion. Neither worker
+startup nor opening the database replays unfinished reservations. The app's live state
+machine has not switched protocols yet; unexpected effective results fail closed.
 
 `Storage::create_analyzed_paste` composes the existing private transaction helpers
 for document creation, validated Mode B analysis and exact-surface registration.

@@ -4,6 +4,7 @@
 //! wired into the app. Full chapter provenance never belongs in shell callbacks.
 
 use serde::{Deserialize, Serialize};
+use std::sync::Arc;
 
 use crate::{
     document::{TextAnchor, TextRange},
@@ -91,8 +92,45 @@ impl EffectivePageRequest {
 }
 
 struct RetainedPage {
-    key: Option<EffectiveReaderTokenKey>,
+    key: Option<Arc<EffectiveReaderTokenKey>>,
     view: EffectiveReaderPage,
+}
+
+/// Rust-only accepted page command. Sharing the immutable full key makes retry
+/// clones cheap and keeps it alive after movement invalidates shell callbacks.
+/// Construct through the owning session, before dispatch or checkpoint drain.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct EffectivePageCommand {
+    identity: EffectivePageIdentity,
+    key: Arc<EffectiveReaderTokenKey>,
+}
+
+impl EffectivePageCommand {
+    pub fn identity(&self) -> EffectivePageIdentity {
+        self.identity
+    }
+
+    pub fn key(&self) -> &EffectiveReaderTokenKey {
+        &self.key
+    }
+}
+
+/// A visible eligible selection authenticated before accepting a word/custom
+/// command. Storage still revalidates this full key in its own transaction.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct EffectiveSelectionCommand {
+    page: EffectivePageCommand,
+    selection: EffectiveReaderSelection,
+}
+
+impl EffectiveSelectionCommand {
+    pub fn selection(&self) -> EffectiveReaderSelection {
+        self.selection
+    }
+
+    pub fn key(&self) -> &EffectiveReaderTokenKey {
+        self.page.key()
+    }
 }
 
 /// Own this alongside the core model for its entire lifetime, never per page.
@@ -160,13 +198,13 @@ impl EffectiveReaderSession {
             return false;
         }
         // Move the full resolution, avoiding snapshot.key()'s chapter-sized clone.
-        let key = snapshot
-            .segmentation
-            .map(|segmentation| EffectiveReaderTokenKey {
+        let key = snapshot.segmentation.map(|segmentation| {
+            Arc::new(EffectiveReaderTokenKey {
                 document_id: snapshot.document_id,
                 page: snapshot.page,
                 segmentation,
-            });
+            })
+        });
         self.current = Some(RetainedPage {
             key,
             view: EffectiveReaderPage {
@@ -197,8 +235,28 @@ impl EffectiveReaderSession {
     pub fn resolve(&self, identity: EffectivePageIdentity) -> Option<&EffectiveReaderTokenKey> {
         let page = self.current.as_ref()?;
         (page.view.identity == identity)
-            .then_some(page.key.as_ref())
+            .then_some(page.key.as_deref())
             .flatten()
+    }
+
+    pub fn freeze_page(&self, identity: EffectivePageIdentity) -> Option<EffectivePageCommand> {
+        let page = self.current.as_ref()?;
+        (page.view.identity == identity).then_some(())?;
+        Some(EffectivePageCommand {
+            identity,
+            key: Arc::clone(page.key.as_ref()?),
+        })
+    }
+
+    pub fn freeze_selection(
+        &self,
+        selection: EffectiveReaderSelection,
+    ) -> Option<EffectiveSelectionCommand> {
+        self.resolve_selection(selection)?;
+        Some(EffectiveSelectionCommand {
+            page: self.freeze_page(selection.page)?,
+            selection,
+        })
     }
 
     /// Only Japanese segments actually visible on the retained page are valid.

@@ -1,5 +1,5 @@
 # Resume here
-Updated: 2026-10-27. Compact effective identity/lifecycle done; live integration next.
+Updated: 2026-10-27. Native effective FIFO protocol done; live app switch next.
 ## Working
 - Pure Crux routes/Library/Settings; Render-only UI; FIFO SQLite/analysis; Library start.
 - Chapter-local UTF-8 position/whole-book percentage/five presets persist; reflow
@@ -55,26 +55,26 @@ Updated: 2026-10-27. Compact effective identity/lifecycle done; live integration
   selections/built-in gates, literal drafts/Cancel/retries; no history/status writes.
 - Furigana: persisted switch/retries, source-first/B fallback independent of status;
   half-size readings, strict UTF-16, full crossing readings/fitted width/headroom.
-- Effective segmentation: B + A/B/C/manual partitions; contiguous JP B matches,
-  local/newer precedence/reversal; exact metadata provenance, unmatched unresolved.
-- Pure effective furigana: same resolved metadata/source priority, complete crossing
-  readings; unresolved manual parts never borrow B readings. Live furigana stays B.
-- Effective APIs: clipped eligibility/start-owned occurrences/live statuses; word/custom
-  freeze exact provenance/base, unresolved surface-only; shared CRUD/built-in gates.
+- Effective segmentation: B + A/B/C/manual; contiguous JP B matches, local/newer
+  precedence/reversal; exact metadata provenance, unmatched unresolved.
+- Pure effective furigana: source priority/crossings; unresolved manual has no B fallback.
+- Effective APIs: eligibility/start-owned counts/live statuses; frozen word/custom
+  provenance/base, unresolved surface-only; shared CRUD/built-in gates.
 - Effective completion (0018): full key/occurrences/time frozen durably; page-only
   registration/New-only Known/history/time/position/finish atomic. Exact replay
   survives reversal/deletion/reopen; legacy calls reject its ID. Live reader uses B.
 - Atomic override registration: winning parts only; retry no-op; reversal keeps history.
 - Compact effective_session: one full key + view, fresh revisions, stale/foreign/
   duplicate guards, retry/Missing B; prototype Kotlin codecs, page/selection 60/68 B.
+- Native effective_storage: same FIFO/dictionary; tokens/word/custom/prepare/commit.
+  Shared frozen keys survive invalidation/retry; no shell codec/restart replay.
 ## Next tasks (ordered)
-1. Wire effective completion/token/furigana/word/custom through core/FIFO/FFI/Android
-   using EFFECTIVE_READER_PAYLOAD.md; retain accepted keys across retries, no replay.
+1. Switch live core/FFI/Android completion/token/furigana/word/custom together using
+   effective_storage + EFFECTIVE_READER_PAYLOAD.md; wire retained command lifecycle.
 2. Add typed reads/choices/save/reverse with rendered-key/intervening-edit retry guards.
-3. Add Android A/B/C/manual, default All occurrences versus This occurrence; measure
-   real-book/JNI/device cost (100k fixture full key 14.3 MB vs compact page 33 KB JSON).
+3. Add Android A/B/C/manual + All/This occurrence; measure real-book/JNI/device cost.
 Physical arm64 deferred; Nostr empty; Q188 unresolved before forwarding.
 ## Verification
-- PASS: 537 Rust tests (17 ignored), strict Clippy/Rustfmt/Kotlin formatting/diff;
+- PASS: 544 Rust tests (17 ignored), strict Clippy/Rustfmt/Kotlin formatting/diff;
   15 Full + one runtime EACH owned/mapped; real-Full Kotlin/JNI/7 Unicode/100 handles.
-- Repeat codegen identical; APK/device/lint/release/arm64 not rerun. DEVELOPMENT.md end.
+- Codegen identical; APK/device/lint/release/arm64 not rerun. DEVELOPMENT.md end.

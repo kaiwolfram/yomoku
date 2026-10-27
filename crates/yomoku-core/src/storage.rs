@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 use crate::active_time::{ReadingTimeUpdate, SavedReadingTime};
 use crate::completion::{AnalyzedCompletionOutcome, AnalyzedPageCompletion, PageCompletionIntent};
 use crate::document::{DocumentId, LibraryDocument, ReaderDocument};
+use crate::effective_storage::{EffectiveStorageOperation, EffectiveStorageResult};
 use crate::imports::{EpubImport, SrtImport, TxtImport};
 use crate::pagination::{PageLength, ReadingPosition};
 use crate::reader::{
@@ -52,6 +53,11 @@ pub enum StorageOperation {
     ImportTxt(TxtImport),
     ImportSrt(SrtImport),
     ImportEpub(EpubImport),
+    /// Native-only protocol. Neither full keys nor reserved completions have a
+    /// shell codec; the generated event/view schemas remain compact.
+    #[serde(skip)]
+    #[cfg_attr(feature = "facet_typegen", facet(skip))]
+    Effective(#[cfg_attr(feature = "facet_typegen", facet(opaque))] EffectiveStorageOperation),
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -104,6 +110,9 @@ pub enum StorageResult {
     ReaderStatusChanged(ReaderStatusChange, Option<ReaderVocabulary>),
     /// Cooperative file cancellation rolled back the current file, without error.
     ImportCancelled,
+    #[serde(skip)]
+    #[cfg_attr(feature = "facet_typegen", facet(skip))]
+    Effective(#[cfg_attr(feature = "facet_typegen", facet(opaque))] EffectiveStorageResult),
 }
 
 impl Operation for StorageOperation {

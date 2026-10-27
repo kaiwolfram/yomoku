@@ -4496,3 +4496,57 @@ use original B. APK/device/Android lint/release, real-book memory/JNI latency,
 process-death and physical arm64 were not rerun; existing AVD untouched. Next: the
 coordinated live-reader switch, then guarded override controls. No implementation
 blocker; local staging/commit needs the existing authorized `.git` escalation.
+
+## Native effective-reader FIFO protocol
+
+2026-10-27, repository root, pinned offline Rust/JDK:
+
+```sh
+export PATH=/home/kai/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin:$PATH
+export JAVA_HOME=/home/kai/repos/yomoku/.local/jdk-17/jdk-17.0.21+9
+cargo test -p yomoku-runtime effective_worker --all-features --locked --offline
+cargo test -p yomoku-ffi --test effective_protocol --all-features --locked --offline
+cargo test --workspace --all-features --locked --offline --quiet
+tools/test-sudachi.sh
+cargo clippy --workspace --all-targets --all-features --locked --offline -- -D warnings
+cargo fmt --all -- --check
+tools/format-kotlin.sh --check
+tools/test-kotlin-bridge.sh
+cargo run -p yomoku-ffi --bin generate-kotlin --features facet_typegen --locked --offline -- target/generated/kotlin-repeat
+# Compare after generation exits.
+diff -r target/generated/kotlin target/generated/kotlin-repeat
+git diff --check
+```
+
+PASS: seven new cases (one core accepted-command ownership, five actual asynchronous
+FIFO worker cases and one FFI codec exclusion), 544 workspace Rust tests (17 opt-in
+ignored), strict Clippy/Rustfmt/Kotlin formatting/diff and byte-identical repeat
+generation. Fifteen Full analysis fixtures plus one runtime fixture pass EACH
+owned/mapped (32 invocations). Host Kotlin/JNI verifies real-Full word/custom paths,
+imports/direct cancellation, navigation/codecs, seven Unicode fixtures and 100 handles.
+
+Native effective tokens/word/custom/preparation/completion use the existing FIFO and
+dictionary/error/reopen policy. Private-field accepted page/selection commands share
+one immutable full-key allocation with the retained page. Invalidation retires shell
+callbacks while accepted commands/retries keep their exact key. Full native protocol
+variants are skipped by Serde/Facet; no full chapter or reservation enters shell
+values. Storage revalidates stale provenance; reserved completion replay remains exact.
+
+Tests verify read-only bytes/no Sudachi loads, unresolved manual fields/live statuses,
+literal supplementary/combining/NUL custom values, identical-save no-ops, built-in
+gates, corrupt dictionary protection/reopen/explicit retry, Missing B/deleted sources,
+reversed-rule stale selection rejection, blocked-SQLite final checkpoint before
+preparation, atomic completion rollback, reversal/reopen exact retry, no automatic
+reservation replay and fresh reread counts. Original B remains immutable.
+
+Initial compilation required marking the skipped native payload fields Facet-opaque;
+Facet skip alone still requires nested reflection. The codec/codegen checks verify
+the final representation stays native-only. Existing Crux middleware teardown and
+ktfmt JDK deprecation messages remain informational. Logs:
+`/tmp/yomoku-effective-worker-{tests,full,clippy,bridge,codec}.log`.
+
+No dependency/version, migration, public shell schema or Android source changes.
+Live app core/FFI/Android completion/token/word/custom/furigana integration remains;
+the current reader still uses B. APK/device/Android lint/release, performance,
+process-death and physical arm64 were not rerun; AVD untouched. No implementation
+blocker. Local staging/commit requires the already authorized `.git` escalation.

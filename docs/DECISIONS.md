@@ -3043,3 +3043,25 @@ round trips verify 60-byte available-B identities and 68-byte selections includi
 maximum unsigned counters and literal Unicode. The synthetic compact JSON page is
 32,983 bytes at both 10k/100k chapter characters. These are serialization measurements;
 real JNI timing/memory, live integration and physical-device validation remain pending.
+
+## 2026-10-27 — Native effective commands on the existing FIFO
+
+Introduce the effective storage protocol as a nested, Rust-only operation/result in
+the existing storage capability. Consume it on the same FIFO, SQLite connection and
+lazy word dictionary as original-B operations. Serde skips both nested variants;
+Facet skips them and treats their payload fields as opaque. Full chapter keys and
+durable completion payloads intentionally have no shell codec. No new worker/service,
+public JNI entry point, dependency, migration or alternate persistence policy.
+
+The pure retained-page session issues private-field accepted command values after
+authenticating compact page/visible selection identities. Store the immutable key
+in `Arc` and share it with accepted commands/retries, keeping chapter-sized copies
+out of retry cloning. UI invalidation does not discard accepted work. Storage still
+revalidates provenance for every word/custom/preparation transaction; only already
+reserved completions survive later edits with their frozen meanings. Preparation
+follows final time checkpoints in the same queue, and restart never auto-replays.
+
+This is an independently verified transport slice before the coordinated live app
+switch: current core events/views and Android still use original B. Native protocol
+failures reuse `DocumentError`, pending command ownership remains with the core, and
+unexpected effective results in the current live state machine fail closed.

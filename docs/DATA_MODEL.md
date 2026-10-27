@@ -608,11 +608,15 @@ No migration is added.
 These remain separate domain/repository APIs: live reader token/word/furigana and
 completion commands still use original B. Read projections never register vocabulary,
 reset position or rewrite history. Effective completion and override-time registration storage
-are described below. Core/FIFO/FFI integration and segmentation UI remain pending.
+are described below. Native FIFO transport is implemented; live app core/FFI integration
+and segmentation UI remain pending.
 
 The [payload review](EFFECTIVE_READER_PAYLOAD.md) records reproducible synthetic
 full-key/page-token JSON sizes. Current complete chapter keys are deliberately
-internal; the effective bridge representation/lifecycle still needs implementation.
+internal. Compact bridge identity/lifecycle and shared immutable Rust command keys are
+implemented; live reader event/view integration still needs the coordinated switch.
+The native-only effective storage protocol delegates to these same transactions and
+migration 0018 below. It introduces no schema change or alternate history semantics.
 
 ## Frozen effective completions (migration 0018)
 

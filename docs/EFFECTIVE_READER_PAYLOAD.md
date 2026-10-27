@@ -41,6 +41,14 @@ for its whole lifetime. It retains at most one full effective key and a compact
 visible page, with no global registry, runtime cache, I/O or persistent handles.
 `accept` moves the full resolution from the validated storage snapshot into the
 key; it does not clone the chapter. Rendering exposes only `EffectiveReaderPage`.
+The retained key now uses immutable `Arc` ownership. `freeze_page`/`freeze_selection`
+issue private-field Rust-only command values after compact identity/visibility checks.
+Accepted commands and retry clones share that allocation across invalidation instead
+of cloning the chapter. The native `effective_storage` protocol routes token/word/
+custom/preparation/completion commands through the existing SQLite FIFO/dictionary.
+Both nested protocol variants have no Serde shell codec and remain skipped by Facet
+generation. The worker still revalidates complete provenance through storage; errors
+use the existing typed channel. No unfinished reservation is replayed automatically.
 
 `EffectivePageIdentity` carries a monotonically increasing `u64` revision and the
 existing document/page/original-B identity. `EffectiveReaderSelection` adds a
@@ -88,5 +96,5 @@ fixtures verify the available-B sizes, maximum revision/index, exact large IDs,
 supplementary/combining/NUL text, resolved/unresolved metadata and deleted vocabulary.
 These measure serialized values, not JNI execution time, allocation or device memory.
 Full resolution and storage revalidation costs remain; real-book/device measurements
-are still pending. Prototype schemas are generated and tested independently; no live
-event/view or completion/token/word/custom/furigana path has switched from original B.
+are still pending. Compact schemas and native FIFO operations are tested independently;
+no live event/view or completion/token/word/custom/furigana path has switched from B.

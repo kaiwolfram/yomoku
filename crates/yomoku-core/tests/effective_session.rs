@@ -322,3 +322,46 @@ fn unresolved_manual_parts_keep_eligibility_without_borrowing_original_b_metadat
         })
         .is_none());
 }
+
+#[test]
+fn accepted_commands_share_one_key_and_survive_invalidation_without_authorizing_new_callbacks() {
+    let snapshot = snapshot();
+    let base = base(&snapshot);
+    let mut session = EffectiveReaderSession::default();
+    let request = session.begin_load(base).unwrap();
+    assert!(session.accept(request, snapshot));
+    let identity = session.page().unwrap().identity;
+    let selection = EffectiveReaderSelection {
+        page: identity,
+        segment_index: 0,
+    };
+    let page = session.freeze_page(identity).unwrap();
+    let word = session.freeze_selection(selection).unwrap();
+    let retry = word.clone();
+    assert!(std::ptr::eq(page.key(), word.key()));
+    assert!(std::ptr::eq(word.key(), retry.key()));
+    assert!(std::ptr::eq(session.resolve(identity).unwrap(), page.key()));
+    assert_eq!(word.selection(), selection);
+    assert_eq!(page.identity(), identity);
+    for index in [1, 3, u64::MAX] {
+        assert!(session
+            .freeze_selection(EffectiveReaderSelection {
+                segment_index: index,
+                ..selection
+            })
+            .is_none());
+    }
+    session.invalidate();
+    assert!(session.freeze_page(identity).is_none());
+    assert!(session.freeze_selection(selection).is_none());
+    assert_eq!(word.key(), page.key());
+    assert!(std::ptr::eq(word.key(), retry.key()));
+    let request = session.begin_load(base).unwrap();
+    assert!(session.accept(request, snapshot_with_manual_split(true)));
+    assert!(session.freeze_page(identity).is_none());
+    assert!(session.freeze_selection(selection).is_none());
+    assert_ne!(
+        session.resolve(session.page().unwrap().identity).unwrap(),
+        page.key()
+    );
+}

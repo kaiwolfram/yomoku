@@ -25,6 +25,10 @@ pub type WordDictionaryLoader = Box<dyn FnMut() -> Result<PathBuf, DocumentError
 
 use crate::imports::{AnalyzerLifecycle, AnalyzerLoader, FileImportControl, Imports};
 
+mod effective;
+#[cfg(test)]
+mod effective_tests;
+
 pub(crate) enum Job {
     EpubCover(DocumentId, crate::epub_assets::CoverCallback),
     EpubAsset(
@@ -209,6 +213,10 @@ fn execute(
     }
     let storage = storage.as_mut().expect("opened storage");
     match operation {
+        StorageOperation::Effective(operation) => {
+            effective::execute(storage, dictionary, word_loader, operation)
+                .map(StorageResult::Effective)
+        }
         StorageOperation::List => Ok(StorageResult::Listed(
             storage.list_documents().map_err(map_error)?,
             storage.page_length().map_err(map_error)?,

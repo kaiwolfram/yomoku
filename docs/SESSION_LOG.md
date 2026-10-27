@@ -2339,3 +2339,23 @@
 - Updated payload lifecycle obligations, architecture/decisions/plan/development
   and 80-line handoff. No dependencies/schema/Android source changes; APK/device/
   Android lint/release/performance/process-death/arm64 not rerun. No blocker.
+
+## 2026-10-27 — Native effective-reader FIFO protocol
+
+- Routed effective tokens/word/custom CRUD and completion preparation/commit through
+  the existing Rust storage capability, FIFO/connection and lazy dictionary. Full
+  keys/reservations have no shell codec; current live app remains original B.
+- Added private-field page/selection commands sharing immutable retained keys via
+  Arc. Accepted retries survive page invalidation without chapter-sized key clones;
+  storage still revalidates current provenance before selection writes/preparation.
+- PASS: seven new core/worker/FFI tests, 544 workspace Rust tests (17 ignored), strict
+  Clippy/Rustfmt/Kotlin formatting/diff, 15 Full + one runtime EACH owned/mapped,
+  real-Full Kotlin/JNI/seven Unicode/100 handles and identical repeat generation.
+- Worker tests cover no analyzer loads, read-only bytes, unresolved manual metadata,
+  live statuses, literal custom data, built-in/corrupt dictionary protection, explicit
+  repair/retry, Missing B/deletion, stale keys, blocked final-time FIFO order, atomic
+  rollback, reversal/reopen exact retry, no startup replay and deliberate rereads.
+- Updated architecture/data/payload/decisions/plan/development/handoff. No dependency,
+  schema or Android source change. APK/device/lint/release/performance/process-death/
+  arm64 not rerun. Next: coordinated live core/FFI/Android switch, guarded override
+  commands, then A/B/C/manual controls. No implementation blocker.
