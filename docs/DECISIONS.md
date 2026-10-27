@@ -2541,3 +2541,33 @@ has its own executor, while AndroidSVG exposes a process-global resolver/entity
 setting. This prevents one session from clearing another session's resolver or
 recycling its temporary rasters. No new dependency, schema, core/FFI, permission,
 source-asset mutation or destructive semantics.
+
+## 2026-10-27 — Self-contained nested SVG image resources
+
+Continue the compound-image task with exact `data:image/svg+xml;base64,` children,
+using the pinned AndroidSVG 1.4 dependency. Rechecked the recorded source-JAR
+SHA-256 and its image rendering/resolver path against the
+[upstream resolver API](https://bigbadaboom.github.io/androidsvg/doc/com/caverock/androidsvg/SVGExternalFileResolver.html).
+The resolver supplies bitmaps, so prepare nested vectors off main, then rasterize
+each unique child once before its parent. Retain independent child IDs/styles;
+outer styles do not enter an image document. Reuse the existing source-ratio
+viewport wrappers, sampled page/viewer/cover pipeline and process-wide lock.
+No original data URI reaches the renderer's unbounded built-in decoder.
+
+Use one preparation context for all descendants: <=64 distinct exact URI resources
+across SVG/PNG/JPEG, <=8 image-resource nesting levels, <=2 MiB total root/decoded
+child XML, <=4096 generated/original nodes and <=32768 expanded nodes. Retain <=64
+nested/reference levels per document. Count each unique child vector expansion
+once, because repeated placements reuse its raster. Explicitly require a single
+closed root: both platform pull parsing and upstream SVG parsing can accept a
+truncated root at EOF. Malformed children reject the whole asset through alt/Retry.
+
+Flatten children before parents and split one additional output-pixel budget
+among ALL unique temporary images, including intermediate SVG bitmaps. No child
+gets a new budget. Retain source limits and <=2048 sampled edges; recycle every
+temporary bitmap on success/failure and deregister the private resolver in finally.
+Child rasterization retains the existing sampled-detail limitation and does not
+establish a total heap/CPU cap. Relative/local/remote image resources, patterns,
+masks, markers and selector-aware/resource CSS remain separate unfinished work.
+No dependency/version, core/FFI/schema, permission, persisted setting, source-asset
+mutation or destructive-semantics change.

@@ -17,20 +17,69 @@ internal const val EPUB_SVG_BYTES = 2 * 1024 * 1024
 private const val SVG_NODES = 4096
 private const val SVG_DEPTH = 64
 private const val SVG_EXPANSIONS = 32768
-private const val SVG_RASTERS = 64
+private const val SVG_IMAGE_RESOURCES = 64
+private const val SVG_IMAGE_DEPTH = 8
 private const val XLINK_NAMESPACE = "http://www.w3.org/1999/xlink"
 private val svgDecodeLock = Any()
 private val imageViewportAttributes =
     setOf("x", "y", "width", "height", "preserveAspectRatio", "overflow", "href")
 private val svgRasterData = Regex("data:image/(png|jpeg);base64,([A-Za-z0-9+/=\\s]+)")
 
-private data class PreparedSvg(val xml: String, val rasters: List<SvgRasterSource>)
+internal sealed class SvgImageSource(val size: Size) {
+    class Vector(val svg: SVG, size: Size) : SvgImageSource(size)
+}
+
+internal data class PreparedSvgImages(
+    val root: SvgImageSource.Vector,
+    val sources: List<SvgImageSource>,
+)
+
+// One compilation owns the entire nested-image graph. Children precede parents, so each
+// unique URI renders once with already-decoded dependencies and one shared pixel budget.
+private class SvgPreparation {
+    var bytes = 0
+    var nodes = 0
+    var expansions = 0
+    var resources = 0
+    val keys = mutableMapOf<String, Int>()
+    val sources = mutableListOf<SvgImageSource>()
+
+    fun source(uri: String, depth: Int): Int? {
+        keys[uri]?.let {
+            return it
+        }
+        if (++resources > SVG_IMAGE_RESOURCES || depth >= SVG_IMAGE_DEPTH) return null
+        val source =
+            if (uri.startsWith("data:image/svg+xml;base64,")) {
+                if (uri.length > EPUB_SVG_BYTES) return null
+                val encoded = uri.substringAfter(',')
+                if (!encoded.matches(Regex("[A-Za-z0-9+/=\\s]+"))) return null
+                val decoded = Base64.decode(encoded, Base64.DEFAULT)
+                prepareSvg(decoded, this, depth + 1) ?: return null
+            } else SvgRasterSource.read(uri) ?: return null
+        sources.add(source)
+        return sources.lastIndex.also { keys[uri] = it }
+    }
+}
+
+/** Prepares all document-scoped graphs before allocating any source pixels. */
+internal fun prepareSvgImages(bytes: ByteArray): PreparedSvgImages? {
+    val preparation = SvgPreparation()
+    val root = prepareSvg(bytes, preparation, 0) ?: return null
+    return PreparedSvgImages(root, preparation.sources)
+}
 
 // AndroidSVG also accepts an IRI missing its closing parenthesis.
 private val svgUrls = Regex("url\\s*\\(([^)]*)(?:\\)|$)", RegexOption.IGNORE_CASE)
 
 /** Preflight before AndroidSVG builds a tree or follows recursive local references. */
-private fun prepareSvg(bytes: ByteArray): PreparedSvg? {
+private fun prepareSvg(
+    bytes: ByteArray,
+    preparation: SvgPreparation,
+    imageDepthLevel: Int,
+): SvgImageSource.Vector? {
+    preparation.bytes += bytes.size
+    if (bytes.isEmpty() || preparation.bytes > EPUB_SVG_BYTES) return null
     data class Node(
         val edges: MutableList<Int> = mutableListOf(),
         val references: MutableList<String> = mutableListOf(),
@@ -42,8 +91,7 @@ private fun prepareSvg(bytes: ByteArray): PreparedSvg? {
     val styles = StringBuilder()
     var styleDepth = 0
     var imageDepth = 0
-    val rasters = linkedMapOf<String, Int>()
-    val sources = mutableListOf<SvgRasterSource>()
+    var hasImages = false
     val output = StringWriter()
     val serializer = Xml.newSerializer().apply { setOutput(output) }
     val parser = Xml.newPullParser()
@@ -59,7 +107,8 @@ private fun prepareSvg(bytes: ByteArray): PreparedSvg? {
                 XmlPullParser.START_TAG -> {
                     if (styleDepth > 0 || imageDepth > 0) return null
                     if (nodes.size >= SVG_NODES || parents.size >= SVG_DEPTH) return null
-                    if (nodes.isEmpty() && parser.name != "svg") return null
+                    if (parents.isEmpty() && (nodes.isNotEmpty() || parser.name != "svg"))
+                        return null
                     if (parser.namespace !in listOf("", "http://www.w3.org/2000/svg")) return null
                     // Patterns/masks/markers can recurse via inherited paint outside this graph.
                     if (
@@ -84,6 +133,8 @@ private fun prepareSvg(bytes: ByteArray): PreparedSvg? {
                         )
                     }
                     val image = parser.name == "image"
+                    preparation.nodes += if (image) 3 else 1
+                    if (preparation.nodes > SVG_NODES) return null
                     if (image) imageDepth = parser.depth
                     if (image) {
                         val names =
@@ -98,13 +149,9 @@ private fun prepareSvg(bytes: ByteArray): PreparedSvg? {
                         if (parser.getAttributeNamespace(attribute) !in listOf("", XLINK_NAMESPACE))
                             return null
                         val uri = parser.getAttributeValue(attribute).trim()
-                        val key =
-                            rasters.getOrPut(uri) {
-                                if (sources.size >= SVG_RASTERS) return null
-                                sources.add(SvgRasterSource.read(uri) ?: return null)
-                                sources.lastIndex
-                            }
-                        // An SVG viewport preserves the ORIGINAL raster ratio even when its
+                        hasImages = true
+                        val key = preparation.source(uri, imageDepthLevel) ?: return null
+                        // An SVG viewport preserves the ORIGINAL source ratio even when its
                         // bounded bitmap rounds to e.g. 1x1. Upstream uses bitmap dimensions.
                         serializer.startTag(parser.namespace, "g")
                         for (attr in 0 until parser.attributeCount) {
@@ -123,7 +170,7 @@ private fun prepareSvg(bytes: ByteArray): PreparedSvg? {
                                 serializer.attribute("", name, parser.getAttributeValue(attr))
                             }
                         }
-                        val source = sources[key]
+                        val source = preparation.sources[key].size
                         serializer.attribute("", "viewBox", "0 0 ${source.width} ${source.height}")
                         serializer.startTag(parser.namespace, "image")
                         serializer.attribute("", "href", "yomoku-svg-image:$key")
@@ -185,8 +232,8 @@ private fun prepareSvg(bytes: ByteArray): PreparedSvg? {
         return null
     // Rewriting image viewports changes selector ancestry/type matching. Keep stylesheet-
     // styled compound SVGs on fallback until selectors can be applied before rewriting.
-    if (sources.isNotEmpty() && styles.isNotBlank()) return null
-    if (nodes.isEmpty()) return null
+    if (hasImages && styles.isNotBlank()) return null
+    if (nodes.isEmpty() || parents.isNotEmpty()) return null
     for (node in nodes) for (reference in node.references) {
         node.edges.add(ids[reference] ?: return null)
     }
@@ -212,8 +259,11 @@ private fun prepareSvg(bytes: ByteArray): PreparedSvg? {
         return true
     }
     if (!visit(0, 1)) return null
+    preparation.expansions += costs[0]
+    if (preparation.expansions > SVG_EXPANSIONS) return null
     serializer.flush()
-    return PreparedSvg(output.toString(), sources)
+    val svg = SVG.getFromString(output.toString())
+    return SvgImageSource.Vector(svg, svgSourceSize(svg) ?: return null)
 }
 
 /** Called only by the serial, off-main image decoder. The output shares its page pixel budget. */
@@ -222,77 +272,83 @@ internal fun decodeEpubSvg(bytes: ByteArray, pixelBudget: Int): DecodedEpubImage
 
 private fun decodeEpubSvgLocked(bytes: ByteArray, pixelBudget: Int): DecodedEpubImage? {
     if (bytes.isEmpty() || bytes.size > EPUB_SVG_BYTES || pixelBudget < 1) return null
-    var bitmap: Bitmap? = null
-    var rasters: SvgRasterResources? = null
+    var resources: SvgImageResources? = null
     return try {
-        val prepared = prepareSvg(bytes) ?: return null
         SVG.setInternalEntitiesEnabled(false)
         SVG.deregisterExternalFileResolver()
-        val svg = SVG.getFromString(prepared.xml)
-        val ratio = svg.documentAspectRatio
-        if (!ratio.isFinite() || ratio <= 0) return null
-        val viewBox = svg.documentViewBox
-        if (
-            viewBox != null &&
-                (!viewBox.left.isFinite() ||
-                    !viewBox.top.isFinite() ||
-                    !viewBox.width().isFinite() ||
-                    !viewBox.height().isFinite() ||
-                    viewBox.width() <= 0 ||
-                    viewBox.height() <= 0)
-        )
-            return null
-        var width = svg.documentWidth
-        var height = svg.documentHeight
-        if (width <= 0 || height <= 0) {
-            width = viewBox?.width() ?: return null
-            height = viewBox.height()
-        }
-        if (
-            !width.isFinite() ||
-                !height.isFinite() ||
-                width <= 0 ||
-                height <= 0 ||
-                width > 32768 ||
-                height > 32768 ||
-                width.toDouble() * height > 100_000_000
-        )
-            return null
-        rasters = SvgRasterResources.decode(prepared.rasters, pixelBudget) ?: return null
-        SVG.registerExternalFileResolver(rasters)
-        val sourceWidth = ceil(width).toInt()
-        val sourceHeight = ceil(height).toInt()
-        var sample = 1
-        fun sampled(edge: Int) = (edge + sample - 1) / sample
-        while (
-            sampled(sourceWidth) > EPUB_IMAGE_EDGE ||
-                sampled(sourceHeight) > EPUB_IMAGE_EDGE ||
-                sampled(sourceWidth).toLong() * sampled(sourceHeight) > pixelBudget
-        ) sample *= 2
-        bitmap =
-            createBitmap(
-                sampled(sourceWidth),
-                sampled(sourceHeight),
-                Bitmap.Config.ARGB_8888,
-            )
+        val prepared = prepareSvgImages(bytes) ?: return null
+        resources = SvgImageResources.decode(prepared.sources, pixelBudget) ?: return null
+        SVG.registerExternalFileResolver(resources)
+        renderSvg(prepared.root, pixelBudget)
+    } catch (_: Exception) {
+        null
+    } catch (_: StackOverflowError) {
+        null
+    } catch (_: OutOfMemoryError) {
+        null
+    } finally {
+        SVG.deregisterExternalFileResolver()
+        resources?.close()
+    }
+}
+
+private fun svgSourceSize(svg: SVG): Size? {
+    val ratio = svg.documentAspectRatio
+    if (!ratio.isFinite() || ratio <= 0) return null
+    val viewBox = svg.documentViewBox
+    if (
+        viewBox != null &&
+            (!viewBox.left.isFinite() ||
+                !viewBox.top.isFinite() ||
+                !viewBox.width().isFinite() ||
+                !viewBox.height().isFinite() ||
+                viewBox.width() <= 0 ||
+                viewBox.height() <= 0)
+    )
+        return null
+    var width = svg.documentWidth
+    var height = svg.documentHeight
+    if (width <= 0 || height <= 0) {
+        width = viewBox?.width() ?: return null
+        height = viewBox.height()
+    }
+    if (
+        !width.isFinite() ||
+            !height.isFinite() ||
+            width <= 0 ||
+            height <= 0 ||
+            width > 32768 ||
+            height > 32768 ||
+            width.toDouble() * height > 100_000_000
+    )
+        return null
+    return Size(width, height)
+}
+
+private fun renderSvg(source: SvgImageSource.Vector, pixelBudget: Int): DecodedEpubImage {
+    val svg = source.svg
+    val width = source.size.width
+    val height = source.size.height
+    val sourceWidth = ceil(width).toInt()
+    val sourceHeight = ceil(height).toInt()
+    var sample = 1
+    fun sampled(edge: Int) = (edge + sample - 1) / sample
+    while (
+        sampled(sourceWidth) > EPUB_IMAGE_EDGE ||
+            sampled(sourceHeight) > EPUB_IMAGE_EDGE ||
+            sampled(sourceWidth).toLong() * sampled(sourceHeight) > pixelBudget
+    ) sample *= 2
+    val bitmap = createBitmap(sampled(sourceWidth), sampled(sourceHeight), Bitmap.Config.ARGB_8888)
+    try {
         svg.documentWidth = width
         svg.documentHeight = height
         val canvas = Canvas(bitmap)
         canvas.scale(bitmap.width / width, bitmap.height / height)
         svg.renderToCanvas(canvas)
-        DecodedEpubImage(bitmap, sourceWidth, sourceHeight, Size(width, height))
-    } catch (_: Exception) {
-        bitmap?.recycle()
-        null
-    } catch (_: StackOverflowError) {
-        bitmap?.recycle()
-        null
-    } catch (_: OutOfMemoryError) {
-        bitmap?.recycle()
-        null
-    } finally {
-        SVG.deregisterExternalFileResolver()
-        rasters?.close()
+        return DecodedEpubImage(bitmap, sourceWidth, sourceHeight, source.size)
+    } catch (error: Throwable) {
+        bitmap.recycle()
+        throw error
     }
 }
 
@@ -302,7 +358,7 @@ internal data class SvgRasterSource(
     val media: String,
     val width: Int,
     val height: Int,
-) {
+) : SvgImageSource(Size(width.toFloat(), height.toFloat())) {
     companion object {
         fun read(uri: String): SvgRasterSource? {
             if (uri.length > EPUB_SVG_BYTES) return null
@@ -331,31 +387,46 @@ internal data class SvgRasterSource(
 }
 
 /** Private keys only. Temporary pixels total <= the output budget, in addition to output pixels. */
-internal class SvgRasterResources private constructor(internal val images: List<Bitmap>) :
+internal class SvgImageResources private constructor(internal val images: List<Bitmap>) :
     SVGExternalFileResolver(), AutoCloseable {
     override fun resolveImage(filename: String): Bitmap? {
         val index = filename.removePrefix("yomoku-svg-image:").toIntOrNull() ?: return null
         return images.getOrNull(index).takeIf { filename == "yomoku-svg-image:$index" }
     }
 
-    override fun isFormatSupported(mimeType: String) = mimeType in listOf("image/png", "image/jpeg")
+    override fun isFormatSupported(mimeType: String) =
+        mimeType in listOf("image/png", "image/jpeg", "image/svg+xml")
 
     override fun close() = images.forEach { it.recycle() }
 
     companion object {
-        fun decode(sources: List<SvgRasterSource>, pixelBudget: Int): SvgRasterResources? {
-            if (sources.size > SVG_RASTERS || sources.size > pixelBudget) return null
+        fun decode(sources: List<SvgImageSource>, pixelBudget: Int): SvgImageResources? =
+            synchronized(svgDecodeLock) { decodeLocked(sources, pixelBudget) }
+
+        private fun decodeLocked(
+            sources: List<SvgImageSource>,
+            pixelBudget: Int,
+        ): SvgImageResources? {
+            if (pixelBudget < 1 || sources.size > SVG_IMAGE_RESOURCES || sources.size > pixelBudget)
+                return null
             val images = mutableListOf<Bitmap>()
             var success = false
             try {
+                SVG.registerExternalFileResolver(SvgImageResources(images))
                 val share = pixelBudget / maxOf(1, sources.size)
                 for (source in sources) {
-                    val image = decodeEpubImage(source.bytes, share, source.media) ?: return null
+                    val image =
+                        when (source) {
+                            is SvgRasterSource ->
+                                decodeEpubImage(source.bytes, share, source.media) ?: return null
+                            is SvgImageSource.Vector -> renderSvg(source, share)
+                        }
                     images.add(image.bitmap)
                 }
                 success = true
-                return SvgRasterResources(images)
+                return SvgImageResources(images)
             } finally {
+                SVG.deregisterExternalFileResolver()
                 if (!success) images.forEach { it.recycle() }
             }
         }

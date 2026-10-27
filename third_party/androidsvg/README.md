@@ -29,8 +29,12 @@ shared temporary bitmaps instead. Original source-ratio viewport wrappers accoun
 for sampling rounding; temporary pixels total <= the output pixel budget and
 recycle after rendering. A process-wide lock protects the static resolver, which
 is always deregistered; fonts/CSS/files/network are never loaded.
-Other nested image resources, DTDs, patterns/masks/markers, active/unsupported
-elements, resource-valued stylesheet rules and stylesheets in embedded-image SVGs
+Self-contained base64 SVG children now receive the same preflight and geometry
+checks, keep independent IDs/styles and render once per URI before their parents.
+Root plus child XML/node/expansion limits and temporary pixel budgets are shared
+across the entire graph; resource nesting is capped at eight. Relative/local image
+references, DTDs, patterns/masks/markers, active/unsupported elements,
+resource-valued stylesheet rules and stylesheets in embedded-image SVGs
 use the existing alt-text/Retry fallback. Paths, shapes, text,
 transforms, local uses, gradients and vector-only color/class styles remain supported within
 the documented bounds. This introduces no browser/WebView or network loading.

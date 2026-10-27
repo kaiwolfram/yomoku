@@ -132,19 +132,27 @@ resource-valued rules must be inline so their owner participates in the graph.
 Entities are disabled. A private in-memory resolver exposes only predecoded images;
 its font/CSS methods return null and it performs no resource I/O.
 
-Embedded `<image>` resources accept only base64 PNG/JPEG with matching decoded
-media, valid source bounds and explicit width/height. Up to 64 exact URI identities
-share temporary bitmaps; bounds-only inspection precedes bitmap allocation.
+Embedded `<image>` resources accept base64 PNG/JPEG with matching decoded media,
+or self-contained base64 SVG, with valid source bounds and explicit width/height.
+One preparation context deduplicates up to 64 exact URI identities across all
+nested documents. Child SVGs retain separate IDs/styles, undergo the same preflight
+and geometry checks, and render before their parents using already-decoded private
+keys. The entire graph shares <=2 MiB of root plus decoded child XML, <=4096 nodes
+including generated wrappers and <=32768 expanded nodes, with <=8 image-resource
+nesting levels and <=64 element/reference levels per document. Repeated images
+reuse rendered child pixels instead of multiplying child vector expansions.
+Bounds-only raster inspection and complete graph preparation precede allocation.
 Preflight rewrites their references to generated private keys so AndroidSVG never
 sees a data URI (its built-in decoder bypasses sampling). Original image viewports
 become group/SVG/image wrappers, preserving source aspect ratio even when sampling
 rounds a raster to 1x1; wrapper nodes count toward expanded-node/depth limits.
 Transforms, inline styles, local uses and clipping remain on the existing graph.
 The combined temporary allocation is <= the asset's output pixel budget (in
-addition to that output); each raster also obeys the 2048-edge limit. All temporary
-bitmaps recycle on success/failure, and the resolver deregisters in `finally`.
+addition to that output); each temporary raster/vector bitmap obeys the 2048-edge
+limit. All temporary bitmaps recycle on success/failure, and the resolver
+deregisters in `finally`.
 A process-wide SVG decode lock covers every session because the upstream resolver
-and entity settings are static. Relative/file/network/nested-vector references,
+and entity settings are static. Relative/local-fragment/file/network references,
 image children, ambiguous hrefs and SVG stylesheets accompanying embedded images
 retain alt/Retry. The last restriction avoids changing selector matching when
 image viewports are rewritten; selector-aware resource styling remains unfinished.

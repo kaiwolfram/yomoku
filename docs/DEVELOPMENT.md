@@ -3377,3 +3377,65 @@ Temporary decoder/Canvas allocations and total heap/CPU/large-book costs remain
 unmeasured. Rust/Clippy/host JNI/codegen, standalone dictionaries, release,
 process-death/reboot and physical arm64 were not rerun for this Android-only slice;
 physical arm64 remains user-deferred.
+
+## Bounded self-contained nested SVG images
+
+2026-10-27, using the Rust PATH/JDK/SDK/Gradle environment above:
+
+```sh
+tools/format-kotlin.sh --check
+git diff --check
+./android/gradlew -p android :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=app.yomoku.EpubSvgNestedImagesTest,app.yomoku.EpubSvgEmbeddedImagesTest,app.yomoku.EpubSvgDecodeTest,app.yomoku.EpubImageDecodeTest,app.yomoku.EpubImageLoaderTest,app.yomoku.ReaderImagesTest,app.yomoku.LibraryCoversTest,app.yomoku.NavigationTest --offline --console=plain
+/home/kai/Android/Sdk/platform-tools/adb -s emulator-5554 shell wm size 2560x1600
+/home/kai/Android/Sdk/platform-tools/adb -s emulator-5554 shell wm density 240
+/home/kai/Android/Sdk/platform-tools/adb -s emulator-5554 shell cmd uimode night yes
+# Repeat the same Gradle command for tablet/dark, then restore phone/light.
+/home/kai/Android/Sdk/platform-tools/adb -s emulator-5554 shell wm size reset
+/home/kai/Android/Sdk/platform-tools/adb -s emulator-5554 shell wm density reset
+/home/kai/Android/Sdk/platform-tools/adb -s emulator-5554 shell cmd uimode night no
+unzip -l android/app/build/outputs/apk/debug/app-debug.apk 'lib/*/libyomoku_jni.so'
+```
+
+Five new decoder fixtures verify nested vectors/rasters, original/fractional ratios,
+independent child IDs/styles, viewBox-only children, UTF-16 XML, transforms/clipping/
+opacity, one-pixel sampling and exact-URI sharing across documents. They inspect
+combined temporary allocation/recycling and reject malformed/active/external/
+cyclic resources, excessive resource nesting and aggregate XML/nodes/expansions.
+Repeated placements reuse child rasterization rather than multiplying vector work.
+Existing concurrent-session tests now alternate raster-only and nested-vector
+resources while repeatedly rendering distinct colors across two threads.
+
+An added real imported EPUB reader/Compose case checks nested SVG pixels, source
+order, adjacent styles/word identities, external website versus inert internal/SVG
+links, viewer/recreation, chapter changes and exact positions. Library cover
+coverage adds nested SVG pixels/ratio/cache/recreation/open/return alongside PNG,
+vector SVG and embedded-raster SVG. Existing raster, cancellation/serialization,
+unsupported fallback, completion and navigation cases stay in the same device run.
+
+The initial 13-case decoder run passed 12: Android's pull parser and AndroidSVG
+both accepted an unclosed child root at EOF. Added explicit single-root/closed-root
+preflight validation; the expanded phone/light run passed all 25 cases in 2m53s
+including builds/lint. Initial ADB listeners and Gradle wildcard-IP sockets needed
+approved outside-sandbox execution; the existing API-36 AVD was already running
+and reused without restart/wipe. Pinned source-JAR SHA-256 matches provenance;
+upstream resolver/image paths were reviewed again. No dependency/version,
+core/FFI/schema, permission, original asset mutation or destructive-semantics change.
+
+Final PASS: both-ABI debug/test APKs, strict Android lint, Kotlin formatting/diff
+and all 25 API-36 x86_64 tests each on phone/light (2m53s including build/lint) and
+tablet/dark (2m34s); zero failures/skips. Reports/results/lint XML, plus the initial
+failure: `.local/test-reports/epub-svg-nested/{initial,phone,tablet-dark}/`.
+APK inspection confirms arm64-v8a/x86_64 libyomoku_jni.so. Restored and verified
+1080x2400, 420dpi, light mode and free rotation; the AVD remains running.
+The existing unrelated FileImports autoboxing lint hint is informational.
+No open failure or blocker.
+
+Nested SVGs share <=64 exact resources, <=8 image-resource levels, <=2 MiB total
+root/child XML, <=4096 nodes including wrappers and <=32768 expanded nodes.
+All temporary raster/intermediate SVG pixels share one additional output-pixel
+budget and recycle in finally. Each document retains <=64 element/reference levels
+and existing source/edge bounds. Child detail stays sampled; total heap/CPU and
+large-book costs remain unmeasured. Relative/local resources, patterns/masks/markers
+and selector-aware/resource CSS remain unfinished. Rust/Clippy/host JNI/codegen,
+standalone dictionary probes, release, process-death/reboot and physical arm64 were
+not rerun for this Android-only slice; arm64 remains user-deferred.

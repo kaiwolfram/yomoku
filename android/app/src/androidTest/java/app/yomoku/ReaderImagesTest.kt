@@ -74,6 +74,10 @@ class ReaderImagesTest {
     fun embeddedSvgRastersKeepWordAndLinkIdentityViewerRecreationAndNavigation() =
         verifyInlineImages(embeddedSvgImageBytes())
 
+    @Test
+    fun nestedSvgImagesKeepWordAndLinkIdentityViewerRecreationAndNavigation() =
+        verifyInlineImages(nestedSvgImageBytes())
+
     private fun verifyInlineImages(svgBytes: ByteArray) {
         compose.waitUntil(30_000) { !core().view.storageBusy }
         val title = "inline-images-${System.nanoTime()}"

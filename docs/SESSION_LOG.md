@@ -1921,3 +1921,24 @@
   unchecked; stylesheet-styled embedded SVGs retain alt/Retry. Font/furigana and
   CI follow. No dependency/core/FFI/schema/permission changes. Rust/JNI/release/
   process-death not rerun; physical arm64 remains user-deferred.
+
+## 2026-10-27 — Bounded self-contained nested SVG images
+
+- Added base64 SVG children to the existing reader/viewer/cover decoder. Unique
+  child vectors/rasters share aggregate XML/node/expansion/resource/pixel limits,
+  render children before parents and retain independent IDs/styles. Intermediate
+  bitmaps recycle after render under the existing global resolver lock. No new
+  dependency, core/FFI/schema/permission or saved-asset changes.
+- PASS: both-ABI APKs, strict lint/formatting/diff and all 25 API-36 x86_64 cases
+  each on phone/light and tablet/dark. Six new decoder/real-EPUB cases plus expanded
+  cover/concurrency fixtures check pixels, bounds, sharing, links, recreation and
+  navigation. Reports: `.local/test-reports/epub-svg-nested/`; commands and limits
+  in DEVELOPMENT.md end.
+- Initial decoder run passed 12/13 and caught permissive acceptance of a truncated
+  child root; explicit single/closed-root preflight fixes it. Approved ADB/Gradle
+  sockets needed; existing AVD reused and restored to phone/light/free rotation.
+  Final suites have zero failures/skips; no open blocker.
+- Updated plan/handoff, architecture/data, decisions, development, README and
+  renderer provenance. Relative/local/other nested image URI forms, complex paint
+  and selector-aware CSS remain unchecked; fonts/furigana and CI follow. Rust/JNI/
+  release/process-death not rerun; physical arm64 remains user-deferred.

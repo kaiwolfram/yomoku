@@ -44,7 +44,7 @@ class EpubSvgEmbeddedImagesTest {
             </svg>"""
             // The resource decoder also supports a one-pixel share without source allocation.
             val raster = checkNotNull(SvgRasterSource.read(uri))
-            val resources = checkNotNull(SvgRasterResources.decode(listOf(raster), 1))
+            val resources = checkNotNull(SvgImageResources.decode(listOf(raster), 1))
             try {
                 assertEquals(1, resources.images.single().width)
                 assertEquals(1, resources.images.single().height)
@@ -99,7 +99,7 @@ class EpubSvgEmbeddedImagesTest {
                 checkNotNull(SvgRasterSource.read(rasterUri(rasterImageBytes(2048, 2048)))),
             )
         for (budget in listOf(2, 128, 16384, EPUB_PAGE_PIXELS)) {
-            val resources = checkNotNull(SvgRasterResources.decode(sources, budget))
+            val resources = checkNotNull(SvgImageResources.decode(sources, budget))
             try {
                 assertTrue(
                     resources.images.sumOf { it.allocationByteCount.toLong() } <= budget * 4L
@@ -133,10 +133,10 @@ class EpubSvgEmbeddedImagesTest {
             }
             assertTrue(resources.images.all { it.isRecycled })
         }
-        assertNull(SvgRasterResources.decode(sources, 1))
-        assertNull(SvgRasterResources.decode(List(65) { sources[0] }, 100))
+        assertNull(SvgImageResources.decode(sources, 1))
+        assertNull(SvgImageResources.decode(List(65) { sources[0] }, 100))
         val bad = SvgRasterSource(byteArrayOf(1, 2, 3), "image/png", 1, 1)
-        assertNull(SvgRasterResources.decode(sources + bad, 128))
+        assertNull(SvgImageResources.decode(sources + bad, 128))
     }
 
     @Test
@@ -159,7 +159,7 @@ class EpubSvgEmbeddedImagesTest {
                 "data:image/png;base64,!!!",
                 "data:image/png;base64,A===",
                 "data:image/png,percent-encoded",
-                rasterUri(svgImageBytes(), "image/svg+xml"),
+                rasterUri(rasterImageBytes(), "image/svg+xml"),
                 rasterUri(png, "image/jpeg"),
                 rasterUri(huge),
             )
@@ -213,7 +213,8 @@ class EpubSvgEmbeddedImagesTest {
                     Callable {
                         val source = embeddedSvgImageBytes(color)
                         repeat(12) {
-                            val image = checkNotNull(decodeEpubImage(source, 1024, "image/svg+xml"))
+                            val bytes = if (it % 2 == 0) source else nestedSvgImageBytes(color)
+                            val image = checkNotNull(decodeEpubImage(bytes, 1024, "image/svg+xml"))
                             assertEquals(color, image.bitmap.getPixel(32, 8))
                             image.bitmap.recycle()
                             assertNull(
