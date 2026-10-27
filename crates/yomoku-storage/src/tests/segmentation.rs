@@ -210,6 +210,14 @@ fn edits_resolution_and_reversal_preserve_original_analyses_and_every_history_va
     let current = storage.save_segmentation_override(&replacement).unwrap();
     assert_ne!(old, current);
     storage.reverse_segmentation_override(current).unwrap();
+    let effective = storage
+        .load_effective_chapter_segmentation(chapter.chapter_id)
+        .unwrap()
+        .unwrap();
+    assert!(effective
+        .segments
+        .iter()
+        .all(|s| s.metadata.as_ref().unwrap().analysis_id == imported.analysis_id));
     assert!(!storage.segmentation_override(old).unwrap().unwrap().active);
     assert_eq!(
         surfaces(
@@ -279,6 +287,14 @@ fn global_rule_survives_origin_content_deletion_and_reimport_gets_no_local_edits
         .segments
         .iter()
         .all(|s| s.override_id == Some(global_id)));
+    let effective = storage
+        .load_effective_chapter_segmentation(fresh.document.chapter.chapter_id)
+        .unwrap()
+        .unwrap();
+    assert!(effective
+        .segments
+        .iter()
+        .all(|s| s.boundary.override_id == Some(global_id) && s.metadata.is_none()));
     assert!(storage.reverse_segmentation_override(global_id).unwrap());
     assert_eq!(
         surfaces(
@@ -346,6 +362,225 @@ fn corrupt_base_or_rules_fail_read_only_without_repair_or_partial_results() {
         storage.connection.pragma_update(None, "query_only", true).unwrap();
         let bytes = fs::read(database.path()).unwrap();
         assert!(matches!(storage.load_chapter_segmentation(imported.document.chapter.chapter_id), Err(StorageError::InvalidAnalysis)), "{sql}");
+        assert!(matches!(storage.load_effective_chapter_segmentation(imported.document.chapter.chapter_id), Err(StorageError::InvalidAnalysis)), "{sql}");
+        assert_eq!(fs::read(database.path()).unwrap(), bytes);
+    }
+}
+
+#[test]
+fn effective_metadata_reopens_with_exact_provenance_without_changing_reader_or_history() {
+    let database = TestDatabase::new();
+    let mut storage = Storage::open(database.path()).unwrap();
+    let imported = import(&mut storage, "食べた 食べた");
+    let chapter = &imported.document.chapter;
+    let original = storage
+        .chapter_analysis(imported.analysis_id)
+        .unwrap()
+        .unwrap();
+    let before = preserved_rows(&storage);
+    let global = storage
+        .save_segmentation_override(&edit(
+            chapter,
+            0,
+            "食べた",
+            &["食べ", "た"],
+            OverrideScope::AllOccurrences,
+        ))
+        .unwrap();
+    let unresolved = storage
+        .load_effective_chapter_segmentation(chapter.chapter_id)
+        .unwrap()
+        .unwrap();
+    assert!(unresolved.segments.iter().all(|s| s.metadata.is_none()));
+    assert_eq!(preserved_rows(&storage), before);
+
+    let mut a = original.clone();
+    a.mode = SplitMode::A;
+    a.tokens = original
+        .tokens
+        .iter()
+        .flat_map(|token| {
+            let middle = TextOffset::try_from(
+                i64::from(token.anchor.range.start) + i64::try_from("食べ".len()).unwrap(),
+            )
+            .unwrap();
+            let mut first = token.clone();
+            first.anchor.range.end = middle;
+            first.surface = "食べ".into();
+            first.dictionary_form = Some(Surface::new("食べる").unwrap());
+            first.reading = Some("タベ".into());
+            let mut second = token.clone();
+            second.anchor.range.start = middle;
+            second.surface = "た".into();
+            second.dictionary_form = Some(Surface::new("た").unwrap());
+            second.reading = Some("タ".into());
+            [first, second]
+        })
+        .collect();
+    let a_id = storage
+        .store_chapter_analysis(chapter.chapter_id, &a)
+        .unwrap();
+    let mut c = a.clone();
+    c.mode = SplitMode::C;
+    for token in &mut c.tokens {
+        token.reading = Some("Cヨミ".into());
+    }
+    storage
+        .store_chapter_analysis(chapter.chapter_id, &c)
+        .unwrap();
+    // Later profiles and B output cannot replace the pinned import metadata.
+    let mut foreign = a.clone();
+    foreign.profile.dictionary_revision.push_str("-later");
+    for mode in [SplitMode::A, SplitMode::B, SplitMode::C] {
+        foreign.mode = mode;
+        let foreign_id = storage
+            .store_chapter_analysis(chapter.chapter_id, &foreign)
+            .unwrap();
+        // Unrelated versions are not loaded or used to repair missing metadata.
+        storage
+            .connection
+            .execute(
+                "UPDATE analyzed_tokens SET surface = '別' WHERE analysis_id = ?1",
+                [i64::from(foreign_id)],
+            )
+            .unwrap();
+    }
+    let local = storage
+        .save_segmentation_override(&edit(
+            chapter,
+            "食べた ".len(),
+            "食べた",
+            &["食べた"],
+            OverrideScope::ThisOccurrence,
+        ))
+        .unwrap();
+    let before = preserved_rows(&storage);
+    let expected = storage
+        .load_effective_chapter_segmentation(chapter.chapter_id)
+        .unwrap()
+        .unwrap();
+    assert_eq!(expected.original_analysis_id, imported.analysis_id);
+    assert_eq!(expected.segments.len(), 3);
+    for (index, segment) in expected.segments[..2].iter().enumerate() {
+        assert_eq!(segment.boundary.override_id, Some(global));
+        let metadata = segment.metadata.as_ref().unwrap();
+        assert_eq!(
+            (metadata.analysis_id, metadata.token_index, metadata.mode),
+            (a_id, index, SplitMode::A)
+        );
+        assert_eq!(metadata.reading, a.tokens[index].reading);
+        assert_eq!(metadata.dictionary_form, a.tokens[index].dictionary_form);
+    }
+    let last = &expected.segments[2];
+    assert_eq!(last.boundary.override_id, Some(local));
+    assert_eq!(
+        last.metadata.as_ref().unwrap().analysis_id,
+        imported.analysis_id
+    );
+    assert_eq!(last.metadata.as_ref().unwrap().token_index, 1);
+    let page = LogicalPages::new(
+        std::slice::from_ref(chapter),
+        storage.page_length().unwrap(),
+    )
+    .unwrap()
+    .pages()[0];
+    let live = storage
+        .load_reader_tokens(imported.document.document_id, page)
+        .unwrap()
+        .unwrap();
+    assert_eq!(
+        live.tokens
+            .iter()
+            .map(|t| t.surface.as_str())
+            .collect::<Vec<_>>(),
+        ["食べた", "食べた"]
+    );
+    assert_eq!(preserved_rows(&storage), before);
+    drop(storage);
+    let mut storage = Storage::open(database.path()).unwrap();
+    storage
+        .connection
+        .pragma_update(None, "query_only", true)
+        .unwrap();
+    let bytes = fs::read(database.path()).unwrap();
+    assert_eq!(
+        storage
+            .load_effective_chapter_segmentation(chapter.chapter_id)
+            .unwrap()
+            .unwrap(),
+        expected
+    );
+    assert_eq!(fs::read(database.path()).unwrap(), bytes);
+    storage
+        .connection
+        .pragma_update(None, "query_only", false)
+        .unwrap();
+    storage.reverse_segmentation_override(local).unwrap();
+    assert_eq!(
+        storage
+            .load_effective_chapter_segmentation(chapter.chapter_id)
+            .unwrap()
+            .unwrap()
+            .segments
+            .len(),
+        4
+    );
+    storage.reverse_segmentation_override(global).unwrap();
+    let restored = storage
+        .load_effective_chapter_segmentation(chapter.chapter_id)
+        .unwrap()
+        .unwrap();
+    assert!(restored
+        .segments
+        .iter()
+        .all(|s| s.boundary.override_id.is_none()
+            && s.metadata.as_ref().unwrap().analysis_id == imported.analysis_id));
+    assert_eq!(preserved_rows(&storage), before);
+}
+
+#[test]
+fn effective_metadata_missing_b_and_corrupt_matching_snapshots_fail_without_writes() {
+    let database = TestDatabase::new();
+    let mut storage = Storage::open(database.path()).unwrap();
+    let document = storage
+        .create_paste(&PasteText::new("猫犬".into()).unwrap())
+        .unwrap();
+    let mut alternate = fixture(&document.chapter).unwrap();
+    alternate.mode = SplitMode::A;
+    storage
+        .store_chapter_analysis(document.chapter.chapter_id, &alternate)
+        .unwrap();
+    assert_eq!(
+        storage
+            .load_effective_chapter_segmentation(document.chapter.chapter_id)
+            .unwrap(),
+        None
+    );
+    assert!(matches!(
+        storage.load_effective_chapter_segmentation(i64::MAX.try_into().unwrap()),
+        Err(StorageError::InvalidAnalysis)
+    ));
+
+    for sql in [
+        "UPDATE analyzed_tokens SET reading = ' ' WHERE analysis_id = ?1",
+        "UPDATE analyzed_tokens SET surface = '別' WHERE analysis_id = ?1",
+        "PRAGMA ignore_check_constraints = ON; UPDATE chapter_analyses SET semantics_version = 2 WHERE id = ?1",
+    ] {
+        let database = TestDatabase::new();
+        let mut storage = Storage::open(database.path()).unwrap();
+        let imported = import(&mut storage, "猫犬");
+        let mut alternate = fixture(&imported.document.chapter).unwrap();
+        alternate.mode = SplitMode::A;
+        let alternate_id = storage.store_chapter_analysis(imported.document.chapter.chapter_id, &alternate).unwrap();
+        if sql.starts_with("PRAGMA") {
+            storage.connection.pragma_update(None, "ignore_check_constraints", true).unwrap();
+            storage.connection.execute("UPDATE chapter_analyses SET semantics_version = 2 WHERE id = ?1", [i64::from(alternate_id)]).unwrap();
+        } else {
+            storage.connection.execute(sql, [i64::from(alternate_id)]).unwrap();
+        }
+        storage.connection.pragma_update(None, "query_only", true).unwrap();
+        let bytes = fs::read(database.path()).unwrap();
+        assert!(matches!(storage.load_effective_chapter_segmentation(imported.document.chapter.chapter_id), Err(StorageError::InvalidAnalysis)), "{sql}");
         assert_eq!(fs::read(database.path()).unwrap(), bytes);
     }
 }

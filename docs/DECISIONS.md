@@ -2838,3 +2838,27 @@ does not yet change reader tokens, custom dictionary gating, furigana, vocabular
 registration or completion behavior. Effective selection/metadata/registration and
 frozen completion identities must be integrated together before exposing controls;
 past completed-reading occurrences must remain unchanged.
+
+## 2026-10-27 — Effective segmentation metadata provenance
+
+Add a separate effective chapter value and read-only repository API before changing
+live reader/completion behavior. Each effective boundary optionally carries exact
+analyzer metadata with its AnalysisId, split mode and whole-chapter token index.
+Readings, dictionary forms and Japanese classification come only from a validated
+token with exactly the same canonical source span; never concatenate neighboring
+readings or copy a neighboring lemma. Missing metadata means unresolved, including
+classification; it is distinct from a token classified as non-Japanese or a known
+analyzer token with absent reading/lemma. Manual conjugation merges remain valid
+boundaries even when no snapshot supplies metadata.
+
+Routine deterministic preference is original B, then same-profile A, then C. This
+preserves original metadata for unchanged spans and favors fine-grained A output
+when both alternates match a changed span. Match by exact occurrence anchor rather
+than surface alone so repeated spellings keep contextual readings. Validate entire
+supplied snapshots, unique IDs/modes and original-profile ownership before returning
+any result. Storage loads only existing A/C snapshots from the pinned original
+engine/dictionary profile in the same transaction as original B and active rules.
+Later profiles are not metadata fallbacks; missing B stays missing. No analyzer,
+registration, history, bridge, schema or dependency changes are needed for this
+prerequisite. Live effective eligibility/selection/registration and frozen future
+completion identities remain the next integration step.

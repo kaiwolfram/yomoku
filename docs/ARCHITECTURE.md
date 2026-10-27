@@ -834,11 +834,18 @@ rules take precedence, then newer IDs within each scope. Resolution preserves
 original token indices only for exact unchanged spans and never invents analyzer
 metadata. `Storage::load_chapter_segmentation` reads original B and the active rules
 in one read transaction, validates retained provenance and returns a separate typed
-result without SQL in core or an analyzer dependency in storage. Domain/storage
-fixtures plus real Full owned/mapped fixtures cover scope, reversibility and
-unchanged snapshots/history. Current reader token/word/furigana/completion paths
-continue using original B; effective vocabulary/completion projection and
-core/FIFO/FFI/Android controls remain the next slice.
+result without SQL in core or an analyzer dependency in storage.
+`resolve_effective_segmentation` and `load_effective_chapter_segmentation` additionally
+attach exact-span analyzer metadata from original B, then same-profile A, then C.
+Metadata retains AnalysisId/mode/token index and original classification/reading/
+dictionary form. Arbitrary manual spans remain explicitly unresolved when no exact
+token exists; metadata is never guessed from neighboring tokens or another spelling
+occurrence. The repository validates complete eligible snapshots in the same
+read-only transaction as rules; later profiles are excluded. Domain/storage fixtures
+plus real Full owned/mapped fixtures cover scope, metadata provenance, reversibility
+and unchanged snapshots/history. Current reader token/word/furigana/completion paths
+continue using original B; effective eligibility/vocabulary/completion projection
+and core/FIFO/FFI/Android controls remain the next slice.
 
 `Storage::create_analyzed_paste` composes the existing private transaction helpers
 for document creation, validated Mode B analysis and exact-surface registration.

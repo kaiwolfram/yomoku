@@ -172,6 +172,44 @@ fn real_segmentation_choices_resolve_scopes_merges_and_reversal_without_replacin
             .load_chapter_segmentation(chapter.chapter_id)
             .unwrap()
             .unwrap();
+        let effective = storage
+            .load_effective_chapter_segmentation(chapter.chapter_id)
+            .unwrap()
+            .unwrap();
+        assert_eq!(effective.original_analysis_id, imported.analysis_id);
+        assert_eq!(effective.profile, original.profile);
+        assert_eq!(
+            effective
+                .segments
+                .iter()
+                .map(|s| &s.boundary)
+                .collect::<Vec<_>>(),
+            resolved.segments.iter().collect::<Vec<_>>()
+        );
+        // Every analyzer-backed effective segment retains the exact source
+        // token, including repeated occurrences, OOV and non-Japanese tokens.
+        for segment in &effective.segments {
+            let metadata = segment.metadata.as_ref().unwrap();
+            let snapshot = if metadata.analysis_id == imported.analysis_id {
+                &original
+            } else {
+                &saved
+                    .iter()
+                    .find(|(id, _)| *id == metadata.analysis_id)
+                    .unwrap()
+                    .1
+            };
+            let token = &snapshot.tokens[metadata.token_index];
+            assert_eq!(token.anchor, segment.boundary.anchor);
+            assert_eq!(token.surface, segment.boundary.surface);
+            assert_eq!(token.reading, metadata.reading);
+            assert_eq!(token.dictionary_form, metadata.dictionary_form);
+            assert_eq!(token.is_japanese, metadata.is_japanese);
+            assert_eq!(snapshot.mode, metadata.mode);
+            if segment.boundary.original_token_index.is_some() {
+                assert_eq!(metadata.analysis_id, imported.analysis_id);
+            }
+        }
         assert_eq!(resolved.original_analysis_id, imported.analysis_id);
         let changed = resolved
             .segments
@@ -240,6 +278,16 @@ fn real_segmentation_choices_resolve_scopes_merges_and_reversal_without_replacin
     assert!(expected.segments.iter().any(|s| s.surface == "食べた"
         && s.override_id == Some(global_id)
         && s.original_token_index.is_none()));
+    let expected_effective = storage
+        .load_effective_chapter_segmentation(chapter.chapter_id)
+        .unwrap()
+        .unwrap();
+    assert!(expected_effective
+        .segments
+        .iter()
+        .any(|s| s.boundary.surface == "食べた"
+            && s.boundary.override_id == Some(global_id)
+            && s.metadata.is_none()));
     drop(storage);
     let mut reopened = Storage::open(&path).unwrap();
     assert_eq!(
@@ -248,6 +296,13 @@ fn real_segmentation_choices_resolve_scopes_merges_and_reversal_without_replacin
             .unwrap()
             .unwrap(),
         expected
+    );
+    assert_eq!(
+        reopened
+            .load_effective_chapter_segmentation(chapter.chapter_id)
+            .unwrap()
+            .unwrap(),
+        expected_effective
     );
     for (id, snapshot) in saved {
         assert_eq!(reopened.chapter_analysis(id).unwrap().unwrap(), snapshot);

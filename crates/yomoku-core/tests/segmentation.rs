@@ -4,7 +4,9 @@ use yomoku_core::{
         SplitMode, StoredOverride,
     },
     document::{ChapterText, TextAnchor, TextOffset, TextRange},
-    segmentation::{resolve_segmentation, segmentation_from_snapshot},
+    segmentation::{
+        resolve_effective_segmentation, resolve_segmentation, segmentation_from_snapshot,
+    },
     vocabulary::Surface,
 };
 
@@ -74,6 +76,195 @@ fn rule(
                 .collect(),
         },
     }
+}
+
+#[test]
+fn effective_metadata_prefers_exact_b_then_a_then_c_with_full_provenance() {
+    let chapter = chapter("国家公務員。国家公務員");
+    let original = analysis(
+        &chapter,
+        &[
+            ("国家", true),
+            ("公務員", true),
+            ("。", false),
+            ("国家", true),
+            ("公務員", true),
+        ],
+    );
+    let mut a = analysis(
+        &chapter,
+        &[
+            ("国家", true),
+            ("公務", true),
+            ("員", true),
+            ("。", false),
+            ("国家", true),
+            ("公務", true),
+            ("員", true),
+        ],
+    );
+    a.mode = SplitMode::A;
+    a.tokens[0].reading = Some("Aを優先しない".into());
+    a.tokens[1].reading = Some("コウム".into());
+    a.tokens[5].reading = Some("ベツヨミ".into());
+    let mut c = a.clone();
+    c.mode = SplitMode::C;
+    c.tokens[1].reading = Some("Cを優先しない".into());
+    let rules = [rule(
+        &chapter,
+        1,
+        0,
+        "国家公務員",
+        &["国家", "公務", "員"],
+        OverrideScope::AllOccurrences,
+    )];
+    let original_id = 10.try_into().unwrap();
+    let mut alternates = vec![
+        (12.try_into().unwrap(), c),
+        (11.try_into().unwrap(), a.clone()),
+    ];
+    let result =
+        resolve_effective_segmentation(&chapter, original_id, &original, &alternates, &rules)
+            .unwrap();
+    assert_eq!(result.original_analysis_id, original_id);
+    assert_eq!(result.profile, original.profile);
+    let unchanged = result.segments[0].metadata.as_ref().unwrap();
+    assert_eq!(
+        (unchanged.analysis_id, unchanged.token_index, unchanged.mode),
+        (original_id, 0, SplitMode::B)
+    );
+    assert_eq!(unchanged.reading, original.tokens[0].reading);
+    let split = result.segments[1].metadata.as_ref().unwrap();
+    assert_eq!(
+        (split.analysis_id, split.token_index, split.mode),
+        (11.try_into().unwrap(), 1, SplitMode::A)
+    );
+    assert_eq!(split.reading.as_deref(), Some("コウム"));
+    assert_eq!(split.dictionary_form, a.tokens[1].dictionary_form);
+    assert!(split.is_japanese);
+    assert_eq!(
+        result.segments[5]
+            .metadata
+            .as_ref()
+            .unwrap()
+            .reading
+            .as_deref(),
+        Some("ベツヨミ")
+    );
+    assert!(!result.segments[3].metadata.as_ref().unwrap().is_japanese);
+    alternates.reverse();
+    assert_eq!(
+        resolve_effective_segmentation(&chapter, original_id, &original, &alternates, &rules)
+            .unwrap(),
+        result
+    );
+}
+
+#[test]
+fn effective_manual_boundaries_do_not_invent_or_borrow_neighboring_metadata() {
+    let chapter = chapter("食べた 食べた 𠮷か\u{3099}\0");
+    let original = analysis(
+        &chapter,
+        &[
+            ("食べ", true),
+            ("た", true),
+            ("食べ", true),
+            ("た", true),
+            ("𠮷か\u{3099}\0", true),
+        ],
+    );
+    let rules = [
+        rule(
+            &chapter,
+            1,
+            0,
+            "食べた",
+            &["食べた"],
+            OverrideScope::AllOccurrences,
+        ),
+        rule(
+            &chapter,
+            2,
+            chapter.text.find('𠮷').unwrap(),
+            "𠮷か\u{3099}\0",
+            &["𠮷", "か\u{3099}\0"],
+            OverrideScope::ThisOccurrence,
+        ),
+    ];
+    let before = original.clone();
+    let result =
+        resolve_effective_segmentation(&chapter, 1.try_into().unwrap(), &original, &[], &rules)
+            .unwrap();
+    assert!(result.segments.iter().all(|s| s.metadata.is_none()));
+    for segment in &result.segments {
+        assert_eq!(
+            segment.boundary.anchor.slice(&chapter).unwrap(),
+            segment.boundary.surface
+        );
+    }
+    // A complete C token supplies its own metadata, never a copied B lemma.
+    let mut c = analysis(
+        &chapter,
+        &[("食べた", true), ("食べた", true), ("𠮷か\u{3099}\0", true)],
+    );
+    c.mode = SplitMode::C;
+    c.tokens[0].reading = None;
+    c.tokens[0].dictionary_form = None;
+    let resolved = resolve_effective_segmentation(
+        &chapter,
+        1.try_into().unwrap(),
+        &original,
+        &[(2.try_into().unwrap(), c)],
+        &rules,
+    )
+    .unwrap();
+    let metadata = resolved.segments[0].metadata.as_ref().unwrap();
+    assert_eq!(metadata.mode, SplitMode::C);
+    assert_eq!(metadata.reading, None);
+    assert_eq!(metadata.dictionary_form, None);
+    assert!(resolved.segments[2].metadata.is_none());
+    assert_eq!(original, before);
+}
+
+#[test]
+fn effective_metadata_requires_unique_same_profile_modes_ids_and_valid_whole_snapshots() {
+    let chapter = chapter("猫犬。");
+    let original = analysis(&chapter, &[("猫犬", true), ("。", false)]);
+    let mut a = analysis(&chapter, &[("猫", true), ("犬", true), ("。", false)]);
+    a.mode = SplitMode::A;
+    let original_id = 1.try_into().unwrap();
+    let alternate_id = 2.try_into().unwrap();
+    let invalid = |alternates: Vec<(yomoku_core::document::AnalysisId, ChapterAnalysis)>| {
+        assert!(
+            resolve_effective_segmentation(&chapter, original_id, &original, &alternates, &[])
+                .is_err()
+        );
+    };
+    invalid(vec![(original_id, a.clone())]);
+    invalid(vec![(alternate_id, original.clone())]);
+    invalid(vec![
+        (alternate_id, a.clone()),
+        (3.try_into().unwrap(), a.clone()),
+    ]);
+    let mut c = a.clone();
+    c.mode = SplitMode::C;
+    invalid(vec![(alternate_id, a.clone()), (alternate_id, c)]);
+    for dictionary in [false, true] {
+        let mut foreign = a.clone();
+        if dictionary {
+            foreign.profile.dictionary_revision.push('2');
+        } else {
+            foreign.profile.engine_revision.push('2');
+        }
+        invalid(vec![(alternate_id, foreign)]);
+    }
+    // Invalid data outside any edited span still fails, even with no rules.
+    let mut corrupt = a.clone();
+    corrupt.tokens.last_mut().unwrap().surface = "！".into();
+    invalid(vec![(alternate_id, corrupt)]);
+    let mut foreign = a;
+    foreign.tokens[0].anchor.chapter_id = 999.try_into().unwrap();
+    invalid(vec![(alternate_id, foreign)]);
 }
 
 #[test]

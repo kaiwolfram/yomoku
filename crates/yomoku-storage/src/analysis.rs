@@ -8,7 +8,10 @@ use yomoku_core::{
         AnalysisId, ChapterId, ChapterText, OverrideId, SourceId, TextAnchor, TextOffset, TextRange,
     },
     reader::ReaderAnalysis,
-    segmentation::{resolve_segmentation, ChapterSegmentation},
+    segmentation::{
+        resolve_effective_segmentation, resolve_segmentation, ChapterSegmentation,
+        EffectiveChapterSegmentation,
+    },
     vocabulary::Surface,
 };
 
@@ -61,23 +64,7 @@ impl Storage {
             return Ok(None);
         };
         let original = read_analysis(&transaction, id)?.ok_or(StorageError::InvalidAnalysis)?;
-        let mut statement = transaction.prepare(
-            "SELECT id FROM segmentation_overrides WHERE active = 1
-             AND (scope = 'all' OR (source_id = ?1 AND chapter_id = ?2)) ORDER BY id",
-        )?;
-        let ids = statement
-            .query_map(
-                (i64::from(chapter.source_id), i64::from(chapter_id)),
-                |row| row.get::<_, i64>(0),
-            )?
-            .collect::<Result<Vec<_>, _>>()?;
-        drop(statement);
-        let rules = ids
-            .into_iter()
-            .map(|id| {
-                read_override(&transaction, override_id(id)?)?.ok_or(StorageError::InvalidAnalysis)
-            })
-            .collect::<Result<Vec<_>, _>>()?;
+        let rules = read_active_rules(&transaction, &chapter)?;
         let segments = resolve_segmentation(&chapter, &original, &rules)
             .map_err(|_| StorageError::InvalidAnalysis)?;
         transaction.commit()?;
@@ -85,6 +72,55 @@ impl Storage {
             original_analysis_id: id,
             segments,
         }))
+    }
+
+    /// Read effective boundaries and exact-span analyzer metadata in one
+    /// transaction. Only stored A/C snapshots with the pinned original profile
+    /// are eligible. Missing metadata remains explicit: no analyzer is loaded
+    /// and no vocabulary, reading history or reader state is changed.
+    pub fn load_effective_chapter_segmentation(
+        &mut self,
+        chapter_id: ChapterId,
+    ) -> Result<Option<EffectiveChapterSegmentation>, StorageError> {
+        let transaction = self.connection.transaction()?;
+        let chapter = read_chapter(&transaction, chapter_id)?;
+        let ReaderAnalysis::Available(id) = read_reader_analysis(&transaction, chapter_id)? else {
+            transaction.commit()?;
+            return Ok(None);
+        };
+        let original = read_analysis(&transaction, id)?.ok_or(StorageError::InvalidAnalysis)?;
+        let mut statement = transaction.prepare(
+            "SELECT id FROM chapter_analyses WHERE chapter_id = ?1
+             AND engine_revision = ?2 AND dictionary_revision = ?3
+             AND split_mode IN ('a', 'c') ORDER BY id",
+        )?;
+        let ids = statement
+            .query_map(
+                (
+                    i64::from(chapter_id),
+                    &original.profile.engine_revision,
+                    &original.profile.dictionary_revision,
+                ),
+                |row| row.get::<_, i64>(0),
+            )?
+            .collect::<Result<Vec<_>, _>>()?;
+        drop(statement);
+        let alternates = ids
+            .into_iter()
+            .map(|id| {
+                let id = analysis_id(id)?;
+                Ok((
+                    id,
+                    read_analysis(&transaction, id)?.ok_or(StorageError::InvalidAnalysis)?,
+                ))
+            })
+            .collect::<Result<Vec<_>, StorageError>>()?;
+        let rules = read_active_rules(&transaction, &chapter)?;
+        let effective =
+            resolve_effective_segmentation(&chapter, id, &original, &alternates, &rules)
+                .map_err(|_| StorageError::InvalidAnalysis)?;
+        transaction.commit()?;
+        Ok(Some(effective))
     }
 
     /// Persist a validated immutable base snapshot. Identical retries reuse its ID;
@@ -206,6 +242,25 @@ impl Storage {
         transaction.commit()?;
         Ok(true)
     }
+}
+
+fn read_active_rules(
+    connection: &Connection,
+    chapter: &ChapterText,
+) -> Result<Vec<StoredOverride>, StorageError> {
+    let mut statement = connection.prepare(
+        "SELECT id FROM segmentation_overrides WHERE active = 1
+         AND (scope = 'all' OR (source_id = ?1 AND chapter_id = ?2)) ORDER BY id",
+    )?;
+    let ids = statement
+        .query_map(
+            (i64::from(chapter.source_id), i64::from(chapter.chapter_id)),
+            |row| row.get::<_, i64>(0),
+        )?
+        .collect::<Result<Vec<_>, _>>()?;
+    ids.into_iter()
+        .map(|id| read_override(connection, override_id(id)?)?.ok_or(StorageError::InvalidAnalysis))
+        .collect()
 }
 
 fn read_chapter(connection: &Connection, id: ChapterId) -> Result<ChapterText, StorageError> {

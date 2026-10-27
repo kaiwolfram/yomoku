@@ -534,8 +534,23 @@ retains the pinned original AnalysisId. `Storage::load_chapter_segmentation` rea
 the original B plus active global/relevant local rules in one deferred transaction;
 missing B returns None, invalid canonical content/rules fail without repair.
 Origin-deleted globals still resolve from retained provenance and exact parts.
+
+`EffectiveChapterSegmentation` additionally retains the original profile and wraps
+each boundary with optional `SegmentMetadata`: source AnalysisId, A/B/C mode,
+whole-chapter token index, Japanese classification, reading and dictionary form.
+The pure resolver matches exact source spans, preferring original B, then A, then
+C; input order does not affect the result. Repeated spellings retain their own
+occurrence's metadata. A known token with no reading/lemma is distinct from an
+unresolved manual boundary, which has no metadata (including classification).
+Never infer metadata by joining or truncating adjacent analyzer tokens.
+`load_effective_chapter_segmentation` reads original B, stored A/C with exactly the
+same engine/dictionary profile and active rules in one deferred transaction. Entire
+eligible snapshots are validated; corrupt matching output fails without partial
+results/repair. Missing B stays missing; later profiles are excluded. This adds no
+table or migration and creates no alternate snapshots automatically.
+
 These are separate domain/repository APIs: current reader token/word/furigana and
-completion APIs still use original B. Effective vocabulary/metadata/completion
+completion APIs still use original B. Effective eligibility/vocabulary/completion
 projection, core/FIFO/FFI commands and segmentation UI remain unimplemented. No
 resolution API registers vocabulary, resets position or rewrites historical data.
 

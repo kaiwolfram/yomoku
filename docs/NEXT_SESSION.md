@@ -1,5 +1,5 @@
 # Resume here
-Updated: 2026-10-27. Effective segmentation boundaries verified; reader integration next.
+Updated: 2026-10-27. Effective segmentation metadata verified; reader integration next.
 ## Working
 - Pure Crux routes/Library/Settings; Render-only UI; FIFO SQLite/analysis; Library start.
 - Chapter-local UTF-8 position/whole-book percentage/five presets persist; reflow
@@ -63,18 +63,18 @@ Updated: 2026-10-27. Effective segmentation boundaries verified; reader integrat
 - Furigana: persisted switch/retries; keyed source-first/original-B fallback, status
   independent. Half-size readings above canonical Text; strict UTF-16, complete
   readings across page/layout splits, fitted base width and measured headroom.
-- Pure effective segmentation + read-only load_chapter_segmentation: original B,
-  A/B/C same-profile partitions/manual edits, exact contiguous Japanese B matches;
-  local then newer-ID precedence, reversible overlaps; no reader/history changes.
+- Effective segmentation: original B, A/B/C/manual partitions, contiguous JP B
+  matches, local/newer-ID precedence/reversal; read-only, no reader/history changes.
+- Effective metadata: exact B/A/C profile/span provenance; unmatched spans unresolved.
 ## Next tasks (ordered)
-1. Integrate effective token/word/metadata/registration and frozen future-completion
-   identities; preserve original snapshots/past history. Reader still uses B today.
+1. Integrate effective eligibility/token/word/registration and frozen future-completion
+   identities; retain original snapshots/past history. Reader still uses B today.
 2. Wire override reads/choices/save/reverse through core/FIFO/FFI, then Android
    A/B/C/manual controls with default All occurrences versus This occurrence.
 Physical arm64 deferred; Nostr empty; Q188 unresolved before forwarding.
 ## Verification
-- PASS: 483 Rust tests (17 ignored), Clippy/format/diff, Full host Kotlin/JNI and
+- PASS: 488 Rust tests (17 ignored), Clippy/format/diff, host Kotlin/JNI and
   repeat codegen; 15 Full + one runtime pass EACH owned/mapped. DEVELOPMENT.md end.
-- Corrected test-only missing table/clone assertion; no blocker. No dependencies,
-  schema, bridge or Android changes. APK/device/lint/release/process-death/physical
-  arm64 not rerun; prior phone/tablet editor reports remain .local/test-reports/.
+- Initial runtime teardown assertion failed once; isolated/full reruns pass. Commands
+  and details: DEVELOPMENT.md end. No dependency/schema/bridge/Android changes;
+  APK/device/lint/release/process-death/physical arm64 not rerun. No open blocker.

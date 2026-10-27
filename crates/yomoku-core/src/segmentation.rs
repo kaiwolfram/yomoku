@@ -7,8 +7,8 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use crate::{
     analysis::{
-        ChapterAnalysis, InvalidAnalysis, OverrideScope, SegmentationOverride, SplitMode,
-        StoredOverride,
+        AnalysisProfile, ChapterAnalysis, InvalidAnalysis, OverrideScope, SegmentationOverride,
+        SplitMode, StoredOverride,
     },
     document::{AnalysisId, ChapterText, OverrideId, TextAnchor, TextOffset, TextRange},
     vocabulary::Surface,
@@ -28,6 +28,100 @@ pub struct ResolvedSegment {
 pub struct ChapterSegmentation {
     pub original_analysis_id: AnalysisId,
     pub segments: Vec<ResolvedSegment>,
+}
+
+/// Analyzer metadata exists only for an exact span in a validated snapshot.
+/// Its source is retained independently of the rule that selected the boundary.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SegmentMetadata {
+    pub analysis_id: AnalysisId,
+    pub mode: SplitMode,
+    pub token_index: usize,
+    pub is_japanese: bool,
+    pub reading: Option<String>,
+    pub dictionary_form: Option<Surface>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct EffectiveSegment {
+    pub boundary: ResolvedSegment,
+    /// None means unresolved, including classification. It does not mean
+    /// non-Japanese, and never licenses guessing a reading or dictionary form.
+    pub metadata: Option<SegmentMetadata>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct EffectiveChapterSegmentation {
+    pub original_analysis_id: AnalysisId,
+    pub profile: AnalysisProfile,
+    pub segments: Vec<EffectiveSegment>,
+}
+
+/// Resolve boundaries and attach exact-span metadata, without creating analyzer
+/// output. Prefer original B, then A, then C, independently of input order.
+/// Alternates must be unique A/C snapshots from the original chapter/profile.
+/// Arbitrary manual partitions can remain unresolved; neighboring metadata is
+/// never concatenated or copied to a differently sized span.
+pub fn resolve_effective_segmentation(
+    chapter: &ChapterText,
+    original_id: AnalysisId,
+    original: &ChapterAnalysis,
+    alternates: &[(AnalysisId, ChapterAnalysis)],
+    rules: &[StoredOverride],
+) -> Result<EffectiveChapterSegmentation, InvalidAnalysis> {
+    let boundaries = resolve_segmentation(chapter, original, rules)?;
+    let mut ids = BTreeSet::from([original_id]);
+    let mut modes = BTreeSet::new();
+    for (id, snapshot) in alternates {
+        snapshot.validate(chapter)?;
+        if snapshot.profile != original.profile
+            || snapshot.mode == SplitMode::B
+            || !ids.insert(*id)
+            || !modes.insert(match snapshot.mode {
+                SplitMode::A => 0,
+                SplitMode::C => 1,
+                SplitMode::B => return Err(InvalidAnalysis),
+            })
+        {
+            return Err(InvalidAnalysis);
+        }
+    }
+    let mut metadata = BTreeMap::new();
+    for (id, snapshot) in std::iter::once((original_id, original)).chain(
+        [SplitMode::A, SplitMode::C].into_iter().flat_map(|mode| {
+            alternates
+                .iter()
+                .filter(move |(_, snapshot)| snapshot.mode == mode)
+                .map(|(id, snapshot)| (*id, snapshot))
+        }),
+    ) {
+        for (index, token) in snapshot.tokens.iter().enumerate() {
+            metadata
+                .entry((token.anchor.range.start, token.anchor.range.end))
+                .or_insert((id, snapshot.mode, index, token));
+        }
+    }
+    let segments = boundaries
+        .into_iter()
+        .map(|boundary| {
+            let metadata = metadata
+                .get(&(boundary.anchor.range.start, boundary.anchor.range.end))
+                .map(|(id, mode, index, token)| SegmentMetadata {
+                    analysis_id: *id,
+                    mode: *mode,
+                    token_index: *index,
+                    is_japanese: token.is_japanese,
+                    reading: token.reading.clone(),
+                    dictionary_form: token.dictionary_form.clone(),
+                });
+            EffectiveSegment { boundary, metadata }
+        })
+        .collect();
+    Ok(EffectiveChapterSegmentation {
+        original_analysis_id: original_id,
+        profile: original.profile.clone(),
+        segments,
+    })
 }
 
 /// Build a boundary edit from A/B/C tokens in a validated, same-profile snapshot.

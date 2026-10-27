@@ -4066,3 +4066,60 @@ APK/device/Android lint, release, performance, process-death and physical arm64
 were not rerun for this domain/storage slice. The existing AVD was not changed.
 Next: effective token/word/metadata/registration and frozen future-completion
 identities, then typed commands and Android controls. Prior occurrences stay immutable.
+
+## Effective segmentation metadata provenance
+
+2026-10-27, from the repository root with the pinned Rust/JDK environment:
+
+```sh
+export PATH=/home/kai/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin:$PATH
+export JAVA_HOME=/home/kai/repos/yomoku/.local/jdk-17/jdk-17.0.21+9
+cargo test -p yomoku-core --test segmentation --all-features --locked --offline
+cargo test -p yomoku-storage segmentation --all-features --locked --offline
+cargo test --workspace --all-features --locked --offline --quiet
+tools/test-sudachi.sh
+cargo clippy --workspace --all-targets --all-features --locked --offline -- -D warnings
+cargo fmt --all -- --check
+tools/test-kotlin-bridge.sh
+cargo run -p yomoku-ffi --bin generate-kotlin --features facet_typegen --locked --offline -- target/generated/kotlin-repeat
+# Compare after generation exits.
+diff -r target/generated/kotlin target/generated/kotlin-repeat
+tools/format-kotlin.sh --check
+git diff --check
+```
+
+Pure effective segmentation now attaches optional exact-span analyzer metadata,
+retaining source AnalysisId/mode/token index. Original B wins, then same-profile A,
+then C, independently of input order. Arbitrary manual spans remain unresolved,
+including classification; absent metadata differs from known tokens with absent
+reading/lemma. No neighboring reading/lemma concatenation or surface-only reuse.
+The new read-only repository transaction loads original B, existing same-profile
+A/C and active rules together. Later profiles are excluded; no analyzer is loaded.
+Live reader/word/furigana/completion behavior remains original B for this prerequisite.
+
+PASS: five new data-free cases, 488 workspace Rust tests (17 opt-in ignored),
+strict Clippy/Rustfmt/Kotlin formatting/diff and byte-identical repeat generation.
+All fifteen Full analysis fixtures plus one runtime fixture pass for EACH owned/
+mapped loader (32 invocations), including new exact metadata/provenance assertions
+in the real segmentation fixture and unresolved conjugation merges/reopen.
+Synthetic cases cover exact repeated contextual readings, B/A/C precedence,
+Unicode/NUL/combining boundaries, duplicate/foreign IDs/modes/profiles, whole-chapter
+corruption, missing B, irrelevant later-profile corruption, global rules after
+origin deletion, reversal, SQLite reopen/query-only byte preservation and unchanged
+original tokens/vocabulary/status/completion/history/progress/settings/time rows.
+
+Initial focused compilation needed an explicit Vec type on a new test closure.
+The first workspace run failed the existing runtime import test's immediate
+`set_foreground(false).is_err()` teardown assertion after dropping its router.
+The isolated test and subsequent complete workspace run pass; no runtime production
+or fixture change was made. Host logs: /tmp/yomoku-effective-metadata-tests.log and
+/tmp/yomoku-effective-metadata-bridge.log. No dependency/version, schema, public
+bridge or Android changes. APK/device/lint, release, performance, process-death and
+physical arm64 checks were not rerun; the existing AVD was not touched.
+Next: effective eligibility/token/word/registration plus frozen future completions,
+then core/FIFO/FFI controls and Android choices. Past occurrences remain immutable.
+
+Final host PASS: real-Full Kotlin/JNI Unicode/codecs, selected-word/custom-entry,
+imports/direct cancellation, reader/navigation and handle-lifecycle checks. Repeat
+Kotlin generation is byte-identical. Known Crux middleware teardown messages stay
+informational. No escalation/network download or unresolved blocker for this slice.

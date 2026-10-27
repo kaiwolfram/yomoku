@@ -2166,3 +2166,25 @@
 - Next effective token/word/metadata/registration and frozen future-completion
   identities, then core/FIFO/FFI/Android choices and controls. Keep past occurrences
   unchanged and All occurrences as the default scope.
+
+## 2026-10-27 — Effective segmentation metadata provenance
+
+- Added pure effective chapter/segment metadata and a read-only SQLite loader.
+  Exact source spans prefer original B, then same-profile A/C, preserving each
+  occurrence's AnalysisId/mode/token index, classification, reading and lemma.
+  Arbitrary manual spans remain explicitly unresolved; no metadata is guessed.
+- Five new data-free cases plus extended real Full owned/mapped coverage verify
+  contextual repeated readings, profile/ID/mode validation, corrupt/missing data,
+  irrelevant later profiles, global/local reversal, reopen, query-only bytes and
+  unchanged original reader tokens and historical rows. No schema/dependency,
+  public bridge, analyzer/registration or live completion changes.
+- PASS: 488 workspace tests (17 ignored), strict Clippy/Rustfmt/Kotlin formatting/
+  diff, 15 Full analysis + one runtime fixture for each owned/mapped loader,
+  real-Full host Kotlin/JNI and byte-identical repeat Kotlin generation.
+  Fixed a test closure's inferred unsized argument. An existing runtime teardown
+  assertion failed once; isolated and full reruns pass without runtime changes.
+- Updated plan, architecture/data model, decisions and 80-line handoff. Full
+  commands/results/log paths: DEVELOPMENT.md end. No unresolved blocker; Android
+  APK/device/lint, release, process-death and physical arm64 were not rerun; AVD
+  untouched. Next: effective eligibility/token/word/registration plus frozen future
+  completions, then typed core/FIFO/FFI and Android segmentation controls.
