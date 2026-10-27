@@ -484,23 +484,7 @@ fn read_content(
         spans: Vec::new(),
         images: Vec::new(),
     };
-    let mut statement = connection.prepare("SELECT ruby_index, start_byte, end_byte, reading FROM source_ruby WHERE chapter_id = ?1 ORDER BY ruby_index")?;
-    let rows = statement.query_map([id], |row| {
-        Ok((
-            row.get::<_, i64>(0)?,
-            row.get::<_, i64>(1)?,
-            row.get::<_, i64>(2)?,
-            row.get::<_, String>(3)?,
-        ))
-    })?;
-    for (index, row) in rows.enumerate() {
-        let (stored_index, start, end, reading) = row?;
-        check_index(index, stored_index)?;
-        content.ruby.push(SourceRuby {
-            range: range(start, end)?,
-            reading,
-        });
-    }
+    content.ruby = crate::txt::load_source_ruby_in(connection, chapter_id, &content.text)?;
     let mut statement = connection.prepare("SELECT span_index, start_byte, end_byte, kind, heading_level, target FROM epub_spans WHERE chapter_id = ?1 ORDER BY span_index")?;
     let rows = statement.query_map([id], |row| {
         Ok((

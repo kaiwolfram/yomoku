@@ -1991,3 +1991,21 @@
 - Updated README/architecture/data/decisions/plan/handoff. Restored emulator to
   phone/light/free rotation. No blocker; release/process-death/physical arm64
   not rerun. Next: default-off source/analyzer furigana; CI remains independent.
+
+
+## 2026-10-27 — Source ruby reader transport and clipping
+- Started clean. Added pure owned/keyed ReaderChapterRuby and clipped page-local
+  ReaderRuby through reader snapshots/FIFO/generated JNI. TXT source/EPUB content/
+  TXT reader loads share read-only ordered-index/range/reading validation.
+- Preserve complete source readings across logical-page boundaries, canonical
+  text/exact offsets and all vocabulary/analysis/history behavior. No schema,
+  parser, dependency or visible reader changes.
+- PASS: six new Rust cases; 446 workspace tests (16 opt-in ignored), strict
+  Clippy/fmt, real-Full Kotlin/JNI/Unicode round trips/repeatable codegen,
+  both-ABI APKs/lint/Kotlin formatting and nine API-36 phone cases.
+- Fixed two missing imports in new Android assertions; Gradle required approved
+  outside-sandbox local sockets. Reports/commands: DEVELOPMENT.md end and
+  .local/test-reports/reader-ruby/. Existing phone/light AVD remains running.
+- Updated README/architecture/data/decisions/plan/handoff. No blocker. Furigana
+  switch/persistence, analyzer fallback and visible layout/taps/themes remain
+  unchecked. Release/process-death/physical-arm64 not rerun; arm64 deferred.

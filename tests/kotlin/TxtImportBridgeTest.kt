@@ -68,9 +68,14 @@ internal fun verifyTxtImportBridge() {
             val id = imported.documents.single().documentId
             val loaded = checkNotNull(listener.dispatch(bridge, Event.LoadPaste(id)).loadedDocument)
             check(loaded.chapters.single().text == canonical)
+            val ruby = loaded.sourceRuby.single()
+            check(ruby.chapterId == loaded.chapters.single().chapterId)
+            check(ruby.ruby.single().reading == "ねこ")
+            check(ruby.ruby.single().range == TextRange(TextOffset(0L), TextOffset(3L)))
             val opened = listener.dispatch(bridge, Event.OpenReader(id))
             val analysis = checkNotNull(opened.readerAnalysis) as ReaderAnalysis.Available
             val page = checkNotNull(opened.reader)
+            check(page.sourceRuby == ruby.ruby)
             val key = ReaderTokenKey(id, page.anchor, analysis)
             val tokens = checkNotNull(listener.dispatch(bridge, Event.LoadReaderTokens(key)).readerTokens)
             val cats = tokens.tokens.filter { it.surface == "猫" }
@@ -101,6 +106,8 @@ internal fun verifyTxtImportBridge() {
             val opened = listener.dispatch(bridge, Event.OpenReader(id))
             check(opened.readerAnalysis == analysis)
             val page = checkNotNull(opened.reader)
+            check(page.sourceRuby.single().reading == "ねこ")
+            check(page.sourceRuby == loaded.sourceRuby.single().ruby)
             val tokens = checkNotNull(listener.dispatch(bridge, Event.LoadReaderTokens(ReaderTokenKey(id, page.anchor, analysis))).readerTokens)
             check(tokens.tokens.filter { it.surface == "猫" }.all { it.vocabulary?.status == VocabularyStatus.FAMILIAR })
             check(fresh.calls.get() == 0)

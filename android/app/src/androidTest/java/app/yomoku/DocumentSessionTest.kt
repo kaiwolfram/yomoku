@@ -7,10 +7,12 @@ import app.yomoku.shared.DocumentError
 import app.yomoku.shared.Event
 import app.yomoku.shared.ImportOutcome
 import app.yomoku.shared.PageLength
+import app.yomoku.shared.ReaderRuby
 import app.yomoku.shared.ReaderStatusChange
 import app.yomoku.shared.ReaderTokenKey
 import app.yomoku.shared.TextEncoding
 import app.yomoku.shared.TextOffset
+import app.yomoku.shared.TextRange
 import app.yomoku.shared.TxtImport
 import app.yomoku.shared.ViewModel
 import app.yomoku.shared.VocabularyStatus
@@ -88,8 +90,15 @@ class DocumentSessionTest {
             val id = created.documents.single().documentId
             val loaded = dispatch(core, Event.LoadPaste(id)).loadedDocument!!
             assertEquals("猫と猫。\r\n𠮷😀\u0000終", loaded.chapters.single().text)
+            val ruby = loaded.sourceRuby.single()
+            assertEquals(loaded.chapters.single().chapterId, ruby.chapterId)
+            assertEquals(
+                ReaderRuby(TextRange(TextOffset(0), TextOffset(3)), "ねこ"),
+                ruby.ruby.single(),
+            )
             val opened = dispatch(core, Event.OpenReader(id))
             val page = opened.reader!!
+            assertEquals(ruby.ruby, page.sourceRuby)
             val key = ReaderTokenKey(id, page.anchor, opened.readerAnalysis!!)
             val tokens = dispatch(core, Event.LoadReaderTokens(key)).readerTokens!!
             val cats = tokens.tokens.filter { it.surface == "猫" }
@@ -145,7 +154,9 @@ class DocumentSessionTest {
                 ImportOutcome.EXISTING,
                 dispatch(core, event(bytes)).importSummary!!.outcome,
             )
-            assertEquals(position, dispatch(core, Event.OpenReader(id)).reader!!.position)
+            val reopened = dispatch(core, Event.OpenReader(id)).reader!!
+            assertEquals(position, reopened.position)
+            assertEquals(ruby.ruby, reopened.sourceRuby)
             val restored = dispatch(core, Event.LoadReaderTokens(key)).readerTokens!!
             assertTrue(
                 restored.tokens

@@ -223,34 +223,11 @@ impl Storage {
         };
         let document =
             load_paste_in(&transaction, document_id)?.ok_or(StorageError::InvalidDocument)?;
-        let ruby = {
-            let mut statement = transaction.prepare(
-                "SELECT ruby_index, start_byte, end_byte, reading FROM source_ruby
-                 WHERE chapter_id = ?1 ORDER BY ruby_index",
-            )?;
-            let rows = statement.query_map([i64::from(document.chapter.chapter_id)], |row| {
-                Ok((
-                    row.get::<_, i64>(0)?,
-                    row.get::<_, i64>(1)?,
-                    row.get::<_, i64>(2)?,
-                    row.get::<_, String>(3)?,
-                ))
-            })?;
-            rows.enumerate()
-                .map(|(index, row)| {
-                    let (stored_index, start, end, reading) = row?;
-                    if stored_index != to_i64(index)? {
-                        return Err(StorageError::InvalidDocument);
-                    }
-                    Ok(SourceRuby {
-                        range: usize::try_from(start).map_err(|_| StorageError::InvalidDocument)?
-                            ..usize::try_from(end).map_err(|_| StorageError::InvalidDocument)?,
-                        reading,
-                    })
-                })
-                .collect::<Result<Vec<_>, StorageError>>()?
-        };
-        validate_ruby(&document.chapter.text, &ruby)?;
+        let ruby = load_source_ruby_in(
+            &transaction,
+            document.chapter.chapter_id,
+            &document.chapter.text,
+        )?;
         transaction.commit()?;
         Ok(Some(StoredTxtSource {
             original_bytes,
@@ -258,6 +235,41 @@ impl Storage {
             ruby,
         }))
     }
+}
+
+pub(crate) fn load_source_ruby_in(
+    connection: &rusqlite::Connection,
+    chapter_id: yomoku_core::document::ChapterId,
+    text: &str,
+) -> Result<Vec<SourceRuby>, StorageError> {
+    let mut statement = connection.prepare(
+        "SELECT ruby_index, start_byte, end_byte, reading FROM source_ruby
+         WHERE chapter_id = ?1 ORDER BY ruby_index",
+    )?;
+    let rows = statement.query_map([i64::from(chapter_id)], |row| {
+        Ok((
+            row.get::<_, i64>(0)?,
+            row.get::<_, i64>(1)?,
+            row.get::<_, i64>(2)?,
+            row.get::<_, String>(3)?,
+        ))
+    })?;
+    let ruby = rows
+        .enumerate()
+        .map(|(index, row)| {
+            let (stored_index, start, end, reading) = row?;
+            if stored_index != to_i64(index)? {
+                return Err(StorageError::InvalidDocument);
+            }
+            Ok(SourceRuby {
+                range: usize::try_from(start).map_err(|_| StorageError::InvalidDocument)?
+                    ..usize::try_from(end).map_err(|_| StorageError::InvalidDocument)?,
+                reading,
+            })
+        })
+        .collect::<Result<Vec<_>, StorageError>>()?;
+    validate_ruby(text, &ruby)?;
+    Ok(ruby)
 }
 
 pub(crate) fn validate_ruby(text: &str, ruby: &[SourceRuby]) -> Result<(), StorageError> {

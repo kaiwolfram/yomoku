@@ -2633,3 +2633,24 @@ Visual wrapping/height can change; core logical pages, exact reading offsets,
 original analysis, image sizing/decoding and history do not change. Dictionary
 panels and Material controls retain their own typography. Source/analyzer
 furigana remains the next independent slice.
+
+
+## 2026-10-27 — Transport source ruby before the furigana switch/rendering
+
+Continue the furigana task with a bounded core/storage/JNI slice: carry existing
+TXT/EPUB source readings through keyed ReaderChapterRuby in ReaderDocument and
+clipped ReaderRuby in ReaderPage. Do not parse source files or load Full to expose
+readings. Share the existing read-only ordered-index/range/reading loader between
+TXT source, EPUB content and TXT reader repositories; preserve their transaction
+boundaries. Pure core rejects foreign/duplicate chapter keys, invalid scalar
+ranges, empty bases/readings and unordered/overlapping source bases.
+
+A logical page may split a source ruby base. Clip its displayed UTF-8 range and
+retain the complete supplied reading on every intersecting page, just as token
+fragments retain whole-token readings. Japanese compounds do not provide a safe
+proportional mapping from base characters/bytes to reading characters. Preserve
+the complete original chapter annotation in ReaderDocument; never move logical
+page boundaries or saved reading anchors to fit ruby. No source normalization,
+vocabulary registration/status/history change, dependency or schema migration.
+This is transport/projection only; keep the default-off switch, source-preferred
+analyzer fallback, Compose layout and word/link tap verification unchecked.

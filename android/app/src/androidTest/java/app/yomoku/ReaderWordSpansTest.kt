@@ -27,6 +27,7 @@ class ReaderWordSpansTest {
             2UL,
             emptyList(),
             emptyList(),
+            emptyList(),
         )
 
     @Test

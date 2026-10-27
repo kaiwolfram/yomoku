@@ -333,6 +333,7 @@ impl Imports {
                     reading_position: stored.reading_position,
                     formatting: Vec::new(),
                     images: Vec::new(),
+                    source_ruby: Vec::new(),
                     chapters: stored
                         .chapters
                         .into_iter()

@@ -120,7 +120,20 @@ style. Nested formatting is valid. Stored inert links stay in SQLite and are omi
 from this display projection. `ReaderPage.formatting` clips intersections into
 page-local UTF-8 ranges, preserving the canonical text and all durable identities.
 Plain/single-text documents have no formatting entries. No migration or source
-rewrite is required; source ruby remains outside this transport.
+rewrite is required. Source ruby uses the separate keyed projection below.
+
+`ReaderDocument.source_ruby` carries sparse, unique owned `ReaderChapterRuby`
+keys for TXT/EPUB. Each ordered, nonoverlapping `ReaderRuby` has a nonempty
+scalar-aligned chapter-local range and complete nonempty source reading.
+`ReaderPage.source_ruby` clips intersecting bases into page-local UTF-8 ranges,
+retaining the full reading for a crossing base; readings cannot be divided by
+base byte/character counts. Canonical text, saved offsets, logical pages and
+word/link identities stay unchanged. Paste/SRT and chapters without ruby have
+empty projections. TXT source, EPUB content and TXT reader loads share the same
+read-only ordered-index/range/reading validator. Source readings survive missing
+analysis or deleted vocabulary and are independent of all five statuses. Generated
+Kotlin transports both keyed chapter and clipped page forms. No schema/parser
+change; the default-off switch, analyzer fallback and ruby rendering remain open.
 
 `ReaderDocument.images` carries sparse, unique owned `ReaderChapterImages` keys.
 Each source-ordered `ReaderInlineImage` holds one exact U+FFFC `TextRange`, literal
@@ -211,8 +224,9 @@ to Library/celebrates. No chapter truncation, parsing, Full load or registration
 Legacy PastedDocument/ReaderSnapshot and their single-text read/open/position APIs
 remain for repository callers and still reject EPUB. Their historical protocol
 names LoadPaste/OpenReader remain stable; only the loaded-document view field's
-serialized shape changes. No database migration or parser change. EPUB assets/ruby
-are not yet reader payloads; Android selection accepts EPUB/TXT/SRT.
+serialized shape changes. No database migration or parser change. Formatting,
+image metadata and source ruby now travel in reader payloads; image bytes remain
+outside them. Android selection accepts EPUB/TXT/SRT.
 
 ## SRT canonical content and atomic file repository (migration 0013)
 
@@ -308,9 +322,10 @@ Each file has one canonical chapter. `load_txt_source` reads bytes/encoding/ruby
 one transaction, verifies digest, ordered nonoverlapping scalar ranges and readings,
 and rejects corruption without repair or reanalysis. Historical single-text
 snapshot APIs accept paste/TXT/SRT; application/bridge readers now use ReaderDocument
-and the generic ordered repositories above. No ruby reader payload
-exists yet. Typed per-file runtime/JNI imports and the retained Android mixed-format picker,
-encoding choices, progress, Cancel and summary are connected. The Android foreground
+and the generic ordered repositories above, including source-ruby projections.
+Ruby rendering remains open. Typed per-file runtime/JNI imports and the retained
+Android mixed-format picker, encoding choices, progress, Cancel and summary are
+connected. The Android foreground
 lease/notifications persist no queue, URI, current-file bytes, progress or summary.
 Process death preserves only committed per-file data; a fresh helper starts empty
 and never automatically resumes unfinished selections. No schema change.

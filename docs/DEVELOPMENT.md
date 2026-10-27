@@ -3575,3 +3575,61 @@ AVD remains running. No open blocker. No dependency/version, permission or
 destructive-semantics change. Release, process-death/reboot, standalone dictionary
 benchmarks and physical arm64 checks were not rerun; physical arm64 remains
 user-deferred. Default-off source/analyzer furigana is next.
+
+
+## Source ruby reader transport and clipping
+
+2026-10-27, using the existing pinned local toolchain and running emulator:
+
+```sh
+export PATH=/home/kai/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin:$PATH
+export JAVA_HOME=/home/kai/repos/yomoku/.local/jdk-17/jdk-17.0.21+9
+export GRADLE_USER_HOME=/home/kai/repos/yomoku/.local/gradle
+export ANDROID_HOME=/home/kai/Android/Sdk
+cargo test -p yomoku-core --test reader_ruby --all-features --locked --offline
+cargo test -p yomoku-storage source_ruby --all-features --locked --offline
+cargo test --workspace --all-features --locked --offline --quiet
+cargo clippy --workspace --all-targets --all-features --locked --offline -- -D warnings
+cargo fmt --all -- --check
+tools/test-kotlin-bridge.sh
+cargo run -p yomoku-ffi --bin generate-kotlin --features facet_typegen --locked --offline -- target/generated/kotlin-repeat
+# Wait for generation to finish before comparing or starting the Android build.
+diff -r target/generated/kotlin target/generated/kotlin-repeat
+tools/format-kotlin.sh --check
+git diff --check
+./android/gradlew -p android :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=app.yomoku.DocumentSessionTest,app.yomoku.ReaderWordSpansTest,app.yomoku.ReaderFormattingTest --offline --console=plain
+```
+
+Six new host cases cover all logical page presets, crossing and adjacent source
+bases, Unicode/NUL preservation, exact nonzero saved offsets, chapter ownership,
+foreign/duplicate/unordered/overlapping/empty/non-scalar rejection, read-only
+TXT/EPUB reopen and save, all five vocabulary statuses, deleted vocabulary,
+Missing analysis and corrupted TXT metadata without repair. The shared loader
+also retains existing TXT original-source and EPUB integrity tests. No parser,
+schema, dependencies or source text changes.
+
+PASS: 446 workspace Rust tests (16 data-dependent fixtures ignored), strict
+Clippy/Rustfmt, host Kotlin/JNI and byte-identical repeat generation. Host JNI
+checks real Full TXT/EPUB loads, positions/reopen/statuses and source-ruby payloads;
+Rust/Kotlin round trips include nonzero supplementary/combining/NUL ranges and
+readings. Android's existing production TXT session test now verifies the keyed
+chapter and page metadata before and after native-session recreation; the span
+test fixture supplies the new generated field. Source ruby remains visually
+unused pending the switch/source-preferred analyzer fallback/Compose layout.
+
+Initial sandbox Gradle execution hit the documented wildcard-IP/local-socket
+restriction; retried offline outside the sandbox with approval. Initial Android
+compilation caught missing ReaderRuby/TextRange imports in the new test assertion;
+fixed both before rerunning. An initial repeat-codegen comparison ran before its
+generator had exited; the comparison after successful exit is identical.
+
+Final PASS: both-ABI debug/test APKs and strict Android lint; all nine selected
+API-36 x86_64 phone cases pass with no failures/errors/skips (1m39s final Gradle
+run). APK inspection confirms arm64-v8a/x86_64 libyomoku_jni.so. Reports and host/
+Android logs, including the initial missing-import failure, are saved under
+`.local/test-reports/reader-ruby/`. Reused the existing phone/light AVD without
+changing display/theme/rotation settings; it remains running. No open blocker.
+Tablet/dark UI, release, standalone dictionary probes, process-death/reboot and
+physical arm64 were not rerun for this transport slice; physical arm64 remains
+deferred. Next: default-off persisted furigana, source-preferred analyzer fallback,
+Compose layout and tap/theme verification.

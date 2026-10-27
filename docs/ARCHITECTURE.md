@@ -216,7 +216,8 @@ fit. Canvas/button/key input in the separate window resets reader idle accountin
 The shared viewer accepts an ImageBitmap, source dimensions and loading/error/retry
 callbacks, with no EPUB, storage, networking or core dependency. Future displayed
 Nostr images can use it. Advanced SVG resources are outside v1 scope; source ruby
-remains open. Settings ships AndroidSVG attribution and its full license offline.
+transport is connected, while its switch/analyzer fallback/rendering remain open.
+Settings ships AndroidSVG attribution and its full license offline.
 
 Shared file preflight and TXT/SRT/EPUB Existing results now carry `LibraryDocument`
 references (ID, title, whole-book progress, permanent finish marker). Exact-byte
@@ -245,7 +246,8 @@ queued/load/chapter work and uses the existing commit gate. Background release,
 engine-failure eviction and later-file retries share the existing analyzer cache.
 Android mixed selection, reader text formatting/website links and raster/static
 SVG images with the shared viewer and Library cover thumbnails are connected;
-ruby remains open; advanced SVG resources are outside v1 scope.
+ruby switch/analyzer fallback/rendering remain open; advanced SVG resources are
+outside v1 scope.
 
 Its SRT parser
 accepts decoded text and returns canonical LF text plus ordered UTF-8 cue ranges.
@@ -285,7 +287,16 @@ decoding/analysis and preserves its chosen encoding/statuses/progress. The analy
 callback obeys the same ready-worker/no-I/O/provisional-ID contract as paste. Shared
 legacy single-text repository APIs retain PastedDocument; the application/bridge
 uses ReaderDocument for every format;
-source ruby has a separate read-only repository, awaiting reader transport/rendering.
+source ruby also retains its separate original-source repository. TXT source,
+EPUB content and TXT reader loads share ordered-index/range/reading validation.
+ReaderDocument now transports sparse keyed ReaderChapterRuby and ReaderPage clips
+source bases into page-local UTF-8 ranges. Complete readings remain unchanged even
+for crossing bases; no byte/character-to-reading alignment is inferred. Chapter
+keys, scalar boundaries, nonempty readings and ordered nonoverlapping bases are
+validated in pure core. No analysis/vocabulary lookup is needed; Missing analysis,
+deleted vocabulary and all five statuses preserve source readings. Generated JNI
+carries both forms. The default-off setting, source-preferred analyzer fallback
+and visible ruby rendering/tap integration remain the next reader slice.
 `import_analyzed_txt_cancellable` adds a shared per-file `ImportCancellation` handle.
 Checkpoints before/after parsing, ruby writes and analysis can discard provisional
 rows; the last check and COMMIT share a mutex. Cancellation winning that gate rolls
@@ -891,7 +902,8 @@ repository/FIFO/typed JNI imports are verified. EPUB persistence and ordered-cha
 reader/application/FIFO/typed JNI imports are verified. Android mixed-format
 batches use the shared retained picker/encoding/progress/Cancel/summary helper;
 reader text formatting/website links and raster/static SVG images/shared viewer
-are connected, including Library covers; ruby remains open; advanced SVG resources are outside v1 scope.
+are connected, including Library covers; ruby switch/analyzer fallback/rendering
+remain open; advanced SVG resources are outside v1 scope.
 All file background notifications use the platform-only
 foreground lease described above. Legacy imports
 are not automatically rescanned.

@@ -80,6 +80,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         document_id: DocumentId::try_from(i64::MAX)?,
         title: "章 📖".into(),
         images: Vec::new(),
+        source_ruby: Vec::new(),
         formatting: vec![yomoku_core::reader_formatting::ReaderChapterFormatting {
             chapter_id: ChapterId::try_from(i64::MAX - 2)?,
             spans: [
@@ -151,6 +152,16 @@ fn main() -> Result<(), Box<dyn Error>> {
                 media_type: "image/png".into(),
             },
             alt: "説明𠮷か\u{3099}\0".into(),
+        }],
+    }];
+    illustrated.source_ruby = vec![yomoku_core::reader_ruby::ReaderChapterRuby {
+        chapter_id: illustrated.chapters[0].chapter_id,
+        ruby: vec![yomoku_core::reader_ruby::ReaderRuby {
+            range: TextRange {
+                start: TextOffset::at(image_text, "😀".len())?,
+                end: TextOffset::at(image_text, "😀𠮷か\u{3099}".len())?,
+            },
+            reading: "よし𠮷か\u{3099}\0".into(),
         }],
     }];
     illustrated.validate()?;

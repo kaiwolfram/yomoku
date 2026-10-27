@@ -127,6 +127,7 @@ pub struct ReaderDocument {
     pub chapters: Vec<ChapterText>,
     pub formatting: Vec<crate::reader_formatting::ReaderChapterFormatting>,
     pub images: Vec<crate::reader_images::ReaderChapterImages>,
+    pub source_ruby: Vec<crate::reader_ruby::ReaderChapterRuby>,
     pub reading_position: Option<crate::pagination::ReadingPosition>,
 }
 
@@ -139,6 +140,7 @@ impl From<PastedDocument> for ReaderDocument {
             chapters: vec![document.chapter],
             formatting: Vec::new(),
             images: Vec::new(),
+            source_ruby: Vec::new(),
             reading_position: document.reading_position,
         }
     }
@@ -178,6 +180,13 @@ impl ReaderDocument {
                     return Err(InvalidTextValue);
                 }
             }
+        }
+        let mut annotated = std::collections::HashSet::new();
+        for ruby in &self.source_ruby {
+            if !annotated.insert(ruby.chapter_id) {
+                return Err(InvalidTextValue);
+            }
+            ruby.validate(self.chapter(ruby.chapter_id)?)?;
         }
         if let Some(position) = self.reading_position {
             position.validate(self.chapter(position.chapter_id)?)?;

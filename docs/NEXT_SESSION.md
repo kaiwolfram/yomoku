@@ -1,5 +1,5 @@
 # Resume here
-Updated: 2026-10-27. Global font/line controls complete; default-off furigana next.
+Updated: 2026-10-27. Source-ruby transport complete; furigana controls/rendering next.
 ## Working
 - Pure Crux routes/Library/Settings; Render-only UI; FIFO SQLite/analysis; Library start.
 - Chapter-local UTF-8 position/whole-book percentage/five presets persist; reflow
@@ -18,8 +18,8 @@ Updated: 2026-10-27. Global font/line controls complete; default-off furigana ne
   Strict UTF-8→UTF-16 failure falls back to plain text. Loads wait for pending saves.
 - Five manual statuses atomically update history; same-status no-op. Deleted entries
   never register. Reads/choices need explicit retry. Phone sheet/wide panel shows
-  original reading/base, expanded restriction-aware English senses/compact POS,
-  separate names/categories/lifetime counts. Opening read-only; navigation dismisses.
+  original/base, expanded senses/POS, names/categories/counts. Opening read-only;
+  navigation dismisses.
 - Clock uses elapsedRealtime/15s checkpoints, restore-before-Resume, five-minute
   idle/background cap and movement epochs. Absolute revisions freeze retries,
   coalesce maxima and drain before movement/exit. CoreSession close retains callbacks
@@ -28,14 +28,13 @@ Updated: 2026-10-27. Global font/line controls complete; default-off furigana ne
   ID + duration. One transaction writes occurrences, New-only Known/history/time/
   position/finish. Exact retries; AlreadyRecorded/zero silent, positive toast once.
   Only new final-book completion returns Library + 1.4s confetti. Images count no words.
-- Verified FD+1/mapped Full releases in background; pinned 2026-10-25 English
-  JMdict/JMnedict/notices bundled. Word index stays lazy until close/query failure.
+- FD+1/mapped Full releases in background; bundled English word/name index stays lazy.
 - TXT/SRT strict UTF-8/Shift-JIS preserve original bytes/filename/encoding/B and
   canonical Aozora ruby or SRT cues; exact duplicate's first interpretation wins.
 - Retained FileImports reads one mixed EPUB/TXT/SRT URI off main, routes literal
   case-insensitive extensions; wildcard picker accepts generic MIME. TXT/SRT have
   separate encoding/Skip/errors; EPUB none. Filename/X-of-N/progress/summary survive
-  recreation/background. Name before bytes. No persisted queue/process restart.
+  recreation/background. No persisted queue/process restart.
 - Direct off-main cancelFileImport bypasses FIFO; COMMIT may wait. Silent full-file
   rollback; winning/prior commits stay. Android ignores late reads and awaits BOTH
   native return + outcome before clearing/draining. Dedicated cancellation executor.
@@ -46,35 +45,35 @@ Updated: 2026-10-27. Global font/line controls complete; default-off furigana ne
   source/assets without parsing; large-book costs remain unmeasured.
 - ReaderDocument carries keyed validated heading/emphasis/strong/HTTP(S) spans;
   ReaderPage clips to page-local UTF-8; generated JNI/Compose preserve exact text.
-  Website taps open browser with token identity; other links inert. No CSS/TOC/ruby.
+  Website taps open browser with token identity; other links inert. No CSS/TOC.
 - ReaderDocument carries validated page-local image placeholders/alt/asset metadata;
   no image BLOBs in state. One-shot FIFO asset reads verify live document ownership,
-  expected media/SHA-256 and 32 MiB cap without dictionaries or core/state writes.
+  expected media/SHA-256 and 32 MiB cap; no dictionaries/core/state writes.
 - CoreSession-owned decoder serializes asset read/decode across pages. Bounds-first
   BitmapFactory rejects >32768-edge/100 MP sources, samples to <=2048-edge and each
   distinct asset's share of 16 MiB page pixels. Repeated assets share one bitmap.
-  Disposed/reflow/recreation requests cancel delivery; accepted callbacks drain.
 - Compose replaces exact U+FFFC scalars with source-position/ratio images;
   tall frames cap at 8192px; styles/word/link identities stay intact. Local zero text
   targets stop adjacent-link capture. Alt/loading/failure + Retry for unsupported data.
 - Image taps open source-agnostic full-window Dialog with 1–8x fit zoom/clamped pan,
-  Zoom in/out/Reset/Close and Back. Reuses page bitmap; sampled detail stays bounded.
-  Selection/zoom/normalized focus survive rotation/recreation; close/page change resets.
-  Modal gestures cannot complete pages; pointer/key input resets reader idle policy.
-- AndroidSVG 1.4 vectors/base64 PNG/JPEG/nested SVG share viewer/covers; offline credits.
-  <=2 MiB XML/4096 nodes/32768 expansions; <=8 resource levels/64 refs; closed roots.
-  <=64 URIs share extra output-pixel budget; child-first isolated IDs/styles/lock/recycle.
-  No I/O/DTD/entities; basic SVG accepted for v1; complex resources/styles fallback.
+  Reuses bounded page bitmap; Zoom in/out/Reset/Close and Back.
+  Selection/zoom/focus survive recreation; close/page change resets. Modal gestures
+  cannot complete pages; pointer/key input resets reader idle policy.
+- AndroidSVG 1.4 vectors/base64/nested SVG share viewer/covers; offline credits.
+  Bounded closed resources; advanced SVG outside v1 scope (DECISIONS.md).
 - Library covers resolve live path/media/SHA-256 metadata without book BLOBs/Full.
   Media+digest LRU <=4 MiB/64 entries; misses verify bytes/digest and decode <=64 KiB.
-- Noto Serif JP 2.003 bundled; 400/700 axes, synthesized italic/fallback, offline credits.
-- Global 14/16/18/20/24sp + 125/150/175/200% line height; defaults 16sp/150%.
-  Migration 0015/core/FIFO/JNI/Settings persist atomic pairs without changing anchors.
+- Noto Serif JP 2.003/400/700 + synthesized italic/fallback/credits. Global
+  14/16/18/20/24sp + 125/150/175/200%; default 16sp/150%. Migration 0015 persists pairs.
+- ReaderDocument.source_ruby has owned ReaderChapterRuby; ReaderPage.source_ruby
+  clips bases to page-local UTF-8, keeps complete source readings across boundaries.
+  Shared TXT/EPUB validator; read-only, no Full/vocabulary dependency or schema change.
 ## Next tasks (ordered)
-1. Default-off furigana: transport source ruby, else analyzer; preserve anchors/taps.
+1. Default-off furigana switch/persistence + source-preferred analyzer fallback and
+   Compose layout. Source transport ready; verify anchors/taps + phone/tablet themes.
 2. CI host/unsigned builds independent; arm64 deferred. Nostr empty/Q188 unresolved.
 ## Verification
-- PASS: 440 Rust (16 opt-in ignored), strict Clippy/fmt, host JNI/repeat Kotlin codegen.
-  Both-ABI APKs/lint; 12 distinct phone cases + four tablet/dark cases pass across runs.
-  Commands/fixed fixtures/runtime flake: DEVELOPMENT.md end; .local/test-reports/reader-typography/.
-  Restored phone/light/free rotation; no blocker. Release/physical-arm64/process-death not rerun.
+- PASS: 446 Rust (16 opt-in ignored), strict Clippy/fmt, host JNI/repeat Kotlin codegen.
+  Both-ABI APKs/lint + nine phone persistence/spans/EPUB links/recreation cases pass.
+  Commands: DEVELOPMENT.md end; .local/test-reports/reader-ruby/. No open blocker.
+  No release/physical-arm64/process-death rerun. Phone/light AVD remains running.

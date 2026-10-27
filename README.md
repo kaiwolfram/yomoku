@@ -98,7 +98,9 @@ Bounded static SVGs also render off main with fractional source ratios and offli
 renderer credits. Embedded base64 PNG/JPEG and nested self-contained SVG resources
 share bounded temporary bitmaps, retain their original aspect ratio and work in
 the same viewer/cover pipeline. This basic SVG support satisfies v1 scope;
-complex styles/resources retain the existing fallback. Source ruby remains pending.
+complex styles/resources retain the existing fallback. TXT/EPUB source ruby now
+travels through validated chapter/page snapshots and typed JNI, preserving exact
+text positions. The switch, analyzer fallback and ruby rendering remain planned.
 The pure [SRT parser](crates/yomoku-import/src/srt.rs) has host fixtures for cue
 boundaries, formatting, speakers and malformed input. Its atomic repository now
 persists original bytes/encoding, canonical cues, Mode B and vocabulary registrations
