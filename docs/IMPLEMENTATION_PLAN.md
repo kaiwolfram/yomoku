@@ -34,7 +34,6 @@ position/encounter history. Keep incremental builds green.
 - [x] Hide main navigation in the active reader when the phase-2 reader route is implemented; phone/tablet landscape first-page opening/Settings/Back verified by Compose instrumentation.
 - [x] Add `crates/yomoku-storage` SQLite initialization and numbered migration; empty DB creation/reopens, ordered upgrades, rollback, concurrent opens and failure preservation pass in 11 host tests; bundled SQLite compiles for both Android ABIs. Runtime/FFI document wiring remains below.
 - [x] Exercise document create/read/list through runtime/FFI on device; private Android DB, worker I/O, exact Unicode/reopen and failure/retry pass on API 36 x86_64. Rename/delete CRUD remains in phase 4 with its specified semantics.
-- [ ] Add `.github/workflows/ci.yml` host Rust checks, Kotlin lint/tests and unsigned Android build; verify each command locally where available.
 - [x] Document SDK/emulator/adb setup, native ABIs and build/install/run commands; API 36 x86_64 AVD installed with Android CLI, KVM checked on host, launcher restart/ADB authorization/instrumentation and debug APK install/Library launch verified. Default CLI startup graphics failure and swangle fallback documented; arm64 runtime testing remains future work.
 
 ## 2 — Paste-to-reader slice

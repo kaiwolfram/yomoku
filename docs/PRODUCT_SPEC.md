@@ -40,7 +40,7 @@ must not change without user approval.
 - **Rust effects:** Rust-side `EffectRouter` executes Rust I/O. Nostr networking through Rust **`nostr-sdk`**, not duplicated in Kotlin.
 - **Android bridge:** Kotlin handles Compose, file picker, notifications/background execution, Android Keystore, AnkiDroid provider integration, and platform APIs; expose a narrowly scoped Rust FFI interface. Prefer explicit, typed state/actions over ad hoc strings.
 - **Workstation workflow:** Gradle/Cargo CLI, terminal-based Android SDK/emulator/`adb`; **no Android Studio requirement** for normal build/test/run. Document native library build, ABI packaging, emulator setup, and release signing without committing secrets.
-- **Repository:** MIT license for original code, respecting third-party licenses; clear module boundaries; tests and CI (GitHub Actions) for Rust, Kotlin, lint, and Android builds. Manual approval for signed publishing. Eventual APK distribution via GitHub Releases and Zapstore, not Google Play/F-Droid for initial publishing.
+- **Repository:** MIT license for original code, respecting third-party licenses; clear module boundaries; local Rust/Kotlin tests, lint, and Android builds. CI/GitHub Actions is not required (user clarification 2026-10-27). Manual approval for signed publishing. Eventual APK distribution via GitHub Releases and Zapstore, not Google Play/F-Droid for initial publishing.
 
 If a chosen library does not support a required capability or architecture in current versions, validate its actual API and explain the minimal deviation before changing a major architectural choice. Avoid blind dependency/version guesses.
 

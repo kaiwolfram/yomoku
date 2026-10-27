@@ -67,9 +67,8 @@ Updated: 2026-10-27. Furigana switch/layout verified and complete.
   Compose paints half-size readings above unchanged canonical Text/tap identities.
   Strict UTF-16; complete readings repeat across splits and fit base width; measured headroom.
 ## Next tasks (ordered)
-1. CI host Rust/Kotlin checks + unsigned Android build; verify commands locally.
-2. Custom English meaning/reading for missing dictionary matches; immutable built-ins.
-3. A/B/C/manual split/merge overrides; start with testable persisted anchors.
+1. Custom English meaning/reading for missing dictionary matches; immutable built-ins.
+2. A/B/C/manual split/merge overrides; start with testable persisted anchors.
 Physical arm64 deferred; Nostr empty; Q188 unresolved before forwarding.
 ## Verification
 - PASS: both-ABI debug/test APKs, strict lint, Kotlin formatting/Rustfmt/diff checks;

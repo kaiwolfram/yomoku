@@ -2072,3 +2072,9 @@
 - Updated README/architecture/data/decisions/plan/handoff. Next: CI, missing-match
   custom definitions/readings, then persisted segmentation overrides. Release,
   process-death and physical-arm64 not rerun; arm64 remains user-deferred.
+
+## 2026-10-27 — Remove CI task at user request
+- Removed CI/GitHub Actions from the implementation checklist and handoff; updated
+  the product specification and recorded the scope decision. Local verification remains.
+- Next: custom meanings/readings for missing dictionary matches, then segmentation overrides.
+- Documentation only; verified the diff and active task lists. No tests run or blockers.

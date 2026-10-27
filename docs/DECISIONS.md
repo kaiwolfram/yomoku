@@ -2719,3 +2719,10 @@ No logical boundary moves or partial reading is inferred.
 Use existing pinned Compose APIs only; no new dependency, schema or I/O. Primary
 API references: AndroidX [LineHeightStyle](https://github.com/androidx/androidx/blob/androidx-main/compose/ui/ui-text/src/commonMain/kotlin/androidx/compose/ui/text/style/LineHeightStyle.kt)
 and [TextLayoutResult](https://github.com/androidx/androidx/blob/androidx-main/compose/ui/ui-text/src/commonMain/kotlin/androidx/compose/ui/text/TextLayoutResult.kt).
+
+## 2026-10-27 — Remove CI from scope
+
+User clarification: CI checks are not needed. Remove the GitHub Actions task from
+the implementation checklist and next-session priorities, and update the product
+specification accordingly. Continue running relevant local tests, lint and builds.
+Next implementation slice: custom meanings/readings for missing dictionary matches.
