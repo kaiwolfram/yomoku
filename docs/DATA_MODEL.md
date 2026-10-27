@@ -787,25 +787,32 @@ then reprojects using the reader's exact ReadingPosition. Reflow never writes
 current position, Library progress, encounters or completion. Late settings saves
 update the global preset without reopening closed reader/Settings routes.
 
-## Reader typography (migration 0015)
+## Reader typography (migrations 0015–0016)
 Migration 0015 adds `font_size` (14/16/18/20/24, default 16) and
 `line_spacing` (125/150/175/200 percent of font size, default 150) to the STRICT
 singleton `reader_settings` table. Values are semantic numbers, never enum
 ordinals. The migration leaves page length, document content/position, original
 analysis, vocabulary and history unchanged; failed ALTERs roll back together.
 
-`ReaderTypography` is a pure typed pair of finite enums. `reader_typography`
-validates both stored values; `save_reader_typography` validates the existing
-row/page preset, updates both fields in one immediate transaction, and returns
-only after commit. Missing/corrupt settings fail without silent replacement.
+Migration 0016 adds `furigana`, an INTEGER constrained to 0/1, default 0 (off).
+Existing font size, line spacing, page length, content and reading state are
+preserved. Invalid boolean integers fail validation without repair.
+
+`ReaderTypography` contains finite font/spacing enums and a furigana boolean.
+`reader_typography` validates all three stored values; `save_reader_typography`
+validates the existing row/page preset, updates all three fields in one immediate
+transaction, and returns only after commit. Missing/corrupt settings fail without
+silent replacement.
 Library startup loads typography alongside page length; every ordered-document
 snapshot includes it from the same read transaction as content/position/analysis.
 Legacy single-paste `ReaderSnapshot` remains unchanged; the app uses the ordered
 snapshot. `SetReaderTypography`/`SaveReaderTypography`/`ReaderTypographySaved`
-carry the pair through core/FIFO/generated Kotlin. The optional ViewModel value
-is absent until a successful load; failed saves retain the previous pair and
+carry these preferences through core/FIFO/generated Kotlin. The optional ViewModel
+value is absent until a successful load; failed saves retain the previous values and
 can be repeated. Typography never changes logical pagination or anchors and
 produces no position, encounter, vocabulary or completion writes.
+The furigana preference is transported and persisted; its visible switch and
+source-preferred analyzer fallback/rendering remain pending.
 
 ## Reader analysis restoration (no schema change)
 `load_reader_snapshot` reads canonical paste content/current position, persisted

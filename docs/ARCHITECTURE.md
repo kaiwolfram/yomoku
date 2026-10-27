@@ -73,8 +73,9 @@ wrapping/scroll height; core logical page boundaries, canonical text/UTF-8 range
 and saved positions are unchanged. Settings exposes complete offline attribution
 and SIL OFL 1.1 in the existing retained credit dialog.
 
-Global `ReaderTypography` carries finite font-size and line-spacing preferences
-through typed Settings events, the FIFO storage protocol and generated Kotlin.
+Global `ReaderTypography` carries finite font-size/line-spacing preferences and
+a default-off furigana boolean through typed Settings events, the FIFO storage
+protocol and generated Kotlin.
 Migration 0015 adds constrained numeric columns to the singleton `reader_settings`;
 default 16sp/150% preserves the former 16sp/24sp body text. Library startup and
 consistent document snapshots restore committed values. Core rejects unknown,
@@ -83,7 +84,11 @@ until an explicit retry. Compose applies the selected font size and proportional
 line height to all reader fragments, preserving system font scaling, Material
 letter spacing, status colors and relative EPUB headings. It never repaginates,
 changes text/position/history, or changes image asset keys/sizing rules. Settings controls stay
-disabled until a successful load and while saves are pending. Furigana remains open.
+disabled until a successful load and while saves are pending. Migration 0016
+persists the constrained furigana boolean in the same atomic preference update;
+font/spacing controls preserve it. The typed preference loads with Library and
+reader snapshots. The furigana switch, source-preferred analyzer fallback and
+rendering remain open; no inactive switch is exposed yet.
 
 `ReaderDocument.images` carries keyed `ReaderChapterImages` with source-ordered
 placeholder ranges, alt text and document-scoped `ReaderImageAsset` paths/media

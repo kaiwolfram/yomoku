@@ -61,7 +61,9 @@ internal fun verifyDocumentBridge() {
         val text = "  題𠮷📖  \r\nか\u3099👩‍👩‍👧‍👦\u0000終\n"
         val (document, analysis) = NativeBridge(database.path, listener, dictionary).use { bridge ->
             check(!database.exists())
-            check(listener.dispatch(bridge, Event.RefreshLibrary).documents.isEmpty())
+            val initial = listener.dispatch(bridge, Event.RefreshLibrary)
+            check(initial.documents.isEmpty())
+            check(initial.readerTypography?.furigana == false)
             check(dictionary.calls.get() == 0)
             dictionary.fail = true
             val failed = listener.dispatch(bridge, Event.CreatePaste(text))
@@ -178,18 +180,20 @@ internal fun verifyDocumentBridge() {
                 check(changed.readerTime == secondCheckpoint)
             }
             val typographyPage = ViewModel.bincodeDeserialize(bridge.view()).reader
-            for (size in ReaderFontSize.entries) {
-                for (spacing in ReaderLineSpacing.entries) {
-                    val typography = ReaderTypography(size, spacing)
-                    val before = ViewModel.bincodeDeserialize(bridge.view())
-                    if (before.readerTypography == typography) continue
-                    val event = Event.SetReaderTypography(typography)
-                    check(Event.bincodeDeserialize(event.bincodeSerialize()) == event)
-                    val changed = listener.dispatch(bridge, event)
-                    check(changed.readerTypography == typography)
-                    check(changed.reader == typographyPage)
-                    check(changed.loadedDocument == saved && changed.readerAnalysis == analysis)
-                    check(changed.readerTime == secondCheckpoint)
+            for (furigana in listOf(false, true)) {
+                for (size in ReaderFontSize.entries) {
+                    for (spacing in ReaderLineSpacing.entries) {
+                        val typography = ReaderTypography(size, spacing, furigana)
+                        val before = ViewModel.bincodeDeserialize(bridge.view())
+                        if (before.readerTypography == typography) continue
+                        val event = Event.SetReaderTypography(typography)
+                        check(Event.bincodeDeserialize(event.bincodeSerialize()) == event)
+                        val changed = listener.dispatch(bridge, event)
+                        check(changed.readerTypography == typography)
+                        check(changed.reader == typographyPage)
+                        check(changed.loadedDocument == saved && changed.readerAnalysis == analysis)
+                        check(changed.readerTime == secondCheckpoint)
+                    }
                 }
             }
             bridge.update(Event.CloseSettings.bincodeSerialize())
@@ -221,7 +225,7 @@ internal fun verifyDocumentBridge() {
             check(initial.importSummary == null)
             check(initial.documents.single().documentId == document.documentId)
             check(initial.pageLength == PageLength.CHARACTERS1500)
-            check(initial.readerTypography == ReaderTypography(ReaderFontSize.SP24, ReaderLineSpacing.PERCENT200))
+            check(initial.readerTypography == ReaderTypography(ReaderFontSize.SP24, ReaderLineSpacing.PERCENT200, true))
             check(reopened.dispatch(bridge, Event.LoadPaste(document.documentId)).loadedDocument == document)
             val opened = reopened.dispatch(bridge, Event.OpenReader(document.documentId))
             check(opened.reader?.text == text)

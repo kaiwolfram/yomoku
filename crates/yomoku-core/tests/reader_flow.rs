@@ -2899,12 +2899,59 @@ fn ordered_snapshot_rejects_missing_duplicate_and_foreign_chapter_analysis() {
 }
 
 #[test]
+fn furigana_only_changes_commit_without_replacing_reader_tokens_time_or_notices() {
+    use yomoku_core::typography::ReaderTypography;
+    let (core, _) = analyzed_reader();
+    load_status_tokens(&core);
+    restore_time(&core, 321);
+    core.process_event(Event::OpenSettings);
+    assert!(!core.view().reader_typography.unwrap().furigana);
+    for furigana in [true, false] {
+        let before = core.view();
+        let typography = ReaderTypography {
+            furigana,
+            ..before.reader_typography.unwrap()
+        };
+        let mut effects = core.process_event(Event::SetReaderTypography(typography));
+        assert_eq!(
+            storage_operation(&effects),
+            StorageOperation::SaveReaderTypography(typography)
+        );
+        assert_eq!(core.view().reader_typography, before.reader_typography);
+        finish(
+            &core,
+            &mut effects,
+            StorageResult::Failed(DocumentError::Unavailable),
+        );
+        assert_eq!(core.view().reader_typography, before.reader_typography);
+        let mut effects = core.process_event(Event::SetReaderTypography(typography));
+        finish(
+            &core,
+            &mut effects,
+            StorageResult::ReaderTypographySaved(typography),
+        );
+        let after = core.view();
+        assert_eq!(
+            after,
+            yomoku_core::app::ViewModel {
+                reader_typography: Some(typography),
+                ..before
+            }
+        );
+        assert!(core
+            .process_event(Event::SetReaderTypography(typography))
+            .is_empty());
+    }
+}
+
+#[test]
 fn typography_requires_loaded_settings_commits_before_publish_and_preserves_reader() {
     use yomoku_core::typography::{ReaderFontSize, ReaderLineSpacing, ReaderTypography};
     let core = Core::<Yomoku>::new();
     let typography = ReaderTypography {
         font_size: ReaderFontSize::Sp24,
         line_spacing: ReaderLineSpacing::Percent200,
+        furigana: true,
     };
     core.process_event(Event::OpenSettings);
     assert!(core
@@ -2958,6 +3005,7 @@ fn typography_list_load_and_late_save_do_not_restore_closed_reader() {
     let core = Core::<Yomoku>::new();
     let typography = ReaderTypography {
         font_size: ReaderFontSize::Sp20,
+        furigana: true,
         ..Default::default()
     };
     let mut effects = core.process_event(Event::RefreshLibrary);
@@ -2985,6 +3033,7 @@ fn typography_waits_for_failed_time_and_completion_saves_before_accepting_change
     use yomoku_core::typography::{ReaderFontSize, ReaderTypography};
     let typography = ReaderTypography {
         font_size: ReaderFontSize::Sp24,
+        furigana: true,
         ..Default::default()
     };
     let (core, _) = analyzed_reader();

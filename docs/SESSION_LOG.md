@@ -2009,3 +2009,22 @@
 - Updated README/architecture/data/decisions/plan/handoff. No blocker. Furigana
   switch/persistence, analyzer fallback and visible layout/taps/themes remain
   unchecked. Release/process-death/physical-arm64 not rerun; arm64 deferred.
+
+
+## 2026-10-27 — Persist default-off furigana preference
+- Started clean. Migration 0016 adds constrained 0/1 furigana to global typography;
+  existing core/FIFO/generated JNI loads/saves it atomically with font/spacing.
+  Keep the visible switch for the source-preferred analyzer/layout step.
+- Three new Rust cases plus expanded fixtures cover migration/retry/preservation,
+  all 40 combinations/reopen, corrupt flags and statement/COMMIT rollback, routing
+  gates and unchanged reader state. Existing Android controls preserve the flag.
+- PASS: 449 Rust tests (16 opt-in ignored), strict Clippy/Rustfmt/Kotlin formatting,
+  real-Full host JNI/Unicode/repeatable codegen, both-ABI debug/test APKs/lint and
+  both API-36 phone typography/image/word-tap cases (2m11s final Gradle run).
+- Updated a remaining old schema-version assertion after the first Rust runs;
+  final full workspace passes. Gradle required approved outside-sandbox sockets.
+  Cold-started existing swangle/KVM AVD without wipe; phone/light remains running.
+- Updated README/architecture/data/decisions/plan/handoff. Reports and commands:
+  DEVELOPMENT.md end; .local/test-reports/reader-furigana-preference/. No blocker.
+  Visible switch/source-preferred analyzer fallback/ruby rendering remain next.
+  Tablet/dark/release/process-death/physical-arm64 not rerun; arm64 deferred.

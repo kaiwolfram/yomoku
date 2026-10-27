@@ -3633,3 +3633,60 @@ Tablet/dark UI, release, standalone dictionary probes, process-death/reboot and
 physical arm64 were not rerun for this transport slice; physical arm64 remains
 deferred. Next: default-off persisted furigana, source-preferred analyzer fallback,
 Compose layout and tap/theme verification.
+
+
+## Persisted default-off furigana preference
+
+2026-10-27, using the pinned Rust PATH/JDK/SDK/Gradle environment above:
+
+```sh
+cargo test --workspace --all-features --locked --offline --quiet
+cargo clippy --workspace --all-targets --all-features --locked --offline -- -D warnings
+cargo fmt --all -- --check
+tools/test-kotlin-bridge.sh
+cargo run -p yomoku-ffi --bin generate-kotlin --features facet_typegen --locked --offline -- target/generated/kotlin-repeat
+# Wait for generation to finish before comparing.
+diff -r target/generated/kotlin target/generated/kotlin-repeat
+tools/format-kotlin.sh --check
+git diff --check
+./android/gradlew -p android :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=app.yomoku.ReaderTypographySettingsTest --offline --console=plain
+unzip -l android/app/build/outputs/apk/debug/app-debug.apk 'lib/*/libyomoku_jni.so'
+```
+
+Migration 0016 adds a constrained semantic 0/1 setting, default off. Three new
+Rust cases verify upgrade preserving existing font/spacing/page length and exact
+supplementary-Unicode offset; migration failure preserves schema/history/bytes
+and retries; flag-only core changes publish after commit/retry with the rest of
+the ViewModel unchanged. Existing cases now cover all 40 font/spacing/flag
+combinations through SQLite reopen, statement/deferred-COMMIT rollback of all
+three fields, corrupt boolean rejection without repair, unknown/busy/pending-save
+routing and late saves. Full workspace: 449 passing tests, 16 opt-in ignored.
+
+Host real-Full Kotlin/JNI round-trips all 40 typed combinations and verifies
+unchanged logical page/position, original analysis and pending time; a fresh
+native session restores the enabled flag without loading Full. Repeat Kotlin
+generation is identical; strict Clippy/Rustfmt/Kotlin formatting/diff pass.
+The existing Android typography fixture sets the flag through typed Settings
+before changing font/spacing using visible controls, checking that those changes
+preserve the flag. Its second case supplies the explicit disabled flag while
+retaining image/canonical-fragment/word-tap regression coverage.
+
+The first focused/full Rust runs caught a remaining historical fixture expecting
+schema 15 after successful retry; updated that assertion to 16 before the final
+passing full run. No production fix was needed. Gradle's sandbox wildcard-IP
+restriction required approved outside-sandbox execution. No emulator was running;
+cold-started the existing medium_phone with the documented swangle/KVM flags,
+without wiping data, and confirmed sys.boot_completed=1.
+
+Final PASS: both-ABI debug/test APKs, strict Android lint (only the existing
+informational FileImports autoboxing hint) and both selected API-36 x86_64 phone
+cases, zero failures/errors/skips (2m11s including build/lint). APK inspection
+confirms arm64-v8a/x86_64 JNI. Logs, device reports and lint XML:
+`.local/test-reports/reader-furigana-preference/`. The AVD remains running at
+1080x2400/420dpi/light, unchanged after boot. No open blocker.
+
+This slice persists/transports the preference; the visible switch, source-preferred
+analyzer fallback and ruby layout/taps/themes remain unchecked. No dependency,
+permission or destructive-semantics change. Tablet/dark, release, process-death,
+standalone dictionary benchmarks and physical-arm64 checks were not rerun;
+physical arm64 remains user-deferred.

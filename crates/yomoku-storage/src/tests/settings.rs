@@ -124,7 +124,7 @@ fn typography_migration_preserves_existing_page_length_text_position_and_analysi
 }
 
 #[test]
-fn all_typography_pairs_persist_without_changing_logical_pages_or_document_rows() {
+fn all_typography_preferences_persist_without_changing_logical_pages_or_document_rows() {
     use yomoku_core::typography::{ReaderFontSize, ReaderLineSpacing, ReaderTypography};
     let database = TestDatabase::new();
     let mut storage = Storage::open(database.path()).unwrap();
@@ -135,40 +135,44 @@ fn all_typography_pairs_persist_without_changing_logical_pages_or_document_rows(
         .load_document_reader_snapshot(document.document_id)
         .unwrap()
         .unwrap();
-    for font_size in ReaderFontSize::ALL {
-        for line_spacing in ReaderLineSpacing::ALL {
-            let typography = ReaderTypography {
-                font_size,
-                line_spacing,
-            };
-            assert_eq!(
-                storage.save_reader_typography(typography).unwrap(),
-                typography
-            );
-            let mut reopened = Storage::open(database.path()).unwrap();
-            assert_eq!(reopened.reader_typography().unwrap(), typography);
-            let after = reopened
-                .load_document_reader_snapshot(document.document_id)
-                .unwrap()
-                .unwrap();
-            assert_eq!(
-                after,
-                yomoku_core::reader::DocumentReaderSnapshot {
-                    typography,
-                    ..before.clone()
-                }
-            );
-            assert_eq!(storage.page_length().unwrap(), PageLength::default());
+    for furigana in [false, true] {
+        for font_size in ReaderFontSize::ALL {
+            for line_spacing in ReaderLineSpacing::ALL {
+                let typography = ReaderTypography {
+                    font_size,
+                    line_spacing,
+                    furigana,
+                };
+                assert_eq!(
+                    storage.save_reader_typography(typography).unwrap(),
+                    typography
+                );
+                let mut reopened = Storage::open(database.path()).unwrap();
+                assert_eq!(reopened.reader_typography().unwrap(), typography);
+                let after = reopened
+                    .load_document_reader_snapshot(document.document_id)
+                    .unwrap()
+                    .unwrap();
+                assert_eq!(
+                    after,
+                    yomoku_core::reader::DocumentReaderSnapshot {
+                        typography,
+                        ..before.clone()
+                    }
+                );
+                assert_eq!(storage.page_length().unwrap(), PageLength::default());
+            }
         }
     }
 }
 
 #[test]
-fn typography_statement_and_commit_failure_roll_back_both_fields_and_retry() {
+fn typography_statement_and_commit_failure_roll_back_all_fields_and_retry() {
     use yomoku_core::typography::{ReaderFontSize, ReaderLineSpacing, ReaderTypography};
     let changed = ReaderTypography {
         font_size: ReaderFontSize::Sp24,
         line_spacing: ReaderLineSpacing::Percent200,
+        furigana: true,
     };
     for sql in [
         "CREATE TRIGGER fail_typography BEFORE UPDATE ON reader_settings BEGIN SELECT RAISE(ABORT, 'fixture'); END;",
@@ -192,6 +196,8 @@ fn corrupt_typography_is_rejected_without_writes_or_silent_repair() {
         "DELETE FROM reader_settings",
         "PRAGMA ignore_check_constraints = ON; UPDATE reader_settings SET font_size = 17;",
         "PRAGMA ignore_check_constraints = ON; UPDATE reader_settings SET line_spacing = 151;",
+        "PRAGMA ignore_check_constraints = ON; UPDATE reader_settings SET furigana = -1;",
+        "PRAGMA ignore_check_constraints = ON; UPDATE reader_settings SET furigana = 2;",
     ] {
         let database = TestDatabase::new();
         let mut storage = Storage::open(database.path()).unwrap();
@@ -235,4 +241,77 @@ fn typography_migration_failure_rolls_back_first_column_and_history_before_retry
     let storage = Storage::open(database.path()).unwrap();
     assert_eq!(storage.reader_typography().unwrap(), Default::default());
     assert_eq!(storage.page_length().unwrap(), PageLength::Characters750);
+}
+
+#[test]
+fn furigana_migration_defaults_off_preserving_existing_preferences_and_exact_position() {
+    use yomoku_core::typography::{ReaderFontSize, ReaderLineSpacing, ReaderTypography};
+    let database = TestDatabase::new();
+    let mut connection = Connection::open(database.path()).unwrap();
+    migrate(&mut connection, &MIGRATIONS[..15]).unwrap();
+    let mut old = Storage { connection };
+    old.connection
+        .execute_batch(
+            "UPDATE reader_settings SET font_size = 24, line_spacing = 200, page_length = 750",
+        )
+        .unwrap();
+    let document = old
+        .create_paste(&PasteText::new("𠮷本文".into()).unwrap())
+        .unwrap();
+    let position = yomoku_core::pagination::ReadingPosition {
+        source_id: document.chapter.source_id,
+        chapter_id: document.chapter.chapter_id,
+        offset: yomoku_core::document::TextOffset::at(&document.chapter.text, 4).unwrap(),
+    };
+    let expected = old
+        .save_reading_position(document.document_id, position)
+        .unwrap();
+    drop(old);
+    let mut storage = Storage::open(database.path()).unwrap();
+    let typography = ReaderTypography {
+        font_size: ReaderFontSize::Sp24,
+        line_spacing: ReaderLineSpacing::Percent200,
+        furigana: false,
+    };
+    assert_eq!(storage.reader_typography().unwrap(), typography);
+    assert_eq!(storage.page_length().unwrap(), PageLength::Characters750);
+    assert_eq!(storage.load_paste(document.document_id).unwrap(), expected);
+    let snapshot = storage
+        .load_document_reader_snapshot(document.document_id)
+        .unwrap()
+        .unwrap();
+    assert_eq!(snapshot.typography, typography);
+    assert_eq!(snapshot.document.reading_position, Some(position));
+    let before = fs::read(database.path()).unwrap();
+    drop(storage);
+    let reopened = Storage::open(database.path()).unwrap();
+    assert_eq!(reopened.reader_typography().unwrap(), typography);
+    assert_eq!(fs::read(database.path()).unwrap(), before);
+}
+
+#[test]
+fn furigana_migration_failure_preserves_schema_and_history_before_retry() {
+    let database = TestDatabase::new();
+    let mut connection = Connection::open(database.path()).unwrap();
+    migrate(&mut connection, &MIGRATIONS[..15]).unwrap();
+    connection.execute_batch("UPDATE reader_settings SET font_size = 24, line_spacing = 200; ALTER TABLE reader_settings ADD COLUMN furigana INTEGER NOT NULL DEFAULT 0").unwrap();
+    drop(connection);
+    let before = fs::read(database.path()).unwrap();
+    let before_history = history(&database.path());
+    assert!(matches!(
+        Storage::open(database.path()),
+        Err(StorageError::Sqlite(_))
+    ));
+    assert_eq!(fs::read(database.path()).unwrap(), before);
+    assert_eq!(history(&database.path()), before_history);
+    let connection = Connection::open(database.path()).unwrap();
+    connection
+        .execute_batch("ALTER TABLE reader_settings DROP COLUMN furigana")
+        .unwrap();
+    drop(connection);
+    let storage = Storage::open(database.path()).unwrap();
+    let typography = storage.reader_typography().unwrap();
+    assert!(!typography.furigana);
+    assert_eq!(typography.font_size.sp(), 24);
+    assert_eq!(typography.line_spacing.percent(), 200);
 }

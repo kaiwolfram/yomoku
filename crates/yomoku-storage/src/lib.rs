@@ -117,6 +117,11 @@ const MIGRATIONS: &[Migration] = &[
         name: "0015_reader_typography",
         sql: include_str!("../migrations/0015_reader_typography.sql"),
     },
+    Migration {
+        version: 16,
+        name: "0016_reader_furigana",
+        sql: include_str!("../migrations/0016_reader_furigana.sql"),
+    },
 ];
 
 /// Failures are returned to the runtime; opening never resets a database.

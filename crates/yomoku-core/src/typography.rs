@@ -61,4 +61,6 @@ impl ReaderLineSpacing {
 pub struct ReaderTypography {
     pub font_size: ReaderFontSize,
     pub line_spacing: ReaderLineSpacing,
+    /// Show available source/analyzer readings independently of vocabulary status.
+    pub furigana: bool,
 }

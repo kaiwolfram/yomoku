@@ -1,5 +1,5 @@
 # Resume here
-Updated: 2026-10-27. Source-ruby transport complete; furigana controls/rendering next.
+Updated: 2026-10-27. Furigana preference persists; visible switch/layout next.
 ## Working
 - Pure Crux routes/Library/Settings; Render-only UI; FIFO SQLite/analysis; Library start.
 - Chapter-local UTF-8 position/whole-book percentage/five presets persist; reflow
@@ -65,15 +65,16 @@ Updated: 2026-10-27. Source-ruby transport complete; furigana controls/rendering
   Media+digest LRU <=4 MiB/64 entries; misses verify bytes/digest and decode <=64 KiB.
 - Noto Serif JP 2.003/400/700 + synthesized italic/fallback/credits. Global
   14/16/18/20/24sp + 125/150/175/200%; default 16sp/150%. Migration 0015 persists pairs.
+  Migration 0016 persists default-off furigana through typography/core/FIFO/JNI; no UI yet.
 - ReaderDocument.source_ruby has owned ReaderChapterRuby; ReaderPage.source_ruby
   clips bases to page-local UTF-8, keeps complete source readings across boundaries.
   Shared TXT/EPUB validator; read-only, no Full/vocabulary dependency or schema change.
 ## Next tasks (ordered)
-1. Default-off furigana switch/persistence + source-preferred analyzer fallback and
-   Compose layout. Source transport ready; verify anchors/taps + phone/tablet themes.
+1. Visible furigana switch + source-preferred analyzer fallback and
+   Compose layout. Preference/source transport ready; verify anchors/taps + phone/tablet themes.
 2. CI host/unsigned builds independent; arm64 deferred. Nostr empty/Q188 unresolved.
 ## Verification
-- PASS: 446 Rust (16 opt-in ignored), strict Clippy/fmt, host JNI/repeat Kotlin codegen.
-  Both-ABI APKs/lint + nine phone persistence/spans/EPUB links/recreation cases pass.
-  Commands: DEVELOPMENT.md end; .local/test-reports/reader-ruby/. No open blocker.
+- PASS: 449 Rust (16 opt-in ignored), strict Clippy/fmt, host JNI/repeat Kotlin codegen.
+  Both-ABI APKs/lint + two phone typography persistence/image/word-tap cases pass.
+  Commands: DEVELOPMENT.md end; .local/test-reports/reader-furigana-preference/. No blocker.
   No release/physical-arm64/process-death rerun. Phone/light AVD remains running.

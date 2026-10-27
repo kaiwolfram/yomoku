@@ -2654,3 +2654,19 @@ page boundaries or saved reading anchors to fit ruby. No source normalization,
 vocabulary registration/status/history change, dependency or schema migration.
 This is transport/projection only; keep the default-off switch, source-preferred
 analyzer fallback, Compose layout and word/link tap verification unchecked.
+
+## 2026-10-27 — Persist the furigana preference before exposing its switch
+
+Extend the existing global ReaderTypography value with a default-false boolean.
+Migration 0016 stores semantic 0/1 in the STRICT settings singleton with a CHECK
+constraint. Validate exact integers on read; do not let SQLite's permissive bool
+conversion silently accept corrupt values. Reuse the existing atomic typography
+save and core/FIFO/generated JNI protocol, including loaded-settings, busy and
+pending time/completion gates. Font/spacing controls copy the loaded value and
+preserve the furigana flag. Library and consistent reader snapshots restore it.
+
+This is a bounded persistence step of the open furigana task. Do not expose a
+switch until source-preferred analyzer fallback and Compose rendering give it
+an effect. Preference changes leave canonical text/ranges, logical pages,
+positions, original analyses/tokens, time and vocabulary/history untouched.
+No dependency, permission or destructive-semantics change.

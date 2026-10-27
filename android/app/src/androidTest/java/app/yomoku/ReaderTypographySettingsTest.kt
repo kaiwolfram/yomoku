@@ -68,7 +68,7 @@ class ReaderTypographySettingsTest {
         awaitSaved()
         val original = core().view.readerTypography!!
         try {
-            setTypography(ReaderTypography(ReaderFontSize.SP16, ReaderLineSpacing.PERCENT150))
+            setTypography(ReaderTypography(ReaderFontSize.SP16, ReaderLineSpacing.PERCENT150, true))
             closeSettings()
             val text = "typography-${System.nanoTime()}\n" + "𠮷猫と犬。かな Latin 😀。".repeat(150)
             compose.runOnUiThread { core().dispatch(Event.CreatePaste(text)) }
@@ -115,7 +115,7 @@ class ReaderTypographySettingsTest {
             awaitSaved()
             compose.onNodeWithTag("reader_line_spacing_increase").performScrollTo().performClick()
             awaitSaved()
-            val expected = ReaderTypography(ReaderFontSize.SP20, ReaderLineSpacing.PERCENT175)
+            val expected = ReaderTypography(ReaderFontSize.SP20, ReaderLineSpacing.PERCENT175, true)
             assertEquals(expected, core().view.readerTypography)
             assertNull(core().view.documentError)
             compose.activityRule.scenario.recreate()
@@ -188,8 +188,8 @@ class ReaderTypographySettingsTest {
             val page = core().view.reader!!
             for (value in
                 listOf(
-                    ReaderTypography(ReaderFontSize.SP24, ReaderLineSpacing.PERCENT200),
-                    ReaderTypography(ReaderFontSize.SP14, ReaderLineSpacing.PERCENT125),
+                    ReaderTypography(ReaderFontSize.SP24, ReaderLineSpacing.PERCENT200, false),
+                    ReaderTypography(ReaderFontSize.SP14, ReaderLineSpacing.PERCENT125, false),
                 )) {
                 setTypography(value)
                 compose
