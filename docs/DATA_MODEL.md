@@ -598,8 +598,8 @@ No migration is added.
 
 These remain separate domain/repository APIs: live reader token/word/furigana and
 completion commands still use original B. Read projections never register vocabulary,
-reset position or rewrite history. Effective completion storage is described below;
-override-time registration, core/FIFO/FFI integration and segmentation UI remain pending.
+reset position or rewrite history. Effective completion and override-time registration storage
+are described below. Core/FIFO/FFI integration and segmentation UI remain pending.
 
 ## Frozen effective completions (migration 0018)
 
@@ -634,6 +634,27 @@ document FKs. Historical rows are never rewritten. Vocabulary deletion still cas
 its actual occurrence/status rows; the reservation is identity/provenance, not a counter.
 Migration 0018 creates an empty additive table and leaves all previous histories intact.
 Full-chapter payload size/cost is unmeasured and must be reviewed during live integration.
+
+## Atomic segmentation-override registration
+
+`save_registered_segmentation_override(edit, timestamp)` uses existing migration-0007
+rule/part rows and vocabulary/status-event tables, with no schema change. One immediate
+transaction validates live text, the selected contiguous Japanese original-B span and
+whole effective snapshots/rules, saves/replaces the rule and registers its eligible
+winning segments within the selected occurrence. Exact non-Japanese analyzer matches
+are excluded; unresolved manual parts gain no fabricated analyzer metadata. Repeated
+parts register once, existing statuses survive and new rows receive dated New events.
+Other occurrences/documents are not rescanned for registration, even for global rules.
+
+The rule ID and distinct registration count are returned together. Identical active
+rule retries reuse the ID with zero writes/registration, including after vocabulary
+deletion and SQLite reopen. Reversal preserves registered entries and past history;
+a new explicit save after reversal can register missing spellings again. Rule/part,
+replacement deactivation, vocabulary and event failures (including deferred COMMIT)
+roll back together. Reading encounters/time/position/finish and immutable B/A/C remain
+unchanged. The original analysis-only save API retains its prerequisite semantics.
+Rendered-key validation and retry protection after intervening changes belong to the
+future typed control workflow; this raw storage API is not exposed to Android.
 
 ## Read-only reader token/status projection
 

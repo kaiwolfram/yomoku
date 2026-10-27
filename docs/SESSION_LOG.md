@@ -2277,3 +2277,24 @@
 - Final host Kotlin/JNI and byte-identical repeat codegen pass; seven cross-language
   fixtures and 100 handle lifecycles verify. Existing Crux teardown messages remain
   informational. No escalation/download needed.
+
+
+## 2026-10-27 — Atomic segmentation-override registration
+
+- Added registered-override save sharing transaction-local rule persistence with
+  the original analysis-only API. Validate live Japanese B spans/full effective
+  snapshots, replace the rule and register selected eligible winning parts atomically.
+- Existing statuses/history survive; identical active-rule retries write nothing
+  after deletion/reopen. Reversal retains registration/history. Other occurrences
+  are not rescanned for registration; exact analyzer classification takes priority
+  and unresolved manual spans acquire no guessed reading/lemma.
+- PASS: seven new cases, 524 workspace Rust tests (17 ignored), strict Clippy,
+  Rustfmt/diff, 15 Full + one runtime fixture EACH owned/mapped. Verified Unicode,
+  concurrency, local precedence, stale/corrupt inputs, nonempty history/time/position/
+  finish preservation and statement/deferred-COMMIT rollback. No failing check remains.
+- Updated plan/decisions/architecture/data model, commands and 80-line handoff.
+  No dependencies/schema/bridge/Android changes. Kotlin/JNI/codegen/APK/device/lint/
+  release/performance/process-death/arm64 not rerun; no escalation/download needed.
+- Next: live effective completion/token/word/custom/furigana integration and payload
+  review, then typed override controls with rendered-key/intervening-edit retry guards
+  and Android A/B/C/manual scope choices. Current live reader stays B; no blocker.

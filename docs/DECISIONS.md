@@ -2961,3 +2961,35 @@ restart does not auto-replay unfinished reservations. Entire chapter payload cos
 remain unmeasured; review before switching live reader/FFI paths. No old history is
 backfilled or modified, and vocabulary deletion still removes actual encounter/status
 rows through existing cascades. No destructive migration or architecture change.
+
+
+## 2026-10-27 — Atomic override-time registration prerequisite
+
+Complete the independent storage prerequisite before the larger live-reader switch.
+Add `save_registered_segmentation_override(edit, timestamp)` alongside the existing
+analysis-only save API, sharing the transaction-local override row helper. Require
+live canonical text, complete contiguous Japanese original-B token boundaries and
+valid whole-chapter snapshots/rules. Hold one immediate transaction across validation,
+rule replacement and registration. Return the rule ID and distinct new-entry count.
+No new dependency, migration, analyzer invocation or public bridge payload is needed.
+
+Register only eligible effective segments owned by the newly saved rule within the
+selected source occurrence. Exact analyzer classification takes priority; unresolved
+manual parts inherit Japanese-span eligibility without guessed readings/lemmas. The
+AllOccurrences rule still resolves elsewhere using existing precedence, but saving
+it does not scan other occurrences/documents to register hidden/contextually different
+parts. Existing local winners suppress hidden global parts at the selected occurrence.
+Future explicit completions retain their existing page-only registration policy.
+
+Preserve existing vocabulary/status/history and add dated New registration events
+only for genuinely absent spellings. An identical active-rule retry reuses its ID
+and performs no writes, even after vocabulary deletion or from another occurrence;
+it must not turn a retry into a rescan. Reversal disables the rule without deleting
+registered vocabulary, resurrecting superseded rules or altering past readings/time.
+A deliberate fresh save after reversal may register an absent spelling again.
+
+This internal repository prerequisite does not yet authenticate a rendered selection
+or provide durable retry identity after intervening edits. Add those guards in the
+future typed control workflow; do not expose the raw repository API directly to UI.
+Live effective completion/token/furigana/word/custom integration and payload-cost
+review remain separate, with the current original-B reader intact.

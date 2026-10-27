@@ -1,5 +1,5 @@
 # Resume here
-Updated: 2026-10-27. Frozen effective completions verified; live integration next.
+Updated: 2026-10-27. Atomic override registration verified; live integration next.
 ## Working
 - Pure Crux routes/Library/Settings; Render-only UI; FIFO SQLite/analysis; Library start.
 - Chapter-local UTF-8 position/whole-book percentage/five presets persist; reflow
@@ -48,14 +48,12 @@ Updated: 2026-10-27. Frozen effective completions verified; live integration nex
 - Serial bounds-first decode: <=32768-edge/100 MP source, <=2048-edge sample,
   16 MiB shared page pixels; repeats share bitmaps. Ratio frames <=8192px preserve
   U+FFFC positions/styles/word/link identity; unsupported images keep alt/Retry.
-- Full-window viewer: bounded bitmaps, 1–8x fit zoom/clamped pan, accessible controls;
-  recreation retains selection/zoom/focus; close/page resets; modal gestures never complete.
-- AndroidSVG 1.4 shares bounded/offline viewer/covers; v1 scope met.
+- Full-window viewer: bounded bitmaps, 1–8x fit zoom/clamped pan; accessible controls;
+  retains selection/zoom/focus on recreation; modal gestures never complete.
 - Library covers: verified path/media/SHA-256; <=4 MiB/64-entry LRU; <=64 KiB decode.
 - Noto Serif JP/credits; global font/spacing (16sp/150% default)/furigana persist (0015/16).
-- Custom meanings/readings (0017): global exact-surface CRUD through core/FIFO/FFI/
-  Android; original-token/built-in gates, literal fields, Cancel/exact retries.
-  Selection/drafts reset on dismissal/recreation; history/status/position unchanged.
+- Custom meanings/readings (0017): exact-surface CRUD core/FIFO/FFI/Android; frozen
+  selections/built-in gates, literal drafts/Cancel/retries; no history/status writes.
 - Furigana: persisted switch/retries; keyed source-first/original-B fallback, status
   independent. Half-size readings above canonical Text; strict UTF-16, complete
   readings across page/layout splits, fitted base width and measured headroom.
@@ -68,13 +66,15 @@ Updated: 2026-10-27. Frozen effective completions verified; live integration nex
 - Effective completion (0018): full key/occurrences/time frozen durably; page-only
   registration/New-only Known/history/time/position/finish atomic. Exact replay
   survives reversal/deletion/reopen; legacy calls reject its ID. Live reader uses B.
+- Override save + New registration atomic at selected winning parts; active-rule
+  retries write nothing after deletion/reopen; reversal preserves vocabulary/history.
 ## Next tasks (ordered)
 1. Wire effective completion + token/furigana/word/custom paths through core/FIFO/
    FFI together; review full-chapter payload cost. No restart replay of reservations.
-2. Add atomic override-time registration and typed reads/choices/save/reverse,
-   then Android A/B/C/manual, default All occurrences versus This occurrence.
+2. Add typed reads/choices/save/reverse with rendered-key and intervening-edit retry
+   guards, then Android A/B/C/manual, default All occurrences versus This occurrence.
 Physical arm64 deferred; Nostr empty; Q188 unresolved before forwarding.
 ## Verification
-- PASS: 517 Rust tests (17 ignored), Clippy/format/diff, host Kotlin/JNI/repeat codegen;
-  15 Full + one runtime pass EACH owned/mapped. DEVELOPMENT.md end.
-- APK/device/lint/release/process-death/arm64 not rerun. No blocker.
+- PASS: 524 Rust tests (17 ignored), strict Clippy/Rustfmt/diff;
+  15 Full + one runtime pass EACH owned/mapped. Commands: DEVELOPMENT.md end.
+- Kotlin/JNI/codegen/APK/device/Android lint/release/arm64 not rerun. No blocker.

@@ -4348,3 +4348,48 @@ Final host PASS: real-Full Kotlin/JNI selected-word/custom CRUD, imports/direct
 cancellation, navigation/codecs, seven cross-language fixtures and 100 native handle
 lifecycles. Repeat Kotlin generation is byte-identical. Existing Crux middleware
 teardown messages remain informational. No escalation/download or blocker.
+
+
+## Atomic segmentation-override registration
+
+2026-10-27, from the repository root:
+
+```sh
+export PATH=/home/kai/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin:$PATH
+cargo test -p yomoku-storage registered_override --all-features --locked --offline
+cargo test --workspace --all-features --locked --offline --quiet
+tools/test-sudachi.sh
+cargo clippy --workspace --all-targets --all-features --locked --offline -- -D warnings
+cargo fmt --all -- --check
+git diff --check
+```
+
+PASS: seven new storage cases; 524 workspace Rust tests (17 opt-in ignored), strict
+Clippy, Rustfmt and diff checks. Fifteen Full analysis fixtures plus one runtime
+fixture pass EACH owned/mapped (32 invocations). The real segmentation fixture now
+checks atomic A/B/C choice registration, identical retry no-ops, immutable original
+B and unchanged completion/occurrence counts after SQLite reopen.
+
+Coverage includes all five preserved statuses, repeated parts/occurrences, local
+precedence and exact non-Japanese metadata, missing/corrupt whole snapshots/rules,
+foreign/gapped/invalid UTF-8 spans, supplementary/combining/NUL spelling identity,
+concurrent saves, existing active-rule retries after deletion/reopen, fresh saves
+after reversal, unrelated deleted-word nonregistration, nonempty completed history,
+pending time/progress/finish preservation, replacement/part/vocabulary/status-event
+statement failure and deferred-COMMIT rollback. Only selected winning parts register;
+other occurrences/documents are not rescanned for registration.
+
+Initial checks caught an incorrect test call to the two-argument analyzed completion
+API, and reuse of a moved saved-snapshot fixture vector; corrected the fixtures.
+A retry test initially enabled SQLite query_only before BEGIN IMMEDIATE, which SQLite
+rejects even without row writes. Use aborting write triggers plus exact row/file-byte
+comparisons to verify the no-op instead. No production workaround was needed. Final
+focused/workspace/Full/Clippy checks all pass. Logs:
+/tmp/yomoku-registered-overrides-{tests,full,clippy}.log.
+
+No dependency/version, migration, bridge or Android source changes. Host Kotlin/JNI,
+repeat codegen, Kotlin formatting, APK/device/Android lint, release, performance,
+process-death and physical arm64 were not rerun; AVD untouched. No escalation/download
+or unresolved blocker. Next: integrate effective completion/token/word/custom/furigana
+through core/FIFO/FFI and review payload cost; guarded typed override controls and
+Android A/B/C/manual scope selection remain after that. The current reader uses B.

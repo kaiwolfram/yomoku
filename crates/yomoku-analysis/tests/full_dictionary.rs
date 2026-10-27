@@ -415,8 +415,11 @@ fn real_segmentation_choices_resolve_scopes_merges_and_reversal_without_replacin
             expected_word
         );
     }
-    for (id, snapshot) in saved {
-        assert_eq!(reopened.chapter_analysis(id).unwrap().unwrap(), snapshot);
+    for (id, snapshot) in &saved {
+        assert_eq!(
+            reopened.chapter_analysis(*id).unwrap().as_ref(),
+            Some(snapshot)
+        );
     }
     assert!(reopened
         .delete_effective_reader_custom_entry(&dictionary, &frozen_key, manual.segment_index)
@@ -520,6 +523,48 @@ fn real_segmentation_choices_resolve_scopes_merges_and_reversal_without_replacin
             .unwrap(),
         yomoku_core::completion::AnalyzedCompletionOutcome::AlreadyRecorded
     );
+    // Actual A/B/C boundary choices atomically register their selected spellings,
+    // preserve the immutable B snapshot and never rewrite the completed page.
+    let observer = rusqlite::Connection::open(&path).unwrap();
+    let history_before: (i64, i64) = observer.query_row(
+        "SELECT (SELECT COUNT(*) FROM reading_completions), (SELECT COUNT(*) FROM reading_occurrences)",
+        [], |row| Ok((row.get(0)?, row.get(1)?)),
+    ).unwrap();
+    for (_, snapshot) in &saved {
+        let edit = segmentation_from_snapshot(
+            chapter,
+            &original,
+            snapshot,
+            selected,
+            OverrideScope::ThisOccurrence,
+        )
+        .unwrap();
+        let (id, _) = reopened
+            .save_registered_segmentation_override(&edit, 1000)
+            .unwrap();
+        assert_eq!(
+            reopened
+                .save_registered_segmentation_override(&edit, 1000)
+                .unwrap(),
+            (id, 0)
+        );
+        for part in &edit.parts {
+            assert!(reopened.vocabulary_entry(part).unwrap().is_some());
+        }
+        assert_eq!(
+            reopened
+                .chapter_analysis(imported.analysis_id)
+                .unwrap()
+                .unwrap(),
+            original
+        );
+        assert_eq!(observer.query_row(
+            "SELECT (SELECT COUNT(*) FROM reading_completions), (SELECT COUNT(*) FROM reading_occurrences)",
+            [], |row| Ok((row.get::<_, i64>(0)?, row.get::<_, i64>(1)?)),
+        ).unwrap(), history_before);
+        reopened.reverse_segmentation_override(id).unwrap();
+    }
+    drop(observer);
     drop(reopened);
     std::fs::remove_dir_all(directory).unwrap();
 }

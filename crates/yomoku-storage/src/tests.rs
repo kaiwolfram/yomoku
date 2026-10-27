@@ -26,6 +26,7 @@ mod reader_documents;
 mod reader_tokens;
 mod reader_words;
 mod reading_time;
+mod registered_overrides;
 mod segmentation;
 mod settings;
 mod srt;

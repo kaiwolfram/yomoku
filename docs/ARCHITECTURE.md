@@ -879,8 +879,16 @@ the common position/time/finish transaction and shares original-B exact-surface
 registration/New-only transitions. Effective occurrence indices have explicit versioned
 reservation provenance; prior history remains untouched. No analyzer or SQL enters core.
 The internal JSON reservation is write/compare only; unused IDs never auto-complete.
-Live core/FIFO/FFI integration, override-time registration and Android controls remain
-next. Payload-size/performance and effective bridge schemas still require review.
+A separate registered-override save now shares transaction-local rule persistence
+with the original analysis-only save. One immediate transaction validates the selected
+Japanese B span/full effective snapshots, replaces its rule and registers only that
+rule's eligible winning parts at the selected occurrence. Existing statuses remain;
+identical active-rule retries write nothing, including after vocabulary deletion.
+Reversal preserves registration/history. Other occurrences/documents are not rescanned
+for registration, and no analyzer/platform I/O enters core. No schema/dependency/bridge
+change. Rendered-selection and intervening-edit retry guards remain prerequisites for
+future typed override controls. Live core/FIFO/FFI integration and Android controls
+remain next; payload-size/performance and effective bridge schemas require review.
 
 `Storage::create_analyzed_paste` composes the existing private transaction helpers
 for document creation, validated Mode B analysis and exact-surface registration.
