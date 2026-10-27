@@ -549,10 +549,27 @@ eligible snapshots are validated; corrupt matching output fails without partial
 results/repair. Missing B stays missing; later profiles are excluded. This adds no
 table or migration and creates no alternate snapshots automatically.
 
-These are separate domain/repository APIs: current reader token/word/furigana and
-completion APIs still use original B. Effective eligibility/vocabulary/completion
-projection, core/FIFO/FFI commands and segmentation UI remain unimplemented. No
-resolution API registers vocabulary, resets position or rewrites historical data.
+`EffectiveReaderChapter` privately retains validated resolution and borrows canonical
+chapter text. Its page tokens carry whole effective-chapter segment indices, exact
+surfaces/anchors, page-local UTF-8 display ranges, optional exact metadata and explicit
+reading eligibility. Analyzer Japanese tokens are eligible; exact non-Japanese tokens
+are excluded. An unresolved manual partition inherits eligibility from the Japanese B
+span that made the edit valid (`ManualJapaneseSpan`), without gaining analyzer
+classification, reading or lemma. Visibility includes crossings on both pages;
+completion projection assigns each whole occurrence only to its start page.
+
+`load_effective_reader_tokens` reads document ownership, resolution and live global
+statuses together. It returns the complete effective segmentation alongside tokens;
+distinct visible surfaces use indexed vocabulary lookups, sharing results for repeats.
+New split/merged spellings and deleted entries stay absent until an explicit future
+registration path. A missing live document returns None; missing original B returns
+a snapshot with absent segmentation and no tokens. Malformed pages/snapshots fail.
+Query-only/reopen tests preserve database bytes and stored row values.
+
+These remain separate domain/repository APIs: live reader token/word/furigana and
+completion APIs still use original B. Effective selected-word/registration and frozen
+future-completion identities, core/FIFO/FFI commands and segmentation UI remain
+unimplemented. No projection registers vocabulary, resets position or rewrites history.
 
 ## Read-only reader token/status projection
 

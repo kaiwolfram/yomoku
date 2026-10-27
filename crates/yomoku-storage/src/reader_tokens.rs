@@ -2,17 +2,80 @@ use rusqlite::Connection;
 
 use yomoku_core::{
     document::{DocumentId, TextAnchor, VocabularyId},
+    effective_reader::EffectiveReaderTokenSnapshot,
     reader::{reader_tokens_on_page, ReaderAnalysis, ReaderTokenSnapshot, ReaderVocabulary},
+    vocabulary::Surface,
 };
 
 use crate::{
-    analysis::{read_analysis, read_reader_analysis},
+    analysis::{read_analysis, read_effective_reader_chapter_in, read_reader_analysis},
     reader_documents::load_reader_document_in,
-    vocabulary::decode_status,
+    vocabulary::{decode_status, read_entry_by_surface},
     Storage, StorageError,
 };
 
 impl Storage {
+    /// Read effective visible spans, exact metadata and live exact-surface statuses
+    /// in one transaction. This separate API does not change live reader commands
+    /// or register newly split/merged/deleted surfaces. None means deleted document;
+    /// a snapshot with absent segmentation means missing original Mode B.
+    pub fn load_effective_reader_tokens(
+        &mut self,
+        document_id: DocumentId,
+        page: TextAnchor,
+    ) -> Result<Option<EffectiveReaderTokenSnapshot>, StorageError> {
+        let transaction = self.connection.transaction()?;
+        let Some(document) = load_reader_document_in(&transaction, document_id)? else {
+            return Ok(None);
+        };
+        let chapter = document
+            .chapter(page.chapter_id)
+            .map_err(|_| StorageError::InvalidAnalysis)?;
+        if page
+            .slice(chapter)
+            .map_err(|_| StorageError::InvalidAnalysis)?
+            .is_empty()
+        {
+            return Err(StorageError::InvalidAnalysis);
+        }
+        let effective = read_effective_reader_chapter_in(&transaction, chapter)?;
+        let mut tokens = effective
+            .as_ref()
+            .map(|effective| effective.tokens_on_page(page))
+            .transpose()
+            .map_err(|_| StorageError::InvalidAnalysis)?
+            .unwrap_or_default();
+        // Repeated visible surfaces share one indexed lookup. Missing entries stay
+        // absent; immutable analyzer tokens have no vocabulary foreign key.
+        let mut entries = std::collections::BTreeMap::new();
+        for token in &mut tokens {
+            let surface =
+                Surface::new(&token.surface).map_err(|_| StorageError::InvalidAnalysis)?;
+            let entry = match entries.entry(surface) {
+                std::collections::btree_map::Entry::Occupied(entry) => *entry.get(),
+                std::collections::btree_map::Entry::Vacant(entry) => {
+                    let vocabulary =
+                        read_entry_by_surface(&transaction, entry.key())?.map(|entry| {
+                            ReaderVocabulary {
+                                id: entry.id,
+                                status: entry.status,
+                            }
+                        });
+                    *entry.insert(vocabulary)
+                }
+            };
+            token.vocabulary = entry;
+        }
+        let snapshot = EffectiveReaderTokenSnapshot {
+            document_id,
+            page,
+            segmentation: effective.map(|chapter| chapter.into_segmentation()),
+            tokens,
+        };
+        transaction.commit()?;
+        Ok(Some(snapshot))
+    }
+
     /// Read original Mode B tokens intersecting a supplied page span and their
     /// exact-surface global statuses in one consistent transaction. This does not
     /// load an analyzer, apply boundary overrides, reset progress, register words

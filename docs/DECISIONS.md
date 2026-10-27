@@ -2862,3 +2862,27 @@ Later profiles are not metadata fallbacks; missing B stays missing. No analyzer,
 registration, history, bridge, schema or dependency changes are needed for this
 prerequisite. Live effective eligibility/selection/registration and frozen future
 completion identities remain the next integration step.
+
+## 2026-10-27 — Effective reader eligibility and page projection
+
+Keep reading eligibility separate from analyzer metadata. An exact matching token's
+Japanese classification governs eligibility. When a manual split/merge has no exact
+analyzer token, its parts inherit eligibility from the complete contiguous Japanese
+original-B span required by override resolution. Label this `ManualJapaneseSpan`;
+leave analyzer classification, reading and dictionary form unresolved. This keeps
+manual conjugated expressions selectable/countable without guessing metadata or
+classifying source characters heuristically. Exact non-Japanese output is excluded.
+
+Use an opaque validated `EffectiveReaderChapter` that borrows canonical text and
+owns resolution. Preserve complete effective-chapter indices (distinct from analyzer
+indices), anchors/surfaces and exact metadata. Clip only display ranges; visible
+crossings appear on both pages, and future occurrence projection owns each start
+once. Retain repetitions independently of shared exact-surface vocabulary identities.
+
+Expose a separate read-only storage page/status snapshot using the same resolution
+transaction helper as chapter segmentation. Cache each distinct visible spelling's
+indexed lookup within that transaction; missing/newly partitioned/deleted entries
+stay absent. Retain full effective provenance in the snapshot. No dependency,
+migration, public bridge or live-reader change is needed for this slice. Live word
+lookup/registration and frozen future completions must be integrated before controls
+are exposed; existing analysis, reading history and completion semantics stay intact.

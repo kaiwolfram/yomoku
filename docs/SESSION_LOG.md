@@ -2188,3 +2188,25 @@
   APK/device/lint, release, process-death and physical arm64 were not rerun; AVD
   untouched. Next: effective eligibility/token/word/registration plus frozen future
   completions, then typed core/FIFO/FFI and Android segmentation controls.
+
+## 2026-10-27 — Effective reader eligibility and page/status projection
+
+- Added a pure validated effective reader chapter with explicit analyzer versus
+  manual Japanese-span eligibility, complete metadata/provenance, effective indices,
+  UTF-8 page clipping and start-owned future-occurrence projection. Manual terms
+  remain selectable/countable without fabricated analyzer classification or forms.
+- Added a separate atomic read-only effective page/live-status repository, sharing
+  chapter-resolution loading and indexed lookups for repeated spellings. Newly
+  partitioned/deleted entries remain absent; original live reader/completion stays B.
+- PASS: seven new data-free cases, 495 workspace Rust tests (17 ignored), strict
+  Clippy/Rustfmt/Kotlin formatting/diff, real-Full host Kotlin/JNI, byte-identical
+  repeat generation and 15 Full + one runtime fixture EACH owned/mapped. Fixtures
+  cover exact classification, Unicode/repetition/all-preset crossings, ownership,
+  corrupt off-page data, status/deletion/reversal/reopen and unchanged bytes/rows.
+- Corrected test-only preset names/import and a crossing fixture that originally
+  aligned with paragraph/sentence page boundaries. No production workaround,
+  dependency/schema/bridge/Android changes or open blocker. Updated architecture,
+  data model, decisions, plan and brief handoff; commands/logs: DEVELOPMENT.md end.
+  APK/device/lint/release/process-death/physical arm64 not rerun; AVD untouched.
+- Next: effective selected-word/registration and frozen future-completion identities,
+  live reader/furigana integration, then typed commands and Android controls.

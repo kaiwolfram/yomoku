@@ -4,7 +4,7 @@ use yomoku_core::{
     document::{ChapterText, PasteText, TextAnchor, TextOffset, TextRange},
     pagination::{LogicalPages, ReadingPosition},
     segmentation::ChapterSegmentation,
-    vocabulary::Surface,
+    vocabulary::{Surface, VocabularyStatus},
 };
 
 use super::{imports::fixture, *};
@@ -42,6 +42,259 @@ fn edit(
 
 fn surfaces(result: &ChapterSegmentation) -> Vec<&str> {
     result.segments.iter().map(|s| s.surface.as_str()).collect()
+}
+
+#[test]
+fn effective_reader_tokens_use_live_exact_surface_statuses_without_registration() {
+    use yomoku_core::effective_reader::EffectiveTokenEligibility;
+    let database = TestDatabase::new();
+    let mut storage = Storage::open(database.path()).unwrap();
+    let imported = import(&mut storage, "食べた 食べた English 。 📖");
+    // Register a spelling in a different document, then split both occurrences.
+    import(&mut storage, "食べ");
+    let entry = storage
+        .vocabulary_entry(&Surface::new("食べ").unwrap())
+        .unwrap()
+        .unwrap();
+    storage
+        .set_vocabulary_status(entry.id, VocabularyStatus::Familiar, 110)
+        .unwrap();
+    let chapter = &imported.document.chapter;
+    let id = storage
+        .save_segmentation_override(&edit(
+            chapter,
+            0,
+            "食べた",
+            &["食べ", "た"],
+            OverrideScope::AllOccurrences,
+        ))
+        .unwrap();
+    let page = TextAnchor {
+        source_id: chapter.source_id,
+        chapter_id: chapter.chapter_id,
+        range: TextRange {
+            start: TextOffset::START,
+            end: TextOffset::at(&chapter.text, chapter.text.len()).unwrap(),
+        },
+    };
+    let original = storage
+        .load_reader_tokens(imported.document.document_id, page)
+        .unwrap();
+    let before = preserved_rows(&storage);
+    let file_before = std::fs::read(database.path()).unwrap();
+    storage
+        .connection
+        .execute_batch("PRAGMA query_only = ON")
+        .unwrap();
+    let snapshot = storage
+        .load_effective_reader_tokens(imported.document.document_id, page)
+        .unwrap()
+        .unwrap();
+    assert_eq!(
+        snapshot
+            .tokens
+            .iter()
+            .map(|t| t.surface.as_str())
+            .collect::<Vec<_>>(),
+        ["食べ", "た", "食べ", "た"]
+    );
+    assert!(snapshot
+        .tokens
+        .iter()
+        .all(|t| t.metadata.is_none()
+            && t.eligibility == EffectiveTokenEligibility::ManualJapaneseSpan));
+    for token in &snapshot.tokens {
+        assert_eq!(
+            token.vocabulary.map(|v| (v.id, v.status)),
+            (token.surface == "食べ").then_some((entry.id, VocabularyStatus::Familiar))
+        );
+    }
+    assert_eq!(
+        snapshot.segmentation.as_ref().unwrap().original_analysis_id,
+        imported.analysis_id
+    );
+    assert_eq!(preserved_rows(&storage), before);
+    assert_eq!(std::fs::read(database.path()).unwrap(), file_before);
+    assert_eq!(
+        storage
+            .load_reader_tokens(imported.document.document_id, page)
+            .unwrap(),
+        original
+    );
+    storage
+        .connection
+        .execute_batch("PRAGMA query_only = OFF")
+        .unwrap();
+    drop(storage);
+    let mut storage = Storage::open(database.path()).unwrap();
+    assert_eq!(
+        storage
+            .load_effective_reader_tokens(imported.document.document_id, page)
+            .unwrap()
+            .unwrap(),
+        snapshot
+    );
+    storage
+        .set_vocabulary_status(entry.id, VocabularyStatus::Ignored, 120)
+        .unwrap();
+    let updated = storage
+        .load_effective_reader_tokens(imported.document.document_id, page)
+        .unwrap()
+        .unwrap();
+    assert_eq!(
+        updated.tokens[0].vocabulary.unwrap().status,
+        VocabularyStatus::Ignored
+    );
+    assert_eq!(updated.segmentation, snapshot.segmentation);
+    storage
+        .connection
+        .execute(
+            "DELETE FROM vocabulary WHERE id = ?1",
+            [i64::from(entry.id)],
+        )
+        .unwrap();
+    let before = preserved_rows(&storage);
+    assert!(storage
+        .load_effective_reader_tokens(imported.document.document_id, page)
+        .unwrap()
+        .unwrap()
+        .tokens
+        .iter()
+        .all(|t| t.vocabulary.is_none()));
+    assert_eq!(preserved_rows(&storage), before);
+    storage.reverse_segmentation_override(id).unwrap();
+    let reversed = storage
+        .load_effective_reader_tokens(imported.document.document_id, page)
+        .unwrap()
+        .unwrap();
+    assert_eq!(
+        reversed
+            .tokens
+            .iter()
+            .map(|t| t.surface.as_str())
+            .collect::<Vec<_>>(),
+        ["食べた", "食べた"]
+    );
+    assert_ne!(reversed.segmentation, snapshot.segmentation);
+    // A previously returned result remains the original frozen projection.
+    assert_eq!(snapshot.tokens[0].surface, "食べ");
+}
+
+#[test]
+fn effective_reader_tokens_keep_missing_deleted_and_invalid_states_distinct() {
+    let database = TestDatabase::new();
+    let mut storage = Storage::open(database.path()).unwrap();
+    let imported = import(&mut storage, "猫犬");
+    let chapter = &imported.document.chapter;
+    let page = edit(chapter, 0, "猫犬", &["猫犬"], OverrideScope::AllOccurrences).anchor;
+    let mut foreign = page;
+    foreign.source_id = 999.try_into().unwrap();
+    assert!(matches!(
+        storage.load_effective_reader_tokens(imported.document.document_id, foreign),
+        Err(StorageError::InvalidAnalysis)
+    ));
+    let mut empty = page;
+    empty.range.end = empty.range.start;
+    assert!(matches!(
+        storage.load_effective_reader_tokens(imported.document.document_id, empty),
+        Err(StorageError::InvalidAnalysis)
+    ));
+    let mut broken_utf8 = page;
+    broken_utf8.range.end = 1.try_into().unwrap();
+    assert!(matches!(
+        storage.load_effective_reader_tokens(imported.document.document_id, broken_utf8),
+        Err(StorageError::InvalidAnalysis)
+    ));
+    storage
+        .connection
+        .execute("DELETE FROM chapter_analyses", [])
+        .unwrap();
+    let before = preserved_rows(&storage);
+    let snapshot = storage
+        .load_effective_reader_tokens(imported.document.document_id, page)
+        .unwrap()
+        .unwrap();
+    assert_eq!(snapshot.segmentation, None);
+    assert!(snapshot.tokens.is_empty());
+    assert_eq!(preserved_rows(&storage), before);
+    storage
+        .connection
+        .execute(
+            "DELETE FROM documents WHERE id = ?1",
+            [i64::from(imported.document.document_id)],
+        )
+        .unwrap();
+    assert_eq!(
+        storage
+            .load_effective_reader_tokens(imported.document.document_id, page)
+            .unwrap(),
+        None
+    );
+}
+
+#[test]
+fn effective_reader_tokens_load_exact_alternate_metadata_and_validate_off_page_data() {
+    let database = TestDatabase::new();
+    let mut storage = Storage::open(database.path()).unwrap();
+    let imported = import(&mut storage, "猫犬 鳥");
+    let chapter = &imported.document.chapter;
+    let rule = edit(
+        chapter,
+        0,
+        "猫犬",
+        &["猫", "犬"],
+        OverrideScope::AllOccurrences,
+    );
+    storage.save_segmentation_override(&rule).unwrap();
+    let mut a = storage
+        .chapter_analysis(imported.analysis_id)
+        .unwrap()
+        .unwrap();
+    a.mode = SplitMode::A;
+    let mut cat = a.tokens[0].clone();
+    cat.surface = "猫".into();
+    cat.anchor.range.end = 3.try_into().unwrap();
+    cat.reading = Some("ネコ".into());
+    cat.dictionary_form = Some(Surface::new("猫").unwrap());
+    let mut dog = cat.clone();
+    dog.surface = "犬".into();
+    dog.anchor.range.start = cat.anchor.range.end;
+    dog.anchor.range.end = 6.try_into().unwrap();
+    dog.reading = Some("イヌ".into());
+    dog.dictionary_form = Some(Surface::new("犬").unwrap());
+    a.tokens.splice(0..1, [cat, dog]);
+    let alternate_id = storage
+        .store_chapter_analysis(chapter.chapter_id, &a)
+        .unwrap();
+    // A crossing selection retains the entire token and exact source metadata.
+    let mut page = rule.anchor;
+    page.range.start = 3.try_into().unwrap();
+    let before = preserved_rows(&storage);
+    let snapshot = storage
+        .load_effective_reader_tokens(imported.document.document_id, page)
+        .unwrap()
+        .unwrap();
+    assert_eq!(snapshot.tokens.len(), 1);
+    assert_eq!(snapshot.tokens[0].surface, "犬");
+    let metadata = snapshot.tokens[0].metadata.as_ref().unwrap();
+    assert_eq!(
+        (metadata.analysis_id, metadata.mode, metadata.token_index),
+        (alternate_id, SplitMode::A, 1)
+    );
+    assert_eq!(metadata.reading.as_deref(), Some("イヌ"));
+    assert_eq!(metadata.dictionary_form.as_ref().unwrap().as_str(), "犬");
+    assert_eq!(preserved_rows(&storage), before);
+    storage
+        .connection
+        .execute(
+            "UPDATE analyzed_tokens SET surface = '別' WHERE analysis_id = ?1 AND token_index = 2",
+            [i64::from(alternate_id)],
+        )
+        .unwrap();
+    assert!(matches!(
+        storage.load_effective_reader_tokens(imported.document.document_id, page),
+        Err(StorageError::InvalidAnalysis)
+    ));
 }
 
 fn preserved_rows(storage: &Storage) -> Vec<Vec<Vec<rusqlite::types::Value>>> {

@@ -4,6 +4,7 @@ use yomoku_core::{
         SplitMode, StoredOverride,
     },
     document::{ChapterText, TextAnchor, TextOffset, TextRange},
+    effective_reader::{EffectiveReaderChapter, EffectiveTokenEligibility},
     segmentation::{
         resolve_effective_segmentation, resolve_segmentation, segmentation_from_snapshot,
     },
@@ -639,4 +640,224 @@ fn empty_and_whitespace_only_chapters_remain_empty() {
             .unwrap()
             .is_empty());
     }
+}
+
+#[test]
+fn effective_reader_matches_original_b_without_edits_and_excludes_non_japanese() {
+    let chapter = chapter("猫 English 。 📖 猫");
+    let original = analysis(
+        &chapter,
+        &[
+            ("猫", true),
+            ("English", false),
+            ("。", false),
+            ("📖", false),
+            ("猫", true),
+        ],
+    );
+    let page = anchor(&chapter, 0, chapter.text.len());
+    let effective =
+        EffectiveReaderChapter::resolve(&chapter, 1.try_into().unwrap(), &original, &[], &[])
+            .unwrap();
+    let before = effective.clone();
+    let tokens = effective.tokens_on_page(page).unwrap();
+    let b_tokens = yomoku_core::reader::reader_tokens_on_page(&chapter, &original, page).unwrap();
+    assert_eq!(tokens.len(), b_tokens.len());
+    for (token, b) in tokens.iter().zip(b_tokens) {
+        assert_eq!(token.segment_index, b.token_index);
+        assert_eq!(token.anchor, b.anchor);
+        assert_eq!(token.display_range, b.display_range);
+        assert_eq!(token.surface, b.surface);
+        assert_eq!(
+            token.eligibility,
+            EffectiveTokenEligibility::AnalyzerJapanese
+        );
+        assert_eq!(token.metadata.as_ref().unwrap().reading, b.reading);
+        assert_eq!(token.vocabulary, None);
+    }
+    assert_eq!(
+        tokens.iter().map(|t| t.segment_index).collect::<Vec<_>>(),
+        [0, 4]
+    );
+    assert_eq!(tokens, effective.completion_tokens_on_page(page).unwrap());
+    assert_eq!(effective, before);
+}
+
+#[test]
+fn effective_reader_manual_eligibility_never_fabricates_analyzer_metadata() {
+    let chapter = chapter("食べた 𠮷か\u{3099}\0 。");
+    let original = analysis(
+        &chapter,
+        &[
+            ("食べ", true),
+            ("た", true),
+            ("𠮷か\u{3099}\0", true),
+            ("。", false),
+        ],
+    );
+    let rules = [
+        rule(
+            &chapter,
+            1,
+            0,
+            "食べた",
+            &["食べた"],
+            OverrideScope::AllOccurrences,
+        ),
+        rule(
+            &chapter,
+            2,
+            chapter.text.find('𠮷').unwrap(),
+            "𠮷か\u{3099}\0",
+            &["𠮷", "か\u{3099}\0"],
+            OverrideScope::ThisOccurrence,
+        ),
+    ];
+    let page = anchor(&chapter, 0, chapter.text.len());
+    let effective =
+        EffectiveReaderChapter::resolve(&chapter, 1.try_into().unwrap(), &original, &[], &rules)
+            .unwrap();
+    let tokens = effective.tokens_on_page(page).unwrap();
+    assert_eq!(
+        tokens
+            .iter()
+            .map(|t| t.surface.as_str())
+            .collect::<Vec<_>>(),
+        ["食べた", "𠮷", "か\u{3099}\0"]
+    );
+    assert!(tokens.iter().all(
+        |t| t.eligibility == EffectiveTokenEligibility::ManualJapaneseSpan && t.metadata.is_none()
+    ));
+
+    // An exact A token's explicit classification takes priority over inherited
+    // span eligibility. Non-Japanese output is never counted or selectable.
+    let mut a = analysis(
+        &chapter,
+        &[
+            ("食べた", true),
+            ("𠮷", true),
+            ("か\u{3099}\0", false),
+            ("。", false),
+        ],
+    );
+    a.mode = SplitMode::A;
+    a.tokens[0].reading = Some("タベタ".into());
+    let effective = EffectiveReaderChapter::resolve(
+        &chapter,
+        1.try_into().unwrap(),
+        &original,
+        &[(2.try_into().unwrap(), a)],
+        &rules,
+    )
+    .unwrap();
+    let tokens = effective.tokens_on_page(page).unwrap();
+    assert_eq!(
+        tokens
+            .iter()
+            .map(|t| t.surface.as_str())
+            .collect::<Vec<_>>(),
+        ["食べた", "𠮷"]
+    );
+    assert_eq!(
+        tokens[0].metadata.as_ref().unwrap().reading.as_deref(),
+        Some("タベタ")
+    );
+    assert!(tokens
+        .iter()
+        .all(|t| t.eligibility == EffectiveTokenEligibility::AnalyzerJapanese));
+}
+
+#[test]
+fn effective_reader_clips_unicode_but_counts_crossing_occurrences_once_at_every_preset() {
+    use yomoku_core::pagination::{LogicalPages, PageLength};
+    // Deliberately synthetic tokens include sentence/line boundaries to force
+    // crossings under the reader's paragraph/sentence-aware pagination policy.
+    let surface = format!("{}。\n", "𠮷か\u{3099}\0".repeat(500));
+    let text = format!("{surface}{surface}。{surface}{surface}");
+    let chapter = chapter(&text);
+    let original = analysis(
+        &chapter,
+        &[
+            (&surface, true),
+            (&surface, true),
+            ("。", false),
+            (&surface, true),
+            (&surface, true),
+        ],
+    );
+    let merged = format!("{surface}{surface}");
+    let rules = [rule(
+        &chapter,
+        1,
+        0,
+        &merged,
+        &[&merged],
+        OverrideScope::AllOccurrences,
+    )];
+    let effective =
+        EffectiveReaderChapter::resolve(&chapter, 1.try_into().unwrap(), &original, &[], &rules)
+            .unwrap();
+    for length in PageLength::ALL {
+        let pages = LogicalPages::new(std::slice::from_ref(&chapter), length).unwrap();
+        let mut counted = Vec::new();
+        let mut visible_count = 0;
+        for page in pages.pages() {
+            let visible = effective.tokens_on_page(*page).unwrap();
+            let page_text = page.slice(&chapter).unwrap();
+            for token in &visible {
+                assert_eq!(token.surface, merged);
+                assert!(token.metadata.is_none());
+                let clipped = token.display_range.slice(page_text).unwrap();
+                let start = token.anchor.range.start.max(page.range.start);
+                let end = token.anchor.range.end.min(page.range.end);
+                assert_eq!(
+                    clipped,
+                    TextRange { start, end }.slice(&chapter.text).unwrap()
+                );
+            }
+            visible_count += visible.len();
+            counted.extend(effective.completion_tokens_on_page(*page).unwrap());
+        }
+        assert_eq!(
+            counted.iter().map(|t| t.segment_index).collect::<Vec<_>>(),
+            [0, 2]
+        );
+        assert!(visible_count > counted.len());
+    }
+}
+
+#[test]
+fn effective_reader_validates_whole_snapshots_and_page_ownership_before_projection() {
+    let chapter = chapter("猫犬");
+    let original = analysis(&chapter, &[("猫", true), ("犬", true)]);
+    let id = 1.try_into().unwrap();
+    let effective = EffectiveReaderChapter::resolve(&chapter, id, &original, &[], &[]).unwrap();
+    let page = anchor(&chapter, 0, 3);
+    let mut invalid = vec![anchor(&chapter, 0, 0), anchor(&chapter, 6, 6)];
+    let mut foreign = page;
+    foreign.source_id = 99.try_into().unwrap();
+    invalid.push(foreign);
+    foreign = page;
+    foreign.chapter_id = 99.try_into().unwrap();
+    invalid.push(foreign);
+    foreign = page;
+    foreign.range.end = 1.try_into().unwrap();
+    invalid.push(foreign);
+    for page in invalid {
+        assert!(effective.tokens_on_page(page).is_err());
+        assert!(effective.completion_tokens_on_page(page).is_err());
+    }
+    let mut corrupt = original.clone();
+    corrupt.tokens[1].surface = "鳥".into();
+    assert!(EffectiveReaderChapter::resolve(&chapter, id, &corrupt, &[], &[]).is_err());
+    let mut alternate = corrupt;
+    alternate.mode = SplitMode::A;
+    assert!(EffectiveReaderChapter::resolve(
+        &chapter,
+        id,
+        &original,
+        &[(2.try_into().unwrap(), alternate)],
+        &[]
+    )
+    .is_err());
 }

@@ -288,6 +288,37 @@ fn real_segmentation_choices_resolve_scopes_merges_and_reversal_without_replacin
         .any(|s| s.boundary.surface == "食べた"
             && s.boundary.override_id == Some(global_id)
             && s.metadata.is_none()));
+    let page = TextAnchor {
+        range: TextRange {
+            start: TextOffset::START,
+            end: TextOffset::at(&chapter.text, chapter.text.len()).unwrap(),
+        },
+        ..selected
+    };
+    let expected_tokens = storage
+        .load_effective_reader_tokens(imported.document.document_id, page)
+        .unwrap()
+        .unwrap();
+    assert_eq!(
+        expected_tokens.segmentation.as_ref(),
+        Some(&expected_effective)
+    );
+    let manual = expected_tokens
+        .tokens
+        .iter()
+        .find(|t| t.surface == "食べた")
+        .unwrap();
+    assert_eq!(manual.metadata, None);
+    assert_eq!(
+        manual.eligibility,
+        yomoku_core::effective_reader::EffectiveTokenEligibility::ManualJapaneseSpan
+    );
+    assert!(
+        !expected_tokens.tokens.iter().any(|t| t.surface == "English"
+            || t.surface == "。"
+            || t.surface == "📖"
+            || t.surface == "\0")
+    );
     drop(storage);
     let mut reopened = Storage::open(&path).unwrap();
     assert_eq!(
@@ -303,6 +334,13 @@ fn real_segmentation_choices_resolve_scopes_merges_and_reversal_without_replacin
             .unwrap()
             .unwrap(),
         expected_effective
+    );
+    assert_eq!(
+        reopened
+            .load_effective_reader_tokens(imported.document.document_id, page)
+            .unwrap()
+            .unwrap(),
+        expected_tokens
     );
     for (id, snapshot) in saved {
         assert_eq!(reopened.chapter_analysis(id).unwrap().unwrap(), snapshot);

@@ -843,9 +843,20 @@ token exists; metadata is never guessed from neighboring tokens or another spell
 occurrence. The repository validates complete eligible snapshots in the same
 read-only transaction as rules; later profiles are excluded. Domain/storage fixtures
 plus real Full owned/mapped fixtures cover scope, metadata provenance, reversibility
-and unchanged snapshots/history. Current reader token/word/furigana/completion paths
-continue using original B; effective eligibility/vocabulary/completion projection
-and core/FIFO/FFI/Android controls remain the next slice.
+and unchanged snapshots/history.
+`effective_reader::EffectiveReaderChapter` borrows canonical text and privately owns
+validated resolution. It projects eligible whole occurrences with distinct effective
+segment indices and page-local UTF-8 display ranges. Exact analyzer classification
+governs resolved tokens; unresolved manual partitions inherit reading eligibility
+from the editable Japanese B span, explicitly separate from analyzer metadata.
+Visible crossings appear on both pages; future completion projections own starts.
+`Storage::load_effective_reader_tokens` composes the same resolution loader with
+live indexed exact-surface status reads in one read-only transaction. Repeated
+surfaces share a lookup; missing/deleted entries stay absent. Results retain the
+complete effective segmentation/provenance; no analyzer or registration is invoked.
+Current live reader token/word/furigana/completion paths continue using original B.
+Effective word lookup/registration, frozen future completion identities and
+core/FIFO/FFI/Android controls remain the next integration steps.
 
 `Storage::create_analyzed_paste` composes the existing private transaction helpers
 for document creation, validated Mode B analysis and exact-surface registration.

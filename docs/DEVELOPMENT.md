@@ -4123,3 +4123,59 @@ Final host PASS: real-Full Kotlin/JNI Unicode/codecs, selected-word/custom-entry
 imports/direct cancellation, reader/navigation and handle-lifecycle checks. Repeat
 Kotlin generation is byte-identical. Known Crux middleware teardown messages stay
 informational. No escalation/network download or unresolved blocker for this slice.
+
+## Effective reader eligibility and page/status projection
+
+2026-10-27, from the repository root with the pinned Rust/JDK environment:
+
+```sh
+export PATH=/home/kai/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin:$PATH
+export JAVA_HOME=/home/kai/repos/yomoku/.local/jdk-17/jdk-17.0.21+9
+cargo test -p yomoku-core --test segmentation --all-features --locked --offline
+cargo test -p yomoku-storage segmentation --all-features --locked --offline
+cargo test --workspace --all-features --locked --offline --quiet
+tools/test-sudachi.sh
+cargo clippy --workspace --all-targets --all-features --locked --offline -- -D warnings
+cargo fmt --all -- --check
+tools/format-kotlin.sh --check
+tools/test-kotlin-bridge.sh
+cargo run -p yomoku-ffi --bin generate-kotlin --features facet_typegen --locked --offline -- target/generated/kotlin-repeat
+# Compare only after generation exits.
+diff -r target/generated/kotlin target/generated/kotlin-repeat
+git diff --check
+```
+
+PASS: four new pure and three new storage cases; 495 workspace tests (17 opt-in
+ignored), strict Clippy/Rustfmt/Kotlin formatting/diff, real-Full host Kotlin/JNI
+and byte-identical repeat generation. All fifteen Full analysis fixtures plus one
+runtime fixture pass for EACH owned/mapped loader (32 invocations). Extended the
+real segmentation fixture with effective manual eligibility, non-Japanese exclusions,
+complete resolution provenance and identical page/status results after reopen.
+
+The pure opaque effective chapter borrows canonical text without copying it and
+retains validated boundaries/metadata. Exact analyzer classification governs known
+tokens; unresolved manual partitions explicitly inherit Japanese-span eligibility
+without fabricated metadata. Effective segment indices differ from analyzer indices.
+Visible crossings retain complete surfaces/anchors/metadata on both pages; future
+occurrences own starts exactly once, preserving repetitions at every page preset.
+Synthetic crossing tokens deliberately include sentence/newline boundaries so the
+paragraph/sentence-aware paginator exercises clipping under every preset.
+
+The separate effective page/status repository validates ownership and whole snapshots
+in the same read-only transaction as live indexed exact-surface vocabulary lookups,
+sharing repeated spellings. Query-only bytes/row comparisons, status changes, deleted
+entries, absent B/deleted documents, UTF-8/foreign/empty pages, off-page corruption,
+global reversal and reopen pass. Original B reader/completion behavior is unchanged;
+new or deleted split/merge spellings remain absent until future explicit registration.
+
+Initial focused checks caught two nonexistent page-preset names and a missing test
+status import. Replaced the preset list with PageLength::ALL and added the import.
+The initial crossing fixture had sentence boundaries only between complete merged
+tokens, so it never crossed a logical page. Corrected the synthetic fixture before
+the final passing focused/workspace/Full runs. No production workaround was needed.
+Logs: /tmp/yomoku-effective-reader-{tests,full,clippy,bridge}.log. No dependencies,
+schema/public bridge or Android source changes. No APK/device/Android lint, release,
+performance, process-death or physical-arm64 rerun; AVD unchanged. No blocker.
+Next: effective selected-word/registration and frozen future-completion identities,
+then the live reader/furigana switch and core/FIFO/FFI/Android controls. Past reading
+occurrences remain immutable.

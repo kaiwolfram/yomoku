@@ -1,5 +1,5 @@
 # Resume here
-Updated: 2026-10-27. Effective segmentation metadata verified; reader integration next.
+Updated: 2026-10-27. Effective page/status projection verified; live integration next.
 ## Working
 - Pure Crux routes/Library/Settings; Render-only UI; FIFO SQLite/analysis; Library start.
 - Chapter-local UTF-8 position/whole-book percentage/five presets persist; reflow
@@ -37,8 +37,8 @@ Updated: 2026-10-27. Effective segmentation metadata verified; reader integratio
 - Direct off-main cancelFileImport bypasses FIFO; COMMIT may wait. Silent full-file
   rollback; winning/prior commits stay. Android ignores late reads and awaits BOTH
   native return + outcome before clearing/draining. Dedicated cancellation executor.
-- dataSync lease tracks counts/name only; OS limits apply. Encoding releases it;
-  permission never blocks. Timeout stops lease then Cancel. Notification tap opens Library.
+- dataSync lease tracks counts/name; encoding/timeout release it, timeout Cancels.
+  OS limits apply; permission never blocks. Notification tap opens Library.
 - Bounded EPUB parser ignores CSS; migration 0014 atomically saves original source,
   ordered content/formatting/ruby/images/B/registration. Snapshot loads verify all
   source/assets without parsing; large-book costs remain unmeasured.
@@ -63,18 +63,18 @@ Updated: 2026-10-27. Effective segmentation metadata verified; reader integratio
 - Furigana: persisted switch/retries; keyed source-first/original-B fallback, status
   independent. Half-size readings above canonical Text; strict UTF-16, complete
   readings across page/layout splits, fitted base width and measured headroom.
-- Effective segmentation: original B, A/B/C/manual partitions, contiguous JP B
-  matches, local/newer-ID precedence/reversal; read-only, no reader/history changes.
-- Effective metadata: exact B/A/C profile/span provenance; unmatched spans unresolved.
+- Effective segmentation: B + A/B/C/manual partitions; contiguous JP B matches,
+  local/newer precedence/reversal; exact metadata provenance, unmatched unresolved.
+- Effective reader API: manual JP-span eligibility distinct from analyzer metadata;
+  UTF-8 clipped visibility/start-owned occurrences; atomic read-only live statuses.
 ## Next tasks (ordered)
-1. Integrate effective eligibility/token/word/registration and frozen future-completion
-   identities; retain original snapshots/past history. Reader still uses B today.
+1. Integrate effective selected-word/registration and frozen future-completion
+   identities, then switch live token/furigana paths together. Reader still uses B.
 2. Wire override reads/choices/save/reverse through core/FIFO/FFI, then Android
    A/B/C/manual controls with default All occurrences versus This occurrence.
 Physical arm64 deferred; Nostr empty; Q188 unresolved before forwarding.
 ## Verification
-- PASS: 488 Rust tests (17 ignored), Clippy/format/diff, host Kotlin/JNI and
+- PASS: 495 Rust tests (17 ignored), Clippy/format/diff, host Kotlin/JNI and
   repeat codegen; 15 Full + one runtime pass EACH owned/mapped. DEVELOPMENT.md end.
-- Initial runtime teardown assertion failed once; isolated/full reruns pass. Commands
-  and details: DEVELOPMENT.md end. No dependency/schema/bridge/Android changes;
+- Logs/corrected fixtures: DEVELOPMENT.md end; no dependency/schema/bridge changes.
   APK/device/lint/release/process-death/physical arm64 not rerun. No open blocker.

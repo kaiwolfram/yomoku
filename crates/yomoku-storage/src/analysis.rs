@@ -7,15 +7,54 @@ use yomoku_core::{
     document::{
         AnalysisId, ChapterId, ChapterText, OverrideId, SourceId, TextAnchor, TextOffset, TextRange,
     },
+    effective_reader::EffectiveReaderChapter,
     reader::ReaderAnalysis,
-    segmentation::{
-        resolve_effective_segmentation, resolve_segmentation, ChapterSegmentation,
-        EffectiveChapterSegmentation,
-    },
+    segmentation::{resolve_segmentation, ChapterSegmentation, EffectiveChapterSegmentation},
     vocabulary::Surface,
 };
 
 use crate::{Storage, StorageError};
+
+/// Shared read transaction for segmentation and effective page/status projections.
+pub(crate) fn read_effective_reader_chapter_in<'a>(
+    connection: &Connection,
+    chapter: &'a ChapterText,
+) -> Result<Option<EffectiveReaderChapter<'a>>, StorageError> {
+    let ReaderAnalysis::Available(id) = read_reader_analysis(connection, chapter.chapter_id)?
+    else {
+        return Ok(None);
+    };
+    let original = read_analysis(connection, id)?.ok_or(StorageError::InvalidAnalysis)?;
+    let mut statement = connection.prepare(
+        "SELECT id FROM chapter_analyses WHERE chapter_id = ?1
+         AND engine_revision = ?2 AND dictionary_revision = ?3
+         AND split_mode IN ('a', 'c') ORDER BY id",
+    )?;
+    let ids = statement
+        .query_map(
+            (
+                i64::from(chapter.chapter_id),
+                &original.profile.engine_revision,
+                &original.profile.dictionary_revision,
+            ),
+            |row| row.get::<_, i64>(0),
+        )?
+        .collect::<Result<Vec<_>, _>>()?;
+    let alternates = ids
+        .into_iter()
+        .map(|id| {
+            let id = analysis_id(id)?;
+            Ok((
+                id,
+                read_analysis(connection, id)?.ok_or(StorageError::InvalidAnalysis)?,
+            ))
+        })
+        .collect::<Result<Vec<_>, StorageError>>()?;
+    let rules = read_active_rules(connection, chapter)?;
+    EffectiveReaderChapter::resolve(chapter, id, &original, &alternates, &rules)
+        .map(Some)
+        .map_err(|_| StorageError::InvalidAnalysis)
+}
 
 /// Pin the first persisted Mode B snapshot, including its original profile.
 /// Later engine/dictionary snapshots must not silently replace an import's base.
@@ -84,43 +123,10 @@ impl Storage {
     ) -> Result<Option<EffectiveChapterSegmentation>, StorageError> {
         let transaction = self.connection.transaction()?;
         let chapter = read_chapter(&transaction, chapter_id)?;
-        let ReaderAnalysis::Available(id) = read_reader_analysis(&transaction, chapter_id)? else {
-            transaction.commit()?;
-            return Ok(None);
-        };
-        let original = read_analysis(&transaction, id)?.ok_or(StorageError::InvalidAnalysis)?;
-        let mut statement = transaction.prepare(
-            "SELECT id FROM chapter_analyses WHERE chapter_id = ?1
-             AND engine_revision = ?2 AND dictionary_revision = ?3
-             AND split_mode IN ('a', 'c') ORDER BY id",
-        )?;
-        let ids = statement
-            .query_map(
-                (
-                    i64::from(chapter_id),
-                    &original.profile.engine_revision,
-                    &original.profile.dictionary_revision,
-                ),
-                |row| row.get::<_, i64>(0),
-            )?
-            .collect::<Result<Vec<_>, _>>()?;
-        drop(statement);
-        let alternates = ids
-            .into_iter()
-            .map(|id| {
-                let id = analysis_id(id)?;
-                Ok((
-                    id,
-                    read_analysis(&transaction, id)?.ok_or(StorageError::InvalidAnalysis)?,
-                ))
-            })
-            .collect::<Result<Vec<_>, StorageError>>()?;
-        let rules = read_active_rules(&transaction, &chapter)?;
-        let effective =
-            resolve_effective_segmentation(&chapter, id, &original, &alternates, &rules)
-                .map_err(|_| StorageError::InvalidAnalysis)?;
+        let effective = read_effective_reader_chapter_in(&transaction, &chapter)?
+            .map(EffectiveReaderChapter::into_segmentation);
         transaction.commit()?;
-        Ok(Some(effective))
+        Ok(effective)
     }
 
     /// Persist a validated immutable base snapshot. Identical retries reuse its ID;
