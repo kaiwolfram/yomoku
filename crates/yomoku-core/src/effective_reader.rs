@@ -2,8 +2,9 @@
 
 use crate::{
     analysis::{ChapterAnalysis, InvalidAnalysis, StoredOverride},
+    dictionary::DictionaryCandidates,
     document::{AnalysisId, ChapterText, DocumentId, TextAnchor, TextOffset, TextRange},
-    reader::ReaderVocabulary,
+    reader::{ReaderCustomEntry, ReaderVocabulary},
     segmentation::{resolve_effective_segmentation, EffectiveChapterSegmentation, SegmentMetadata},
 };
 
@@ -38,6 +39,39 @@ pub struct EffectiveReaderTokenSnapshot {
     pub page: TextAnchor,
     pub segmentation: Option<EffectiveChapterSegmentation>,
     pub tokens: Vec<EffectiveReaderToken>,
+}
+
+/// Frozen page and complete resolved provenance, deliberately separate from an
+/// original analyzer identity. Live vocabulary/status changes do not invalidate
+/// it; changed boundaries or metadata do. Not yet part of the public UI bridge.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct EffectiveReaderTokenKey {
+    pub document_id: DocumentId,
+    pub page: TextAnchor,
+    pub segmentation: EffectiveChapterSegmentation,
+}
+
+impl EffectiveReaderTokenSnapshot {
+    /// Missing original B cannot produce a selectable effective identity.
+    pub fn key(&self) -> Option<EffectiveReaderTokenKey> {
+        self.segmentation
+            .as_ref()
+            .map(|segmentation| EffectiveReaderTokenKey {
+                document_id: self.document_id,
+                page: self.page,
+                segmentation: segmentation.clone(),
+            })
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct EffectiveReaderWordDetails {
+    pub key: EffectiveReaderTokenKey,
+    pub token: EffectiveReaderToken,
+    pub encountered: u64,
+    pub candidates: DictionaryCandidates,
+    /// User data remains separate from unresolved analyzer metadata.
+    pub custom_entry: Option<ReaderCustomEntry>,
 }
 
 /// Construction validates entire snapshots/rules before any page is projected.

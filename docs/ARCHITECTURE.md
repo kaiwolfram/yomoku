@@ -854,8 +854,17 @@ Visible crossings appear on both pages; future completion projections own starts
 live indexed exact-surface status reads in one read-only transaction. Repeated
 surfaces share a lookup; missing/deleted entries stay absent. Results retain the
 complete effective segmentation/provenance; no analyzer or registration is invoked.
+`EffectiveReaderTokenKey` freezes document/page and complete resolved boundaries/
+metadata/provenance, independently of live vocabulary. Missing B has no selectable
+key. `Storage::load_effective_reader_word` re-resolves and compares that identity in
+one read-only user-state transaction before accepting an effective segment index.
+It shares exact-surface counts, word/name candidate lookup and missing-match custom
+entry loading with the original-B API. Only exact analyzer metadata supplies a base
+form; manual spans remain unresolved. Reversal/replacement/metadata changes reject
+stale selections, while status/count/custom-entry changes stay live. This internal
+domain/repository key is not yet serialized or exposed through the bridge.
 Current live reader token/word/furigana/completion paths continue using original B.
-Effective word lookup/registration, frozen future completion identities and
+Effective registration, frozen future completion identities and
 core/FIFO/FFI/Android controls remain the next integration steps.
 
 `Storage::create_analyzed_paste` composes the existing private transaction helpers

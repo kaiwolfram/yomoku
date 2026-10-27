@@ -4,11 +4,15 @@
 use std::{error::Error, fmt};
 
 use rusqlite::Connection;
-use yomoku_core::reader::{ReaderToken, ReaderTokenKey};
+use yomoku_core::{
+    dictionary::DictionaryCandidates,
+    effective_reader::{EffectiveReaderTokenKey, EffectiveReaderWordDetails},
+    reader::{ReaderCustomEntry, ReaderToken, ReaderTokenKey, ReaderVocabulary},
+};
 
 use crate::{
     dictionary::{Dictionary, DictionaryError},
-    reader_tokens::load_reader_tokens_in,
+    reader_tokens::{load_effective_reader_tokens_in, load_reader_tokens_in},
     Storage, StorageError,
 };
 
@@ -78,35 +82,61 @@ impl Storage {
         let Some(token) = selected_token_in(&transaction, key, token_index)? else {
             return Ok(None);
         };
-        let encountered = match token.vocabulary {
-            Some(entry) => {
-                let count: i64 = transaction
-                    .query_row(COUNT_SQL, [i64::from(entry.id)], |row| row.get(0))
-                    .map_err(StorageError::from)?;
-                u64::try_from(count).map_err(|_| StorageError::InvalidVocabulary)?
-            }
-            None => 0,
-        };
-        let candidates = dictionary.lookup(&token.surface, token.dictionary_form.as_deref())?;
-        let custom_entry = if candidates.words.is_empty() && candidates.names.is_empty() {
-            crate::custom_dictionary::read_entry_in(
-                &transaction,
-                yomoku_core::vocabulary::Surface::new(token.surface.clone())
-                    .map_err(|_| ReaderWordError::InvalidSelection)?,
-            )
-            .map_err(|error| match error {
-                crate::custom_dictionary::CustomDictionaryError::Storage(error) => {
-                    ReaderWordError::Storage(error)
-                }
-                _ => ReaderWordError::InvalidCustomEntry,
-            })?
-            .map(Into::into)
-        } else {
-            None
-        };
+        let (encountered, candidates, custom_entry) = word_details_in(
+            &transaction,
+            dictionary,
+            &token.surface,
+            token.dictionary_form.as_deref(),
+            token.vocabulary,
+        )?;
         transaction.commit().map_err(StorageError::from)?;
         Ok(Some(ReaderWordDetails {
             key,
+            token,
+            encountered,
+            candidates,
+            custom_entry,
+        }))
+    }
+
+    /// Read a currently resolved effective Japanese segment. The whole frozen
+    /// resolution is compared before using its index: an override replacement,
+    /// reversal or metadata change cannot silently select a different word.
+    /// Status/count/custom-entry reads remain live and never register vocabulary.
+    /// Only exact analyzer metadata may supply a base form for dictionary lookup.
+    pub fn load_effective_reader_word(
+        &mut self,
+        dictionary: &Dictionary,
+        key: &EffectiveReaderTokenKey,
+        segment_index: u64,
+    ) -> Result<Option<EffectiveReaderWordDetails>, ReaderWordError> {
+        let transaction = self.connection.transaction().map_err(StorageError::from)?;
+        let Some(snapshot) =
+            load_effective_reader_tokens_in(&transaction, key.document_id, key.page)?
+        else {
+            return Ok(None);
+        };
+        if snapshot.segmentation.as_ref() != Some(&key.segmentation) {
+            return Err(ReaderWordError::InvalidSelection);
+        }
+        let token = snapshot
+            .tokens
+            .into_iter()
+            .find(|token| token.segment_index == segment_index)
+            .ok_or(ReaderWordError::InvalidSelection)?;
+        let (encountered, candidates, custom_entry) = word_details_in(
+            &transaction,
+            dictionary,
+            &token.surface,
+            token
+                .metadata
+                .as_ref()
+                .and_then(|metadata| metadata.dictionary_form.as_ref().map(|form| form.as_str())),
+            token.vocabulary,
+        )?;
+        transaction.commit().map_err(StorageError::from)?;
+        Ok(Some(EffectiveReaderWordDetails {
+            key: key.clone(),
             token,
             encountered,
             candidates,
@@ -132,6 +162,43 @@ pub(crate) fn selected_token_in(
         .find(|token| token.token_index == token_index)
         .map(Some)
         .ok_or(ReaderWordError::InvalidSelection)
+}
+
+/// Identical exact-surface semantics for original and effective selections.
+fn word_details_in(
+    connection: &Connection,
+    dictionary: &Dictionary,
+    surface: &str,
+    dictionary_form: Option<&str>,
+    vocabulary: Option<ReaderVocabulary>,
+) -> Result<(u64, DictionaryCandidates, Option<ReaderCustomEntry>), ReaderWordError> {
+    let encountered = match vocabulary {
+        Some(entry) => {
+            let count: i64 = connection
+                .query_row(COUNT_SQL, [i64::from(entry.id)], |row| row.get(0))
+                .map_err(StorageError::from)?;
+            u64::try_from(count).map_err(|_| StorageError::InvalidVocabulary)?
+        }
+        None => 0,
+    };
+    let candidates = dictionary.lookup(surface, dictionary_form)?;
+    let custom_entry = if candidates.words.is_empty() && candidates.names.is_empty() {
+        crate::custom_dictionary::read_entry_in(
+            connection,
+            yomoku_core::vocabulary::Surface::new(surface)
+                .map_err(|_| ReaderWordError::InvalidSelection)?,
+        )
+        .map_err(|error| match error {
+            crate::custom_dictionary::CustomDictionaryError::Storage(error) => {
+                ReaderWordError::Storage(error)
+            }
+            _ => ReaderWordError::InvalidCustomEntry,
+        })?
+        .map(Into::into)
+    } else {
+        None
+    };
+    Ok((encountered, candidates, custom_entry))
 }
 
 #[cfg(test)]

@@ -1,5 +1,5 @@
 # Resume here
-Updated: 2026-10-27. Effective page/status projection verified; live integration next.
+Updated: 2026-10-27. Effective selected-word lookup verified; live integration next.
 ## Working
 - Pure Crux routes/Library/Settings; Render-only UI; FIFO SQLite/analysis; Library start.
 - Chapter-local UTF-8 position/whole-book percentage/five presets persist; reflow
@@ -18,8 +18,7 @@ Updated: 2026-10-27. Effective page/status projection verified; live integration
   Strict UTF-8→UTF-16 failure falls back to plain text. Loads wait for pending saves.
 - Five manual statuses atomically update history; same-status no-op. Deleted entries
   never register. Reads/choices need explicit retry. Phone sheet/wide panel shows
-  original/base, expanded senses/POS, names/categories/counts. Opening read-only;
-  navigation dismisses.
+  original/base, senses/POS/names/counts. Read-only opening; movement dismisses.
 - Clock uses elapsedRealtime/15s checkpoints, restore-before-Resume, five-minute
   idle/background cap and movement epochs. Absolute revisions freeze retries,
   coalesce maxima and drain before movement/exit. CoreSession close retains callbacks
@@ -38,7 +37,7 @@ Updated: 2026-10-27. Effective page/status projection verified; live integration
   rollback; winning/prior commits stay. Android ignores late reads and awaits BOTH
   native return + outcome before clearing/draining. Dedicated cancellation executor.
 - dataSync lease tracks counts/name; encoding/timeout release it, timeout Cancels.
-  OS limits apply; permission never blocks. Notification tap opens Library.
+  OS limits apply; permission never blocks; notification opens Library.
 - Bounded EPUB parser ignores CSS; migration 0014 atomically saves original source,
   ordered content/formatting/ruby/images/B/registration. Snapshot loads verify all
   source/assets without parsing; large-book costs remain unmeasured.
@@ -51,11 +50,10 @@ Updated: 2026-10-27. Effective page/status projection verified; live integration
   16 MiB shared page pixels; repeats share bitmaps. Ratio frames <=8192px preserve
   U+FFFC positions/styles/word/link identity; unsupported images keep alt/Retry.
 - Full-window viewer: bounded bitmaps, 1–8x fit zoom/clamped pan, accessible controls;
-  recreation retains selection/zoom/focus; close/page resets. Modal gestures cannot
-  complete pages; input resets idle.
-- AndroidSVG 1.4 vectors/base64/nested SVG share viewer/covers; bounded/offline; v1 scope met.
-- Library covers resolve live path/media/SHA-256 metadata without book BLOBs/Full.
-  Media+digest LRU <=4 MiB/64 entries; misses verify bytes/digest and decode <=64 KiB.
+  recreation retains selection/zoom/focus; close/page resets; modal gestures never complete.
+- AndroidSVG 1.4 shares bounded/offline viewer/covers; v1 scope met.
+- Library covers: live path/media/SHA-256; no book BLOBs/Full. Media+digest LRU
+  <=4 MiB/64 entries; misses verify bytes/digest and decode <=64 KiB.
 - Noto Serif JP/credits; global font/spacing (16sp/150% default)/furigana persist (0015/16).
 - Custom meanings/readings (0017): global exact-surface CRUD through core/FIFO/FFI/
   Android; original-token/built-in gates, literal fields, Cancel/exact retries.
@@ -65,16 +63,18 @@ Updated: 2026-10-27. Effective page/status projection verified; live integration
   readings across page/layout splits, fitted base width and measured headroom.
 - Effective segmentation: B + A/B/C/manual partitions; contiguous JP B matches,
   local/newer precedence/reversal; exact metadata provenance, unmatched unresolved.
-- Effective reader API: manual JP-span eligibility distinct from analyzer metadata;
-  UTF-8 clipped visibility/start-owned occurrences; atomic read-only live statuses.
+- Effective APIs: JP-span eligibility distinct from metadata, clipped visibility/
+  start-owned occurrences/live statuses. Word reads freeze complete resolution,
+  reject changed rule/metadata identities; exact base only, live counts/customs,
+  surface-only unresolved terms; query-only. Live reader still uses B.
 ## Next tasks (ordered)
-1. Integrate effective selected-word/registration and frozen future-completion
-   identities, then switch live token/furigana paths together. Reader still uses B.
+1. Integrate effective registration/custom mutations and frozen future-completion
+   identities, then switch live token/furigana/word paths together. Reader uses B.
 2. Wire override reads/choices/save/reverse through core/FIFO/FFI, then Android
    A/B/C/manual controls with default All occurrences versus This occurrence.
 Physical arm64 deferred; Nostr empty; Q188 unresolved before forwarding.
 ## Verification
-- PASS: 495 Rust tests (17 ignored), Clippy/format/diff, host Kotlin/JNI and
+- PASS: 501 Rust tests (17 ignored), Clippy/format/diff, host Kotlin/JNI and
   repeat codegen; 15 Full + one runtime pass EACH owned/mapped. DEVELOPMENT.md end.
-- Logs/corrected fixtures: DEVELOPMENT.md end; no dependency/schema/bridge changes.
-  APK/device/lint/release/process-death/physical arm64 not rerun. No open blocker.
+- Commands/logs: DEVELOPMENT.md end; pinned SQLite test link only; no schema/bridge change.
+  APK/device/lint/release/process-death/arm64 not rerun. No blocker.

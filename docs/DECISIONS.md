@@ -2886,3 +2886,28 @@ stay absent. Retain full effective provenance in the snapshot. No dependency,
 migration, public bridge or live-reader change is needed for this slice. Live word
 lookup/registration and frozen future completions must be integrated before controls
 are exposed; existing analysis, reading history and completion semantics stay intact.
+
+## 2026-10-27 — Effective selected-word identity and read-only details
+
+Freeze the complete resolved chapter/provenance plus document/page for effective
+selected-word requests. Compare with a fresh validated resolution in the same read
+transaction before using its effective segment index. Original AnalysisId alone
+cannot distinguish a split/merge, replacement/reversal or newly available exact
+metadata. Include applied rule IDs so reapplying the same boundaries does not
+revive a stale selection. Exclude live vocabulary, statuses, counts and custom
+entries from the key. Missing B cannot produce a selectable key. This internal
+value is not a new public bridge payload; serialization/transport and large-chapter
+costs remain to be addressed with the live integration.
+
+Share original/effective exact-surface lifetime counting, dictionary candidate and
+missing-match custom fallback composition. Resolve surface/base from freshly
+validated storage, never caller text. Use a base only from exact analyzer metadata;
+manual eligible spans remain surface-only, including custom-entry gates. Read-only
+lookups never register new or deleted vocabulary or change completed history.
+Keep registration, effective custom mutation commands and frozen future-completion
+identities for later slices before switching live reader/furigana paths together.
+
+The Full analysis integration fixture uses a separate empty immutable word/name
+index, avoiding another downloaded-data requirement. Link the already pinned,
+already used rusqlite 0.40.2 as an analysis dev-dependency to create this fixture;
+no library version, production dependency, schema or public bridge change.

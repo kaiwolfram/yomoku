@@ -4179,3 +4179,61 @@ performance, process-death or physical-arm64 rerun; AVD unchanged. No blocker.
 Next: effective selected-word/registration and frozen future-completion identities,
 then the live reader/furigana switch and core/FIFO/FFI/Android controls. Past reading
 occurrences remain immutable.
+
+## Effective selected-word lookup and frozen selection identity
+
+2026-10-27, from the repository root with the pinned Rust/JDK environment:
+
+```sh
+export PATH=/home/kai/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin:$PATH
+export JAVA_HOME=/home/kai/repos/yomoku/.local/jdk-17/jdk-17.0.21+9
+cargo test -p yomoku-storage reader_words --all-features --locked --offline --quiet
+cargo test -p yomoku-storage effective_reader_words --all-features --locked --offline
+cargo test --workspace --all-features --locked --offline --quiet
+tools/test-sudachi.sh
+cargo clippy --workspace --all-targets --all-features --locked --offline -- -D warnings
+cargo fmt --all -- --check
+tools/format-kotlin.sh --check
+tools/test-kotlin-bridge.sh
+cargo run -p yomoku-ffi --bin generate-kotlin --features facet_typegen --locked --offline -- target/generated/kotlin-repeat
+# Compare after generation exits.
+diff -r target/generated/kotlin target/generated/kotlin-repeat
+git diff --check
+```
+
+PASS: six new effective-word cases, 501 workspace Rust tests (17 opt-in ignored),
+strict Clippy/Rustfmt/Kotlin formatting/diff and byte-identical repeat generation.
+All fifteen Full analysis fixtures plus one runtime fixture pass EACH owned/mapped
+(32 invocations). Extended real segmentation coverage verifies selected effective
+metadata and surface/base query identities, manual unresolved terms, read-only bytes
+and identical complete details after SQLite reopen using an empty immutable index.
+
+Synthetic cases verify simultaneous word/name matches and complete applicable views,
+base-only matches from exact contextual analyzer metadata, surface-only manual terms,
+literal custom Unicode/NUL fields, built-in suppression, all five live statuses,
+repetition/cross-document lifetime counts, source/vocabulary deletion and explicit
+re-registration. Every page preset exercises a complete crossing supplementary/
+combining/NUL token, strict UTF-8 clipping, off-page/non-Japanese indices, missing B,
+foreign/invalid/deleted pages, off-page corrupt snapshots and forged metadata.
+Reversal/replacement and newly available exact metadata invalidate frozen selections;
+status/custom/count changes remain live. Dictionary/custom corruption propagates,
+and explicit retries recover without cached empty results or user-state writes.
+
+The first new focused run caught a test expectation that base==surface should be
+removed from DictionaryCandidates. Existing semantics retain the analyzer base
+while deduplicating query matches; corrected the assertion, with no production
+workaround. The initial workspace command omitted --locked once to add the already
+pinned rusqlite 0.40.2 analysis dev-dependency to Cargo.lock; final locked workspace
+checks pass. No version upgrade, production dependency, migration or bridge change.
+Logs: /tmp/yomoku-effective-word-{tests,full,clippy,bridge}.log.
+APK/device/Android lint, release, performance, process-death and physical arm64 were
+not rerun; the existing AVD was not touched. No open implementation blocker.
+Next: effective registration/custom mutations and frozen future completions, then
+the live reader/furigana/word integration and typed segmentation controls.
+
+Final host PASS: real-Full Kotlin/JNI selected-word/custom-entry payloads and
+Unicode/reopen/retry/counts, import/direct-cancellation regressions, navigation,
+codecs and 100 handle lifecycles; all seven cross-language fixtures verify.
+Known Crux middleware teardown messages and ktfmt JDK deprecation warnings remain
+informational. Repeat generation is byte-identical. No escalation/network download
+was required; no unresolved verification blocker.

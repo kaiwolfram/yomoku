@@ -16,5 +16,6 @@ sha2 = "=0.11.1"
 memmap2 = "=0.9.12"
 
 [dev-dependencies]
+rusqlite = { version = "=0.40.2", default-features = false, features = ["bundled"] }
 yomoku-storage = { path = "../yomoku-storage" }
 zip = { version = "=8.6.0", default-features = false, features = ["deflate-flate2"] }

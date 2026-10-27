@@ -611,3 +611,6 @@ fn corrupt_dictionary_fails_whole_lookup_and_can_retry_without_user_state_change
     assert_eq!(lookup(&mut storage, &dictionary, &imported, 0), expected);
     assert_eq!(fs::read(database.path()).unwrap(), before);
 }
+
+#[path = "reader_words/effective.rs"]
+mod effective;

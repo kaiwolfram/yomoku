@@ -131,6 +131,15 @@ fn real_segmentation_choices_resolve_scopes_merges_and_reversal_without_replacin
     ));
     std::fs::create_dir(&directory).unwrap();
     let path = directory.join("segmentation.sqlite3");
+    // A separate immutable empty word/name fixture exercises selection without
+    // adding another downloaded-data requirement to the Full analysis suite.
+    let dictionary_path = directory.join("dictionary.sqlite3");
+    let dictionary_writer = rusqlite::Connection::open(&dictionary_path).unwrap();
+    dictionary_writer.execute_batch("PRAGMA application_id = 0x594f4449; PRAGMA user_version = 1;
+        CREATE TABLE entries (source TEXT, entry_id INTEGER, payload TEXT, PRIMARY KEY(source, entry_id)) WITHOUT ROWID;
+        CREATE TABLE forms (surface TEXT COLLATE BINARY, source TEXT, entry_id INTEGER, PRIMARY KEY(surface, source, entry_id)) WITHOUT ROWID;").unwrap();
+    drop(dictionary_writer);
+    let dictionary = yomoku_storage::dictionary::Dictionary::open(&dictionary_path).unwrap();
     let mut storage = Storage::open(&path).unwrap();
     let imported = storage
         .create_analyzed_paste(
@@ -319,6 +328,31 @@ fn real_segmentation_choices_resolve_scopes_merges_and_reversal_without_replacin
             || t.surface == "📖"
             || t.surface == "\0")
     );
+    let frozen_key = expected_tokens.key().unwrap();
+    let bytes_before = std::fs::read(&path).unwrap();
+    let expected_words = expected_tokens
+        .tokens
+        .iter()
+        .map(|token| {
+            let details = storage
+                .load_effective_reader_word(&dictionary, &frozen_key, token.segment_index)
+                .unwrap()
+                .unwrap();
+            assert_eq!(details.token, *token);
+            assert_eq!(details.candidates.surface, token.surface);
+            assert_eq!(
+                details.candidates.dictionary_form.as_deref(),
+                token
+                    .metadata
+                    .as_ref()
+                    .and_then(|m| m.dictionary_form.as_ref().map(|f| f.as_str()))
+            );
+            assert_eq!(details.encountered, 0);
+            assert!(details.candidates.words.is_empty() && details.candidates.names.is_empty());
+            details
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(std::fs::read(&path).unwrap(), bytes_before);
     drop(storage);
     let mut reopened = Storage::open(&path).unwrap();
     assert_eq!(
@@ -342,6 +376,19 @@ fn real_segmentation_choices_resolve_scopes_merges_and_reversal_without_replacin
             .unwrap(),
         expected_tokens
     );
+    for expected_word in expected_words {
+        assert_eq!(
+            reopened
+                .load_effective_reader_word(
+                    &dictionary,
+                    &frozen_key,
+                    expected_word.token.segment_index
+                )
+                .unwrap()
+                .unwrap(),
+            expected_word
+        );
+    }
     for (id, snapshot) in saved {
         assert_eq!(reopened.chapter_analysis(id).unwrap().unwrap(), snapshot);
     }

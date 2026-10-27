@@ -2210,3 +2210,27 @@
   APK/device/lint/release/process-death/physical arm64 not rerun; AVD untouched.
 - Next: effective selected-word/registration and frozen future-completion identities,
   live reader/furigana integration, then typed commands and Android controls.
+
+## 2026-10-27 — Effective selected-word lookup
+
+- Added a frozen effective document/page/resolution key and a separate read-only
+  selected-word repository. Fresh resolution/provenance must match before accepting
+  the segment index; override replacement/reversal and metadata changes reject old
+  selections. Live statuses/counts/custom entries do not invalidate the key.
+- Shared original/effective dictionary/count/custom composition. Exact analyzer
+  metadata alone supplies base forms; manual spans use surface-only lookup without
+  guessed readings/lemmas. New/deleted vocabulary remains absent; no registration,
+  history, schema, production dependency, bridge or live-reader behavior change.
+- PASS: six new data-free cases, 501 workspace tests (17 ignored), strict Clippy/
+  Rustfmt/Kotlin formatting/diff, repeat codegen and 15 Full + one runtime fixture
+  EACH owned/mapped. Real Full fixtures now verify effective word details/reopen;
+  already pinned rusqlite 0.40.2 is linked as an analysis test dependency only.
+- Corrected one fixture assertion about retained base==surface dictionary-form
+  payloads. Updated plan, architecture/data model, decisions and 80-line handoff.
+  Commands/results/logs: DEVELOPMENT.md end. APK/device/lint/release/performance/
+  process-death/physical arm64 not rerun; AVD untouched. No implementation blocker.
+- Final host Kotlin/JNI passes selected-word/custom CRUD, Unicode/codecs,
+  imports/cancellation, navigation and handle lifecycle regressions. Known Crux
+  teardown/ktfmt JDK messages remain informational; no escalation/download needed.
+- Next: effective registration/custom mutations and frozen future-completion
+  identities, live token/furigana/word integration, then typed commands/UI controls.

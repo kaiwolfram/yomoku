@@ -566,8 +566,24 @@ registration path. A missing live document returns None; missing original B retu
 a snapshot with absent segmentation and no tokens. Malformed pages/snapshots fail.
 Query-only/reopen tests preserve database bytes and stored row values.
 
+`EffectiveReaderTokenKey` freezes document/page and complete effective segmentation,
+including original B, applied rule IDs and metadata provenance. It excludes live
+vocabulary/status/count/custom-entry data; Missing B has no key. The separate
+`load_effective_reader_word(dictionary, key, segment_index)` transaction validates
+current resolution equality before selecting a visible eligible segment, including
+crossing-page fragments. Caller-provided surfaces/base forms never drive lookup.
+Whole-chapter validation still rejects off-page corruption. Changed resolution is
+InvalidSelection; deleted document is None. No revision table or migration is needed.
+
+Selected details share the original reader's indexed lifetime exact-surface count,
+complete applicable word/name candidates and exact-surface custom fallback. Built-in
+matches suppress custom entries. Only exact analyzer metadata provides a base form;
+manual spans use surface-only lookup without guessed metadata. Deleted/unregistered
+vocabulary stays absent with count zero. Query-only bytes/reopen, literal Unicode,
+all presets, reversal/replacement, metadata arrival and retry tests cover this path.
+
 These remain separate domain/repository APIs: live reader token/word/furigana and
-completion APIs still use original B. Effective selected-word/registration and frozen
+completion APIs still use original B. Effective registration and frozen
 future-completion identities, core/FIFO/FFI commands and segmentation UI remain
 unimplemented. No projection registers vocabulary, resets position or rewrites history.
 
