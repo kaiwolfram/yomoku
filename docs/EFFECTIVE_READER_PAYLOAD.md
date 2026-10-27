@@ -98,3 +98,17 @@ These measure serialized values, not JNI execution time, allocation or device me
 Full resolution and storage revalidation costs remain; real-book/device measurements
 are still pending. Compact schemas and native FIFO operations are tested independently;
 no live event/view or completion/token/word/custom/furigana path has switched from B.
+
+The retained session now also owns word/custom lifecycle and exposes standalone
+`EffectiveReaderWordState`/`EffectiveWordDetails` codecs. Details carry one compact
+visible token, compact selection, count, candidates and optional custom entry;
+no full key is included. A native `EffectiveWordRequest` retains the shared frozen
+key/action and a fresh checked callback attempt per dispatch/retry. Native word
+results authenticate complete key/selection/visible fields before compaction;
+same-surface tokens receive live vocabulary observations, including deletion.
+Dismissal/invalidation clears presentation while accepted callbacks/retries retain
+their keys. Failed custom commands preserve committed fields and require explicit
+retry or Cancel; in-flight writes cannot be abandoned by this component. The new
+Kotlin round trip verifies maximum unsigned counts, unresolved manual metadata,
+literal supplementary/combining/NUL custom fields and retry/error state. It is
+still a prerequisite schema/component, not a live app or JNI performance claim.

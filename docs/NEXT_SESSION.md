@@ -1,5 +1,5 @@
 # Resume here
-Updated: 2026-10-27. Native effective FIFO protocol done; live app switch next.
+Updated: 2026-10-27. Retained effective word/custom lifecycle done; live switch next.
 ## Working
 - Pure Crux routes/Library/Settings; Render-only UI; FIFO SQLite/analysis; Library start.
 - Chapter-local UTF-8 position/whole-book percentage/five presets persist; reflow
@@ -66,15 +66,15 @@ Updated: 2026-10-27. Native effective FIFO protocol done; live app switch next.
 - Atomic override registration: winning parts only; retry no-op; reversal keeps history.
 - Compact effective_session: one full key + view, fresh revisions, stale/foreign/
   duplicate guards, retry/Missing B; prototype Kotlin codecs, page/selection 60/68 B.
-- Native effective_storage: same FIFO/dictionary; tokens/word/custom/prepare/commit.
-  Shared frozen keys survive invalidation/retry; no shell codec/restart replay.
+- Native effective_storage shares FIFO/dictionary; tokens/word/custom/completion.
+  Retained compact word state: frozen keys, fresh attempts, retry/Cancel/stale guards.
 ## Next tasks (ordered)
 1. Switch live core/FFI/Android completion/token/furigana/word/custom together using
-   effective_storage + EFFECTIVE_READER_PAYLOAD.md; wire retained command lifecycle.
+   effective_storage + retained page/word requests + EFFECTIVE_READER_PAYLOAD.md.
 2. Add typed reads/choices/save/reverse with rendered-key/intervening-edit retry guards.
 3. Add Android A/B/C/manual + All/This occurrence; measure real-book/JNI/device cost.
 Physical arm64 deferred; Nostr empty; Q188 unresolved before forwarding.
 ## Verification
-- PASS: 544 Rust tests (17 ignored), strict Clippy/Rustfmt/Kotlin formatting/diff;
+- PASS: 552 Rust tests (17 ignored), strict Clippy/Rustfmt/Kotlin formatting/diff;
   15 Full + one runtime EACH owned/mapped; real-Full Kotlin/JNI/7 Unicode/100 handles.
 - Codegen identical; APK/device/lint/release/arm64 not rerun. DEVELOPMENT.md end.

@@ -27,6 +27,7 @@ use yomoku_core::{
     effective_reader::EffectiveReaderWordDetails,
     effective_session::{
         EffectiveReaderSelection, EffectiveReaderSession, EffectiveSelectionCommand,
+        EffectiveWordRequest,
     },
     effective_storage::{EffectiveStorageOperation as Op, EffectiveStorageResult as Output},
     pagination::PageLength,
@@ -268,6 +269,156 @@ fn word(router: &Router, command: EffectiveSelectionCommand) -> EffectiveReaderW
     };
     assert_eq!(returned, selection);
     *details
+}
+
+fn finish_word(
+    router: &Router,
+    session: &mut EffectiveReaderSession,
+    request: &EffectiveWordRequest,
+) {
+    let result = match run(router, request.operation()) {
+        StorageResult::Effective(result) => Ok(result),
+        StorageResult::Failed(error) => Err(error),
+        result => panic!("unexpected word result: {result:?}"),
+    };
+    assert!(session.finish_word_request(request, result));
+}
+
+#[test]
+fn effective_worker_retained_word_lifecycle_compacts_results_and_retries_frozen_custom_commands() {
+    let fixture = Fixture::new();
+    let router = fixture.router();
+    let mut session = EffectiveReaderSession::default();
+    load(&router, &mut session, fixture.base);
+    let cat = select(&session, "猫").selection();
+    let entry = session
+        .page()
+        .unwrap()
+        .tokens
+        .iter()
+        .find(|token| token.surface == "猫")
+        .unwrap()
+        .vocabulary
+        .unwrap();
+    fixture
+        .storage()
+        .set_vocabulary_status(entry.id, VocabularyStatus::Ignored, 110)
+        .unwrap();
+    let before = std::fs::read(fixture.path()).unwrap();
+    let request = session.begin_word_load(cat).unwrap();
+    finish_word(&router, &mut session, &request);
+    assert_eq!(std::fs::read(fixture.path()).unwrap(), before);
+    assert_eq!(
+        session
+            .word_state()
+            .details
+            .as_ref()
+            .unwrap()
+            .candidates
+            .words
+            .len(),
+        1
+    );
+    assert_eq!(
+        session
+            .word_state()
+            .details
+            .as_ref()
+            .unwrap()
+            .token
+            .vocabulary
+            .unwrap()
+            .status,
+        VocabularyStatus::Ignored
+    );
+    assert!(session
+        .begin_custom_entry_save(cat, "replace built-in".into(), "cat".into())
+        .is_none());
+    assert!(session.begin_custom_entry_delete(cat).is_none());
+    fixture
+        .sql()
+        .execute(
+            "DELETE FROM vocabulary WHERE id = ?1",
+            [i64::from(entry.id)],
+        )
+        .unwrap();
+    let before = std::fs::read(fixture.path()).unwrap();
+    let request = session.begin_word_load(cat).unwrap();
+    finish_word(&router, &mut session, &request);
+    assert_eq!(std::fs::read(fixture.path()).unwrap(), before);
+    assert!(session
+        .word_state()
+        .details
+        .as_ref()
+        .unwrap()
+        .token
+        .vocabulary
+        .is_none());
+
+    let manual = select(&session, "食べ").selection();
+    let request = session.begin_word_load(manual).unwrap();
+    finish_word(&router, &mut session, &request);
+    let details = session.word_state().details.unwrap();
+    assert!(details.token.reading.is_none() && details.token.dictionary_form.is_none());
+    assert!(details.candidates.dictionary_form.is_none());
+    fixture.sql().execute_batch("CREATE TRIGGER fail_custom BEFORE INSERT ON custom_dictionary_entries BEGIN SELECT RAISE(ABORT, 'fixture'); END;").unwrap();
+    let request = session
+        .begin_custom_entry_save(
+            manual,
+            " literal\0meaning 📖 ".into(),
+            " よみか\u{3099}\0 ".into(),
+        )
+        .unwrap();
+    finish_word(&router, &mut session, &request);
+    assert!(session.word_state().custom_entry_error.is_some());
+    assert!(session.word_state().details.unwrap().custom_entry.is_none());
+    fixture
+        .sql()
+        .execute_batch("DROP TRIGGER fail_custom")
+        .unwrap();
+    let retry = session.retry_custom_entry().unwrap();
+    assert_ne!(retry, request);
+    assert_eq!(retry.operation(), request.operation());
+    finish_word(&router, &mut session, &retry);
+    let saved = session.word_state().details.unwrap().custom_entry.unwrap();
+    assert_eq!(saved.surface, "食べ");
+    assert_eq!(saved.english_meaning, " literal\0meaning 📖 ");
+    assert_eq!(saved.reading, " よみか\u{3099}\0 ");
+    assert!(session
+        .page()
+        .unwrap()
+        .tokens
+        .iter()
+        .filter(|token| token.surface == "食べ")
+        .all(|token| token.vocabulary.is_none()));
+    let delete = session.begin_custom_entry_delete(manual).unwrap();
+    session.invalidate();
+    finish_word(&router, &mut session, &delete);
+    assert!(!session.word_state().custom_entry_pending);
+    assert!(session.word_state().details.is_none());
+    assert!(word(
+        &router,
+        match delete.operation() {
+            Op::DeleteCustomEntry(command) => command,
+            _ => unreachable!(),
+        }
+    )
+    .custom_entry
+    .is_none());
+    let sql = fixture.sql();
+    for table in [
+        "reading_completions",
+        "reading_occurrences",
+        "pending_reading_time",
+        "completion_commands",
+    ] {
+        let count: i64 = sql
+            .query_row(&format!("SELECT COUNT(*) FROM {table}"), [], |row| {
+                row.get(0)
+            })
+            .unwrap();
+        assert_eq!(count, 0, "{table}");
+    }
 }
 
 #[test]

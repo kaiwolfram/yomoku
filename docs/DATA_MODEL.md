@@ -673,6 +673,19 @@ unchanged. The original analysis-only save API retains its prerequisite semantic
 Rendered-key validation and retry protection after intervening changes belong to the
 future typed control workflow; this raw storage API is not exposed to Android.
 
+Effective selected-word presentation is now a separate compact core value:
+`EffectiveWordDetails` contains the session selection, visible token, live count,
+word/name candidates and optional exact-surface custom entry. Full chapter keys
+remain in native accepted commands/results and are dropped during compaction.
+The session retains literal pending custom command values for exact explicit
+retry; a fresh native callback attempt distinguishes each retry delivery. This is
+transient process state, not a durable queue. Dismissal/page invalidation cannot
+retarget accepted writes. Successful writes update the displayed committed entry
+only if that selection is still current; failure preserves it. Explicit Cancel can
+discard a failed retry without database writes. No migration or historical data
+semantics change; a new explicit load/edit may supersede the failed retry. Live
+app integration remains pending.
+
 ## Read-only reader token/status projection
 
 `load_reader_tokens(document_id, page)` reads live immutable text, the original

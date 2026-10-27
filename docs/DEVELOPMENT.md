@@ -4550,3 +4550,59 @@ Live app core/FFI/Android completion/token/word/custom/furigana integration rema
 the current reader still uses B. APK/device/Android lint/release, performance,
 process-death and physical arm64 were not rerun; AVD untouched. No implementation
 blocker. Local staging/commit requires the already authorized `.git` escalation.
+
+## Retained effective word/custom lifecycle
+
+2026-10-27, repository root, existing pinned offline Rust/JDK:
+
+```sh
+export PATH=/home/kai/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin:$PATH
+export JAVA_HOME=/home/kai/repos/yomoku/.local/jdk-17/jdk-17.0.21+9
+cargo test -p yomoku-core --test effective_session --all-features --locked --offline
+cargo test -p yomoku-runtime effective_worker_retained --all-features --locked --offline
+cargo test --workspace --all-features --locked --offline --quiet
+cargo clippy --workspace --all-targets --all-features --locked --offline -- -D warnings
+cargo fmt --all -- --check
+tools/format-kotlin.sh --check
+tools/test-sudachi.sh
+tools/test-kotlin-bridge.sh
+cargo run -p yomoku-ffi --bin generate-kotlin --features facet_typegen --locked --offline -- target/generated/kotlin-repeat
+# Compare after both generation commands exit.
+diff -r target/generated/kotlin target/generated/kotlin-repeat
+git diff --check
+```
+
+PASS: eight new cases (seven pure retained-word cases and one actual SQLite FIFO
+case), 552 workspace Rust tests (17 opt-in ignored), strict Clippy/Rustfmt/Kotlin
+formatting/diff and byte-identical repeat generation. Fifteen Full analysis fixtures
+plus one runtime fixture pass EACH owned/mapped (32 invocations). Host Kotlin/JNI
+checks real-Full word/custom paths, imports/direct cancellation, navigation/codecs,
+seven Unicode fixtures and 100 handles, plus the standalone compact effective word
+state schema with literal custom/error fields and maximum unsigned counts.
+
+The pure retained reader session now owns selected-word/custom lifecycle. Full
+native key and visible fields authenticate results before compact presentation;
+no resolved chapter enters the generated word-state codec. Fresh native callback
+attempts reject stale/duplicate deliveries, including previous exact-payload retries.
+Read-only lookup observes live statuses/deletion and updates repeated spellings.
+Missing-match controls preserve literal fields and committed data; built-ins and
+failed lookups cannot create custom commands. Pending custom payloads survive
+invalidation for explicit retry, while explicit Cancel can discard a failed retry.
+New explicit loads/edits can replace failed retries without accepting old callbacks.
+In-flight writes drain and never resurrect dismissed presentation. The FIFO case
+injects a real SQLite write failure, verifies exact repair/retry/delete, no analyzer
+loads and unchanged reading/time/completion tables.
+
+Initial targeted compilation exposed a test module-path error and an unavailable
+test-only JSON import; the final tests use existing generated codecs without a new
+dependency. Kotlin `-Werror` caught an unnecessary safe call in a new assertion;
+the final rerun uses an explicit non-null local. Existing Crux middleware teardown
+messages remain informational. Logs: `/tmp/yomoku-effective-word-state-{tests,
+clippy,full,bridge,format,codegen}.log`.
+
+No dependencies, migration or live Android source changes. This is a retained
+lifecycle/codec slice; live app events/views and completion/token/word/custom/
+furigana remain original B. Next adopt native page/word requests and completion
+reservations together in core/FFI/Android, then guarded override controls. APK/
+device/Android lint/release/performance/process-death/physical arm64 were not rerun.
+No implementation blocker; local commit uses the authorized `.git` escalation.

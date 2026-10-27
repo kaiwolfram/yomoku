@@ -6,6 +6,9 @@
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
+mod words;
+pub use words::{EffectiveReaderWordState, EffectiveWordDetails, EffectiveWordRequest};
+
 use crate::{
     document::{TextAnchor, TextRange},
     effective_reader::{
@@ -142,6 +145,7 @@ pub struct EffectiveReaderSession {
     revision: u64,
     pending: Option<EffectivePageRequest>,
     current: Option<RetainedPage>,
+    words: words::WordState,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -171,6 +175,7 @@ impl EffectiveReaderSession {
     pub fn invalidate(&mut self) {
         self.pending = None;
         self.current = None;
+        self.dismiss_word();
     }
 
     /// Accept only the outstanding request and its document/page/original-B

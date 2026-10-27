@@ -5,7 +5,9 @@ use std::{env, error::Error, path::PathBuf};
 use crux_core::type_generation::facet::{Config, Export, TypeRegistry};
 use yomoku_core::app::{Event, ViewModel};
 use yomoku_core::document::{ChapterText, DocumentId, TextAnchor};
-use yomoku_core::effective_session::{EffectiveReaderPage, EffectiveReaderSelection};
+use yomoku_core::effective_session::{
+    EffectiveReaderPage, EffectiveReaderSelection, EffectiveReaderWordState,
+};
 use yomoku_runtime::ShellEffect;
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -30,6 +32,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         // coordinated effective-reader switch, but codecs are verified now.
         .register_type::<EffectiveReaderPage>()?
         .register_type::<EffectiveReaderSelection>()?
+        .register_type::<EffectiveReaderWordState>()?
         .build()?
         .kotlin(&Config::builder("app.yomoku.shared", output).build())?;
     Ok(())

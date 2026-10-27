@@ -929,6 +929,25 @@ a reserved completion keeps its exact semantics after reversal/deletion. Neither
 startup nor opening the database replays unfinished reservations. The app's live state
 machine has not switched protocols yet; unexpected effective results fail closed.
 
+`EffectiveReaderSession` also owns retained selected-word/custom-entry state. It
+issues Rust-only `EffectiveWordRequest` callback tokens with fresh checked attempt
+numbers for every dispatch, including retries of the same frozen write. Native
+word results authenticate full key, visible token/metadata and exact selection
+before moving candidates/count/custom data into `EffectiveWordDetails`. That
+shell schema contains only one compact token and selection; no chapter provenance.
+Live vocabulary observations update every same-surface visible token. Missing
+matches permit literal custom edits; word/name matches and failed lookups do not.
+Accepted saves/deletes retain their exact key and values until success or an
+explicit action after failure. In-flight writes cannot be cancelled through this
+state API; dismissal/invalidation retires presentation while callbacks still drain.
+New explicit loads/edits may supersede a failed retry without retargeting old callbacks.
+Failures preserve the committed entry. Old attempts cannot consume a newer retry,
+and late results cannot resurrect a dismissed/refreshed page. Load failures require
+another explicit load. The owning app must still apply its shared storage/time/
+completion gates before dispatch and wire callback tokens to the native result.
+Standalone Kotlin codecs and actual FIFO tests verify this component; the live
+app has not adopted it yet. There is no new worker, persistent retry or schema.
+
 `Storage::create_analyzed_paste` composes the existing private transaction helpers
 for document creation, validated Mode B analysis and exact-surface registration.
 A caller-provided callback receives allocated canonical chapter identities; the

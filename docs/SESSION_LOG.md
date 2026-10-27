@@ -2359,3 +2359,21 @@
   schema or Android source change. APK/device/lint/release/performance/process-death/
   arm64 not rerun. Next: coordinated live core/FFI/Android switch, guarded override
   commands, then A/B/C/manual controls. No implementation blocker.
+
+## 2026-10-27 — Retained effective word/custom lifecycle
+
+- Added pure session-owned selected-word/custom state and compact generated details.
+  Native requests retain shared keys and literal actions; fresh callback attempts
+  reject stale/duplicate results, including callbacks from an earlier retry.
+- Added exact save/delete retries, committed-entry preservation, explicit Cancel
+  after failure, dismissal/invalidation guards and live status/deletion observation.
+  Word/name matches and failed lookups cannot enable custom writes. No SQL in core.
+- PASS: seven new pure cases plus one real FIFO/SQLite failure/retry case; 552
+  workspace Rust tests (17 ignored), strict Clippy/Rustfmt/Kotlin formatting/diff,
+  15 Full + one runtime EACH owned/mapped, repeat codegen and real-Full host JNI.
+  Standalone Kotlin codec checks include literal Unicode/custom/error values and
+  maximum unsigned counts. Fixed initial test-path/import and Kotlin warning errors.
+- Updated architecture/data/payload/decisions/plan/development and 80-line handoff.
+  No dependency/schema/live Android changes. Live reader remains original B;
+  coordinated core/FFI/Android switch is next, followed by guarded override controls.
+  APK/device/lint/release/performance/process-death/arm64 not rerun. No blocker.

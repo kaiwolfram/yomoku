@@ -13,6 +13,7 @@ use yomoku_core::{
     effective_reader::EffectiveTokenEligibility,
     effective_session::{
         EffectivePageIdentity, EffectivePageToken, EffectiveReaderPage, EffectiveReaderSelection,
+        EffectiveReaderWordState, EffectiveWordDetails,
     },
     pagination::PageLength,
     reader::ReaderPage,
@@ -206,6 +207,29 @@ fn main() -> Result<(), Box<dyn Error>> {
         page: effective_page.identity,
         segment_index: u64::MAX,
     };
+    let effective_word = EffectiveReaderWordState {
+        selection: Some(effective_selection),
+        details: Some(EffectiveWordDetails {
+            selection: effective_selection,
+            token: effective_page.tokens[1].clone(),
+            encountered: u64::MAX,
+            candidates: yomoku_core::dictionary::DictionaryCandidates {
+                surface: image_text.into(),
+                dictionary_form: None,
+                words: vec![],
+                names: vec![],
+            },
+            custom_entry: Some(yomoku_core::reader::ReaderCustomEntry {
+                surface: image_text.into(),
+                english_meaning: " literal\0meaning 📖 ".into(),
+                reading: " よみか\u{3099}\0 ".into(),
+            }),
+        }),
+        error: None,
+        custom_entry_error: Some(yomoku_core::storage::DocumentError::Unavailable),
+        busy: false,
+        custom_entry_pending: true,
+    };
     let identity_bytes = encode(&effective_page.identity);
     let selection_bytes = encode(&effective_selection);
     assert_eq!(identity_bytes.len(), 60);
@@ -213,6 +237,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     if writing {
         fs::write(dir.join("effective-page.bin"), encode(&effective_page))?;
         fs::write(dir.join("effective-selection.bin"), &selection_bytes)?;
+        fs::write(dir.join("effective-word.bin"), encode(&effective_word))?;
         println!(
             "Effective codec: identity={} bytes, selection={} bytes",
             identity_bytes.len(),
@@ -225,6 +250,9 @@ fn main() -> Result<(), Box<dyn Error>> {
         let returned: EffectiveReaderSelection =
             BincodeFfiFormat::deserialize(&fs::read(dir.join("effective-selection-return.bin"))?)?;
         assert_eq!(returned, effective_selection);
+        let returned: EffectiveReaderWordState =
+            BincodeFfiFormat::deserialize(&fs::read(dir.join("effective-word-return.bin"))?)?;
+        assert_eq!(returned, effective_word);
     }
     if writing {
         fs::write(dir.join("illustrated.bin"), encode(&illustrated))?;

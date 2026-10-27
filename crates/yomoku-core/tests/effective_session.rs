@@ -12,6 +12,9 @@ use yomoku_core::{
     vocabulary::{Surface, VocabularyStatus},
 };
 
+#[path = "effective_session/words.rs"]
+mod words;
+
 fn snapshot() -> EffectiveReaderTokenSnapshot {
     snapshot_with_manual_split(false)
 }

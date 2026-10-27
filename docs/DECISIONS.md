@@ -3065,3 +3065,31 @@ This is an independently verified transport slice before the coordinated live ap
 switch: current core events/views and Android still use original B. Native protocol
 failures reuse `DocumentError`, pending command ownership remains with the core, and
 unexpected effective results in the current live state machine fail closed.
+
+## 2026-10-27 — Retained effective word/custom lifecycle and compact details
+
+Keep selected-word and custom-command lifecycle inside the existing pure retained
+reader session. A Rust-only callback request combines a checked monotonically
+increasing attempt with an accepted shared-key selection and literal action.
+Even exact-payload retries get a fresh attempt, preventing duplicate old callbacks
+from consuming the retry. Reuse the existing native FIFO operations, typed errors
+and repository built-in/stale-key checks; add no worker, dependency or migration.
+
+Move validated native word details into a compact generated shell schema after
+checking complete key, selection and visible token/metadata. Full resolution never
+enters selected-word views. Counts/candidates/custom values remain live, unresolved
+manual metadata stays absent, and a live vocabulary observation updates repeated
+visible spellings. Successful empty matches permit custom controls; immutable word
+or name matches and lookup failures do not. Keep literal fields, no optimistic
+entry replacement, and no status/encounter/position writes from presentation.
+
+Retain accepted custom payloads across dismissal/invalidation and explicit retries;
+the old callback still drains but cannot restore the retired presentation. An
+in-flight command gates mutations. After failure the committed entry remains;
+explicit retry uses frozen values, and explicit Cancel may discard that retry
+without writes. A new explicit load/save/delete can supersede a failed retry;
+Retry itself never reads edited fields. Lookup failure releases its request and needs another explicit
+load. The live app must apply the shared FIFO/time/completion gates and capture
+these native request tokens when adopting this component. This verified slice
+does not switch app events/views or Android from original B; completion/token/
+furigana/word/custom still need their coordinated integration.

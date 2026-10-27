@@ -4,6 +4,7 @@ import app.yomoku.shared.ChapterText
 import app.yomoku.shared.DocumentId
 import app.yomoku.shared.EffectiveReaderPage
 import app.yomoku.shared.EffectiveReaderSelection
+import app.yomoku.shared.EffectiveReaderWordState
 import app.yomoku.shared.EffectiveTokenEligibility
 import app.yomoku.shared.ReaderDocument
 import app.yomoku.shared.ReaderAnalysis
@@ -93,6 +94,23 @@ fun verifyTextBoundaries(directory: String) {
     check(effectiveSelectionBytes.size == 68)
     check(effectiveSelection.bincodeSerialize().contentEquals(effectiveSelectionBytes))
     File(dir, "effective-selection-return.bin").writeBytes(effectiveSelection.bincodeSerialize())
+
+    val effectiveWordBytes = File(dir, "effective-word.bin").readBytes()
+    val effectiveWord = EffectiveReaderWordState.bincodeDeserialize(effectiveWordBytes)
+    check(effectiveWord.selection == effectiveSelection)
+    val details = checkNotNull(effectiveWord.details)
+    check(details.selection == effectiveSelection)
+    check(details.token == effective.tokens[1])
+    check(details.encountered == ULong.MAX_VALUE)
+    check(details.candidates.dictionaryForm == null)
+    check(details.candidates.words.isEmpty() && details.candidates.names.isEmpty())
+    val customEntry = checkNotNull(details.customEntry)
+    check(customEntry.englishMeaning == " literal\u0000meaning 📖 ")
+    check(customEntry.reading == " よみか\u3099\u0000 ")
+    check(effectiveWord.customEntryPending && !effectiveWord.busy)
+    check(effectiveWord.error == null && effectiveWord.customEntryError != null)
+    check(effectiveWord.bincodeSerialize().contentEquals(effectiveWordBytes))
+    File(dir, "effective-word-return.bin").writeBytes(effectiveWord.bincodeSerialize())
 
     val selections = listOf("", "日本語", "𠮷野家😀", "か\u3099", "👩‍👩‍👧‍👦", "第二行\n\n", "端")
     for ((index, selected) in selections.withIndex()) {
