@@ -101,7 +101,9 @@ the same viewer/cover pipeline. This basic SVG support satisfies v1 scope;
 complex styles/resources retain the existing fallback. TXT/EPUB source ruby now
 travels through validated chapter/page snapshots and typed JNI, preserving exact
 text positions. A default-off furigana preference persists through SQLite and the
-typed bridge. The visible switch, analyzer fallback and ruby rendering remain planned.
+typed bridge. Pure core now projects source-preferred readings with original
+Mode B analyzer fallback, independent of vocabulary status, through generated JNI.
+The visible switch and ruby layout remain planned.
 The pure [SRT parser](crates/yomoku-import/src/srt.rs) has host fixtures for cue
 boundaries, formatting, speakers and malformed input. Its atomic repository now
 persists original bytes/encoding, canonical cues, Mode B and vocabulary registrations

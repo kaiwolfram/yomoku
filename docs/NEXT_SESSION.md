@@ -1,5 +1,5 @@
 # Resume here
-Updated: 2026-10-27. Furigana preference persists; visible switch/layout next.
+Updated: 2026-10-27. Source-preferred furigana projection ready; switch/layout next.
 ## Working
 - Pure Crux routes/Library/Settings; Render-only UI; FIFO SQLite/analysis; Library start.
 - Chapter-local UTF-8 position/whole-book percentage/five presets persist; reflow
@@ -59,22 +59,22 @@ Updated: 2026-10-27. Furigana preference persists; visible switch/layout next.
   Reuses bounded page bitmap; Zoom in/out/Reset/Close and Back.
   Selection/zoom/focus survive recreation; close/page change resets. Modal gestures
   cannot complete pages; pointer/key input resets reader idle policy.
-- AndroidSVG 1.4 vectors/base64/nested SVG share viewer/covers; offline credits.
-  Bounded closed resources; advanced SVG outside v1 scope (DECISIONS.md).
+- AndroidSVG 1.4 vectors/base64/nested SVG share viewer/covers; bounded/offline; v1 scope met.
 - Library covers resolve live path/media/SHA-256 metadata without book BLOBs/Full.
   Media+digest LRU <=4 MiB/64 entries; misses verify bytes/digest and decode <=64 KiB.
-- Noto Serif JP 2.003/400/700 + synthesized italic/fallback/credits. Global
-  14/16/18/20/24sp + 125/150/175/200%; default 16sp/150%. Migration 0015 persists pairs.
-  Migration 0016 persists default-off furigana through typography/core/FIFO/JNI; no UI yet.
+- Noto Serif JP/credits; global font/spacing (16sp/150% default)/furigana persist (0015/16).
 - ReaderDocument.source_ruby has owned ReaderChapterRuby; ReaderPage.source_ruby
-  clips bases to page-local UTF-8, keeps complete source readings across boundaries.
-  Shared TXT/EPUB validator; read-only, no Full/vocabulary dependency or schema change.
+  clips bases to page-local UTF-8, keeps complete readings; shared read-only TXT/EPUB validator.
+- Enabled ViewModel.reader_furigana merges source ruby with original B readings.
+  Any source overlap suppresses that whole token reading; literal complete readings.
+  Full key/owned anchors/clipped ranges/surface validation; invalid/unavailable tokens
+  retain source only. All statuses/deleted vocabulary work; no I/O/position/history change.
 ## Next tasks (ordered)
-1. Visible furigana switch + source-preferred analyzer fallback and
-   Compose layout. Preference/source transport ready; verify anchors/taps + phone/tablet themes.
+1. Visible furigana switch + Compose ruby layout using reader_furigana.
+   Preference/projection ready; verify anchors/word/link taps + phone/tablet themes.
 2. CI host/unsigned builds independent; arm64 deferred. Nostr empty/Q188 unresolved.
 ## Verification
-- PASS: 449 Rust (16 opt-in ignored), strict Clippy/fmt, host JNI/repeat Kotlin codegen.
-  Both-ABI APKs/lint + two phone typography persistence/image/word-tap cases pass.
-  Commands: DEVELOPMENT.md end; .local/test-reports/reader-furigana-preference/. No blocker.
+- PASS: 453 Rust (16 opt-in ignored), strict Clippy/fmt, host JNI/repeat Kotlin codegen.
+  Both-ABI APKs/lint + ten phone transport/word-span/typography cases pass (3m03s).
+  Commands: DEVELOPMENT.md end; .local/test-reports/reader-furigana-projection/. No blocker.
   No release/physical-arm64/process-death rerun. Phone/light AVD remains running.

@@ -87,8 +87,17 @@ changes text/position/history, or changes image asset keys/sizing rules. Setting
 disabled until a successful load and while saves are pending. Migration 0016
 persists the constrained furigana boolean in the same atomic preference update;
 font/spacing controls preserve it. The typed preference loads with Library and
-reader snapshots. The furigana switch, source-preferred analyzer fallback and
-rendering remain open; no inactive switch is exposed yet.
+reader snapshots. Pure core projects `ViewModel.reader_furigana` when enabled:
+sorted page-local UTF-8 ruby, preferring source bases over every overlapping
+original Mode B token and using available whole analyzer readings elsewhere.
+Vocabulary status/absence never filters readings. Full document/page/analysis,
+token ownership, clipped range and canonical surface validation rejects stale or
+malformed analyzer snapshots as a whole while retaining independent source ruby.
+Projection performs no I/O, does not change text/positions/history and follows
+existing token refresh/reflow/departure invalidation. Readings stay literal and
+complete across page boundaries; no proportional reading split is inferred.
+The visible switch and Compose ruby layout remain open; no inactive switch is
+exposed yet.
 
 `ReaderDocument.images` carries keyed `ReaderChapterImages` with source-ordered
 placeholder ranges, alt text and document-scoped `ReaderImageAsset` paths/media

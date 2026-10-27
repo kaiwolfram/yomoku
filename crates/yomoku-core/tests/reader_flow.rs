@@ -2935,6 +2935,19 @@ fn furigana_only_changes_commit_without_replacing_reader_tokens_time_or_notices(
             after,
             yomoku_core::app::ViewModel {
                 reader_typography: Some(typography),
+                reader_furigana: if furigana {
+                    before
+                        .reader
+                        .as_ref()
+                        .unwrap()
+                        .furigana(
+                            before.reader_analysis.unwrap(),
+                            before.reader_tokens.as_ref(),
+                        )
+                        .unwrap()
+                } else {
+                    vec![]
+                },
                 ..before
             }
         );
@@ -2942,6 +2955,103 @@ fn furigana_only_changes_commit_without_replacing_reader_tokens_time_or_notices(
             .process_event(Event::SetReaderTypography(typography))
             .is_empty());
     }
+}
+
+#[test]
+fn furigana_projection_tracks_source_tokens_refresh_reflow_and_departure_without_io() {
+    use yomoku_core::reader_ruby::{ReaderChapterRuby, ReaderRuby};
+    use yomoku_core::typography::ReaderTypography;
+    let core = Core::<Yomoku>::new();
+    let document = document(&format!("{}\n{}\n猫。", "𠮷".repeat(250), "𠮷".repeat(250)));
+    let StorageResult::Loaded(mut saved) = snapshot(
+        document.clone(),
+        PageLength::default(),
+        ReaderAnalysis::Available(42.try_into().unwrap()),
+    ) else {
+        unreachable!()
+    };
+    let source = ReaderRuby {
+        range: yomoku_core::document::TextRange {
+            start: 4.try_into().unwrap(),
+            end: 8.try_into().unwrap(),
+        },
+        reading: "ソース𠮷\0か\u{3099}".into(),
+    };
+    saved.document.source_ruby = vec![ReaderChapterRuby {
+        chapter_id: document.chapter.chapter_id,
+        ruby: vec![source.clone()],
+    }];
+    let mut effects = core.process_event(Event::OpenReader(document.document_id));
+    finish(&core, &mut effects, StorageResult::Loaded(saved));
+    assert!(core.view().reader_furigana.is_empty());
+    let page = core.view().reader.unwrap();
+    core.process_event(Event::OpenSettings);
+    let typography = ReaderTypography {
+        furigana: true,
+        ..Default::default()
+    };
+    let mut effects = core.process_event(Event::SetReaderTypography(typography));
+    assert!(core.view().reader_furigana.is_empty());
+    finish(
+        &core,
+        &mut effects,
+        StorageResult::ReaderTypographySaved(typography),
+    );
+    assert_eq!(core.view().reader_furigana, std::slice::from_ref(&source));
+    core.process_event(Event::CloseSettings);
+    let change = load_status_tokens(&core);
+    let ruby = core.view().reader_furigana;
+    assert_eq!(ruby.len(), 3);
+    assert_eq!(ruby[1], source);
+    assert_eq!(ruby[0].reading, "ヨシ");
+    assert_eq!(ruby[2].reading, "ヨシ");
+    let before = core.view();
+    for status in [
+        VocabularyStatus::Learning,
+        VocabularyStatus::Familiar,
+        VocabularyStatus::Known,
+        VocabularyStatus::Ignored,
+        VocabularyStatus::New,
+    ] {
+        let change = ReaderStatusChange { status, ..change };
+        let mut effects = core.process_event(Event::SetReaderStatus(change));
+        finish(&core, &mut effects, status_result(change));
+        assert_eq!(core.view().reader_furigana, ruby);
+        assert_eq!(core.view().reader, Some(page.clone()));
+    }
+    let key = token_key(&core);
+    let mut effects = core.process_event(Event::LoadReaderTokens(key));
+    assert_eq!(core.view().reader_furigana, std::slice::from_ref(&source));
+    finish(
+        &core,
+        &mut effects,
+        StorageResult::Failed(DocumentError::Unavailable),
+    );
+    assert_eq!(core.view().reader_furigana, std::slice::from_ref(&source));
+    load_status_tokens(&core);
+    assert_eq!(core.view().reader_furigana, ruby);
+    assert_eq!(core.view().loaded_document, before.loaded_document);
+    assert_eq!(core.view().reader_time, before.reader_time);
+    assert_eq!(core.view().completion_notice, before.completion_notice);
+    core.process_event(Event::OpenSettings);
+    let mut effects = core.process_event(Event::SetPageLength(PageLength::Characters250));
+    finish(
+        &core,
+        &mut effects,
+        StorageResult::PageLengthSaved(PageLength::Characters250),
+    );
+    assert_eq!(core.view().reader_furigana, [source]);
+    assert_eq!(core.view().reader.unwrap().position, page.position);
+    core.process_event(Event::CloseSettings);
+    let mut effects = core.process_event(Event::LoadReaderTokens(token_key(&core)));
+    core.process_event(Event::CloseDocument);
+    finish(
+        &core,
+        &mut effects,
+        StorageResult::ReaderTokensLoaded(token_snapshot(key)),
+    );
+    assert!(core.view().reader_furigana.is_empty());
+    assert!(core.view().reader.is_none());
 }
 
 #[test]

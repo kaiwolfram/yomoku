@@ -2670,3 +2670,28 @@ switch until source-preferred analyzer fallback and Compose rendering give it
 an effect. Preference changes leave canonical text/ranges, logical pages,
 positions, original analyses/tokens, time and vocabulary/history untouched.
 No dependency, permission or destructive-semantics change.
+
+## 2026-10-27 — Resolve source-preferred furigana in pure core
+
+Continue the open furigana task with an independently testable projection before
+Compose layout. `ReaderPage::furigana` merges existing source ruby with available
+original Mode B token readings. `ViewModel.reader_furigana` publishes sorted
+page-local `ReaderRuby` only when the committed global preference is enabled.
+Source ruby is independent of token availability; analyzer fallback uses only the
+existing explicit page-token snapshot, with no new effects, Full load or scan.
+
+Each source base owns all overlapping analyzer tokens. Suppress a whole analyzer
+reading on any source overlap rather than inventing how part of a compound's
+reading maps to uncovered characters. Use analyzer readings for other tokens,
+including kana bases; retain literal readings (no katakana/hiragana conversion).
+Crossing page bases keep complete readings. Do not filter by vocabulary status or
+presence: Known, Ignored and deleted entries retain available readings.
+
+Validate full document/page/base identity, owned ordered token anchors/indices,
+exact scalar-aligned clipped ranges and canonical surface fragments before using
+any fallback. A stale or malformed analyzer snapshot contributes no readings;
+valid source ruby remains usable. Existing refresh/reflow/movement/exit rules
+invalidate the derived fallback automatically. Preference commits only affect
+presentation metadata, never canonical text/anchors/history/time. No schema,
+dependency, I/O protocol or destructive-semantics change. Keep the visible switch
+and Compose layout/tap/theme verification unchecked for the next slice.

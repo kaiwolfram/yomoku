@@ -133,7 +133,8 @@ empty projections. TXT source, EPUB content and TXT reader loads share the same
 read-only ordered-index/range/reading validator. Source readings survive missing
 analysis or deleted vocabulary and are independent of all five statuses. Generated
 Kotlin transports both keyed chapter and clipped page forms. No schema/parser
-change; the default-off switch, analyzer fallback and ruby rendering remain open.
+change. The enabled source-preferred projection is described below; the visible
+switch and ruby rendering remain open.
 
 `ReaderDocument.images` carries sparse, unique owned `ReaderChapterImages` keys.
 Each source-ordered `ReaderInlineImage` holds one exact U+FFFC `TextRange`, literal
@@ -811,8 +812,23 @@ carry these preferences through core/FIFO/generated Kotlin. The optional ViewMod
 value is absent until a successful load; failed saves retain the previous values and
 can be repeated. Typography never changes logical pagination or anchors and
 produces no position, encounter, vocabulary or completion writes.
-The furigana preference is transported and persisted; its visible switch and
-source-preferred analyzer fallback/rendering remain pending.
+`ViewModel.reader_furigana` is a transient, derived `Vec<ReaderRuby>`, empty when
+disabled or no reader is open. Enabled projection retains validated page source
+ruby and appends original Mode B token readings only for tokens whose clipped
+base has no source overlap. Any source overlap suppresses that whole analyzer
+reading: no mapping of part of a compound reading to uncovered characters is
+invented. Keep literal readings (including analyzer katakana), sorted by base.
+All statuses and absent/deleted vocabulary receive the same readings. Tokens
+without readings add nothing; source bases do not depend on tokens or analysis.
+Require exact document/page/analysis identity, owned ordered token anchors/indices,
+scalar-aligned exact clipped ranges and matching canonical surface fragments.
+Reject an invalid analyzer snapshot as a whole, retaining valid source ruby.
+Refresh failures, Missing analysis and pending loads therefore retain source
+readings. Page moves/reflow/departure follow existing snapshot invalidation; late
+callbacks cannot restore departed readings. The projection does not request I/O,
+reanalysis or writes, and never changes text, logical pages, saved offsets,
+token/link identities or reading/vocabulary/history state. Generated Kotlin
+transports the derived field; visible switch and Compose layout remain pending.
 
 ## Reader analysis restoration (no schema change)
 `load_reader_snapshot` reads canonical paste content/current position, persisted

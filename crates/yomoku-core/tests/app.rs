@@ -22,6 +22,7 @@ fn starts_in_library() {
             reader: None,
             reader_analysis: None,
             reader_tokens: None,
+            reader_furigana: Vec::new(),
             reader_word_selection: None,
             reader_word: None,
             reader_word_error: None,

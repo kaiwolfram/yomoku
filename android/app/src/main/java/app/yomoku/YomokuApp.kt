@@ -228,6 +228,7 @@ private fun YomokuPreview() {
                 completionNotice = null,
                 bookCompletionNotice = null,
                 readerTokens = null,
+                readerFurigana = emptyList(),
             ),
             dispatch = {},
         )

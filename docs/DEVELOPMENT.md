@@ -3690,3 +3690,59 @@ analyzer fallback and ruby layout/taps/themes remain unchecked. No dependency,
 permission or destructive-semantics change. Tablet/dark, release, process-death,
 standalone dictionary benchmarks and physical-arm64 checks were not rerun;
 physical arm64 remains user-deferred.
+
+
+## Source-preferred furigana projection
+
+2026-10-27, using the pinned Rust PATH/JDK/SDK/Gradle environment above:
+
+```sh
+cargo test -p yomoku-core --test reader_furigana --all-features --locked --offline
+cargo test -p yomoku-core --test reader_flow --all-features --locked --offline furigana
+cargo test --workspace --all-features --locked --offline --quiet
+cargo clippy --workspace --all-targets --all-features --locked --offline -- -D warnings
+cargo fmt --all -- --check
+tools/test-kotlin-bridge.sh
+cargo run -p yomoku-ffi --bin generate-kotlin --features facet_typegen --locked --offline -- target/generated/kotlin-repeat
+diff -r target/generated/kotlin target/generated/kotlin-repeat
+tools/format-kotlin.sh --check
+git diff --check
+./android/gradlew -p android :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=app.yomoku.DocumentSessionTest,app.yomoku.ReaderWordSpansTest,app.yomoku.ReaderTypographySettingsTest --offline --console=plain
+unzip -l android/app/build/outputs/apk/debug/app-debug.apk 'lib/*/libyomoku_jni.so'
+```
+
+Four new Rust cases cover source overlap with multiple/partial analyzer tokens,
+all five statuses and absent/deleted vocabulary, no readings/Missing analysis,
+complete crossing readings at all five logical presets, supplementary/combining/
+NUL text, stale document/page/analysis keys, foreign anchors, malformed/clipped/
+non-scalar/reversed ranges, canonical surface mismatch, unordered/duplicate tokens,
+committed preference gating and refresh failure/retry/reflow/departure. Source ruby
+remains usable when analyzer data is unavailable/rejected. No I/O, schema, parser,
+dependency, text/anchor, history or vocabulary semantics change.
+
+Real-Full host Kotlin/JNI and Android's production TXT session fixture now assert
+an empty disabled projection, source readings before loading tokens, literal
+source hiragana over analyzer katakana, fallback for a second unannotated cat,
+unchanged readings after a status choice, fresh-session preference/source restore
+and dictionary-free token loads. Existing EPUB/SRT/dictionary/Unicode host checks
+pass. Generated ViewModel transports readerFurigana; Compose does not consume it
+yet. The visible switch/layout/taps/themes task remains unchecked.
+
+Final PASS: 453 workspace Rust tests (16 opt-in ignored), strict Clippy/Rustfmt,
+full host Kotlin/JNI, byte-identical repeat generation, Kotlin formatting/diff,
+both arm64-v8a/x86_64 debug/test APKs and strict Android lint. Ten selected
+API-36 x86_64 phone cases pass with zero failures/errors/skips (3m03s including
+build/lint); APK inspection confirms both JNI ABIs. The preexisting FileImports
+autoboxing lint hint remains informational. Logs/reports/lint XML are under
+`.local/test-reports/reader-furigana-projection/` (host JNI output is in the session
+tool transcript).
+
+Initial checks caught an old explicit ViewModel initializer missing the new field,
+a new reflow fixture whose single long paragraph produced identical logical pages,
+and Clippy's lazy-Option/clone-in-assert suggestions. Updated the initializer,
+used two paragraph boundaries to exercise actual reflow, and applied the lint
+suggestions before the final passing runs. Gradle and ADB local sockets required
+approved outside-sandbox execution; no downloads. Reused the existing AVD without
+restart/wipe/display/theme changes; verified 1080x2400/420dpi. No blocker.
+Tablet/dark layout, release, standalone dictionary benchmarks, process-death/reboot
+and physical-arm64 checks were not rerun; physical arm64 remains user-deferred.

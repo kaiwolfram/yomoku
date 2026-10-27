@@ -201,6 +201,7 @@ internal fun verifyDocumentBridge() {
             check(ViewModel.bincodeDeserialize(bridge.view()).contentRoute == ContentRoute.MAIN)
             check(ViewModel.bincodeDeserialize(bridge.view()).readerAnalysis == null)
             check(ViewModel.bincodeDeserialize(bridge.view()).readerTime == null)
+            check(ViewModel.bincodeDeserialize(bridge.view()).readerFurigana.isEmpty())
             val duplicate = listener.dispatch(bridge, Event.CreatePaste(text))
             check(duplicate.documents.single().documentId == id)
             check(duplicate.documents.single().progressPercent > 0UL)

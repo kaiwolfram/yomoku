@@ -191,6 +191,8 @@ pub struct ViewModel {
     pub book_completion_notice: Option<CompletionCommandId>,
     /// None until explicitly loaded for the current document/page/base analysis.
     pub reader_tokens: Option<ReaderTokenSnapshot>,
+    /// Enabled source-preferred readings, in page-local UTF-8 ranges. No I/O.
+    pub reader_furigana: Vec<crate::reader_ruby::ReaderRuby>,
     pub reader_word_selection: Option<ReaderWordSelection>,
     pub reader_word: Option<ReaderWordDetails>,
     /// Separate from save errors so timer checkpoints cannot erase a failed lookup.
@@ -964,6 +966,18 @@ impl App for Yomoku {
             completion_notice: model.completion_notice,
             book_completion_notice: model.book_completion_notice,
             reader_tokens: model.reader_tokens.clone(),
+            reader_furigana: model
+                .reader_typography
+                .filter(|typography| typography.furigana)
+                .and(model.reader.as_ref())
+                .and_then(|page| {
+                    page.furigana(
+                        model.reader_analysis.unwrap_or(ReaderAnalysis::Missing),
+                        model.reader_tokens.as_ref(),
+                    )
+                    .ok()
+                })
+                .unwrap_or_default(),
             reader_word_selection: model.reader_word_selection,
             reader_word: model.reader_word.clone(),
             reader_word_error: model.reader_word_error,

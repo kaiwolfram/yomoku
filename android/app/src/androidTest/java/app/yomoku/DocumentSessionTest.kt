@@ -99,21 +99,40 @@ class DocumentSessionTest {
             val opened = dispatch(core, Event.OpenReader(id))
             val page = opened.reader!!
             assertEquals(ruby.ruby, page.sourceRuby)
+            assertTrue(opened.readerFurigana.isEmpty())
+            dispatch(core, Event.OpenSettings)
+            val enabled =
+                dispatch(
+                    core,
+                    Event.SetReaderTypography(opened.readerTypography!!.copy(furigana = true)),
+                )
+            assertEquals(page.sourceRuby, enabled.readerFurigana)
+            assertEquals(page, enabled.reader)
+            dispatch(core, Event.CloseSettings)
             val key = ReaderTokenKey(id, page.anchor, opened.readerAnalysis!!)
-            val tokens = dispatch(core, Event.LoadReaderTokens(key)).readerTokens!!
+            val tokenView = dispatch(core, Event.LoadReaderTokens(key))
+            val tokens = tokenView.readerTokens!!
             val cats = tokens.tokens.filter { it.surface == "猫" }
             assertEquals(2, cats.size)
-            dispatch(
-                core,
-                Event.SetReaderStatus(
-                    ReaderStatusChange(
-                        key,
-                        cats.first().vocabulary!!.id,
-                        VocabularyStatus.FAMILIAR,
-                        1234,
-                    )
-                ),
+            assertEquals(page.sourceRuby.single(), tokenView.readerFurigana.first())
+            assertFalse(page.sourceRuby.single().reading == cats[0].reading)
+            assertEquals(
+                cats[1].reading,
+                tokenView.readerFurigana.single { it.range == cats[1].displayRange }.reading,
             )
+            val familiar =
+                dispatch(
+                    core,
+                    Event.SetReaderStatus(
+                        ReaderStatusChange(
+                            key,
+                            cats.first().vocabulary!!.id,
+                            VocabularyStatus.FAMILIAR,
+                            1234,
+                        )
+                    ),
+                )
+            assertEquals(tokenView.readerFurigana, familiar.readerFurigana)
             val position = page.position.copy(offset = TextOffset(3))
             dispatch(core, Event.SaveReadingPosition(position))
             dispatch(core, Event.CloseDocument)
@@ -154,9 +173,12 @@ class DocumentSessionTest {
                 ImportOutcome.EXISTING,
                 dispatch(core, event(bytes)).importSummary!!.outcome,
             )
-            val reopened = dispatch(core, Event.OpenReader(id)).reader!!
+            val reopenedView = dispatch(core, Event.OpenReader(id))
+            val reopened = reopenedView.reader!!
             assertEquals(position, reopened.position)
             assertEquals(ruby.ruby, reopened.sourceRuby)
+            assertTrue(reopenedView.readerTypography!!.furigana)
+            assertEquals(reopened.sourceRuby, reopenedView.readerFurigana)
             val restored = dispatch(core, Event.LoadReaderTokens(key)).readerTokens!!
             assertTrue(
                 restored.tokens

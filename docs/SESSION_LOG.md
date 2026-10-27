@@ -2028,3 +2028,24 @@
   DEVELOPMENT.md end; .local/test-reports/reader-furigana-preference/. No blocker.
   Visible switch/source-preferred analyzer fallback/ruby rendering remain next.
   Tablet/dark/release/process-death/physical-arm64 not rerun; arm64 deferred.
+
+
+## 2026-10-27 — Source-preferred furigana projection
+- Started clean. Added pure ReaderPage::furigana and derived ViewModel.reader_furigana
+  through generated JNI. Enabled projection prefers source bases over all overlapping
+  original B token readings, retains literal complete readings and ignores statuses.
+- Validate full keys/owned anchors/exact clipped ranges/canonical fragments; stale
+  or malformed analyzer snapshots retain source ruby alone. Existing refresh/reflow/
+  exit invalidation applies. No I/O/schema/dependency/text/history changes.
+- PASS: four new Rust cases; 453 workspace tests (16 opt-in ignored), strict
+  Clippy/Rustfmt/Kotlin formatting, full real-Full host JNI/repeat codegen,
+  both-ABI debug/test APKs/lint and ten API-36 phone transport/span/typography cases
+  (3m03s). TXT JNI checks source-before-tokens, source precedence, analyzer fallback,
+  status independence and fresh-session dictionary-free restoration.
+- Fixed old explicit ViewModel fixture/new reflow fixture and Clippy suggestions;
+  Gradle/ADB sockets needed approved outside-sandbox execution. Existing phone AVD
+  remains running, unchanged. Commands/results: DEVELOPMENT.md end and
+  .local/test-reports/reader-furigana-projection/. No blocker.
+- Updated README/architecture/data/decisions/plan/handoff. Next: visible switch and
+  Compose ruby layout from reader_furigana, then anchor/word/link/theme checks.
+  Tablet/dark/release/process-death/physical-arm64 not rerun; arm64 deferred.
