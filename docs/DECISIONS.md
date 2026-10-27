@@ -2504,3 +2504,40 @@ Failures are not cached and retry when the row is redisplayed or Library reenter
 Disposal removes queued requests, suppresses late image delivery and drains
 accepted metadata callbacks. No schema, native API, permissions or destructive
 semantics change. Remaining compound SVG resources stay a separate unfinished task.
+
+
+## 2026-10-27 — Bounded embedded SVG rasters
+
+Continue the unfinished SVG task with self-contained base64 PNG/JPEG resources;
+relative EPUB asset traversal, nested vectors, complex paint and selector-aware
+resource CSS remain separate work. Recheck the pinned AndroidSVG 1.4 source JAR
+against its recorded SHA-256 and upstream resolver documentation. Its
+`checkForImageDataURL` runs before `resolveImage` and decodes without sampling, so
+never pass original data-URI image hrefs through to the renderer.
+
+During existing streaming preflight, validate a single unqualified/xlink href,
+explicit width/height, exact PNG/JPEG media, source dimensions and bounds-only
+codec detection. Cap unique exact URI identities at 64 within the existing 2 MiB
+input cap; decode each distinct source once and share it for repeated placements
+and `<use>` instances. Rewrite hrefs to generated private keys and install a
+resolver that returns only those bitmaps. Do not install font/CSS/file/network
+resolvers. Each temporary raster gets its equal share of one additional asset
+pixel budget, within the existing edge/source limits; final output retains its
+normal budget. Recycle temporary pixels and deregister the resolver on every
+exit. This is a temporary decode cap, not a whole-process heap guarantee.
+
+The renderer infers raster aspect ratio from sampled bitmap dimensions. Wrap each
+image viewport in a group/SVG/image sequence using original source dimensions and
+an inner stretched raster, preserving original fit/slice/none behavior even at
+1x1 sampling. Preserve placement, transforms, IDs, inline styling and clipping;
+count the generated wrappers in reference depth/expanded-node costs. Reject image
+children and ambiguous/foreign hrefs. Keep stylesheet-styled embedded-image SVGs
+on fallback because changing the element hierarchy can change CSS selector
+matching; vector-only color/class CSS remains supported. Other unsupported
+resources continue to show alt/Retry instead of silently missing content.
+
+Serialize all SVG decode operations with a process-wide lock: each CoreSession
+has its own executor, while AndroidSVG exposes a process-global resolver/entity
+setting. This prevents one session from clearing another session's resolver or
+recycling its temporary rasters. No new dependency, schema, core/FFI, permission,
+source-asset mutation or destructive semantics.

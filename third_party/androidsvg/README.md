@@ -21,9 +21,16 @@ Reviewed Maven Central downloads (SHA-256):
 - Sources JAR: `b11595da341bb23c04a5fed0157babd630a44618f8e11c4f2b400167b0e0ce56`
 
 Yomoku preflights SVG XML and local reference expansion, disables entity expansion,
-installs no resource resolver and renders only onto a page-budgeted bitmap. SVGs
-with nested image resources, DTDs, patterns/masks/markers, active/unsupported
-elements or resource-valued
-stylesheet rules use the existing alt-text/Retry fallback. Paths, shapes, text,
-transforms, local uses, gradients and color/class styles remain supported within
+renders onto a page-budgeted bitmap and installs only an in-memory image resolver.
+The pinned source archive was rechecked on 2026-10-27: upstream
+`SVGAndroidRenderer.checkForImageDataURL` decodes before the resolver without bounds;
+Yomoku rewrites base64 PNG/JPEG hrefs to generated private keys and provides sampled,
+shared temporary bitmaps instead. Original source-ratio viewport wrappers account
+for sampling rounding; temporary pixels total <= the output pixel budget and
+recycle after rendering. A process-wide lock protects the static resolver, which
+is always deregistered; fonts/CSS/files/network are never loaded.
+Other nested image resources, DTDs, patterns/masks/markers, active/unsupported
+elements, resource-valued stylesheet rules and stylesheets in embedded-image SVGs
+use the existing alt-text/Retry fallback. Paths, shapes, text,
+transforms, local uses, gradients and vector-only color/class styles remain supported within
 the documented bounds. This introduces no browser/WebView or network loading.

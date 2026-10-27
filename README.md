@@ -91,8 +91,10 @@ The typed cover-reference API reads stored path/media/SHA-256 metadata without
 copying book or image BLOBs. Library displays bounded cover thumbnails with a
 4 MiB memory LRU, verified asset bytes, source ratios and generic fallback icons.
 Bounded static SVGs also render off main with fractional source ratios and offline
-renderer credits. Compound SVG image resources and source ruby remain
-pending.
+renderer credits. Embedded base64 PNG/JPEG resources use bounded temporary
+bitmaps, retain their original aspect ratio and work in the same viewer/cover
+pipeline. Other compound SVG resources, stylesheet-styled embedded images and
+source ruby remain pending.
 The pure [SRT parser](crates/yomoku-import/src/srt.rs) has host fixtures for cue
 boundaries, formatting, speakers and malformed input. Its atomic repository now
 persists original bytes/encoding, canonical cues, Mode B and vocabulary registrations

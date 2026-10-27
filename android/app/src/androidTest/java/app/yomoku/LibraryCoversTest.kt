@@ -62,6 +62,7 @@ class LibraryCoversTest {
             listOf(
                 Triple("png", "image/png", rasterImageBytes(600, 1200)),
                 Triple("svg", "image/svg+xml", svgImageBytes()),
+                Triple("embedded.svg", "image/svg+xml", embeddedSvgImageBytes()),
             )
         for ((extension, media, image) in images) {
             val title = "library-cover-$extension-${System.nanoTime()}"

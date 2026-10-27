@@ -125,12 +125,29 @@ allocation; actual allocation is checked too. Dimensions retain the source ratio
 Verified `image/svg+xml` assets select AndroidSVG 1.4 on that same executor.
 Before library parsing, a streaming XML preflight caps input at 2 MiB, 4096
 elements, 64 nested/reference levels and 32768 expanded nodes. It rejects DTDs,
-processing instructions, compound `<image>` resources, active/unsupported
-elements, patterns/masks/markers, duplicate IDs, missing/nonlocal references and
-recursive/explosive
-reference graphs. Color/class SVG styles are supported; resource-valued rules
-must be inline so the owning element participates in the reference graph.
-Entities are disabled and no external file/font/CSS resolver is installed.
+processing instructions, active/unsupported elements, patterns/masks/markers,
+duplicate IDs, missing/nonlocal references and recursive/explosive reference
+graphs. Color/class SVG styles are supported for vector-only documents;
+resource-valued rules must be inline so their owner participates in the graph.
+Entities are disabled. A private in-memory resolver exposes only predecoded images;
+its font/CSS methods return null and it performs no resource I/O.
+
+Embedded `<image>` resources accept only base64 PNG/JPEG with matching decoded
+media, valid source bounds and explicit width/height. Up to 64 exact URI identities
+share temporary bitmaps; bounds-only inspection precedes bitmap allocation.
+Preflight rewrites their references to generated private keys so AndroidSVG never
+sees a data URI (its built-in decoder bypasses sampling). Original image viewports
+become group/SVG/image wrappers, preserving source aspect ratio even when sampling
+rounds a raster to 1x1; wrapper nodes count toward expanded-node/depth limits.
+Transforms, inline styles, local uses and clipping remain on the existing graph.
+The combined temporary allocation is <= the asset's output pixel budget (in
+addition to that output); each raster also obeys the 2048-edge limit. All temporary
+bitmaps recycle on success/failure, and the resolver deregisters in `finally`.
+A process-wide SVG decode lock covers every session because the upstream resolver
+and entity settings are static. Relative/file/network/nested-vector references,
+image children, ambiguous hrefs and SVG stylesheets accompanying embedded images
+retain alt/Retry. The last restriction avoids changing selector matching when
+image viewports are rewritten; selector-aware resource styling remains unfinished.
 Validated intrinsic dimensions or the viewBox determine the source ratio, with
 the raster source-dimension limits; Canvas renders directly into a bitmap within
 the same edge/page-pixel bounds. Fractional source sizes stay separate from
@@ -166,7 +183,7 @@ leaving the reader or closing the viewer disposes it. Closing/reopening starts a
 fit. Canvas/button/key input in the separate window resets reader idle accounting.
 The shared viewer accepts an ImageBitmap, source dimensions and loading/error/retry
 callbacks, with no EPUB, storage, networking or core dependency. Future displayed
-Nostr images can use it. SVG compound resources and source ruby
+Nostr images can use it. Other SVG compound resources and source ruby
 remain open. Settings ships AndroidSVG attribution and its full license offline.
 
 Shared file preflight and TXT/SRT/EPUB Existing results now carry `LibraryDocument`

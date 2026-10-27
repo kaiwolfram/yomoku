@@ -1900,3 +1900,24 @@
   unchecked; Noto/font/furigana and CI follow. Cache cap excludes visible/evicted
   bitmaps awaiting GC; process restart rebuilds. Rust/JNI/release/process-death and
   physical arm64 not rerun; arm64 remains user-deferred.
+
+
+## 2026-10-27 — Bounded embedded SVG raster resources
+
+- Added self-contained base64 PNG/JPEG decoding through the existing image/viewer/
+  cover pipeline. Rewrote data URIs to private resolver keys; <=64 distinct sources
+  share one additional asset pixel budget and recycle after render. Original-ratio
+  viewport wrappers survive one-pixel sampling. A process-wide lock protects the
+  upstream static resolver across CoreSessions; no resource I/O/source mutation.
+- PASS: both-ABI APKs, strict lint/formatting/diff; 19 API-36 x86_64 cases each on
+  phone/light and tablet/dark, including six new decoder/reader cases, cover pixels/
+  recreation and existing image/navigation regressions. Reports:
+  .local/test-reports/epub-svg-embedded/; DEVELOPMENT.md end has exact commands.
+- Corrected a test pixel coordinate; final phone/tablet runs have zero failures or
+  skipped cases. Approved source download/sockets needed; existing AVD restarted
+  without wipe and restored to phone/light/free rotation. No open blocker.
+- Updated plan, handoff, architecture/data, decisions, development and provenance.
+  Remaining local/nested resources, complex paint and selector-aware CSS stay
+  unchecked; stylesheet-styled embedded SVGs retain alt/Retry. Font/furigana and
+  CI follow. No dependency/core/FFI/schema/permission changes. Rust/JNI/release/
+  process-death not rerun; physical arm64 remains user-deferred.

@@ -173,8 +173,10 @@ instance state for configuration changes. It makes no progress/history/vocabular
 writes or additional asset reads; page changes/close dispose viewer state.
 Static SVG assets now use the same verified bytes/pixel-bounded Android decoder,
 with XML/reference preflight and no resource I/O. Fractional SVG source dimensions
-are presentation-only, never stored or used for text positions. Compound SVG
-resources remain unfinished. Library covers use the same bounded decoder with a
+are presentation-only, never stored or used for text positions. Embedded base64
+PNG/JPEG resources now use transient sampled bitmaps/private resolver keys and
+presentation-only viewport wrappers; original saved asset bytes remain unchanged.
+Other compound SVG resources and embedded-image stylesheets remain unfinished. Library covers use the same bounded decoder with a
 smaller pixel budget; all cache/bitmap data stays outside SQLite/core state.
 No schema migration is needed.
 

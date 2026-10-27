@@ -12,9 +12,10 @@ internal fun rasterImageBytes(
     width: Int = 64,
     height: Int = 32,
     format: Bitmap.CompressFormat = Bitmap.CompressFormat.PNG,
+    color: Int = android.graphics.Color.BLUE,
 ): ByteArray {
     val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-    bitmap.eraseColor(android.graphics.Color.BLUE)
+    bitmap.eraseColor(color)
     return ByteArrayOutputStream().use {
         assertTrue(bitmap.compress(format, 100, it))
         bitmap.recycle()

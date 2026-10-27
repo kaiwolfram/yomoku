@@ -3307,3 +3307,73 @@ benchmark claim. No core/FFI/schema/dependency/permission/destructive-semantics
 change. Rust/Clippy/host JNI/codegen, standalone Full/index/Python, release,
 process-death/reboot and physical arm64 were not rerun for this Android-only slice;
 arm64 remains user-deferred. Compound SVG resources and source ruby remain open.
+
+
+## Bounded embedded PNG/JPEG in SVG assets
+
+2026-10-27, using the Rust PATH/JDK/SDK/Gradle environment above:
+
+```sh
+tools/format-kotlin.sh --check
+git diff --check
+./android/gradlew -p android :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=app.yomoku.EpubSvgEmbeddedImagesTest,app.yomoku.EpubSvgDecodeTest,app.yomoku.EpubImageDecodeTest,app.yomoku.EpubImageLoaderTest,app.yomoku.ReaderImagesTest,app.yomoku.LibraryCoversTest,app.yomoku.NavigationTest --offline --console=plain
+/home/kai/Android/Sdk/platform-tools/adb -s emulator-5554 shell wm size 2560x1600
+/home/kai/Android/Sdk/platform-tools/adb -s emulator-5554 shell wm density 240
+/home/kai/Android/Sdk/platform-tools/adb -s emulator-5554 shell cmd uimode night yes
+# Repeat the same Gradle command for tablet/dark, then restore phone/light.
+/home/kai/Android/Sdk/platform-tools/adb -s emulator-5554 shell wm size reset
+/home/kai/Android/Sdk/platform-tools/adb -s emulator-5554 shell wm density reset
+/home/kai/Android/Sdk/platform-tools/adb -s emulator-5554 shell cmd uimode night no
+unzip -l android/app/build/outputs/apk/debug/app-debug.apk 'lib/*/libyomoku_jni.so'
+```
+
+PASS: both-ABI debug/test APKs, strict Android lint, Kotlin formatting/diff and all
+19 API-36 x86_64 tests on final phone/light (2m17s including build/lint) and
+tablet/dark (1m56s); no skipped cases or open blocker. APK inspection confirms
+arm64-v8a/x86_64 libyomoku_jni.so. Reports/results/lint XML:
+`.local/test-reports/epub-svg-embedded/{phone-final,tablet-dark}/` (initial failure
+and preliminary passing phone results are archived alongside). Restored/verified
+1080x2400, 420dpi, light mode and free rotation; the AVD remains running.
+
+Five new decoder fixtures cover actual PNG/JPEG pixels, UTF-16 XML, transforms,
+clipping, local uses and repeated exact data URIs; aggregate temporary allocation,
+2048-edge bounds and one-pixel shares; original-ratio letterboxing/opacity when
+64 distinct resources each become 1x1; resolver key isolation and recycling;
+malformed base64, mismatched codecs, huge forged PNG headers, missing/ambiguous/
+foreign hrefs, image children, nested vectors, file/relative/remote references,
+styled embedded SVGs and resource-count/budget failures. Two concurrent decoder
+threads repeatedly render distinct colors with failures between successful calls,
+checking that static resolvers never cross sessions or return recycled pixels.
+
+An additional real imported EPUB/Compose fixture retains source order, styles,
+word identities, website versus internal-link behavior, inert SVG/image anchors,
+viewer zoomed pixels, recreation, chapter transitions and exact reader positions
+with embedded images. Library cover coverage now includes an embedded-raster SVG
+alongside PNG and vector SVG, including cache/recreation/open/return checks.
+Existing vector, raster, loader cancellation/serialization, unsupported fallback,
+image-only completion and navigation regressions remain in the same device run.
+
+The initial seven-case decode run passed six and caught an incorrect assertion:
+x=1 lay on the scaled image boundary rather than outside it. Corrected it to x=0
+and added the 64-source/one-pixel original-ratio test. A preliminary 19-case phone
+run passed; after final missing-size, malformed-base64 and stylesheet guards, the
+final phone run passed all 19 in 2m17s including build/lint. The pinned source JAR
+was downloaded again and matches its recorded SHA-256; reviewed upstream data-URI
+bypass and resolver/static lifetime before implementation. Initial sandbox DNS,
+ADB listeners and Gradle wildcard-IP sockets needed approved outside-sandbox
+execution. Restarted the existing swangle/KVM AVD without wiping data and verified
+sys.boot_completed=1 before tests. Existing unrelated FileImports autoboxing lint
+hint remains informational.
+
+Only self-contained base64 PNG/JPEG is added. <=64 unique exact URI identities
+share sampled temporary bitmaps with a combined <= output pixel budget (in
+addition to output pixels), recycled after render. Generated source-ratio wrappers
+count toward reference depth/expansion limits. Relative/local/remote resources,
+nested vectors, patterns/masks/markers and selector-aware resource CSS remain
+unfinished. Stylesheets accompanying embedded images retain fallback because
+rewritten viewport ancestry can change selector matching. No resource I/O, new
+dependency, core/FFI/schema/permission/source mutation or destructive semantics.
+Temporary decoder/Canvas allocations and total heap/CPU/large-book costs remain
+unmeasured. Rust/Clippy/host JNI/codegen, standalone dictionaries, release,
+process-death/reboot and physical arm64 were not rerun for this Android-only slice;
+physical arm64 remains user-deferred.

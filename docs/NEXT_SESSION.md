@@ -1,5 +1,5 @@
 # Resume here
-Updated: 2026-10-26. Library cover thumbnails/cache added; results below.
+Updated: 2026-10-27. Bounded embedded PNG/JPEG SVG resources; results below.
 ## Working
 - Pure Crux routes/Library/Settings; Render-only UI; FIFO SQLite/analysis; Library start.
 - Chapter-local UTF-8 position/whole-book percentage/five presets persist; reflow
@@ -61,19 +61,19 @@ Updated: 2026-10-26. Library cover thumbnails/cache added; results below.
   Zoom in/out/Reset/Close and Back. Reuses page bitmap; sampled detail stays bounded.
   Selection/zoom/normalized focus survive rotation/recreation; close/page change resets.
   Modal gestures cannot complete pages; pointer/key input resets reader idle policy.
-- Reviewed AndroidSVG 1.4 renders static vectors on the same executor/pixel budget.
-  Fractional layout/viewer; preflight <=2 MiB/4096 nodes/64 levels/32768 expansions.
-  No DTD/entities/resource I/O/cycles. Compound resources retain alt/Retry; credits ship.
+- AndroidSVG 1.4 vectors/base64 PNG/JPEG share decoder/viewer/covers; offline credits.
+  <=2 MiB/4096 source nodes/64 levels/32768 expansions incl source-ratio wrappers.
+  <=64 URI-shared temporary rasters/one extra output-pixel budget; final recycling.
+  Global lock/private resolver; no DTD/entities/I/O/cycles. Other resources and
+  stylesheet-styled embedded SVGs fall back; vector color/class CSS remains.
 - Library covers resolve live path/media/SHA-256 metadata without book BLOBs/Full.
   Media+digest LRU <=4 MiB/64 entries; misses verify bytes/digest and decode <=64 KiB.
-  Shared serial decoder; source ratio/generic fallback; disposed callbacks suppressed.
-  Recreation retains pixels; process restart rebuilds. No disk/negative cache.
+  Source ratio/fallback/disposal; recreation retains pixels; restart rebuilds. No disk cache.
 ## Next tasks (ordered)
-1. Remaining SVG compound images/patterns/masks/markers/stylesheet resource rules.
+1. Remaining SVG local/nested images, patterns/masks/markers and selector-aware resource CSS.
 2. Bundle Noto Serif JP/font/line/default-off furigana (source ruby preferred).
 3. CI host/unsigned builds independent; arm64 deferred. Nostr empty/Q188 unresolved.
 ## Verification
-- PASS: both-ABI APKs, lint/formatting/diff; six new cover cases on phone + tablet/dark,
-  eight phone image/navigation regressions. DEVELOPMENT.md end has commands/failures;
-  reports: .local/test-reports/epub-cover-thumbnails/. No open blocker; sockets approved.
-  No core/FFI/schema/dependency change. Rust/JNI/release/process-death/arm64 not rerun.
+- PASS: both-ABI APKs, strict lint/formatting/diff; 19 cases each phone/light + tablet/dark.
+  DEVELOPMENT.md end has commands/failures; .local/test-reports/epub-svg-embedded/.
+  No blocker; sockets approved; phone/light restored. Rust/JNI/release/arm64 not rerun.

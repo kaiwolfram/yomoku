@@ -67,7 +67,14 @@ class ReaderImagesTest {
     }
 
     @Test
-    fun realEpubSvgImagesKeepSourceOrderRatioStylesWordIdentityRecreationAndChapterNavigation() {
+    fun realEpubSvgImagesKeepSourceOrderRatioStylesWordIdentityRecreationAndChapterNavigation() =
+        verifyInlineImages(svgImageBytes())
+
+    @Test
+    fun embeddedSvgRastersKeepWordAndLinkIdentityViewerRecreationAndNavigation() =
+        verifyInlineImages(embeddedSvgImageBytes())
+
+    private fun verifyInlineImages(svgBytes: ByteArray) {
         compose.waitUntil(30_000) { !core().view.storageBusy }
         val title = "inline-images-${System.nanoTime()}"
         val path = "images/挿絵.svg"
@@ -76,7 +83,7 @@ class ReaderImagesTest {
                 title,
                 """<p><strong>😀𠮷前<img src='$path' alt='一枚目'/>後</strong> 猫。</p>
             <p><a href='https://example.org/'>外部<img src='$path' alt='二枚目'/>site</a> <a href='two.xhtml'>note</a></p>""",
-                images = mapOf(path to ("image/svg+xml" to svgImageBytes())),
+                images = mapOf(path to ("image/svg+xml" to svgBytes)),
                 secondBody = "<img src='$path' alt='絵だけの章'/>",
             )
         compose.runOnUiThread {
