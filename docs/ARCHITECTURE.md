@@ -896,8 +896,17 @@ change. Rendered-selection and intervening-edit retry guards remain prerequisite
 future typed override controls. Live core/FIFO/FFI integration and Android controls
 remain next. The [synthetic payload review](EFFECTIVE_READER_PAYLOAD.md) measures
 14.3 MB of full-key JSON for a 100,000-character chapter versus 42.5 KB of visible
-500-character page tokens. Effective bridge identity/lifecycle design and actual
-device/real-book performance remain pending; these are not JNI wire measurements.
+500-character page tokens. The pure `effective_session::EffectiveReaderSession`
+prerequisite retains one full key in core while exposing compact typed page/selection
+identities and visible token fields. Each load/refresh gets a fresh session revision;
+invalidation drops pending/current state without resetting the counter. Exact request,
+document/page/original-B checks reject stale results; selection additionally requires
+a visible eligible segment. Missing B remains plain and unselectable. Full provenance
+still authenticates repository transactions and separately retained accepted commands.
+Prototype generated Kotlin codecs verify 60-byte available-B identities and 68-byte
+selections; no full chapter enters those values. These schemas/state methods are not
+yet wired into live core/FIFO/FFI/Android events/views. The linked payload review defines
+lifecycle/integration obligations; actual device/real-book performance remains pending.
 
 `Storage::create_analyzed_paste` composes the existing private transaction helpers
 for document creation, validated Mode B analysis and exact-surface registration.

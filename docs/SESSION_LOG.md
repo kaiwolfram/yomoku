@@ -2320,3 +2320,22 @@
   direct cancellation, navigation/codecs, seven Unicode fixtures and 100 handles.
   Repeat codegen is byte-identical. Existing Crux teardown messages are informational;
   no verification blocker remains.
+
+## 2026-10-27 — Compact effective reader identity/lifecycle
+
+- Added a pure core retained-page component with compact revision/document/page/B
+  identity, Rust-only load attempts, immediate invalidation and visible effective
+  selection guards. Full provenance stays in one Rust key; accepted commands can
+  retain an independent frozen key across drains/retries. No persistent/global cache.
+- Added compact page/selection schemas to standalone Kotlin generation and literal
+  Unicode codec fixtures. Missing B stays unselectable; manual parts keep eligibility
+  without guessed readings/base. Live app paths still use B; integration is next.
+- PASS: eight new Rust cases, 537 workspace Rust tests (17 ignored), strict Clippy,
+  Rustfmt/Kotlin formatting, 15 Full + one runtime EACH owned/mapped, repeat codegen.
+- Synthetic compact page JSON stays 32,983 B at 10k/100k chapter characters versus
+  full keys of 1.4/14.3 MB. Actual Bincode available-B identity/selection = 60/68 B.
+  Cross-language fixtures check maximum unsigned values, literal Unicode and exact
+  metadata. Initial Kotlin enum-name assertions were corrected before the rerun.
+- Updated payload lifecycle obligations, architecture/decisions/plan/development
+  and 80-line handoff. No dependencies/schema/Android source changes; APK/device/
+  Android lint/release/performance/process-death/arm64 not rerun. No blocker.

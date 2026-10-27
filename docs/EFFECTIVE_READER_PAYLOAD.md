@@ -23,12 +23,70 @@ the representation already used for durable effective reservations.
 The full key grows with chapter length even when the visible page stays the same.
 At 100,000 characters it is about 47.6 times the canonical UTF-8 source size.
 Copying this representation into every rendered state, selection and callback
-would multiply that cost. Keep this evidence available when defining the narrow
-typed effective bridge; its identity representation and lifecycle remain pending.
+would multiply that cost. The narrow typed effective bridge prerequisite below
+keeps full resolution out of shell values.
 Full frozen provenance must still authenticate selections and durable completions.
 
 These are synthetic JSON size measurements, not generated Kotlin/JNI wire sizes,
-real-book memory measurements or latency benchmarks. No new bridge representation,
-storage migration, opaque handle/cache lifecycle or changed completion semantics is
-introduced by this review. Real EPUB cost, peak allocation and device timings remain
+real-book memory measurements or latency benchmarks. The initial size review did not
+introduce a bridge representation or change storage/completion semantics. Real EPUB
+cost, peak allocation and device timings remain
 unmeasured. Re-run the example when effective domain fields change.
+
+## Compact identity and retained-page prerequisite
+
+`effective_session::EffectiveReaderSession` is a pure core state component, ready
+for the coordinated live-reader switch. One instance belongs to one core session
+for its whole lifetime. It retains at most one full effective key and a compact
+visible page, with no global registry, runtime cache, I/O or persistent handles.
+`accept` moves the full resolution from the validated storage snapshot into the
+key; it does not clone the chapter. Rendering exposes only `EffectiveReaderPage`.
+
+`EffectivePageIdentity` carries a monotonically increasing `u64` revision and the
+existing document/page/original-B identity. `EffectiveReaderSelection` adds a
+whole-chapter effective segment index. These are scoped to the owning native/core
+session; Android must discard them when replacing/closing that session, as it does
+existing callbacks. They are not durable IDs or authorization credentials.
+
+- `begin_load` invalidates the current page and issues a fresh Rust-only request
+  before dispatch. Retries and same-page refreshes also get a new revision.
+- `accept` requires the exact outstanding request and matching document/page/B
+  identity. A stale, duplicate or mismatched result cannot replace a newer page.
+  Missing B accepts only an empty plain projection and has no selectable key.
+- `fail` consumes only its outstanding request; retry remains explicit. Movement,
+  reflow, exit, refresh and override edits call `invalidate` before asynchronous
+  work. Invalidation drops the key and pending request, retaining the counter.
+  Exhaustion fails closed; it never wraps or reuses an identity.
+- `resolve` checks the entire compact identity. `resolve_selection` additionally
+  requires an eligible visible segment. Punctuation/off-page indices fail; clipped
+  crossings retain their full occurrence identity. Storage must still revalidate
+  the full frozen provenance in its transaction before word/custom/edit commands.
+- An accepted pending completion/custom command separately owns its frozen full
+  key across checkpoint drains and exact retries. Invalidation retires UI callbacks
+  without discarding an accepted command. Durable effective completion reservations
+  keep their existing full provenance and write/compare semantics. Unfinished
+  reservations never auto-replay after restart.
+
+`EffectivePageToken` contains visible anchor/range/surface/eligibility, exact reading/
+base and optional live vocabulary; metadata-source and rule provenance stay in Rust.
+Unresolved manual parts keep eligibility without borrowing readings/base forms.
+Live status changes do not change full provenance; an explicit refresh still retires
+old UI callbacks. Source-preferred furigana must come from the existing pure effective
+projection during the coordinated switch, not from guessed token metadata.
+
+The example now also measures compact JSON at revision 1, absent vocabulary:
+
+| Chapter characters | Compact page JSON | Identity JSON | Selection JSON |
+| ---: | ---: | ---: | ---: |
+| 1,000 | 66,233 | 136 | 163 |
+| 10,000 | 32,983 | 136 | 163 |
+| 100,000 | 32,983 | 136 | 163 |
+
+The generated Bincode shell codec uses **60 bytes** for an available-B identity
+and **68 bytes** for a selection (56/64 with Missing B). Rust→generated Kotlin→Rust
+fixtures verify the available-B sizes, maximum revision/index, exact large IDs,
+supplementary/combining/NUL text, resolved/unresolved metadata and deleted vocabulary.
+These measure serialized values, not JNI execution time, allocation or device memory.
+Full resolution and storage revalidation costs remain; real-book/device measurements
+are still pending. Prototype schemas are generated and tested independently; no live
+event/view or completion/token/word/custom/furigana path has switched from original B.

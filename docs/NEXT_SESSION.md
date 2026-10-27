@@ -1,5 +1,5 @@
 # Resume here
-Updated: 2026-10-27. Effective furigana + payload review done; live integration next.
+Updated: 2026-10-27. Compact effective identity/lifecycle done; live integration next.
 ## Working
 - Pure Crux routes/Library/Settings; Render-only UI; FIFO SQLite/analysis; Library start.
 - Chapter-local UTF-8 position/whole-book percentage/five presets persist; reflow
@@ -59,22 +59,22 @@ Updated: 2026-10-27. Effective furigana + payload review done; live integration 
   local/newer precedence/reversal; exact metadata provenance, unmatched unresolved.
 - Pure effective furigana: same resolved metadata/source priority, complete crossing
   readings; unresolved manual parts never borrow B readings. Live furigana stays B.
-- Effective APIs: JP eligibility distinct from metadata; clipped visibility/start-owned
-  occurrences/live statuses. Word/custom APIs freeze provenance, exact base only,
-  unresolved surface-only; query-only reads/shared atomic CRUD/built-in gates.
+- Effective APIs: clipped eligibility/start-owned occurrences/live statuses; word/custom
+  freeze exact provenance/base, unresolved surface-only; shared CRUD/built-in gates.
 - Effective completion (0018): full key/occurrences/time frozen durably; page-only
   registration/New-only Known/history/time/position/finish atomic. Exact replay
   survives reversal/deletion/reopen; legacy calls reject its ID. Live reader uses B.
 - Atomic override registration: winning parts only; retry no-op; reversal keeps history.
+- Compact effective_session: one full key + view, fresh revisions, stale/foreign/
+  duplicate guards, retry/Missing B; prototype Kotlin codecs, page/selection 60/68 B.
 ## Next tasks (ordered)
-1. Define narrow effective bridge identity/lifecycle using EFFECTIVE_READER_PAYLOAD.md:
-   100k-char full key = 14.3 MB JSON vs 42.5 KB page tokens; actual JNI cost unmeasured.
-2. Wire effective completion/token/furigana/word/custom through core/FIFO/FFI together;
-   use the pure furigana API. No restart replay of unfinished reservations.
-3. Add typed reads/choices/save/reverse with rendered-key and intervening-edit retry
-   guards, then Android A/B/C/manual, default All occurrences versus This occurrence.
+1. Wire effective completion/token/furigana/word/custom through core/FIFO/FFI/Android
+   using EFFECTIVE_READER_PAYLOAD.md; retain accepted keys across retries, no replay.
+2. Add typed reads/choices/save/reverse with rendered-key/intervening-edit retry guards.
+3. Add Android A/B/C/manual, default All occurrences versus This occurrence; measure
+   real-book/JNI/device cost (100k fixture full key 14.3 MB vs compact page 33 KB JSON).
 Physical arm64 deferred; Nostr empty; Q188 unresolved before forwarding.
 ## Verification
-- PASS: 529 Rust tests (17 ignored), strict Clippy/Rustfmt/Kotlin formatting/diff;
+- PASS: 537 Rust tests (17 ignored), strict Clippy/Rustfmt/Kotlin formatting/diff;
   15 Full + one runtime EACH owned/mapped; real-Full Kotlin/JNI/7 Unicode/100 handles.
 - Repeat codegen identical; APK/device/lint/release/arm64 not rerun. DEVELOPMENT.md end.

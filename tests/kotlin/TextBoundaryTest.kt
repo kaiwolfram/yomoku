@@ -2,12 +2,16 @@ package app.yomoku.tests
 
 import app.yomoku.shared.ChapterText
 import app.yomoku.shared.DocumentId
+import app.yomoku.shared.EffectiveReaderPage
+import app.yomoku.shared.EffectiveReaderSelection
+import app.yomoku.shared.EffectiveTokenEligibility
 import app.yomoku.shared.ReaderDocument
 import app.yomoku.shared.ReaderAnalysis
 import app.yomoku.shared.ReaderPage
 import app.yomoku.shared.TextAnchor
 import app.yomoku.shared.TextOffset
 import app.yomoku.shared.TextRange
+import app.yomoku.shared.VocabularyStatus
 import java.io.File
 
 // Test-only exchange using production-generated payload codecs. The live JNI
@@ -66,6 +70,29 @@ fun verifyTextBoundaries(directory: String) {
     check(illustratedPage.text == illustrated.chapters.single().text)
     check(illustratedPage.bincodeSerialize().contentEquals(pageBytes))
     File(dir, "illustrated-page-return.bin").writeBytes(illustratedPage.bincodeSerialize())
+
+    val effectiveBytes = File(dir, "effective-page.bin").readBytes()
+    val effective = EffectiveReaderPage.bincodeDeserialize(effectiveBytes)
+    check(effective.identity.revision == ULong.MAX_VALUE)
+    check(effective.identity.base.page == illustratedPage.anchor)
+    check(effective.tokens.map { it.segmentIndex } == listOf(0uL, 1uL))
+    check(effective.tokens.all { it.surface == illustratedPage.text })
+    check(effective.tokens[0].eligibility == EffectiveTokenEligibility.ANALYZERJAPANESE)
+    check(effective.tokens[0].reading == "読み𠮷か\u3099\u0000")
+    check(effective.tokens[0].dictionaryForm == "原形𠮷か\u3099\u0000")
+    check(effective.tokens[0].vocabulary?.status == VocabularyStatus.KNOWN)
+    check(effective.tokens[1].eligibility == EffectiveTokenEligibility.MANUALJAPANESESPAN)
+    check(effective.tokens[1].reading == null && effective.tokens[1].dictionaryForm == null)
+    check(effective.tokens[1].vocabulary == null)
+    check(effective.identity.bincodeSerialize().size == 60)
+    check(effective.bincodeSerialize().contentEquals(effectiveBytes))
+    File(dir, "effective-page-return.bin").writeBytes(effective.bincodeSerialize())
+    val effectiveSelectionBytes = File(dir, "effective-selection.bin").readBytes()
+    val effectiveSelection = EffectiveReaderSelection.bincodeDeserialize(effectiveSelectionBytes)
+    check(effectiveSelection.page == effective.identity && effectiveSelection.segmentIndex == ULong.MAX_VALUE)
+    check(effectiveSelectionBytes.size == 68)
+    check(effectiveSelection.bincodeSerialize().contentEquals(effectiveSelectionBytes))
+    File(dir, "effective-selection-return.bin").writeBytes(effectiveSelection.bincodeSerialize())
 
     val selections = listOf("", "日本語", "𠮷野家😀", "か\u3099", "👩‍👩‍👧‍👦", "第二行\n\n", "端")
     for ((index, selected) in selections.withIndex()) {

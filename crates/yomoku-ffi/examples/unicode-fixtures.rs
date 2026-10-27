@@ -10,6 +10,10 @@ use yomoku_core::document::{
 };
 use yomoku_core::{
     document::PastedDocument,
+    effective_reader::EffectiveTokenEligibility,
+    effective_session::{
+        EffectivePageIdentity, EffectivePageToken, EffectiveReaderPage, EffectiveReaderSelection,
+    },
     pagination::PageLength,
     reader::ReaderPage,
     reader_images::{ReaderChapterImages, ReaderImageAsset, ReaderInlineImage},
@@ -166,6 +170,62 @@ fn main() -> Result<(), Box<dyn Error>> {
     }];
     illustrated.validate()?;
     let illustrated_page = ReaderPage::open_document(&illustrated, PageLength::default())?;
+    // Standalone prerequisite schemas use the actual generated shell codec.
+    // Maximum revisions/indices and literal unresolved metadata stay lossless.
+    let effective_page = EffectiveReaderPage {
+        identity: EffectivePageIdentity {
+            revision: u64::MAX,
+            base: yomoku_core::reader::ReaderTokenKey {
+                document_id: illustrated.document_id,
+                page: illustrated_page.anchor,
+                analysis: ReaderAnalysis::Available(AnalysisId::try_from(i64::MAX)?),
+            },
+        },
+        tokens: [
+            EffectiveTokenEligibility::AnalyzerJapanese,
+            EffectiveTokenEligibility::ManualJapaneseSpan,
+        ]
+        .into_iter()
+        .enumerate()
+        .map(|(index, eligibility)| EffectivePageToken {
+            segment_index: index as u64,
+            anchor: illustrated_page.anchor,
+            display_range: illustrated_page.anchor.range,
+            surface: image_text.into(),
+            eligibility,
+            reading: (index == 0).then(|| "読み𠮷か\u{3099}\0".into()),
+            dictionary_form: (index == 0).then(|| "原形𠮷か\u{3099}\0".into()),
+            vocabulary: (index == 0).then(|| yomoku_core::reader::ReaderVocabulary {
+                id: i64::MAX.try_into().unwrap(),
+                status: yomoku_core::vocabulary::VocabularyStatus::Known,
+            }),
+        })
+        .collect(),
+    };
+    let effective_selection = EffectiveReaderSelection {
+        page: effective_page.identity,
+        segment_index: u64::MAX,
+    };
+    let identity_bytes = encode(&effective_page.identity);
+    let selection_bytes = encode(&effective_selection);
+    assert_eq!(identity_bytes.len(), 60);
+    assert_eq!(selection_bytes.len(), 68);
+    if writing {
+        fs::write(dir.join("effective-page.bin"), encode(&effective_page))?;
+        fs::write(dir.join("effective-selection.bin"), &selection_bytes)?;
+        println!(
+            "Effective codec: identity={} bytes, selection={} bytes",
+            identity_bytes.len(),
+            selection_bytes.len()
+        );
+    } else {
+        let returned: EffectiveReaderPage =
+            BincodeFfiFormat::deserialize(&fs::read(dir.join("effective-page-return.bin"))?)?;
+        assert_eq!(returned, effective_page);
+        let returned: EffectiveReaderSelection =
+            BincodeFfiFormat::deserialize(&fs::read(dir.join("effective-selection-return.bin"))?)?;
+        assert_eq!(returned, effective_selection);
+    }
     if writing {
         fs::write(dir.join("illustrated.bin"), encode(&illustrated))?;
         fs::write(dir.join("illustrated-page.bin"), encode(&illustrated_page))?;

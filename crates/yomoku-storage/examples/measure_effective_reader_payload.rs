@@ -4,14 +4,17 @@
 use yomoku_core::{
     analysis::{AnalysisProfile, AnalyzedToken, ChapterAnalysis, SplitMode},
     document::{ChapterText, PastedDocument, TextAnchor, TextOffset, TextRange},
-    effective_reader::{EffectiveReaderChapter, EffectiveReaderTokenKey},
+    effective_reader::{
+        EffectiveReaderChapter, EffectiveReaderTokenKey, EffectiveReaderTokenSnapshot,
+    },
+    effective_session::{EffectiveReaderSelection, EffectiveReaderSession},
     pagination::PageLength,
-    reader::ReaderPage,
+    reader::{ReaderAnalysis, ReaderPage, ReaderTokenKey},
     vocabulary::Surface,
 };
 
 fn main() {
-    println!("characters,segments,source_utf8_bytes,page_characters,key_json_bytes,page_token_json_bytes");
+    println!("characters,segments,source_utf8_bytes,page_characters,key_json_bytes,page_token_json_bytes,compact_page_json_bytes,compact_identity_json_bytes,compact_selection_json_bytes");
     for repeats in [250, 2_500, 25_000] {
         let chapter = ChapterText {
             source_id: 1.try_into().unwrap(),
@@ -63,16 +66,40 @@ fn main() {
             page: page.anchor,
             segmentation: projection.segmentation().clone(),
         };
+        let tokens = projection.tokens_on_page(page.anchor).unwrap();
+        let mut session = EffectiveReaderSession::default();
+        let request = session
+            .begin_load(ReaderTokenKey {
+                document_id: document.document_id,
+                page: page.anchor,
+                analysis: ReaderAnalysis::Available(key.segmentation.original_analysis_id),
+            })
+            .unwrap();
+        assert!(session.accept(
+            request,
+            EffectiveReaderTokenSnapshot {
+                document_id: document.document_id,
+                page: page.anchor,
+                segmentation: Some(key.segmentation.clone()),
+                tokens: tokens.clone(),
+            },
+        ));
+        let compact = session.page().unwrap();
+        let selection = EffectiveReaderSelection {
+            page: compact.identity,
+            segment_index: compact.tokens[0].segment_index,
+        };
         println!(
-            "{},{},{},{},{},{}",
+            "{},{},{},{},{},{},{},{},{}",
             chapter.text.chars().count(),
             key.segmentation.segments.len(),
             chapter.text.len(),
             page.text.chars().count(),
             serde_json::to_vec(&key).unwrap().len(),
-            serde_json::to_vec(&projection.tokens_on_page(page.anchor).unwrap())
-                .unwrap()
-                .len(),
+            serde_json::to_vec(&tokens).unwrap().len(),
+            serde_json::to_vec(compact).unwrap().len(),
+            serde_json::to_vec(&compact.identity).unwrap().len(),
+            serde_json::to_vec(&selection).unwrap().len(),
         );
     }
 }

@@ -5,6 +5,7 @@ use std::{env, error::Error, path::PathBuf};
 use crux_core::type_generation::facet::{Config, Export, TypeRegistry};
 use yomoku_core::app::{Event, ViewModel};
 use yomoku_core::document::{ChapterText, DocumentId, TextAnchor};
+use yomoku_core::effective_session::{EffectiveReaderPage, EffectiveReaderSelection};
 use yomoku_runtime::ShellEffect;
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -25,6 +26,10 @@ fn main() -> Result<(), Box<dyn Error>> {
         .register_type::<DocumentId>()?
         .register_type::<TextAnchor>()?
         .register_type::<ChapterText>()?
+        // Prerequisite schemas: no live event/view uses these until the
+        // coordinated effective-reader switch, but codecs are verified now.
+        .register_type::<EffectiveReaderPage>()?
+        .register_type::<EffectiveReaderSelection>()?
         .build()?
         .kotlin(&Config::builder("app.yomoku.shared", output).build())?;
     Ok(())

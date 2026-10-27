@@ -1,6 +1,6 @@
 //! Read-only reader projections over validated effective segmentation.
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use crate::{
     analysis::{ChapterAnalysis, InvalidAnalysis, StoredOverride},
@@ -17,7 +17,9 @@ use crate::{
 /// Reading eligibility is distinct from analyzer metadata. A manual partition
 /// inherits the editable Japanese B span; it does not acquire an analyzer lemma,
 /// reading or classification. Exact analyzer output, when available, takes priority.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
+#[repr(C)]
 pub enum EffectiveTokenEligibility {
     AnalyzerJapanese,
     ManualJapaneseSpan,

@@ -3011,3 +3011,35 @@ justifies addressing identity representation before transporting full chapters i
 render/selection payloads. It does not measure actual JNI bytes, peak memory or
 real-device latency. Bridge identity/lifecycle design stays pending; no new cache,
 handle system, dependency, migration or product behavior is chosen by this slice.
+
+## 2026-10-27 — Compact effective reader identities and one retained page
+
+Use a pure core-owned `EffectiveReaderSession` component for the next live-reader
+integration. Keep one full chapter key in Rust and expose a compact session revision
+plus document/page/original-B identity. Selections add an effective segment index.
+Move the validated storage resolution into the retained key instead of cloning it;
+send only visible token fields to Kotlin. This follows the current core-owned reader
+state and existing Rust effect routing, without an opaque runtime service, LRU,
+hashing dependency or schema change. Full key equality remains the repository's
+transactional authority; a compact revision is a stale-callback guard only.
+
+Issue fresh revisions before reads, including same-page refresh/retry, and clear
+current/pending state immediately on movement/reflow/exit/edit. Keep the counter for
+the entire core lifetime; checked exhaustion fails closed. Results must echo the
+exact Rust-issued attempt and match document/page/B. A failed/stale result cannot
+consume another attempt; Missing B has no selection. Resolve selections only against
+the retained visible eligible indices, preserving complete crossing anchors.
+
+Scope identities to their existing native/core handle. Close/replacement drops all
+UI callbacks; do not persist or carry revisions between sessions. Accepted commands
+retain their own full frozen keys across drains/retries, independently of visible
+page invalidation. Durable completion semantics and no restart replay remain intact.
+Live status changes leave provenance intact; an explicit refresh retires callbacks.
+Intervening-edit retry guards remain required for the future override controls.
+
+Register prerequisite page/selection schemas explicitly with the Kotlin generator
+and test them independently before modifying live app events/views. Generated-codec
+round trips verify 60-byte available-B identities and 68-byte selections including
+maximum unsigned counters and literal Unicode. The synthetic compact JSON page is
+32,983 bytes at both 10k/100k chapter characters. These are serialization measurements;
+real JNI timing/memory, live integration and physical-device validation remain pending.

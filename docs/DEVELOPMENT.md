@@ -4445,3 +4445,54 @@ handle lifecycles. Existing Crux middleware teardown messages remain information
 Repeat generation is byte-identical. No download or unresolved verification failure.
 Git staging/commit requires the already authorized filesystem escalation because
 the sandbox mounts `.git` read-only; source edits/checks need no escalation.
+
+## Compact effective reader identity/lifecycle prerequisite
+
+2026-10-27, repository root, pinned offline Rust/JDK:
+
+```sh
+export PATH=/home/kai/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin:$PATH
+export JAVA_HOME=/home/kai/repos/yomoku/.local/jdk-17/jdk-17.0.21+9
+cargo test -p yomoku-core --test effective_session --all-features --locked --offline
+cargo test --workspace --all-features --locked --offline --quiet
+tools/test-sudachi.sh
+cargo run -p yomoku-storage --example measure_effective_reader_payload --locked --offline
+cargo clippy --workspace --all-targets --all-features --locked --offline -- -D warnings
+cargo fmt --all -- --check
+tools/format-kotlin.sh --check
+tools/test-kotlin-bridge.sh
+cargo run -p yomoku-ffi --bin generate-kotlin --features facet_typegen --locked --offline -- target/generated/kotlin-repeat
+# Compare after generation exits.
+diff -r target/generated/kotlin target/generated/kotlin-repeat
+git diff --check
+```
+
+PASS: eight new Rust cases (seven integration, one counter-exhaustion unit), 537
+workspace Rust tests (17 opt-in ignored), strict Clippy/Rustfmt/Kotlin formatting.
+Fifteen Full analysis fixtures plus one runtime fixture pass EACH owned/mapped
+(32 invocations). Repeat Kotlin generation is byte-identical.
+
+The pure core component retains one full key and compact view, with unique per-load
+revisions and immediate invalidation. Coverage includes late/duplicate/foreign loads,
+same-page explicit retry, Missing B, clipped crossings/literal Unicode, punctuation/
+off-page rejection, all live statuses/deleted vocabulary, unresolved manual parts,
+metadata changes and separately retained command keys across invalidation.
+
+The payload example preserves the original measurements and adds compact page JSON:
+66,233 / 32,983 / 32,983 bytes for 1k/10k/100k synthetic chapter characters, with
+136-byte revision-1 identity and 163-byte selection JSON. Generated Bincode codec
+round trips use 60/68 bytes for available-B identity/selection, including maximum
+unsigned revision/index, large IDs, literal supplementary/combining/NUL text and
+resolved/unresolved metadata. These are serialized sizes, not device performance.
+
+Initial host Kotlin compilation caught assertions using sealed-type names for
+generated unit enums. Corrected to the generator's uppercase enum values and reran
+the complete host suite. Known Crux middleware teardown messages remain informational.
+Logs: /tmp/yomoku-effective-session-{tests,full,clippy,bridge,payload,codegen,kotlin-format}.log.
+
+No dependencies, migrations or Android source changes. New schemas are standalone
+prerequisites; live reader events/views/completion/token/word/custom/furigana still
+use original B. APK/device/Android lint/release, real-book memory/JNI latency,
+process-death and physical arm64 were not rerun; existing AVD untouched. Next: the
+coordinated live-reader switch, then guarded override controls. No implementation
+blocker; local staging/commit needs the existing authorized `.git` escalation.
