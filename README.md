@@ -21,6 +21,8 @@ Yomoku is under active development. The working app supports:
   batches never automatically resume after process death.
 - Opening imported text in a centered, scrollable reader, with saved text
   positions and Library progress percentages.
+- Bundled Noto Serif JP reader text, with regular/bold weights, EPUB emphasis
+  and complete font attribution/license available offline in Settings.
 - Five persisted logical page-length presets: 250, 500, 750, 1,000 and 1,500
   non-whitespace characters. Changing the preset preserves the exact text offset.
 - Phone and tablet navigation, retained sessions across Activity recreation,
@@ -237,5 +239,6 @@ specification is the source of truth; record routine technical choices in
 Original Yomoku code is licensed under the [MIT License](LICENSE). Third-party
 engine code and dictionary data retain their own licenses and attribution
 requirements; see the [Sudachi notices](third_party/sudachi/README.md) and
-[JMdict/JMnedict notices](third_party/dictionaries/README.md), and
-[AndroidSVG notices](third_party/androidsvg/README.md).
+[JMdict/JMnedict notices](third_party/dictionaries/README.md),
+[AndroidSVG notices](third_party/androidsvg/README.md), and
+[Noto Serif JP notices](third_party/noto-serif-jp/README.md).

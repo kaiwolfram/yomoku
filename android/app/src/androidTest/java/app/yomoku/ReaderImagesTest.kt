@@ -62,6 +62,7 @@ class ReaderImagesTest {
         val text = node.fetchSemanticsNode().config[SemanticsProperties.Text].single()
         val layouts = mutableListOf<androidx.compose.ui.text.TextLayoutResult>()
         node.fetchSemanticsNode().config[SemanticsActions.GetTextLayoutResult].action!!(layouts)
+        assertEquals(readerFontFamily, layouts.single().layoutInput.style.fontFamily)
         val bounds = layouts.single().getBoundingBox(text.text.indexOf(word))
         node.performTouchInput { click(bounds.center) }
     }

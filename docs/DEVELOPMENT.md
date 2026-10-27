@@ -3439,3 +3439,65 @@ large-book costs remain unmeasured. Relative/local resources, patterns/masks/mar
 and selector-aware/resource CSS remain unfinished. Rust/Clippy/host JNI/codegen,
 standalone dictionary probes, release, process-death/reboot and physical arm64 were
 not rerun for this Android-only slice; arm64 remains user-deferred.
+
+
+## Bundled Noto Serif JP reader text
+
+2026-10-27, using the Rust PATH/JDK/SDK/Gradle environment above:
+
+```sh
+tools/format-kotlin.sh --check
+git diff --check
+# Broad phone/light regression run (initially 22/23; see corrected fixture below).
+./android/gradlew -p android :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=app.yomoku.ReaderTypographyTest,app.yomoku.ReaderFormattingTest,app.yomoku.ReaderImagesTest,app.yomoku.ReaderWordsTest,app.yomoku.ReaderNavigationTest,app.yomoku.NavigationTest --offline --console=plain
+# Final corrected font/Unicode/credits checks: all three pass on phone/light.
+./android/gradlew -p android :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=app.yomoku.ReaderTypographyTest --offline --console=plain
+/home/kai/Android/Sdk/platform-tools/adb -s emulator-5554 shell wm size 2560x1600
+/home/kai/Android/Sdk/platform-tools/adb -s emulator-5554 shell wm density 240
+/home/kai/Android/Sdk/platform-tools/adb -s emulator-5554 shell cmd uimode night yes
+./android/gradlew -p android :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=app.yomoku.ReaderTypographyTest,app.yomoku.ReaderFormattingTest,app.yomoku.ReaderImagesTest --offline --console=plain
+/home/kai/Android/Sdk/platform-tools/adb -s emulator-5554 shell wm size reset
+/home/kai/Android/Sdk/platform-tools/adb -s emulator-5554 shell wm density reset
+/home/kai/Android/Sdk/platform-tools/adb -s emulator-5554 shell cmd uimode night no
+/home/kai/Android/Sdk/platform-tools/adb -s emulator-5554 shell settings put system accelerometer_rotation 1
+```
+
+PASS: both-ABI debug/test APKs, strict Android lint, Kotlin formatting/diff and
+23 distinct API-36 x86_64 phone/light cases across the initial broad run and final
+three-case corrected rerun (45s including build/lint), plus all eight focused
+tablet/dark cases (2m16s). The broader run (10m10s) passed all 20 preexisting
+formatting/image/word/navigation regressions and two new cases; its only failure
+was the new font fixture's metadata assertion. Final three/eight-case runs have
+zero failures/errors/skips. Reports/logs/lint XML, including initial fixture and
+device failures: `.local/test-reports/reader-font/`.
+
+Three new cases verify the actual packaged font SHA-256; regular/bold glyph
+outlines against independent platform instances from the verified font bytes;
+synthesized italic; mixed Japanese/kana/Latin/supplementary/emoji text with exact
+canonical text, font family, column bounds and unchanged page on recreation; and
+complete offline attribution/OFL through Settings/recreation. Existing EPUB
+formatting/image cases now also assert the font family used by actual layouts
+while exercising links, word taps, viewer, image-only completion and chapter moves.
+APK inspection confirms both JNI ABIs, the exact 13,574,352-byte font (8,094,431
+compressed bytes), attribution and full license. No runtime font downloads.
+
+Initial font test wrongly equated Typeface.weight with the selected variable
+axis: Android reports this file's default weight 200 even with a 400/700 axis.
+Compare actual outlines instead. The independent Typeface.Builder(assets, path)
+oracle then returned null for the compressed res/font entry; build reference
+instances from a temporary private-cache copy of the hash-verified resource bytes
+and delete it in finally. Both were test-fixture fixes; app font loading worked.
+The corrected three-case rerun and tablet suite pass. One intervening attempt ran
+zero cases because the AVD disconnected; restarted the existing documented
+swangle/KVM emulator without wiping data and waited for sys.boot_completed=1.
+Sandbox DNS/Gradle wildcard-IP sockets needed approved outside-sandbox runs.
+Existing FileImports autoboxing lint hint remains informational (zero warnings).
+
+Restored/verified 1080x2400, 420dpi, light mode and free rotation; AVD remains
+running. No open blocker. The shared text component retains inherited size/line
+height, status colors and annotations; logical page/UTF-8 anchors stay unchanged.
+No dependency/core/FFI/schema/permission/destructive-semantics change. Persisted
+font-size/line-spacing controls and default-off source/analyzer furigana remain
+unchecked. Rust/Clippy/host JNI/codegen, standalone dictionaries, release,
+process-death/reboot and physical-arm64 checks were not rerun for this Android-only
+slice; physical arm64 remains user-deferred.

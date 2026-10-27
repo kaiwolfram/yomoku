@@ -2583,3 +2583,32 @@ unsupported alt/Retry/generic-cover fallbacks; EPUB page CSS remains ignored.
 This supersedes earlier notes describing those extensions as unfinished v1 work.
 Fonts, line spacing and default-off furigana are next. Documentation-only scope
 change; no implementation removal, dependency, persistence or runtime changes.
+
+
+## 2026-10-27 — Bundle Noto Serif JP before typography controls
+
+Implement the independently testable font/attribution part of the existing reader
+typography task first. Use the unmodified Google Fonts Noto Serif JP variable
+TrueType file, internal version 2.003, at immutable Google Fonts revision
+`8b0a1d0f5983c89bc2b93f1b5fb55f9e252744b5` (13,574,352 bytes). Record font,
+OFL and metadata SHA-256 plus original source revision in
+`third_party/noto-serif-jp/README.md`; retain upstream METADATA.pb. Bundle the
+complete SIL OFL 1.1 and both the font's Adobe copyright and upstream Google
+license notice. Settings uses the existing offline, recreation-retained credits
+dialog. No runtime downloads, new library, or font processing tool is required.
+
+The existing Compose BOM 2026.03.01 resolves ui-text 1.10.6. Verified
+[resource Font/FontFamily and variable-font APIs](https://developer.android.com/develop/ui/compose/text/fonts)
+against official Android documentation before use. Explicit weight-axis values
+400/700 give regular and real bold from one file; Compose synthesizes italic for
+EPUB emphasis because this font has no italic/slant axis. API-29 minimum already
+exceeds variable-font support's API-26 minimum. Keep Android glyph fallback for
+characters outside the font (including emoji). No additional family selector.
+
+Apply the family only in the shared reader text component, including plain
+fallback and all fragments surrounding inline images. Preserve inherited body
+size/line height, status colors, formatting/link annotations, exact text and core
+logical pages/positions. Material controls, dictionary panels and SVG asset text
+retain their existing typography. This slice adds no setting/schema/core/FFI
+payload or destructive behavior. Persisted global font-size/line-spacing controls
+and default-off source/analyzer furigana remain unchecked continuation work.

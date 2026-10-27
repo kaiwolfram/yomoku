@@ -1952,3 +1952,24 @@
   scope notes; fonts/line spacing/default-off furigana are next.
 - Documentation-only: git diff check passed; app tests/builds were not rerun.
   No blocker or runtime change; previous verified image results remain recorded.
+
+
+## 2026-10-27 — Bundled Noto Serif JP reader font
+
+- Bundled the unmodified pinned Noto Serif JP 2.003 variable font with complete
+  offline Settings attribution/SIL OFL 1.1. Shared reader text blocks use explicit
+  regular/bold axes and synthesized EPUB italic, including fragments around images.
+  Recorded source revision, upstream metadata and SHA-256; no new dependency,
+  core/FFI/schema/settings or saved-text/position change.
+- PASS: both-ABI APKs, strict lint/formatting/diff, 23 distinct phone/light cases
+  across the broad run and corrected three-case rerun, plus eight tablet/dark
+  cases. Glyph outlines match direct platform font instances; Unicode/recreation,
+  credits, EPUB formatting/images, word/link taps and navigation stay correct.
+- Fixed two new test-fixture assumptions (variable default-weight metadata and
+  compressed resource access); final tests pass. One disconnected-device attempt
+  ran zero tests; restarted the existing swangle/KVM AVD without wiping data.
+  Reports: `.local/test-reports/reader-font/`; commands in DEVELOPMENT.md end.
+- Restored phone/light/free rotation; no open blocker. Updated plan/handoff,
+  architecture, decisions, README and font provenance. Persisted size/line spacing
+  and source/analyzer furigana remain unchecked. Rust/JNI/release/process-death
+  checks not rerun; physical arm64 remains deferred.

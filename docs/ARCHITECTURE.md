@@ -62,6 +62,18 @@ backgrounds; the remaining word fragments retain the full token identity.
 Malformed nested source links are split into disjoint click targets in source-span
 order. CSS, internal navigation and TOC jumps remain absent.
 
+Reader text uses the bundled, unmodified Noto Serif JP variable font (version
+2.003), pinned by source revision and SHA-256 in `third_party/noto-serif-jp/`.
+Compose `readerFontFamily` maps regular/bold to explicit 400/700 weight axes of
+one offline resource; EPUB emphasis synthesizes italic (no italic axis). The
+shared ReaderTextBlock applies it to plain/tokenized pages and every text fragment
+around inline images. Missing glyphs retain Android fallback. Material UI and
+image-decoder SVG text keep their existing fonts. Font metrics affect visual line
+wrapping/scroll height; core logical page boundaries, canonical text/UTF-8 ranges
+and saved positions are unchanged. Settings exposes complete offline attribution
+and SIL OFL 1.1 in the existing retained credit dialog. Adjustable font size/line
+spacing and furigana remain separate work; no settings/schema/FFI change yet.
+
 `ReaderDocument.images` carries keyed `ReaderChapterImages` with source-ordered
 placeholder ranges, alt text and document-scoped `ReaderImageAsset` paths/media
 types. Core validates unique owned chapter keys, exact U+FFFC scalar ranges,

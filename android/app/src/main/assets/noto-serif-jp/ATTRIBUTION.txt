@@ -1,0 +1,16 @@
+Noto Serif JP
+
+Font copyright: (c) 2017-2024 Adobe (http://www.adobe.com/).
+Google Fonts OFL notice: Copyright 2012 Google Inc. All Rights Reserved.
+Licensed under the SIL Open Font License, Version 1.1 (see OFL.txt).
+
+Version 2.003-H1;hotconv 1.1.1;makeotfexe 2.6.0
+Unmodified variable TrueType font; weight axis 200-900.
+
+Source: https://github.com/google/fonts/tree/8b0a1d0f5983c89bc2b93f1b5fb55f9e252744b5/ofl/notoserifjp
+Original filename: NotoSerifJP[wght].ttf
+Bundled filename: res/font/noto_serif_jp.ttf
+Font SHA-256: 2fd527ba12b6a44ec30d796d633360da0aeba6c5d4af1304ce12bb4dc15a7dfc
+
+Upstream project: https://github.com/notofonts/noto-cjk
+Google Fonts metadata source revision: 985fa52c81c1d6692ccdd82bc3656e8fb932fd89

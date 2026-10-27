@@ -36,6 +36,7 @@ internal fun SettingsScreen(view: ViewModel, dispatch: (Event) -> Unit) {
     var showNotices by rememberSaveable { mutableStateOf(false) }
     var showWordNotices by rememberSaveable { mutableStateOf(false) }
     var showSvgNotices by rememberSaveable { mutableStateOf(false) }
+    var showFontNotices by rememberSaveable { mutableStateOf(false) }
     if (showNotices) {
         SudachiNotices(onDismiss = { showNotices = false })
     }
@@ -44,6 +45,9 @@ internal fun SettingsScreen(view: ViewModel, dispatch: (Event) -> Unit) {
     }
     if (showSvgNotices) {
         SvgNotices(onDismiss = { showSvgNotices = false })
+    }
+    if (showFontNotices) {
+        ReaderFontNotices(onDismiss = { showFontNotices = false })
     }
     Column(
         modifier =
@@ -107,6 +111,9 @@ internal fun SettingsScreen(view: ViewModel, dispatch: (Event) -> Unit) {
         }
         TextButton(onClick = { showSvgNotices = true }) {
             Text(stringResource(R.string.svg_notices_title))
+        }
+        TextButton(onClick = { showFontNotices = true }) {
+            Text(stringResource(R.string.reader_font_notices_title))
         }
     }
 }

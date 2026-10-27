@@ -49,6 +49,7 @@ class ReaderFormattingTest {
         val node = compose.onNodeWithTag("reader_text").performScrollTo()
         val layouts = mutableListOf<androidx.compose.ui.text.TextLayoutResult>()
         node.fetchSemanticsNode().config[SemanticsActions.GetTextLayoutResult].action!!(layouts)
+        assertEquals(readerFontFamily, layouts.single().layoutInput.style.fontFamily)
         val box = layouts.single().getBoundingBox(annotated().text.indexOf(text))
         node.performTouchInput { click(box.center) }
         compose.waitForIdle()

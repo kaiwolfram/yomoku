@@ -1,5 +1,5 @@
 # Resume here
-Updated: 2026-10-27. User accepts basic SVG support for v1; fonts/furigana next.
+Updated: 2026-10-27. Noto Serif JP bundled; font/line controls and furigana next.
 ## Working
 - Pure Crux routes/Library/Settings; Render-only UI; FIFO SQLite/analysis; Library start.
 - Chapter-local UTF-8 position/whole-book percentage/five presets persist; reflow
@@ -62,18 +62,19 @@ Updated: 2026-10-27. User accepts basic SVG support for v1; fonts/furigana next.
   Selection/zoom/normalized focus survive rotation/recreation; close/page change resets.
   Modal gestures cannot complete pages; pointer/key input resets reader idle policy.
 - AndroidSVG 1.4 vectors/base64 PNG/JPEG/nested SVG share viewer/covers; offline credits.
-  Aggregate <=2 MiB XML/4096 nodes/32768 expansions incl source-ratio wrappers;
-  <=8 resource levels/64 element-reference levels per document; single closed roots.
-  <=64 exact URI resources share one extra output-pixel budget, children before parents;
-  child IDs/styles isolated; global lock/private resolver/final recycling; no I/O/DTD/entities.
-  Basic SVG scope accepted for v1; complex resources/styles stay on fallback.
+  <=2 MiB XML/4096 nodes/32768 expansions; <=8 resource levels/64 refs; closed roots.
+  <=64 URIs share extra output-pixel budget; child-first isolated IDs/styles/lock/recycle.
+  No I/O/DTD/entities; basic SVG accepted for v1; complex resources/styles fallback.
 - Library covers resolve live path/media/SHA-256 metadata without book BLOBs/Full.
   Media+digest LRU <=4 MiB/64 entries; misses verify bytes/digest and decode <=64 KiB.
+- Noto Serif JP 2.003 pinned/bundled; explicit 400/700 axes, synthesized italic and
+  Android glyph fallback in every reader text block. Full offline Settings credits.
 ## Next tasks (ordered)
-1. Bundle Noto Serif JP/font/line/default-off furigana (source ruby preferred).
-2. CI host/unsigned builds independent; arm64 deferred. Nostr empty/Q188 unresolved.
+1. Persist global font-size/line-spacing via reader_settings/core/FIFO/JNI/Settings.
+2. Default-off furigana: transport source ruby, else analyzer; preserve anchors/taps.
+3. CI host/unsigned builds independent; arm64 deferred. Nostr empty/Q188 unresolved.
 ## Verification
-- Last code slice PASS: both-ABI APKs, strict lint/formatting/diff; 25 cases each phone/light + tablet/dark.
-  DEVELOPMENT.md end has commands/failures; .local/test-reports/epub-svg-nested/.
-  No blocker; sockets approved; phone/light restored. Rust/JNI/release/arm64 not rerun.
-- Latest scope-only docs: diff check; no app code changes or test reruns.
+- PASS: both-ABI APKs, strict lint/formatting/diff; 23 distinct phone + 8 tablet/dark cases.
+  DEVELOPMENT.md end has commands/failures; .local/test-reports/reader-font/.
+  Font test fixture assumptions fixed; emulator restarted, phone/light/free rotation restored.
+  No blocker. Rust/host-JNI/release/physical-arm64/process-death checks not rerun.

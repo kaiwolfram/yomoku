@@ -56,6 +56,18 @@ internal fun SvgNotices(onDismiss: () -> Unit) {
 }
 
 @Composable
+internal fun ReaderFontNotices(onDismiss: () -> Unit) {
+    OfflineNotices(
+        title = stringResource(R.string.reader_font_notices_title),
+        attribution = stringResource(R.string.reader_font_attribution),
+        root = "noto-serif-jp",
+        names = listOf("ATTRIBUTION.txt", "OFL.txt"),
+        tag = "reader_font_notices_text",
+        onDismiss = onDismiss,
+    )
+}
+
+@Composable
 internal fun WordDictionaryNotices(onDismiss: () -> Unit) {
     OfflineNotices(
         title = stringResource(R.string.word_dictionary_notices_title),

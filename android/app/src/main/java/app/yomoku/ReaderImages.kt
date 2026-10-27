@@ -52,7 +52,11 @@ private fun ReaderTextBlock(text: AnnotatedString, modifier: Modifier) {
             }
         }
     CompositionLocalProvider(LocalViewConfiguration provides configuration) {
-        Text(text, style = MaterialTheme.typography.bodyLarge, modifier = modifier)
+        Text(
+            text,
+            style = MaterialTheme.typography.bodyLarge.copy(fontFamily = readerFontFamily),
+            modifier = modifier,
+        )
     }
 }
 
