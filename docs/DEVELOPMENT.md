@@ -3945,3 +3945,66 @@ install are retained alongside final device/lint/host logs and reports under
 verification blocker. The restarted AVD remains running at 1080x2400/420dpi.
 Tablet/dark, release, standalone dictionary benchmarks, process-death and physical
 arm64 were not rerun; hardware validation remains user-deferred.
+
+## Android missing-match custom dictionary editor
+
+2026-10-27, using the pinned Rust PATH/JDK/SDK/Gradle environment above:
+
+```sh
+# Initial complete word-panel/transport run.
+./android/gradlew -p android :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=app.yomoku.ReaderWordsTest,app.yomoku.ReaderWordDetailsSessionTest --offline --console=plain
+# Focused editor/lookup cases, including keyboard input and cross-book reuse.
+./android/gradlew -p android :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug :app:connectedDebugAndroidTest '-Pandroid.testInstrumentationRunnerArguments.class=app.yomoku.ReaderWordsTest#customEntryCreateEditDeleteSurvivesRecreationAndIsGlobalWithoutChangingReaderHistory,app.yomoku.ReaderWordsTest#customEntrySaveAndDeleteFailuresRetainDataAndOnlyRetryOnExplicitActions,app.yomoku.ReaderWordsTest#customDraftsAreSelectionScopedAndPendingSavesGateEveryMutation,app.yomoku.ReaderWordsTest#dictionaryFailureNeedsExplicitRetryAndEmptyMatchesAreSuccessful' --offline --console=plain
+# Repeat only the cross-book case after correcting its reader-close/time-drain flow.
+./android/gradlew -p android :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug :app:connectedDebugAndroidTest '-Pandroid.testInstrumentationRunnerArguments.class=app.yomoku.ReaderWordsTest#customEntryCreateEditDeleteSurvivesRecreationAndIsGlobalWithoutChangingReaderHistory' --offline --console=plain
+/home/kai/Android/Sdk/platform-tools/adb -s emulator-5554 shell wm size 2560x1600
+/home/kai/Android/Sdk/platform-tools/adb -s emulator-5554 shell wm density 240
+/home/kai/Android/Sdk/platform-tools/adb -s emulator-5554 shell cmd uimode night yes
+# Repeat the four-case focused command above, then restore phone/light.
+/home/kai/Android/Sdk/platform-tools/adb -s emulator-5554 shell wm size reset
+/home/kai/Android/Sdk/platform-tools/adb -s emulator-5554 shell wm density reset
+/home/kai/Android/Sdk/platform-tools/adb -s emulator-5554 shell cmd uimode night no
+tools/format-kotlin.sh --check
+cargo fmt --all -- --check
+git diff --check
+unzip -l android/app/build/outputs/apk/debug/app-debug.apk 'lib/*/libyomoku_jni.so'
+```
+
+Three new device cases exercise the visible Add/Edit/Delete controls within the
+existing sheet/panel, required nonblank fields and literal supplementary/combining
+Unicode/whitespace, Cancel, committed-only display, recreation/reselection, multiple
+original occurrences and cross-book exact-surface reuse. They compare original
+page/tokens and database vocabulary/status/completion counts before and after CRUD.
+Tokyo word/name matches and failed dictionary reads never offer custom controls.
+
+Real SQLite INSERT/DELETE triggers verify retained drafts/committed data, separate
+save/delete errors, no automatic retry after clock writes, and explicit retries of
+the exact failed payload even after draft edits. An isolated scrollable fixture
+verifies storage/time/completion gates on fields/Save/Edit/Delete/Retry, selection
+changes discarding drafts/errors, and edit callbacks recording reader interaction.
+Production core/storage/FFI/schema/dependencies remain unchanged. The formatter also
+wraps one existing assertion in the exercised transport fixture.
+
+Phone results: initial run 12/13 passed, with the new isolated fixture failing only
+because its test container lacked a scroll parent. Added that fixture container;
+the next four-case run passed three cases including keyboard edits, exact retries
+and pending-save gates. Its enhanced cross-book test attempted CreatePaste directly
+from the active reader while final time was saving; the core correctly rejected the
+busy command. Follow the real Library flow: CloseDocument, await final-time drain,
+then import/open; close/drain again before returning to the original book. The
+corrected single case passes (1m06s), including unchanged database counts. Thirteen
+distinct phone cases pass across these runs. No production workaround was needed.
+
+PASS: both arm64-v8a/x86_64 debug/test APKs, strict Android lint (only the existing
+informational FileImports autoboxing hint), Kotlin formatting/Rustfmt/diff and APK
+ABI inspection. Gradle wildcard-IP/local sockets required approved outside-sandbox
+execution; no downloads. Preserved initial/focused/final device logs and reports:
+`.local/test-reports/custom-dictionary-editor/`. Rust tests/Clippy/host JNI/repeat
+codegen, release, standalone dictionary benchmarks, process-death/reboot and physical
+arm64 were not rerun for this Android-only slice; physical hardware stays deferred.
+
+Final tablet/dark results: all four focused cases pass (1m49s), zero failures/
+errors/skips, including actual field focus/keyboard edits in the wide popup and
+recreation, retries and cross-book persistence. Preserved reports/lint XML alongside
+phone runs. Restored the existing AVD to 1080x2400/420dpi/light without wiping or
+restarting it; it remains running. No unresolved verification/application blocker.

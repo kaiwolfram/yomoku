@@ -403,7 +403,9 @@ existing transaction when both immutable candidate sections are empty. Invalid
 custom values fail the whole lookup; a later built-in match suppresses retained
 custom data. The typed core/FIFO/FFI carries `ReaderCustomEntry` and explicit
 save/delete selection commands, with a separate retryable mutation error. This
-transport adds no schema or persisted UI state. Android editor controls remain pending.
+transport adds no schema or persisted UI state. Android Add/Edit/Delete and explicit
+save/delete retries use these commands; only committed definitions persist, while
+selection-scoped drafts are discarded with the reader word panel.
 
 ## Implemented domain values
 - `Surface`: nonblank exact written Unicode string; equality/hash/order use exact

@@ -2,9 +2,14 @@ package app.yomoku
 
 import android.database.sqlite.SQLiteDatabase
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
@@ -146,6 +151,324 @@ class ReaderWordsTest {
                     android.content.res.Configuration.UI_MODE_NIGHT_YES
             assertEquals(vocabularyBackground(status, dark), link.styles!!.style!!.background)
         }
+    }
+
+    private val customSurface = "ヌヌヌヌヌヌ"
+
+    private fun openCustomDocument() {
+        database().use {
+            it.execSQL(
+                "DELETE FROM custom_dictionary_entries WHERE surface = ?",
+                arrayOf(customSurface),
+            )
+        }
+        openDocument("\n$customSurface $customSurface ヌヌヌヌヌヌヌ")
+        tapSurface(customSurface)
+        compose.onNodeWithTag("word_no_match").performScrollTo().assertIsDisplayed()
+    }
+
+    private fun customAction(tag: String) =
+        compose.onNodeWithTag(tag).performScrollTo().performClick()
+
+    private fun enterCustom(meaning: String, reading: String) {
+        customAction("word_custom_edit")
+        compose
+            .onNodeWithTag("word_custom_meaning_input")
+            .performScrollTo()
+            .performClick()
+            .performTextReplacement(meaning)
+        compose
+            .onNodeWithTag("word_custom_reading_input")
+            .performScrollTo()
+            .performClick()
+            .performTextReplacement(reading)
+    }
+
+    @Test
+    fun customEntryCreateEditDeleteSurvivesRecreationAndIsGlobalWithoutChangingReaderHistory() {
+        openCustomDocument()
+        val original = core().view.reader
+        val tokens = core().view.readerTokens
+        val meaning = " literal meaning 📖 "
+        val reading = " か\u3099𠮷 "
+        database().use { db ->
+            val history = count(db, "SELECT count(*) FROM reading_completions")
+            val statuses = count(db, "SELECT count(*) FROM vocabulary_status_events")
+            val vocabulary = count(db, "SELECT count(*) FROM vocabulary")
+            customAction("word_custom_edit")
+            compose.onNodeWithTag("word_custom_save").assertIsNotEnabled()
+            compose
+                .onNodeWithTag("word_custom_meaning_input")
+                .performScrollTo()
+                .performTextReplacement(" ")
+            compose
+                .onNodeWithTag("word_custom_reading_input")
+                .performScrollTo()
+                .performTextReplacement(reading)
+            compose.onNodeWithTag("word_custom_save").assertIsNotEnabled()
+            customAction("word_custom_cancel")
+            enterCustom(meaning, reading)
+            customAction("word_custom_save")
+            awaitWords()
+            compose.onNodeWithTag("word_custom_meaning").performScrollTo().assertTextEquals(meaning)
+            compose.onNodeWithTag("word_custom_reading").assertTextEquals("Reading: $reading")
+            compose.onNodeWithTag("word_custom_meaning_input").assertDoesNotExist()
+            assertEquals(original, core().view.reader)
+            assertEquals(tokens, core().view.readerTokens)
+            assertEquals(0UL, core().view.readerWord!!.encountered)
+            assertEquals(history, count(db, "SELECT count(*) FROM reading_completions"))
+            assertEquals(statuses, count(db, "SELECT count(*) FROM vocabulary_status_events"))
+            assertEquals(vocabulary, count(db, "SELECT count(*) FROM vocabulary"))
+            compose.activityRule.scenario.recreate()
+            awaitWords()
+            compose.onNodeWithTag("reader_word_panel").assertDoesNotExist()
+            tapSurface(customSurface)
+            customAction("word_custom_edit")
+            compose
+                .onNodeWithTag("word_custom_meaning_input")
+                .assertTextEquals("English meaning", meaning)
+            compose.onNodeWithTag("word_custom_reading_input").assertTextEquals("Reading", reading)
+            compose
+                .onNodeWithTag("word_custom_meaning_input")
+                .performScrollTo()
+                .performTextReplacement("discard me")
+            customAction("word_custom_cancel")
+            compose.onNodeWithTag("word_custom_meaning").assertTextEquals(meaning)
+            enterCustom("edited meaning", "ぬぬ")
+            customAction("word_custom_save")
+            awaitWords()
+            compose.onNodeWithText("Close").performClick()
+            tapSurface("東京")
+            compose.onNodeWithTag("word_definitions").assertExists()
+            compose.onNodeWithTag("word_names").assertExists()
+            compose.onNodeWithTag("word_custom_entry").assertDoesNotExist()
+            compose.onNodeWithText("Close").performClick()
+            // A second original occurrence uses the same global exact-surface definition.
+            val span =
+                readerDisplayTokens(core().view.reader!!, key(), core().view.readerTokens!!)!!
+                    .last { it.token.surface == customSurface }
+            val text =
+                compose
+                    .onNodeWithTag("reader_text")
+                    .fetchSemanticsNode()
+                    .config[SemanticsProperties.Text]
+                    .single()
+            val link = text.getLinkAnnotations(span.start, span.end).single().item
+            compose.runOnUiThread { link.linkInteractionListener!!.onClick(link) }
+            awaitWords()
+            compose
+                .onNodeWithTag("word_custom_meaning")
+                .performScrollTo()
+                .assertTextEquals("edited meaning")
+            // Follow the Library import/open flow so final reader time drains first.
+            compose.runOnUiThread { core().dispatch(Event.CloseDocument) }
+            compose.waitUntil(30_000) {
+                core().view.reader == null &&
+                    !core().view.storageBusy &&
+                    !core().view.readingTimeSavePending
+            }
+            val title = "Custom global ${System.nanoTime()}"
+            compose.runOnUiThread {
+                core().dispatch(Event.CreatePaste("$title\n$customSurface 東京"))
+            }
+            compose.waitUntil(60_000) { !core().view.storageBusy }
+            val secondId = core().view.documents.single { it.title == title }.documentId
+            compose.runOnUiThread { core().dispatch(Event.OpenReader(secondId)) }
+            awaitWords()
+            tapSurface(customSurface)
+            compose
+                .onNodeWithTag("word_custom_meaning")
+                .performScrollTo()
+                .assertTextEquals("edited meaning")
+            compose.runOnUiThread { core().dispatch(Event.CloseDocument) }
+            compose.waitUntil(30_000) {
+                core().view.reader == null &&
+                    !core().view.storageBusy &&
+                    !core().view.readingTimeSavePending
+            }
+            compose.runOnUiThread { core().dispatch(Event.OpenReader(original!!.documentId)) }
+            awaitWords()
+            tapSurface(customSurface)
+            customAction("word_custom_delete")
+            awaitWords()
+            compose.onNodeWithTag("word_custom_meaning").assertDoesNotExist()
+            compose.activityRule.scenario.recreate()
+            awaitWords()
+            tapSurface(customSurface)
+            compose
+                .onNodeWithTag("word_custom_edit")
+                .performScrollTo()
+                .assertTextEquals("Add meaning and reading")
+            assertNull(core().view.readerWord!!.customEntry)
+            assertEquals(original, core().view.reader)
+            assertEquals(tokens, core().view.readerTokens)
+            assertEquals(history, count(db, "SELECT count(*) FROM reading_completions"))
+            assertEquals(statuses, count(db, "SELECT count(*) FROM vocabulary_status_events"))
+            assertEquals(vocabulary, count(db, "SELECT count(*) FROM vocabulary"))
+        }
+    }
+
+    @Test
+    fun customEntrySaveAndDeleteFailuresRetainDataAndOnlyRetryOnExplicitActions() {
+        openCustomDocument()
+        val original = core().view.reader
+        val tokens = core().view.readerTokens
+        database().use { db ->
+            try {
+                db.execSQL(
+                    "CREATE TRIGGER fail_custom_ui BEFORE INSERT ON custom_dictionary_entries WHEN NEW.surface = '$customSurface' BEGIN SELECT RAISE(ABORT, 'test save'); END"
+                )
+                enterCustom("original attempted meaning", "ぬぬ")
+                customAction("word_custom_save")
+                awaitWords()
+                compose
+                    .onNodeWithTag("word_custom_error")
+                    .performScrollTo()
+                    .assertTextEquals("Could not save entry. Your changes are still here.")
+                compose
+                    .onNodeWithTag("word_custom_meaning_input")
+                    .assertTextEquals("English meaning", "original attempted meaning")
+                assertNull(core().view.readerWord!!.customEntry)
+                db.execSQL("DROP TRIGGER fail_custom_ui")
+                // A later clock write must not retry the mutation or hide its error.
+                compose.runOnUiThread { core().setReaderActive(false) }
+                awaitWords()
+                assertNotNull(core().view.readerCustomEntryError)
+                assertEquals(
+                    0,
+                    count(
+                        db,
+                        "SELECT count(*) FROM custom_dictionary_entries WHERE surface = '$customSurface'",
+                    ),
+                )
+                compose
+                    .onNodeWithTag("word_custom_meaning_input")
+                    .performScrollTo()
+                    .performTextReplacement("a different draft")
+                customAction("word_custom_retry")
+                awaitWords()
+                compose
+                    .onNodeWithTag("word_custom_meaning")
+                    .performScrollTo()
+                    .assertTextEquals("original attempted meaning")
+                compose.onNodeWithTag("word_custom_error").assertDoesNotExist()
+                db.execSQL(
+                    "CREATE TRIGGER fail_custom_ui BEFORE DELETE ON custom_dictionary_entries WHEN OLD.surface = '$customSurface' BEGIN SELECT RAISE(ABORT, 'test delete'); END"
+                )
+                customAction("word_custom_delete")
+                awaitWords()
+                compose
+                    .onNodeWithTag("word_custom_error")
+                    .performScrollTo()
+                    .assertTextEquals("Could not delete entry. Your saved entry is still here.")
+                assertEquals(
+                    "original attempted meaning",
+                    core().view.readerWord!!.customEntry!!.englishMeaning,
+                )
+                db.execSQL("DROP TRIGGER fail_custom_ui")
+                compose.waitForIdle()
+                assertEquals(
+                    1,
+                    count(
+                        db,
+                        "SELECT count(*) FROM custom_dictionary_entries WHERE surface = '$customSurface'",
+                    ),
+                )
+                customAction("word_custom_retry")
+                awaitWords()
+                compose.onNodeWithTag("word_custom_error").assertDoesNotExist()
+                compose.onNodeWithTag("word_custom_meaning").assertDoesNotExist()
+                assertNull(core().view.readerCustomEntryError)
+                assertEquals(original, core().view.reader)
+                assertEquals(tokens, core().view.readerTokens)
+                assertEquals(0UL, core().view.readerWord!!.encountered)
+            } finally {
+                db.execSQL("DROP TRIGGER IF EXISTS fail_custom_ui")
+            }
+        }
+    }
+
+    @Test
+    fun customDraftsAreSelectionScopedAndPendingSavesGateEveryMutation() {
+        openCustomDocument()
+        val base = core().view
+        val events = mutableListOf<Event>()
+        var frame by mutableStateOf(base)
+        var interactions = 0
+        compose.runOnUiThread {
+            compose.activity.setContent {
+                YomokuTheme {
+                    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+                        ReaderCustomDictionary(
+                            frame.readerWord!!,
+                            !frame.storageBusy &&
+                                !frame.readingTimeSavePending &&
+                                !frame.completionSavePending,
+                            frame.readerCustomEntryError,
+                            { events.add(it) },
+                            { interactions++ },
+                        )
+                    }
+                }
+            }
+        }
+        enterCustom("draft 📖", "か\u3099")
+        for (blocked in
+            listOf(
+                base.copy(storageBusy = true),
+                base.copy(readingTimeSavePending = true),
+                base.copy(completionSavePending = true),
+            )) {
+            compose.runOnUiThread { frame = blocked }
+            compose.onNodeWithTag("word_custom_save").assertIsNotEnabled()
+            compose.onNodeWithTag("word_custom_meaning_input").assertIsNotEnabled()
+            compose.onNodeWithTag("word_custom_reading_input").assertIsNotEnabled()
+        }
+        assertTrue(events.isEmpty())
+        compose.runOnUiThread { frame = base }
+        customAction("word_custom_save")
+        val selection = ReaderWordSelection(base.readerWord!!.key, base.readerWord.token.tokenIndex)
+        assertEquals(listOf(Event.SaveReaderCustomEntry(selection, "draft 📖", "か\u3099")), events)
+        compose.runOnUiThread {
+            frame = base.copy(readerCustomEntryError = DocumentError.UNAVAILABLE)
+        }
+        compose.onNodeWithTag("word_custom_retry").assertExists()
+        compose.runOnUiThread { frame = frame.copy(readingTimeSavePending = true) }
+        compose.onNodeWithTag("word_custom_retry").assertIsNotEnabled()
+        assertEquals(1, events.size)
+        val other = base.readerTokens!!.tokens.last { it.surface == customSurface }
+        compose.runOnUiThread {
+            frame =
+                base.copy(
+                    readerWord = base.readerWord.copy(token = other),
+                    readerCustomEntryError = null,
+                )
+        }
+        compose.onNodeWithTag("word_custom_meaning_input").assertDoesNotExist()
+        compose.onNodeWithTag("word_custom_retry").assertDoesNotExist()
+        customAction("word_custom_edit")
+        compose.onNodeWithTag("word_custom_meaning_input").assertTextEquals("English meaning", "")
+        customAction("word_custom_cancel")
+        val committed =
+            base.copy(
+                readerWord =
+                    base.readerWord.copy(
+                        token = other,
+                        customEntry = ReaderCustomEntry(customSurface, "saved", "ぬぬ"),
+                    )
+            )
+        for (blocked in
+            listOf(
+                committed.copy(storageBusy = true),
+                committed.copy(readingTimeSavePending = true),
+                committed.copy(completionSavePending = true),
+            )) {
+            compose.runOnUiThread { frame = blocked }
+            compose.onNodeWithTag("word_custom_edit").assertIsNotEnabled()
+            compose.onNodeWithTag("word_custom_delete").assertIsNotEnabled()
+        }
+        assertEquals(1, events.size)
+        assertTrue(interactions >= 5)
     }
 
     @Test
@@ -494,6 +817,7 @@ class ReaderWordsTest {
             tapSurface("猫")
             compose.onNodeWithTag("word_lookup_error").assertExists()
             compose.onNodeWithTag("word_no_match").assertDoesNotExist()
+            compose.onNodeWithTag("word_custom_entry").assertDoesNotExist()
             assertEquals(1, calls.get())
             fail.set(false)
             compose.runOnUiThread { session.setReaderActive(false) }

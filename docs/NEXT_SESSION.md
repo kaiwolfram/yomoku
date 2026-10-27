@@ -1,5 +1,5 @@
 # Resume here
-Updated: 2026-10-27. Custom dictionary core/FIFO/FFI wired; Android editor next.
+Updated: 2026-10-27. Custom dictionary editor verified; segmentation overrides next.
 ## Working
 - Pure Crux routes/Library/Settings; Render-only UI; FIFO SQLite/analysis; Library start.
 - Chapter-local UTF-8 position/whole-book percentage/five presets persist; reflow
@@ -45,36 +45,35 @@ Updated: 2026-10-27. Custom dictionary core/FIFO/FFI wired; Android editor next.
 - ReaderDocument carries keyed validated heading/emphasis/strong/HTTP(S) spans;
   ReaderPage clips to page-local UTF-8; generated JNI/Compose preserve exact text.
   Website taps open browser with token identity; other links inert. No CSS/TOC.
-- ReaderDocument carries validated page-local image placeholders/alt/asset metadata;
-  no image BLOBs in state. One-shot FIFO asset reads verify live document ownership,
-  expected media/SHA-256 and 32 MiB cap; no dictionaries/core/state writes.
-- CoreSession-owned decoder serializes asset read/decode across pages. Bounds-first
-  BitmapFactory rejects >32768-edge/100 MP sources, samples to <=2048-edge and each
-  distinct asset's share of 16 MiB page pixels. Repeated assets share one bitmap.
-- Compose replaces exact U+FFFC scalars with source-position/ratio images;
-  tall frames cap at 8192px; styles/word/link identities stay intact. Local zero text
-  targets stop adjacent-link capture. Alt/loading/failure + Retry for unsupported data.
-- Full-window image viewer: bounded bitmaps, 1–8x fit zoom/clamped pan, accessible
-  buttons/Back. Recreation retains selection/zoom/focus; close/page resets. Modal
-  gestures cannot complete pages; input resets idle.
+- Keyed image placeholders/alt/metadata; no BLOBs in state. One-shot FIFO reads
+  verify live ownership/media/SHA-256/32 MiB cap without dictionary/core writes.
+- Serial bounds-first decode: <=32768-edge/100 MP source, <=2048-edge sample,
+  16 MiB shared page pixels; repeats share bitmaps. Ratio frames <=8192px preserve
+  U+FFFC positions/styles/word/link identity; unsupported images keep alt/Retry.
+- Full-window viewer: bounded bitmaps, 1–8x fit zoom/clamped pan, accessible controls;
+  recreation retains selection/zoom/focus; close/page resets. Modal gestures cannot
+  complete pages; input resets idle.
 - AndroidSVG 1.4 vectors/base64/nested SVG share viewer/covers; bounded/offline; v1 scope met.
 - Library covers resolve live path/media/SHA-256 metadata without book BLOBs/Full.
   Media+digest LRU <=4 MiB/64 entries; misses verify bytes/digest and decode <=64 KiB.
 - Noto Serif JP/credits; global font/spacing (16sp/150% default)/furigana persist (0015/16).
 - Custom meanings/readings (0017): exact global surface; original-token/built-in gates.
-  Same-transaction reads, typed core/FIFO/FFI CRUD, explicit retries/late-result/clock drains.
-  No history/analysis/status/position changes; Android editor pending.
+  Typed core/FIFO/FFI CRUD; Android Add/Edit/Delete, required literal fields/Cancel,
+  explicit exact-command retries. Selection/drafts reset on dismissal/recreation.
+  Committed data persists across books; no history/analysis/status/position changes.
 - Furigana: persisted switch/retries; keyed source-first/original-B fallback, status
   independent. Half-size readings above canonical Text; strict UTF-16, complete
   readings across page/layout splits, fitted base width and measured headroom.
 ## Next tasks (ordered)
-1. Add Android missing-match meaning/reading editor/delete + explicit failure retries;
-   verify persistence/recreation, built-ins, selection and reader/history semantics.
-2. A/B/C/manual split/merge overrides; start with testable persisted anchors.
+1. A/B/C/manual split/merge effective overrides using existing 0007 anchors/snapshots;
+   test local/global resolution, reversal and unchanged historical occurrences.
+2. Wire verified overrides through core/FIFO/FFI and Android; default All occurrences
+   versus This occurrence. Keep immutable original analysis/history semantics.
 Physical arm64 deferred; Nostr empty; Q188 unresolved before forwarding.
 ## Verification
-- PASS: 470 Rust tests (16 opt-in ignored), strict Clippy/Rustfmt/Kotlin format,
-  real-Full host JNI/repeat codegen; six new cases. Commands: DEVELOPMENT.md end.
-- PASS: both-ABI debug/test APKs/lint and 13 distinct phone cases (9 + 4 continuation).
-  AVD disconnect/install failure resolved; reports: .local/test-reports/custom-dictionary-transport/.
-  No blocker; no tablet/dark/release/process-death/physical-arm64 rerun; AVD running.
+- PASS: both-ABI debug/test APKs/lint, Kotlin format/Rustfmt/diff; 13 distinct phone
+  cases including three new editor fixtures; four tablet/dark cases. DEVELOPMENT.md end.
+- Reports: .local/test-reports/custom-dictionary-editor/. Fixture scroll parent and
+  cross-book final-time drain fixed. Rust suite/Clippy/host JNI/codegen unchanged,
+  not rerun (last 470 Rust tests pass). Release/process-death/physical arm64 not rerun.
+- No blocker. AVD restored to 1080x2400/420dpi/light and left running.

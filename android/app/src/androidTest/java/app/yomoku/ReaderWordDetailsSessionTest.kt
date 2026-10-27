@@ -166,7 +166,8 @@ class ReaderWordDetailsSessionTest {
             assertNull(builtins.customEntry)
             assertEquals(
                 builtins,
-                dispatch(core, Event.SaveReaderCustomEntry(builtin, "override", reading)).readerWord,
+                dispatch(core, Event.SaveReaderCustomEntry(builtin, "override", reading))
+                    .readerWord,
             )
             assertEquals(
                 builtins,

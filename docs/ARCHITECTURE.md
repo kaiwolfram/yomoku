@@ -800,7 +800,12 @@ Failed mutations retain the committed entry and expose `reader_custom_entry_erro
 independent of lookup/time errors; explicit submission retries, with no automatic
 write loop or frozen retry obligation. Success/failure drain queued clock saves and
 session teardown uses existing busy gates. Generated Kotlin/JNI and Android session
-transport exercise CRUD/reopen; visible editor/delete controls remain pending.
+transport exercise CRUD/reopen. Compose shows committed custom meaning/reading
+and Add/Edit/Delete only for successful empty built-in matches, inside the existing
+phone sheet/wide panel. Selection-keyed drafts preserve literal input across
+status/clock updates; dismissal/recreation follows the existing selection reset.
+Shared save gates disable mutations; separate save/delete errors retain draft and
+committed data with explicit exact-command retries. IME edits reset reader idle.
 Migration 0010 adds completion_analyses historical identities, every Japanese
 reading_occurrence and completion-linked New→Known status events in the same
 time/history/position transaction. Pure analysis selects tokens by their start

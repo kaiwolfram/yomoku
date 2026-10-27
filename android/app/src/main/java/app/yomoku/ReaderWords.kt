@@ -352,6 +352,7 @@ internal fun ReaderWords(
                 dispatch(Event.DismissReaderWord)
             },
             onRetry = { selection?.let { dispatch(Event.LoadReaderWord(it)) } },
+            dispatch = dispatch,
         ) { status ->
             selected.vocabulary?.let {
                 dispatch(
@@ -373,6 +374,7 @@ private fun ReaderWordPanel(
     onInteraction: () -> Unit,
     onClose: () -> Unit,
     onRetry: () -> Unit,
+    dispatch: (Event) -> Unit,
     onStatus: (VocabularyStatus) -> Unit,
 ) {
     val close = {
@@ -449,6 +451,15 @@ private fun ReaderWordPanel(
                 }
             if (details != null) {
                 ReaderDictionary(details)
+                if (details.candidates.words.isEmpty() && details.candidates.names.isEmpty()) {
+                    ReaderCustomDictionary(
+                        details,
+                        enabled,
+                        view.readerCustomEntryError,
+                        dispatch,
+                        onInteraction,
+                    )
+                }
             } else if (view.readerWordError != null) {
                 Text(
                     stringResource(R.string.word_lookup_failed),

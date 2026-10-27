@@ -2782,3 +2782,25 @@ time checkpoints/departures. Reuse lazy dictionary connection/error retirement a
 the existing FIFO/Render-only shell; no dependency/schema/architecture or destructive
 semantics change. Android transport tests are part of this slice; visible editor and
 delete/retry controls are the next independently verifiable slice.
+
+## 2026-10-27 — Android custom dictionary editor
+
+Show Add meaning and reading only after a successful lookup with both built-in
+sections empty. Display committed custom reading/meaning separately from original
+analyzer metadata, with Edit entry and Delete entry actions. Both input fields are
+required nonblank; retain literal Unicode without trimming or language guessing.
+Cancel discards the draft. Use the existing phone sheet/wide panel and typed events;
+no new dependency, dialog or persistence mechanism is needed.
+
+Scope draft/edit/retry state to the full original-token selection. Status/clock
+updates preserve it; dismissal, movement, refresh and Activity recreation discard
+selection/drafts following existing panel behavior. Committed data reloads on the
+next tap. Disable fields and mutations while shared storage/time/completion gates
+are pending. Input callbacks reset reader idle time, including IME edits.
+
+Keep committed data and the draft on failure. Show a specific save/delete error
+with an explicit Retry action holding the exact failed command, even if fields
+have since changed; Save entry can submit the new draft instead. Only committed
+success closes the editor. Clock saves/recomposition never submit mutations.
+Deletion affects only the selected spelling's custom definition, using the existing
+explicit atomic delete semantics; no vocabulary/history or built-in changes.

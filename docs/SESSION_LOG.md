@@ -2120,3 +2120,26 @@
   editor/edit/delete + explicit retries, then segmentation overrides. No blocker.
   AVD running at original phone size; no tablet/dark/release/process-death/physical
   arm64 rerun; hardware remains user-deferred.
+
+## 2026-10-27 — Android custom dictionary editor
+- Started clean. Added missing-match Add/Edit/Delete controls with required literal
+  meaning/reading fields and Cancel in the existing phone sheet/wide popup. Built-in
+  word/name matches and failed lookups never offer custom writes.
+- Selection-keyed drafts/failed commands survive clock/status updates; shared save
+  gates disable fields/mutations. Explicit exact-command Retry retains drafts and
+  committed entries after failed save/delete. IME edits record reader interaction.
+- PASS: both-ABI debug/test APKs, strict lint, Kotlin formatting/Rustfmt/diff and
+  13 distinct API-36 phone cases across runs; all four focused tablet/dark cases
+  pass (1m49s). Three new tests cover Unicode/validation/Cancel/CRUD/recreation,
+  cross-occurrence/book reuse, built-ins/errors, pending gates, real SQLite failures
+  and unchanged tokens/position/vocabulary/status/completion counts.
+- Corrected two fixture errors: isolated editor lacked a scroll container; enhanced
+  cross-book import skipped closing/draining reader time. Final single phone case
+  passes (1m06s). All corrections were in test setup. Gradle local sockets required
+  approved outside-sandbox execution; no downloads. Logs/reports/lint XML:
+  .local/test-reports/custom-dictionary-editor/; exact commands: DEVELOPMENT.md end.
+- Updated plan/architecture/data/decisions/handoff. Next effective A/B/C/manual
+  overrides using existing anchors, then typed transport/UI. No blocker; AVD
+  restored to original 1080x2400/420dpi/light and running. No Rust/core/FFI/schema/
+  dependency changes; Rust suite/Clippy/host JNI/codegen, release, benchmarks,
+  process-death and physical arm64 not rerun; hardware stays deferred.
