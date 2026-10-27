@@ -219,6 +219,62 @@ fn real_segmentation_choices_resolve_scopes_merges_and_reversal_without_replacin
                 assert_eq!(metadata.analysis_id, imported.analysis_id);
             }
         }
+        // Furigana uses that same frozen resolution, before any live vocabulary
+        // projection. Original B, alternate readings and source ruby stay distinct.
+        let alternates = saved
+            .iter()
+            .filter(|(_, snapshot)| snapshot.mode != SplitMode::B)
+            .cloned()
+            .collect::<Vec<_>>();
+        let projection = yomoku_core::effective_reader::EffectiveReaderChapter::resolve(
+            chapter,
+            imported.analysis_id,
+            &original,
+            &alternates,
+            &[storage.segmentation_override(override_id).unwrap().unwrap()],
+        )
+        .unwrap();
+        assert_eq!(projection.segmentation(), &effective);
+        let page = TextAnchor {
+            range: TextRange {
+                start: TextOffset::START,
+                end: TextOffset::at(&chapter.text, chapter.text.len()).unwrap(),
+            },
+            ..selected
+        };
+        let fallback = projection
+            .tokens_on_page(page)
+            .unwrap()
+            .into_iter()
+            .filter_map(|token| {
+                token
+                    .metadata?
+                    .reading
+                    .map(|reading| yomoku_core::reader_ruby::ReaderRuby {
+                        range: token.display_range,
+                        reading,
+                    })
+            })
+            .collect::<Vec<_>>();
+        assert!(!fallback.is_empty());
+        assert_eq!(projection.furigana_on_page(page, None).unwrap(), fallback);
+        let source = yomoku_core::reader_ruby::ReaderChapterRuby {
+            chapter_id: chapter.chapter_id,
+            ruby: vec![yomoku_core::reader_ruby::ReaderRuby {
+                range: selected.range,
+                reading: "ソース𠮷か\u{3099}\0".into(),
+            }],
+        };
+        let mut expected = source.ruby.clone();
+        expected.extend(
+            fallback
+                .into_iter()
+                .filter(|ruby| ruby.range.start >= selected.range.end),
+        );
+        assert_eq!(
+            projection.furigana_on_page(page, Some(&source)).unwrap(),
+            expected
+        );
         assert_eq!(resolved.original_analysis_id, imported.analysis_id);
         let changed = resolved
             .segments

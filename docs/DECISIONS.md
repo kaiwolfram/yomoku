@@ -2993,3 +2993,21 @@ or provide durable retry identity after intervening edits. Add those guards in t
 future typed control workflow; do not expose the raw repository API directly to UI.
 Live effective completion/token/furigana/word/custom integration and payload-cost
 review remain separate, with the current original-B reader intact.
+
+## 2026-10-27 — Effective furigana prerequisite and payload evidence
+
+Project effective furigana from `EffectiveReaderChapter`'s private validated
+resolution before the coordinated live-reader switch. Reuse one source-precedence
+merge helper with the existing original-B projection. Validate chapter source ruby
+in full, reject invalid/foreign/empty pages, clip visible bases and retain complete
+literal readings. Only exact Japanese analyzer metadata supplies fallback readings;
+unresolved manual spans never inherit old B readings. Vocabulary/status/custom data
+does not participate. Source ruby remains usable on unresolved spans.
+
+Add a reproducible synthetic size example using existing pinned serde_json and
+record its results in EFFECTIVE_READER_PAYLOAD.md. At 100,000 characters, full-key
+JSON is 14,290,979 bytes versus 42,519 bytes of 500-character page tokens. This
+justifies addressing identity representation before transporting full chapters in
+render/selection payloads. It does not measure actual JNI bytes, peak memory or
+real-device latency. Bridge identity/lifecycle design stays pending; no new cache,
+handle system, dependency, migration or product behavior is chosen by this slice.

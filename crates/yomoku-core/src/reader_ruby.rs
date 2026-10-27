@@ -33,6 +33,33 @@ fn validate_ruby(text: &str, ruby: &[ReaderRuby]) -> Result<(), InvalidTextValue
     Ok(())
 }
 
+/// Both inputs have validated, ordered, nonoverlapping page-local bases. A
+/// source base suppresses an entire overlapping fallback, including partial
+/// overlaps; neither reading can be divided by the base's byte length.
+pub(crate) fn source_preferred_ruby(
+    source: &[ReaderRuby],
+    fallback: impl IntoIterator<Item = ReaderRuby>,
+) -> Vec<ReaderRuby> {
+    let mut ruby = source.to_vec();
+    let mut source_index = 0;
+    for candidate in fallback {
+        while source
+            .get(source_index)
+            .is_some_and(|source| source.range.end <= candidate.range.start)
+        {
+            source_index += 1;
+        }
+        if !source
+            .get(source_index)
+            .is_some_and(|source| source.range.start < candidate.range.end)
+        {
+            ruby.push(candidate);
+        }
+    }
+    ruby.sort_by_key(|ruby| ruby.range.start);
+    ruby
+}
+
 impl ReaderChapterRuby {
     pub fn validate(&self, chapter: &ChapterText) -> Result<(), InvalidTextValue> {
         if self.chapter_id != chapter.chapter_id {
@@ -80,35 +107,19 @@ impl ReaderPage {
         snapshot: Option<&ReaderTokenSnapshot>,
     ) -> Result<Vec<ReaderRuby>, InvalidTextValue> {
         validate_ruby(&self.text, &self.source_ruby)?;
-        let mut ruby = self.source_ruby.clone();
         let Some(snapshot) = snapshot.filter(|snapshot| self.valid_ruby_tokens(analysis, snapshot))
         else {
-            return Ok(ruby);
+            return Ok(self.source_ruby.clone());
         };
-        let mut source_index = 0;
-        for token in &snapshot.tokens {
-            while self
-                .source_ruby
-                .get(source_index)
-                .is_some_and(|source| source.range.end <= token.display_range.start)
-            {
-                source_index += 1;
-            }
-            let overlaps_source = self
-                .source_ruby
-                .get(source_index)
-                .is_some_and(|source| source.range.start < token.display_range.end);
-            if !overlaps_source {
-                if let Some(reading) = &token.reading {
-                    ruby.push(ReaderRuby {
-                        range: token.display_range,
-                        reading: reading.clone(),
-                    });
-                }
-            }
-        }
-        ruby.sort_by_key(|ruby| ruby.range.start);
-        Ok(ruby)
+        Ok(source_preferred_ruby(
+            &self.source_ruby,
+            snapshot.tokens.iter().filter_map(|token| {
+                token.reading.as_ref().map(|reading| ReaderRuby {
+                    range: token.display_range,
+                    reading: reading.clone(),
+                })
+            }),
+        ))
     }
 
     fn valid_ruby_tokens(&self, analysis: ReaderAnalysis, snapshot: &ReaderTokenSnapshot) -> bool {

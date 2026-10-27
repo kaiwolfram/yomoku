@@ -558,6 +558,15 @@ span that made the edit valid (`ManualJapaneseSpan`), without gaining analyzer
 classification, reading or lemma. Visibility includes crossings on both pages;
 completion projection assigns each whole occurrence only to its start page.
 
+`EffectiveReaderChapter::furigana_on_page(page, source)` independently projects ruby
+from the same validated boundaries/metadata. Optional chapter source ruby is wholly
+validated (including off-page spans) and owns every overlapping fallback base.
+Exact Japanese B/A/C metadata supplies readings, preserving each occurrence's
+provenance; unresolved manual parts and exact non-Japanese parts supply none.
+Clipped bases keep full literal readings across every page preset. Canonical text,
+snapshots, rules and vocabulary remain untouched. This pure API is a prerequisite
+for the coordinated live switch, not a separate live reader identity.
+
 `load_effective_reader_tokens` reads document ownership, resolution and live global
 statuses together. It returns the complete effective segmentation alongside tokens;
 distinct visible surfaces use indexed vocabulary lookups, sharing results for repeats.
@@ -600,6 +609,10 @@ These remain separate domain/repository APIs: live reader token/word/furigana an
 completion commands still use original B. Read projections never register vocabulary,
 reset position or rewrite history. Effective completion and override-time registration storage
 are described below. Core/FIFO/FFI integration and segmentation UI remain pending.
+
+The [payload review](EFFECTIVE_READER_PAYLOAD.md) records reproducible synthetic
+full-key/page-token JSON sizes. Current complete chapter keys are deliberately
+internal; the effective bridge representation/lifecycle still needs implementation.
 
 ## Frozen effective completions (migration 0018)
 

@@ -4393,3 +4393,55 @@ process-death and physical arm64 were not rerun; AVD untouched. No escalation/do
 or unresolved blocker. Next: integrate effective completion/token/word/custom/furigana
 through core/FIFO/FFI and review payload cost; guarded typed override controls and
 Android A/B/C/manual scope selection remain after that. The current reader uses B.
+
+## Effective furigana and synthetic payload review
+
+2026-10-27, from the repository root:
+
+```sh
+export PATH=/home/kai/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin:$PATH
+export JAVA_HOME=/home/kai/repos/yomoku/.local/jdk-17/jdk-17.0.21+9
+cargo test -p yomoku-core --test effective_furigana --test reader_furigana --all-features --locked --offline
+cargo test --workspace --all-features --locked --offline --quiet
+tools/test-sudachi.sh
+cargo run -p yomoku-storage --example measure_effective_reader_payload --locked --offline
+cargo clippy --workspace --all-targets --all-features --locked --offline -- -D warnings
+cargo fmt --all -- --check
+tools/format-kotlin.sh --check
+tools/test-kotlin-bridge.sh
+cargo run -p yomoku-ffi --bin generate-kotlin --features facet_typegen --locked --offline -- target/generated/kotlin-repeat
+# Compare after both generation commands exit.
+diff -r target/generated/kotlin target/generated/kotlin-repeat
+git diff --check
+```
+
+PASS: five new effective-furigana cases and three original-B regression cases;
+529 workspace Rust tests (17 opt-in ignored), strict Clippy, Rustfmt and Kotlin
+formatting. Fifteen Full analysis fixtures plus one runtime fixture pass EACH
+owned/mapped (32 invocations). Real A/B/C segmentation checks now project furigana
+from the same frozen resolution and verify literal source-ruby precedence.
+
+Coverage includes exact B/A/C readings and contextual repetitions, unresolved manual
+and non-Japanese exclusions, missing readings, partial/multiple source overlaps,
+reversal and old-resolution stability, all five presets, complete crossing readings,
+supplementary/combining/NUL text and UTF-16 offsets, foreign/empty/malformed pages and
+off-page source-ruby corruption. Both projections share one source-precedence helper.
+
+The payload example reproduces full-key JSON sizes of 139,145 / 1,409,312 / 14,290,979
+bytes for 1k / 10k / 100k synthetic characters. Visible page tokens at 10k and 100k
+stay 42,519 bytes. EFFECTIVE_READER_PAYLOAD.md records the fixture, exact page sizes,
+interpretation and limits; this does not measure JNI bytes or actual device latency.
+No dependency/version, migration, public schema or Android source changes.
+
+Logs: /tmp/yomoku-effective-furigana-{tests,full,clippy,bridge,payload,kotlin-format}.log.
+APK/device/Android lint, release, real-book performance, process-death and physical
+arm64 were not rerun; the existing AVD was untouched. No implementation blocker.
+Next: effective bridge identity/lifecycle using the payload evidence, coordinated
+completion/token/word/custom/furigana integration, then guarded typed override UI.
+
+Final PASS: real-Full Kotlin/JNI selected-word/custom CRUD, all file imports/direct
+cancellation, navigation/codecs, seven cross-language Unicode fixtures and 100 native
+handle lifecycles. Existing Crux middleware teardown messages remain informational.
+Repeat generation is byte-identical. No download or unresolved verification failure.
+Git staging/commit requires the already authorized filesystem escalation because
+the sandbox mounts `.git` read-only; source edits/checks need no escalation.

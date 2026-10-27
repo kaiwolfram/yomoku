@@ -2298,3 +2298,25 @@
 - Next: live effective completion/token/word/custom/furigana integration and payload
   review, then typed override controls with rendered-key/intervening-edit retry guards
   and Android A/B/C/manual scope choices. Current live reader stays B; no blocker.
+
+## 2026-10-27 — Effective furigana and payload review
+
+- Added pure source-preferred furigana over the private validated effective chapter;
+  original and effective projections share one overlap helper. Exact B/A/C readings
+  retain occurrence provenance; unresolved manual parts never borrow old B readings.
+- Five new tests verify source overlaps, reversal, repeated/literal Unicode readings,
+  all-preset crossing bases/UTF-16 and invalid page/whole-source rejection. Extended
+  real Full A/B/C fixtures verify the same projection and source priority.
+- PASS: 529 workspace Rust tests (17 ignored), strict Clippy/Rustfmt/Kotlin formatting,
+  15 Full analysis + one runtime fixture EACH owned/mapped (32 invocations).
+- Added reproducible payload example and EFFECTIVE_READER_PAYLOAD.md: 100k synthetic
+  characters produce 14.3 MB of complete-key JSON versus 42.5 KB of page tokens.
+  Actual JNI representation, real-book memory and device timing remain unmeasured.
+- Updated plan/decisions/architecture/data model and handoff. No dependency/version,
+  schema or Android source changes. APK/device/lint/release/process-death/arm64 not
+  rerun. Next: narrow effective bridge identity/lifecycle, coordinated live reader
+  integration, then guarded override controls. Current live reader stays B.
+- Final host Kotlin/JNI passes real-Full selected-word/custom CRUD, file imports/
+  direct cancellation, navigation/codecs, seven Unicode fixtures and 100 handles.
+  Repeat codegen is byte-identical. Existing Crux teardown messages are informational;
+  no verification blocker remains.

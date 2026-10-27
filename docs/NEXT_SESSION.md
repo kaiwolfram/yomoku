@@ -1,5 +1,5 @@
 # Resume here
-Updated: 2026-10-27. Atomic override registration verified; live integration next.
+Updated: 2026-10-27. Effective furigana + payload review done; live integration next.
 ## Working
 - Pure Crux routes/Library/Settings; Render-only UI; FIFO SQLite/analysis; Library start.
 - Chapter-local UTF-8 position/whole-book percentage/five presets persist; reflow
@@ -48,33 +48,33 @@ Updated: 2026-10-27. Atomic override registration verified; live integration nex
 - Serial bounds-first decode: <=32768-edge/100 MP source, <=2048-edge sample,
   16 MiB shared page pixels; repeats share bitmaps. Ratio frames <=8192px preserve
   U+FFFC positions/styles/word/link identity; unsupported images keep alt/Retry.
-- Full-window viewer: bounded bitmaps, 1–8x fit zoom/clamped pan; accessible controls;
-  retains selection/zoom/focus on recreation; modal gestures never complete.
-- Library covers: verified path/media/SHA-256; <=4 MiB/64-entry LRU; <=64 KiB decode.
+- Full-window viewer: bounded 1–8x zoom/pan, retained selection; modal never completes.
+- Verified Library covers: <=4 MiB/64-entry LRU; <=64 KiB decode.
 - Noto Serif JP/credits; global font/spacing (16sp/150% default)/furigana persist (0015/16).
 - Custom meanings/readings (0017): exact-surface CRUD core/FIFO/FFI/Android; frozen
   selections/built-in gates, literal drafts/Cancel/retries; no history/status writes.
-- Furigana: persisted switch/retries; keyed source-first/original-B fallback, status
-  independent. Half-size readings above canonical Text; strict UTF-16, complete
-  readings across page/layout splits, fitted base width and measured headroom.
+- Furigana: persisted switch/retries, source-first/B fallback independent of status;
+  half-size readings, strict UTF-16, full crossing readings/fitted width/headroom.
 - Effective segmentation: B + A/B/C/manual partitions; contiguous JP B matches,
   local/newer precedence/reversal; exact metadata provenance, unmatched unresolved.
-- Effective APIs: JP-span eligibility distinct from metadata; clipped visibility/
-  start-owned occurrences/live statuses. Word reads freeze resolution/provenance;
-  exact base only, live counts/customs, surface-only unresolved; query-only.
-  Custom CRUD shares frozen validation/built-in gates/atomic row helpers.
+- Pure effective furigana: same resolved metadata/source priority, complete crossing
+  readings; unresolved manual parts never borrow B readings. Live furigana stays B.
+- Effective APIs: JP eligibility distinct from metadata; clipped visibility/start-owned
+  occurrences/live statuses. Word/custom APIs freeze provenance, exact base only,
+  unresolved surface-only; query-only reads/shared atomic CRUD/built-in gates.
 - Effective completion (0018): full key/occurrences/time frozen durably; page-only
   registration/New-only Known/history/time/position/finish atomic. Exact replay
   survives reversal/deletion/reopen; legacy calls reject its ID. Live reader uses B.
-- Override save + New registration atomic at selected winning parts; active-rule
-  retries write nothing after deletion/reopen; reversal preserves vocabulary/history.
+- Atomic override registration: winning parts only; retry no-op; reversal keeps history.
 ## Next tasks (ordered)
-1. Wire effective completion + token/furigana/word/custom paths through core/FIFO/
-   FFI together; review full-chapter payload cost. No restart replay of reservations.
-2. Add typed reads/choices/save/reverse with rendered-key and intervening-edit retry
+1. Define narrow effective bridge identity/lifecycle using EFFECTIVE_READER_PAYLOAD.md:
+   100k-char full key = 14.3 MB JSON vs 42.5 KB page tokens; actual JNI cost unmeasured.
+2. Wire effective completion/token/furigana/word/custom through core/FIFO/FFI together;
+   use the pure furigana API. No restart replay of unfinished reservations.
+3. Add typed reads/choices/save/reverse with rendered-key and intervening-edit retry
    guards, then Android A/B/C/manual, default All occurrences versus This occurrence.
 Physical arm64 deferred; Nostr empty; Q188 unresolved before forwarding.
 ## Verification
-- PASS: 524 Rust tests (17 ignored), strict Clippy/Rustfmt/diff;
-  15 Full + one runtime pass EACH owned/mapped. Commands: DEVELOPMENT.md end.
-- Kotlin/JNI/codegen/APK/device/Android lint/release/arm64 not rerun. No blocker.
+- PASS: 529 Rust tests (17 ignored), strict Clippy/Rustfmt/Kotlin formatting/diff;
+  15 Full + one runtime EACH owned/mapped; real-Full Kotlin/JNI/7 Unicode/100 handles.
+- Repeat codegen identical; APK/device/lint/release/arm64 not rerun. DEVELOPMENT.md end.

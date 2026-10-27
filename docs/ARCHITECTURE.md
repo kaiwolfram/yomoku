@@ -850,6 +850,12 @@ segment indices and page-local UTF-8 display ranges. Exact analyzer classificati
 governs resolved tokens; unresolved manual partitions inherit reading eligibility
 from the editable Japanese B span, explicitly separate from analyzer metadata.
 Visible crossings appear on both pages; future completion projections own starts.
+`EffectiveReaderChapter::furigana_on_page` projects source-preferred ruby from that
+same private validated resolution. It shares the original reader's source-overlap
+policy, clips bases while retaining complete readings, and uses only exact Japanese
+analyzer metadata as fallback. Unresolved manual spans never borrow old B readings.
+Whole source-ruby validation and page ownership checks precede output; no live
+vocabulary, dictionary, SQL, registration or platform I/O participates.
 `Storage::load_effective_reader_tokens` composes the same resolution loader with
 live indexed exact-surface status reads in one read-only transaction. Repeated
 surfaces share a lookup; missing/deleted entries stay absent. Results retain the
@@ -888,7 +894,10 @@ Reversal preserves registration/history. Other occurrences/documents are not res
 for registration, and no analyzer/platform I/O enters core. No schema/dependency/bridge
 change. Rendered-selection and intervening-edit retry guards remain prerequisites for
 future typed override controls. Live core/FIFO/FFI integration and Android controls
-remain next; payload-size/performance and effective bridge schemas require review.
+remain next. The [synthetic payload review](EFFECTIVE_READER_PAYLOAD.md) measures
+14.3 MB of full-key JSON for a 100,000-character chapter versus 42.5 KB of visible
+500-character page tokens. Effective bridge identity/lifecycle design and actual
+device/real-book performance remain pending; these are not JNI wire measurements.
 
 `Storage::create_analyzed_paste` composes the existing private transaction helpers
 for document creation, validated Mode B analysis and exact-surface registration.
