@@ -2804,3 +2804,37 @@ have since changed; Save entry can submit the new draft instead. Only committed
 success closes the editor. Clock saves/recomposition never submit mutations.
 Deletion affects only the selected spelling's custom definition, using the existing
 explicit atomic delete semantics; no vocabulary/history or built-in changes.
+
+## 2026-10-27 — Effective segmentation boundary resolution
+
+Continue migration 0007 with a pure resolver and one read-only repository API.
+Keep this result separate from `ChapterAnalysis`: manual boundaries are not new
+Sudachi output and cannot fabricate a reading, Japanese classification or lemma.
+Resolved segments retain exact anchors/surfaces and applied rule IDs. An original
+token index is available only when the effective span exactly equals that B token;
+future consumers must obtain analyzer metadata from validated snapshots.
+
+Routine matching policy: global rules apply only across complete adjacent Japanese
+Mode B tokens, with literal source bytes. Avoid arbitrary substring edits within
+other B words or across punctuation/whitespace. This occurrence uses the exact
+source/chapter/range and the same B eligibility. Local rules win overlaps regardless
+of age; newer OverrideIds win within one scope. A self-overlapping global rule
+uses leftmost nonoverlapping matches. Apply winners once against immutable B,
+independent of the caller's rule order and page length. Losing overlapping rules
+stay active, so reversal can reveal them; reversal never reactivates a superseded
+same-key edit. These rules are covered with synthetic boundary cases and the
+pinned real Full dictionary before any UI exposure.
+
+The A/B/C helper selects complete eligible spans from whole-chapter snapshots with
+exactly matching engine/dictionary profiles; crossing tokens and changed profiles
+are rejected. Manual split/merge continues using existing exact partitions. Reader
+selection will need to expose complete original-B spans for these operations.
+
+Storage loads original pinned B plus globals/relevant locals in one transaction,
+including globals retained after originating content deletion. Missing B stays
+missing; malformed snapshots/rules fail without partial projection or repair.
+No schema/dependency/bridge change or automatic rescan is required. This step
+does not yet change reader tokens, custom dictionary gating, furigana, vocabulary
+registration or completion behavior. Effective selection/metadata/registration and
+frozen completion identities must be integrated together before exposing controls;
+past completed-reading occurrences must remain unchanged.

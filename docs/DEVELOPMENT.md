@@ -4008,3 +4008,61 @@ errors/skips, including actual field focus/keyboard edits in the wide popup and
 recreation, retries and cross-book persistence. Preserved reports/lint XML alongside
 phone runs. Restored the existing AVD to 1080x2400/420dpi/light without wiping or
 restarting it; it remains running. No unresolved verification/application blocker.
+
+## Effective segmentation boundary resolution
+
+2026-10-27, from the repository root with the pinned Rust/JDK environment:
+
+```sh
+export PATH=/home/kai/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin:$PATH
+export JAVA_HOME=/home/kai/repos/yomoku/.local/jdk-17/jdk-17.0.21+9
+cargo test -p yomoku-core --test segmentation --all-features --locked --offline
+cargo test -p yomoku-storage segmentation --all-features --locked --offline
+cargo test --workspace --all-features --locked --offline --quiet
+tools/test-sudachi.sh
+cargo clippy --workspace --all-targets --all-features --locked --offline -- -D warnings
+cargo fmt --all -- --check
+tools/test-kotlin-bridge.sh
+cargo run -p yomoku-ffi --bin generate-kotlin --features facet_typegen --locked --offline -- target/generated/kotlin-repeat
+# Compare only after generation exits.
+diff -r target/generated/kotlin target/generated/kotlin-repeat
+tools/format-kotlin.sh --check
+git diff --check
+```
+
+The pure resolver applies migration-0007 partitions over complete adjacent Japanese
+Mode B tokens, with literal UTF-8 and local/newer-ID overlap precedence. A/B/C
+partition construction requires complete tokens and the exact original profile.
+Read-only `load_chapter_segmentation` restores original B plus active global/local
+rules in one transaction. It returns separate boundary data and original-token
+references without manufacturing analyzer metadata or changing existing reader/
+completion behavior. No dependency, migration or public bridge change.
+
+PASS: eight new core and five new storage cases; 483 workspace tests (17 opt-in
+ignored), strict Clippy/Rustfmt, Kotlin formatting, whitespace, real-Full host
+Kotlin/JNI and byte-identical repeat generation. All fifteen real-Full analysis fixtures plus one runtime fixture
+pass for EACH owned/mapped loader (32 invocations). The new real fixture exercises
+A/B/C, manual conjugation merge, local B restoration, reversal, SQLite reopen and
+unchanged immutable snapshots against pinned Full; both loaders pass it.
+
+Data-free coverage includes supplementary/combining/NUL surfaces, no substring/
+normalization/gap/punctuation matching, repeated/self-overlapping matches, local
+and newest-rule precedence independent of input order, reverse revealing still-
+active overlaps, inactive superseded rules, cross-document globals, deleted-origin
+provenance/reimport identity, same-profile snapshot validation, pinned original B,
+Missing B/foreign modes, corrupt rules/snapshots and query-only byte preservation.
+Full row/value comparisons verify save/replace/resolve/reverse leave analyses,
+vocabulary/status events, completions/occurrences, position, settings and time intact.
+
+Initial focused storage checks caught a test-only reference to a nonexistent
+`document_reading_state` table; compare `documents` and `pending_reading_time`
+instead. Initial Clippy requested a borrowed singleton in one new assertion;
+corrected before the final passing run. No production workaround or new blocker.
+The complete host bridge run passes Unicode/codecs, imports/cancellation,
+selected-word/custom CRUD, navigation and handle lifecycle checks; the known Crux
+middleware teardown messages remain informational. No sandbox escalation or
+network download was needed for these checks.
+APK/device/Android lint, release, performance, process-death and physical arm64
+were not rerun for this domain/storage slice. The existing AVD was not changed.
+Next: effective token/word/metadata/registration and frozen future-completion
+identities, then typed commands and Android controls. Prior occurrences stay immutable.

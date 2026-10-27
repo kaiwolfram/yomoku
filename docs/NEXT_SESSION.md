@@ -1,5 +1,5 @@
 # Resume here
-Updated: 2026-10-27. Custom dictionary editor verified; segmentation overrides next.
+Updated: 2026-10-27. Effective segmentation boundaries verified; reader integration next.
 ## Working
 - Pure Crux routes/Library/Settings; Render-only UI; FIFO SQLite/analysis; Library start.
 - Chapter-local UTF-8 position/whole-book percentage/five presets persist; reflow
@@ -57,23 +57,24 @@ Updated: 2026-10-27. Custom dictionary editor verified; segmentation overrides n
 - Library covers resolve live path/media/SHA-256 metadata without book BLOBs/Full.
   Media+digest LRU <=4 MiB/64 entries; misses verify bytes/digest and decode <=64 KiB.
 - Noto Serif JP/credits; global font/spacing (16sp/150% default)/furigana persist (0015/16).
-- Custom meanings/readings (0017): exact global surface; original-token/built-in gates.
-  Typed core/FIFO/FFI CRUD; Android Add/Edit/Delete, required literal fields/Cancel,
-  explicit exact-command retries. Selection/drafts reset on dismissal/recreation.
-  Committed data persists across books; no history/analysis/status/position changes.
+- Custom meanings/readings (0017): global exact-surface CRUD through core/FIFO/FFI/
+  Android; original-token/built-in gates, literal fields, Cancel/exact retries.
+  Selection/drafts reset on dismissal/recreation; history/status/position unchanged.
 - Furigana: persisted switch/retries; keyed source-first/original-B fallback, status
   independent. Half-size readings above canonical Text; strict UTF-16, complete
   readings across page/layout splits, fitted base width and measured headroom.
+- Pure effective segmentation + read-only load_chapter_segmentation: original B,
+  A/B/C same-profile partitions/manual edits, exact contiguous Japanese B matches;
+  local then newer-ID precedence, reversible overlaps; no reader/history changes.
 ## Next tasks (ordered)
-1. A/B/C/manual split/merge effective overrides using existing 0007 anchors/snapshots;
-   test local/global resolution, reversal and unchanged historical occurrences.
-2. Wire verified overrides through core/FIFO/FFI and Android; default All occurrences
-   versus This occurrence. Keep immutable original analysis/history semantics.
+1. Integrate effective token/word/metadata/registration and frozen future-completion
+   identities; preserve original snapshots/past history. Reader still uses B today.
+2. Wire override reads/choices/save/reverse through core/FIFO/FFI, then Android
+   A/B/C/manual controls with default All occurrences versus This occurrence.
 Physical arm64 deferred; Nostr empty; Q188 unresolved before forwarding.
 ## Verification
-- PASS: both-ABI debug/test APKs/lint, Kotlin format/Rustfmt/diff; 13 distinct phone
-  cases including three new editor fixtures; four tablet/dark cases. DEVELOPMENT.md end.
-- Reports: .local/test-reports/custom-dictionary-editor/. Fixture scroll parent and
-  cross-book final-time drain fixed. Rust suite/Clippy/host JNI/codegen unchanged,
-  not rerun (last 470 Rust tests pass). Release/process-death/physical arm64 not rerun.
-- No blocker. AVD restored to 1080x2400/420dpi/light and left running.
+- PASS: 483 Rust tests (17 ignored), Clippy/format/diff, Full host Kotlin/JNI and
+  repeat codegen; 15 Full + one runtime pass EACH owned/mapped. DEVELOPMENT.md end.
+- Corrected test-only missing table/clone assertion; no blocker. No dependencies,
+  schema, bridge or Android changes. APK/device/lint/release/process-death/physical
+  arm64 not rerun; prior phone/tablet editor reports remain .local/test-reports/.

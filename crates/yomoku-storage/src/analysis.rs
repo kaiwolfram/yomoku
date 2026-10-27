@@ -8,6 +8,7 @@ use yomoku_core::{
         AnalysisId, ChapterId, ChapterText, OverrideId, SourceId, TextAnchor, TextOffset, TextRange,
     },
     reader::ReaderAnalysis,
+    segmentation::{resolve_segmentation, ChapterSegmentation},
     vocabulary::Surface,
 };
 
@@ -46,6 +47,46 @@ pub(crate) fn read_reader_analysis(
 }
 
 impl Storage {
+    /// Read the pinned original Mode B plus active global/relevant local rules
+    /// atomically. Missing B stays missing; this never analyzes, registers words,
+    /// changes the reader's current projection or writes completed-reading data.
+    pub fn load_chapter_segmentation(
+        &mut self,
+        chapter_id: ChapterId,
+    ) -> Result<Option<ChapterSegmentation>, StorageError> {
+        let transaction = self.connection.transaction()?;
+        let chapter = read_chapter(&transaction, chapter_id)?;
+        let ReaderAnalysis::Available(id) = read_reader_analysis(&transaction, chapter_id)? else {
+            transaction.commit()?;
+            return Ok(None);
+        };
+        let original = read_analysis(&transaction, id)?.ok_or(StorageError::InvalidAnalysis)?;
+        let mut statement = transaction.prepare(
+            "SELECT id FROM segmentation_overrides WHERE active = 1
+             AND (scope = 'all' OR (source_id = ?1 AND chapter_id = ?2)) ORDER BY id",
+        )?;
+        let ids = statement
+            .query_map(
+                (i64::from(chapter.source_id), i64::from(chapter_id)),
+                |row| row.get::<_, i64>(0),
+            )?
+            .collect::<Result<Vec<_>, _>>()?;
+        drop(statement);
+        let rules = ids
+            .into_iter()
+            .map(|id| {
+                read_override(&transaction, override_id(id)?)?.ok_or(StorageError::InvalidAnalysis)
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        let segments = resolve_segmentation(&chapter, &original, &rules)
+            .map_err(|_| StorageError::InvalidAnalysis)?;
+        transaction.commit()?;
+        Ok(Some(ChapterSegmentation {
+            original_analysis_id: id,
+            segments,
+        }))
+    }
+
     /// Persist a validated immutable base snapshot. Identical retries reuse its ID;
     /// different output under the same engine/dictionary/mode identity is an error.
     /// This prerequisite does not register vocabulary or record reading encounters.

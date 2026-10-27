@@ -2143,3 +2143,26 @@
   restored to original 1080x2400/420dpi/light and running. No Rust/core/FFI/schema/
   dependency changes; Rust suite/Clippy/host JNI/codegen, release, benchmarks,
   process-death and physical arm64 not rerun; hardware stays deferred.
+
+## 2026-10-27 — Effective segmentation boundary resolver
+- Started clean. Added a pure original-B resolver for migration-0007 manual/A/B/C
+  partitions and same-profile A/B/C partition construction. Literal contiguous
+  Japanese B token matching, local/newer-ID overlap precedence and reversal retain
+  immutable snapshots; changed boundaries carry no invented analyzer metadata.
+- Added one read-only SQLite chapter-segmentation API, with pinned B, retained
+  global provenance, exact local scopes and consistent active-rule loading. Current
+  reader/word/furigana/completion APIs remain original B; no schema/dependency or
+  public bridge change. Updated architecture/data/decisions/plan and brief handoff.
+- PASS: 13 new data-free cases, 483 workspace Rust tests (17 opt-in ignored), strict
+  Clippy/Rustfmt, Kotlin formatting/diff, full real-Full host Kotlin/JNI and
+  byte-identical repeat Kotlin generation.
+  All 15 Full analysis + one runtime fixture pass for each owned/mapped loader;
+  new real-data coverage exercises A/B/C/conjugation merge/local reversal/reopen.
+  History tests compare complete persisted rows/values before/after edits/reversal.
+- Fixed a nonexistent table name in the new test snapshot and Clippy's borrowed-
+  singleton assertion request before passing checks. No blocker or new approval
+  requirement. Commands/results: DEVELOPMENT.md end. Android APK/device/lint,
+  release, performance, process-death and physical arm64 were not rerun; AVD untouched.
+- Next effective token/word/metadata/registration and frozen future-completion
+  identities, then core/FIFO/FFI/Android choices and controls. Keep past occurrences
+  unchanged and All occurrences as the default scope.

@@ -112,6 +112,173 @@ fn default_b_and_all_three_real_split_modes() {
 
 #[test]
 #[ignore = "requires pinned Sudachi Full; run tools/test-sudachi.sh"]
+fn real_segmentation_choices_resolve_scopes_merges_and_reversal_without_replacing_b() {
+    use yomoku_core::{
+        analysis::{OverrideScope, SegmentationOverride},
+        document::{PasteText, TextAnchor, TextOffset, TextRange},
+        segmentation::segmentation_from_snapshot,
+        vocabulary::Surface,
+    };
+    use yomoku_storage::Storage;
+
+    let directory = std::env::temp_dir().join(format!(
+        "yomoku-real-segmentation-{}-{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    ));
+    std::fs::create_dir(&directory).unwrap();
+    let path = directory.join("segmentation.sqlite3");
+    let mut storage = Storage::open(&path).unwrap();
+    let imported = storage
+        .create_analyzed_paste(
+            &PasteText::new("国家公務員。国家公務員。食べた。English 𰻞📖\0".into()).unwrap(),
+            100,
+            |chapter| analyzer().analyze(chapter),
+        )
+        .unwrap();
+    let chapter = &imported.document.chapter;
+    let original = storage
+        .chapter_analysis(imported.analysis_id)
+        .unwrap()
+        .unwrap();
+    let selected = TextAnchor {
+        source_id: chapter.source_id,
+        chapter_id: chapter.chapter_id,
+        range: TextRange {
+            start: TextOffset::START,
+            end: TextOffset::at(&chapter.text, "国家公務員".len()).unwrap(),
+        },
+    };
+    let mut saved = Vec::new();
+    for mode in [SplitMode::A, SplitMode::B, SplitMode::C] {
+        let snapshot = analyzer().analyze_mode(chapter, mode).unwrap();
+        let id = storage
+            .store_chapter_analysis(chapter.chapter_id, &snapshot)
+            .unwrap();
+        saved.push((id, snapshot.clone()));
+        let edit = segmentation_from_snapshot(
+            chapter,
+            &original,
+            &snapshot,
+            selected,
+            OverrideScope::default(),
+        )
+        .unwrap();
+        let override_id = storage.save_segmentation_override(&edit).unwrap();
+        let resolved = storage
+            .load_chapter_segmentation(chapter.chapter_id)
+            .unwrap()
+            .unwrap();
+        assert_eq!(resolved.original_analysis_id, imported.analysis_id);
+        let changed = resolved
+            .segments
+            .iter()
+            .filter(|s| s.override_id == Some(override_id))
+            .collect::<Vec<_>>();
+        assert_eq!(changed.len(), edit.parts.len() * 2);
+        for (index, segment) in changed.iter().enumerate() {
+            assert_eq!(
+                segment.surface,
+                edit.parts[index % edit.parts.len()].as_str()
+            );
+            assert_eq!(segment.anchor.slice(chapter).unwrap(), segment.surface);
+        }
+        assert_eq!(
+            storage
+                .chapter_analysis(imported.analysis_id)
+                .unwrap()
+                .unwrap(),
+            original
+        );
+        storage.reverse_segmentation_override(override_id).unwrap();
+    }
+    // Merge the real inflected B sequence 食べ + た into a selectable surface.
+    let start = chapter.text.find("食べた").unwrap();
+    let merged = SegmentationOverride {
+        scope: OverrideScope::AllOccurrences,
+        anchor: TextAnchor {
+            range: TextRange {
+                start: TextOffset::at(&chapter.text, start).unwrap(),
+                end: TextOffset::at(&chapter.text, start + "食べた".len()).unwrap(),
+            },
+            ..selected
+        },
+        surface: Surface::new("食べた").unwrap(),
+        parts: vec![Surface::new("食べた").unwrap()],
+    };
+    let global_id = storage.save_segmentation_override(&merged).unwrap();
+    let local = segmentation_from_snapshot(
+        chapter,
+        &original,
+        &original,
+        merged.anchor,
+        OverrideScope::ThisOccurrence,
+    )
+    .unwrap();
+    let local_id = storage.save_segmentation_override(&local).unwrap();
+    let resolved = storage
+        .load_chapter_segmentation(chapter.chapter_id)
+        .unwrap()
+        .unwrap();
+    assert_eq!(
+        resolved
+            .segments
+            .iter()
+            .filter(|s| s.override_id == Some(local_id))
+            .map(|s| s.surface.as_str())
+            .collect::<Vec<_>>(),
+        ["食べ", "た"]
+    );
+    storage.reverse_segmentation_override(local_id).unwrap();
+    let expected = storage
+        .load_chapter_segmentation(chapter.chapter_id)
+        .unwrap()
+        .unwrap();
+    assert!(expected.segments.iter().any(|s| s.surface == "食べた"
+        && s.override_id == Some(global_id)
+        && s.original_token_index.is_none()));
+    drop(storage);
+    let mut reopened = Storage::open(&path).unwrap();
+    assert_eq!(
+        reopened
+            .load_chapter_segmentation(chapter.chapter_id)
+            .unwrap()
+            .unwrap(),
+        expected
+    );
+    for (id, snapshot) in saved {
+        assert_eq!(reopened.chapter_analysis(id).unwrap().unwrap(), snapshot);
+    }
+    reopened.reverse_segmentation_override(global_id).unwrap();
+    let restored = reopened
+        .load_chapter_segmentation(chapter.chapter_id)
+        .unwrap()
+        .unwrap();
+    assert!(restored.segments.iter().all(|s| s.override_id.is_none()));
+    assert_eq!(
+        restored
+            .segments
+            .iter()
+            .map(|s| s.surface.as_str())
+            .collect::<Vec<_>>(),
+        surfaces(&original)
+    );
+    assert_eq!(
+        reopened
+            .chapter_analysis(imported.analysis_id)
+            .unwrap()
+            .unwrap(),
+        original
+    );
+    drop(reopened);
+    std::fs::remove_dir_all(directory).unwrap();
+}
+
+#[test]
+#[ignore = "requires pinned Sudachi Full; run tools/test-sudachi.sh"]
 fn inflected_surfaces_stay_distinct_from_analyzer_forms() {
     let result = analyze("食べる。食べた。食べます。", SplitMode::B);
     assert_eq!(

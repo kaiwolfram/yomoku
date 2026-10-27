@@ -510,10 +510,34 @@ Original selected bytes and source/chapter metadata survive content deletion, so
 global edits remain inspectable/reversible. Load validates their shape/ownership
 and, while canonical text exists, their exact source span. No production deletion
 API is introduced. Existing documents are not analyzed/rescanned by migration.
-Real analyzer output and atomic paste registration are implemented separately;
-matching rules across occurrences, overlapping rule precedence and segmentation
-UI/application remain unimplemented. No override is applied to
-the current reader or treated as a completed-reading occurrence.
+Real analyzer output and atomic paste registration are implemented separately.
+The pure `segmentation` module now derives effective boundaries without modifying
+these snapshots. `segmentation_from_snapshot` creates an exact partition from
+A/B/C output only when the engine/dictionary profile matches original B and both
+ends align with complete, adjacent Japanese tokens in both snapshots. Existing
+manual partitions use the same exact-source anchors/parts representation.
+
+`resolve_segmentation` matches global rules against complete, adjacent Japanese
+original B tokens. It never replaces a substring within a different B word, crosses
+whitespace gaps/non-Japanese tokens or normalizes spelling. Local rules apply only
+to their exact source/chapter/range and must cover the same eligible B spans.
+Local rules take precedence over overlapping globals; within a scope the newest
+OverrideId takes precedence. Repeated self-overlapping matches of one global rule
+choose the leftmost nonoverlapping matches. A losing overlapping rule stays active
+and may reappear after the winner is reversed; superseded same-key rules stay
+inactive. Resolution is independent of page length and input rule order.
+
+`ResolvedSegment` carries exact surface/anchor, the applied OverrideId when present,
+and an original token index only for an exact unchanged B token span. Changed
+boundaries supply no invented reading or dictionary form. `ChapterSegmentation`
+retains the pinned original AnalysisId. `Storage::load_chapter_segmentation` reads
+the original B plus active global/relevant local rules in one deferred transaction;
+missing B returns None, invalid canonical content/rules fail without repair.
+Origin-deleted globals still resolve from retained provenance and exact parts.
+These are separate domain/repository APIs: current reader token/word/furigana and
+completion APIs still use original B. Effective vocabulary/metadata/completion
+projection, core/FIFO/FFI commands and segmentation UI remain unimplemented. No
+resolution API registers vocabulary, resets position or rewrites historical data.
 
 ## Read-only reader token/status projection
 

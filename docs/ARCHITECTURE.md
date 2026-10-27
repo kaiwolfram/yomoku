@@ -821,12 +821,24 @@ Migration 0007 persists immutable chapter analysis/token snapshots and reversibl
 segmentation overrides. Identical snapshot retries reuse IDs; conflicting output
 under the same revision/mode key errors. Override replacement/deactivation commits
 atomically, keeps base output intact and preserves global rules after source content
-deletion. No production document edit/rename/delete API exists. One hundred and three storage
+deletion. No production document edit/rename/delete API exists. Storage
 tests cover migrations, reopen, rollback, Unicode, concurrency, ID allocation,
 settings, vocabulary, analysis anchors and completion history. Base-analysis identity and anchored completion intents reach core/FFI; token/override
-repositories have no UI operations; synthetic fixtures validate storage,
-not Sudachi behavior. Cross-occurrence matching and overlapping edit resolution
-belong to the later segmentation application task.
+repositories have no segmentation UI operations.
+
+Pure `yomoku-core::segmentation` derives effective whole-chapter boundaries from
+original Mode B and active edits. A/B/C choices partition a complete Japanese span
+from a validated same-profile snapshot; manual edits share the exact partition
+representation. Global rules match complete adjacent B tokens; local source/range
+rules take precedence, then newer IDs within each scope. Resolution preserves
+original token indices only for exact unchanged spans and never invents analyzer
+metadata. `Storage::load_chapter_segmentation` reads original B and the active rules
+in one read transaction, validates retained provenance and returns a separate typed
+result without SQL in core or an analyzer dependency in storage. Domain/storage
+fixtures plus real Full owned/mapped fixtures cover scope, reversibility and
+unchanged snapshots/history. Current reader token/word/furigana/completion paths
+continue using original B; effective vocabulary/completion projection and
+core/FIFO/FFI/Android controls remain the next slice.
 
 `Storage::create_analyzed_paste` composes the existing private transaction helpers
 for document creation, validated Mode B analysis and exact-surface registration.
