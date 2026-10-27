@@ -20,6 +20,8 @@ use crate::{
     reader_words::ReaderWordError, AnalyzedPaste, Storage, StorageError, MIGRATIONS,
 };
 
+mod effective;
+
 fn dictionary() -> TestDatabase {
     let file = TestDatabase::new();
     let connection = Connection::open(file.path()).unwrap();

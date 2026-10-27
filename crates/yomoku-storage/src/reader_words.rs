@@ -6,7 +6,7 @@ use std::{error::Error, fmt};
 use rusqlite::Connection;
 use yomoku_core::{
     dictionary::DictionaryCandidates,
-    effective_reader::{EffectiveReaderTokenKey, EffectiveReaderWordDetails},
+    effective_reader::{EffectiveReaderToken, EffectiveReaderTokenKey, EffectiveReaderWordDetails},
     reader::{ReaderCustomEntry, ReaderToken, ReaderTokenKey, ReaderVocabulary},
 };
 
@@ -111,19 +111,9 @@ impl Storage {
         segment_index: u64,
     ) -> Result<Option<EffectiveReaderWordDetails>, ReaderWordError> {
         let transaction = self.connection.transaction().map_err(StorageError::from)?;
-        let Some(snapshot) =
-            load_effective_reader_tokens_in(&transaction, key.document_id, key.page)?
-        else {
+        let Some(token) = selected_effective_token_in(&transaction, key, segment_index)? else {
             return Ok(None);
         };
-        if snapshot.segmentation.as_ref() != Some(&key.segmentation) {
-            return Err(ReaderWordError::InvalidSelection);
-        }
-        let token = snapshot
-            .tokens
-            .into_iter()
-            .find(|token| token.segment_index == segment_index)
-            .ok_or(ReaderWordError::InvalidSelection)?;
         let (encountered, candidates, custom_entry) = word_details_in(
             &transaction,
             dictionary,
@@ -143,6 +133,29 @@ impl Storage {
             custom_entry,
         }))
     }
+}
+
+/// Shared validation for effective word reads and custom-entry mutations. Call
+/// inside the operation's transaction so rules cannot change between validation
+/// and use. Only visible, eligible segments may supply surface/base identity.
+pub(crate) fn selected_effective_token_in(
+    connection: &Connection,
+    key: &EffectiveReaderTokenKey,
+    segment_index: u64,
+) -> Result<Option<EffectiveReaderToken>, ReaderWordError> {
+    let Some(snapshot) = load_effective_reader_tokens_in(connection, key.document_id, key.page)?
+    else {
+        return Ok(None);
+    };
+    if snapshot.segmentation.as_ref() != Some(&key.segmentation) {
+        return Err(ReaderWordError::InvalidSelection);
+    }
+    snapshot
+        .tokens
+        .into_iter()
+        .find(|token| token.segment_index == segment_index)
+        .map(Some)
+        .ok_or(ReaderWordError::InvalidSelection)
 }
 
 pub(crate) fn selected_token_in(

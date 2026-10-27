@@ -2234,3 +2234,24 @@
   teardown/ktfmt JDK messages remain informational; no escalation/download needed.
 - Next: effective registration/custom mutations and frozen future-completion
   identities, live token/furigana/word integration, then typed commands/UI controls.
+
+## 2026-10-27 — Effective custom-entry CRUD
+
+- Added effective custom-entry load/save/delete using the frozen resolved selection
+  and shared transaction-local validation with selected-word reads. Immediate
+  mutations keep resolution checks, built-in protection and writes atomic.
+- Shared original/effective dictionary gates and custom row helpers. Exact metadata
+  alone supplies base forms; manual terms remain surface-only. Literal fields,
+  global spelling identity, absent/deleted vocabulary, write-free retries, corrupt
+  state rejection and rollback are preserved. No registration/history/metadata,
+  dependencies, migrations, bridge or live-reader changes.
+- PASS: seven new cases, 508 workspace tests (17 ignored), strict Clippy/Rustfmt/
+  Kotlin formatting/diff, repeat codegen and 15 Full + one runtime fixture EACH
+  owned/mapped. Real Full now checks effective custom CRUD/reopen and stale writes.
+  Host Kotlin/JNI selected-word/custom CRUD, imports/cancellation, Unicode/codecs,
+  navigation and handle lifecycle regressions pass. No failing check or blocker.
+- Updated plan, decisions, architecture/data docs, DEVELOPMENT.md commands/logs and
+  80-line handoff. APK/device/lint/release/performance/process-death/physical arm64
+  were not rerun; AVD untouched. No escalation/download needed.
+- Next: effective registration and frozen future completions, then live reader/
+  furigana/word integration and core/FIFO/FFI/Android segmentation controls.

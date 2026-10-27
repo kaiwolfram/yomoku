@@ -582,6 +582,20 @@ manual spans use surface-only lookup without guessed metadata. Deleted/unregiste
 vocabulary stays absent with count zero. Query-only bytes/reopen, literal Unicode,
 all presets, reversal/replacement, metadata arrival and retry tests cover this path.
 
+`load_effective_reader_custom_entry`, `save_effective_reader_custom_entry` and
+`delete_effective_reader_custom_entry` use the same frozen key and effective segment
+index. Shared selection validation re-resolves the complete chapter in the operation's
+transaction. Reads stay query-only compatible; saves/deletes use an immediate
+transaction so resolution cannot change between validation and mutation. Exact
+metadata supplies the only allowed base form; unresolved manual spans use surface
+alone. Either word or name matches reject all three operations, including base-only
+matches. Dictionary failures never grant fallback permission. Stale selections fail;
+deleted documents return None/false. Shared original/effective mutation helpers keep
+literal fields, corrupt-entry rejection, write-free identical retries and atomic
+rollback semantics. Entries remain global by exact spelling, independently of live
+or deleted vocabulary; these APIs never register it or rewrite readings/history.
+No migration is added.
+
 These remain separate domain/repository APIs: live reader token/word/furigana and
 completion APIs still use original B. Effective registration and frozen
 future-completion identities, core/FIFO/FFI commands and segmentation UI remain

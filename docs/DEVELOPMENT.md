@@ -4237,3 +4237,53 @@ codecs and 100 handle lifecycles; all seven cross-language fixtures verify.
 Known Crux middleware teardown messages and ktfmt JDK deprecation warnings remain
 informational. Repeat generation is byte-identical. No escalation/network download
 was required; no unresolved verification blocker.
+
+## Effective custom-entry CRUD
+
+2026-10-27, from the repository root with the pinned Rust/JDK environment:
+
+```sh
+export PATH=/home/kai/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin:$PATH
+export JAVA_HOME=/home/kai/repos/yomoku/.local/jdk-17/jdk-17.0.21+9
+cargo test -p yomoku-storage effective_custom_dictionary --all-features --locked --offline
+cargo test --workspace --all-features --locked --offline --quiet
+tools/test-sudachi.sh
+cargo clippy --workspace --all-targets --all-features --locked --offline -- -D warnings
+cargo fmt --all -- --check
+tools/format-kotlin.sh --check
+tools/test-kotlin-bridge.sh
+cargo run -p yomoku-ffi --bin generate-kotlin --features facet_typegen --locked --offline -- target/generated/kotlin-repeat
+# Compare after generation exits.
+diff -r target/generated/kotlin target/generated/kotlin-repeat
+git diff --check
+```
+
+PASS: seven new effective-custom cases, 508 workspace Rust tests (17 opt-in ignored),
+strict Clippy/Rustfmt/Kotlin formatting/diff and byte-identical repeat generation.
+All fifteen Full analysis fixtures plus one runtime fixture pass EACH owned/mapped
+(32 invocations). The real segmentation fixture exercises custom CRUD for both exact
+analyzer spans and unresolved manual merges, literal fields, SQLite reopen and
+stale mutation rejection after reversal. Stored B/A/C and effective page/status
+snapshots remain identical through the writes.
+
+Data-free cases cover global spelling reuse across repetitions/documents/original
+and effective paths; literal supplementary/combining/NUL fields; manual spans with
+no invented metadata; absent/deleted vocabulary and deleted documents; word/name/
+base-only built-in gates and later exact metadata; reversal/replacement/forged keys,
+off-page/non-Japanese indices, missing B and invalid UTF-8 page boundaries. All page
+presets preserve complete crossing identities. Read-only loads preserve file bytes;
+invalid/corrupt entries and dictionary failures never permit replacement/deletion.
+Identical saves/repeated deletes stay no-ops. Statement and deferred-commit failures
+roll back create/edit/delete and exact retries recover.
+
+Logs: /tmp/yomoku-effective-custom-{tests,full,clippy,bridge,codegen,kotlin-format}.log.
+No dependencies, schema, bridge payloads or live reader behavior changed.
+APK/device/Android lint, release, performance, process-death and physical arm64 were
+not rerun; the existing AVD was untouched. No implementation blocker.
+Next: effective registration and frozen future completions, then the live reader/
+furigana/word switch and typed segmentation controls.
+
+Final host PASS: real-Full selected-word/custom-entry Kotlin/JNI payloads, literal
+Unicode/reopen/retry, import/direct-cancellation regressions, navigation/codecs and
+100 handle lifecycles; seven cross-language fixtures verify. Known Crux middleware
+teardown messages remain informational. No escalation/download was required.

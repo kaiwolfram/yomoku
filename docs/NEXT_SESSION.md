@@ -1,5 +1,5 @@
 # Resume here
-Updated: 2026-10-27. Effective selected-word lookup verified; live integration next.
+Updated: 2026-10-27. Effective custom CRUD verified; registration/completions next.
 ## Working
 - Pure Crux routes/Library/Settings; Render-only UI; FIFO SQLite/analysis; Library start.
 - Chapter-local UTF-8 position/whole-book percentage/five presets persist; reflow
@@ -63,18 +63,18 @@ Updated: 2026-10-27. Effective selected-word lookup verified; live integration n
   readings across page/layout splits, fitted base width and measured headroom.
 - Effective segmentation: B + A/B/C/manual partitions; contiguous JP B matches,
   local/newer precedence/reversal; exact metadata provenance, unmatched unresolved.
-- Effective APIs: JP-span eligibility distinct from metadata, clipped visibility/
-  start-owned occurrences/live statuses. Word reads freeze complete resolution,
-  reject changed rule/metadata identities; exact base only, live counts/customs,
-  surface-only unresolved terms; query-only. Live reader still uses B.
+- Effective APIs: JP-span eligibility distinct from metadata; clipped visibility/
+  start-owned occurrences/live statuses. Word reads freeze resolution/provenance;
+  exact base only, live counts/customs, surface-only unresolved; query-only.
+  Custom CRUD shares frozen validation/built-in gates/atomic row helpers;
+  no registration/metadata/history writes. Live reader B.
 ## Next tasks (ordered)
-1. Integrate effective registration/custom mutations and frozen future-completion
-   identities, then switch live token/furigana/word paths together. Reader uses B.
+1. Integrate effective registration and frozen future-completion identities,
+   then switch live token/furigana/word paths together. Reader uses B.
 2. Wire override reads/choices/save/reverse through core/FIFO/FFI, then Android
    A/B/C/manual controls with default All occurrences versus This occurrence.
 Physical arm64 deferred; Nostr empty; Q188 unresolved before forwarding.
 ## Verification
-- PASS: 501 Rust tests (17 ignored), Clippy/format/diff, host Kotlin/JNI and
-  repeat codegen; 15 Full + one runtime pass EACH owned/mapped. DEVELOPMENT.md end.
-- Commands/logs: DEVELOPMENT.md end; pinned SQLite test link only; no schema/bridge change.
-  APK/device/lint/release/process-death/arm64 not rerun. No blocker.
+- PASS: 508 Rust tests (17 ignored), Clippy/format/diff, host Kotlin/JNI/repeat codegen;
+  15 Full + one runtime pass EACH owned/mapped. DEVELOPMENT.md end.
+- APK/device/lint/release/process-death/arm64 not rerun. No blocker.

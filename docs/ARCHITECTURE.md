@@ -863,6 +863,12 @@ entry loading with the original-B API. Only exact analyzer metadata supplies a b
 form; manual spans remain unresolved. Reversal/replacement/metadata changes reject
 stale selections, while status/count/custom-entry changes stay live. This internal
 domain/repository key is not yet serialized or exposed through the bridge.
+Effective custom-entry CRUD shares that transaction-local selection validator.
+Save/delete hold an immediate SQLite transaction across validation, dictionary
+gating and mutation; read-only loads use a normal read transaction. Both original
+and effective APIs share exact-surface built-in protection and custom row helpers.
+Manual spans never inherit an original token's base form. No registration, analyzer
+metadata, historical event, schema or bridge changes are made by these operations.
 Current live reader token/word/furigana/completion paths continue using original B.
 Effective registration, frozen future completion identities and
 core/FIFO/FFI/Android controls remain the next integration steps.

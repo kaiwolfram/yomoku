@@ -330,7 +330,7 @@ fn real_segmentation_choices_resolve_scopes_merges_and_reversal_without_replacin
     );
     let frozen_key = expected_tokens.key().unwrap();
     let bytes_before = std::fs::read(&path).unwrap();
-    let expected_words = expected_tokens
+    let mut expected_words = expected_tokens
         .tokens
         .iter()
         .map(|token| {
@@ -353,6 +353,32 @@ fn real_segmentation_choices_resolve_scopes_merges_and_reversal_without_replacin
         })
         .collect::<Vec<_>>();
     assert_eq!(std::fs::read(&path).unwrap(), bytes_before);
+    // Both exact analyzer spans and unresolved manual merges use the same
+    // exact-surface fallback without changing segmentation or registration.
+    for word in &mut expected_words {
+        let entry = storage
+            .save_effective_reader_custom_entry(
+                &dictionary,
+                &frozen_key,
+                word.token.segment_index,
+                format!(" literal meaning for {}\n📖\0 ", word.token.surface),
+                " よみ\u{3099}\0 ".into(),
+            )
+            .unwrap()
+            .unwrap();
+        assert_eq!(entry.surface().as_str(), word.token.surface);
+        assert_eq!(
+            storage
+                .load_effective_reader_custom_entry(
+                    &dictionary,
+                    &frozen_key,
+                    word.token.segment_index
+                )
+                .unwrap(),
+            Some(entry.clone())
+        );
+        word.custom_entry = Some(entry.into());
+    }
     drop(storage);
     let mut reopened = Storage::open(&path).unwrap();
     assert_eq!(
@@ -392,7 +418,27 @@ fn real_segmentation_choices_resolve_scopes_merges_and_reversal_without_replacin
     for (id, snapshot) in saved {
         assert_eq!(reopened.chapter_analysis(id).unwrap().unwrap(), snapshot);
     }
+    assert!(reopened
+        .delete_effective_reader_custom_entry(&dictionary, &frozen_key, manual.segment_index)
+        .unwrap());
+    assert!(!reopened
+        .delete_effective_reader_custom_entry(&dictionary, &frozen_key, manual.segment_index)
+        .unwrap());
     reopened.reverse_segmentation_override(global_id).unwrap();
+    assert!(matches!(
+        reopened.save_effective_reader_custom_entry(
+            &dictionary,
+            &frozen_key,
+            manual.segment_index,
+            "late mutation".into(),
+            "かな".into()
+        ),
+        Err(
+            yomoku_storage::custom_dictionary::CustomDictionaryError::Selection(
+                yomoku_storage::reader_words::ReaderWordError::InvalidSelection
+            )
+        )
+    ));
     let restored = reopened
         .load_chapter_segmentation(chapter.chapter_id)
         .unwrap()

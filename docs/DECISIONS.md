@@ -2911,3 +2911,24 @@ The Full analysis integration fixture uses a separate empty immutable word/name
 index, avoiding another downloaded-data requirement. Link the already pinned,
 already used rusqlite 0.40.2 as an analysis dev-dependency to create this fixture;
 no library version, production dependency, schema or public bridge change.
+
+## 2026-10-27 — Effective custom-entry CRUD with transaction-local selection
+
+Continue segmentation integration with a bounded storage slice: add effective
+custom-entry load/save/delete using the existing complete resolved key and effective
+segment index. Extract selected-effective-token validation from word lookup so both
+paths reject stale rule/metadata provenance identically. Read loads use a read
+transaction; mutations acquire an immediate transaction before resolving identity,
+checking built-in matches and changing the custom row. This prevents a concurrent
+override change between selection validation and mutation without a new revision
+table or schema migration.
+
+Share original/effective built-in gates and custom row helpers. Resolve exact
+surface/base from storage; manual unresolved spans use only their surface. Word or
+name matches (including exact analyzer base-only matches) block load/save/delete;
+dictionary errors do not permit a custom fallback. Keep literal Unicode fields,
+invalid/corrupt-row rejection, write-free identical saves and repeated deletes,
+atomic failure rollback and global spelling identity. Custom entries survive
+vocabulary deletion and do not register absent/deleted spellings or supply analyzer
+metadata. Retain live original-B behavior until effective registration, frozen
+future completion identities and reader paths can be integrated together.
