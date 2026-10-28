@@ -1,5 +1,5 @@
 # Resume here
-Updated: 2026-10-28. Compact override contracts done; live switch next.
+Updated: 2026-10-28. Effective render adapters done; live switch next.
 ## Working
 - Pure Crux routes/Library/Settings; Render-only UI; FIFO SQLite/analysis; Library start.
 - Chapter-local UTF-8 position/whole-book percentage/five presets persist; reflow
@@ -56,9 +56,8 @@ Updated: 2026-10-28. Compact override contracts done; live switch next.
 - Effective completion (0018): full key/occurrences/time frozen durably; page-only
   registration/New-only Known/history/time/position/finish atomic. Exact replay
   survives reversal/deletion/reopen; legacy calls reject its ID. Live reader uses B.
-- Compact effective_session: one full key + view, fresh revisions, stale/foreign/
-  duplicate guards, retry/Missing B; prototype Kotlin codecs, page/selection 60/68 B.
-- Native effective_storage shares FIFO/dictionary; compact word state/retry/stale guards.
+- Compact effective_session: one full key + view, revisions/stale/retry/Missing B;
+  Kotlin page/selection 60/68 B; native effective_storage shares FIFO/dictionary/word state.
 - Retained completion: freeze before time drain; exact retries/reopen/reversal count once.
 - Effective status: atomic key/surface/ID guards; five choices/no-op retries/gates.
 - Guarded overrides: stored A/B/C/shared key/rule revision; atomic edits/register/
@@ -66,15 +65,16 @@ Updated: 2026-10-28. Compact override contracts done; live switch next.
   gates; stale/lost success requires explicit reload. Rollbacks retry.
 - Explicit A/C uses the FIFO/import analyzer cache, whole chapter/original profile;
   stored reuse skips Full. Rechecks key/revision at commit; metadata requires reload.
-- Compact override prompt/actions: fresh same-page prompt identities; default All,
-  literal choices/reverse/retry/Cancel guards; generated Kotlin codecs. Not live.
+- Compact override prompt/actions: fresh same-page identities; default All, literal
+  choices/reverse/retry/Cancel; generated codecs. Retained furigana + strict Android
+  effectiveDisplayTokens adapters ready (crossings/unresolved/source preference). Not live.
 ## Next tasks (ordered)
 1. Switch live core/FFI/Android completion/token/status/furigana/word/custom together
-   via effective_storage + retained requests; see EFFECTIVE_READER_PAYLOAD.md.
+   via effective_storage + retained requests + render adapters; see EFFECTIVE_READER_PAYLOAD.md.
 2. Wire compact override actions/state to Android A/B/C/manual + All/This/reversal.
 3. Measure real-book/JNI/device cost, including whole-chapter on-demand generation.
 Physical arm64 deferred; Nostr empty; Q188 unresolved before forwarding.
 ## Verification
-- PASS: 611 Rust (17 ignored); Clippy/fmt/diff; Kotlin/JNI + repeat codegen.
-- Commands/logs: DEVELOPMENT.md end. Standalone prompt schemas; live reader uses B.
-- Full matrix/APK/device/lint/release/arm64 not rerun; no blocker.
+- PASS: 614 Rust (17 ignored); Clippy/fmt/diff; Kotlin/JNI/codegen; debug APKs/lint.
+- Commands/logs: DEVELOPMENT.md end. Live reader uses B; effective adapters only.
+- PASS: 10 focused phone tests; full matrix/release/arm64 not rerun. No blocker.

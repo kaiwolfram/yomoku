@@ -171,3 +171,19 @@ including maximum revisions/IDs/timestamps, both scopes, A/B/C, literal
 supplementary/combining/NUL parts and distinct storage/invalid/stale failures.
 These are prototype standalone schemas, not live Event/ViewModel integration or
 JNI/device performance measurements. The live reader still uses original B.
+
+## Retained rendering adapters
+
+`EffectiveReaderSession::furigana(page, analysis)` borrows the current compact
+page's readings and shares the original renderer's strict text/range validation
+and source-precedence policy. It never clones the retained full key or resolves
+the chapter again. Missing/stale/invalid fallback data retains validated source
+ruby; unresolved manual parts have no guessed B/custom reading.
+
+Android's `effectiveDisplayTokens` accepts the expected compact identity and page,
+rejects stale revisions/foreign bases and malformed whole projections, and returns
+UTF-16 ranges paired with full tokens and `EffectiveReaderSelection`. Crossings
+retain the same chapter segment/full surface, contextual metadata stays per
+occurrence, and unresolved manual parts stay selectable without metadata. Its
+geometry is shared with the existing B renderer and compiled by the host Kotlin
+test runner. No wire-schema/size change or live reader switch is included.

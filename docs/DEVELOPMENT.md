@@ -4893,3 +4893,59 @@ Next switch token/status/word/custom/completion/furigana together, then wire com
 override controls. No dependency, migration or persistent-data change. Separate
 Full-loader matrix, APK/device/Android lint/release/performance/process-death/arm64
 were not rerun. No implementation blocker.
+
+
+## Retained effective rendering adapters
+
+2026-10-28, repository root, pinned offline Rust/JDK:
+
+```sh
+export PATH=/home/kai/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin:$PATH
+export JAVA_HOME=/home/kai/repos/yomoku/.local/jdk-17/jdk-17.0.21+9
+export GRADLE_USER_HOME=/home/kai/repos/yomoku/.local/gradle
+export ANDROID_HOME=/home/kai/Android/Sdk
+cargo test -p yomoku-core --test effective_session --test effective_furigana --test reader_furigana --all-features --locked --offline
+cargo test --workspace --all-features --locked --offline --quiet
+cargo clippy --workspace --all-targets --all-features --locked --offline -- -D warnings
+cargo fmt --all -- --check
+tools/format-kotlin.sh --check
+"$JAVA_HOME/bin/java" -jar .local/ktfmt-0.64.jar --kotlinlang-style --dry-run --set-exit-if-changed tests/kotlin/EffectiveReaderDisplayTest.kt
+tools/test-kotlin-bridge.sh
+cargo run -p yomoku-ffi --bin generate-kotlin --features facet_typegen --locked --offline -- target/generated/kotlin-repeat
+# Compare after generation exits.
+diff -r target/generated/kotlin target/generated/kotlin-repeat
+./android/gradlew -p android :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug --offline --console=plain
+./android/gradlew -p android :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=app.yomoku.ReaderWordSpansTest,app.yomoku.ReaderFuriganaTest,app.yomoku.ReaderRubyLayoutTest,app.yomoku.ReaderFormattingTest --offline --console=plain
+git diff --check
+```
+
+PASS: three new pure cases; 614 workspace Rust tests (17 opt-in ignored), strict
+Clippy/Rustfmt/Kotlin formatting, host Kotlin/JNI and byte-identical repeat codegen.
+The Kotlin runner now compiles the production Android range helper and tests
+supplementary/combining/NUL text, invalid UTF-16/UTF-8 offsets, stale revisions,
+foreign bases, complete crossing surfaces/selections, all statuses/deletion,
+contextual repeated spellings and unresolved manual metadata guards. Existing
+host JNI Full imports/direct cancellation, dictionary/custom CRUD, Unicode/codecs
+and 100 handle lifecycles pass. Debug app/test APK assembly and Android lint pass.
+All 10 focused emulator tests above pass on medium_phone, Android 16/API 36; these
+cover the live B renderer sharing the refactored geometry, source word/link/image
+identities, formatting/recreation, furigana reflow and ruby layout/theme/font scale.
+
+The retained ruby path is compared with the validated chapter projection for
+B/A/C provenance, source partial overlaps, unresolved spans, reversal, contextual
+repetitions and complete crossing readings at all five page presets. New lifecycle
+cases cover pending/failed/refresh/Missing B/invalidated/foreign reads and malformed
+whole projections while keeping independently validated source ruby usable.
+No full key is cloned/re-resolved by the production projection.
+
+Initial focused test compilation caught a fixture borrow conflict; fixed before
+all passing reruns. Gradle's sandbox wildcard-IP failure required the usual local
+socket escalation; the offline build/lint then passed. Existing Crux teardown
+messages remain informational. Logs: `/tmp/yomoku-effective-render-{tests,clippy,
+bridge,format,format-check,codegen,android,device,emulator}.log`.
+
+No dependency, migration or wire-schema change. The live reader still uses B;
+next adopt the retained protocol and these render adapters in Event/ViewModel/
+FFI/Compose together, then wire override controls. Separate Full-loader matrix,
+full device matrix, performance/process-death/release/physical arm64 not rerun.
+No implementation blocker.

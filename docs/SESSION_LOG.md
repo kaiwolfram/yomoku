@@ -2483,3 +2483,20 @@
   migration or live Android change. Coordinated live reader switch stays unchecked;
   then wire compact override controls and measure real-book/device costs. Separate
   Full matrix/APK/device/lint/release/arm64 not rerun; no blocker for this slice.
+
+
+## 2026-10-28 — Retained effective rendering adapters
+
+- Added borrowed retained-page furigana using shared strict original/effective
+  text/range/source validation. Extracted Android UTF-8/UTF-16 geometry and added
+  compact effective tokens with full crossing surface/revision/segment selections;
+  unresolved manual metadata stays absent. No chapter clone/re-resolution or I/O.
+- PASS: three new pure cases; 614 Rust tests (17 ignored), strict Clippy/format,
+  production-helper host Kotlin checks plus Full JNI import/custom/codec/lifecycle
+  regressions, repeat codegen, debug app/test APKs and Android lint. All 10 focused
+  phone emulator span/formatting/furigana/ruby-layout tests pass. Fixed initial
+  fixture borrow error; Gradle required usual sandbox socket escalation.
+- Updated plan/handoff/architecture/decisions/payload/development. No dependency,
+  migration or wire-schema change. Live reader still uses B; next switch app/FFI/
+  Android commands and render adapters together, then add compact override controls
+  and measure real-book/device costs. Full matrix/release/arm64 not rerun; no blocker.

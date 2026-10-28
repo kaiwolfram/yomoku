@@ -6,6 +6,7 @@
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
+mod ruby;
 mod statuses;
 pub use statuses::{EffectiveStatusRequest, EffectiveStatusState};
 mod overrides;

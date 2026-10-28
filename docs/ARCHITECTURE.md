@@ -856,6 +856,18 @@ policy, clips bases while retaining complete readings, and uses only exact Japan
 analyzer metadata as fallback. Unresolved manual spans never borrow old B readings.
 Whole source-ruby validation and page ownership checks precede output; no live
 vocabulary, dictionary, SQL, registration or platform I/O participates.
+`EffectiveReaderSession::furigana` now supplies the corresponding retained-page
+projection for live integration. It borrows compact visible metadata without
+cloning/re-resolving the full chapter key. Original and effective paths share
+strict page/surface/range validation and source-overlap policy; stale, pending,
+failed, Missing B or invalid fallback data leaves validated source ruby usable.
+Android's pure `ReaderTokenRanges.kt` shares the existing B renderer's UTF-8 to
+UTF-16 geometry with `effectiveDisplayTokens`. Effective display tokens keep the
+compact page revision/segment selection and full crossing surface, and reject the
+whole projection on stale identity, malformed Unicode/ranges or invented manual
+metadata. The host Kotlin bridge runner compiles/tests this production helper.
+These adapters are ready; live Event/ViewModel/Compose adoption remains coordinated
+with completion/status/word/custom commands below.
 `Storage::load_effective_reader_tokens` composes the same resolution loader with
 live indexed exact-surface status reads in one read-only transaction. Repeated
 surfaces share a lookup; missing/deleted entries stay absent. Results retain the

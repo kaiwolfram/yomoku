@@ -3225,3 +3225,21 @@ handle/registry, automatic rebase or replay. Default scope remains All occurrenc
 Keep the coordinated live token/status/word/custom/completion/furigana switch
 unchecked. This slice supplies a testable prompt transport/handler contract; it
 does not expose controls that could edit boundaries while completion still uses B.
+
+## 2026-10-28 — Retained effective rendering adapters
+
+Complete a testable rendering portion of the coordinated reader switch before
+changing live commands. Project furigana directly from the retained effective
+page's exact visible metadata, borrowing its key rather than cloning or resolving
+the chapter again. Share page/surface/range validation and source-overlap policy
+with the existing B projection. Keep validated source ruby on absent, invalid,
+stale or Missing B fallbacks; unresolved manual parts get no guessed reading.
+
+Extract Android's existing pure UTF-8/UTF-16 token geometry from Compose and reuse
+it for compact effective tokens. Carry the full surface plus page revision and
+effective segment selection through clipping; never substitute a B index. Reject
+the whole projection for malformed Unicode/ranges, stale identity or metadata on
+an unresolved manual token. Compile this production helper in the host Kotlin/JNI
+test runner so boundary guards can be tested without an emulator. No dependency,
+migration or new shell schema. Keep the live switch unchecked until token/status/
+word/custom/completion/furigana all adopt the retained protocol together.

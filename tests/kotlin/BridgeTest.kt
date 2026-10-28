@@ -43,6 +43,7 @@ private inline fun <reified T : Throwable> expectFailure(block: () -> Unit) {
 }
 
 fun main(args: Array<String>) {
+    verifyEffectiveReaderDisplay()
     verifyTextBoundaries(args.single())
     verifyDocumentBridge()
     verifyTxtImportBridge()

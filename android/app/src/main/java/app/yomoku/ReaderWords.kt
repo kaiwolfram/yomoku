@@ -54,108 +54,14 @@ import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupProperties
 import androidx.core.net.toUri
 import app.yomoku.shared.Event
-import app.yomoku.shared.ReaderPage
 import app.yomoku.shared.ReaderStatusChange
 import app.yomoku.shared.ReaderTextSpan
 import app.yomoku.shared.ReaderTextStyle
 import app.yomoku.shared.ReaderToken
 import app.yomoku.shared.ReaderTokenKey
-import app.yomoku.shared.ReaderTokenSnapshot
 import app.yomoku.shared.ReaderWordSelection
 import app.yomoku.shared.ViewModel
 import app.yomoku.shared.VocabularyStatus
-
-internal data class ReaderDisplayToken(val token: ReaderToken, val start: Int, val end: Int)
-
-/** Reject malformed UTF-16 and byte offsets inside a scalar, never round them. */
-internal fun utf8Boundaries(text: String): Map<Long, Int>? {
-    val boundaries = mutableMapOf(0L to 0)
-    var utf16 = 0
-    var bytes = 0L
-    while (utf16 < text.length) {
-        val char = text[utf16]
-        val width =
-            when {
-                char.isHighSurrogate() -> {
-                    if (utf16 + 1 >= text.length || !text[utf16 + 1].isLowSurrogate()) return null
-                    2
-                }
-                char.isLowSurrogate() -> return null
-                else -> 1
-            }
-        bytes +=
-            when {
-                width == 2 -> 4
-                char.code < 0x80 -> 1
-                char.code < 0x800 -> 2
-                else -> 3
-            }
-        utf16 += width
-        boundaries[bytes] = utf16
-    }
-    return boundaries
-}
-
-/** Full identity stays on the token; only the clipped display range becomes UTF-16. */
-internal fun readerDisplayTokens(
-    page: ReaderPage,
-    key: ReaderTokenKey,
-    snapshot: ReaderTokenSnapshot,
-): List<ReaderDisplayToken>? {
-    if (
-        page.documentId != key.documentId ||
-            page.anchor != key.page ||
-            snapshot.documentId != key.documentId ||
-            snapshot.page != key.page ||
-            snapshot.analysis != key.analysis ||
-            (key.analysis is app.yomoku.shared.ReaderAnalysis.Missing &&
-                snapshot.tokens.isNotEmpty())
-    )
-        return null
-    val boundaries = utf8Boundaries(page.text) ?: return null
-    val pageStart = page.anchor.range.start.value
-    val pageEnd = page.anchor.range.end.value
-    if (
-        pageStart < 0 || pageEnd <= pageStart || boundaries[pageEnd - pageStart] != page.text.length
-    ) {
-        return null
-    }
-    var previousEnd = 0
-    var previousIndex: ULong? = null
-    return snapshot.tokens.map { token ->
-        val start = boundaries[token.displayRange.start.value] ?: return null
-        val end = boundaries[token.displayRange.end.value] ?: return null
-        val anchor = token.anchor
-        if (
-            start < previousEnd ||
-                start >= end ||
-                (previousIndex != null && token.tokenIndex <= previousIndex) ||
-                anchor.sourceId != page.anchor.sourceId ||
-                anchor.chapterId != page.anchor.chapterId ||
-                anchor.range.start.value < 0 ||
-                anchor.range.end.value <= anchor.range.start.value ||
-                token.displayRange.start.value !=
-                    maxOf(anchor.range.start.value, pageStart) - pageStart ||
-                token.displayRange.end.value != minOf(anchor.range.end.value, pageEnd) - pageStart
-        )
-            return null
-        val surfaceBoundaries = utf8Boundaries(token.surface) ?: return null
-        val surfaceStart =
-            surfaceBoundaries[maxOf(pageStart - anchor.range.start.value, 0)] ?: return null
-        val surfaceEnd =
-            surfaceBoundaries[minOf(pageEnd, anchor.range.end.value) - anchor.range.start.value]
-                ?: return null
-        if (
-            surfaceBoundaries[anchor.range.end.value - anchor.range.start.value] !=
-                token.surface.length ||
-                token.surface.substring(surfaceStart, surfaceEnd) != page.text.substring(start, end)
-        )
-            return null
-        previousEnd = end
-        previousIndex = token.tokenIndex
-        ReaderDisplayToken(token, start, end)
-    }
-}
 
 internal fun vocabularyBackground(status: VocabularyStatus?, dark: Boolean): Color =
     when (status) {

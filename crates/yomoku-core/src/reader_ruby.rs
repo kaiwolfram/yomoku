@@ -22,7 +22,7 @@ pub struct ReaderRuby {
     pub reading: String,
 }
 
-fn validate_ruby(text: &str, ruby: &[ReaderRuby]) -> Result<(), InvalidTextValue> {
+pub(crate) fn validate_ruby(text: &str, ruby: &[ReaderRuby]) -> Result<(), InvalidTextValue> {
     let mut end = TextOffset::START;
     for ruby in ruby {
         if ruby.range.start < end || ruby.range.slice(text)?.is_empty() || ruby.reading.is_empty() {
@@ -130,45 +130,73 @@ impl ReaderPage {
         };
         if snapshot.key() != key
             || (analysis == ReaderAnalysis::Missing && !snapshot.tokens.is_empty())
-            || i64::from(self.anchor.range.end).checked_sub(self.anchor.range.start.into())
-                != i64::try_from(self.text.len()).ok()
         {
             return false;
         }
-        let mut previous_end = TextOffset::START;
-        let mut previous_index = None;
-        for token in &snapshot.tokens {
-            let start = token.anchor.range.start.max(self.anchor.range.start);
-            let end = token.anchor.range.end.min(self.anchor.range.end);
-            let surface_start = i64::from(start) - i64::from(token.anchor.range.start);
-            let surface_end = i64::from(end) - i64::from(token.anchor.range.start);
-            let surface = usize::try_from(surface_start)
-                .ok()
-                .zip(usize::try_from(surface_end).ok())
-                .and_then(|(start, end)| token.surface.get(start..end));
-            if token.anchor.source_id != self.anchor.source_id
-                || token.anchor.chapter_id != self.anchor.chapter_id
-                || start >= end
-                || i64::from(token.anchor.range.end) - i64::from(token.anchor.range.start)
-                    != i64::try_from(token.surface.len()).unwrap_or(-1)
-                || i64::from(token.display_range.start)
-                    != i64::from(start) - i64::from(self.anchor.range.start)
-                || i64::from(token.display_range.end)
-                    != i64::from(end) - i64::from(self.anchor.range.start)
-                || token.display_range.start < previous_end
-                || previous_index.is_some_and(|index| index >= token.token_index)
-                || token
-                    .reading
-                    .as_ref()
-                    .is_some_and(|reading| reading.trim().is_empty())
-                || surface.is_none()
-                || token.display_range.slice(&self.text).ok() != surface
-            {
-                return false;
-            }
-            previous_end = token.display_range.end;
-            previous_index = Some(token.token_index);
-        }
-        true
+        valid_page_tokens(
+            self,
+            snapshot.tokens.iter().map(|token| RubyToken {
+                index: token.token_index,
+                anchor: token.anchor,
+                display_range: token.display_range,
+                surface: &token.surface,
+                reading: token.reading.as_deref(),
+            }),
+        )
     }
+}
+
+/// Borrowed visible fields shared by original/effective ruby projection. This
+/// validates clipped text without cloning a surface or a resolved chapter key.
+pub(crate) struct RubyToken<'a> {
+    pub index: u64,
+    pub anchor: crate::document::TextAnchor,
+    pub display_range: TextRange,
+    pub surface: &'a str,
+    pub reading: Option<&'a str>,
+}
+
+pub(crate) fn valid_page_tokens<'a>(
+    page: &ReaderPage,
+    tokens: impl IntoIterator<Item = RubyToken<'a>>,
+) -> bool {
+    if i64::from(page.anchor.range.end).checked_sub(page.anchor.range.start.into())
+        != i64::try_from(page.text.len()).ok()
+    {
+        return false;
+    }
+    let mut previous_end = TextOffset::START;
+    let mut previous_index = None;
+    for token in tokens {
+        let start = token.anchor.range.start.max(page.anchor.range.start);
+        let end = token.anchor.range.end.min(page.anchor.range.end);
+        let surface_start = i64::from(start) - i64::from(token.anchor.range.start);
+        let surface_end = i64::from(end) - i64::from(token.anchor.range.start);
+        let surface = usize::try_from(surface_start)
+            .ok()
+            .zip(usize::try_from(surface_end).ok())
+            .and_then(|(start, end)| token.surface.get(start..end));
+        if token.anchor.source_id != page.anchor.source_id
+            || token.anchor.chapter_id != page.anchor.chapter_id
+            || start >= end
+            || i64::from(token.anchor.range.end) - i64::from(token.anchor.range.start)
+                != i64::try_from(token.surface.len()).unwrap_or(-1)
+            || i64::from(token.display_range.start)
+                != i64::from(start) - i64::from(page.anchor.range.start)
+            || i64::from(token.display_range.end)
+                != i64::from(end) - i64::from(page.anchor.range.start)
+            || token.display_range.start < previous_end
+            || previous_index.is_some_and(|index| index >= token.index)
+            || token
+                .reading
+                .is_some_and(|reading| reading.trim().is_empty())
+            || surface.is_none()
+            || token.display_range.slice(&page.text).ok() != surface
+        {
+            return false;
+        }
+        previous_end = token.display_range.end;
+        previous_index = Some(token.index);
+    }
+    true
 }

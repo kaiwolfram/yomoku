@@ -4,9 +4,10 @@ use yomoku_core::{
         SplitMode, StoredOverride,
     },
     document::{ChapterText, PastedDocument, TextAnchor, TextOffset, TextRange},
-    effective_reader::EffectiveReaderChapter,
-    pagination::PageLength,
-    reader::ReaderPage,
+    effective_reader::{EffectiveReaderChapter, EffectiveReaderTokenSnapshot},
+    effective_session::EffectiveReaderSession,
+    pagination::{PageLength, ReadingPosition},
+    reader::{ReaderAnalysis, ReaderPage, ReaderTokenKey},
     reader_ruby::{ReaderChapterRuby, ReaderRuby},
     vocabulary::Surface,
 };
@@ -78,6 +79,55 @@ fn rule(chapter: &ChapterText, id: i64, surface: &str, parts: &[&str]) -> Stored
     }
 }
 
+fn assert_retained_ruby(
+    chapter: &ChapterText,
+    effective: &EffectiveReaderChapter<'_>,
+    anchor: TextAnchor,
+    source: Option<&ReaderChapterRuby>,
+    expected: &[ReaderRuby],
+) {
+    let page = ReaderPage {
+        document_id: 1.try_into().unwrap(),
+        title: "本".into(),
+        finished_at_least_once: false,
+        text: anchor.slice(chapter).unwrap().to_owned(),
+        anchor,
+        position: ReadingPosition {
+            source_id: anchor.source_id,
+            chapter_id: anchor.chapter_id,
+            offset: anchor.range.start,
+        },
+        page_number: 1,
+        total_pages: 1,
+        formatting: vec![],
+        images: vec![],
+        source_ruby: source
+            .map(|s| s.on_page(chapter, anchor.range).unwrap())
+            .unwrap_or_default(),
+    };
+    let analysis = ReaderAnalysis::Available(effective.segmentation().original_analysis_id);
+    let mut session = EffectiveReaderSession::default();
+    let request = session
+        .begin_load(ReaderTokenKey {
+            document_id: page.document_id,
+            page: anchor,
+            analysis,
+        })
+        .unwrap();
+    assert!(session.accept(
+        request,
+        EffectiveReaderTokenSnapshot {
+            document_id: page.document_id,
+            page: anchor,
+            segmentation: Some(effective.segmentation().clone()),
+            tokens: effective.tokens_on_page(anchor).unwrap(),
+        }
+    ));
+    let before = session.page().unwrap().clone();
+    assert_eq!(session.furigana(&page, analysis).unwrap(), expected);
+    assert_eq!(session.page(), Some(&before));
+}
+
 #[test]
 fn exact_effective_b_a_c_readings_exclude_unresolved_manual_and_non_japanese_parts() {
     let chapter = chapter("国家公務員 食べた 猫犬 鳥。");
@@ -137,6 +187,13 @@ fn exact_effective_b_a_c_readings_exclude_unresolved_manual_and_non_japanese_par
             alternates[1].1.tokens[1].reading.as_deref().unwrap(),
         ]
     );
+    assert_retained_ruby(
+        &chapter,
+        &effective,
+        anchor(&chapter, 0, chapter.text.len()),
+        None,
+        &ruby,
+    );
     assert_eq!((original, alternates, rules), before);
 }
 
@@ -184,6 +241,13 @@ fn source_suppresses_whole_overlapping_effective_tokens_and_covers_unresolved_sp
             source.ruby[1].clone(),
         ]
     );
+    assert_retained_ruby(
+        &chapter,
+        &effective,
+        anchor(&chapter, 0, chapter.text.len()),
+        Some(&source),
+        &ruby,
+    );
     assert_eq!((effective, source), before);
 }
 
@@ -215,6 +279,7 @@ fn repeated_spellings_use_each_occurrences_metadata_and_reversal_restores_b() {
             .map(|t| t.reading.clone())
             .collect::<Vec<_>>()
     );
+    assert_retained_ruby(&chapter, &effective, page, None, &split);
     rules[0].active = false;
     let reversed = EffectiveReaderChapter::resolve(
         &chapter,
@@ -235,6 +300,7 @@ fn repeated_spellings_use_each_occurrences_metadata_and_reversal_restores_b() {
             .map(|t| t.reading.clone())
             .collect::<Vec<_>>()
     );
+    assert_retained_ruby(&chapter, &reversed, page, None, &ruby);
     // The old validated resolution stays frozen until the caller refreshes it.
     assert_eq!(effective.furigana_on_page(page, None).unwrap(), split);
 }
@@ -275,6 +341,7 @@ fn crossing_effective_and_source_bases_keep_complete_readings_at_every_preset() 
             let mut text = String::new();
             loop {
                 let ruby = effective.furigana_on_page(page.anchor, source).unwrap();
+                assert_retained_ruby(&chapter, &effective, page.anchor, source, &ruby);
                 assert_eq!(ruby.len(), 1);
                 assert_eq!(
                     ruby[0].reading,
