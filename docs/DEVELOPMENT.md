@@ -5529,3 +5529,65 @@ switch and compact override UI remain next. APK/Android lint/JNI/codegen/device,
 full separate loader matrix, real EPUB/large-Library performance, peak allocations,
 guarded on-demand FIFO timings, release APK/process death and physical arm64 were
 not rerun/measured for this host-only slice.
+
+## Real EPUB / repeated-book Library scaling
+
+2026-10-28, repository root, pinned offline host Rust:
+
+```sh
+export PATH=/home/kai/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin:$PATH
+cargo test -p yomoku-storage effective_library --all-features --locked --offline
+cargo test -p yomoku-analysis --example measure_effective_reader --locked --offline
+cargo test --workspace --all-features --locked --offline --quiet
+cargo clippy --workspace --all-targets --all-features --locked --offline -- -D warnings
+cargo fmt --all -- --check
+export YOMOKU_SUDACHI_DICTIONARY=/home/kai/repos/yomoku/.local/sudachi/full-20261015/system_full.dic
+for loader in owned mapped; do
+    YOMOKU_SUDACHI_STORAGE="$loader" cargo test -p yomoku-analysis --test full_dictionary real_segmentation_choices_resolve_scopes_merges_and_reversal_without_replacing_b --locked --offline -- --ignored
+done
+cargo build -p yomoku-analysis --example measure_effective_reader --release --locked --offline
+# Download/check the pinned EPUB as in EFFECTIVE_READER_PERFORMANCE.md.
+target/release/examples/measure_effective_reader \
+  .local/sudachi/full-20261015/system_full.dic 5 /tmp/yomoku-kusamakura.epub
+mkdir -p .local/effective-measure
+TMPDIR="$PWD/.local/effective-measure" target/release/examples/measure_effective_reader \
+  .local/sudachi/full-20261015/system_full.dic 5 --epub-copies 100 /tmp/yomoku-kusamakura.epub
+git diff --check
+```
+
+PASS: eight focused effective-Library cases, 678 workspace tests (17 opt-in ignored),
+the additional archive-copy example test, strict Clippy/Rustfmt/diff and the selected
+real Full segmentation/Library fixture with both owned/mapped loaders. The new
+24-document storage case checks per-book exact Unicode spelling counts/all five
+statuses, external changes between scans on the same connection, deletion/fresh-ID
+re-registration, corrupt later analysis and explicit recovery after the failed scan.
+Every successful/failed read compares unchanged database bytes in query-only mode.
+The example test checks deterministic distinct source bytes without changing ordered
+ZIP member names/compression/CRC/content, including supplementary/NUL text. Ten
+invalid CLI cases reject before dictionary loading/import: missing dictionary/iteration,
+0/102 iterations, missing/0/1001 copies, repeated copy option (including count 1), TXT
+with copies and multiple EPUB inputs with copies.
+
+Sequential release measurements use the unmodified IDPF Kusamakura EPUB and a
+100-document/1,600-chapter repeated-book fixture, one warmup/five samples per metric.
+The before executable uses production code from `ab9ed06` plus this slice's harness;
+the after executable adds only transaction-local status sharing. Distinct executable
+hashes were checked. Initial single-book observations from a pre-existing target
+artifact are excluded; the final single-book pair was rerun with the same saved
+before/after executables used for 100 books. Initial CSV files remain at
+`/tmp/yomoku-epub-initial-{before,after}.csv`. No builds/tests overlap the timed runs. Each phase compares
+database hashes, and normal exit removes the scratch database. Corpus hashes,
+setup/results/limitations are in EFFECTIVE_READER_PERFORMANCE.md. Inputs stay out
+of Git. The download needed network escalation after sandbox DNS failure.
+The first cleanup assertion used an overly broad glob matching prior-session logs/
+source copies; restricting it to numeric PID/timestamp scratch directories passes.
+Existing unrelated artifacts were preserved.
+
+No dependency/migration/wire change or remaining implementation blocker. Live
+reader/Library adoption and compact Android override controls remain next. APK,
+Android lint/JNI/codegen/device, separate full loader matrix, peak allocations,
+diverse/image-heavy Libraries, guarded FIFO/on-demand latency, release/process death
+and physical arm64 were not rerun/measured for this host-only slice. Logs:
+`/tmp/yomoku-epub-{focused,tests,example-test,clippy,full-owned,full-mapped,build-before,build-after}.log`,
+`/tmp/yomoku-epub-{before,after}.{csv,log}` and
+`/tmp/yomoku-epub-100-{before,after}.{csv,log}`.

@@ -169,7 +169,8 @@ identity explicitly includes its chapter ID and original Mode B or Missing; no
 analyzer, source parsing, token rescan or registration runs. The text projection
 omits source bytes/image payloads, while its EPUB loader still verifies all saved
 content/digests/annotations/assets. This repeats on each reader repository operation;
-large-book performance has not been measured or optimized.
+limited host EPUB/page measurements are in EFFECTIVE_READER_PERFORMANCE.md. No loader
+optimization or device/image-heavy-book performance claim is made.
 
 `ReaderDocument.formatting` carries sparse keyed `ReaderChapterFormatting` entries.
 Each chapter key is owned and unique; `ReaderTextSpan` has a nonempty scalar-aligned
@@ -1554,9 +1555,11 @@ stored original B, same-profile A/C metadata, active rules and live vocabulary.
 It shares validated reader/completion eligibility: exact Japanese analyzer spans
 and unresolved manual Japanese-span parts qualify; exact non-Japanese metadata
 does not. Deduplicate eligible surfaces across the whole document before indexed
-status reads. Only surfaces still registered in vocabulary contribute. Missing B
+status reads. Repeated spellings reuse validated status/absence only within that
+read transaction; no observations survive into the next scan. Only surfaces still
+registered in vocabulary contribute. Missing B
 in any chapter yields None, while corrupt analysis/rules/statuses fail the read.
 Deleted origin documents do not disable global rules for remaining books.
 Canonical text is needed for resolution, but original file/image BLOBs and
-dictionaries are not read. No writes or new table/cache/schema. The live Library
+dictionaries are not read. No writes or new table/persistent cache/schema. The live Library
 still calls its original-B API until the reader also adopts effective boundaries.

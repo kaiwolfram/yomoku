@@ -78,9 +78,13 @@ documents, canonical chapters, pinned B/same-profile A/C, winning rules and glob
 statuses. `EffectiveReaderChapter::eligible_surfaces` borrows surfaces using the
 same eligibility predicate as page tokens/completions; no full-page token copies
 or guessed manual metadata. Deduplicate exact spellings across the document,
-then use indexed live vocabulary reads. It never loads source archives, image
+then use indexed live vocabulary reads. A transaction-local map shares each
+referenced spelling's validated status/absence across documents in that one
+snapshot; it is discarded on success/failure and every refresh reads afresh.
+It never loads source archives, image
 assets or dictionaries, registers entries or writes. Resolve one chapter at a
-time; large-library/chapter costs remain unmeasured. The live FIFO still calls
+time; host measurements and their corpus limits are in
+EFFECTIVE_READER_PERFORMANCE.md. The live FIFO still calls
 the original-B API until reader and Library membership switch together.
 
 `yomoku-import` is a separate pure content-extraction boundary. Its EPUB parser
@@ -116,7 +120,8 @@ loader. Forward completion moves to the next page/chapter or the last chapter's
 EOF. Only the last page of the entire document marks it finished; transaction,
 replay, original-token ownership and New-only status semantics remain unchanged.
 The loader currently verifies all EPUB content/assets on every reader operation;
-large-book performance is unmeasured. Reader snapshots omit source bytes/image
+limited host EPUB/page measurements are in EFFECTIVE_READER_PERFORMANCE.md;
+device/image-heavy-book costs remain unmeasured. Reader snapshots omit source bytes/image
 payloads; keyed chapter formatting now travels with canonical text.
 Pure `ReaderChapterFormatting` validates owned chapter keys, scalar ranges, heading
 levels and HTTP(S) targets. `ReaderPage` clips these spans to page-local UTF-8

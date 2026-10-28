@@ -1,11 +1,12 @@
 //! Host-only, opt-in measurements over real TXT/EPUB inputs in a disposable DB.
-//! Usage: measure_effective_reader DICTIONARY ITERATIONS BOOK.txt [BOOK.epub ...]
+//! Usage: measure_effective_reader DICTIONARY ITERATIONS [--epub-copies N] BOOK...
 //! Inputs are read only. No user database, JNI, device or cold-cache claim.
 
 use std::{
     error::Error,
     fs,
     hint::black_box,
+    io::{Cursor, Read},
     path::{Path, PathBuf},
     time::{Instant, SystemTime, UNIX_EPOCH},
 };
@@ -20,7 +21,7 @@ use yomoku_core::{
     reader::{ReaderAnalysis, ReaderTokenKey},
     segmentation::{resolve_effective_segmentation, segmentation_from_snapshot},
 };
-use yomoku_storage::Storage;
+use yomoku_storage::{EpubImportOutcome, Storage};
 
 type Result<T> = std::result::Result<T, Box<dyn Error>>;
 
@@ -151,7 +152,7 @@ fn scan(
     Ok(())
 }
 
-fn import(storage: &mut Storage, analyzer: &Analyzer, path: &Path) -> Result<()> {
+fn import(storage: &mut Storage, analyzer: &Analyzer, path: &Path, copies: usize) -> Result<()> {
     let bytes = fs::read(path)?;
     let filename = path
         .file_name()
@@ -172,11 +173,29 @@ fn import(storage: &mut Storage, analyzer: &Analyzer, path: &Path) -> Result<()>
         Some("epub") => {
             storage
                 .import_analyzed_epub(&bytes, filename, 0, |chapter| analyzer.analyze(chapter))?;
+            for index in 1..copies {
+                // Distinct source bytes exercise production dedup/registration
+                // without changing any book member, text, ruby or image. This
+                // deliberately measures repeated content, not corpus diversity.
+                let copy = epub_copy(&bytes, index)?;
+                let start = Instant::now();
+                let result = storage.import_analyzed_epub(&copy, filename, 0, |chapter| {
+                    analyzer.analyze(chapter)
+                })?;
+                if !matches!(result, EpubImportOutcome::Created(_)) {
+                    return Err("generated EPUB copy unexpectedly deduplicated".into());
+                }
+                eprintln!(
+                    "EPUB copy {}/{copies}: {:.3} ms",
+                    index + 1,
+                    start.elapsed().as_secs_f64() * 1000.0
+                );
+            }
         }
         _ => return Err("expected .txt or .epub input".into()),
     }
     eprintln!(
-        "import {}: {} source bytes, {:.3} ms, sha256={}",
+        "import {} ({copies} copies): {} original source bytes, {:.3} ms total, sha256={}",
         path.display(),
         bytes.len(),
         start.elapsed().as_secs_f64() * 1000.0,
@@ -188,15 +207,30 @@ fn import(storage: &mut Storage, analyzer: &Analyzer, path: &Path) -> Result<()>
     Ok(())
 }
 
+fn epub_copy(bytes: &[u8], index: usize) -> Result<Vec<u8>> {
+    let mut writer = zip::ZipWriter::new_append(Cursor::new(bytes.to_vec()))?;
+    writer.set_comment(format!("yomoku host scaling fixture copy {index}"))?;
+    Ok(writer.finish()?.into_inner())
+}
+
 fn database_digest(path: &Path) -> Result<[u8; 32]> {
-    Ok(Sha256::digest(fs::read(path)?).into())
+    let mut file = fs::File::open(path)?;
+    let mut digest = Sha256::new();
+    let mut buffer = [0; 64 * 1024];
+    loop {
+        let count = file.read(&mut buffer)?;
+        if count == 0 {
+            return Ok(digest.finalize().into());
+        }
+        digest.update(&buffer[..count]);
+    }
 }
 
 fn main() -> Result<()> {
     let mut arguments = std::env::args_os().skip(1);
     let dictionary = arguments
         .next()
-        .ok_or("usage: measure_effective_reader DICTIONARY ITERATIONS BOOK.txt [BOOK.epub ...]")?;
+        .ok_or("usage: measure_effective_reader DICTIONARY ITERATIONS [--epub-copies N] BOOK...")?;
     let iterations: usize = arguments
         .next()
         .ok_or("missing iterations")?
@@ -206,9 +240,38 @@ fn main() -> Result<()> {
     if !(1..=101).contains(&iterations) {
         return Err("iterations must be 1..=101".into());
     }
-    let inputs: Vec<PathBuf> = arguments.map(PathBuf::from).collect();
+    let mut copy_count = None;
+    let mut inputs = Vec::new();
+    while let Some(argument) = arguments.next() {
+        if argument == "--epub-copies" {
+            if copy_count.is_some() {
+                return Err("--epub-copies may be supplied only once".into());
+            }
+            let copies = arguments
+                .next()
+                .ok_or("missing EPUB copy count")?
+                .to_str()
+                .ok_or("invalid EPUB copy count")?
+                .parse()?;
+            if !(1..=1000).contains(&copies) {
+                return Err("EPUB copies must be 1..=1000".into());
+            }
+            copy_count = Some(copies);
+        } else {
+            inputs.push(PathBuf::from(argument));
+        }
+    }
     if inputs.is_empty() {
         return Err("at least one TXT/EPUB is required".into());
+    }
+    let copies = copy_count.unwrap_or(1);
+    if copy_count.is_some()
+        && (inputs.len() != 1
+            || !inputs[0]
+                .extension()
+                .is_some_and(|extension| extension.eq_ignore_ascii_case("epub")))
+    {
+        return Err("--epub-copies requires exactly one EPUB input".into());
     }
 
     eprintln!("arch={} debug_assertions={} sqlite={}\nengine={ENGINE_REVISION}\ndictionary={DICTIONARY_REVISION}", std::env::consts::ARCH, cfg!(debug_assertions), rusqlite::version());
@@ -223,9 +286,12 @@ fn main() -> Result<()> {
     let database = scratch.0.join("measurement.sqlite3");
     let mut storage = Storage::open(&database)?;
     for input in inputs {
-        import(&mut storage, &analyzer, &input)?;
+        import(&mut storage, &analyzer, &input, copies)?;
     }
     let documents = storage.list_documents()?;
+    if copy_count.is_some() && documents.len() != copies {
+        return Err("EPUB scaling fixture has an unexpected document count".into());
+    }
     let mut chapters = Vec::new();
     for document in &documents {
         let snapshot = storage
@@ -360,4 +426,48 @@ fn main() -> Result<()> {
         eprintln!("no aligned alternate split; global_split phase omitted");
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::Write;
+
+    #[test]
+    fn scaling_copies_change_source_identity_without_changing_archive_members() {
+        let mut writer = zip::ZipWriter::new(Cursor::new(Vec::new()));
+        writer.set_comment("original comment").unwrap();
+        for (name, text) in [
+            ("mimetype", "application/epub+zip"),
+            ("本文.xhtml", "猫𠮷\0"),
+        ] {
+            writer
+                .start_file(name, zip::write::SimpleFileOptions::default())
+                .unwrap();
+            writer.write_all(text.as_bytes()).unwrap();
+        }
+        let original = writer.finish().unwrap().into_inner();
+        let first = epub_copy(&original, 1).unwrap();
+        let second = epub_copy(&original, 2).unwrap();
+        assert_ne!(first, original);
+        assert_ne!(first, second);
+        assert_eq!(first, epub_copy(&original, 1).unwrap());
+        for bytes in [&first, &second] {
+            let mut before = zip::ZipArchive::new(Cursor::new(&original)).unwrap();
+            let mut after = zip::ZipArchive::new(Cursor::new(bytes)).unwrap();
+            assert_eq!(before.len(), after.len());
+            for index in 0..before.len() {
+                let mut left = before.by_index(index).unwrap();
+                let mut right = after.by_index(index).unwrap();
+                assert_eq!(left.name(), right.name());
+                assert_eq!(left.compression(), right.compression());
+                assert_eq!(left.crc32(), right.crc32());
+                let mut left_bytes = Vec::new();
+                let mut right_bytes = Vec::new();
+                left.read_to_end(&mut left_bytes).unwrap();
+                right.read_to_end(&mut right_bytes).unwrap();
+                assert_eq!(left_bytes, right_bytes);
+            }
+        }
+    }
 }

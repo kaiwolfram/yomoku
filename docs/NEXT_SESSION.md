@@ -1,5 +1,5 @@
 # Resume here
-Updated: 2026-10-28. Effective host performance slice verified; live switch next.
+Updated: 2026-10-28. EPUB/Library host scaling verified; live switch next.
 ## Working
 - Rename: retained literal draft/Cancel/Retry; title-only atomic save, no-op retries.
 - Single/bulk deletion: one transaction, history/vocabulary/rules retained; reimport fresh.
@@ -9,7 +9,7 @@ Updated: 2026-10-28. Effective host performance slice verified; live switch next
   Read order (0019) on explicit open only; newest unknown/unopened afterward.
   Duplicates preserve recency; legacy history unknown.
 - Live bars use original B/live statuses; read-only FIFO; explicit Retry; batches defer scans.
-  Effective Library API shares eligibility/resolution; distinct across chapters; deleted absent;
+  Effective Library API shares eligibility/resolution + transaction-local status lookups;
   Missing/zero differ. Stored text/rules, no source/assets/Full/writes. Switch with reader.
 - Chapter-local UTF-8 position/whole-book percentage/five presets persist; reflow
   preserves offsets. Scroll resets; 720dp column; controls below content; 48dp swipes.
@@ -42,7 +42,7 @@ Updated: 2026-10-28. Effective host performance slice verified; live switch next
   native return + outcome before clearing/draining. Dedicated cancellation executor.
 - Bounded EPUB parser ignores CSS; migration 0014 atomically saves original source,
   ordered content/formatting/ruby/images/B/registration. Snapshot loads verify all
-  source/assets without parsing; real EPUB/device costs remain unmeasured.
+  source/assets without parsing; limited host EPUB costs measured, device pending.
 - ReaderDocument carries keyed validated heading/emphasis/strong/HTTP(S) spans;
   ReaderPage clips to page-local UTF-8; generated JNI/Compose preserve exact text.
   Website taps open browser with token identity; other links inert. No CSS/TOC.
@@ -73,8 +73,8 @@ Updated: 2026-10-28. Effective host performance slice verified; live switch next
    (effective_library_word_distributions) via retained requests/command/finish_request + render
    adapters; see EFFECTIVE_READER_PAYLOAD.md. No live adoption yet.
 2. Wire compact override actions/state to Android A/B/C/manual + All/This/reversal.
-3. Measure real EPUB/large-Library/JNI/device costs; host TXT baseline in performance doc.
+3. Measure JNI/device/diverse/image-heavy costs; TXT/EPUB/100-copy host results in performance doc.
 Physical arm64 deferred; Nostr empty; Q188 unresolved before forwarding.
 ## Verification
-- PASS this slice: 677 Rust (17 ignored), Full owned/mapped, Clippy/fmt/payload sizes.
-- Prior JNI/APKs/lint/12 phone + wide cases not rerun. No blocker. DEVELOPMENT.md end.
+- PASS: 678 Rust (17 ignored) + benchmark test, Full owned/mapped, Clippy/fmt, 10 CLI rejects.
+- EPUB/100-copy reads preserve DB bytes; no JNI/APKs/lint/device rerun. No blocker. DEVELOPMENT end.

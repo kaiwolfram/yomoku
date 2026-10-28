@@ -1,6 +1,6 @@
 //! Read-only Library distributions for original-B and effective reader membership.
 
-use std::collections::BTreeSet;
+use std::collections::{btree_map::Entry, BTreeMap, BTreeSet};
 
 use yomoku_core::{
     document::{ChapterId, DocumentId},
@@ -32,6 +32,10 @@ impl Storage {
             rows.collect::<Result<Vec<_>, _>>()?
         };
         let mut distributions = Vec::with_capacity(documents.len());
+        // Exact spellings share a global status, and this transaction pins one
+        // snapshot. Resolve a referenced spelling only once per scan, including
+        // absent entries. Nothing survives commit, failure or a later refresh.
+        let mut statuses = BTreeMap::new();
         for (id, source_id) in documents {
             let chapters = {
                 let mut statement = transaction.prepare(
@@ -63,10 +67,18 @@ impl Storage {
             let mut counts = WordStatusCounts::default();
             if available {
                 for surface in surfaces {
-                    let Some(entry) = read_entry_by_surface(&transaction, &surface)? else {
+                    let status = match statuses.entry(surface) {
+                        Entry::Occupied(entry) => *entry.get(),
+                        Entry::Vacant(entry) => {
+                            let status = read_entry_by_surface(&transaction, entry.key())?
+                                .map(|entry| entry.status);
+                            *entry.insert(status)
+                        }
+                    };
+                    let Some(status) = status else {
                         continue;
                     };
-                    let count = match entry.status {
+                    let count = match status {
                         VocabularyStatus::New => &mut counts.new,
                         VocabularyStatus::Learning => &mut counts.learning,
                         VocabularyStatus::Familiar => &mut counts.familiar,

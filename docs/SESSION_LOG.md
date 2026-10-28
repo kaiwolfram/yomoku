@@ -2681,3 +2681,30 @@ timings were discarded and distinct baseline/production executables verified.
 No dependency/migration/wire change or blocker. Handoff/plan/architecture/decisions/
 development updated; live effective reader/Library switch and override UI remain
 next. APK/Android lint/JNI/device checks were not rerun for this host-only slice.
+
+## 2026-10-28 — Real EPUB / repeated-book Library scaling
+
+Continued the pending host measurement slice with the unchanged IDPF Kusamakura
+EPUB (16 chapters, 96,296 canonical characters) and 100 distinct-byte copies
+(1,600 chapters/6.23 million B tokens). The opt-in `--epub-copies` harness changes
+only archive comments, imports through production dedup/registration, checks exact
+document counts and streams database hashes. Inputs stay out of Git; timed reads
+preserve database bytes and normal exit removes only the scratch database.
+
+Effective Library storage now shares validated exact-surface status/absence across
+books within one read transaction, retaining per-document distinct counts/full
+chapter validation. Nothing persists between scans or after failure. The new
+24-book case verifies all statuses, Unicode identities, external changes, deletion/
+fresh-ID re-registration and corrupt later analysis/repair without read writes.
+Sequential release before/after medians improve 6.41→4.37 seconds for B-only and
+12.70→11.55 seconds for stored A/B/C on the repeated-book fixture. Single-book scans
+do not improve; peak memory/device/diverse-corpus costs remain unmeasured. Corpus
+hashes, full methods/results/limitations: EFFECTIVE_READER_PERFORMANCE.md.
+
+678 workspace tests (17 ignored), the additional archive-copy example test, eight
+focused storage cases, selected real Full owned/mapped fixture, strict Clippy/fmt/
+diff and ten invalid CLI cases pass. Network escalation was needed for the corpus
+download after sandbox DNS failure. No dependency/migration/wire change or blocker.
+Updated plan/handoff/architecture/data/decisions/development. Next: coordinated live
+reader/Library switch, Android override controls, then JNI/device/diverse-book costs.
+APK/Android lint/JNI/codegen/device checks were not rerun for this host-only slice.

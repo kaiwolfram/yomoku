@@ -3435,3 +3435,25 @@ Do not add a cache, schema/payload change, guessed metadata or live-reader adopt
 as part of this optimization. A full-scan oracle across 4,096 Unicode partitions and
 existing storage/real-Full cases guard the unchanged semantics. Remaining hundreds
 of milliseconds of repository work need separate measurement before a cache design.
+
+## 2026-10-28 — EPUB Library scaling and transaction-local status sharing
+
+Continue the pending host EPUB/Library performance slice independently of live
+reader adoption. Use the unchanged IDPF Kusamakura sample and an explicit opt-in
+`--epub-copies` harness option. Change only ZIP comments for distinct source hashes;
+keep package members/text/ruby/assets identical and import every copy through the
+production repository. Label the result a repeated-book scaling fixture, never a
+diverse corpus or Android measurement. Stream database hashes to avoid a second
+database-sized allocation; keep the disposable database under configurable TMPDIR.
+No new dependency, migration or import/dedup behavior.
+
+Share exact-surface vocabulary observations between documents only inside the
+existing effective Library read transaction. A referenced spelling has one global
+status/absence in that pinned snapshot, so repeated books do not need repeated
+indexed lookups/entry validation. Retain the existing per-document surface set and
+full per-chapter analysis/rule validation, including corrupt later chapters and
+Missing B. Discard the map on commit/failure; the next scan must observe external
+status changes, deletion/re-registration and repaired data afresh. Do not preload
+unreferenced lifetime vocabulary, persist a cache, weaken provenance or switch the
+live B Library independently of the reader. The transient map consumes memory
+proportional to referenced distinct spellings; peak allocations remain unmeasured.

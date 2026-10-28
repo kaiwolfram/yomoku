@@ -113,8 +113,96 @@ For a baseline comparison, use a separate source copy at the revision above, cop
 this example into it and use a separate Cargo target directory. Rebuild and retain
 each executable before sequential runs. Do not run compilers/tests during timings.
 
-Real EPUB/image-heavy books, large Libraries, peak allocations, mapped-loader
-performance, JNI/Android/FIFO latency, guarded on-demand generation, process death
-and physical arm64 remain unmeasured. The coordinated live-reader/Library switch
-and Android override controls remain pending. No automatic cache or new data
-semantics is justified by this one host corpus.
+## Real EPUB and repeated-book Library scaling
+
+The second corpus is IDPF's [Kusamakura EPUB sample](https://idpf.github.io/epub3-samples/30/samples.html),
+downloaded unchanged from the [20230704 release](https://github.com/IDPF/epub3-samples/releases/download/20230704/kusamakura-japanese-vertical-writing.epub).
+The publisher lists ruby, media overlays, non-ASCII paths and embedded fonts; its
+sample collection is CC BY-SA 3.0 unless specified otherwise. The EPUB stays outside
+Git. Yomoku uses its normal horizontal, CSS-ignoring extraction and supported assets;
+these measurements do not claim support for media overlays or embedded fonts.
+
+- Original archive: 17,940,673 bytes, SHA-256
+  `6d4d4ed5eda3f612e3263c54fa0f74ccfa87260f43e81bb58ea658636e52eeb7`.
+- One EPUB imports as 16 chapters, 96,296 canonical characters and 62,310 B tokens.
+  Initial database: 22,540,288 bytes. The largest chapter has 15,271 characters;
+  its first page has 614 characters at the default preset.
+- `--epub-copies 100` imports the original plus 99 generated archives through the
+  same production EPUB repository. Each changes only the ZIP archive comment,
+  keeping all members and canonical content identical while giving exact-byte
+  deduplication distinct inputs. The fixture has 100 documents, 1,600 chapters,
+  9,629,600 canonical characters, 6,231,000 B tokens and a 2,188,136,448-byte initial
+  database. It exercises repeated global spellings, not a diverse 100-book corpus.
+- Same host/toolchain/dictionary/owned loader and direct-host method as above;
+  one warmup and five measured iterations. Separate before/after executables run
+  sequentially without competing builds/tests. Setup and SHA-256 validation are
+  outside timings. Database hashing now streams 64 KiB blocks rather than allocating
+  a second database-sized buffer. Every timed phase still verifies unchanged bytes.
+- The single-book database is on RAM-backed `/tmp`; the 100-book database is on
+  the disk-backed workspace under `.local/effective-measure`. Compare before/after
+  within each fixture; the two fixture sizes also differ in storage medium/cache
+  pressure. Peak memory, CPU frequency and OS caches are uncontrolled.
+- Before production code: `ab9ed06c37166f96f6d338caa725982f7870f37e` plus this
+  slice's harness. The saved before/after executable SHA-256 values are
+  `2c49eab5d8e119a6bd6a097e488defc682865c635579528bd1cdb8f117236044` and
+  `21aa76bd0e3d57e6d08ad055921883d4bb6eaba10ccd3c5d6d96a4c2f5489460`.
+  The final single-book pair uses those same verified executables; initial
+  observations using a pre-existing target artifact are excluded from this table.
+
+Effective Library scan results, minimum / median / maximum milliseconds:
+
+| Documents | Phase | Before (ms) | After (ms) |
+| ---: | --- | ---: | ---: |
+| 1 | b_only | 59.768 / 59.926 / 60.037 | 61.316 / 61.526 / 62.342 |
+| 1 | stored_abc | 119.416 / 120.367 / 120.925 | 121.724 / 122.702 / 131.074 |
+| 1 | global_split | 120.395 / 120.686 / 122.488 | 130.966 / 139.310 / 147.132 |
+| 100 | b_only | 6375.808 / 6413.813 / 6470.057 | 4239.719 / 4367.281 / 4415.313 |
+| 100 | stored_abc | 12607.967 / 12700.945 / 13311.292 | 11007.700 / 11551.966 / 11605.262 |
+| 100 | global_split | 12857.390 / 13904.929 / 14321.956 | 10844.141 / 11078.235 / 11317.180 |
+
+The only production change shares a referenced spelling's validated status/absence
+across documents within the existing read transaction. The next scan starts empty;
+it still validates every chapter and deduplicates each document independently.
+The map does not preload unreferenced lifetime vocabulary or survive a failure.
+Its memory grows with referenced distinct spellings; peak allocation is unmeasured.
+
+The 100-book effective-scan medians fall about 32% / 9% / 20% across the three
+phases. Single-book scans do not improve. Other unchanged metrics also vary:
+100-book original-Library medians move 2933/3214/2688→2646/2588/2726 ms, pure
+resolution 717/1513/1631→760/1488/1606 ms, and page-load medians stay near
+39/51/51 ms. In the single-book global phase, pure resolution rises
+14.338→15.602 ms and page-load median 54.767→60.846 ms alongside the scan increase.
+These runs do not separate host variation from allocation effects or establish a
+universal speedup. Stored A/B/C repository scans remain expensive; no page-load,
+Android responsiveness or memory improvement is claimed.
+
+Untimed 100-book setup, before→after: Full loading 409→400 ms, EPUB imports
+67.680→67.963 seconds, A analysis 15.894→15.158 seconds plus storage
+44.870→43.285 seconds, C analysis 14.244→14.858 seconds plus storage
+44.066→44.133 seconds. Setup is separate from guarded FIFO on-demand timing.
+
+The harness accepts `--epub-copies N` for exactly one EPUB (1–1,000). It never
+modifies the supplied archive or accepts a user database. The generated files exist
+only in memory during import; the disposable database is removed on exit. A unit
+fixture verifies distinct deterministic source bytes with identical ordered member
+names, compression, checksums and contents, including literal Unicode/NUL data.
+Use `TMPDIR` on a filesystem with room for source bytes plus stored B/A/C snapshots
+when running larger fixtures; the default `/tmp` may be RAM-backed.
+
+```sh
+curl --fail --location --silent --show-error \
+  https://github.com/IDPF/epub3-samples/releases/download/20230704/kusamakura-japanese-vertical-writing.epub \
+  --output /tmp/yomoku-kusamakura.epub
+echo '6d4d4ed5eda3f612e3263c54fa0f74ccfa87260f43e81bb58ea658636e52eeb7  /tmp/yomoku-kusamakura.epub' | sha256sum --check
+mkdir -p .local/effective-measure
+cargo build -p yomoku-analysis --example measure_effective_reader --release --locked --offline
+target/release/examples/measure_effective_reader \
+  .local/sudachi/full-20261015/system_full.dic 5 /tmp/yomoku-kusamakura.epub
+TMPDIR="$PWD/.local/effective-measure" target/release/examples/measure_effective_reader \
+  .local/sudachi/full-20261015/system_full.dic 5 --epub-copies 100 /tmp/yomoku-kusamakura.epub
+```
+
+Peak allocations, diverse/image-heavy book Libraries, mapped-loader performance,
+JNI/Android/FIFO latency, guarded on-demand generation, process death and physical
+arm64 remain unmeasured. The coordinated live-reader/Library switch and Android
+override controls remain pending.
