@@ -15,6 +15,9 @@ use crux_core::{
     render, App, Command, Core,
 };
 use rusqlite::Connection;
+use yomoku_core::effective_session::{
+    EffectiveCompletionProgress as CompletionProgress, EffectiveCompletionRequest,
+};
 use yomoku_core::{
     active_time::{PendingReadingTime, ReadingTimeUpdate},
     analysis::{
@@ -835,4 +838,214 @@ fn effective_worker_fifo_freezes_drained_time_then_retries_exact_completion_afte
             .mode,
         SplitMode::B
     );
+}
+
+fn finish_completion(
+    router: &Router,
+    session: &mut EffectiveReaderSession,
+    request: &EffectiveCompletionRequest,
+) -> CompletionProgress {
+    let result = match run(router, request.operation()) {
+        StorageResult::Effective(result) => Ok(result),
+        StorageResult::Failed(error) => Err(error),
+        result => panic!("unexpected completion result: {result:?}"),
+    };
+    session.finish_completion_request(request, result).unwrap()
+}
+
+#[test]
+fn effective_worker_retained_completion_drains_time_and_retries_without_reinterpreting_or_double_counting(
+) {
+    let fixture = Fixture::new();
+    let router = fixture.router();
+    let mut session = EffectiveReaderSession::default();
+    load(&router, &mut session, fixture.base);
+    let identity = session.page().unwrap().identity;
+    assert!(session.begin_completion(identity, fixture.intent));
+    assert!(session.completion_state().pending && !session.completion_state().busy);
+    assert!(!session.begin_completion(identity, fixture.intent));
+
+    let saved = fixture
+        .storage()
+        .load_pending_reading_time(fixture.base.document_id, fixture.intent.departing_position)
+        .unwrap();
+    let lock = fixture.sql();
+    lock.execute_batch("BEGIN IMMEDIATE").unwrap();
+    let checkpoint = enqueue(
+        &router,
+        StorageOperation::SaveReadingTime {
+            previous: saved,
+            checkpoint: ReadingTimeUpdate {
+                pending: PendingReadingTime::from_millis(1234).unwrap(),
+                ..saved.value
+            },
+        },
+    );
+    assert!(checkpoint.try_recv().is_err());
+    // Accepted completion owns its old page while final clock work is blocked.
+    session.invalidate();
+    assert!(!session.completion_state().busy);
+    lock.execute_batch("COMMIT").unwrap();
+    wait(checkpoint);
+    let StorageResult::ReadingTimeSaved(saved) = router.view().pop().unwrap() else {
+        panic!("saved checkpoint")
+    };
+    // The app drains its coalesced maximum before dispatching preparation.
+    wait(enqueue(
+        &router,
+        StorageOperation::SaveReadingTime {
+            previous: saved,
+            checkpoint: ReadingTimeUpdate {
+                pending: PendingReadingTime::from_millis(2345).unwrap(),
+                ..saved.value
+            },
+        },
+    ));
+    assert_eq!(
+        fixture
+            .sql()
+            .query_row("SELECT COUNT(*) FROM completion_commands", [], |r| r
+                .get::<_, i64>(0))
+            .unwrap(),
+        0
+    );
+    fixture.sql().execute_batch("CREATE TRIGGER fail_preparation BEFORE INSERT ON completion_commands BEGIN SELECT RAISE(ABORT, 'fixture'); END;").unwrap();
+    let prepare = session.dispatch_completion().unwrap();
+    let before = std::fs::read(fixture.path()).unwrap();
+    assert_eq!(
+        finish_completion(&router, &mut session, &prepare),
+        CompletionProgress::Failed(DocumentError::Unavailable)
+    );
+    assert_eq!(std::fs::read(fixture.path()).unwrap(), before);
+    fixture
+        .sql()
+        .execute_batch("DROP TRIGGER fail_preparation")
+        .unwrap();
+    let retry = session.dispatch_completion().unwrap();
+    assert_ne!(retry, prepare);
+    assert_eq!(retry.operation(), prepare.operation());
+    assert!(session
+        .finish_completion_request(&prepare, Err(DocumentError::Unavailable))
+        .is_none());
+    assert_eq!(
+        finish_completion(&router, &mut session, &retry),
+        CompletionProgress::Prepared
+    );
+    assert!(session
+        .finish_completion_request(&retry, Err(DocumentError::Unavailable))
+        .is_none());
+    let commit = session.dispatch_completion().unwrap();
+    let Op::CompletePage(prepared) = commit.operation() else {
+        panic!("commit reservation")
+    };
+    assert_eq!(prepared.completion().pending_time.milliseconds(), 2345);
+    assert_eq!(prepared.occurrences().len(), 6);
+    assert_eq!(
+        fixture
+            .sql()
+            .query_row("SELECT COUNT(*) FROM reading_completions", [], |r| r
+                .get::<_, i64>(0))
+            .unwrap(),
+        0
+    );
+    fixture
+        .storage()
+        .reverse_segmentation_override(fixture.rule)
+        .unwrap();
+    fixture.sql().execute_batch("CREATE TRIGGER fail_completion BEFORE INSERT ON reading_completions BEGIN SELECT RAISE(ABORT, 'fixture'); END;").unwrap();
+    let before = std::fs::read(fixture.path()).unwrap();
+    assert_eq!(
+        finish_completion(&router, &mut session, &commit),
+        CompletionProgress::Failed(DocumentError::Unavailable)
+    );
+    assert_eq!(std::fs::read(fixture.path()).unwrap(), before);
+    fixture
+        .sql()
+        .execute_batch("DROP TRIGGER fail_completion")
+        .unwrap();
+    drop(router);
+    let router = fixture.router();
+    wait(enqueue(&router, StorageOperation::List));
+    assert_eq!(
+        fixture
+            .sql()
+            .query_row("SELECT COUNT(*) FROM reading_completions", [], |r| r
+                .get::<_, i64>(0))
+            .unwrap(),
+        0
+    );
+    let retry = session.dispatch_completion().unwrap();
+    let Op::CompletePage(retried) = retry.operation() else {
+        panic!("exact retry")
+    };
+    assert!(Arc::ptr_eq(&prepared, &retried));
+    assert!(session
+        .finish_completion_request(&commit, Err(DocumentError::Unavailable))
+        .is_none());
+    // Simulate a committed transaction whose follow-up read/response was lost.
+    assert!(matches!(
+        run(&router, retry.operation()),
+        StorageResult::Effective(Output::PageCompleted(
+            _,
+            AnalyzedCompletionOutcome::Recorded { newly_known: 4 }
+        ))
+    ));
+    assert_eq!(
+        session.finish_completion_request(&retry, Err(DocumentError::Unavailable)),
+        Some(CompletionProgress::Failed(DocumentError::Unavailable))
+    );
+    let final_retry = session.dispatch_completion().unwrap();
+    assert_eq!(retry.operation(), final_retry.operation());
+    let CompletionProgress::Completed {
+        completion,
+        document,
+        outcome,
+    } = finish_completion(&router, &mut session, &final_retry)
+    else {
+        panic!("completed")
+    };
+    assert_eq!(completion, prepared.completion());
+    assert_eq!(outcome, AnalyzedCompletionOutcome::AlreadyRecorded);
+    assert!(document.finished_at_least_once);
+    assert_eq!(
+        document.current_position().unwrap().offset,
+        fixture.base.page.range.end
+    );
+    assert!(!session.completion_state().pending);
+    assert!(session.dispatch_completion().is_none());
+    assert!(session
+        .finish_completion_request(&final_retry, Err(DocumentError::Unavailable))
+        .is_none());
+    let sql = fixture.sql();
+    assert_eq!(
+        sql.query_row("SELECT COUNT(*) FROM reading_completions", [], |r| r
+            .get::<_, i64>(0))
+            .unwrap(),
+        1
+    );
+    assert_eq!(
+        sql.query_row("SELECT COUNT(*) FROM reading_occurrences", [], |r| r
+            .get::<_, i64>(0))
+            .unwrap(),
+        6
+    );
+    assert_eq!(
+        sql.query_row("SELECT active_time_ms FROM reading_completions", [], |r| {
+            r.get::<_, i64>(0)
+        })
+        .unwrap(),
+        2345
+    );
+    assert_eq!(
+        sql.query_row(
+            "SELECT SUM(milliseconds) FROM pending_reading_time",
+            [],
+            |r| r.get::<_, i64>(0)
+        )
+        .unwrap(),
+        0
+    );
+    assert!(EffectiveReaderSession::default()
+        .dispatch_completion()
+        .is_none());
 }

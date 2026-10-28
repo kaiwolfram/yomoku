@@ -948,6 +948,22 @@ completion gates before dispatch and wire callback tokens to the native result.
 Standalone Kotlin codecs and actual FIFO tests verify this component; the live
 app has not adopted it yet. There is no new worker, persistent retry or schema.
 
+The same retained session now owns completion from acceptance through final-time
+drain, reservation and commit. `begin_completion` freezes the rendered key/intent
+and invalidates shell callbacks immediately; word I/O and accepted custom retries
+must drain first. Pending completion blocks new word/custom work. The owning app
+must drain accepted AND coalesced checkpoints before `dispatch_completion`; core
+does not read clocks or storage. Each native `EffectiveCompletionRequest` gets a
+fresh checked attempt, even on exact retries. Preparation authenticates the returned
+key/intent; commit retries share the same reservation allocation across invalidation
+and worker reopen. Stale/duplicate/wrong-stage results cannot consume newer work.
+Failures retain their obligation for explicit retry; there is no completion Cancel
+because commit may have succeeded before a follow-up read failed. Only one consumed
+success returns its frozen command and Recorded/AlreadyRecorded outcome to the app
+for position/time/notice handling. No unfinished command auto-replays on restart.
+Actual FIFO tests verify checkpoint ordering, rollback and a lost-success response.
+This component is still separate from live app events/views and Android.
+
 `Storage::create_analyzed_paste` composes the existing private transaction helpers
 for document creation, validated Mode B analysis and exact-surface registration.
 A caller-provided callback receives allocated canonical chapter identities; the

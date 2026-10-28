@@ -8,6 +8,10 @@ use std::sync::Arc;
 
 mod words;
 pub use words::{EffectiveReaderWordState, EffectiveWordDetails, EffectiveWordRequest};
+mod completions;
+pub use completions::{
+    EffectiveCompletionProgress, EffectiveCompletionRequest, EffectiveCompletionState,
+};
 
 use crate::{
     document::{TextAnchor, TextRange},
@@ -146,6 +150,7 @@ pub struct EffectiveReaderSession {
     pending: Option<EffectivePageRequest>,
     current: Option<RetainedPage>,
     words: words::WordState,
+    completion: completions::CompletionState,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

@@ -652,6 +652,15 @@ its actual occurrence/status rows; the reservation is identity/provenance, not a
 Migration 0018 creates an empty additive table and leaves all previous histories intact.
 Full-chapter payload size/cost is unmeasured and must be reviewed during live integration.
 
+The pure retained session now freezes a shared rendered key and intent before final
+checkpoint drain, then owns the exact native reservation through commit/retry.
+Every dispatch has a fresh callback attempt; failed callbacks never substitute a
+newly resolved partition. A commit followed by a failed read still requires the
+same command, which returns AlreadyRecorded without repeating history/time/status
+writes. Completion acceptance/reservation alone records no encounters. These are
+in-process lifecycle values, with no new persistence schema or shell codec and
+no automatic process-restart replay. Live app integration remains pending.
+
 ## Atomic segmentation-override registration
 
 `save_registered_segmentation_override(edit, timestamp)` uses existing migration-0007

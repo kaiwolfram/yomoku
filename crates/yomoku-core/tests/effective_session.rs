@@ -12,6 +12,8 @@ use yomoku_core::{
     vocabulary::{Surface, VocabularyStatus},
 };
 
+#[path = "effective_session/completions.rs"]
+mod completions;
 #[path = "effective_session/words.rs"]
 mod words;
 

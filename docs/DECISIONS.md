@@ -3093,3 +3093,20 @@ load. The live app must apply the shared FIFO/time/completion gates and capture
 these native request tokens when adopting this component. This verified slice
 does not switch app events/views or Android from original B; completion/token/
 furigana/word/custom still need their coordinated integration.
+
+## 2026-10-28 — Retained effective completion ownership
+
+Keep accepted completion lifecycle in the existing pure effective reader session.
+Freeze the rendered partition and intent before final clock drain, immediately
+invalidate UI callbacks, then dispatch preparation only after the app drains both
+accepted and coalesced checkpoints. Word I/O/accepted custom retries gate acceptance;
+pending completion gates new word/custom work. No clock, SQL or new worker in core.
+
+Use a native checked attempt per dispatch/retry, authenticate preparation against
+the entire frozen key/intent, and share the exact durable reservation across commit
+retries. Failed preparation/commit retains explicit retry ownership. Do not expose
+Cancel: atomic commit can succeed before its follow-up read fails, requiring exact
+AlreadyRecorded replay. Only a consumed success returns position/time/notice inputs;
+duplicate or stale callbacks cannot return another success. A new session does not
+auto-replay reservations. No dependency, migration, shell codec or live reader change.
+Coordinated core/FFI/Android adoption remains the next implementation slice.

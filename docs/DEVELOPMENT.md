@@ -4606,3 +4606,56 @@ furigana remain original B. Next adopt native page/word requests and completion
 reservations together in core/FFI/Android, then guarded override controls. APK/
 device/Android lint/release/performance/process-death/physical arm64 were not rerun.
 No implementation blocker; local commit uses the authorized `.git` escalation.
+
+## Retained effective completion lifecycle
+
+2026-10-28, repository root, existing pinned offline Rust/JDK:
+
+```sh
+export PATH=/home/kai/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin:$PATH
+export JAVA_HOME=/home/kai/repos/yomoku/.local/jdk-17/jdk-17.0.21+9
+cargo test -p yomoku-core --test effective_session --all-features --locked --offline
+cargo test -p yomoku-runtime effective_worker_retained_completion --all-features --locked --offline
+cargo test --workspace --all-features --locked --offline --quiet
+cargo clippy --workspace --all-targets --all-features --locked --offline -- -D warnings
+cargo fmt --all -- --check
+tools/format-kotlin.sh --check
+tools/test-sudachi.sh
+tools/test-kotlin-bridge.sh
+cargo run -p yomoku-ffi --bin generate-kotlin --features facet_typegen --locked --offline -- target/generated/kotlin-repeat
+# Compare after generation exits.
+diff -r target/generated/kotlin target/generated/kotlin-repeat
+git diff --check
+```
+
+PASS: seven new pure retained-completion cases and one actual FIFO/SQLite case;
+560 workspace Rust tests (17 opt-in ignored), strict Clippy/Rustfmt/Kotlin
+formatting. Fifteen Full analysis fixtures plus one runtime fixture pass EACH
+owned/mapped (32 invocations).
+
+Acceptance freezes the rendered effective key/intent before clock drain, retires UI
+callbacks and gates word/custom obligations. Separate dispatch allows the app to
+drain accepted/coalesced checkpoints before reservation. Fresh callback attempts
+reject duplicates, stale retries, wrong-stage results and changed reservations.
+Preparation retries preserve intent; commit retries share the exact reservation.
+Only a consumed success returns position/time/notice inputs. The real FIFO case
+blocks the first checkpoint, drains a newer absolute value, injects preparation
+and completion failures, reverses the rule, reopens the worker and loses a
+successful response. Final AlreadyRecorded replay leaves one completion/six
+occurrences/2345 ms and consumes pending duration without duplicate effects.
+
+Initial checks caught a wrong test enum name, an oversized progress enum (boxed
+the returned document) and an assertion expecting consumed time rows to be deleted
+(existing semantics reset duration while retaining revision). Corrected and reran.
+A server restart interrupted the first Full run; the complete rerun passed.
+Host Kotlin/JNI also passes real-Full imports/direct cancellation, selected-word/
+custom CRUD, navigation/codecs, seven Unicode fixtures and 100 handle lifecycles.
+Repeat code generation is byte-identical; `git diff --check` passes. Existing
+Crux middleware teardown messages remain informational.
+Logs: `/tmp/yomoku-effective-completion-session-{tests,clippy,full,bridge,format,codegen}.log`.
+
+No dependency, migration, shell schema or live Android source changes. This is a
+native retained-lifecycle slice. Live events/views and completion/token/word/custom/
+furigana still use B; adopt the retained requests together next, then guarded
+override controls. APK/device/Android lint/release/performance/process-death/arm64
+were not rerun. No unresolved implementation blocker.

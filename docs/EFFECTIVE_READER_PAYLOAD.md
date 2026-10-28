@@ -112,3 +112,13 @@ retry or Cancel; in-flight writes cannot be abandoned by this component. The new
 Kotlin round trip verifies maximum unsigned counts, unresolved manual metadata,
 literal supplementary/combining/NUL custom fields and retry/error state. It is
 still a prerequisite schema/component, not a live app or JNI performance claim.
+
+The retained session also owns completion acceptance, preparation and commit retries.
+Acceptance freezes the displayed full key/intent before final-time drain and retires
+shell callbacks. Native `EffectiveCompletionRequest` attempts are fresh on every
+dispatch; accepted keys and durable reservations share their existing allocations.
+The app must drain both checkpoint slots before dispatch and explicitly retry failures.
+No completion Cancel or restart replay is introduced: a failed follow-up read can
+hide a successful commit, so the exact reservation must return AlreadyRecorded.
+Seven pure cases and a real FIFO failure/reversal/reopen/lost-response case verify
+this lifecycle. No new shell schema or payload measurement; the live switch remains.

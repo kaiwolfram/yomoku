@@ -84,6 +84,16 @@ pub(super) struct WordState {
     in_flight: bool,
 }
 
+impl WordState {
+    pub(super) fn blocks_completion(&self) -> bool {
+        self.in_flight
+            || self
+                .pending
+                .as_ref()
+                .is_some_and(|request| request.action != Action::Load)
+    }
+}
+
 impl EffectiveReaderSession {
     pub fn word_state(&self) -> EffectiveReaderWordState {
         EffectiveReaderWordState {
@@ -115,7 +125,7 @@ impl EffectiveReaderSession {
         &mut self,
         selection: EffectiveReaderSelection,
     ) -> Option<EffectiveWordRequest> {
-        if self.words.in_flight {
+        if self.words.in_flight || self.completion_state().pending {
             return None;
         }
         let command = self.freeze_selection(selection)?;
@@ -165,7 +175,7 @@ impl EffectiveReaderSession {
     /// Retry the accepted key and literal values, even after UI invalidation.
     /// Storage revalidates provenance; it never substitutes the new visible word.
     pub fn retry_custom_entry(&mut self) -> Option<EffectiveWordRequest> {
-        if self.words.in_flight {
+        if self.words.in_flight || self.completion_state().pending {
             return None;
         }
         let pending = self.words.pending.as_ref()?;
@@ -361,7 +371,10 @@ impl EffectiveReaderSession {
         &self,
         selection: EffectiveReaderSelection,
     ) -> Option<EffectiveSelectionCommand> {
-        if self.words.in_flight || self.words.selection != Some(selection) {
+        if self.words.in_flight
+            || self.completion_state().pending
+            || self.words.selection != Some(selection)
+        {
             return None;
         }
         let details = self.words.details.as_ref()?;

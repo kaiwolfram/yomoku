@@ -2377,3 +2377,21 @@
   No dependency/schema/live Android changes. Live reader remains original B;
   coordinated core/FFI/Android switch is next, followed by guarded override controls.
   APK/device/lint/release/performance/process-death/arm64 not rerun. No blocker.
+
+## 2026-10-28 — Retained effective completion lifecycle
+
+- Added pure ownership from accepted rendered key/intent through final-time drain,
+  reservation and exact commit retries. Fresh callback attempts reject duplicates,
+  stale/wrong-stage results and changed reservations. Word/custom obligations gate
+  completion; pending completion gates word/custom work. No completion Cancel.
+- Added seven pure cases plus one real FIFO/SQLite case for checkpoint ordering,
+  preparation/commit rollback, reversal/reopen and a lost successful response.
+  Replay preserves one completion/six occurrences/2345 ms without duplicate effects.
+- PASS: 560 workspace Rust tests (17 ignored), strict Clippy/Rustfmt/Kotlin
+  formatting, 15 Full + one runtime fixture EACH owned/mapped. Corrected initial
+  enum/size/assertion issues; reran Full after an interrupted server restart.
+- PASS: real-Full Kotlin/JNI imports/cancellation/word/custom, seven Unicode
+  fixtures, 100 handle lifecycles, byte-identical repeat generation and diff check.
+- Updated architecture/data/payload/decisions/plan/development/handoff. No dependency,
+  schema or live Android changes. Live reader remains B; coordinated adoption is
+  next. APK/device/lint/release/performance/process-death/arm64 not rerun. No blocker.
