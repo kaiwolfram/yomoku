@@ -5591,3 +5591,65 @@ and physical arm64 were not rerun/measured for this host-only slice. Logs:
 `/tmp/yomoku-epub-{focused,tests,example-test,clippy,full-owned,full-mapped,build-before,build-after}.log`,
 `/tmp/yomoku-epub-{before,after}.{csv,log}` and
 `/tmp/yomoku-epub-100-{before,after}.{csv,log}`.
+
+## Isolated Android compact boundary editor
+
+2026-10-28, repository root, pinned offline tools:
+
+```sh
+export PATH=/home/kai/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin:$PATH
+export JAVA_HOME=/home/kai/repos/yomoku/.local/jdk-17/jdk-17.0.21+9
+export GRADLE_USER_HOME=/home/kai/repos/yomoku/.local/gradle
+export ANDROID_HOME=/home/kai/Android/Sdk
+cargo test -p yomoku-core --test effective_session --all-features --locked --offline
+tools/test-kotlin-bridge.sh
+tools/format-kotlin.sh --check
+"$JAVA_HOME/bin/java" -jar .local/ktfmt-0.64.jar --kotlinlang-style --dry-run --set-exit-if-changed tests/kotlin/ReaderBoundaryDraftTest.kt
+./android/gradlew -p android :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug --offline --console=plain
+./android/gradlew -p android :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=app.yomoku.ReaderBoundaryEditorTest --offline --console=plain
+/home/kai/Android/Sdk/platform-tools/adb -s emulator-5554 shell wm size 2560x1600
+/home/kai/Android/Sdk/platform-tools/adb -s emulator-5554 shell wm density 240
+/home/kai/Android/Sdk/platform-tools/adb -s emulator-5554 shell cmd uimode night yes
+./android/gradlew -p android :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=app.yomoku.ReaderBoundaryEditorTest --offline --console=plain
+/home/kai/Android/Sdk/platform-tools/adb -s emulator-5554 shell wm size reset
+/home/kai/Android/Sdk/platform-tools/adb -s emulator-5554 shell wm density reset
+/home/kai/Android/Sdk/platform-tools/adb -s emulator-5554 shell cmd uimode night no
+git diff --check
+```
+
+PASS: 53 retained-session Rust tests, host Kotlin/JNI suite with real Full imports,
+new pure Kotlin partition checks, app/test APKs, strict Android lint, Kotlin
+formatting and diff checks. All eight Compose cases pass on the API-36 x86_64
+phone (1080×2400, 420 dpi) and tablet (2560×1600, 240 dpi) configurations.
+Original phone dimensions/density/system-light mode were restored afterward.
+
+The eight Compose cases use compact typed fixtures in a debug-only, non-exported
+ComponentActivity without a native app session. They verify default All/This,
+stored modes/explicit missing-C generation, exact large-ID actions, global/local
+reversal, literal supplementary/combining/NUL partitions, whitespace guards,
+busy/pending gates, exact native Retry/Cancel identities, explicit reload after
+stale/invalid/failed reads, dismissal, prompt/session replacement and saved-state
+restoration. Long spans scroll at 1.6 font scale in both local light/dark themes;
+the fixture intentionally controls its theme independently of system mode.
+The host helper additionally checks every scalar partition of mixed-script/
+supplementary/combining/NUL/whitespace samples against exact text preservation,
+strict surrogate validation and Rust/JVM whitespace differences.
+
+The initial build rejected an unnecessary `!!` under Kotlin -Werror; removed.
+The first device run found cuts/scope saved inside Dialog's separate view registry
+were lost by the restoration test. Hoist the saveable holder above Dialog. A
+second failure exposed nullable inner state restoration on owner replacement;
+reject the complete MutableState holder so rememberSaveable initializes a fresh
+draft, rather than accepting MutableState(null). The same-session restoration,
+old-owner saved-state rejection and prompt-change cases then pass. A visual check
+also led to visible scope radio controls and explicit unavailable-mode labels.
+Gradle/ADB/emulator required the usual local-socket/AVD sandbox escalation.
+
+No native/schema/dependency/wire change. Tests here do not prove live JNI editor
+integration, persistence or device performance: the reader still uses original B.
+Next coordinate the reader/Library switch, then open validated original-B spans
+and connect this component to retained events/state with shared time/FIFO gates.
+Full workspace/Clippy, separate Full owned/mapped matrix, process death, release,
+physical arm64 and diverse-book performance were not rerun for this UI slice.
+Logs: `/tmp/yomoku-boundary-{core,host,android,device,tablet,format-check}.log`;
+initial failures: `/tmp/yomoku-boundary-device-{initial,restore-holder}.log`.

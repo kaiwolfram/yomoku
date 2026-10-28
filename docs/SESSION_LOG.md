@@ -2708,3 +2708,28 @@ download after sandbox DNS failure. No dependency/migration/wire change or block
 Updated plan/handoff/architecture/data/decisions/development. Next: coordinated live
 reader/Library switch, Android override controls, then JNI/device/diverse-book costs.
 APK/Android lint/JNI/codegen/device checks were not rerun for this host-only slice.
+
+## 2026-10-28 — Independent Android boundary editor
+
+Implemented ReaderBoundaryEditor against the existing compact state/action
+contract: A/B/C choices/explicit generation, All/This scope, scalar cut toggles/
+join without editing text, winning-rule scope/reversal and native Retry/Cancel.
+Stale/invalid contexts require explicit reload. ReaderBoundaryText validates exact
+Unicode partitions and matches Rust whitespace semantics. Session/prompt/text
+guards keep saveable drafts scoped; accepted retry payloads remain native.
+The component reports dialog interaction/scroll/keys to the reader clock hook.
+No native/schema/dependency/wire change or live reader/Library adoption.
+
+Eight isolated Compose cases pass on API-36 phone and tablet; long-span scrolling
+uses 1.6 font scale and both themes. Host Kotlin partition checks and real-Full
+JNI regressions, 53 retained-session Rust tests, APKs, strict lint/formatting/diff
+pass. Fixed the initial unnecessary-!! compile warning, Dialog-registry restoration
+loss and nullable-inner-saver rejection during session replacement; all corrected
+before the final device runs. Gradle/ADB/emulator needed sandbox escalation;
+original emulator display/theme restored. Exact commands/failures: DEVELOPMENT end.
+
+Updated plan/handoff/architecture/data/decisions/payload/development. No blocker.
+Next coordinate live core/FFI/Android reader/completion/Library membership, then
+expose the editor with validated original-B span selection and retained events.
+Full workspace/Clippy/separate Full-loader matrix, process death, release,
+physical arm64 and performance measurements were not rerun for this UI slice.

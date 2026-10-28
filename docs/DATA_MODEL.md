@@ -1488,6 +1488,11 @@ enter SQLite or replace transaction-local provenance/rule validation. No migrati
 history rewrite, new durable command or automatic replay; live Android adoption
 remains pending.
 
+The isolated Android boundary editor saves only draft cuts/scope, guarded by the
+retained native session key, complete compact prompt identity and literal surface.
+These UI drafts are not accepted overrides or write reservations. Exact pending
+writes/retries and provenance remain native; no SQLite/schema change is involved.
+
 
 ## Library read order (migration 0019)
 

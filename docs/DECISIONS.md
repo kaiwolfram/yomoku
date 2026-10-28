@@ -3457,3 +3457,28 @@ status changes, deletion/re-registration and repaired data afresh. Do not preloa
 unreferenced lifetime vocabulary, persist a cache, weaken provenance or switch the
 live B Library independently of the reader. The transient map consumes memory
 proportional to referenced distinct spellings; peak allocations remain unmeasured.
+
+## 2026-10-28 — Independently verified Android boundary editor
+
+Implement the compact Android boundary dialog as an independent part of the
+remaining override controls while the coordinated live-reader/Library switch
+stays pending. Render the existing typed prompt and emit only its scoped actions;
+do not add a second native session, worker, analysis path, migration or dependency.
+The owner must provide the retained native session's identity and shared FIFO/time
+gates. Opening/selecting the original-B span and forwarding these actions through
+live Event/ViewModel remain part of that switch.
+
+Initialize manual boundaries from a valid stored B choice, otherwise the whole
+literal selected span. Toggle cuts at Unicode scalar boundaries, including
+combining characters; join removes cuts without editing source text. Validate
+nonblank parts against Rust's Unicode White_Space rules, which differ from JVM
+isBlank. Stored A/B/C choices save explicitly; absent A/C request generation.
+Show winning-rule surface/parts/scope before explicit reversal. Rust owns exact
+pending writes: Android emits Retry/Cancel with the accepted prompt identity and
+requires explicit reload for retired contexts. No automatic retries or writes.
+
+Keep the saveable cuts/scope above Dialog's separate view save-state registry.
+Restore only for the same retained native session, full compact prompt identity
+and literal surface; replacing/restarting a session discards old drafts even if
+revision numbers repeat. Pending write payloads never enter saved Android state.
+All pointer/key/scroll interaction in the dialog reports reader activity.

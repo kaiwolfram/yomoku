@@ -1,5 +1,5 @@
 # Resume here
-Updated: 2026-10-28. EPUB/Library host scaling verified; live switch next.
+Updated: 2026-10-28. Android boundary editor component ready; live switch next.
 ## Working
 - Rename: retained literal draft/Cancel/Retry; title-only atomic save, no-op retries.
 - Single/bulk deletion: one transaction, history/vocabulary/rules retained; reimport fresh.
@@ -65,16 +65,16 @@ Updated: 2026-10-28. EPUB/Library host scaling verified; live switch next.
   Fresh attempts/exact retries/shared gates; stale/lost success requires reload.
 - Explicit A/C uses the FIFO/import analyzer cache, whole chapter/original profile;
   stored reuse skips Full. Rechecks key/revision at commit; metadata requires reload.
-- Compact override prompt/actions: fresh same-page identities; default All, literal
-  choices/reverse/retry/Cancel; generated codecs. Retained furigana + strict Android
-  effectiveDisplayTokens adapters ready (crossings/unresolved/source preference). Not live.
+- Compact prompts/actions: fresh IDs, All default; furigana/effectiveDisplayTokens adapters ready.
+- ReaderBoundaryEditor: typed A/B/C/manual, All/This, reversal, native Retry/Cancel/reload;
+  literal scalar cuts + Rust whitespace, session/prompt-scoped saveable drafts. Isolated UI;
+  no live exposure. Caller must supply stable session key and shared time/FIFO gates.
 ## Next tasks (ordered)
-1. Switch live core/FFI/Android completion/token/status/furigana/word/custom + Library membership
-   (effective_library_word_distributions) via retained requests/command/finish_request + render
-   adapters; see EFFECTIVE_READER_PAYLOAD.md. No live adoption yet.
-2. Wire compact override actions/state to Android A/B/C/manual + All/This/reversal.
+1. Switch live core/FFI/Android completion/token/status/furigana/word/custom + effective Library
+   membership via retained requests/command/finish_request + render adapters; EFFECTIVE_READER_PAYLOAD.md.
+2. Expose prepared ReaderBoundaryEditor with original-B span selection + compact events/state.
 3. Measure JNI/device/diverse/image-heavy costs; TXT/EPUB/100-copy host results in performance doc.
 Physical arm64 deferred; Nostr empty; Q188 unresolved before forwarding.
 ## Verification
-- PASS: 678 Rust (17 ignored) + benchmark test, Full owned/mapped, Clippy/fmt, 10 CLI rejects.
-- EPUB/100-copy reads preserve DB bytes; no JNI/APKs/lint/device rerun. No blocker. DEVELOPMENT end.
+- PASS: 53 retained-session Rust, host Kotlin/JNI, 8 UI cases each phone/tablet, APKs/lint/fmt.
+- No native/schema changes; broad 678 Rust not rerun. DEVELOPMENT end: commands/failures. No blocker.

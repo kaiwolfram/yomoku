@@ -210,3 +210,14 @@ acceptance and drain both final checkpoint slots before dispatching preparation.
 The real FIFO tests use this adapter for token, word/custom and completion flows;
 status/deletion and override save/reload/reversal also run through it. Live app
 adoption and device measurements remain pending.
+
+## Android boundary editor component
+
+`ReaderBoundaryEditor` now renders the existing compact prompt and emits its typed
+Choose/Save/Generate/Reverse/Retry/Cancel/Dismiss actions in isolated Compose tests.
+Manual partitions toggle Unicode scalar boundaries without changing the literal
+surface. Draft cuts/scope restore only for the same retained native session and
+complete prompt identity/text; pending write payloads stay in Rust. Explicit
+reload handles retired contexts. No wire-schema/payload-size change or live
+Event/ViewModel/reader adoption is included. The parent still must open validated
+original-B spans and enforce shared FIFO/time gates during the coordinated switch.

@@ -1301,8 +1301,24 @@ identity. Dismiss/reopen of the same span on the same retained page therefore
 rejects old actions. Accepted writes retain that identity across invalidation and
 exact retries; new callback attempts remain separate. Retry/Cancel authenticate
 the accepted obligation, and in-flight writes still drain. Generated Kotlin
-round trips exercise these standalone schemas; no live Event/ViewModel or Android
-flow uses them yet. No migration, dependency or durable prompt registry.
+round trips exercise these standalone schemas; live Event/ViewModel adoption is
+pending. No migration, dependency or durable prompt registry.
+
+`ReaderBoundaryEditor` is an independently tested Android renderer for that compact
+state/action contract. It offers stored A/B/C or explicit missing-A/C generation,
+All/This scope, scalar-boundary cut toggles/join, literal partition previews and
+winning-rule reversal. `ReaderBoundaryText` rejects malformed UTF-16 and blank
+parts using Rust's whitespace policy. No source editing or inferred readings.
+Saveable cuts/scope belong above Dialog and authenticate the native session key,
+entire prompt identity and literal text at restoration. The parent must keep the
+session key across rotation and replace it with the native session.
+
+Pending writes expose only native Retry/Cancel; busy writes cannot be dismissed.
+Retired/invalid prompts offer explicit reload, and dictionary-clock interactions
+include dialog scrolling/keys. The owner supplies existing time/FIFO gates and
+reload/close callbacks. The component has no native bridge/session of its own and
+is not exposed in the current B reader: original-B span selection, live app events
+and the coordinated reader/Library switch remain pending.
 
 ## Native effective reader callbacks
 
