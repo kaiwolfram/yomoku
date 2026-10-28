@@ -2611,3 +2611,24 @@ Progress/architecture/data/decisions/handoff updated. Rename and bulk/Select All
 remain unchecked; coordinated effective-reader/Library adoption remains first.
 No migration/dependency. Release, separate Full-loader matrix, performance,
 process-death and physical arm64 not rerun. Commands/results: DEVELOPMENT.md end.
+
+
+## 2026-10-28 — Library rename
+
+Implemented the next independent Library slice while coordinated effective-reader
+adoption stays pending. Pure core retains literal ID/title/error drafts across
+Activity recreation; Save/explicit Retry/Cancel use the existing typed FIFO/JNI.
+Only the live Library title changes atomically; history/source titles/content/assets,
+progress/finish/recency/time, vocabulary/counts and dedup identities survive.
+Same-title retries write nothing; absent IDs fail without recreating documents.
+Search/sort reproject after success and duplicates keep the renamed title.
+
+Eight new Rust cases; 668 workspace tests (17 ignored), strict Clippy/fmt/Kotlin,
+real-Full host JNI, repeat codegen, both-ABI APKs/lint and eleven focused phone tests
+pass; the rename case also passes wide/dark, with display settings restored.
+Initial fixture/constructor errors
+were corrected before passing reruns; Gradle/ADB required local-socket escalation.
+No dependency/migration. Progress/data/architecture/decisions/handoff updated;
+effective-reader/Library adoption, override controls and bulk deletion remain next.
+Release/process-death/physical arm64/performance were not rerun. Exact commands
+and final device results: DEVELOPMENT.md end.

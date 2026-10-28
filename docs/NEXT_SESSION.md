@@ -1,8 +1,8 @@
 # Resume here
-Updated: 2026-10-28. Single deletion verified; coordinated effective switch next.
+Updated: 2026-10-28. Rename verified; coordinated effective switch next.
 ## Working
-- Confirmed single deletion: retained target/Cancel/Retry; atomic live-content cleanup,
-  history/vocabulary/rules preserved; reimport fresh. Bulk/rename remain pending.
+- Rename: retained literal draft/Cancel/Retry; title-only atomic save, no-op retries.
+  Single deletion preserves history/vocabulary/rules; reimport fresh. Bulk pending.
 - Library title-only search/Clear + Last read/Title/Import date; query/sort retained.
   Read order (0019) on explicit open only; newest unknown/unopened afterward.
   Pure search/sort; duplicates preserve recency; legacy history unknown.
@@ -71,10 +71,10 @@ Updated: 2026-10-28. Single deletion verified; coordinated effective switch next
    (effective_library_word_distributions) via retained requests/command/finish_request + render
    adapters; see EFFECTIVE_READER_PAYLOAD.md. No live adoption in this slice.
 2. Wire compact override actions/state to Android A/B/C/manual + All/This/reversal.
-3. Library rename + confirmed bulk/Select All deletion; single deletion is wired.
+3. Library confirmed bulk/Select All deletion; rename + single deletion are wired.
 Measure real-book/JNI/device + Library scan cost, including on-demand whole chapters.
 Physical arm64 deferred; Nostr empty; Q188 unresolved before forwarding.
 ## Verification
-- Native PASS: 660 Rust (17 ignored), JNI/codecs/repeat codegen, Clippy/fmt/APKs/lint.
-- PASS: 9 phone regressions + deletion phone/wide-dark; display restored. No blocker.
-  Initial empty-Library fixture fixed; emulator restarted. Commands: DEVELOPMENT.md end.
+- Native PASS: 668 Rust (17 ignored), JNI/codecs/repeat codegen, Clippy/fmt/APKs/lint.
+- PASS: 11 phone tests + rename wide/dark; display restored. No blocker.
+  Fixtures/preview constructor corrected. Commands/results: DEVELOPMENT.md end.

@@ -27,6 +27,17 @@ survives Settings/tab/reader navigation and retained Activity recreation. A fres
 native session starts with an empty query. Compose binds the field/clear action
 to typed events and distinguishes an empty Library from zero matching titles.
 
+`RequestDocumentRename` opens an editor for a visible Library ID. Pure core owns
+its literal draft and separate retry error; edits/Cancel are synchronous and
+retained across Activity recreation. `SaveDocumentTitle` freezes its ID/title on
+the existing typed storage FIFO, rejects doubles during I/O and reconciles only a
+matching result. SQLite changes only the live title in one immediate transaction,
+without dictionary/content reads or other writes. Same-title retries write nothing.
+Success reprojects the full Library under the retained query/sort and updates any
+matching import summary. Word distributions stay valid. Navigation clears the
+editor; accepted I/O completes. Android gates rename during imports/unresolved
+saves, disables blank submissions and offers explicit Save/Retry/Cancel.
+
 `SortLibrary` synchronously selects Last read (default), Title or Import date,
 including during an outstanding storage operation. The selection lives in the
 owning core session alongside search and resets to Last read in a new session.

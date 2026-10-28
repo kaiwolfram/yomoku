@@ -241,11 +241,9 @@ fn live_title_is_separate_from_canonical_text_and_historical_title() {
     let database = TestDatabase::new();
     let mut storage = Storage::open(database.path()).unwrap();
     let document = storage.create_paste(&paste("元の題名\n本文")).unwrap();
-    // Rename is not exposed yet; exercise the schema separation without adding UI.
-    storage
-        .connection
-        .execute("UPDATE documents SET title = '新しい題名'", [])
-        .unwrap();
+    assert!(storage
+        .rename_document(document.document_id, "新しい題名")
+        .unwrap());
     let renamed = storage.load_paste(document.document_id).unwrap().unwrap();
     assert_eq!(renamed.title, "新しい題名");
     assert_eq!(renamed.chapter, document.chapter);

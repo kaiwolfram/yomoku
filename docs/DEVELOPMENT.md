@@ -5322,3 +5322,70 @@ Original display size/density and light mode were restored. Ten distinct focused
 phone cases and this wide case pass across the initial/corrected runs; no remaining
 implementation blocker. No production code changed after the passing native/JNI
 suite; only the corrected device fixture and documentation changed afterward.
+
+
+## Library rename
+
+2026-10-28, repository root, pinned offline Rust/JDK:
+
+```sh
+export PATH=/home/kai/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin:$PATH
+export JAVA_HOME=/home/kai/repos/yomoku/.local/jdk-17/jdk-17.0.21+9
+export GRADLE_USER_HOME=/home/kai/repos/yomoku/.local/gradle
+export ANDROID_HOME=/home/kai/Android/Sdk
+cargo test --workspace --all-features --locked --offline --quiet
+cargo clippy --workspace --all-targets --all-features --locked --offline -- -D warnings
+cargo fmt --all -- --check
+tools/format-kotlin.sh --check
+"$JAVA_HOME/bin/java" -jar .local/ktfmt-0.64.jar --kotlinlang-style --dry-run --set-exit-if-changed tests/kotlin/DocumentRenameBridgeTest.kt
+tools/test-kotlin-bridge.sh
+# After native builds/generation finish:
+cargo run -p yomoku-ffi --bin generate-kotlin --features facet_typegen --locked --offline -- target/generated/kotlin-repeat
+diff -r target/generated/kotlin target/generated/kotlin-repeat
+./android/gradlew -p android :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug --offline --console=plain
+./android/gradlew -p android :app:connectedDebugAndroidTest '-Pandroid.testInstrumentationRunnerArguments.class=app.yomoku.DocumentRenameTest,app.yomoku.DocumentDeletionTest,app.yomoku.LibraryWordsTest,app.yomoku.LibrarySortTest,app.yomoku.LibrarySearchTest,app.yomoku.LibraryCoversTest,app.yomoku.NavigationTest,app.yomoku.PasteReaderTest#pasteReturnsToLibraryAndOpensFirstLogicalPageWithBackAndRecreation,app.yomoku.TxtPickerTest#cancelBlockedReadRetainsCompletedFilesAndFreshBatchIgnoresLateProviderResult' --offline --console=plain
+/home/kai/Android/Sdk/platform-tools/adb -s emulator-5554 shell wm size 2560x1600
+/home/kai/Android/Sdk/platform-tools/adb -s emulator-5554 shell wm density 240
+/home/kai/Android/Sdk/platform-tools/adb -s emulator-5554 shell cmd uimode night yes
+./android/gradlew -p android :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=app.yomoku.DocumentRenameTest --offline --console=plain
+/home/kai/Android/Sdk/platform-tools/adb -s emulator-5554 shell wm size reset
+/home/kai/Android/Sdk/platform-tools/adb -s emulator-5554 shell wm density reset
+/home/kai/Android/Sdk/platform-tools/adb -s emulator-5554 shell cmd uimode night no
+git diff --check
+```
+
+PASS: eight new Rust cases (four core/three SQLite/one FIFO); 668 workspace tests
+(17 opt-in ignored), strict Clippy/Rustfmt/Kotlin formatting and byte-identical
+repeat codegen. Storage compares every table outside documents plus full reader/
+Library snapshots, including completed/partial time, source provenance/history,
+original bytes, ruby/cues, EPUB chapters/assets, analyses/statuses and dedup keys.
+All four formats retain renamed titles on duplicate import. Exact same-title
+retries preserve database bytes; statement/deferred-COMMIT failures roll back;
+missing/deleted IDs cannot recreate content. Pure tests cover visibility/ID guards,
+blank drafts, literal Unicode/NUL, query/sort updates, Cancel, separate errors,
+double submissions, navigation and foreign callback rejection.
+
+Real-Full host JNI verifies literal supplementary/combining/NUL titles, Cancel
+without writes, progress/finish/count retention, duplicate references and reopened
+sessions without additional dictionary loads. Existing import/cancellation/word/
+custom/codecs/100-handle JNI regressions pass. Both-ABI app/test APKs and strict
+Android lint pass. All eleven focused phone tests above pass on Android 16/API 36.
+The new UI case verifies retained drafts and failed saves across Activity recreation,
+blank submission gating, Cancel, forced SQLite failure/explicit Retry, search removal,
+unchanged finished-book state/history/counts and renamed duplicate/reader titles.
+The same rename case passes at 2560x1600/240dpi in dark mode. Original phone
+display size/density and light mode were restored; no remaining blocker.
+
+Initial test compilation needed the new ViewModel field, correct duplicate outcome
+fields and a typed no-analysis closure. The storage fixture initially used a raw
+legacy survivor, whose dedup backfill legitimately wrote on a later import; using
+the production analyzed import fixed the fixture. Android compilation found the
+positional Compose preview constructor; it now uses named fields. All corrections
+precede passing reruns. Gradle/ADB needed the usual local-socket escalation.
+Existing Crux teardown diagnostics remain informational. Logs:
+`/tmp/yomoku-library-rename-{tests,focused,clippy,bridge,codegen,format,format-check,
+android,device,wide}.log`.
+
+No dependency or migration. The effective-reader switch/override controls and bulk
+Library deletion remain pending. Separate Full-loader matrix, release/process-death,
+physical arm64 and performance checks were not rerun/measured for this slice.

@@ -231,6 +231,15 @@ fn execute(
             storage.delete_document(id).map_err(map_error)?;
             Ok(StorageResult::DocumentDeleted(id))
         }
+        StorageOperation::RenameDocument { document_id, title } => {
+            if !storage
+                .rename_document(document_id, &title)
+                .map_err(map_error)?
+            {
+                return Err(DocumentError::NotFound);
+            }
+            Ok(StorageResult::DocumentRenamed { document_id, title })
+        }
         StorageOperation::CreatePaste(_) => {
             let paste = paste.expect("validated paste");
             if let Some(imports) = imports.as_mut() {

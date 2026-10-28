@@ -13,6 +13,7 @@ mod analysis;
 mod completions;
 mod custom_dictionary;
 mod document_deletion;
+mod document_rename;
 mod documents;
 mod effective_completions;
 mod effective_overrides;

@@ -23,6 +23,10 @@ pub enum StorageOperation {
     List,
     LoadLibraryWordDistributions,
     DeleteDocument(DocumentId),
+    RenameDocument {
+        document_id: DocumentId,
+        title: String,
+    },
     CreatePaste(String),
     LoadPaste(DocumentId),
     /// Explicit entry records Library recency and resets a finished book atomically.
@@ -96,6 +100,10 @@ pub enum StorageResult {
     Listed(Vec<LibraryDocument>, PageLength, ReaderTypography),
     LibraryWordDistributionsLoaded(Vec<LibraryWordDistribution>),
     DocumentDeleted(DocumentId),
+    DocumentRenamed {
+        document_id: DocumentId,
+        title: String,
+    },
     /// Import results reference Library state; content is loaded separately.
     Created(LibraryDocument),
     /// Exact duplicate: preserve persisted title/position and reference it once.

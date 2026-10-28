@@ -132,6 +132,10 @@
     <string name="library_words_distribution">Distinct words: New %1$s, Learning %2$s, Familiar %3$s, Known %4$s, Ignored %5$s</string>
     <string name="library_words_error">Could not load word status.</string>
     <string name="library_delete">Delete</string>
+    <string name="library_rename">Rename</string>
+    <string name="save">Save</string>
+    <string name="library_document_title">Title</string>
+    <string name="library_rename_error">Could not rename this document. Retry or cancel.</string>
     <string name="library_delete_title">Delete document?</string>
     <string name="library_delete_confirmation">Delete “%1$s” from your Library? This removes its content and reading progress. Your vocabulary and reading history are kept. This cannot be undone.</string>
     <string name="library_delete_error">Could not delete this document. Retry or cancel.</string>

@@ -3,6 +3,19 @@
 use crate::document::{DocumentId, LibraryDocument};
 use serde::{Deserialize, Serialize};
 
+/// Session-local title editor. Only an explicit save changes the live title.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
+pub struct LibraryRenameState {
+    pub document_id: DocumentId,
+    pub title: String,
+    pub error: Option<crate::storage::DocumentError>,
+}
+
+pub fn valid_document_title(title: &str) -> bool {
+    !title.trim().is_empty()
+}
+
 /// Live registered exact surfaces, each counted once under the chosen document
 /// segmentation. Missing/deleted vocabulary is absent, never implicitly New.
 #[derive(Clone, Copy, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]

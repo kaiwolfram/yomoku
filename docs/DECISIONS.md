@@ -3373,3 +3373,24 @@ Missing IDs are idempotent no-ops for explicit lost-response retries. Do not loa
 content/dictionaries before deleting or reset allocation/recency high-water marks.
 Normal reimport creates fresh IDs, zero progress, no finish/recency/partial time;
 existing vocabulary/history remain intact. No dependency or architecture change.
+
+## 2026-10-28 — Library rename
+
+Implement rename as the next small independent Library slice while the coordinated
+effective-reader switch remains pending. Keep the ID/literal draft/separate error
+in core so Activity recreation preserves edits and failed saves. Open only from a
+visible row; Save must match its ID. Freeze accepted values until the FIFO returns,
+reject double submissions/edits/Cancel during that write, and allow explicit retry
+or editing/Cancel after failure. Navigation retires the editor, while the accepted
+callback can still update only its exact ID/title. Keep search/sort and word counts.
+
+Reject blank/whitespace-only rename submissions without trimming, normalizing or
+truncating accepted titles. This is editor validation; preserve existing imported
+titles, including empty first lines. Store only `documents.title` in one immediate
+transaction. Retain historical original titles, all source/content/assets/analysis,
+progress/finish/recency/time, vocabulary/history and dedup keys. A missing document
+reports NotFound and is never recreated. Same-title retries skip UPDATE, so explicit
+lost-response retries are write-free. Update matching import summaries and retire
+cached loaded documents after success. Disable Android actions during file batches
+using the existing Library gate. No dependency or migration; bulk deletion stays
+separate and unchecked.

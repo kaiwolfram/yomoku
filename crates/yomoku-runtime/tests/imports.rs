@@ -30,6 +30,8 @@ const TIMEOUT: Duration = Duration::from_secs(10);
 
 #[path = "imports/document_deletion.rs"]
 mod document_deletion;
+#[path = "imports/document_rename.rs"]
+mod document_rename;
 
 struct Database(PathBuf);
 impl Database {

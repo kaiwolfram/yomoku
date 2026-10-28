@@ -76,6 +76,7 @@ internal fun LibraryScreen(
             view.libraryWordDistributions?.associateBy { it.documentId }
         }
     LibraryDeleteDialog(view, dispatch, enabled = libraryActionsEnabled)
+    LibraryRenameDialog(view, dispatch, enabled = libraryActionsEnabled)
     Column(Modifier.fillMaxSize().padding(16.dp)) {
         Button(onClick = { dispatch(Event.OpenPaste) }, enabled = !view.storageBusy) {
             Text(stringResource(R.string.paste_title))
@@ -194,16 +195,35 @@ internal fun LibraryScreen(
                             documentId = document.documentId.value,
                         )
                     }
-                    TextButton(
-                        onClick = { dispatch(Event.RequestDocumentDeletion(document.documentId)) },
-                        enabled =
-                            libraryActionsEnabled &&
-                                !view.storageBusy &&
-                                !view.readingTimeSavePending &&
-                                !view.completionSavePending,
-                        modifier = Modifier.testTag("delete_document_${document.documentId.value}"),
-                    ) {
-                        Text(stringResource(R.string.library_delete))
+                    Column {
+                        TextButton(
+                            onClick = {
+                                dispatch(Event.RequestDocumentRename(document.documentId))
+                            },
+                            enabled =
+                                libraryActionsEnabled &&
+                                    !view.storageBusy &&
+                                    !view.readingTimeSavePending &&
+                                    !view.completionSavePending,
+                            modifier =
+                                Modifier.testTag("rename_document_${document.documentId.value}"),
+                        ) {
+                            Text(stringResource(R.string.library_rename))
+                        }
+                        TextButton(
+                            onClick = {
+                                dispatch(Event.RequestDocumentDeletion(document.documentId))
+                            },
+                            enabled =
+                                libraryActionsEnabled &&
+                                    !view.storageBusy &&
+                                    !view.readingTimeSavePending &&
+                                    !view.completionSavePending,
+                            modifier =
+                                Modifier.testTag("delete_document_${document.documentId.value}"),
+                        ) {
+                            Text(stringResource(R.string.library_delete))
+                        }
                     }
                 }
             }

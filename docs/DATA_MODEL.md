@@ -1,5 +1,23 @@
 # Data model
 
+## Library rename
+
+`Storage::rename_document` changes only `documents.title` in an immediate
+transaction. Bind the literal title without trimming, normalization or truncation;
+reject empty/whitespace-only submissions. Imported titles can still be empty.
+An absent live ID returns false (FIFO maps this to NotFound); rename never
+recreates a deleted document. Same-title retries skip UPDATE and write nothing.
+Statement/COMMIT failure preserves the prior title. Source original titles,
+canonical text/formatting/ruby/cues, original file bytes/assets, dedup identities,
+analysis/rules, progress/finish/recency/time and vocabulary/history stay intact.
+Exact duplicate imports return the current renamed title with existing progress.
+
+The pure core retains a session-local ID/title/error editor across Activity
+recreation. Save freezes the exact ID/title until its FIFO callback; Cancel and
+draft edits perform no I/O. Success updates the full Library and any import summary
+before query/sort projection, preserving word counts. Navigation retires the editor
+while an accepted callback still reconciles its matching ID/title. No migration.
+
 ## Confirmed single-document deletion
 
 `Storage::delete_document` holds one immediate transaction, deleting canonical
@@ -17,7 +35,7 @@ atomic registration and allocates fresh document/source/chapter IDs with zero
 progress, no finish marker, no recency or partial time; existing vocabulary/history
 survive. The runtime dispatches this through the existing FIFO without dictionaries.
 Core requires a retained visible Library target plus matching explicit confirmation;
-Cancel performs no I/O. Rename and bulk/Select All deletion remain pending.
+Cancel performs no I/O. Bulk/Select All deletion remains pending.
 
 ## EPUB canonical content and atomic repository (migration 0014)
 

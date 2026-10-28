@@ -11,6 +11,40 @@ use yomoku_core::{
 use crate::{analysis::read_reader_analysis, settings::read_page_length, Storage, StorageError};
 
 impl Storage {
+    /// Change only the live Library title, preserving literal spelling and all
+    /// source/history/content/progress fields. False means the live ID is absent.
+    /// Same-title retries perform no writes, including after a lost response.
+    pub fn rename_document(
+        &mut self,
+        document_id: DocumentId,
+        title: &str,
+    ) -> Result<bool, StorageError> {
+        if !yomoku_core::library::valid_document_title(title) {
+            return Err(StorageError::InvalidDocument);
+        }
+        let transaction = self
+            .connection
+            .transaction_with_behavior(TransactionBehavior::Immediate)?;
+        let previous: Option<String> = transaction
+            .query_row(
+                "SELECT title FROM documents WHERE id = ?1",
+                [i64::from(document_id)],
+                |row| row.get(0),
+            )
+            .optional()?;
+        let Some(previous) = previous else {
+            return Ok(false);
+        };
+        if previous != title {
+            transaction.execute(
+                "UPDATE documents SET title = ?2 WHERE id = ?1",
+                rusqlite::params![i64::from(document_id), title],
+            )?;
+        }
+        transaction.commit()?;
+        Ok(true)
+    }
+
     /// Remove live content and Library state atomically, retaining source/chapter
     /// provenance, global vocabulary, overrides and completed-reading history.
     /// An absent ID is an idempotent no-op, including an explicit lost-response retry.
