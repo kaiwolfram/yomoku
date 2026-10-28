@@ -11,6 +11,9 @@ use yomoku_core::{
     vocabulary::Surface,
 };
 
+#[path = "segmentation/metadata_partitions.rs"]
+mod metadata_partitions;
+
 fn chapter(text: &str) -> ChapterText {
     ChapterText {
         source_id: 1.try_into().unwrap(),

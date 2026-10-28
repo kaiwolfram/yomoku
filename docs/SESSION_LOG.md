@@ -2657,3 +2657,27 @@ dependency/migration. Next: coordinated effective-reader/Library adoption, Andro
 override controls and real-book/device measurements. Physical arm64 remains deferred;
 release/process-death/separate Full-loader matrix/performance not rerun. Exact commands,
 results and initial/corrected device-run distinction: DEVELOPMENT.md end.
+
+## 2026-10-28 — Effective resolution performance and real-novel host baseline
+
+Completed the planned host performance slice before the coordinated live switch.
+Added an opt-in TXT/EPUB benchmark that imports into a disposable file-backed DB,
+measures B-only/stored-A/B/C/global-split resolution/Library/page costs and separate
+whole-chapter A/C setup, verifies unchanged DB bytes and preserves source files.
+Aozora's real novel produces one 329,187-character chapter with 211,016 B tokens.
+Removed the extra chapter-sized metadata tree: reuse exact B indices, binary-search
+validated A then C only for changed spans, preserving every provenance field.
+Pure B-only median improves 65→41 ms; full repository reads still take hundreds
+of milliseconds. Detailed before/after figures and corpus hashes are in
+EFFECTIVE_READER_PERFORMANCE.md; Android/JNI/real EPUB costs remain unmeasured.
+
+677 Rust tests (17 ignored), strict Clippy/fmt/diff, pinned Sudachi verification,
+real Full owned/mapped segmentation and unchanged synthetic payload sizes pass.
+New exhaustive regression checks 4,096 Unicode B/A/C/manual partitions against a
+full-scan metadata oracle. Multi-input/two-chapter EPUB/duplicate/even-iteration
+benchmark smoke and invalid CLI checks pass, with scratch directories cleaned.
+Initial download needed DNS/network escalation; exploratory overlapping-build
+timings were discarded and distinct baseline/production executables verified.
+No dependency/migration/wire change or blocker. Handoff/plan/architecture/decisions/
+development updated; live effective reader/Library switch and override UI remain
+next. APK/Android lint/JNI/device checks were not rerun for this host-only slice.

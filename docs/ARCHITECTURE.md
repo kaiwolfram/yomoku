@@ -928,6 +928,13 @@ occurrence. The repository validates complete eligible snapshots in the same
 read-only transaction as rules; later profiles are excluded. Domain/storage fixtures
 plus real Full owned/mapped fixtures cover scope, metadata provenance, reversibility
 and unchanged snapshots/history.
+Metadata resolution reuses the boundary's exact original-B token index. Changed
+spans binary-search validated sorted A, then C, requiring both ends to match; no
+additional chapter-sized metadata tree is built. Complete snapshot validation,
+contextual provenance and B/A/C priority remain unchanged. The opt-in
+`measure_effective_reader` host example measures real TXT/EPUB inputs in a fresh
+scratch database; see EFFECTIVE_READER_PERFORMANCE.md for the real-novel baseline
+and remaining SQLite/device costs. It introduces no app cache or new payload.
 `effective_reader::EffectiveReaderChapter` borrows canonical text and privately owns
 validated resolution. It projects eligible whole occurrences with distinct effective
 segment indices and page-local UTF-8 display ranges. Exact analyzer classification

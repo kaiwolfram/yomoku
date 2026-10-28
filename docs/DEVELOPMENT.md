@@ -5469,3 +5469,63 @@ the passing native/JNI/production APK checks. Additional logs:
 No dependency/migration. Coordinated effective-reader/Library adoption and Android
 override controls remain next. Separate Full-loader matrix, release/process-death,
 physical arm64 and real-book/performance checks were not rerun/measured.
+
+## Effective reader host performance and exact metadata lookup
+
+2026-10-28, repository root, pinned offline host Rust:
+
+```sh
+export PATH=/home/kai/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin:$PATH
+cargo test -p yomoku-core --test segmentation --all-features --locked --offline
+cargo test --workspace --all-features --locked --offline --quiet
+python3 tools/verify-sudachi-source.py
+export YOMOKU_SUDACHI_DICTIONARY=/home/kai/repos/yomoku/.local/sudachi/full-20261015/system_full.dic
+for loader in owned mapped; do
+    YOMOKU_SUDACHI_STORAGE="$loader" cargo test -p yomoku-analysis --test full_dictionary real_segmentation_choices_resolve_scopes_merges_and_reversal_without_replacing_b --locked --offline -- --ignored
+done
+cargo run -p yomoku-storage --example measure_effective_reader_payload --locked --offline
+cargo clippy --workspace --all-targets --all-features --locked --offline -- -D warnings
+cargo fmt --all -- --check
+git diff --check
+# Prepare/verify the Aozora corpus as in EFFECTIVE_READER_PERFORMANCE.md.
+cargo run -p yomoku-analysis --example measure_effective_reader --release \
+  --locked --offline -- .local/sudachi/full-20261015/system_full.dic \
+  7 /tmp/yomoku-aozora-cat.txt
+```
+
+PASS: 677 Rust tests (17 opt-in ignored), including the new full-scan provenance
+oracle over all 4,096 combinations of B/A/C/manual four-unit partitions. Coverage
+includes exact starts with differing ends, A-before-C independent of input order,
+conflicting classification, absent readings/lemmas, contextual repeated spellings,
+supplementary/combining/NUL text, unresolved parts and punctuation. All prior storage
+keys/completion/replay/status/custom/furigana tests pass. The real Full segmentation
+fixture also passes separately with owned and mapped loaders; pinned source/patch
+verification passes. Strict Clippy/Rustfmt/diff pass. Synthetic full-key/page/compact
+JSON sizes match every existing value in EFFECTIVE_READER_PAYLOAD.md.
+
+The optional benchmark uses production TXT/EPUB imports and a disposable file-backed
+database. The real Aozora TXT fixture has 329,187 canonical characters/211,016 B tokens.
+Sequential optimized before/after runs with identical workloads, warmup and seven
+samples measure pure resolution, original/effective Library scans and retained page
+load/accept under B-only, stored-A/B/C and global-split phases. Database SHA-256 stays
+unchanged during reads. Full results/corpus hashes/reproduction/limitations are in
+EFFECTIVE_READER_PERFORMANCE.md. B-only pure median drops 64.946→41.270 ms; stored-A/B/C
+repository reads still cost hundreds of milliseconds. Whole-chapter A/C analysis and
+storage setup are reported separately. A synthetic two-chapter EPUB + TXT + duplicate
+TXT smoke run (two iterations) verifies multi-input dedup, largest nonfirst chapter,
+even medians and scratch cleanup; five invalid CLI cases reject without importing.
+
+The first corpus download needed network escalation after sandbox DNS failure.
+Exploratory timings that overlapped compilation were discarded. Comparing separate
+source copies in a shared Cargo target reused the last executable; the production
+source/example were explicitly rebuilt and distinct executable hashes verified
+before the sequential final runs. Future comparisons should use separate targets.
+No remaining implementation blocker. Logs: `/tmp/yomoku-effective-performance-`
+`{focused,tests,clippy,full-owned,full-mapped,payload}.log` and
+`/tmp/yomoku-effective-measure-{before-final,after-final,smoke}.{csv,log}`.
+
+No dependency/migration/wire change. Live Android/Library still use B; the coordinated
+switch and compact override UI remain next. APK/Android lint/JNI/codegen/device,
+full separate loader matrix, real EPUB/large-Library performance, peak allocations,
+guarded on-demand FIFO timings, release APK/process death and physical arm64 were
+not rerun/measured for this host-only slice.

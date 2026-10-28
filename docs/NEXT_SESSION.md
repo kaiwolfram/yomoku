@@ -1,5 +1,5 @@
 # Resume here
-Updated: 2026-10-28. Library bulk deletion verified; coordinated effective switch next.
+Updated: 2026-10-28. Effective host performance slice verified; live switch next.
 ## Working
 - Rename: retained literal draft/Cancel/Retry; title-only atomic save, no-op retries.
 - Single/bulk deletion: one transaction, history/vocabulary/rules retained; reimport fresh.
@@ -42,7 +42,7 @@ Updated: 2026-10-28. Library bulk deletion verified; coordinated effective switc
   native return + outcome before clearing/draining. Dedicated cancellation executor.
 - Bounded EPUB parser ignores CSS; migration 0014 atomically saves original source,
   ordered content/formatting/ruby/images/B/registration. Snapshot loads verify all
-  source/assets without parsing; large-book costs remain unmeasured.
+  source/assets without parsing; real EPUB/device costs remain unmeasured.
 - ReaderDocument carries keyed validated heading/emphasis/strong/HTTP(S) spans;
   ReaderPage clips to page-local UTF-8; generated JNI/Compose preserve exact text.
   Website taps open browser with token identity; other links inert. No CSS/TOC.
@@ -73,8 +73,8 @@ Updated: 2026-10-28. Library bulk deletion verified; coordinated effective switc
    (effective_library_word_distributions) via retained requests/command/finish_request + render
    adapters; see EFFECTIVE_READER_PAYLOAD.md. No live adoption yet.
 2. Wire compact override actions/state to Android A/B/C/manual + All/This/reversal.
-3. Measure real-book/JNI/device + Library scan cost, including on-demand whole chapters.
+3. Measure real EPUB/large-Library/JNI/device costs; host TXT baseline in performance doc.
 Physical arm64 deferred; Nostr empty; Q188 unresolved before forwarding.
 ## Verification
-- PASS: 676 Rust (17 ignored), JNI/repeat codegen, Clippy/fmt/both-ABI APKs/lint.
-- PASS: 12 phone cases + bulk wide/dark; display restored. No blocker. DEVELOPMENT.md end.
+- PASS this slice: 677 Rust (17 ignored), Full owned/mapped, Clippy/fmt/payload sizes.
+- Prior JNI/APKs/lint/12 phone + wide cases not rerun. No blocker. DEVELOPMENT.md end.

@@ -88,30 +88,42 @@ pub fn resolve_effective_segmentation(
             return Err(InvalidAnalysis);
         }
     }
-    let mut metadata = BTreeMap::new();
-    for (id, snapshot) in std::iter::once((original_id, original)).chain(
-        [SplitMode::A, SplitMode::C].into_iter().flat_map(|mode| {
-            alternates
-                .iter()
-                .filter(move |(_, snapshot)| snapshot.mode == mode)
-                .map(|(id, snapshot)| (*id, snapshot))
-        }),
-    ) {
-        for (index, token) in snapshot.tokens.iter().enumerate() {
-            metadata
-                .entry((token.anchor.range.start, token.anchor.range.end))
-                .or_insert((id, snapshot.mode, index, token));
-        }
-    }
+    // Boundary resolution already records every exact original-B token match.
+    // Use that index directly; do not build another chapter-sized lookup tree.
+    // Whole-snapshot validation above guarantees sorted, nonoverlapping tokens,
+    // so changed spans can search at most two alternates by their exact start.
+    let alternates = [SplitMode::A, SplitMode::C].map(|mode| {
+        alternates
+            .iter()
+            .find(|(_, snapshot)| snapshot.mode == mode)
+    });
     let segments = boundaries
         .into_iter()
         .map(|boundary| {
-            let metadata = metadata
-                .get(&(boundary.anchor.range.start, boundary.anchor.range.end))
+            let metadata = boundary
+                .original_token_index
+                .map(|index| (original_id, SplitMode::B, index, &original.tokens[index]))
+                .or_else(|| {
+                    alternates.into_iter().flatten().find_map(|(id, snapshot)| {
+                        let index = snapshot
+                            .tokens
+                            .binary_search_by_key(&boundary.anchor.range.start, |token| {
+                                token.anchor.range.start
+                            })
+                            .ok()?;
+                        let token = &snapshot.tokens[index];
+                        (token.anchor == boundary.anchor).then_some((
+                            *id,
+                            snapshot.mode,
+                            index,
+                            token,
+                        ))
+                    })
+                })
                 .map(|(id, mode, index, token)| SegmentMetadata {
-                    analysis_id: *id,
-                    mode: *mode,
-                    token_index: *index,
+                    analysis_id: id,
+                    mode,
+                    token_index: index,
                     is_japanese: token.is_japanese,
                     reading: token.reading.clone(),
                     dictionary_form: token.dictionary_form.clone(),

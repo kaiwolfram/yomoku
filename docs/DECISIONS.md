@@ -3417,3 +3417,21 @@ selection and confirmation. Freeze targets through failures/explicit retries and
 disable selection edits/Cancel/double submission during accepted writes. Use the
 existing file-batch and reader-save UI gates. Reimports use fresh IDs, so a repeated
 old selection cannot delete them.
+
+## 2026-10-28 — Effective resolution performance before live adoption
+
+Take the planned real-book/Library performance slice independently of the coordinated
+reader switch. Use an opt-in host example over supplied TXT/EPUB files with a new
+scratch database, explicit Full analysis and distinct B-only/stored-A/B/C/global-edit
+phases. Keep inputs/corpus out of Git and verify that timed reads preserve database
+bytes. Record host/setup/iteration details and keep JNI/device/EPUB/large-Library
+claims separate from the measured one-novel TXT fixture.
+
+Remove the measured extra metadata tree by reusing exact original-B indices and
+binary-searching sorted validated A then C only for changed spans. Continue to
+validate entire snapshots and require both anchor ends; preserve original provenance,
+classification, unresolved metadata, command keys and serialized reservations exactly.
+Do not add a cache, schema/payload change, guessed metadata or live-reader adoption
+as part of this optimization. A full-scan oracle across 4,096 Unicode partitions and
+existing storage/real-Full cases guard the unchanged semantics. Remaining hundreds
+of milliseconds of repository work need separate measurement before a cache design.

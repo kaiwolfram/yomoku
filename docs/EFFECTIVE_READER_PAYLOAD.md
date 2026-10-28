@@ -190,6 +190,11 @@ test runner. No wire-schema/size change or live reader switch is included.
 
 ## Native callback dispatch
 
+The separate [host performance review](EFFECTIVE_READER_PERFORMANCE.md) now measures
+a real novel's chapter resolution, Library scans and retained-page acceptance,
+including whole-chapter A/C setup. It preserves all payload/provenance fields while
+removing the temporary metadata tree. JNI/device and real EPUB costs remain pending.
+
 `EffectiveReaderRequest` wraps the accepted token/word/custom/status/completion/
 override attempts. Its `command` method sends the existing storage effect and
 captures the originating request in a native Crux callback. `finish_request`
