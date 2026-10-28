@@ -274,6 +274,30 @@ fn real_segmentation_choices_resolve_scopes_merges_and_reversal_without_replacin
             },
             ..selected
         };
+        // Library membership must match this reader projection for every real
+        // A/B/C choice, counting only registered exact surfaces once.
+        let surfaces = projection
+            .tokens_on_page(page)
+            .unwrap()
+            .into_iter()
+            .map(|token| token.surface)
+            .collect::<std::collections::BTreeSet<_>>();
+        let registered = surfaces
+            .iter()
+            .filter(|surface| {
+                storage
+                    .vocabulary_entry(&Surface::new(surface.as_str()).unwrap())
+                    .unwrap()
+                    .is_some()
+            })
+            .count() as u64;
+        assert_eq!(
+            storage.effective_library_word_distributions().unwrap()[0].counts,
+            Some(yomoku_core::library::WordStatusCounts {
+                new: registered,
+                ..Default::default()
+            })
+        );
         let fallback = projection
             .tokens_on_page(page)
             .unwrap()

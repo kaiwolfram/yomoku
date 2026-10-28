@@ -1488,3 +1488,17 @@ batch (including provider reads); failures preserve document/import errors and
 require explicit Retry. Search/sort/recreation reuse
 the retained snapshot. Neither this read nor rendering writes history, position,
 recency, status or vocabulary. Large-library scan cost remains unmeasured.
+
+The separate `Storage::effective_library_word_distributions` returns the same
+compact counts with effective membership, ready for the coordinated reader
+switch. A single deferred read transaction spans all live documents/chapters,
+stored original B, same-profile A/C metadata, active rules and live vocabulary.
+It shares validated reader/completion eligibility: exact Japanese analyzer spans
+and unresolved manual Japanese-span parts qualify; exact non-Japanese metadata
+does not. Deduplicate eligible surfaces across the whole document before indexed
+status reads. Only surfaces still registered in vocabulary contribute. Missing B
+in any chapter yields None, while corrupt analysis/rules/statuses fail the read.
+Deleted origin documents do not disable global rules for remaining books.
+Canonical text is needed for resolution, but original file/image BLOBs and
+dictionaries are not read. No writes or new table/cache/schema. The live Library
+still calls its original-B API until the reader also adopts effective boundaries.

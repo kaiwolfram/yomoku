@@ -3,8 +3,8 @@
 use crate::document::{DocumentId, LibraryDocument};
 use serde::{Deserialize, Serialize};
 
-/// Live registered exact surfaces, each counted once in the document's original
-/// Mode B. Missing/deleted vocabulary is absent, never implicitly New.
+/// Live registered exact surfaces, each counted once under the chosen document
+/// segmentation. Missing/deleted vocabulary is absent, never implicitly New.
 #[derive(Clone, Copy, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
 #[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
 pub struct WordStatusCounts {

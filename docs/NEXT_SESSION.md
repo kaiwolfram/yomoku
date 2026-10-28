@@ -1,12 +1,12 @@
 # Resume here
-Updated: 2026-10-28. Library search/sorts/status bars done; live switch next.
+Updated: 2026-10-28. Effective Library storage ready; coordinated live switch next.
 ## Working
 - Library title-only search/Clear + Last read/Title/Import date; query/sort retained.
   Read order (0019) on explicit open only; newest unknown/unopened afterward.
   Pure sort/search; duplicates preserve recency, legacy history stays unknown.
-- Distinct registered-surface bars use original B, live statuses and one read-only
-  FIFO snapshot. Deleted entries stay absent; Missing/zero differ; explicit Retry.
-  Refresh on return/status/completion; batches defer scans. Switch membership with reader.
+- Live bars use original B/live statuses; read-only FIFO; explicit Retry; batches defer scans.
+  Effective Library API shares eligibility/resolution; distinct across chapters; deleted absent;
+  Missing/zero differ. Stored text/rules, no source/assets/Full/writes. Switch with reader.
 - Chapter-local UTF-8 position/whole-book percentage/five presets persist; reflow
   preserves offsets. Scroll resets; 720dp column; controls below content; 48dp swipes.
   Previous only saves position; busy gates reject doubles; deliberate rereads count.
@@ -70,10 +70,11 @@ Updated: 2026-10-28. Library search/sorts/status bars done; live switch next.
 - EffectiveReaderRequest.command/finish_request retains attempts/retries; stale results rejected.
 ## Next tasks (ordered)
 1. Switch live core/FFI/Android completion/token/status/furigana/word/custom + Library membership
-   via retained requests/command/finish_request + render adapters; see EFFECTIVE_READER_PAYLOAD.md.
+   (effective_library_word_distributions) via retained requests/command/finish_request + render
+   adapters; see EFFECTIVE_READER_PAYLOAD.md. No live adoption in this slice.
 2. Wire compact override actions/state to Android A/B/C/manual + All/This/reversal.
 3. Measure real-book/JNI/device + Library scan cost, including on-demand whole chapters.
 Physical arm64 deferred; Nostr empty; Q188 unresolved before forwarding.
 ## Verification
-- PASS: 645 Rust (17 ignored), Clippy/fmt/diff, host JNI/repeat codegen, APKs/lint.
-- PASS: 8 phone + 1 wide/dark; commands/fixes: DEVELOPMENT.md end. No blocker; release/arm64 not rerun.
+- This slice PASS: 652 Rust (17 ignored), Full A/B/C fixture owned+mapped, Clippy/fmt/diff.
+- Prior: host JNI/codegen/APKs/lint; 8 phone + 1 wide/dark. No blocker. Commands: DEVELOPMENT.md end.

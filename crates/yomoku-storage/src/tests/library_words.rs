@@ -7,6 +7,8 @@ use yomoku_core::{
 
 use super::{imports::fixture, *};
 
+mod effective;
+
 fn import(storage: &mut Storage, text: &str) -> AnalyzedPaste {
     storage
         .create_analyzed_paste(&PasteText::new(text.into()).unwrap(), 100, fixture)

@@ -11,7 +11,10 @@ use crate::{
     },
     reader::{ReaderCustomEntry, ReaderVocabulary},
     reader_ruby::{source_preferred_ruby, ReaderChapterRuby, ReaderRuby},
-    segmentation::{resolve_effective_segmentation, EffectiveChapterSegmentation, SegmentMetadata},
+    segmentation::{
+        resolve_effective_segmentation, EffectiveChapterSegmentation, EffectiveSegment,
+        SegmentMetadata,
+    },
 };
 
 /// Reading eligibility is distinct from analyzer metadata. A manual partition
@@ -118,6 +121,15 @@ impl<'a> EffectiveReaderChapter<'a> {
         self.segmentation
     }
 
+    /// Borrow whole-chapter reading surfaces without allocating page tokens or
+    /// cloning metadata. Library membership uses the same eligibility as reading
+    /// and completion; callers deduplicate exact spellings across chapters.
+    pub fn eligible_surfaces(&self) -> impl Iterator<Item = &str> {
+        self.segmentation.segments.iter().filter_map(|segment| {
+            segment_eligibility(segment).map(|_| segment.boundary.surface.as_str())
+        })
+    }
+
     /// Crossing tokens remain selectable on both pages with a complete surface,
     /// anchor and metadata. Only display_range is clipped to page-local UTF-8.
     pub fn tokens_on_page(
@@ -176,15 +188,8 @@ impl<'a> EffectiveReaderChapter<'a> {
         let mut tokens = Vec::new();
         for (index, segment) in self.segmentation.segments.iter().enumerate() {
             let boundary = &segment.boundary;
-            let eligibility = match &segment.metadata {
-                Some(metadata) if metadata.is_japanese => {
-                    EffectiveTokenEligibility::AnalyzerJapanese
-                }
-                Some(_) => continue,
-                None if boundary.override_id.is_some() => {
-                    EffectiveTokenEligibility::ManualJapaneseSpan
-                }
-                None => continue,
+            let Some(eligibility) = segment_eligibility(segment) else {
+                continue;
             };
             if boundary.anchor.range.start >= page.range.end
                 || boundary.anchor.range.end <= page.range.start
@@ -214,6 +219,17 @@ impl<'a> EffectiveReaderChapter<'a> {
             });
         }
         Ok(tokens)
+    }
+}
+
+fn segment_eligibility(segment: &EffectiveSegment) -> Option<EffectiveTokenEligibility> {
+    match &segment.metadata {
+        Some(metadata) if metadata.is_japanese => Some(EffectiveTokenEligibility::AnalyzerJapanese),
+        Some(_) => None,
+        None if segment.boundary.override_id.is_some() => {
+            Some(EffectiveTokenEligibility::ManualJapaneseSpan)
+        }
+        None => None,
     }
 }
 

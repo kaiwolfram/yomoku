@@ -2565,3 +2565,22 @@ Batch cancellation/picker regressions verify the new scan guard. Documentation
 and plan updated. Effective-reader switch remains next, including Library
 membership; release/performance/physical arm64 remain deferred. Commands and
 final device/environment details: DEVELOPMENT.md end.
+
+## 2026-10-28 — Effective Library membership storage
+
+Added a separate atomic read-only effective Library distribution API for the
+coordinated reader switch. It shares reading/completion eligibility, resolves
+pinned B/same-profile metadata/winning rules and counts each registered exact
+surface once across chapters. Missing/deleted vocabulary stays absent; Missing B
+and zero counts differ. Canonical-text reads skip source/image BLOBs and Full.
+Live Library and reader continue matching original B until their joint adoption.
+
+Seven new SQLite cases, 652 workspace Rust tests (17 ignored), strict Clippy/fmt/
+diff and extended real Full A/B/C fixture with both loaders pass. Tests cover
+split/merge/precedence/reversal, exact classification/Unicode, live statuses,
+deleted-origin globals, corrupt data, query-only bytes and unchanged history.
+Initial import/iterator-lifetime compilation errors were fixed before passing
+reruns. Plan, architecture/data/decisions and handoff updated; no blocker.
+Next switch live core/FFI/Android and the Library FIFO membership call together,
+then wire compact override controls. Android/JNI/release/hardware/performance
+not rerun; exact commands/results: DEVELOPMENT.md end.

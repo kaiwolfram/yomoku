@@ -61,6 +61,17 @@ Membership matches the current B reader and must adopt resolved effective
 partitions with the coordinated reader switch before boundary controls go live.
 Android draws the five proportional colors and exposes exact accessible counts.
 
+`Storage::effective_library_word_distributions` is the separate storage read for
+the coordinated effective-reader switch. One deferred transaction covers live
+documents, canonical chapters, pinned B/same-profile A/C, winning rules and global
+statuses. `EffectiveReaderChapter::eligible_surfaces` borrows surfaces using the
+same eligibility predicate as page tokens/completions; no full-page token copies
+or guessed manual metadata. Deduplicate exact spellings across the document,
+then use indexed live vocabulary reads. It never loads source archives, image
+assets or dictionaries, registers entries or writes. Resolve one chapter at a
+time; large-library/chapter costs remain unmeasured. The live FIFO still calls
+the original-B API until reader and Library membership switch together.
+
 `yomoku-import` is a separate pure content-extraction boundary. Its EPUB parser
 reads Stored/Deflate ZIP entries from a borrowed byte slice, without filesystem
 extraction/network access. Container/OPF metadata selects the first package and

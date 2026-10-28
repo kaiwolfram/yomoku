@@ -3332,3 +3332,22 @@ A failed read has its own explicit Retry and cannot clear import errors.
 Use the existing status palette plus green for Known, and expose all five exact
 counts to accessibility. No schema/dependency or persistent cache. Large-library
 query cost is unmeasured; include it in the existing performance work.
+
+## 2026-10-28 — Effective Library membership prerequisite
+
+Implement the pending Library membership part of the coordinated effective-reader
+switch as a separate read-only storage API. Keep the live Library on original B
+until the reader switches too. Reuse validated chapter resolution and one shared
+eligibility predicate for Library surfaces, reader tokens and completion, so
+unresolved manual parts and exact non-Japanese metadata cannot drift apart.
+Borrow eligible surfaces without allocating full-chapter page tokens; deduplicate
+literal spellings across chapters before reading current indexed vocabulary.
+
+Use one deferred SQLite transaction across live documents, chapter text, stored
+analyses/rules and statuses. Resolve one chapter at a time; do not load/verify
+original file or image BLOBs or load Full. Missing B makes a document unavailable;
+corrupt available data fails closed. Never register missing/deleted entries or
+write caches, history, position or recency. Global rules remain valid after their
+origin document is deleted. Existing shared resolution does require canonical
+text and stored-analysis reads; include that cost in the planned measurements.
+No migration, dependency, public wire-schema or new product behavior.

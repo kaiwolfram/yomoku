@@ -1,13 +1,92 @@
-//! Read-only Library distribution over the same frozen B used by the live reader.
+//! Read-only Library distributions for original-B and effective reader membership.
+
+use std::collections::BTreeSet;
 
 use yomoku_core::{
-    document::DocumentId,
+    document::{ChapterId, DocumentId},
     library::{LibraryWordDistribution, WordStatusCounts},
+    vocabulary::{Surface, VocabularyStatus},
 };
 
-use crate::{Storage, StorageError};
+use crate::{
+    analysis::{read_chapter, read_effective_reader_chapter_in},
+    vocabulary::read_entry_by_surface,
+    Storage, StorageError,
+};
 
 impl Storage {
+    /// Resolve all live documents and statuses in one read transaction. This
+    /// separate API is ready for the coordinated effective-reader switch; the
+    /// live B reader keeps its matching original-B distribution until then.
+    /// Reads canonical chapters/stored analysis/rules, never source/assets or
+    /// dictionaries. Missing B stays unavailable; missing vocabulary stays absent.
+    pub fn effective_library_word_distributions(
+        &mut self,
+    ) -> Result<Vec<LibraryWordDistribution>, StorageError> {
+        let transaction = self.connection.transaction()?;
+        let documents = {
+            let mut statement =
+                transaction.prepare("SELECT id, source_id FROM documents ORDER BY id")?;
+            let rows = statement
+                .query_map([], |row| Ok((row.get::<_, i64>(0)?, row.get::<_, i64>(1)?)))?;
+            rows.collect::<Result<Vec<_>, _>>()?
+        };
+        let mut distributions = Vec::with_capacity(documents.len());
+        for (id, source_id) in documents {
+            let chapters = {
+                let mut statement = transaction.prepare(
+                    "SELECT id FROM chapters WHERE source_id = ?1 ORDER BY chapter_index",
+                )?;
+                let rows = statement.query_map([source_id], |row| row.get::<_, i64>(0))?;
+                rows.collect::<Result<Vec<_>, _>>()?
+            };
+            if chapters.is_empty() {
+                return Err(StorageError::InvalidAnalysis);
+            }
+            let mut available = true;
+            let mut surfaces = BTreeSet::new();
+            for chapter_id in chapters {
+                let chapter = read_chapter(
+                    &transaction,
+                    ChapterId::try_from(chapter_id).map_err(|_| StorageError::InvalidAnalysis)?,
+                )?;
+                let Some(effective) = read_effective_reader_chapter_in(&transaction, &chapter)?
+                else {
+                    available = false;
+                    continue;
+                };
+                for surface in effective.eligible_surfaces() {
+                    surfaces
+                        .insert(Surface::new(surface).map_err(|_| StorageError::InvalidAnalysis)?);
+                }
+            }
+            let mut counts = WordStatusCounts::default();
+            if available {
+                for surface in surfaces {
+                    let Some(entry) = read_entry_by_surface(&transaction, &surface)? else {
+                        continue;
+                    };
+                    let count = match entry.status {
+                        VocabularyStatus::New => &mut counts.new,
+                        VocabularyStatus::Learning => &mut counts.learning,
+                        VocabularyStatus::Familiar => &mut counts.familiar,
+                        VocabularyStatus::Known => &mut counts.known,
+                        VocabularyStatus::Ignored => &mut counts.ignored,
+                    };
+                    *count = count
+                        .checked_add(1)
+                        .ok_or(StorageError::InvalidVocabulary)?;
+                }
+            }
+            distributions.push(LibraryWordDistribution {
+                document_id: DocumentId::try_from(id).map_err(|_| StorageError::InvalidDocument)?,
+                counts: available.then_some(counts),
+            });
+        }
+        transaction.commit()?;
+        Ok(distributions)
+    }
+
     /// One SQLite statement/snapshot for every live document and global status.
     /// Deduplicate exact spellings across repetitions and chapters before joining
     /// vocabulary. Do not analyze, register missing entries or read source/assets.

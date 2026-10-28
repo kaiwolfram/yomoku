@@ -5193,3 +5193,46 @@ independent of this lazy token query. Counts match the current original-B reader
 adopt effective membership with the coordinated live-reader switch before exposing
 boundary controls. Library scan performance, separate Full-loader matrix, release,
 process-death and physical arm64 were not measured/rerun here.
+
+## Effective Library membership storage
+
+2026-10-28, repository root, pinned offline Rust:
+
+```sh
+export PATH=/home/kai/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin:$PATH
+cargo test -p yomoku-storage library_words --all-features --locked --offline
+cargo test --workspace --all-features --locked --offline --quiet
+python3 tools/verify-sudachi-source.py
+export YOMOKU_SUDACHI_DICTIONARY=/home/kai/repos/yomoku/.local/sudachi/full-20261015/system_full.dic
+for loader in owned mapped; do
+    YOMOKU_SUDACHI_STORAGE="$loader" cargo test -p yomoku-analysis --test full_dictionary real_segmentation_choices_resolve_scopes_merges_and_reversal_without_replacing_b --locked --offline -- --ignored
+done
+cargo clippy --workspace --all-targets --all-features --locked --offline -- -D warnings
+cargo fmt --all -- --check
+git diff --check
+```
+
+PASS: seven new SQLite cases (11 Library storage cases total), 652 workspace Rust
+tests (17 opt-in ignored), strict Clippy/Rustfmt/diff checks. The existing real
+Full A/B/C segmentation fixture now checks effective Library counts against
+registered distinct reader surfaces; it passes separately with owned and mapped
+Full. Pinned Sudachi source/patch verification passes.
+
+Coverage includes split/merge/complete-B-boundary matching, global/local/newer
+precedence/reversal, exact same-profile classification and later-profile exclusion,
+literal supplementary/combining/inflected spelling, all five live statuses across
+connections, deleted/unregistered entries, Missing B versus zero, cross-chapter
+deduplication and global rules after origin deletion. Query-only/unchanged database
+bytes and preserved history/position/command rows verify no writes. Corrupt
+available analyses/rules/statuses fail closed. Damaged original EPUB/image BLOBs
+do not affect these canonical-text reads.
+
+Initial focused compilation caught a missing test import and two rusqlite iterator
+lifetimes; corrected before passing reruns. No remaining blocker. Logs:
+`/tmp/yomoku-effective-library-{tests,clippy,full-owned,full-mapped}.log`.
+
+No dependency, migration or wire-schema changes. Live Library/reader still use B;
+switch the existing FIFO call to `effective_library_word_distributions` with the
+coordinated core/FFI/Android reader adoption. APK/lint/device, host Kotlin/JNI,
+separate full-loader matrix, release/process-death/physical arm64 and real-book
+performance were not rerun/measured for this Rust storage slice.
