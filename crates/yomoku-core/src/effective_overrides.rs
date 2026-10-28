@@ -1,5 +1,6 @@
-//! Native boundary prompt snapshots. No storage I/O or shell serialization.
+//! Native boundary prompt snapshots and typed failures, without storage I/O.
 
+use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
 use crate::{
@@ -10,9 +11,11 @@ use crate::{
     vocabulary::Surface,
 };
 
-/// Native-only failures preserve the distinction between retryable I/O and a
+/// Typed failures preserve the distinction between retryable I/O and a
 /// retired prompt. A stale edit must never be automatically rebased/replayed.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
+#[repr(C)]
 pub enum EffectiveOverrideFailure {
     Storage(DocumentError),
     InvalidSelection,

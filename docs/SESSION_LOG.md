@@ -2467,3 +2467,19 @@
   architecture/data/decisions/payload/development; no dependency/migration/schema.
 - Next: coordinated live reader switch, Android override controls, real-book/device
   measurements. Android builds/device/lint/release/arm64 not rerun; no blocker.
+
+## 2026-10-28 — Compact boundary prompt contracts
+
+- Added compact prompt/action schemas and a pure guarded handler over the retained
+  override lifecycle. Full chapter/rule revision/retry payloads remain native.
+  Fresh prompt identities reject actions after same-page/span dismiss/reopen;
+  stored A/B/C, literal manual parts, both scopes/default All, winning reversal,
+  exact retries/Cancel and typed stale/reload state are ready for shell adoption.
+- PASS: six new pure cases; 611 Rust tests (17 ignored), strict Clippy/format,
+  extended actual SQLite/FIFO rollback/reopen/lost-success/reversal case, five state
+  and 15 action Kotlin fixtures, host JNI imports/cancellation/custom/100 handles,
+  byte-identical repeat generation and diff check. Fixed initial Facet repr errors.
+- Updated plan/handoff/architecture/data/decisions/payload/development. No dependency,
+  migration or live Android change. Coordinated live reader switch stays unchecked;
+  then wire compact override controls and measure real-book/device costs. Separate
+  Full matrix/APK/device/lint/release/arm64 not rerun; no blocker for this slice.

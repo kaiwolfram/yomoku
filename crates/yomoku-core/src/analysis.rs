@@ -1,13 +1,15 @@
 //! Validated analyzer output and reversible boundary edits, without tokenization or I/O.
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use crate::{
     document::{ChapterText, OverrideId, TextAnchor, TextOffset, TextRange},
     vocabulary::Surface,
 };
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize)]
+#[derive(Clone, Copy, Debug, Default, Deserialize, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
+#[repr(C)]
 pub enum SplitMode {
     A,
     #[default]
@@ -115,7 +117,9 @@ impl ChapterAnalysis {
     }
 }
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, Deserialize, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
+#[repr(C)]
 pub enum OverrideScope {
     #[default]
     AllOccurrences,

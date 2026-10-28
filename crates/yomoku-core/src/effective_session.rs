@@ -9,7 +9,11 @@ use std::sync::Arc;
 mod statuses;
 pub use statuses::{EffectiveStatusRequest, EffectiveStatusState};
 mod overrides;
-pub use overrides::{EffectiveOverrideProgress, EffectiveOverrideRequest, EffectiveOverrideState};
+pub use overrides::{
+    EffectiveBoundaryChoice, EffectiveOverrideAction, EffectiveOverrideIdentity,
+    EffectiveOverrideProgress, EffectiveOverridePrompt, EffectiveOverrideRequest,
+    EffectiveOverrideState, EffectiveReaderOverrideState, EffectiveWinningRule,
+};
 mod words;
 pub use words::{EffectiveReaderWordState, EffectiveWordDetails, EffectiveWordRequest};
 mod completions;

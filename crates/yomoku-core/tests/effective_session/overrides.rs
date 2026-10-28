@@ -7,7 +7,8 @@ use yomoku_core::{
         StoredBoundaryChoice,
     },
     effective_session::{
-        EffectiveOverrideProgress as Progress, EffectiveOverrideRequest, EffectivePageIdentity,
+        EffectiveOverrideAction as Shell, EffectiveOverrideProgress as Progress,
+        EffectiveOverrideRequest, EffectivePageIdentity,
     },
     effective_storage::{EffectiveStorageOperation as Op, EffectiveStorageResult as Output},
     storage::DocumentError,
@@ -40,6 +41,298 @@ fn loaded(manual: bool) -> (EffectiveReaderSession, EffectivePageIdentity, TextA
     assert!(session.accept(request, snapshot));
     let identity = session.page().unwrap().identity;
     (session, identity, anchor)
+}
+
+#[test]
+fn compact_prompt_projects_only_stored_choices_winning_rules_and_default_global_scope() {
+    let (mut session, page, anchor) = loaded(true);
+    let request = session
+        .handle_override_action(Shell::Open { page, anchor })
+        .unwrap();
+    let loading = session.override_view();
+    assert!(loading.busy && loading.pending && loading.prompt.is_none());
+    let expected = context(&request, true);
+    session
+        .finish_override_request(
+            &request,
+            Ok(Output::OverrideContextLoaded(Arc::clone(&expected))),
+        )
+        .unwrap();
+    let view = session.override_view();
+    let prompt = view.prompt.unwrap();
+    assert_eq!(view.identity, Some(prompt.identity));
+    assert_eq!(prompt.identity.page, page);
+    assert_eq!(prompt.anchor, anchor); // full crossing span, not clipped to page
+    assert!(anchor.range.end > page.base.page.range.end);
+    assert_eq!(prompt.surface, "猫犬");
+    assert_eq!(prompt.default_scope, OverrideScope::AllOccurrences);
+    assert_eq!(
+        prompt
+            .choices
+            .iter()
+            .map(|choice| choice.mode)
+            .collect::<Vec<_>>(),
+        vec![SplitMode::A, SplitMode::B]
+    );
+    assert_eq!(prompt.choices[0].parts, vec!["猫", "犬"]);
+    assert_eq!(prompt.winning_rules.len(), 1);
+    let rule = &prompt.winning_rules[0];
+    assert_eq!(rule.id, expected.rules()[0].id);
+    assert_eq!(rule.scope, OverrideScope::AllOccurrences);
+    assert_eq!(rule.surface, "猫犬");
+    assert_eq!(rule.parts, vec!["猫", "犬"]);
+    assert!(!view.busy && !view.pending && view.error.is_none() && !view.reload_required);
+}
+
+#[test]
+fn reopened_same_page_prompt_rejects_old_choices_manual_generation_reversal_and_dismissal() {
+    let (mut session, page, anchor) = loaded(true);
+    prompt(&mut session, page, anchor, true);
+    let old = session.override_view().identity.unwrap();
+    session.handle_override_action(Shell::Dismiss { identity: old });
+    assert!(session.override_view().prompt.is_none());
+    prompt(&mut session, page, anchor, true);
+    let view = session.override_view();
+    let fresh = view.identity.unwrap();
+    assert_eq!(old.page, fresh.page);
+    assert!(fresh.revision > old.revision);
+    for action in [
+        Shell::Choose {
+            identity: old,
+            mode: SplitMode::A,
+            scope: OverrideScope::default(),
+            registered_at_unix_ms: 100,
+        },
+        Shell::Save {
+            identity: old,
+            scope: OverrideScope::ThisOccurrence,
+            parts: vec!["猫".into(), "犬".into()],
+            registered_at_unix_ms: 100,
+        },
+        Shell::Generate {
+            identity: old,
+            mode: SplitMode::C,
+        },
+        Shell::Reverse {
+            identity: old,
+            id: 5.try_into().unwrap(),
+        },
+        Shell::Retry { identity: old },
+        Shell::Cancel { identity: old },
+        Shell::Dismiss { identity: old },
+    ] {
+        assert!(session.handle_override_action(action).is_none());
+        assert_eq!(session.override_view(), view);
+    }
+    let request = session
+        .handle_override_action(Shell::Choose {
+            identity: fresh,
+            mode: SplitMode::A,
+            scope: OverrideScope::ThisOccurrence,
+            registered_at_unix_ms: 123,
+        })
+        .unwrap();
+    assert!(
+        matches!(request.operation(), Op::SaveOverride { scope: OverrideScope::ThisOccurrence, registered_at_unix_ms: 123, parts: ref p, .. } if p == &parts(&["猫", "犬"]))
+    );
+    assert!(session.override_view().prompt.is_none());
+    assert!(session.page().is_none());
+}
+
+#[test]
+fn shell_manual_parts_are_literal_validated_and_retry_cancel_authenticate_the_accepted_prompt() {
+    let (mut session, page, anchor) = loaded(false);
+    prompt(&mut session, page, anchor, false);
+    let identity = session.override_view().identity.unwrap();
+    for values in [
+        vec![],
+        vec![""],
+        vec![" "],
+        vec!["犬", "猫"],
+        vec!["猫", "犬 "],
+    ] {
+        assert!(session
+            .handle_override_action(Shell::Save {
+                identity,
+                scope: OverrideScope::default(),
+                parts: values.into_iter().map(str::to_owned).collect(),
+                registered_at_unix_ms: 123,
+            })
+            .is_none());
+        assert!(!session.override_view().pending);
+        assert!(session.override_view().prompt.is_some());
+    }
+    let request = session
+        .handle_override_action(Shell::Save {
+            identity,
+            scope: OverrideScope::AllOccurrences,
+            parts: vec!["猫".into(), "犬".into()],
+            registered_at_unix_ms: 123,
+        })
+        .unwrap();
+    session.handle_override_action(Shell::Cancel { identity });
+    assert!(session.override_view().busy); // in-flight writes cannot be abandoned
+    session
+        .finish_override_request(&request, Err(DocumentError::Unavailable))
+        .unwrap();
+    let failed = session.override_view();
+    assert_eq!(failed.identity, Some(identity));
+    assert_eq!(
+        failed.error,
+        Some(Failure::Storage(DocumentError::Unavailable))
+    );
+    assert!(failed.pending && !failed.busy && failed.prompt.is_none());
+    let mut foreign = identity;
+    foreign.revision += 1;
+    for action in [
+        Shell::Retry { identity: foreign },
+        Shell::Cancel { identity: foreign },
+    ] {
+        assert!(session.handle_override_action(action).is_none());
+        assert_eq!(session.override_view(), failed);
+    }
+    let retry = session
+        .handle_override_action(Shell::Retry { identity })
+        .unwrap();
+    assert_ne!(retry, request);
+    assert_eq!(retry.operation(), request.operation());
+    session
+        .finish_override_request(&retry, Err(DocumentError::Unavailable))
+        .unwrap();
+    session.handle_override_action(Shell::Cancel { identity });
+    let canceled = session.override_view();
+    assert!(canceled.reload_required);
+    assert!(!canceled.pending && !canceled.busy);
+    assert!(canceled.identity.is_none() && canceled.prompt.is_none() && canceled.error.is_none());
+}
+
+#[test]
+fn compact_generation_reversal_and_stale_results_preserve_native_reload_semantics() {
+    for generate in [false, true] {
+        let (mut session, page, anchor) = loaded(true);
+        prompt(&mut session, page, anchor, true);
+        let identity = session.override_view().identity.unwrap();
+        let action = if generate {
+            Shell::Generate {
+                identity,
+                mode: SplitMode::C,
+            }
+        } else {
+            Shell::Reverse {
+                identity,
+                id: 5.try_into().unwrap(),
+            }
+        };
+        let request = session.handle_override_action(action).unwrap();
+        assert!(session.override_view().prompt.is_none());
+        let result = if generate {
+            Output::OverrideAnalysisStored(SplitMode::C)
+        } else {
+            Output::OverrideReversed(5.try_into().unwrap())
+        };
+        session
+            .finish_override_request(&request, Ok(result))
+            .unwrap();
+        let done = session.override_view();
+        assert!(done.reload_required && !done.pending && done.prompt.is_none());
+        assert!(session
+            .handle_override_action(Shell::Retry { identity })
+            .is_none());
+    }
+    let (mut session, page, anchor) = loaded(false);
+    prompt(&mut session, page, anchor, false);
+    let identity = session.override_view().identity.unwrap();
+    let request = session
+        .handle_override_action(Shell::Generate {
+            identity,
+            mode: SplitMode::C,
+        })
+        .unwrap();
+    session
+        .finish_override_request(&request, Ok(Output::OverrideFailed(Failure::StaleContext)))
+        .unwrap();
+    let stale = session.override_view();
+    assert!(stale.reload_required && !stale.pending && stale.identity.is_none());
+    assert_eq!(stale.error, Some(Failure::StaleContext));
+    assert!(session
+        .handle_override_action(Shell::Retry { identity })
+        .is_none());
+}
+
+#[test]
+fn compact_dismissed_reads_and_page_refreshes_cannot_restore_prompt_actions() {
+    let (mut session, page, anchor) = loaded(false);
+    let request = session
+        .handle_override_action(Shell::Open { page, anchor })
+        .unwrap();
+    let identity = session.override_view().identity.unwrap();
+    let context = context(&request, false);
+    session.handle_override_action(Shell::Dismiss { identity });
+    session
+        .finish_override_request(&request, Ok(Output::OverrideContextLoaded(context)))
+        .unwrap();
+    assert!(session.override_view().prompt.is_none());
+    assert!(session.override_view().identity.is_none());
+    prompt(&mut session, page, anchor, false);
+    let identity = session.override_view().identity.unwrap();
+    let snapshot = snapshot();
+    let load = session.begin_load(base(&snapshot)).unwrap();
+    assert!(session.accept(load, snapshot));
+    assert!(session.override_view().prompt.is_none());
+    assert!(session
+        .handle_override_action(Shell::Save {
+            identity,
+            scope: OverrideScope::default(),
+            parts: vec!["猫".into(), "犬".into()],
+            registered_at_unix_ms: 123
+        })
+        .is_none());
+}
+
+#[test]
+fn compact_manual_command_preserves_supplementary_combining_and_nul_parts_without_normalizing() {
+    let (mut session, page, _) = loaded(false);
+    let anchor = session.resolve(page).unwrap().segmentation.segments[0]
+        .boundary
+        .anchor;
+    let request = session
+        .handle_override_action(Shell::Open { page, anchor })
+        .unwrap();
+    let Op::LoadOverrideContext { command, .. } = request.operation() else {
+        unreachable!()
+    };
+    let context = Arc::new(EffectiveOverrideContext::from_snapshot(
+        command.shared_key(),
+        anchor,
+        Surface::new("𠮷か\u{3099}\0").unwrap(),
+        OverrideRuleRevision {
+            newest_id: 0,
+            inactive: 0,
+        },
+        vec![StoredBoundaryChoice {
+            mode: SplitMode::B,
+            parts: parts(&["𠮷か\u{3099}\0"]),
+        }],
+        vec![],
+    ));
+    session
+        .finish_override_request(&request, Ok(Output::OverrideContextLoaded(context)))
+        .unwrap();
+    let view = session.override_view();
+    let prompt = view.prompt.unwrap();
+    assert_eq!(prompt.surface, "𠮷か\u{3099}\0");
+    assert_eq!(prompt.choices[0].parts, vec!["𠮷か\u{3099}\0"]);
+    let request = session
+        .handle_override_action(Shell::Save {
+            identity: prompt.identity,
+            scope: prompt.default_scope,
+            parts: vec!["𠮷".into(), "か\u{3099}\0".into()],
+            registered_at_unix_ms: 123,
+        })
+        .unwrap();
+    assert!(
+        matches!(request.operation(), Op::SaveOverride { parts: ref p, .. } if p == &parts(&["𠮷", "か\u{3099}\0"]))
+    );
 }
 
 fn parts(values: &[&str]) -> Vec<Surface> {

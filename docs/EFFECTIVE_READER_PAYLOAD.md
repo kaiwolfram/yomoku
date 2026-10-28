@@ -156,3 +156,18 @@ New metadata can retire a full key even when boundaries stay identical. Acceptan
 therefore invalidates callbacks, success requires explicit reload, and a lost
 success never silently rebases a stale prompt. No shell schema/size change or live
 reader adoption. Real-book/JNI/device cost remains unmeasured.
+
+Compact override prompt/action schemas now accompany the native lifecycle.
+`EffectiveReaderOverrideState` contains only selected-span text/stored partitions,
+winning-rule display/reversal facts and pending/error/reload state. Full contexts,
+chapter resolutions, rule revisions and frozen retry payloads remain native.
+Each open gets a fresh prompt revision even on an unchanged page/span; subsequent
+actions authenticate it. Accepted write retry/Cancel retains that identity across
+invalidation, while callback attempts remain fresh.
+
+The available-B prompt identity encodes to **68 bytes**. Five presentation fixtures
+and all eight action variants round-trip through generated Rust/Kotlin codecs,
+including maximum revisions/IDs/timestamps, both scopes, A/B/C, literal
+supplementary/combining/NUL parts and distinct storage/invalid/stale failures.
+These are prototype standalone schemas, not live Event/ViewModel integration or
+JNI/device performance measurements. The live reader still uses original B.

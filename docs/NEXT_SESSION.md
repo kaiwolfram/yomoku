@@ -1,5 +1,5 @@
 # Resume here
-Updated: 2026-10-28. On-demand A/C prerequisite done; live switch next.
+Updated: 2026-10-28. Compact override contracts done; live switch next.
 ## Working
 - Pure Crux routes/Library/Settings; Render-only UI; FIFO SQLite/analysis; Library start.
 - Chapter-local UTF-8 position/whole-book percentage/five presets persist; reflow
@@ -28,15 +28,12 @@ Updated: 2026-10-28. On-demand A/C prerequisite done; live switch next.
   Only new final-book completion returns Library + 1.4s confetti. Images count no words.
 - TXT/SRT strict UTF-8/Shift-JIS preserve original bytes/filename/encoding/B and
   canonical Aozora ruby or SRT cues; exact duplicate's first interpretation wins.
-- Retained FileImports reads one mixed EPUB/TXT/SRT URI off main, routes literal
-  case-insensitive extensions; wildcard picker accepts generic MIME. TXT/SRT have
-  separate encoding/Skip/errors; EPUB none. Filename/X-of-N/progress/summary survive
-  recreation/background. No persisted queue/process restart.
+- Retained mixed FileImports reads off main by extension, accepts generic MIME;
+  TXT/SRT encoding/Skip/errors and progress survive recreation. No restart queue.
 - Direct off-main cancelFileImport bypasses FIFO; COMMIT may wait. Silent full-file
   rollback; winning/prior commits stay. Android ignores late reads and awaits BOTH
   native return + outcome before clearing/draining. Dedicated cancellation executor.
-- dataSync lease tracks name/counts; encoding/timeout release, timeout Cancels.
-  OS limits apply; permission never blocks; notification opens Library.
+- dataSync lease/timeout Cancel; OS limits apply; permission never blocks imports.
 - Bounded EPUB parser ignores CSS; migration 0014 atomically saves original source,
   ordered content/formatting/ruby/images/B/registration. Snapshot loads verify all
   source/assets without parsing; large-book costs remain unmeasured.
@@ -49,7 +46,7 @@ Updated: 2026-10-28. On-demand A/C prerequisite done; live switch next.
   16 MiB shared page pixels; repeats share bitmaps. Ratio frames <=8192px preserve
   U+FFFC positions/styles/word/link identity; unsupported images keep alt/Retry.
 - Viewer: 1–8x zoom/pan; no completion. Covers: 4 MiB/64-entry LRU.
-- Noto Serif JP/credits; font/spacing (16sp/150%)/furigana persist (0015/16).
+- Noto Serif JP/credits; typography/furigana persist (0015/16).
 - Custom entries (0017): exact-surface CRUD core/FIFO/FFI/Android; frozen selections,
   built-in gates, literal drafts/Cancel/retries; no history/status writes.
 - Furigana: persisted switch/retries, source-first/B fallback independent of status;
@@ -69,12 +66,15 @@ Updated: 2026-10-28. On-demand A/C prerequisite done; live switch next.
   gates; stale/lost success requires explicit reload. Rollbacks retry.
 - Explicit A/C uses the FIFO/import analyzer cache, whole chapter/original profile;
   stored reuse skips Full. Rechecks key/revision at commit; metadata requires reload.
+- Compact override prompt/actions: fresh same-page prompt identities; default All,
+  literal choices/reverse/retry/Cancel guards; generated Kotlin codecs. Not live.
 ## Next tasks (ordered)
 1. Switch live core/FFI/Android completion/token/status/furigana/word/custom together
    via effective_storage + retained requests; see EFFECTIVE_READER_PAYLOAD.md.
-2. Add compact Android A/B/C/manual + All/This occurrence and winning-rule reversal.
+2. Wire compact override actions/state to Android A/B/C/manual + All/This/reversal.
 3. Measure real-book/JNI/device cost, including whole-chapter on-demand generation.
 Physical arm64 deferred; Nostr empty; Q188 unresolved before forwarding.
 ## Verification
-- PASS: 605 Rust (17 ignored); Clippy/fmt/diff; Full + JNI (DEVELOPMENT.md end).
-- No shell schema changes. APK/device/lint/release/arm64 not rerun.
+- PASS: 611 Rust (17 ignored); Clippy/fmt/diff; Kotlin/JNI + repeat codegen.
+- Commands/logs: DEVELOPMENT.md end. Standalone prompt schemas; live reader uses B.
+- Full matrix/APK/device/lint/release/arm64 not rerun; no blocker.

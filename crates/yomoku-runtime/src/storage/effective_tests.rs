@@ -303,7 +303,9 @@ fn finish_word(
 fn effective_worker_retained_override_failure_reopen_lost_success_requires_explicit_reload() {
     use yomoku_core::{
         effective_overrides::EffectiveOverrideFailure as Failure,
-        effective_session::EffectiveOverrideProgress as Progress,
+        effective_session::{
+            EffectiveOverrideAction as Shell, EffectiveOverrideProgress as Progress,
+        },
     };
     let fixture = Fixture::new();
     let mut storage = fixture.storage();
@@ -345,7 +347,12 @@ fn effective_worker_retained_override_failure_reopen_lost_success_requires_expli
         .find(|token| token.surface == "𠮷か\u{3099}\0")
         .unwrap()
         .anchor;
-    let request = session.begin_override_load(identity, anchor).unwrap();
+    let request = session
+        .handle_override_action(Shell::Open {
+            page: identity,
+            anchor,
+        })
+        .unwrap();
     let before = std::fs::read(fixture.path()).unwrap();
     let StorageResult::Effective(output @ Output::OverrideContextLoaded(_)) =
         run(&router, request.operation())
@@ -367,14 +374,14 @@ fn effective_worker_retained_override_failure_reopen_lost_success_requires_expli
             .collect::<Vec<_>>(),
         [SplitMode::A, SplitMode::B, SplitMode::C]
     );
+    let prompt_identity = session.override_view().identity.unwrap();
     let request = session
-        .begin_override_save(
-            OverrideScope::ThisOccurrence,
-            ["𠮷", "か\u{3099}\0"]
-                .map(|value| Surface::new(value).unwrap())
-                .into(),
-            600,
-        )
+        .handle_override_action(Shell::Save {
+            identity: prompt_identity,
+            scope: OverrideScope::ThisOccurrence,
+            parts: vec!["𠮷".into(), "か\u{3099}\0".into()],
+            registered_at_unix_ms: 600,
+        })
         .unwrap();
     fixture.sql().execute_batch("CREATE TRIGGER fail_override BEFORE INSERT ON segmentation_overrides BEGIN SELECT RAISE(ABORT, 'injected failure'); END;").unwrap();
     let before = std::fs::read(fixture.path()).unwrap();
@@ -395,7 +402,11 @@ fn effective_worker_retained_override_failure_reopen_lost_success_requires_expli
         .unwrap();
     drop(router);
     let router = fixture.override_router();
-    let retry = session.retry_override_write().unwrap();
+    let retry = session
+        .handle_override_action(Shell::Retry {
+            identity: prompt_identity,
+        })
+        .unwrap();
     assert_eq!(retry.operation(), request.operation());
     let StorageResult::Effective(Output::OverrideSaved { id, registered }) =
         run(&router, retry.operation())
@@ -412,7 +423,11 @@ fn effective_worker_retained_override_failure_reopen_lost_success_requires_expli
         .sql()
         .execute("DELETE FROM vocabulary WHERE surface = ?1", ["𠮷"])
         .unwrap();
-    let retry = session.retry_override_write().unwrap();
+    let retry = session
+        .handle_override_action(Shell::Retry {
+            identity: prompt_identity,
+        })
+        .unwrap();
     let before = std::fs::read(fixture.path()).unwrap();
     let StorageResult::Effective(output) = run(&router, retry.operation()) else {
         panic!("stale")
@@ -434,14 +449,25 @@ fn effective_worker_retained_override_failure_reopen_lost_success_requires_expli
     );
     load(&router, &mut session, fixture.base);
     let read = session
-        .begin_override_load(session.page().unwrap().identity, anchor)
+        .handle_override_action(Shell::Open {
+            page: session.page().unwrap().identity,
+            anchor,
+        })
         .unwrap();
     let StorageResult::Effective(output) = run(&router, read.operation()) else {
         panic!("reload")
     };
     session.finish_override_request(&read, Ok(output)).unwrap();
     assert_eq!(session.override_context().unwrap().rules()[0].id, id);
-    let reverse = session.begin_override_reverse(id).unwrap();
+    let compact = session.override_view().prompt.unwrap();
+    assert_eq!(compact.winning_rules[0].id, id);
+    assert_eq!(compact.winning_rules[0].parts, vec!["𠮷", "か\u{3099}\0"]);
+    let reverse = session
+        .handle_override_action(Shell::Reverse {
+            identity: compact.identity,
+            id,
+        })
+        .unwrap();
     let StorageResult::Effective(output) = run(&router, reverse.operation()) else {
         panic!("reverse")
     };

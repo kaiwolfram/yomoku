@@ -1,5 +1,6 @@
-//! Retained boundary prompts and exact native edit requests. No shell codec.
+//! Compact boundary prompts backed by exact native edit requests.
 
+use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
 use super::{EffectivePageCommand, EffectivePageIdentity, EffectiveReaderSession};
@@ -11,6 +12,97 @@ use crate::{
     storage::DocumentError,
     vocabulary::Surface,
 };
+
+/// Session-scoped prompt identity. Reopening the same span on the same page
+/// issues a fresh revision, so a dismissed prompt cannot edit its replacement.
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
+pub struct EffectiveOverrideIdentity {
+    pub page: EffectivePageIdentity,
+    pub revision: u64,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
+pub struct EffectiveBoundaryChoice {
+    pub mode: SplitMode,
+    pub parts: Vec<String>,
+}
+
+/// Only winning rule facts needed for display/reversal. The originating source,
+/// full rule anchor and chapter resolution remain in the native before-image.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
+pub struct EffectiveWinningRule {
+    pub id: OverrideId,
+    pub scope: OverrideScope,
+    pub surface: String,
+    pub parts: Vec<String>,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
+pub struct EffectiveOverridePrompt {
+    pub identity: EffectiveOverrideIdentity,
+    pub anchor: TextAnchor,
+    pub surface: String,
+    pub choices: Vec<EffectiveBoundaryChoice>,
+    pub winning_rules: Vec<EffectiveWinningRule>,
+    pub default_scope: OverrideScope,
+}
+
+/// No full key, rule revision, retry payload or analyzer output crosses FFI.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
+pub struct EffectiveReaderOverrideState {
+    pub identity: Option<EffectiveOverrideIdentity>,
+    pub prompt: Option<EffectiveOverridePrompt>,
+    pub pending: bool,
+    pub busy: bool,
+    pub error: Option<Failure>,
+    pub reload_required: bool,
+}
+
+/// Prototype shell commands for coordinated live integration. Every command
+/// after Open authenticates the exact retained prompt, including retry/Cancel.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
+#[repr(C)]
+pub enum EffectiveOverrideAction {
+    Open {
+        page: EffectivePageIdentity,
+        anchor: TextAnchor,
+    },
+    Choose {
+        identity: EffectiveOverrideIdentity,
+        mode: SplitMode,
+        scope: OverrideScope,
+        registered_at_unix_ms: i64,
+    },
+    Save {
+        identity: EffectiveOverrideIdentity,
+        scope: OverrideScope,
+        parts: Vec<String>,
+        registered_at_unix_ms: i64,
+    },
+    Generate {
+        identity: EffectiveOverrideIdentity,
+        mode: SplitMode,
+    },
+    Reverse {
+        identity: EffectiveOverrideIdentity,
+        id: OverrideId,
+    },
+    Retry {
+        identity: EffectiveOverrideIdentity,
+    },
+    Cancel {
+        identity: EffectiveOverrideIdentity,
+    },
+    Dismiss {
+        identity: EffectiveOverrideIdentity,
+    },
+}
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 enum Action {
@@ -45,6 +137,7 @@ impl Action {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct EffectiveOverrideRequest {
     attempt: u64,
+    identity: EffectiveOverrideIdentity,
     action: Action,
 }
 
@@ -99,8 +192,8 @@ pub enum EffectiveOverrideProgress {
 #[derive(Default)]
 pub(super) struct OverrideState {
     attempt: u64,
-    prompt: Option<(EffectivePageIdentity, TextAnchor)>,
-    context: Option<(EffectivePageIdentity, Arc<EffectiveOverrideContext>)>,
+    prompt: Option<(EffectiveOverrideIdentity, TextAnchor)>,
+    context: Option<(EffectiveOverrideIdentity, Arc<EffectiveOverrideContext>)>,
     pending: Option<EffectiveOverrideRequest>,
     in_flight: bool,
     error: Option<Failure>,
@@ -114,6 +207,143 @@ impl OverrideState {
 }
 
 impl EffectiveReaderSession {
+    pub fn override_view(&self) -> EffectiveReaderOverrideState {
+        let state = self.override_state();
+        let prompt = self
+            .overrides
+            .context
+            .as_ref()
+            .and_then(|(identity, context)| {
+                self.resolve(identity.page)?;
+                Some(EffectiveOverridePrompt {
+                    identity: *identity,
+                    anchor: context.anchor(),
+                    surface: context.surface().as_str().to_owned(),
+                    choices: context
+                        .choices()
+                        .iter()
+                        .map(|choice| EffectiveBoundaryChoice {
+                            mode: choice.mode,
+                            parts: choice
+                                .parts
+                                .iter()
+                                .map(|part| part.as_str().to_owned())
+                                .collect(),
+                        })
+                        .collect(),
+                    winning_rules: context
+                        .rules()
+                        .iter()
+                        .filter(|rule| rule.active)
+                        .map(|rule| EffectiveWinningRule {
+                            id: rule.id,
+                            scope: rule.edit.scope,
+                            surface: rule.edit.surface.as_str().to_owned(),
+                            parts: rule
+                                .edit
+                                .parts
+                                .iter()
+                                .map(|part| part.as_str().to_owned())
+                                .collect(),
+                        })
+                        .collect(),
+                    default_scope: OverrideScope::default(),
+                })
+            });
+        EffectiveReaderOverrideState {
+            identity: self
+                .overrides
+                .prompt
+                .map(|(identity, _)| identity)
+                .or_else(|| {
+                    self.overrides
+                        .pending
+                        .as_ref()
+                        .map(|request| request.identity)
+                }),
+            prompt,
+            pending: state.pending,
+            busy: state.busy,
+            error: state.error,
+            reload_required: state.reload_required,
+        }
+    }
+
+    /// Returns accepted native work to dispatch; Dismiss/Cancel only change state.
+    /// The live app must also apply its FIFO/time/lifecycle gates before calling.
+    pub fn handle_override_action(
+        &mut self,
+        action: EffectiveOverrideAction,
+    ) -> Option<EffectiveOverrideRequest> {
+        use EffectiveOverrideAction as Shell;
+        match action {
+            Shell::Open { page, anchor } => self.begin_override_load(page, anchor),
+            Shell::Choose {
+                identity,
+                mode,
+                scope,
+                registered_at_unix_ms,
+            } if self.matches_override_prompt(identity) => {
+                self.begin_override_choice(mode, scope, registered_at_unix_ms)
+            }
+            Shell::Save {
+                identity,
+                scope,
+                parts,
+                registered_at_unix_ms,
+            } if self.matches_override_prompt(identity) => {
+                let parts = parts
+                    .into_iter()
+                    .map(Surface::new)
+                    .collect::<Result<Vec<_>, _>>()
+                    .ok()?;
+                self.begin_override_save(scope, parts, registered_at_unix_ms)
+            }
+            Shell::Generate { identity, mode } if self.matches_override_prompt(identity) => {
+                self.begin_override_analysis(mode)
+            }
+            Shell::Reverse { identity, id } if self.matches_override_prompt(identity) => {
+                self.begin_override_reverse(id)
+            }
+            Shell::Retry { identity }
+                if self
+                    .overrides
+                    .pending
+                    .as_ref()
+                    .is_some_and(|request| request.identity == identity) =>
+            {
+                self.retry_override_write()
+            }
+            Shell::Cancel { identity }
+                if self
+                    .overrides
+                    .pending
+                    .as_ref()
+                    .is_some_and(|request| request.identity == identity) =>
+            {
+                self.cancel_override_retry();
+                None
+            }
+            Shell::Dismiss { identity }
+                if self
+                    .overrides
+                    .prompt
+                    .is_some_and(|(current, _)| current == identity) =>
+            {
+                self.dismiss_override();
+                None
+            }
+            _ => None,
+        }
+    }
+
+    fn matches_override_prompt(&self, identity: EffectiveOverrideIdentity) -> bool {
+        self.overrides
+            .context
+            .as_ref()
+            .is_some_and(|(current, _)| *current == identity)
+    }
+
     pub fn override_state(&self) -> EffectiveOverrideState {
         EffectiveOverrideState {
             pending: self.overrides.pending.is_some(),
@@ -123,7 +353,7 @@ impl EffectiveReaderSession {
         }
     }
 
-    /// Native-only full context; a future shell view must compact choices/rules.
+    /// Native-only full context. Use override_view for shell presentation.
     pub fn override_context(&self) -> Option<&EffectiveOverrideContext> {
         self.overrides
             .context
@@ -157,7 +387,11 @@ impl EffectiveReaderSession {
         {
             return None;
         }
-        let request = self.start_override(Action::Load { command, anchor })?;
+        let identity = EffectiveOverrideIdentity {
+            page: identity,
+            revision: self.overrides.attempt.checked_add(1)?,
+        };
+        let request = self.start_override(identity, Action::Load { command, anchor })?;
         self.dismiss_override();
         self.overrides.prompt = Some((identity, anchor));
         self.overrides.reload_required = false;
@@ -188,7 +422,8 @@ impl EffectiveReaderSession {
         if mode == SplitMode::B || context.choices().iter().any(|choice| choice.mode == mode) {
             return None;
         }
-        let request = self.start_override(Action::Generate { context, mode })?;
+        let identity = self.overrides.context.as_ref()?.0;
+        let request = self.start_override(identity, Action::Generate { context, mode })?;
         self.invalidate();
         Some(request)
     }
@@ -213,12 +448,16 @@ impl EffectiveReaderSession {
         }
         .validate_shape()
         .ok()?;
-        let request = self.start_override(Action::Save {
-            context,
-            scope,
-            parts,
-            registered_at_unix_ms,
-        })?;
+        let identity = self.overrides.context.as_ref()?.0;
+        let request = self.start_override(
+            identity,
+            Action::Save {
+                context,
+                scope,
+                parts,
+                registered_at_unix_ms,
+            },
+        )?;
         self.invalidate();
         Some(request)
     }
@@ -229,7 +468,8 @@ impl EffectiveReaderSession {
             .rules()
             .iter()
             .find(|rule| rule.id == id && rule.active)?;
-        let request = self.start_override(Action::Reverse { context, id })?;
+        let identity = self.overrides.context.as_ref()?.0;
+        let request = self.start_override(identity, Action::Reverse { context, id })?;
         self.invalidate();
         Some(request)
     }
@@ -240,11 +480,13 @@ impl EffectiveReaderSession {
         if self.overrides.in_flight || !self.override_work_allowed() {
             return None;
         }
-        let action = self.overrides.pending.as_ref()?.action.clone();
+        let pending = self.overrides.pending.as_ref()?;
+        let identity = pending.identity;
+        let action = pending.action.clone();
         if !action.is_write() {
             return None;
         }
-        self.start_override(action)
+        self.start_override(identity, action)
     }
 
     pub fn cancel_override_retry(&mut self) -> bool {
@@ -271,10 +513,10 @@ impl EffectiveReaderSession {
             (Action::Load { command, anchor }, Ok(Output::OverrideContextLoaded(context)))
                 if context.key() == command.key() && context.anchor() == *anchor =>
             {
-                if self.overrides.prompt == Some((command.identity(), *anchor))
+                if self.overrides.prompt == Some((request.identity, *anchor))
                     && self.resolve(command.identity()).is_some()
                 {
-                    self.overrides.context = Some((command.identity(), context));
+                    self.overrides.context = Some((request.identity, context));
                 }
                 Ok(EffectiveOverrideProgress::Loaded)
             }
@@ -338,12 +580,20 @@ impl EffectiveReaderSession {
             return None;
         }
         let (identity, context) = self.overrides.context.as_ref()?;
-        (self.resolve(*identity) == Some(context.key())).then(|| Arc::clone(context))
+        (self.resolve(identity.page) == Some(context.key())).then(|| Arc::clone(context))
     }
 
-    fn start_override(&mut self, action: Action) -> Option<EffectiveOverrideRequest> {
+    fn start_override(
+        &mut self,
+        identity: EffectiveOverrideIdentity,
+        action: Action,
+    ) -> Option<EffectiveOverrideRequest> {
         let attempt = self.overrides.attempt.checked_add(1)?;
-        let request = EffectiveOverrideRequest { attempt, action };
+        let request = EffectiveOverrideRequest {
+            attempt,
+            identity,
+            action,
+        };
         self.overrides.attempt = attempt;
         self.overrides.pending = Some(request.clone());
         self.overrides.in_flight = true;

@@ -6,7 +6,8 @@ use crux_core::type_generation::facet::{Config, Export, TypeRegistry};
 use yomoku_core::app::{Event, ViewModel};
 use yomoku_core::document::{ChapterText, DocumentId, TextAnchor};
 use yomoku_core::effective_session::{
-    EffectiveReaderPage, EffectiveReaderSelection, EffectiveReaderWordState,
+    EffectiveOverrideAction, EffectiveReaderOverrideState, EffectiveReaderPage,
+    EffectiveReaderSelection, EffectiveReaderWordState,
 };
 use yomoku_runtime::ShellEffect;
 
@@ -33,6 +34,8 @@ fn main() -> Result<(), Box<dyn Error>> {
         .register_type::<EffectiveReaderPage>()?
         .register_type::<EffectiveReaderSelection>()?
         .register_type::<EffectiveReaderWordState>()?
+        .register_type::<EffectiveReaderOverrideState>()?
+        .register_type::<EffectiveOverrideAction>()?
         .build()?
         .kotlin(&Config::builder("app.yomoku.shared", output).build())?;
     Ok(())

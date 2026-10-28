@@ -19,6 +19,7 @@ import java.io.File
 // document path will be exercised when real document commands are implemented.
 fun verifyTextBoundaries(directory: String) {
     val dir = File(directory)
+    verifyEffectiveOverrideCodecs(dir)
     val document = DocumentId.bincodeDeserialize(File(dir, "document.bin").readBytes())
     check(document.value == Long.MAX_VALUE)
     File(dir, "document-return.bin").writeBytes(document.bincodeSerialize())

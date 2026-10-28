@@ -1419,3 +1419,11 @@ storage can resolve previously unknown metadata without changing boundaries, so
 the retained core requires explicit page/context reload. History, frozen completion
 reservations, pending time, progress, rules and vocabulary remain intact. There is
 no registration/rescan or automatic restart replay.
+
+Compact override prompt/action codecs now expose selected-span choices and winning
+rule display facts without serializing the context's full chapter or rule-table
+revision. A session-only prompt revision plus compact page identity authenticates
+actions, including same-span reopen and frozen retry/Cancel. These values never
+enter SQLite or replace transaction-local provenance/rule validation. No migration,
+history rewrite, new durable command or automatic replay; live Android adoption
+remains pending.

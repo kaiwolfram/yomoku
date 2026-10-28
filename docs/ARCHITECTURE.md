@@ -1156,10 +1156,10 @@ FIFO/SQLite connection without analyzer or word-dictionary loading. Typed native
 failures distinguish storage errors from invalid selections/stale contexts; no
 shell error enum changes. Pending override I/O/failed writes mutually gate retained
 word/custom/status/completion requests. The live app must also apply its time/FIFO/
-lifecycle gates. There is no new migration, dependency, worker, public shell schema
-or Android behavior. Contexts are database/session scoped and must be discarded on
-replacement/restore. Compact shell choices and Android controls remain pending
-alongside the coordinated live reader switch.
+lifecycle gates. Contexts are database/session scoped and must be discarded on
+replacement/restore. Full contexts and requests have no shell codec. Compact
+prototype contracts are described below; live Android controls remain pending
+alongside the coordinated reader switch.
 
 Explicit `GenerateOverrideAnalysis` uses the same FIFO-owned analyzer cache as
 imports. Its retained request freezes mode plus the shared context and gets a fresh
@@ -1179,3 +1179,19 @@ page callbacks and success requires explicit page/context reload. Failed attempt
 retain their before-image for explicit retry/Cancel; a lost success that changes
 metadata becomes stale. Stored but unaligned alternates remain absent from prompt
 choices and are never regenerated. No new migration or public shell codec.
+
+`EffectiveReaderOverrideState` now projects only the selected literal span, stored
+A/B/C partitions, winning-rule IDs/scopes/parts, default All occurrences and typed
+pending/error/reload facts. Full chapter resolution, rule revision, originating
+rule anchors and retry payloads stay native. `EffectiveOverrideAction` supplies
+Open/Choose/manual Save/Generate/Reverse/Retry/Cancel/Dismiss. Its pure handler
+authenticates prompt identity before delegating to the existing retained lifecycle;
+the live app must still enforce shared time/FIFO/lifecycle gates.
+
+Each opened prompt receives a checked fresh revision alongside its compact page
+identity. Dismiss/reopen of the same span on the same retained page therefore
+rejects old actions. Accepted writes retain that identity across invalidation and
+exact retries; new callback attempts remain separate. Retry/Cancel authenticate
+the accepted obligation, and in-flight writes still drain. Generated Kotlin
+round trips exercise these standalone schemas; no live Event/ViewModel or Android
+flow uses them yet. No migration, dependency or durable prompt registry.

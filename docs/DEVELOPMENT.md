@@ -4846,3 +4846,50 @@ No dependency, migration, public shell schema or Android source change. Native
 analyzer mode capability is ready; coordinated live reader adoption and Android
 controls remain next. APK/device/Android lint/release/performance/process-death/
 physical arm64 were not rerun. No blocker.
+
+## Compact override prompt/action contracts
+
+2026-10-28, repository root, pinned offline Rust/JDK:
+
+```sh
+export PATH=/home/kai/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin:$PATH
+export JAVA_HOME=/home/kai/repos/yomoku/.local/jdk-17/jdk-17.0.21+9
+cargo test -p yomoku-core --test effective_session --all-features --locked --offline
+cargo test --workspace --all-features --locked --offline --quiet
+cargo clippy --workspace --all-targets --all-features --locked --offline -- -D warnings
+cargo fmt --all -- --check
+tools/format-kotlin.sh --check
+"$JAVA_HOME/bin/java" -jar .local/ktfmt-0.64.jar --kotlinlang-style --dry-run --set-exit-if-changed tests/kotlin/EffectiveOverrideCodecTest.kt
+tools/test-kotlin-bridge.sh
+cargo run -p yomoku-ffi --bin generate-kotlin --features facet_typegen --locked --offline -- target/generated/kotlin-repeat
+# Compare after generation exits.
+diff -r target/generated/kotlin target/generated/kotlin-repeat
+git diff --check
+```
+
+PASS: six new pure cases; 611 workspace Rust tests (17 opt-in ignored), strict
+Clippy, Rustfmt and Kotlin formatting. The existing actual SQLite/FIFO case now
+uses compact commands for literal manual save, injected rollback, exact retry after
+reopen, lost success/stale rejection and winning-rule reversal, preserving all
+reading/time/position data and deleted vocabulary.
+
+Five presentation fixtures and all eight action variants (15 action fixtures)
+round-trip Rust→generated Kotlin→Rust. They verify default All/both scopes,
+A/B/C, winning rule IDs/parts, distinct storage/invalid/stale failures, maximum
+revisions/IDs/timestamps and literal supplementary/combining/NUL parts. Prompt
+identity is 68 B with available B; no full context or chapter crosses the codec.
+Fresh prompt revisions reject same-page/span dismissed actions; exact write retries
+keep accepted identity and fresh native callback attempts. In-flight Cancel rejects.
+
+Host Kotlin/JNI also passes real-Full TXT/SRT/EPUB import/direct cancellation,
+selected-word/custom CRUD, navigation/codecs, seven Unicode cases and 100 handle
+lifecycles. Repeat generation is byte-identical; diff check passes. Initial targeted
+compilation caught missing Facet enum representations; added explicit repr(C) before
+all passing reruns. Existing Crux middleware teardown/JDK messages are informational.
+Logs: `/tmp/yomoku-override-shell-{tests,clippy,bridge,format,codegen}.log`.
+
+Standalone schemas/handler only: live Event/ViewModel/Android still use original B.
+Next switch token/status/word/custom/completion/furigana together, then wire compact
+override controls. No dependency, migration or persistent-data change. Separate
+Full-loader matrix, APK/device/Android lint/release/performance/process-death/arm64
+were not rerun. No implementation blocker.

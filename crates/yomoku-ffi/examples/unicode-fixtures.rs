@@ -21,6 +21,9 @@ use yomoku_core::{
 };
 use yomoku_core::{pagination::ReadingPosition, reader::ReaderAnalysis};
 
+#[path = "unicode-fixtures/effective_overrides.rs"]
+mod effective_overrides;
+
 const CASES: &[(&str, &str)] = &[
     ("", ""),
     ("日本語の文章。", "日本語"),
@@ -207,6 +210,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         page: effective_page.identity,
         segment_index: u64::MAX,
     };
+    effective_overrides::exchange(dir, writing, effective_page.identity)?;
     let effective_word = EffectiveReaderWordState {
         selection: Some(effective_selection),
         details: Some(EffectiveWordDetails {

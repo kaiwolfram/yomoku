@@ -3205,3 +3205,23 @@ and requires explicit page/context reload on success. Failed requests permit exa
 retry or Cancel; stale contexts never rebase, including after lost success. Cache
 generation writes no overrides, vocabulary, encounters, progress or time; previously
 reserved completions retain their frozen unresolved/resolved meanings after reopen.
+
+## 2026-10-28 — Compact boundary prompt contracts and prompt revisions
+
+Project selected-span choices and winning-rule display/reversal facts into a
+standalone generated shell contract before Android controls. Keep the shared full
+key, rule-table revision, original rule anchors and exact retry payload in Rust.
+Reuse SplitMode/OverrideScope and the existing typed override failures; no new
+dependency, migration or change to live reader behavior.
+
+A page revision alone cannot reject a delayed action after dismiss/reopen of the
+same span without reloading the page. Give each prompt a checked fresh revision
+from the existing native attempt counter. Pair it with compact page identity;
+authenticate Choose/manual Save/Generate/Reverse/Dismiss against that prompt.
+Accepted writes retain its identity across invalidation, with Retry/Cancel scoped
+to the pending obligation and fresh native attempts on dispatch. No persisted
+handle/registry, automatic rebase or replay. Default scope remains All occurrences.
+
+Keep the coordinated live token/status/word/custom/completion/furigana switch
+unchecked. This slice supplies a testable prompt transport/handler contract; it
+does not expose controls that could edit boundaries while completion still uses B.
