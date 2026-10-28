@@ -70,6 +70,8 @@ class TxtPickerTest {
                     owner().fileImports.results.size == 1
             }
             val retained = owner().fileImports
+            // No lazy count scan may take the FIFO between a batch's files.
+            assertNull(owner().session.view.libraryWordDistributions)
             compose.onNodeWithText("Cancel").performClick()
             compose.waitUntil(30_000) { !retained.active }
             awaitIdle()

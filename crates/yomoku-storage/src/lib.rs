@@ -15,6 +15,7 @@ mod epub_assets;
 mod files;
 mod import_cancellation;
 mod imports;
+mod library_words;
 mod reader_documents;
 mod reader_tokens;
 pub mod reader_words;

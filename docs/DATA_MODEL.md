@@ -1462,3 +1462,29 @@ Title sorts Unicode-lowercased text ascending and breaks ties by descending ID.
 The selected `LibrarySort` and literal title query remain ephemeral core-session
 state; sort/search are pure projections over the full retained Library and do not
 write SQLite or load dictionaries. Fresh sessions default to Last read.
+
+## Library word distributions (read-only, no migration)
+
+`LibraryWordDistribution` carries a live document ID and optional `WordStatusCounts`
+(five unsigned counts in New/Learning/Familiar/Known/Ignored order). None means
+at least one chapter lacks original B; five zeros mean an analyzed document with
+no currently registered Japanese surfaces. The Library keeps these separately
+from title/progress/import summaries, avoiding analysis-token scans during exact
+duplicate preflight. No denormalized counts, membership table or persisted codec.
+
+`Storage::library_word_distributions` performs one consistent SQLite statement:
+pin the first B per chapter, deduplicate `(source_id, surface)` for Japanese tokens,
+then join exact live vocabulary spelling/status and aggregate across the whole
+document. Repetitions, alternate readings, and chapter boundaries cannot increase
+a spelling's contribution; inflections and literal Unicode spellings stay distinct.
+Deleted vocabulary joins nothing, never implicitly New or automatically recreated.
+Later B profiles and A/C are excluded, matching the live reader. Effective
+membership must switch with the reader before live override controls are added.
+
+The FIFO operation returns compact distributions to core. Imports, manual status/
+word observations, completion, refresh and return to Library invalidate its cache.
+Android requests missing counts only while visible and idle with no active file
+batch (including provider reads); failures preserve document/import errors and
+require explicit Retry. Search/sort/recreation reuse
+the retained snapshot. Neither this read nor rendering writes history, position,
+recency, status or vocabulary. Large-library scan cost remains unmeasured.

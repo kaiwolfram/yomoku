@@ -22,6 +22,8 @@ Yomoku is under active development. The working app supports:
 - Opening imported text in a centered, scrollable reader, with saved text
   positions and Library progress percentages.
 - Searching Library titles with a retained query and a clear action.
+- Library sorting by Last read, Title or Import date, with distinct-word status
+  bars that refresh after global status changes and page completion.
 - Bundled Noto Serif JP reader text, with regular/bold weights, EPUB emphasis
   and complete font attribution/license available offline in Settings.
 - Persisted global font size and line spacing, with unchanged logical pages and

@@ -1,10 +1,12 @@
 # Resume here
-Updated: 2026-10-28. Library search/sorts done; coordinated live switch next.
+Updated: 2026-10-28. Library search/sorts/status bars done; live switch next.
 ## Working
-- Pure Crux/Render-only UI; FIFO SQLite/analysis; Library start.
 - Library title-only search/Clear + Last read/Title/Import date; query/sort retained.
   Read order (0019) on explicit open only; newest unknown/unopened afterward.
   Pure sort/search; duplicates preserve recency, legacy history stays unknown.
+- Distinct registered-surface bars use original B, live statuses and one read-only
+  FIFO snapshot. Deleted entries stay absent; Missing/zero differ; explicit Retry.
+  Refresh on return/status/completion; batches defer scans. Switch membership with reader.
 - Chapter-local UTF-8 position/whole-book percentage/five presets persist; reflow
   preserves offsets. Scroll resets; 720dp column; controls below content; 48dp swipes.
   Previous only saves position; busy gates reject doubles; deliberate rereads count.
@@ -12,7 +14,6 @@ Updated: 2026-10-28. Library search/sorts done; coordinated live switch next.
   title/status/progress without Full/rescan/writes. Summary returns Library; no auto-open.
 - Loads are read-only; explicit finished-book open resets to page 1 atomically.
   Finish survives movement/time/reflow; deletion resets it, preserving history.
-- Ordered chapters/frozen B/Missing identities survive loads; Previous crosses chapters.
 - Token reads atomically load original B/live statuses/metadata + clipped UTF-8
   ranges; completion owns token start. Deleted IDs absent. Whole-chapter validation.
   Full page/base/result identities gate callbacks; movement/reflow/refresh invalidate.
@@ -35,7 +36,6 @@ Updated: 2026-10-28. Library search/sorts done; coordinated live switch next.
 - Direct off-main cancelFileImport bypasses FIFO; COMMIT may wait. Silent full-file
   rollback; winning/prior commits stay. Android ignores late reads and awaits BOTH
   native return + outcome before clearing/draining. Dedicated cancellation executor.
-- dataSync lease/timeout Cancel; OS limits apply; permission never blocks imports.
 - Bounded EPUB parser ignores CSS; migration 0014 atomically saves original source,
   ordered content/formatting/ruby/images/B/registration. Snapshot loads verify all
   source/assets without parsing; large-book costs remain unmeasured.
@@ -47,7 +47,6 @@ Updated: 2026-10-28. Library search/sorts done; coordinated live switch next.
 - Serial bounds-first decode: <=32768-edge/100 MP source, <=2048-edge sample,
   16 MiB shared page pixels; repeats share bitmaps. Ratio frames <=8192px preserve
   U+FFFC positions/styles/word/link identity; unsupported images keep alt/Retry.
-- Viewer: 1–8x zoom/pan. Covers: 4 MiB/64-entry LRU. Noto/typography/furigana (0015/16).
 - Custom entries (0017): exact-surface CRUD, frozen selections/built-in gates,
   literal drafts/Cancel/retries; no history/status writes.
 - Furigana: persisted switch/retries, source-first/B fallback independent of status;
@@ -70,11 +69,11 @@ Updated: 2026-10-28. Library search/sorts done; coordinated live switch next.
   effectiveDisplayTokens adapters ready (crossings/unresolved/source preference). Not live.
 - EffectiveReaderRequest.command/finish_request retains attempts/retries; stale results rejected.
 ## Next tasks (ordered)
-1. Switch live core/FFI/Android completion/token/status/furigana/word/custom together
+1. Switch live core/FFI/Android completion/token/status/furigana/word/custom + Library membership
    via retained requests/command/finish_request + render adapters; see EFFECTIVE_READER_PAYLOAD.md.
 2. Wire compact override actions/state to Android A/B/C/manual + All/This/reversal.
-3. Measure real-book/JNI/device cost, including whole-chapter on-demand generation.
+3. Measure real-book/JNI/device + Library scan cost, including on-demand whole chapters.
 Physical arm64 deferred; Nostr empty; Q188 unresolved before forwarding.
 ## Verification
-- PASS: 637 Rust (17 ignored), Clippy/fmt/diff, host JNI/repeat codegen, APKs/lint.
-- PASS: 7 phone + 2 wide/dark; commands/fixed issues: DEVELOPMENT.md end. Release/arm64 not rerun; no blocker.
+- PASS: 645 Rust (17 ignored), Clippy/fmt/diff, host JNI/repeat codegen, APKs/lint.
+- PASS: 8 phone + 1 wide/dark; commands/fixes: DEVELOPMENT.md end. No blocker; release/arm64 not rerun.

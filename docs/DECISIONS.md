@@ -3305,3 +3305,30 @@ date; no date is displayed, so do not invent/backfill wall timestamps. Title sor
 by locale-independent Unicode lowercasing without normalization, ascending, with
 newest import as a deterministic tie-breaker. The Android menu names the current
 choice. No dependency, destructive-data behavior or new reader interaction.
+
+## 2026-10-28 — Library distinct-surface status bars
+
+Continue the existing Library checklist with stacked New/Learning/Familiar/Known/
+Ignored bars. Count exact registered Japanese surfaces once per whole document,
+deduplicating repetitions and chapters before joining current global vocabulary.
+Use the first stored B per chapter, matching the live reader; later profiles and
+stored A/C do not substitute. The coordinated effective-reader switch must also
+switch this membership projection to resolved partitions before exposing edits.
+Do not silently give the Library a different segmentation from the live reader.
+
+Keep this a separate lazy read on the existing FIFO so title/progress listing,
+import summaries and duplicate preflight do not acquire a token scan. Read every
+distribution in one SQLite statement/snapshot without source text/assets, Full,
+registration or writes. Deleted vocabulary contributes to no status and is never
+recreated. A missing chapter B yields an unavailable distribution; an analyzed
+document with zero live Japanese entries has an empty neutral bar.
+
+Retain the compact counts/errors in core, invalidate after imports, status
+observations/completion, refresh and return to Library, and request them only
+while Library is visible and saves are drained. Search/sort/recreation reuse the
+snapshot. Defer automatic reads and disable their Retry during an active file
+batch, so scans cannot take the FIFO between provider reads and import submission.
+A failed read has its own explicit Retry and cannot clear import errors.
+Use the existing status palette plus green for Known, and expose all five exact
+counts to accessibility. No schema/dependency or persistent cache. Large-library
+query cost is unmeasured; include it in the existing performance work.

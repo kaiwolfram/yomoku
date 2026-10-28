@@ -8,6 +8,7 @@ use crate::completion::{AnalyzedCompletionOutcome, AnalyzedPageCompletion, PageC
 use crate::document::{DocumentId, LibraryDocument, ReaderDocument};
 use crate::effective_storage::{EffectiveStorageOperation, EffectiveStorageResult};
 use crate::imports::{EpubImport, SrtImport, TxtImport};
+use crate::library::LibraryWordDistribution;
 use crate::pagination::{PageLength, ReadingPosition};
 use crate::reader::{
     DocumentReaderSnapshot, ReaderCustomEntry, ReaderStatusChange, ReaderTokenKey,
@@ -20,6 +21,7 @@ use crate::typography::ReaderTypography;
 #[repr(C)]
 pub enum StorageOperation {
     List,
+    LoadLibraryWordDistributions,
     CreatePaste(String),
     LoadPaste(DocumentId),
     /// Explicit entry records Library recency and resets a finished book atomically.
@@ -91,6 +93,7 @@ pub enum DocumentError {
 #[repr(C)]
 pub enum StorageResult {
     Listed(Vec<LibraryDocument>, PageLength, ReaderTypography),
+    LibraryWordDistributionsLoaded(Vec<LibraryWordDistribution>),
     /// Import results reference Library state; content is loaded separately.
     Created(LibraryDocument),
     /// Exact duplicate: preserve persisted title/position and reference it once.

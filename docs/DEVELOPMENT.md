@@ -5121,3 +5121,75 @@ remains ephemeral and fresh sessions default to Last read. No dependency change.
 The coordinated effective-reader switch remains next; Library status bars remain
 unchecked. Separate Full-loader matrix, release/performance/process-death and
 physical arm64 were not rerun here. No remaining implementation blocker.
+
+## Library distinct-surface status bars
+
+2026-10-28, repository root, pinned offline Rust/JDK:
+
+```sh
+export PATH=/home/kai/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin:$PATH
+export JAVA_HOME=/home/kai/repos/yomoku/.local/jdk-17/jdk-17.0.21+9
+export GRADLE_USER_HOME=/home/kai/repos/yomoku/.local/gradle
+export ANDROID_HOME=/home/kai/Android/Sdk
+cargo test -p yomoku-storage library_words --all-features --locked --offline
+cargo test -p yomoku-core --test library_words --all-features --locked --offline
+cargo test --workspace --all-features --locked --offline --quiet
+cargo clippy --workspace --all-targets --all-features --locked --offline -- -D warnings
+cargo fmt --all -- --check
+tools/format-kotlin.sh --check
+"$JAVA_HOME/bin/java" -jar .local/ktfmt-0.64.jar --kotlinlang-style --dry-run --set-exit-if-changed tests/kotlin/LibraryWordsBridgeTest.kt
+tools/test-kotlin-bridge.sh
+cargo run -p yomoku-ffi --bin generate-kotlin --features facet_typegen --locked --offline -- target/generated/kotlin-repeat
+# Compare after generation exits; keep native generation/builds sequential.
+diff -r target/generated/kotlin target/generated/kotlin-repeat
+./android/gradlew -p android :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug --offline --console=plain
+./android/gradlew -p android :app:connectedDebugAndroidTest :app:lintDebug '-Pandroid.testInstrumentationRunnerArguments.class=app.yomoku.LibraryWordsTest,app.yomoku.LibrarySortTest,app.yomoku.LibrarySearchTest,app.yomoku.NavigationTest,app.yomoku.PasteReaderTest#pasteReturnsToLibraryAndOpensFirstLogicalPageWithBackAndRecreation,app.yomoku.TxtPickerTest#cancelBlockedReadRetainsCompletedFilesAndFreshBatchIgnoresLateProviderResult,app.yomoku.TxtPickerTest#pickerBatchRetainsEncodingAndSummarizesEveryFileWithoutOpeningReader' --offline --console=plain
+/home/kai/Android/Sdk/platform-tools/adb -s emulator-5554 shell wm size 2560x1600
+/home/kai/Android/Sdk/platform-tools/adb -s emulator-5554 shell wm density 240
+/home/kai/Android/Sdk/platform-tools/adb -s emulator-5554 shell cmd uimode night yes
+./android/gradlew -p android :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=app.yomoku.LibraryWordsTest --offline --console=plain
+/home/kai/Android/Sdk/platform-tools/adb -s emulator-5554 shell wm size reset
+/home/kai/Android/Sdk/platform-tools/adb -s emulator-5554 shell wm density reset
+/home/kai/Android/Sdk/platform-tools/adb -s emulator-5554 shell cmd uimode night no
+git diff --check
+```
+
+PASS: four new core/four new SQLite cases; 645 workspace Rust tests (17 opt-in
+ignored), strict Clippy/Rustfmt/Kotlin formatting and byte-identical repeat codegen.
+Cases cover global five-status changes, exact Unicode/inflection identity,
+repetitions, distinct surfaces across EPUB chapters, first-B pinning against
+later profiles/A/C, missing analysis versus zero words, deleted vocabulary/documents,
+query-only/reopen/unchanged database bytes, retained presentation and explicit
+retry/busy/navigation guards. No source/assets or dictionary load during count reads.
+
+Real-Full host JNI verifies count refresh across two documents after manual status
+and final-page completion, unchanged SQLite bytes/dictionary loading on reads,
+search reuse and maximum unsigned count codecs. Existing TXT/SRT/EPUB imports,
+direct cancellation, word/custom CRUD, Unicode and 100-handle regressions pass.
+Both-ABI debug app/test APKs and strict Android lint pass.
+All eight focused phone tests above pass on medium_phone, Android 16/API 36.
+The new bar test verifies six distinct surfaces despite repeated tokens, all five
+colors/proportions, exact accessible counts, two-document global refresh after
+manual choices/completion and retained Activity recreation. Existing title/sort/
+navigation/paste regressions and mixed picker/cancellation cases pass. The bar
+case also passes at 2560x1600/240dpi in dark mode; original display settings and
+light mode were restored afterward.
+
+Initial verification caught missing default view fields and an EPUB fixture's
+chapter wrapper; corrected before the passing Rust/JNI/APK reruns. The first device
+bar test timed out because it polled core before Compose ran the lazy read; flushing
+composition before awaiting native counts fixed it. Review also found a batch
+provider-read race with automatic count scans; MainActivity now defers them (and
+their Retry) for an active batch, verified by the blocked-provider cancellation and
+mixed-format picker regressions. Gradle/ADB required the usual local-socket
+escalation. The emulator disconnected after the successful phone suite; the first
+wide attempt had no device. Restarting it and rerunning the wide case passed.
+Existing Crux teardown diagnostics remain informational. No remaining blocker.
+Logs: `/tmp/yomoku-library-words-{tests,core,clippy,bridge,codegen,format-check,
+host-format-check,android,device,device-focused,wide,emulator}.log`.
+
+No dependency or migration. Title/progress listing and duplicate preflight remain
+independent of this lazy token query. Counts match the current original-B reader;
+adopt effective membership with the coordinated live-reader switch before exposing
+boundary controls. Library scan performance, separate Full-loader matrix, release,
+process-death and physical arm64 were not measured/rerun here.

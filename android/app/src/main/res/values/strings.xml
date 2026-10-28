@@ -126,4 +126,9 @@
     <string name="library_sort_last_read">Last read</string>
     <string name="library_sort_title">Title</string>
     <string name="library_sort_import_date">Import date</string>
+    <string name="library_words_loading">Loading word status…</string>
+    <string name="library_words_unavailable">Word status unavailable</string>
+    <string name="library_words_empty">No registered words</string>
+    <string name="library_words_distribution">Distinct words: New %1$s, Learning %2$s, Familiar %3$s, Known %4$s, Ignored %5$s</string>
+    <string name="library_words_error">Could not load word status.</string>
 </resources>

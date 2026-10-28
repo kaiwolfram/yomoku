@@ -47,6 +47,20 @@ loading a dictionary. Clock/write/validation/commit failures roll back entry and
 recency together; exhaustion fails closed. Android renders the current sort in
 an accessible menu and uses the existing stable document keys.
 
+Library word bars use a separate `LoadLibraryWordDistributions` read through the
+existing FIFO/shared busy gate. Core retains compact per-document five-status
+counts and a separate explicit-retry error. Android requests missing counts only
+while Library is composed, pending saves are drained and no file batch is active;
+search/sort/recreation reuse them. Imports, global-status observations, completion,
+list refresh and
+return to Library invalidate the snapshot. One SQLite statement deduplicates
+exact Japanese surfaces across every chapter's first stored B before joining
+live vocabulary. No analyzer, source/assets, registration, writes or token cache
+is involved. Deleted entries are absent; Missing B and zero counts differ.
+Membership matches the current B reader and must adopt resolved effective
+partitions with the coordinated reader switch before boundary controls go live.
+Android draws the five proportional colors and exposes exact accessible counts.
+
 `yomoku-import` is a separate pure content-extraction boundary. Its EPUB parser
 reads Stored/Deflate ZIP entries from a borrowed byte slice, without filesystem
 extraction/network access. Container/OPF metadata selects the first package and

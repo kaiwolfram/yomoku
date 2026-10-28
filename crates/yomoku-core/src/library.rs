@@ -1,7 +1,28 @@
 //! Pure Library presentation. Import identity is durable commit order, not wall time.
 
-use crate::document::LibraryDocument;
+use crate::document::{DocumentId, LibraryDocument};
 use serde::{Deserialize, Serialize};
+
+/// Live registered exact surfaces, each counted once in the document's original
+/// Mode B. Missing/deleted vocabulary is absent, never implicitly New.
+#[derive(Clone, Copy, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+#[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
+pub struct WordStatusCounts {
+    pub new: u64,
+    pub learning: u64,
+    pub familiar: u64,
+    pub known: u64,
+    pub ignored: u64,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
+pub struct LibraryWordDistribution {
+    pub document_id: DocumentId,
+    /// None when any chapter lacks its original B analysis. Some(all zero) is
+    /// an analyzed document with no remaining registered Japanese surfaces.
+    pub counts: Option<WordStatusCounts>,
+}
 
 #[derive(Clone, Copy, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
 #[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]

@@ -16,7 +16,7 @@ use crate::{
     completion::{AnalyzedCompletionOutcome, CompletionNotice, PageCompletionIntent},
     document::{CompletionCommandId, DocumentId, LibraryDocument, ReaderDocument, TextAnchor},
     imports::{EpubImport, SrtImport, TxtImport},
-    library::LibrarySort,
+    library::{LibrarySort, LibraryWordDistribution},
     pagination::{LogicalPages, PageLength, ReadingPosition},
     reader::{
         ReaderAnalysis, ReaderChapterAnalysis, ReaderPage, ReaderStatusChange, ReaderTokenKey,
@@ -73,6 +73,9 @@ pub struct Model {
     documents: Vec<LibraryDocument>,
     library_title_query: String,
     library_sort: LibrarySort,
+    library_word_distributions: Option<Vec<LibraryWordDistribution>>,
+    library_word_error: Option<DocumentError>,
+    loading_library_words: bool,
     loaded_document: Option<ReaderDocument>,
     storage_busy: bool,
     document_error: Option<DocumentError>,
@@ -114,6 +117,8 @@ pub enum Event {
     OpenSettings,
     CloseSettings,
     RefreshLibrary,
+    /// Read-only lazy refresh when Library is visible; retries are explicit.
+    LoadLibraryWordDistributions,
     /// Literal, Unicode-lowercase substring search over Library titles only.
     SearchLibraryTitles(String),
     SortLibrary(LibrarySort),
@@ -193,6 +198,8 @@ pub struct ViewModel {
     pub library_sort: LibrarySort,
     /// Unfiltered count distinguishes an empty Library from an empty search.
     pub library_document_count: u64,
+    pub library_word_distributions: Option<Vec<LibraryWordDistribution>>,
+    pub library_word_error: Option<DocumentError>,
     pub loaded_document: Option<ReaderDocument>,
     pub storage_busy: bool,
     pub document_error: Option<DocumentError>,
@@ -436,6 +443,15 @@ impl App for Yomoku {
                 }
             }
             Event::RefreshLibrary => Some(StorageOperation::List),
+            Event::LoadLibraryWordDistributions => {
+                if model.destination != Destination::Library
+                    || model.content_route != ContentRoute::Main
+                    || model.settings_open
+                {
+                    return Command::done();
+                }
+                Some(StorageOperation::LoadLibraryWordDistributions)
+            }
             Event::CreatePaste(text) => Some(StorageOperation::CreatePaste(text.clone())),
             Event::ImportTxt(input) => Some(StorageOperation::ImportTxt(input.clone())),
             Event::ImportSrt(input) => Some(StorageOperation::ImportSrt(input.clone())),
@@ -572,6 +588,7 @@ impl App for Yomoku {
                 matches!(operation, StorageOperation::LoadReadingTime { .. });
             model.time_checkpoint_can_wait = match &operation {
                 StorageOperation::List
+                | StorageOperation::LoadLibraryWordDistributions
                 | StorageOperation::LoadPaste(_)
                 | StorageOperation::SavePageLength(_)
                 | StorageOperation::SaveReaderTypography(_)
@@ -589,7 +606,14 @@ impl App for Yomoku {
                 _ => false,
             };
             model.storage_busy = true;
-            model.document_error = None;
+            if operation == StorageOperation::LoadLibraryWordDistributions {
+                model.loading_library_words = true;
+                model.library_word_distributions = None;
+                model.library_word_error = None;
+            }
+            if operation != StorageOperation::LoadLibraryWordDistributions {
+                model.document_error = None;
+            }
             if let StorageOperation::LoadReaderWord(selection) = operation {
                 model.reader_word_selection = Some(selection);
                 model.pending_word_load = Some(selection);
@@ -690,6 +714,9 @@ impl App for Yomoku {
                 model.library_sort = sort;
             }
             Event::SelectDestination(destination) => {
+                if destination == Destination::Library {
+                    model.invalidate_library_words();
+                }
                 model.completion_notice = None;
                 model.book_completion_notice = None;
                 model.import_summary = None;
@@ -741,6 +768,7 @@ impl App for Yomoku {
                 model.storage_busy = false;
                 model.time_checkpoint_can_wait = false;
                 let restoring_time = std::mem::take(&mut model.restoring_reader_time);
+                let loading_library_words = std::mem::take(&mut model.loading_library_words);
                 let pending_reader = model.pending_reader.take();
                 let token_load = model.pending_token_load.take();
                 let status_change = model.pending_status_change.take();
@@ -759,6 +787,7 @@ impl App for Yomoku {
                     }
                     StorageResult::ImportCancelled => {}
                     StorageResult::ReaderWordLoaded(details) => {
+                        model.invalidate_library_words();
                         if word_load == Some(details.selection())
                             && model.reader_word_selection == word_load
                             && model.current_token_key() == Some(details.key)
@@ -801,6 +830,7 @@ impl App for Yomoku {
                         }
                     }
                     StorageResult::ReaderStatusChanged(change, entry) => {
+                        model.invalidate_library_words();
                         if status_change == Some(change)
                             && model.current_token_key() == Some(change.key)
                             && entry.is_none_or(|entry| {
@@ -843,9 +873,15 @@ impl App for Yomoku {
                         }
                     }
                     StorageResult::Listed(documents, length, typography) => {
+                        model.invalidate_library_words();
                         model.reader_typography = Some(typography);
                         model.documents = documents;
                         model.apply_page_length(length);
+                    }
+                    StorageResult::LibraryWordDistributionsLoaded(distributions) => {
+                        if loading_library_words {
+                            model.library_word_distributions = Some(distributions);
+                        }
                     }
                     StorageResult::ReaderTypographySaved(typography) => {
                         model.reader_typography = Some(typography);
@@ -887,6 +923,7 @@ impl App for Yomoku {
                         return self.update(Event::RetryReaderCompletion, model);
                     }
                     StorageResult::PageCompleted(document, outcome) => {
+                        model.invalidate_library_words();
                         let Some(StorageOperation::CompletePage(prepared)) =
                             model.pending_completion.take()
                         else {
@@ -936,6 +973,7 @@ impl App for Yomoku {
                         }
                     }
                     StorageResult::Created(document) | StorageResult::Existing(document) => {
+                        model.invalidate_library_words();
                         model.import_summary = Some(ImportSummary {
                             document_id: document.document_id,
                             title: document.title.clone(),
@@ -1002,7 +1040,9 @@ impl App for Yomoku {
                     StorageResult::PositionSaved(document) => model.apply_position(document),
                     StorageResult::Failed(error) => {
                         let key = token_load.or(status_change.map(|change| change.key));
-                        if let Some(selection) = custom_change {
+                        if loading_library_words {
+                            model.library_word_error = Some(error);
+                        } else if let Some(selection) = custom_change {
                             if model.can_edit_custom_entry(selection) {
                                 model.reader_custom_entry_error = Some(error);
                             }
@@ -1032,6 +1072,7 @@ impl App for Yomoku {
                 }
             }
             Event::RefreshLibrary
+            | Event::LoadLibraryWordDistributions
             | Event::CreatePaste(_)
             | Event::ImportTxt(_)
             | Event::ImportSrt(_)
@@ -1066,6 +1107,8 @@ impl App for Yomoku {
                 .project(&model.documents, &model.library_title_query),
             library_title_query: model.library_title_query.clone(),
             library_sort: model.library_sort,
+            library_word_distributions: model.library_word_distributions.clone(),
+            library_word_error: model.library_word_error,
             library_document_count: model.documents.len() as u64,
             loaded_document: model.loaded_document.clone(),
             storage_busy: model.storage_busy,
@@ -1104,6 +1147,11 @@ impl App for Yomoku {
 }
 
 impl Model {
+    fn invalidate_library_words(&mut self) {
+        self.library_word_distributions = None;
+        self.library_word_error = None;
+    }
+
     fn can_edit_custom_entry(&self, selection: ReaderWordSelection) -> bool {
         !self.settings_open
             && self.current_token_key() == Some(selection.key)
@@ -1136,6 +1184,7 @@ impl Model {
     }
 
     fn close_document(&mut self) {
+        self.invalidate_library_words();
         self.completion_notice = None;
         self.book_completion_notice = None;
         self.content_route = ContentRoute::Main;

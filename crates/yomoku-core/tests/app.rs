@@ -7,6 +7,8 @@ fn starts_in_library() {
     assert_eq!(
         core.view(),
         ViewModel {
+            library_word_distributions: None,
+            library_word_error: None,
             reader_time: None,
             reading_time_save_pending: false,
             completion_save_pending: false,

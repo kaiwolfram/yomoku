@@ -25,6 +25,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -49,7 +50,31 @@ internal fun LibraryScreen(
     dispatch: (Event) -> Unit,
     onImportFiles: (() -> Unit)? = null,
     coverLoader: EpubCoverLoader? = null,
+    loadWordDistributions: Boolean = true,
 ) {
+    LaunchedEffect(
+        loadWordDistributions,
+        view.libraryWordDistributions,
+        view.libraryWordError,
+        view.storageBusy,
+        view.readingTimeSavePending,
+        view.completionSavePending,
+    ) {
+        if (
+            loadWordDistributions &&
+                view.libraryWordDistributions == null &&
+                view.libraryWordError == null &&
+                !view.storageBusy &&
+                !view.readingTimeSavePending &&
+                !view.completionSavePending
+        ) {
+            dispatch(Event.LoadLibraryWordDistributions)
+        }
+    }
+    val distributions =
+        remember(view.libraryWordDistributions) {
+            view.libraryWordDistributions?.associateBy { it.documentId }
+        }
     Column(Modifier.fillMaxSize().padding(16.dp)) {
         Button(onClick = { dispatch(Event.OpenPaste) }, enabled = !view.storageBusy) {
             Text(stringResource(R.string.paste_title))
@@ -66,6 +91,16 @@ internal fun LibraryScreen(
             }
         }
         StorageStatus(view)
+        if (view.libraryWordError != null) {
+            Text(stringResource(R.string.library_words_error))
+            TextButton(
+                onClick = { dispatch(Event.LoadLibraryWordDistributions) },
+                enabled = loadWordDistributions && !view.storageBusy,
+                modifier = Modifier.testTag("retry_library_words"),
+            ) {
+                Text(stringResource(R.string.retry))
+            }
+        }
         view.importSummary?.let { summary ->
             Column(modifier = Modifier.fillMaxWidth().testTag("import_summary")) {
                 Text(
@@ -151,6 +186,11 @@ internal fun LibraryScreen(
                                 document.progressPercent.toLong(),
                             ),
                             modifier = Modifier.testTag("progress_${document.documentId.value}"),
+                        )
+                        LibraryWordBar(
+                            distributions?.get(document.documentId)?.counts,
+                            loading = distributions == null && view.libraryWordError == null,
+                            documentId = document.documentId.value,
                         )
                     }
                 }

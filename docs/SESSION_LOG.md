@@ -2548,3 +2548,20 @@ and two wide/dark cases pass. Fixed old fixtures/generated enum/preview assumpti
 Architecture/data/decision docs updated. Effective-reader live switch stays next;
 Library status bars remain unchecked. No blocker; physical
 arm64, release and performance remain deferred. Commands: DEVELOPMENT.md end.
+
+## 2026-10-28 — Library distinct-surface status bars
+
+Added read-only whole-document five-status distributions and accessible Android
+stacked bars. Exact registered Japanese spellings count once across repetitions/
+chapters; first B matches the live reader, global statuses stay live, and deleted
+entries remain absent. Core retains counts/explicit-retry errors; return/import/
+status/completion refresh them. Defer scans during active file batches.
+
+Four core/four SQLite cases, 645 Rust tests (17 ignored), strict Clippy/format,
+real-Full host JNI, repeat codegen, both-ABI debug APKs/lint, eight focused phone
+tests and one wide/dark case pass. Initial fixture field/EPUB-wrapper compile assumptions were corrected;
+device polling now flushes Compose's lazy effect before awaiting native counts.
+Batch cancellation/picker regressions verify the new scan guard. Documentation
+and plan updated. Effective-reader switch remains next, including Library
+membership; release/performance/physical arm64 remain deferred. Commands and
+final device/environment details: DEVELOPMENT.md end.

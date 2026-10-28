@@ -24,6 +24,7 @@ mod finished;
 mod import_dedup;
 mod imports;
 mod library_order;
+mod library_words;
 mod positions;
 mod reader_documents;
 mod reader_tokens;

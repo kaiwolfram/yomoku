@@ -222,6 +222,11 @@ fn execute(
             storage.page_length().map_err(map_error)?,
             storage.reader_typography().map_err(map_error)?,
         )),
+        StorageOperation::LoadLibraryWordDistributions => {
+            Ok(StorageResult::LibraryWordDistributionsLoaded(
+                storage.library_word_distributions().map_err(map_error)?,
+            ))
+        }
         StorageOperation::CreatePaste(_) => {
             let paste = paste.expect("validated paste");
             if let Some(imports) = imports.as_mut() {
