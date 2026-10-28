@@ -1,5 +1,5 @@
 # Resume here
-Updated: 2026-10-28. Effective manual status lifecycle done; live switch next.
+Updated: 2026-10-28. Guarded override repositories done; live switch next.
 ## Working
 - Pure Crux routes/Library/Settings; Render-only UI; FIFO SQLite/analysis; Library start.
 - Chapter-local UTF-8 position/whole-book percentage/five presets persist; reflow
@@ -56,24 +56,25 @@ Updated: 2026-10-28. Effective manual status lifecycle done; live switch next.
   half-size readings, strict UTF-16, full crossing readings/fitted width/headroom.
 - Effective segmentation: B + A/B/C/manual; contiguous JP B matches, local/newer
   precedence/reversal; exact metadata provenance, unmatched unresolved.
-- Effective APIs: counts/statuses/frozen provenance; unresolved surface-only/shared CRUD.
 - Effective completion (0018): full key/occurrences/time frozen durably; page-only
   registration/New-only Known/history/time/position/finish atomic. Exact replay
   survives reversal/deletion/reopen; legacy calls reject its ID. Live reader uses B.
-- Atomic override registration: winning parts only; retry no-op; reversal keeps history.
 - Compact effective_session: one full key + view, fresh revisions, stale/foreign/
   duplicate guards, retry/Missing B; prototype Kotlin codecs, page/selection 60/68 B.
 - Native effective_storage shares FIFO/dictionary; all effective commands.
   Compact word state: frozen keys, fresh attempts, retry/Cancel/stale guards.
 - Retained completion: freeze before time drain; exact retries/reopen/reversal count once.
-- Effective status: same-transaction key/surface/ID guards; five choices/no-op retries,
-  deletion/replacement safe; retained attempts + word/custom/completion gates.
+- Effective status: atomic key/surface/ID guards; five choices/no-op retries; retained gates.
+- Guarded override storage: read-only stored A/B/C choices + shared key/rule revision;
+  atomic save/register/reverse, stale/ABA/concurrent guards. Rollbacks retry; successful
+  mutations require explicit reload. No core/FIFO/UI adapter or on-demand A/C yet.
 ## Next tasks (ordered)
 1. Switch live core/FFI/Android completion/token/status/furigana/word/custom together
    via effective_storage + retained requests; see EFFECTIVE_READER_PAYLOAD.md.
-2. Add typed reads/choices/save/reverse with rendered-key/intervening-edit retry guards.
+2. Route guarded override reads/choices/save/reverse through retained core/FIFO requests;
+   add explicit stale reload handling and same-profile on-demand A/C generation.
 3. Add Android A/B/C/manual + All/This occurrence; measure real-book/JNI/device cost.
 Physical arm64 deferred; Nostr empty; Q188 unresolved before forwarding.
 ## Verification
-- PASS: 571 Rust (17 ignored); Clippy/Rustfmt/Kotlin format/diff; Full + host JNI.
-- Codegen identical. APK/device/lint/release/arm64 not rerun. DEVELOPMENT.md end.
+- PASS: 583 Rust (17 ignored); Clippy/Rustfmt/diff; Full + host JNI (DEVELOPMENT.md end).
+- No shell schema changes. APK/device/lint/release/arm64 not rerun.

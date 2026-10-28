@@ -619,6 +619,81 @@ fn real_segmentation_choices_resolve_scopes_merges_and_reversal_without_replacin
             [], |row| Ok((row.get::<_, i64>(0)?, row.get::<_, i64>(1)?)),
         ).unwrap(), history_before);
         reopened.reverse_segmentation_override(id).unwrap();
+        let rendered = std::sync::Arc::new(
+            reopened
+                .load_effective_reader_tokens(imported.document.document_id, page)
+                .unwrap()
+                .unwrap()
+                .key()
+                .unwrap(),
+        );
+        let prompt = reopened
+            .load_effective_override_context(rendered.clone(), selected)
+            .unwrap();
+        assert_eq!(prompt.choices().len(), 3);
+        for choice in prompt.choices() {
+            let snapshot = saved
+                .iter()
+                .find(|(_, snapshot)| snapshot.mode == choice.mode)
+                .unwrap();
+            assert_eq!(
+                choice.parts,
+                segmentation_from_snapshot(
+                    chapter,
+                    &original,
+                    &snapshot.1,
+                    selected,
+                    OverrideScope::default()
+                )
+                .unwrap()
+                .parts
+            );
+        }
+        let (guarded_id, registered) = reopened
+            .save_effective_override(
+                &prompt,
+                OverrideScope::ThisOccurrence,
+                edit.parts.clone(),
+                1100,
+            )
+            .unwrap();
+        assert_eq!(registered, 0); // First pass already registered these parts.
+        let changed = std::sync::Arc::new(
+            reopened
+                .load_effective_reader_tokens(imported.document.document_id, page)
+                .unwrap()
+                .unwrap()
+                .key()
+                .unwrap(),
+        );
+        let reverse = reopened
+            .load_effective_override_context(changed, selected)
+            .unwrap();
+        reopened
+            .reverse_effective_override(&reverse, guarded_id)
+            .unwrap();
+        assert_eq!(
+            &reopened
+                .load_effective_reader_tokens(imported.document.document_id, page)
+                .unwrap()
+                .unwrap()
+                .key()
+                .unwrap(),
+            rendered.as_ref()
+        );
+        assert!(matches!(
+            reopened.save_effective_override(
+                &prompt,
+                OverrideScope::ThisOccurrence,
+                edit.parts.clone(),
+                1200
+            ),
+            Err(yomoku_storage::effective_overrides::EffectiveOverrideError::StaleContext)
+        ));
+        assert_eq!(observer.query_row(
+            "SELECT (SELECT COUNT(*) FROM reading_completions), (SELECT COUNT(*) FROM reading_occurrences)",
+            [], |row| Ok((row.get::<_, i64>(0)?, row.get::<_, i64>(1)?)),
+        ).unwrap(), history_before);
     }
     drop(observer);
     drop(reopened);

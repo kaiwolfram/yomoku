@@ -1119,3 +1119,27 @@ returns to Library and celebrates each newly Recorded command, including rereads
 effective segmentation edits and statistics aggregation remain
 separate tasks. Add analysis/import crates only with
 actual behavior; Sudachi Full defaults to B, JMdict/JMnedict remain offline data, and future Nostr I/O stays in Rust. Configuration is empty.
+## Guarded effective boundary repositories
+
+`yomoku-storage::effective_overrides` adds a native-only read/choice/save/reverse
+slice. `yomoku-core::effective_overrides` owns the I/O-free snapshot types.
+`EffectiveOverrideContext` shares a supplied frozen effective key through
+`Arc`; context/retry clones do not duplicate the chapter. One read transaction
+checks rendered provenance and exact contiguous Japanese original-B bounds whose
+edge tokens intersect the page, then reads existing same-profile A/B/C partitions
+and winning rules. Crossing tokens remain whole; unavailable or unaligned alternate
+choices are omitted. This API never invokes the analyzer or registers vocabulary.
+
+Save and reversal revalidate both the full key and a rule-table revision in one
+immediate transaction. Save reuses the transaction-local registered-override helper,
+preserving winning-parts-only registration and same-rule no-ops. Reversal is limited
+to a winning rule returned by the prompt. The revision observes every supported
+append/deactivation, catching an intervening split/reversal even if the key returns
+to its original B value. Rule changes elsewhere conservatively invalidate prompts;
+live vocabulary and time changes do not. Failed transactions can retry unchanged
+contexts; committed mutations require explicit reload, including lost responses.
+
+There is no new migration, dependency, worker, FFI/schema or Android behavior.
+Contexts are scoped to their originating database/native session and must be
+discarded on replacement/restore. Core/FIFO request ownership, on-demand A/C,
+compact shell choices and Android controls remain pending alongside the live switch.

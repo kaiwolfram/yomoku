@@ -3132,3 +3132,25 @@ retry, another explicit choice or Cancel; in-flight requests must drain. Pending
 status gates word/custom/completion, and their accepted obligations gate status.
 The live app must still apply its shared FIFO/time/lifecycle gates. No dependency,
 migration, shell schema or current Android behavior change in this native slice.
+## 2026-10-28 — Guard boundary prompts against intervening edits
+
+Add a storage-only prompt context for the existing effective-reader boundary work.
+It shares the native frozen full key through `Arc`, keeps canonical original-B
+selection bounds and exposes only already stored, exact same-profile A/B/C choices
+and winning rules. It has no shell codec. On-demand analysis, retained callback
+ownership and the coordinated live reader switch remain separate pending work.
+
+Compare the full key and an opaque rule revision inside the same immediate
+transaction as save/registration or reversal. The revision is `(MAX(rule id),
+inactive rule count)`: current repositories append immutable rules, deactivate
+only, and preserve rows after document deletion. This detects split-then-reversal
+even when full rendered provenance returns to B. Conservatively retire prompts
+after edits elsewhere; status/count/time changes do not retire them. No migration
+or persistent command registry is required; computing the revision scans rules.
+
+Rollback preserves the before-image for explicit retry. A committed mutation makes
+the old context stale, including a lost-success response; the future UI must offer
+explicit reload and never automatically rebase/replay old fields. An already
+identical active-rule save remains write-free and never re-registers deleted
+vocabulary. Reversal accepts only an exact winning rule shown by that context.
+These are repository guards, not implemented Android flows or new product controls.

@@ -191,42 +191,9 @@ impl Storage {
         let transaction = self
             .connection
             .transaction_with_behavior(TransactionBehavior::Immediate)?;
-        let chapter = read_chapter(&transaction, edit.anchor.chapter_id)?;
-        let ReaderAnalysis::Available(original_id) =
-            read_reader_analysis(&transaction, chapter.chapter_id)?
-        else {
-            return Err(StorageError::InvalidAnalysis);
-        };
-        let original =
-            read_analysis(&transaction, original_id)?.ok_or(StorageError::InvalidAnalysis)?;
-        // Both ends must cover contiguous, complete Japanese original-B tokens.
-        // This also rejects gaps, punctuation and non-Japanese source spans.
-        segmentation_from_snapshot(&chapter, &original, &original, edit.anchor, edit.scope)
-            .map_err(|_| StorageError::InvalidAnalysis)?;
-        read_effective_reader_chapter_in(&transaction, &chapter)?
-            .ok_or(StorageError::InvalidAnalysis)?;
-        let (id, changed) = save_segmentation_override_in(&transaction, edit)?;
-        let registered = if changed {
-            let effective = read_effective_reader_chapter_in(&transaction, &chapter)?
-                .ok_or(StorageError::InvalidAnalysis)?;
-            let surfaces = effective
-                .tokens_on_page(edit.anchor)
-                .map_err(|_| StorageError::InvalidAnalysis)?
-                .into_iter()
-                .filter(|token| {
-                    effective.segmentation().segments[token.segment_index as usize]
-                        .boundary
-                        .override_id
-                        == Some(id)
-                })
-                .map(|token| Surface::new(token.surface).map_err(|_| StorageError::InvalidAnalysis))
-                .collect::<Result<std::collections::BTreeSet<_>, _>>()?;
-            register_vocabulary_in(&transaction, &surfaces, registered_at_unix_ms)?
-        } else {
-            0
-        };
+        let result = save_registered_override_in(&transaction, edit, registered_at_unix_ms)?;
         transaction.commit()?;
-        Ok((id, registered))
+        Ok(result)
     }
 
     pub fn segmentation_override(
@@ -260,6 +227,47 @@ impl Storage {
     }
 }
 
+/// Reuse one transaction for rendered-context validation and rule/registration writes.
+pub(crate) fn save_registered_override_in(
+    connection: &Connection,
+    edit: &SegmentationOverride,
+    registered_at_unix_ms: i64,
+) -> Result<(OverrideId, usize), StorageError> {
+    let chapter = read_chapter(connection, edit.anchor.chapter_id)?;
+    let ReaderAnalysis::Available(original_id) =
+        read_reader_analysis(connection, chapter.chapter_id)?
+    else {
+        return Err(StorageError::InvalidAnalysis);
+    };
+    let original = read_analysis(connection, original_id)?.ok_or(StorageError::InvalidAnalysis)?;
+    // Both ends must cover contiguous, complete Japanese original-B tokens.
+    // This also rejects gaps, punctuation and non-Japanese source spans.
+    segmentation_from_snapshot(&chapter, &original, &original, edit.anchor, edit.scope)
+        .map_err(|_| StorageError::InvalidAnalysis)?;
+    read_effective_reader_chapter_in(connection, &chapter)?.ok_or(StorageError::InvalidAnalysis)?;
+    let (id, changed) = save_segmentation_override_in(connection, edit)?;
+    let registered = if changed {
+        let effective = read_effective_reader_chapter_in(connection, &chapter)?
+            .ok_or(StorageError::InvalidAnalysis)?;
+        let surfaces = effective
+            .tokens_on_page(edit.anchor)
+            .map_err(|_| StorageError::InvalidAnalysis)?
+            .into_iter()
+            .filter(|token| {
+                effective.segmentation().segments[token.segment_index as usize]
+                    .boundary
+                    .override_id
+                    == Some(id)
+            })
+            .map(|token| Surface::new(token.surface).map_err(|_| StorageError::InvalidAnalysis))
+            .collect::<Result<std::collections::BTreeSet<_>, _>>()?;
+        register_vocabulary_in(connection, &surfaces, registered_at_unix_ms)?
+    } else {
+        0
+    };
+    Ok((id, registered))
+}
+
 fn read_active_rules(
     connection: &Connection,
     chapter: &ChapterText,
@@ -279,7 +287,10 @@ fn read_active_rules(
         .collect()
 }
 
-fn read_chapter(connection: &Connection, id: ChapterId) -> Result<ChapterText, StorageError> {
+pub(crate) fn read_chapter(
+    connection: &Connection,
+    id: ChapterId,
+) -> Result<ChapterText, StorageError> {
     let (source, text) = connection.query_row(
         "SELECT c.source_id, t.text FROM chapters c JOIN chapter_texts t ON t.chapter_id = c.id WHERE c.id = ?1",
         [i64::from(id)], |row| Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?)),
@@ -362,7 +373,7 @@ pub(crate) fn read_analysis(
     Ok(Some(analysis))
 }
 
-fn read_override(
+pub(crate) fn read_override(
     connection: &Connection,
     id: OverrideId,
 ) -> Result<Option<StoredOverride>, StorageError> {

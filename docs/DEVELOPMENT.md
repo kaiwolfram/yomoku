@@ -4705,3 +4705,50 @@ uses original B; include status in the coordinated token/word/custom/completion/
 furigana switch next. APK/device/Android lint/release/performance/process-death/
 physical arm64 not rerun. No implementation blocker or initial check failures.
 Logs: `/tmp/yomoku-effective-status-{core,storage,worker,tests,clippy,full,bridge,format,codegen}.log`.
+
+## Guarded effective override repositories
+
+2026-10-28, repository root, pinned offline Rust/JDK:
+
+```sh
+export PATH=/home/kai/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin:$PATH
+export JAVA_HOME=/home/kai/repos/yomoku/.local/jdk-17/jdk-17.0.21+9
+cargo test -p yomoku-storage effective_override --all-features --locked --offline
+cargo test --workspace --all-features --locked --offline --quiet
+cargo clippy --workspace --all-targets --all-features --locked --offline -- -D warnings
+cargo fmt --all -- --check
+tools/test-sudachi.sh
+tools/test-kotlin-bridge.sh
+git diff --check
+```
+
+PASS: 12 new SQLite cases, 583 workspace Rust tests (17 opt-in ignored), strict
+Clippy/Rustfmt. Fifteen Full analysis fixtures plus one runtime fixture pass EACH
+owned/mapped (32 invocations); the existing real segmentation fixture now exercises
+stored A/B/C prompt choices and guarded save/reversal/stale retries. After moving
+only the I/O-free snapshot types into core, workspace tests/Clippy/format pass again;
+that real segmentation fixture was also rerun individually with EACH Full loader.
+
+Contexts share the native full key through Arc and capture the rule-table revision
+in the same read-only transaction as stored exact same-profile choices/winning
+rules. Immediate save/register/reverse transactions reject stale resolutions,
+intervening split-then-reversal and competing connections. Rollback permits an
+explicit retry; successful mutations require reload, including lost responses.
+Tests cover statement/deferred-commit rollback, reopen, same-rule no-ops after
+vocabulary deletion, deleted-origin globals, foreign/off-page/non-Japanese spans,
+changed exact metadata, literal supplementary/combining/NUL text and page crossings.
+Nonempty completed history, current position/finish and pending time are preserved.
+
+Host Kotlin/JNI passes real-Full imports/direct cancellation, selected-word/custom
+CRUD, navigation/codecs, seven Unicode fixtures and 100 handle lifecycles. Existing
+Crux middleware teardown messages remain informational. Initial tests exposed an
+incorrect deletion fixture column and an unseeded pending-time completion fixture;
+both were corrected before the passing reruns. Initial diff check also caught
+extra documentation EOF blank lines; removed them. Logs:
+`/tmp/yomoku-guarded-overrides-{targeted,tests,clippy,format,full,full-final,bridge}.log`.
+
+No dependency, migration, shell schema or live Android change. Guarded storage and
+pure snapshot types are complete; retained core/FIFO adapters, on-demand A/C and
+Android controls remain pending. The coordinated live token/status/word/custom/
+completion/furigana switch is still next. APK/device/Android lint/release/performance/
+process-death/physical arm64 were not rerun. No implementation blocker.

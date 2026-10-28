@@ -2415,3 +2415,22 @@
   migration, shell schema or live Android change. Next adopt token/status/word/custom/
   completion/furigana together. APK/device/lint/release/performance/process-death/
   physical arm64 not rerun; no implementation blocker.
+
+## 2026-10-28 — Guarded effective boundary repositories
+
+- Continued the segmentation task with a small storage slice before the live switch:
+  read-only stored A/B/C choices/winning rules and atomic guarded save/register/reverse.
+  Native snapshots live in pure core and share full keys via Arc; no shell codec.
+- Added an intervening-rule revision to reject old prompts after split/reversal even
+  when the rendered key returns to B. Concurrent connections cannot overwrite a
+  committed winner. Failed transactions retry; successful mutations require explicit
+  reload. Same-rule no-ops never recreate deleted vocabulary.
+- PASS: 12 new SQLite cases; 583 workspace Rust tests (17 ignored), strict Clippy and
+  Rustfmt. All 15 Full + one runtime fixture EACH owned/mapped; extended real A/B/C
+  segmentation fixture also rerun after the pure type move. Host Kotlin/JNI passes
+  real imports/cancellation/word/custom, seven Unicode fixtures and 100 handles.
+- Corrected deletion/pending-time test fixtures and documentation EOF whitespace.
+  Updated plan/handoff/architecture/data/decisions/development. No dependency,
+  migration, shell schema or Android source change. Live reader still uses B.
+  Next: coordinated live switch, retained guarded-edit adapters/on-demand A/C,
+  then Android controls. Device/APK/lint/release/arm64 not rerun; no blocker.

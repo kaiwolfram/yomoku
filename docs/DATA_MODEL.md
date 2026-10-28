@@ -1371,3 +1371,29 @@ replay a consumed command. Neither animation nor its notice is persisted.
 
 Refine schema with executable migration/transaction tests before claiming storage
 or accurate historical statistics are complete.
+## Guarded effective override contexts
+
+The new `load_effective_override_context` repository atomically compares a rendered
+effective key, validates a whole contiguous Japanese original-B selection with no
+wholly off-page edge token, and reads stored exact same-profile A/B/C partitions
+and active winning rules. It returns an opaque native context sharing the key;
+missing alternates are not analyzed or guessed. Literal supplementary/combining/NUL
+text, whole crossing tokens, both override scopes and deleted-origin global rules
+retain the existing anchor semantics.
+
+The context freezes `(MAX(segmentation_overrides.id), inactive row count)` as an
+intervening-edit guard. Supported repositories never remove/rewrite/reactivate rule
+rows: replacement appends a new ID and disables the old rule; reversal only disables.
+Document deletion retains those rows. Therefore the pair changes on every supported
+rule mutation, including split/reversal restoring identical B provenance. It is
+database scoped, not a backup/durable authorization ID. An edit anywhere retires
+older contexts conservatively; this aggregate currently scans the rule table.
+
+`save_effective_override` and `reverse_effective_override` compare that guard and the
+full rendered resolution inside their write transaction. Save shares existing rule
+replacement and winning-parts registration; reverse must name a winning ID shown
+in the context. History/time/position/finish remain unchanged. Rollback permits
+explicit retry; a committed mutation makes the old context stale and requires
+explicit reload even if its success response was lost. Same-rule no-ops under a
+fresh context stay write-free after vocabulary deletion. No migration or shell
+codec is added. Native lifecycle/FIFO/on-demand analysis/UI adoption is pending.

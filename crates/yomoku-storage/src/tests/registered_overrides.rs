@@ -47,7 +47,7 @@ fn entry(storage: &Storage, surface: &str) -> Option<yomoku_core::vocabulary::Vo
         .unwrap()
 }
 
-fn state(storage: &Storage) -> Vec<Vec<Vec<rusqlite::types::Value>>> {
+pub(super) fn state(storage: &Storage) -> Vec<Vec<Vec<rusqlite::types::Value>>> {
     // Preserve actual values, not just counters, across failed writes and retry.
     [
         "segmentation_overrides",
