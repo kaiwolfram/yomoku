@@ -6,7 +6,7 @@ use std::{
 };
 
 use yomoku_core::{
-    analysis::ChapterAnalysis,
+    analysis::{AnalysisProfile, ChapterAnalysis, SplitMode},
     document::{ChapterText, PasteText, ReaderDocument},
     imports::{EpubImport, SrtImport, TextEncoding, TxtImport},
     storage::{DocumentError, StorageResult},
@@ -27,6 +27,18 @@ use crate::storage::{map_error, Job};
 /// A closure capturing a Sudachi Analyzer implements this without requiring Send.
 pub trait PasteAnalyzer {
     fn analyze(&mut self, chapter: &ChapterText) -> Result<ChapterAnalysis, DocumentError>;
+
+    /// Explicit alternate generation only. Implementations must honor the pinned
+    /// import profile; a newer engine/dictionary cannot reinterpret old content.
+    /// Existing import-only factories remain valid and reject this capability.
+    fn analyze_mode(
+        &mut self,
+        _chapter: &ChapterText,
+        _mode: SplitMode,
+        _profile: &AnalysisProfile,
+    ) -> Result<ChapterAnalysis, DocumentError> {
+        Err(DocumentError::Unavailable)
+    }
 }
 
 impl<F> PasteAnalyzer for F
@@ -139,6 +151,30 @@ impl Imports {
         if !self.foreground {
             self.analyzer = None;
         }
+    }
+
+    pub(crate) fn analyze_mode(
+        &mut self,
+        chapter: &ChapterText,
+        mode: SplitMode,
+        profile: &AnalysisProfile,
+    ) -> Result<ChapterAnalysis, DocumentError> {
+        if self.analyzer.is_none() {
+            self.analyzer = Some((self.loader)()?);
+        }
+        let result = self
+            .analyzer
+            .as_mut()
+            .expect("loaded analyzer")
+            .analyze_mode(chapter, mode, profile);
+        if result.is_err() {
+            self.analyzer = None;
+        }
+        result
+    }
+
+    pub(crate) fn discard_analyzer(&mut self) {
+        self.analyzer = None;
     }
 
     pub(crate) fn import_txt(

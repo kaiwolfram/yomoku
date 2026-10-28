@@ -144,5 +144,15 @@ attempt. Writes invalidate visible callbacks immediately and mutually gate word/
 custom/status/completion obligations. Dismissed reads cannot restore a prompt.
 Stale contexts are discarded and require explicit page/context reload; a lost
 successful write cannot re-register deleted vocabulary on retry. This introduces
-no shell schema or new payload measurement. Compact prompt presentation, on-demand
-A/C and live Android controls remain pending with the coordinated reader switch.
+no shell schema or new payload measurement. Compact prompt presentation and live
+Android controls remain pending with the coordinated reader switch.
+
+Explicit on-demand A/C generation now shares the retained override lifecycle and
+existing import analyzer cache. Requests retain mode/context across fresh retry
+attempts. Stored same-profile snapshots bypass Full, including unaligned choices.
+Missing modes analyze the whole canonical chapter outside the transaction; storage
+checks exact profile/mode/anchors and revalidates the key/rule revision at commit.
+New metadata can retire a full key even when boundaries stay identical. Acceptance
+therefore invalidates callbacks, success requires explicit reload, and a lost
+success never silently rebases a stale prompt. No shell schema/size change or live
+reader adoption. Real-book/JNI/device cost remains unmeasured.

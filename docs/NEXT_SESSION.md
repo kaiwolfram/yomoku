@@ -1,5 +1,5 @@
 # Resume here
-Updated: 2026-10-28. Retained guarded-edit requests done; live switch next.
+Updated: 2026-10-28. On-demand A/C prerequisite done; live switch next.
 ## Working
 - Pure Crux routes/Library/Settings; Render-only UI; FIFO SQLite/analysis; Library start.
 - Chapter-local UTF-8 position/whole-book percentage/five presets persist; reflow
@@ -63,18 +63,18 @@ Updated: 2026-10-28. Retained guarded-edit requests done; live switch next.
   duplicate guards, retry/Missing B; prototype Kotlin codecs, page/selection 60/68 B.
 - Native effective_storage shares FIFO/dictionary; compact word state/retry/stale guards.
 - Retained completion: freeze before time drain; exact retries/reopen/reversal count once.
-- Effective status: atomic key/surface/ID guards; five choices/no-op retries; retained gates.
-- Guarded override storage: read-only stored A/B/C choices + shared key/rule revision;
-  atomic save/register/reverse, stale/ABA/concurrent guards. Rollbacks retry; successful
-  mutations require explicit reload. Retained core/FIFO choices/manual/save/reverse:
-  fresh attempts, exact retries, shared gates; stale/lost success requires reload.
+- Effective status: atomic key/surface/ID guards; five choices/no-op retries/gates.
+- Guarded overrides: stored A/B/C/shared key/rule revision; atomic edits/register/
+  reverse, stale/ABA/concurrent guards. Retained fresh attempts/exact retries/shared
+  gates; stale/lost success requires explicit reload. Rollbacks retry.
+- Explicit A/C uses the FIFO/import analyzer cache, whole chapter/original profile;
+  stored reuse skips Full. Rechecks key/revision at commit; metadata requires reload.
 ## Next tasks (ordered)
 1. Switch live core/FFI/Android completion/token/status/furigana/word/custom together
    via effective_storage + retained requests; see EFFECTIVE_READER_PAYLOAD.md.
-2. Add same-profile on-demand A/C generation to retained guarded override requests;
-   preserve explicit stale reload, stored provenance and frozen retry semantics.
-3. Add Android A/B/C/manual + All/This occurrence; measure real-book/JNI/device cost.
+2. Add compact Android A/B/C/manual + All/This occurrence and winning-rule reversal.
+3. Measure real-book/JNI/device cost, including whole-chapter on-demand generation.
 Physical arm64 deferred; Nostr empty; Q188 unresolved before forwarding.
 ## Verification
-- PASS: 592 Rust (17 ignored); Clippy/Rustfmt/diff; Full + host JNI (DEVELOPMENT.md end).
+- PASS: 605 Rust (17 ignored); Clippy/fmt/diff; Full + JNI (DEVELOPMENT.md end).
 - No shell schema changes. APK/device/lint/release/arm64 not rerun.

@@ -4799,3 +4799,50 @@ No dependency, migration, public shell schema or live Android change. Coordinate
 live token/status/word/custom/completion/furigana adoption is still next, followed
 by on-demand same-profile A/C and compact override controls. APK/device/Android
 lint/release/performance/process-death/physical arm64 were not rerun. No blocker.
+
+## Guarded on-demand same-profile A/C generation
+
+2026-10-28, repository root, pinned offline Rust/JDK:
+
+```sh
+export PATH=/home/kai/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin:$PATH
+export JAVA_HOME=/home/kai/repos/yomoku/.local/jdk-17/jdk-17.0.21+9
+cargo test --workspace --all-features --locked --offline --quiet
+cargo clippy --workspace --all-targets --all-features --locked --offline -- -D warnings
+cargo fmt --all -- --check
+tools/test-sudachi.sh
+tools/test-kotlin-bridge.sh
+tools/format-kotlin.sh --check
+cargo run -p yomoku-ffi --bin generate-kotlin --features facet_typegen --locked --offline -- target/generated/kotlin-repeat
+diff -r target/generated/kotlin target/generated/kotlin-repeat
+git diff --check
+```
+
+PASS: 13 new cases (two pure, seven SQLite, four real FIFO); 605 workspace Rust
+tests (17 opt-in ignored), strict Clippy/Rustfmt/Kotlin formatting. Fifteen real Full
+analysis fixtures plus one runtime fixture pass EACH owned/mapped (32 invocations).
+The real segmentation fixture now generates A/C through guarded storage with exact
+whole-chapter/profile checks. Host Kotlin/JNI passes actual Full imports/direct
+cancellation, selected-word/custom CRUD, navigation/codecs, seven Unicode fixtures
+and 100 handle lifecycles. Repeat code generation is byte-identical.
+
+Coverage includes lazy/stored reuse without Full, canonical whole-chapter and
+literal Unicode/crossing anchors, omitted unaligned choices, bad profile/mode/
+anchors/coverage, loader/engine failure, analyzer reuse/background release,
+statement/deferred-commit rollback and explicit frozen retries after reopen.
+Concurrent connections can edit while analysis runs outside SQLite's transaction;
+final revalidation rejects intervening edits/reversals. New metadata invalidates
+old contexts, including lost success; reserved completions retain frozen meanings
+and exact replay after generation/reopen. Vocabulary/history/progress/time stay
+unchanged by generation.
+
+Initial test compilation caught incorrect TextOffset conversions and an assertion
+on the wrong token field. Corrected before the passing workspace/Clippy reruns;
+Rustfmt then required collapsing that corrected assertion. Existing middleware/JDK
+messages remain informational. Logs: `/tmp/yomoku-ondemand-{storage,core,worker,
+tests,clippy,full,bridge,format,codegen}.log`.
+
+No dependency, migration, public shell schema or Android source change. Native
+analyzer mode capability is ready; coordinated live reader adoption and Android
+controls remain next. APK/device/Android lint/release/performance/process-death/
+physical arm64 were not rerun. No blocker.

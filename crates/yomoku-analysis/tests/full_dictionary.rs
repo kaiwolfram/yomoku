@@ -164,9 +164,41 @@ fn real_segmentation_choices_resolve_scopes_merges_and_reversal_without_replacin
     let mut saved = Vec::new();
     for mode in [SplitMode::A, SplitMode::B, SplitMode::C] {
         let snapshot = analyzer().analyze_mode(chapter, mode).unwrap();
-        let id = storage
-            .store_chapter_analysis(chapter.chapter_id, &snapshot)
-            .unwrap();
+        let id = if mode == SplitMode::B {
+            storage
+                .store_chapter_analysis(chapter.chapter_id, &snapshot)
+                .unwrap()
+        } else {
+            let page = TextAnchor {
+                range: TextRange {
+                    start: TextOffset::START,
+                    end: TextOffset::at(&chapter.text, chapter.text.len()).unwrap(),
+                },
+                ..selected
+            };
+            let key = std::sync::Arc::new(
+                storage
+                    .load_effective_reader_tokens(imported.document.document_id, page)
+                    .unwrap()
+                    .unwrap()
+                    .key()
+                    .unwrap(),
+            );
+            let prompt = storage
+                .load_effective_override_context(key, selected)
+                .unwrap();
+            storage
+                .generate_effective_override_analysis(&prompt, mode, |whole, requested, profile| {
+                    assert_eq!(whole, chapter);
+                    assert_eq!(profile, &original.profile);
+                    analyzer().analyze_mode(whole, requested)
+                })
+                .unwrap()
+        };
+        assert_eq!(
+            storage.chapter_analysis(id).unwrap().as_ref(),
+            Some(&snapshot)
+        );
         saved.push((id, snapshot.clone()));
         let edit = segmentation_from_snapshot(
             chapter,

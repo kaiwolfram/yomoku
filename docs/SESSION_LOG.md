@@ -2452,3 +2452,18 @@
 - Updated progress/architecture/data/decisions/payload/development. Next coordinated
   live reader switch, on-demand A/C, then compact Android override controls.
   APK/device/Android lint/release/performance/process-death/arm64 not rerun; no blocker.
+
+## 2026-10-28 — Guarded on-demand A/C prerequisite
+
+- Added explicit retained A/C generation through the existing FIFO/import analyzer
+  cache and pinned-profile native adapter. Stored alternatives bypass Full; missing
+  modes analyze the whole chapter outside SQLite and revalidate context at commit.
+- Generation registers no vocabulary or reading data. New metadata requires page/
+  context reload; fresh retry attempts retain mode/context, reject stale/lost-success
+  rebasing and preserve previously reserved completion meanings after reopen.
+- PASS: 13 new cases; 605 Rust tests (17 ignored), strict Clippy/format, 15 Full +
+  one runtime fixture EACH owned/mapped, host Kotlin/JNI and repeat code generation.
+  Fixed test compilation/format issues before passing reruns. Updated plan/handoff/
+  architecture/data/decisions/payload/development; no dependency/migration/schema.
+- Next: coordinated live reader switch, Android override controls, real-book/device
+  measurements. Android builds/device/lint/release/arm64 not rerun; no blocker.

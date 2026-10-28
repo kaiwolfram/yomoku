@@ -42,6 +42,8 @@ use yomoku_storage::{AnalyzedPaste, Storage};
 
 use super::StorageEffects;
 
+mod analysis;
+
 const TIMEOUT: Duration = Duration::from_secs(10);
 type Router = HandleEffectLayer<Core<Probe>, StorageEffects>;
 

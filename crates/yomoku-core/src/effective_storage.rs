@@ -4,7 +4,7 @@
 use std::sync::Arc;
 
 use crate::{
-    analysis::OverrideScope,
+    analysis::{OverrideScope, SplitMode},
     completion::{AnalyzedCompletionOutcome, PageCompletionIntent},
     document::{OverrideId, ReaderDocument, TextAnchor, VocabularyId},
     effective_overrides::{EffectiveOverrideContext, EffectiveOverrideFailure},
@@ -25,6 +25,10 @@ pub enum EffectiveStorageOperation {
     LoadOverrideContext {
         command: EffectivePageCommand,
         anchor: TextAnchor,
+    },
+    GenerateOverrideAnalysis {
+        context: Arc<EffectiveOverrideContext>,
+        mode: SplitMode,
     },
     SaveOverride {
         context: Arc<EffectiveOverrideContext>,
@@ -63,6 +67,7 @@ pub enum EffectiveStorageOperation {
 pub enum EffectiveStorageResult {
     TokensLoaded(EffectivePageRequest, EffectiveReaderTokenSnapshot),
     OverrideContextLoaded(Arc<EffectiveOverrideContext>),
+    OverrideAnalysisStored(SplitMode),
     OverrideSaved { id: OverrideId, registered: usize },
     OverrideReversed(OverrideId),
     OverrideFailed(EffectiveOverrideFailure),

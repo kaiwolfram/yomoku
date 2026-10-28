@@ -214,7 +214,7 @@ fn execute(
     let storage = storage.as_mut().expect("opened storage");
     match operation {
         StorageOperation::Effective(operation) => {
-            effective::execute(storage, dictionary, word_loader, operation)
+            effective::execute(storage, imports, dictionary, word_loader, operation)
                 .map(StorageResult::Effective)
         }
         StorageOperation::List => Ok(StorageResult::Listed(

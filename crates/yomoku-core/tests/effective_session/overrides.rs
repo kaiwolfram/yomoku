@@ -448,3 +448,106 @@ fn override_io_and_accepted_word_status_custom_completion_commands_gate_each_oth
         .begin_override_load(selection.page, anchor)
         .is_none());
 }
+
+#[test]
+fn alternate_generation_freezes_mode_context_retries_with_fresh_attempt_and_requires_reload() {
+    let (mut session, identity, anchor) = loaded(false);
+    assert!(session.begin_override_analysis(SplitMode::C).is_none());
+    prompt(&mut session, identity, anchor, false);
+    assert!(session.begin_override_analysis(SplitMode::B).is_none());
+    assert!(session.begin_override_analysis(SplitMode::A).is_none()); // already offered
+    let request = session.begin_override_analysis(SplitMode::C).unwrap();
+    assert!(session.page().is_none());
+    assert!(session.override_context().is_none());
+    assert!(!session.cancel_override_retry());
+    assert!(session.begin_override_analysis(SplitMode::C).is_none());
+    assert_eq!(
+        session.finish_override_request(&request, Err(DocumentError::Unavailable)),
+        Some(Progress::Failed(Failure::Storage(
+            DocumentError::Unavailable
+        )))
+    );
+    session.invalidate();
+    let retry = session.retry_override_write().unwrap();
+    assert_ne!(request, retry);
+    let (
+        Op::GenerateOverrideAnalysis {
+            context: first,
+            mode: SplitMode::C,
+        },
+        Op::GenerateOverrideAnalysis {
+            context: second,
+            mode: SplitMode::C,
+        },
+    ) = (request.operation(), retry.operation())
+    else {
+        panic!("generation")
+    };
+    assert!(Arc::ptr_eq(&first, &second));
+    assert!(session
+        .finish_override_request(&request, Ok(Output::OverrideAnalysisStored(SplitMode::C)))
+        .is_none());
+    // A mismatched mode cannot complete the retained request.
+    assert_eq!(
+        session.finish_override_request(&retry, Ok(Output::OverrideAnalysisStored(SplitMode::A))),
+        Some(Progress::Failed(Failure::Storage(
+            DocumentError::InvalidDocument
+        )))
+    );
+    let retry = session.retry_override_write().unwrap();
+    assert_eq!(
+        session.finish_override_request(&retry, Ok(Output::OverrideAnalysisStored(SplitMode::C))),
+        Some(Progress::AnalysisStored(SplitMode::C))
+    );
+    assert!(!session.override_state().pending);
+    assert!(session.override_state().reload_required);
+    assert!(session.page().is_none());
+    assert!(session.retry_override_write().is_none());
+}
+
+#[test]
+fn alternate_generation_stale_or_cancel_requires_reload_and_gates_fresh_reader_work() {
+    for stale in [false, true] {
+        let (mut session, identity, anchor) = loaded(false);
+        prompt(&mut session, identity, anchor, false);
+        let request = session.begin_override_analysis(SplitMode::C).unwrap();
+        session.dismiss_override();
+        // Even a refreshed page cannot bypass this accepted cache write.
+        let snapshot = snapshot();
+        let load = session.begin_load(base(&snapshot)).unwrap();
+        assert!(session.accept(load, snapshot));
+        let identity = session.page().unwrap().identity;
+        let selection = EffectiveReaderSelection {
+            page: identity,
+            segment_index: 2,
+        };
+        assert!(session.begin_word_load(selection).is_none());
+        assert!(session
+            .begin_status_change(
+                selection,
+                55.try_into().unwrap(),
+                VocabularyStatus::Known,
+                123
+            )
+            .is_none());
+        assert!(!session.begin_completion(identity, super::statuses::intent(selection)));
+        assert!(session.begin_override_load(identity, anchor).is_none());
+        let failure = if stale {
+            Failure::StaleContext
+        } else {
+            Failure::Storage(DocumentError::Unavailable)
+        };
+        session
+            .finish_override_request(&request, Ok(Output::OverrideFailed(failure)))
+            .unwrap();
+        if stale {
+            assert!(session.retry_override_write().is_none());
+        } else {
+            assert!(session.override_state().pending);
+            assert!(session.cancel_override_retry());
+        }
+        assert!(session.override_state().reload_required);
+        assert!(session.page().is_none());
+        assert!(session.override_context().is_none());
+    }
+}

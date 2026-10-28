@@ -3176,3 +3176,32 @@ a commit. Dismissed reads drain without restoring presentation. Keep typed nativ
 stale/invalid/storage failures outside the existing shell `DocumentError` schema.
 No dependency, migration or live Android change; on-demand A/C and compact prompt
 controls remain separate work after the coordinated reader switch.
+
+## 2026-10-28 — Guarded on-demand same-profile A/C generation
+
+Complete the independent analyzer prerequisite before the larger coordinated live
+reader switch. Keep ordinary page/prompt reads read-only. Add an explicit native
+generation action to retained override requests and reuse the existing FIFO/import
+analyzer cache; no new worker, dependency, migration or public shell schema.
+
+Storage first checks the shared rendered key and rule revision and reuses any
+existing original-profile A/C snapshot, even when its boundaries cannot form a
+prompt choice. Missing modes analyze the whole canonical chapter outside SQLite's
+transaction, preserving contextual output and allowing competing connections to
+write. Verify mode, exact original profile and all anchors, then validate the same
+before-image again under the immediate transaction that stores immutable analysis.
+Failed SQL/commit leaves no partial cache. Explicit retries freeze context, mode
+and profile; deterministic output can be recomputed until stored. Conflicting
+output under an existing immutable identity remains an error.
+
+Extend the worker analyzer trait with an explicit profile-aware mode capability;
+import-only closures reject it. The native Full adapter checks pinned engine and
+dictionary identities before tokenizing. Bad output/engine failures discard cached
+analyzer state; reuse and background release keep existing import policy.
+
+New exact metadata can change effective identity without changing boundaries.
+Generation therefore uses retained write gates, invalidates callbacks on acceptance
+and requires explicit page/context reload on success. Failed requests permit exact
+retry or Cancel; stale contexts never rebase, including after lost success. Cache
+generation writes no overrides, vocabulary, encounters, progress or time; previously
+reserved completions retain their frozen unresolved/resolved meanings after reopen.

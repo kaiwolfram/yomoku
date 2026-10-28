@@ -8,18 +8,50 @@ use yomoku_core::{
     reader::ReaderAnalysis,
     storage::DocumentError,
 };
-use yomoku_storage::effective_overrides::EffectiveOverrideError;
+use yomoku_storage::effective_overrides::{EffectiveOverrideAnalysisError, EffectiveOverrideError};
 use yomoku_storage::{dictionary::Dictionary, Storage};
+
+use crate::imports::Imports;
 
 use super::{map_custom_error, map_error, map_word_error, word_dictionary, WordDictionaryLoader};
 
 pub(super) fn execute(
     storage: &mut Storage,
+    imports: &mut Option<Imports>,
     dictionary: &mut Option<Dictionary>,
     word_loader: &mut Option<WordDictionaryLoader>,
     operation: EffectiveStorageOperation,
 ) -> Result<EffectiveStorageResult, DocumentError> {
     match operation {
+        EffectiveStorageOperation::GenerateOverrideAnalysis { context, mode } => {
+            let result = storage.generate_effective_override_analysis(
+                &context,
+                mode,
+                |chapter, mode, profile| {
+                    imports
+                        .as_mut()
+                        .ok_or(DocumentError::Unavailable)?
+                        .analyze_mode(chapter, mode, profile)
+                },
+            );
+            Ok(match result {
+                Ok(_) => EffectiveStorageResult::OverrideAnalysisStored(mode),
+                Err(EffectiveOverrideAnalysisError::Analysis(error)) => {
+                    EffectiveStorageResult::OverrideFailed(EffectiveOverrideFailure::Storage(error))
+                }
+                Err(EffectiveOverrideAnalysisError::Context(EffectiveOverrideError::Storage(
+                    yomoku_storage::StorageError::InvalidAnalysis,
+                ))) => {
+                    if let Some(imports) = imports.as_mut() {
+                        imports.discard_analyzer();
+                    }
+                    EffectiveStorageResult::OverrideFailed(EffectiveOverrideFailure::Storage(
+                        DocumentError::InvalidDocument,
+                    ))
+                }
+                Err(EffectiveOverrideAnalysisError::Context(error)) => override_error(error),
+            })
+        }
         EffectiveStorageOperation::LoadOverrideContext { command, anchor } => Ok(
             match storage.load_effective_override_context(command.shared_key(), anchor) {
                 Ok(context) => EffectiveStorageResult::OverrideContextLoaded(Arc::new(context)),

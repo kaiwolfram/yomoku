@@ -1406,4 +1406,16 @@ Cancel retire rendered state and require explicit reload. Stale before-images ar
 discarded rather than rebased, including after lost-success responses; deleted
 vocabulary is never recreated by replaying that old prompt. Pending edits mutually
 gate word/custom/status/completion obligations. No new durable command, automatic
-replay, migration or shell codec. On-demand analysis and live UI adoption remain.
+replay, migration or shell codec. Live UI adoption remains.
+
+On-demand A/C fills existing immutable `chapter_analyses`/`analyzed_tokens` rows
+only. A guarded read checks the rendered context and reuses the exact original
+profile/mode when stored; otherwise whole-chapter analysis runs outside SQLite's
+transaction. The final immediate transaction rechecks both full provenance and
+the intervening-rule guard before storing validated same-profile output. Existing
+identity conflicts keep their rejection semantics. Failed SQL/commit rolls back
+all analysis rows; retry retains canonical chapter/mode/profile/context. Successful
+storage can resolve previously unknown metadata without changing boundaries, so
+the retained core requires explicit page/context reload. History, frozen completion
+reservations, pending time, progress, rules and vocabulary remain intact. There is
+no registration/rescan or automatic restart replay.

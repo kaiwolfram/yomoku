@@ -1158,5 +1158,24 @@ shell error enum changes. Pending override I/O/failed writes mutually gate retai
 word/custom/status/completion requests. The live app must also apply its time/FIFO/
 lifecycle gates. There is no new migration, dependency, worker, public shell schema
 or Android behavior. Contexts are database/session scoped and must be discarded on
-replacement/restore. On-demand A/C, compact shell choices and Android controls
-remain pending alongside the coordinated live reader switch.
+replacement/restore. Compact shell choices and Android controls remain pending
+alongside the coordinated live reader switch.
+
+Explicit `GenerateOverrideAnalysis` uses the same FIFO-owned analyzer cache as
+imports. Its retained request freezes mode plus the shared context and gets a fresh
+attempt on retry. Storage validates the before-image in a read transaction and
+reuses existing same-profile A/C snapshots without loading Full. For a missing mode,
+it releases the transaction before whole-chapter analysis, then rechecks the key
+and rule revision under an immediate transaction before storing immutable output.
+The requested mode, original engine/dictionary profile and all canonical anchors
+must match. Competing edits reject the computed result; no automatic rebase occurs.
+The production native adapter supports pinned-profile modes; import-only analyzer
+closures reject alternate requests. Failures discard a bad analyzer, while normal
+reuse/background release follows the existing import lifecycle.
+
+Generation creates no rule, vocabulary, encounter, time or progress writes. New
+exact metadata can nevertheless change effective identity, so acceptance retires
+page callbacks and success requires explicit page/context reload. Failed attempts
+retain their before-image for explicit retry/Cancel; a lost success that changes
+metadata becomes stale. Stored but unaligned alternates remain absent from prompt
+choices and are never regenerated. No new migration or public shell codec.

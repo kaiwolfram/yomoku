@@ -2,10 +2,10 @@
 
 use std::{collections::BTreeSet, sync::Arc};
 
-use rusqlite::{Connection, TransactionBehavior};
+use rusqlite::{Connection, OptionalExtension, TransactionBehavior};
 use yomoku_core::{
-    analysis::{OverrideScope, SegmentationOverride, SplitMode},
-    document::{OverrideId, TextAnchor},
+    analysis::{AnalysisProfile, ChapterAnalysis, OverrideScope, SegmentationOverride, SplitMode},
+    document::{AnalysisId, ChapterText, OverrideId, TextAnchor},
     effective_overrides::OverrideRuleRevision,
     effective_reader::EffectiveReaderTokenKey,
     segmentation::segmentation_from_snapshot,
@@ -13,7 +13,10 @@ use yomoku_core::{
 };
 
 use crate::{
-    analysis::{read_analysis, read_chapter, read_override, save_registered_override_in},
+    analysis::{
+        read_analysis, read_chapter, read_override, save_registered_override_in,
+        store_chapter_analysis_in,
+    },
     reader_tokens::load_effective_reader_tokens_in,
     Storage, StorageError,
 };
@@ -59,7 +62,103 @@ impl std::error::Error for EffectiveOverrideError {
 
 pub use yomoku_core::effective_overrides::{EffectiveOverrideContext, StoredBoundaryChoice};
 
+#[derive(Debug)]
+pub enum EffectiveOverrideAnalysisError<E> {
+    Context(EffectiveOverrideError),
+    Analysis(E),
+}
+
+impl<E> From<EffectiveOverrideError> for EffectiveOverrideAnalysisError<E> {
+    fn from(error: EffectiveOverrideError) -> Self {
+        Self::Context(error)
+    }
+}
+
+impl<E> From<StorageError> for EffectiveOverrideAnalysisError<E> {
+    fn from(error: StorageError) -> Self {
+        Self::Context(error.into())
+    }
+}
+
+impl<E> From<rusqlite::Error> for EffectiveOverrideAnalysisError<E> {
+    fn from(error: rusqlite::Error) -> Self {
+        Self::Context(error.into())
+    }
+}
+
 impl Storage {
+    /// Explicit on-demand cache fill, never part of a page/prompt read. Reuse
+    /// stored same-profile A/C before invoking the analyzer; compute against the
+    /// WHOLE canonical chapter outside the transaction/write lock. Revalidate
+    /// the frozen key and rule revision under the final immediate transaction.
+    /// No rules, registration, history, time or progress are changed. Reload the
+    /// page/context after success: new exact metadata may retire the old key.
+    pub fn generate_effective_override_analysis<E>(
+        &mut self,
+        context: &EffectiveOverrideContext,
+        mode: SplitMode,
+        analyze: impl FnOnce(&ChapterText, SplitMode, &AnalysisProfile) -> Result<ChapterAnalysis, E>,
+    ) -> Result<AnalysisId, EffectiveOverrideAnalysisError<E>> {
+        if mode == SplitMode::B {
+            return Err(EffectiveOverrideError::InvalidSelection.into());
+        }
+        let transaction = self.connection.transaction()?;
+        validate_context_in(&transaction, context)?;
+        let chapter = read_chapter(&transaction, context.anchor().chapter_id)?;
+        let original = read_analysis(
+            &transaction,
+            context.key().segmentation.original_analysis_id,
+        )?
+        .ok_or(StorageError::InvalidAnalysis)?;
+        let base = segmentation_from_snapshot(
+            &chapter,
+            &original,
+            &original,
+            context.anchor(),
+            OverrideScope::default(),
+        )
+        .map_err(|_| EffectiveOverrideError::InvalidSelection)?;
+        if base.surface != *context.surface() {
+            return Err(EffectiveOverrideError::InvalidSelection.into());
+        }
+        let existing: Option<i64> = transaction
+            .query_row(
+                "SELECT id FROM chapter_analyses WHERE chapter_id = ?1
+                 AND engine_revision = ?2 AND dictionary_revision = ?3 AND split_mode = ?4",
+                (
+                    i64::from(chapter.chapter_id),
+                    &original.profile.engine_revision,
+                    &original.profile.dictionary_revision,
+                    if mode == SplitMode::A { "a" } else { "c" },
+                ),
+                |row| row.get(0),
+            )
+            .optional()?;
+        if let Some(id) = existing {
+            let id = id.try_into().map_err(|_| StorageError::InvalidAnalysis)?;
+            read_analysis(&transaction, id)?.ok_or(StorageError::InvalidAnalysis)?;
+            transaction.commit()?;
+            return Ok(id);
+        }
+        transaction.commit()?;
+
+        let analysis = analyze(&chapter, mode, &original.profile)
+            .map_err(EffectiveOverrideAnalysisError::Analysis)?;
+        if analysis.mode != mode || analysis.profile != original.profile {
+            return Err(StorageError::InvalidAnalysis.into());
+        }
+        analysis
+            .validate(&chapter)
+            .map_err(|_| StorageError::InvalidAnalysis)?;
+        let transaction = self
+            .connection
+            .transaction_with_behavior(TransactionBehavior::Immediate)?;
+        validate_context_in(&transaction, context)?;
+        let id = store_chapter_analysis_in(&transaction, chapter.chapter_id, &analysis)?;
+        transaction.commit()?;
+        Ok(id)
+    }
+
     /// Read choices and an intervening-edit guard from the rendered full key in
     /// one read-only transaction. Both span ends cover complete contiguous JP B
     /// tokens that intersect the page; a crossing edge token stays whole.

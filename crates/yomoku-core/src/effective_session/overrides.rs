@@ -18,6 +18,10 @@ enum Action {
         command: EffectivePageCommand,
         anchor: TextAnchor,
     },
+    Generate {
+        context: Arc<EffectiveOverrideContext>,
+        mode: SplitMode,
+    },
     Save {
         context: Arc<EffectiveOverrideContext>,
         scope: OverrideScope,
@@ -51,6 +55,10 @@ impl EffectiveOverrideRequest {
                 command: command.clone(),
                 anchor: *anchor,
             },
+            Action::Generate { context, mode } => Operation::GenerateOverrideAnalysis {
+                context: Arc::clone(context),
+                mode: *mode,
+            },
             Action::Save {
                 context,
                 scope,
@@ -82,6 +90,7 @@ pub struct EffectiveOverrideState {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum EffectiveOverrideProgress {
     Loaded,
+    AnalysisStored(SplitMode),
     Saved { id: OverrideId, registered: usize },
     Reversed(OverrideId),
     Failed(Failure),
@@ -171,6 +180,19 @@ impl EffectiveReaderSession {
         self.begin_override_save(scope, parts, registered_at_unix_ms)
     }
 
+    /// Explicitly generate one missing alternate on the existing FIFO. A stored
+    /// snapshot may resolve previously unknown metadata, so retire callbacks now
+    /// and require page/context reload on success, just as after a boundary edit.
+    pub fn begin_override_analysis(&mut self, mode: SplitMode) -> Option<EffectiveOverrideRequest> {
+        let context = self.editable_override_context()?;
+        if mode == SplitMode::B || context.choices().iter().any(|choice| choice.mode == mode) {
+            return None;
+        }
+        let request = self.start_override(Action::Generate { context, mode })?;
+        self.invalidate();
+        Some(request)
+    }
+
     /// Freeze literal parts, scope, timestamp and before-image. Immediately retire
     /// the rendered page so completion/selection cannot use its old partition.
     pub fn begin_override_save(
@@ -258,6 +280,11 @@ impl EffectiveReaderSession {
             }
             (Action::Save { .. }, Ok(Output::OverrideSaved { id, registered })) => {
                 Ok(EffectiveOverrideProgress::Saved { id, registered })
+            }
+            (Action::Generate { mode, .. }, Ok(Output::OverrideAnalysisStored(returned)))
+                if *mode == returned =>
+            {
+                Ok(EffectiveOverrideProgress::AnalysisStored(returned))
             }
             (Action::Reverse { id, .. }, Ok(Output::OverrideReversed(returned)))
                 if *id == returned =>

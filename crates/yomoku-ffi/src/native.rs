@@ -2,13 +2,40 @@
 
 use crate::{FfiError, YomokuBridge};
 use std::{fs::File, os::fd::FromRawFd, sync::Arc};
-use yomoku_analysis::Analyzer;
+use yomoku_analysis::{Analyzer, DICTIONARY_REVISION, ENGINE_REVISION};
 use yomoku_core::{
+    analysis::{AnalysisProfile, ChapterAnalysis, SplitMode},
     document::{ChapterText, DocumentId},
     reader_images::ReaderImageAsset,
     storage::DocumentError,
 };
 use yomoku_runtime::{AnalyzerLifecycle, PasteAnalyzer};
+
+struct NativeAnalyzer(Analyzer);
+
+impl PasteAnalyzer for NativeAnalyzer {
+    fn analyze(&mut self, chapter: &ChapterText) -> Result<ChapterAnalysis, DocumentError> {
+        self.0
+            .analyze(chapter)
+            .map_err(|_| DocumentError::InvalidDocument)
+    }
+
+    fn analyze_mode(
+        &mut self,
+        chapter: &ChapterText,
+        mode: SplitMode,
+        profile: &AnalysisProfile,
+    ) -> Result<ChapterAnalysis, DocumentError> {
+        if profile.engine_revision != ENGINE_REVISION
+            || profile.dictionary_revision != DICTIONARY_REVISION
+        {
+            return Err(DocumentError::Unavailable);
+        }
+        self.0
+            .analyze_mode(chapter, mode)
+            .map_err(|_| DocumentError::InvalidDocument)
+    }
+}
 
 /// Trusted platform descriptor publisher, called only on the storage worker.
 /// Return a newly owned read-only FD plus one for the verified private Full
@@ -151,11 +178,7 @@ impl NativeBridge {
             // writes/truncation of live inodes. The adapter rehashes this mapping.
             let analyzer = unsafe { Analyzer::open_full_mapped(&file) }
                 .map_err(|_| DocumentError::Unavailable)?;
-            Ok(Box::new(move |chapter: &ChapterText| {
-                analyzer
-                    .analyze(chapter)
-                    .map_err(|_| DocumentError::InvalidDocument)
-            }) as Box<dyn PasteAnalyzer>)
+            Ok(Box::new(NativeAnalyzer(analyzer)) as Box<dyn PasteAnalyzer>)
         });
         let (bridge, lifecycle) = YomokuBridge::with_dictionaries(
             database_path.into(),
