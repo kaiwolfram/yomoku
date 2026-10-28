@@ -205,6 +205,16 @@ impl Fixture {
         .unwrap();
         Core::<Probe>::new().handle_effects_using(effects)
     }
+
+    fn override_router(&self) -> Router {
+        let (effects, _) = StorageEffects::with_dictionaries(
+            self.path(),
+            Box::new(|| panic!("boundary commands must never load Sudachi")),
+            Box::new(|| panic!("boundary commands must never load word dictionaries")),
+        )
+        .unwrap();
+        Core::<Probe>::new().handle_effects_using(effects)
+    }
 }
 
 impl Drop for Fixture {
@@ -285,6 +295,229 @@ fn finish_word(
         result => panic!("unexpected word result: {result:?}"),
     };
     assert!(session.finish_word_request(request, result));
+}
+
+#[test]
+fn effective_worker_retained_override_failure_reopen_lost_success_requires_explicit_reload() {
+    use yomoku_core::{
+        effective_overrides::EffectiveOverrideFailure as Failure,
+        effective_session::EffectiveOverrideProgress as Progress,
+    };
+    let fixture = Fixture::new();
+    let mut storage = fixture.storage();
+    for mode in [SplitMode::A, SplitMode::C] {
+        let mut alternate = analysis(&fixture.imported.document.chapter).unwrap();
+        alternate.mode = mode;
+        storage
+            .store_chapter_analysis(fixture.base.page.chapter_id, &alternate)
+            .unwrap();
+    }
+    let time = storage
+        .load_pending_reading_time(fixture.base.document_id, fixture.intent.departing_position)
+        .unwrap();
+    storage
+        .save_pending_reading_time(time, PendingReadingTime::from_millis(987).unwrap())
+        .unwrap();
+    let document = storage
+        .load_document_reader_snapshot(fixture.base.document_id)
+        .unwrap();
+    drop(storage);
+    let reading_state = || {
+        fixture.sql().query_row(
+        "SELECT (SELECT COUNT(*) FROM reading_completions), (SELECT COUNT(*) FROM reading_occurrences),
+         (SELECT COUNT(*) FROM vocabulary_status_events WHERE cause = 'manual'),
+         (SELECT SUM(milliseconds) FROM pending_reading_time)", [],
+        |r| Ok((r.get::<_, i64>(0)?, r.get::<_, i64>(1)?, r.get::<_, i64>(2)?, r.get::<_, i64>(3)?))
+    ).unwrap()
+    };
+    let before_reading = reading_state();
+    let router = fixture.override_router();
+    let mut session = EffectiveReaderSession::default();
+    load(&router, &mut session, fixture.base);
+    let identity = session.page().unwrap().identity;
+    let anchor = session
+        .page()
+        .unwrap()
+        .tokens
+        .iter()
+        .find(|token| token.surface == "𠮷か\u{3099}\0")
+        .unwrap()
+        .anchor;
+    let request = session.begin_override_load(identity, anchor).unwrap();
+    let before = std::fs::read(fixture.path()).unwrap();
+    let StorageResult::Effective(output @ Output::OverrideContextLoaded(_)) =
+        run(&router, request.operation())
+    else {
+        panic!("context")
+    };
+    assert_eq!(std::fs::read(fixture.path()).unwrap(), before);
+    assert_eq!(
+        session.finish_override_request(&request, Ok(output)),
+        Some(Progress::Loaded)
+    );
+    assert_eq!(
+        session
+            .override_context()
+            .unwrap()
+            .choices()
+            .iter()
+            .map(|choice| choice.mode)
+            .collect::<Vec<_>>(),
+        [SplitMode::A, SplitMode::B, SplitMode::C]
+    );
+    let request = session
+        .begin_override_save(
+            OverrideScope::ThisOccurrence,
+            ["𠮷", "か\u{3099}\0"]
+                .map(|value| Surface::new(value).unwrap())
+                .into(),
+            600,
+        )
+        .unwrap();
+    fixture.sql().execute_batch("CREATE TRIGGER fail_override BEFORE INSERT ON segmentation_overrides BEGIN SELECT RAISE(ABORT, 'injected failure'); END;").unwrap();
+    let before = std::fs::read(fixture.path()).unwrap();
+    let StorageResult::Effective(output) = run(&router, request.operation()) else {
+        panic!("failure")
+    };
+    assert_eq!(
+        session.finish_override_request(&request, Ok(output)),
+        Some(Progress::Failed(Failure::Storage(
+            DocumentError::Unavailable
+        )))
+    );
+    assert_eq!(std::fs::read(fixture.path()).unwrap(), before);
+    assert_eq!(reading_state(), before_reading);
+    fixture
+        .sql()
+        .execute_batch("DROP TRIGGER fail_override")
+        .unwrap();
+    drop(router);
+    let router = fixture.override_router();
+    let retry = session.retry_override_write().unwrap();
+    assert_eq!(retry.operation(), request.operation());
+    let StorageResult::Effective(Output::OverrideSaved { id, registered }) =
+        run(&router, retry.operation())
+    else {
+        panic!("saved")
+    };
+    assert_eq!(registered, 2);
+    // Lose the successful response, then delete one new vocabulary entry. The
+    // retained before-image must become stale rather than recreating that row.
+    session
+        .finish_override_request(&retry, Err(DocumentError::Unavailable))
+        .unwrap();
+    fixture
+        .sql()
+        .execute("DELETE FROM vocabulary WHERE surface = ?1", ["𠮷"])
+        .unwrap();
+    let retry = session.retry_override_write().unwrap();
+    let before = std::fs::read(fixture.path()).unwrap();
+    let StorageResult::Effective(output) = run(&router, retry.operation()) else {
+        panic!("stale")
+    };
+    assert_eq!(
+        session.finish_override_request(&retry, Ok(output)),
+        Some(Progress::Failed(Failure::StaleContext))
+    );
+    assert_eq!(std::fs::read(fixture.path()).unwrap(), before);
+    assert!(session.override_state().reload_required);
+    assert!(session.retry_override_write().is_none());
+    assert_eq!(reading_state(), before_reading);
+    assert_eq!(
+        fixture
+            .storage()
+            .load_document_reader_snapshot(fixture.base.document_id)
+            .unwrap(),
+        document
+    );
+    load(&router, &mut session, fixture.base);
+    let read = session
+        .begin_override_load(session.page().unwrap().identity, anchor)
+        .unwrap();
+    let StorageResult::Effective(output) = run(&router, read.operation()) else {
+        panic!("reload")
+    };
+    session.finish_override_request(&read, Ok(output)).unwrap();
+    assert_eq!(session.override_context().unwrap().rules()[0].id, id);
+    let reverse = session.begin_override_reverse(id).unwrap();
+    let StorageResult::Effective(output) = run(&router, reverse.operation()) else {
+        panic!("reverse")
+    };
+    assert_eq!(
+        session.finish_override_request(&reverse, Ok(output)),
+        Some(Progress::Reversed(id))
+    );
+    assert!(session.page().is_none());
+    assert_eq!(reading_state(), before_reading);
+    load(&router, &mut session, fixture.base);
+    assert!(session
+        .page()
+        .unwrap()
+        .tokens
+        .iter()
+        .any(|token| token.surface == "𠮷か\u{3099}\0"));
+    assert!(fixture
+        .storage()
+        .vocabulary_entry(&Surface::new("𠮷").unwrap())
+        .unwrap()
+        .is_none());
+}
+
+#[test]
+fn effective_worker_override_rejects_stale_render_and_invalid_span_without_dictionary_or_writes() {
+    use yomoku_core::{
+        effective_overrides::EffectiveOverrideFailure as Failure,
+        effective_session::EffectiveOverrideProgress as Progress,
+    };
+    let fixture = Fixture::new();
+    let router = fixture.override_router();
+    let mut session = EffectiveReaderSession::default();
+    load(&router, &mut session, fixture.base);
+    let identity = session.page().unwrap().identity;
+    // A punctuation/Latin span is visible but not a valid boundary-edit target.
+    let text = &fixture.imported.document.chapter.text;
+    let start = text.find("English").unwrap();
+    let anchor = TextAnchor {
+        range: TextRange {
+            start: TextOffset::at(text, start).unwrap(),
+            end: TextOffset::at(text, start + "English".len()).unwrap(),
+        },
+        ..fixture.base.page
+    };
+    let request = session.begin_override_load(identity, anchor).unwrap();
+    let before = std::fs::read(fixture.path()).unwrap();
+    let StorageResult::Effective(output) = run(&router, request.operation()) else {
+        panic!("invalid")
+    };
+    assert_eq!(
+        session.finish_override_request(&request, Ok(output)),
+        Some(Progress::Failed(Failure::InvalidSelection))
+    );
+    assert_eq!(std::fs::read(fixture.path()).unwrap(), before);
+    load(&router, &mut session, fixture.base);
+    let identity = session.page().unwrap().identity;
+    let anchor = TextAnchor {
+        range: TextRange {
+            start: 0.try_into().unwrap(),
+            end: 9.try_into().unwrap(),
+        },
+        ..fixture.base.page
+    };
+    let request = session.begin_override_load(identity, anchor).unwrap();
+    fixture
+        .storage()
+        .reverse_segmentation_override(fixture.rule)
+        .unwrap();
+    let before = std::fs::read(fixture.path()).unwrap();
+    let StorageResult::Effective(output) = run(&router, request.operation()) else {
+        panic!("stale")
+    };
+    assert_eq!(
+        session.finish_override_request(&request, Ok(output)),
+        Some(Progress::Failed(Failure::StaleContext))
+    );
+    assert!(session.page().is_none());
+    assert_eq!(std::fs::read(fixture.path()).unwrap(), before);
 }
 
 #[test]

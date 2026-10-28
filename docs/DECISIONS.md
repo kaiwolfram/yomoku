@@ -3154,3 +3154,25 @@ explicit reload and never automatically rebase/replay old fields. An already
 identical active-rule save remains write-free and never re-registers deleted
 vocabulary. Reversal accepts only an exact winning rule shown by that context.
 These are repository guards, not implemented Android flows or new product controls.
+
+## 2026-10-28 — Retained guarded boundary requests on the existing FIFO
+
+Continue the independent guarded-edit prerequisite before attempting the broad
+coordinated live-reader switch. Keep prompt context and accepted command ownership
+in the existing pure effective session; dispatch through its existing native-only
+storage envelope/FIFO. No second worker, shell chapter payload or durable edit queue.
+Stored A/B/C choices and manual parts share save validation/registration. Freeze
+scope, literal partition, timestamp and shared before-image; each explicit retry
+gets a fresh checked callback attempt. Pending word/custom/status/completion work
+mutually gates edits; the live app must additionally apply its clock/lifecycle gates.
+
+Retire the rendered page on write acceptance. A storage failure keeps the frozen
+request for explicit exact retry or failed-request Cancel; in-flight writes must
+drain. Stale/invalid contexts discard retry ownership and require explicit reload,
+without rebasing old fields. A successful write also requires reload; a lost success
+therefore becomes stale on retry and cannot recreate deleted vocabulary. Cancel
+after a failed write retires newer rendered state too because its response may hide
+a commit. Dismissed reads drain without restoring presentation. Keep typed native
+stale/invalid/storage failures outside the existing shell `DocumentError` schema.
+No dependency, migration or live Android change; on-demand A/C and compact prompt
+controls remain separate work after the coordinated reader switch.

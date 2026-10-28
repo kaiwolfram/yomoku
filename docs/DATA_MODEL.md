@@ -1396,4 +1396,14 @@ in the context. History/time/position/finish remain unchanged. Rollback permits
 explicit retry; a committed mutation makes the old context stale and requires
 explicit reload even if its success response was lost. Same-rule no-ops under a
 fresh context stay write-free after vocabulary deletion. No migration or shell
-codec is added. Native lifecycle/FIFO/on-demand analysis/UI adoption is pending.
+codec is added.
+
+The retained native session now owns read/stored-choice/manual-save/reverse attempts
+on the existing FIFO. Each dispatch/retry has a fresh checked attempt; writes retain
+the same shared context, scope, literal parts and registration timestamp across
+invalidation/reopen retries. Successful writes, stale contexts and failed-write
+Cancel retire rendered state and require explicit reload. Stale before-images are
+discarded rather than rebased, including after lost-success responses; deleted
+vocabulary is never recreated by replaying that old prompt. Pending edits mutually
+gate word/custom/status/completion obligations. No new durable command, automatic
+replay, migration or shell codec. On-demand analysis and live UI adoption remain.

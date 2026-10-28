@@ -8,6 +8,8 @@ use std::sync::Arc;
 
 mod statuses;
 pub use statuses::{EffectiveStatusRequest, EffectiveStatusState};
+mod overrides;
+pub use overrides::{EffectiveOverrideProgress, EffectiveOverrideRequest, EffectiveOverrideState};
 mod words;
 pub use words::{EffectiveReaderWordState, EffectiveWordDetails, EffectiveWordRequest};
 mod completions;
@@ -122,6 +124,10 @@ impl EffectivePageCommand {
     pub fn key(&self) -> &EffectiveReaderTokenKey {
         &self.key
     }
+
+    pub fn shared_key(&self) -> Arc<EffectiveReaderTokenKey> {
+        Arc::clone(&self.key)
+    }
 }
 
 /// A visible eligible selection authenticated before accepting a word/custom
@@ -154,6 +160,7 @@ pub struct EffectiveReaderSession {
     words: words::WordState,
     completion: completions::CompletionState,
     status: statuses::StatusState,
+    overrides: overrides::OverrideState,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -184,6 +191,7 @@ impl EffectiveReaderSession {
         self.pending = None;
         self.current = None;
         self.dismiss_word();
+        self.dismiss_override();
     }
 
     /// Accept only the outstanding request and its document/page/original-B

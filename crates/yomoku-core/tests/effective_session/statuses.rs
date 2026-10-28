@@ -63,7 +63,7 @@ fn entry() -> ReaderVocabulary {
     }
 }
 
-fn intent(selection: EffectiveReaderSelection) -> PageCompletionIntent {
+pub(super) fn intent(selection: EffectiveReaderSelection) -> PageCompletionIntent {
     PageCompletionIntent {
         document_id: selection.page.base.document_id,
         page: selection.page.base.page,

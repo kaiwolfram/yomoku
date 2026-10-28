@@ -4752,3 +4752,50 @@ pure snapshot types are complete; retained core/FIFO adapters, on-demand A/C and
 Android controls remain pending. The coordinated live token/status/word/custom/
 completion/furigana switch is still next. APK/device/Android lint/release/performance/
 process-death/physical arm64 were not rerun. No implementation blocker.
+
+## Retained guarded override requests and FIFO adapter
+
+2026-10-28, repository root, existing pinned offline Rust/JDK:
+
+```sh
+export PATH=/home/kai/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin:$PATH
+export JAVA_HOME=/home/kai/repos/yomoku/.local/jdk-17/jdk-17.0.21+9
+cargo test -p yomoku-core --test effective_session --all-features --locked --offline
+cargo test -p yomoku-runtime effective_worker_ --all-features --locked --offline
+cargo test --workspace --all-features --locked --offline --quiet
+cargo clippy --workspace --all-targets --all-features --locked --offline -- -D warnings
+cargo fmt --all -- --check
+tools/format-kotlin.sh --check
+tools/test-sudachi.sh
+tools/test-kotlin-bridge.sh
+cargo run -p yomoku-ffi --bin generate-kotlin --features facet_typegen --locked --offline -- target/generated/kotlin-repeat
+# Compare only after both generation commands finish.
+diff -r target/generated/kotlin target/generated/kotlin-repeat
+git diff --check
+```
+
+PASS: seven new pure cases and two real SQLite/FIFO cases; 592 workspace Rust tests
+(17 opt-in ignored), strict Clippy/Rustfmt/Kotlin formatting. Fifteen Full fixtures
+plus one runtime fixture pass EACH owned/mapped (32 invocations). Host Kotlin/JNI
+passes real-Full imports/cancellation, selected-word/custom CRUD, navigation/codecs,
+seven Unicode fixtures and 100 handle lifecycles. Repeat generation is byte-identical.
+
+Tests cover exact shared-context/manual values/scope/timestamp across invalidation
+and explicit retry/reopen; callback attempts, dismissed reads, stored A/B/C choices,
+winning-rule reversal, stale reload and mutual word/custom/status/completion gates.
+An injected write failure rolls back; a lost successful response makes the retained
+before-image stale and never recreates subsequently deleted vocabulary. Read/error/
+stale paths preserve database bytes; edits preserve history, position, finish and
+nonzero pending duration. Both analyzer and word-dictionary loaders panic if invoked
+by these worker cases. No automatic replay or rebase.
+
+Initial test compilation caught a private helper and a shadowed fixture function;
+the worker fixture also used the wrong pending-time column name. Corrected and
+reran affected checks. Existing Crux middleware teardown/ktfmt JDK messages remain
+informational. Logs: `/tmp/yomoku-retained-overrides-{core,worker,tests,clippy,
+full,bridge,format,codegen}.log`.
+
+No dependency, migration, public shell schema or live Android change. Coordinated
+live token/status/word/custom/completion/furigana adoption is still next, followed
+by on-demand same-profile A/C and compact override controls. APK/device/Android
+lint/release/performance/process-death/physical arm64 were not rerun. No blocker.

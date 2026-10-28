@@ -8,7 +8,7 @@ use yomoku_core::{
     storage::DocumentError,
 };
 
-fn loaded(
+pub(super) fn loaded(
     manual: bool,
 ) -> (
     EffectiveReaderSession,

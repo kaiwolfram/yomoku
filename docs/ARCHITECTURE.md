@@ -1139,7 +1139,24 @@ to its original B value. Rule changes elsewhere conservatively invalidate prompt
 live vocabulary and time changes do not. Failed transactions can retry unchanged
 contexts; committed mutations require explicit reload, including lost responses.
 
-There is no new migration, dependency, worker, FFI/schema or Android behavior.
-Contexts are scoped to their originating database/native session and must be
-discarded on replacement/restore. Core/FIFO request ownership, on-demand A/C,
-compact shell choices and Android controls remain pending alongside the live switch.
+`effective_session::overrides` now retains prompt presentation and accepted native
+read/save/reverse requests. Stored choices and manual partitions share the same
+save path; core validates literal partition shape, while storage revalidates full
+provenance and rule revision transactionally. Checked fresh callback attempts reject
+duplicates and previous retries. Dismissed/invalidated reads drain without restoring
+prompts. Accepted writes share an immutable context through `Arc` across invalidation
+and explicit exact retries; in-flight work cannot Cancel. Write acceptance retires
+the rendered page immediately. Successful writes and stale results require explicit
+page/context reload. A lost success retried against its old before-image returns
+stale, without re-registering deleted vocabulary. Failed-write Cancel also retires
+any newer page, since an unknown response can hide a committed edit.
+
+Native `LoadOverrideContext`/`SaveOverride`/`ReverseOverride` effects use the existing
+FIFO/SQLite connection without analyzer or word-dictionary loading. Typed native
+failures distinguish storage errors from invalid selections/stale contexts; no
+shell error enum changes. Pending override I/O/failed writes mutually gate retained
+word/custom/status/completion requests. The live app must also apply its time/FIFO/
+lifecycle gates. There is no new migration, dependency, worker, public shell schema
+or Android behavior. Contexts are database/session scoped and must be discarded on
+replacement/restore. On-demand A/C, compact shell choices and Android controls
+remain pending alongside the coordinated live reader switch.

@@ -2434,3 +2434,21 @@
   migration, shell schema or Android source change. Live reader still uses B.
   Next: coordinated live switch, retained guarded-edit adapters/on-demand A/C,
   then Android controls. Device/APK/lint/release/arm64 not rerun; no blocker.
+
+## 2026-10-28 — Retained guarded override requests
+
+- Added native retained prompt/stored-choice/manual-save/reverse requests through
+  the existing FIFO. Frozen context/parts/scope/timestamp survive invalidation and
+  explicit retries; fresh attempts reject duplicate callbacks. Dismissed reads
+  drain without restoring prompts. Word/custom/status/completion obligations gate.
+- Stale contexts and successful writes require explicit reload; a lost-success
+  retry never recreates deleted vocabulary. Failed-write Cancel retires the page;
+  in-flight work drains. No analyzer/dictionary loads, reading/time/position writes,
+  shell schema, migration, dependency or live Android change.
+- PASS: seven pure + two worker cases; 592 Rust tests (17 ignored), strict Clippy/
+  Rustfmt/Kotlin formatting, 15 Full + one runtime fixture EACH owned/mapped, host
+  Kotlin/JNI, repeat generation and diff check. Fixed test helper/shadowing/column
+  errors before the passing reruns; existing middleware/JDK messages informational.
+- Updated progress/architecture/data/decisions/payload/development. Next coordinated
+  live reader switch, on-demand A/C, then compact Android override controls.
+  APK/device/Android lint/release/performance/process-death/arm64 not rerun; no blocker.

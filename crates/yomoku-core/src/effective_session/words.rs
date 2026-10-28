@@ -140,7 +140,11 @@ impl EffectiveReaderSession {
         &mut self,
         selection: EffectiveReaderSelection,
     ) -> Option<EffectiveWordRequest> {
-        if self.words.in_flight || self.completion_state().pending || self.status_state().pending {
+        if self.words.in_flight
+            || self.completion_state().pending
+            || self.status_state().pending
+            || self.overrides.blocks_reader()
+        {
             return None;
         }
         let command = self.freeze_selection(selection)?;
@@ -190,7 +194,11 @@ impl EffectiveReaderSession {
     /// Retry the accepted key and literal values, even after UI invalidation.
     /// Storage revalidates provenance; it never substitutes the new visible word.
     pub fn retry_custom_entry(&mut self) -> Option<EffectiveWordRequest> {
-        if self.words.in_flight || self.completion_state().pending || self.status_state().pending {
+        if self.words.in_flight
+            || self.completion_state().pending
+            || self.status_state().pending
+            || self.overrides.blocks_reader()
+        {
             return None;
         }
         let pending = self.words.pending.as_ref()?;
@@ -389,6 +397,7 @@ impl EffectiveReaderSession {
         if self.words.in_flight
             || self.completion_state().pending
             || self.status_state().pending
+            || self.overrides.blocks_reader()
             || self.words.selection != Some(selection)
         {
             return None;

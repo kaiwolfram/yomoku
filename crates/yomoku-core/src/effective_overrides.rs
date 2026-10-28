@@ -6,8 +6,18 @@ use crate::{
     analysis::{SplitMode, StoredOverride},
     document::TextAnchor,
     effective_reader::EffectiveReaderTokenKey,
+    storage::DocumentError,
     vocabulary::Surface,
 };
+
+/// Native-only failures preserve the distinction between retryable I/O and a
+/// retired prompt. A stale edit must never be automatically rebased/replayed.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum EffectiveOverrideFailure {
+    Storage(DocumentError),
+    InvalidSelection,
+    StaleContext,
+}
 
 /// Repositories append immutable rules, deactivate only and retain rule rows
 /// after document deletion. This pair changes on every supported rule mutation,

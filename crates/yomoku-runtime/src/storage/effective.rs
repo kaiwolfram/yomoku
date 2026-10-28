@@ -3,10 +3,12 @@
 use std::sync::Arc;
 
 use yomoku_core::{
+    effective_overrides::EffectiveOverrideFailure,
     effective_storage::{EffectiveStorageOperation, EffectiveStorageResult},
     reader::ReaderAnalysis,
     storage::DocumentError,
 };
+use yomoku_storage::effective_overrides::EffectiveOverrideError;
 use yomoku_storage::{dictionary::Dictionary, Storage};
 
 use super::{map_custom_error, map_error, map_word_error, word_dictionary, WordDictionaryLoader};
@@ -18,6 +20,29 @@ pub(super) fn execute(
     operation: EffectiveStorageOperation,
 ) -> Result<EffectiveStorageResult, DocumentError> {
     match operation {
+        EffectiveStorageOperation::LoadOverrideContext { command, anchor } => Ok(
+            match storage.load_effective_override_context(command.shared_key(), anchor) {
+                Ok(context) => EffectiveStorageResult::OverrideContextLoaded(Arc::new(context)),
+                Err(error) => override_error(error),
+            },
+        ),
+        EffectiveStorageOperation::SaveOverride {
+            context,
+            scope,
+            parts,
+            registered_at_unix_ms,
+        } => Ok(
+            match storage.save_effective_override(&context, scope, parts, registered_at_unix_ms) {
+                Ok((id, registered)) => EffectiveStorageResult::OverrideSaved { id, registered },
+                Err(error) => override_error(error),
+            },
+        ),
+        EffectiveStorageOperation::ReverseOverride { context, id } => {
+            Ok(match storage.reverse_effective_override(&context, id) {
+                Ok(()) => EffectiveStorageResult::OverrideReversed(id),
+                Err(error) => override_error(error),
+            })
+        }
         EffectiveStorageOperation::LoadTokens(request) => {
             let base = request.base();
             let snapshot = storage
@@ -114,4 +139,14 @@ pub(super) fn execute(
             Ok(EffectiveStorageResult::PageCompleted(document, outcome))
         }
     }
+}
+
+fn override_error(error: EffectiveOverrideError) -> EffectiveStorageResult {
+    EffectiveStorageResult::OverrideFailed(match error {
+        EffectiveOverrideError::Storage(error) => {
+            EffectiveOverrideFailure::Storage(map_error(error))
+        }
+        EffectiveOverrideError::InvalidSelection => EffectiveOverrideFailure::InvalidSelection,
+        EffectiveOverrideError::StaleContext => EffectiveOverrideFailure::StaleContext,
+    })
 }

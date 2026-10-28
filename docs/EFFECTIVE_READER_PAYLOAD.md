@@ -135,3 +135,14 @@ update repeated visible spellings and selected-word details only for the retaine
 revision. Pending choices gate word/custom/completion until success or explicit
 failed-request Cancel/new choice. No shell schema or payload-size change. Include
 status with token/word/custom/completion/furigana in the coordinated live switch.
+
+Guarded boundary prompts now have retained native callback/request ownership too.
+`EffectiveOverrideRequest` dispatches context reads, stored A/B/C choices, literal
+manual partitions and winning-rule reversals through the same FIFO. A request
+shares its full key/context with exact retries and uses a fresh checked callback
+attempt. Writes invalidate visible callbacks immediately and mutually gate word/
+custom/status/completion obligations. Dismissed reads cannot restore a prompt.
+Stale contexts are discarded and require explicit page/context reload; a lost
+successful write cannot re-register deleted vocabulary on retry. This introduces
+no shell schema or new payload measurement. Compact prompt presentation, on-demand
+A/C and live Android controls remain pending with the coordinated reader switch.

@@ -1,5 +1,5 @@
 # Resume here
-Updated: 2026-10-28. Guarded override repositories done; live switch next.
+Updated: 2026-10-28. Retained guarded-edit requests done; live switch next.
 ## Working
 - Pure Crux routes/Library/Settings; Render-only UI; FIFO SQLite/analysis; Library start.
 - Chapter-local UTF-8 position/whole-book percentage/five presets persist; reflow
@@ -61,20 +61,20 @@ Updated: 2026-10-28. Guarded override repositories done; live switch next.
   survives reversal/deletion/reopen; legacy calls reject its ID. Live reader uses B.
 - Compact effective_session: one full key + view, fresh revisions, stale/foreign/
   duplicate guards, retry/Missing B; prototype Kotlin codecs, page/selection 60/68 B.
-- Native effective_storage shares FIFO/dictionary; all effective commands.
-  Compact word state: frozen keys, fresh attempts, retry/Cancel/stale guards.
+- Native effective_storage shares FIFO/dictionary; compact word state/retry/stale guards.
 - Retained completion: freeze before time drain; exact retries/reopen/reversal count once.
 - Effective status: atomic key/surface/ID guards; five choices/no-op retries; retained gates.
 - Guarded override storage: read-only stored A/B/C choices + shared key/rule revision;
   atomic save/register/reverse, stale/ABA/concurrent guards. Rollbacks retry; successful
-  mutations require explicit reload. No core/FIFO/UI adapter or on-demand A/C yet.
+  mutations require explicit reload. Retained core/FIFO choices/manual/save/reverse:
+  fresh attempts, exact retries, shared gates; stale/lost success requires reload.
 ## Next tasks (ordered)
 1. Switch live core/FFI/Android completion/token/status/furigana/word/custom together
    via effective_storage + retained requests; see EFFECTIVE_READER_PAYLOAD.md.
-2. Route guarded override reads/choices/save/reverse through retained core/FIFO requests;
-   add explicit stale reload handling and same-profile on-demand A/C generation.
+2. Add same-profile on-demand A/C generation to retained guarded override requests;
+   preserve explicit stale reload, stored provenance and frozen retry semantics.
 3. Add Android A/B/C/manual + All/This occurrence; measure real-book/JNI/device cost.
 Physical arm64 deferred; Nostr empty; Q188 unresolved before forwarding.
 ## Verification
-- PASS: 583 Rust (17 ignored); Clippy/Rustfmt/diff; Full + host JNI (DEVELOPMENT.md end).
+- PASS: 592 Rust (17 ignored); Clippy/Rustfmt/diff; Full + host JNI (DEVELOPMENT.md end).
 - No shell schema changes. APK/device/lint/release/arm64 not rerun.

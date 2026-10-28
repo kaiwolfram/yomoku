@@ -65,6 +65,7 @@ impl EffectiveReaderSession {
         occurred_at_unix_ms: i64,
     ) -> Option<EffectiveStatusRequest> {
         if self.status.in_flight
+            || self.overrides.blocks_reader()
             || self.words.blocks_completion()
             || self.completion_state().pending
             || occurred_at_unix_ms < 0
@@ -95,6 +96,7 @@ impl EffectiveReaderSession {
     /// even when the visible page has been invalidated. Storage revalidates them.
     pub fn retry_status_change(&mut self) -> Option<EffectiveStatusRequest> {
         if self.status.in_flight
+            || self.overrides.blocks_reader()
             || self.completion_state().pending
             || self.words.blocks_completion()
         {
