@@ -2395,3 +2395,23 @@
 - Updated architecture/data/payload/decisions/plan/development/handoff. No dependency,
   schema or live Android changes. Live reader remains B; coordinated adoption is
   next. APK/device/lint/release/performance/process-death/arm64 not rerun. No blocker.
+
+
+## 2026-10-28 — Effective manual status commands and retained lifecycle
+
+- Found the remaining original-B-only manual status path while reviewing the live
+  switch. Added native effective status operations on the existing FIFO, sharing
+  the manual status/history helper under transaction-local full-key/visible-word/
+  exact-surface-ID validation. Deleted entries stay absent; replacement IDs reject.
+- Retained frozen choices/timestamps across invalidation and explicit exact retries
+  with fresh callback attempts; success updates repeated spellings/selected details.
+  Word/custom/completion obligations mutually gate. No dictionary loads or reading
+  writes; same-status/lost-success retries add no duplicate history.
+- PASS: six pure, four storage and one actual worker case; 571 workspace Rust tests
+  (17 ignored), strict Clippy/Rustfmt/Kotlin formatting, 15 Full + one runtime fixture
+  EACH owned/mapped, real-Full host Kotlin/JNI, seven Unicode fixtures, 100 handles,
+  byte-identical repeat generation and diff check. No initial verification failures.
+- Updated plan/handoff/architecture/data/decisions/payload/development. No dependency,
+  migration, shell schema or live Android change. Next adopt token/status/word/custom/
+  completion/furigana together. APK/device/lint/release/performance/process-death/
+  physical arm64 not rerun; no implementation blocker.

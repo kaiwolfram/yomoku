@@ -9,7 +9,7 @@ use crate::{
     dictionary::{CustomDictionaryEntry, DictionaryCandidates},
     effective_reader::EffectiveReaderWordDetails,
     effective_storage::{EffectiveStorageOperation as Operation, EffectiveStorageResult as Output},
-    reader::ReaderCustomEntry,
+    reader::{ReaderCustomEntry, ReaderVocabulary},
     storage::DocumentError,
     vocabulary::Surface,
 };
@@ -95,6 +95,21 @@ impl WordState {
 }
 
 impl EffectiveReaderSession {
+    pub(super) fn observe_word_status(
+        &mut self,
+        page: super::EffectivePageIdentity,
+        surface: &str,
+        vocabulary: Option<ReaderVocabulary>,
+    ) {
+        if let Some(details) =
+            self.words.details.as_mut().filter(|details| {
+                details.selection.page == page && details.token.surface == surface
+            })
+        {
+            details.token.vocabulary = vocabulary;
+        }
+    }
+
     pub fn word_state(&self) -> EffectiveReaderWordState {
         EffectiveReaderWordState {
             selection: self.words.selection,
@@ -125,7 +140,7 @@ impl EffectiveReaderSession {
         &mut self,
         selection: EffectiveReaderSelection,
     ) -> Option<EffectiveWordRequest> {
-        if self.words.in_flight || self.completion_state().pending {
+        if self.words.in_flight || self.completion_state().pending || self.status_state().pending {
             return None;
         }
         let command = self.freeze_selection(selection)?;
@@ -175,7 +190,7 @@ impl EffectiveReaderSession {
     /// Retry the accepted key and literal values, even after UI invalidation.
     /// Storage revalidates provenance; it never substitutes the new visible word.
     pub fn retry_custom_entry(&mut self) -> Option<EffectiveWordRequest> {
-        if self.words.in_flight || self.completion_state().pending {
+        if self.words.in_flight || self.completion_state().pending || self.status_state().pending {
             return None;
         }
         let pending = self.words.pending.as_ref()?;
@@ -373,6 +388,7 @@ impl EffectiveReaderSession {
     ) -> Option<EffectiveSelectionCommand> {
         if self.words.in_flight
             || self.completion_state().pending
+            || self.status_state().pending
             || self.words.selection != Some(selection)
         {
             return None;

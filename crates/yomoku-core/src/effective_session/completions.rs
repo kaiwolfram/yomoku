@@ -90,6 +90,7 @@ impl EffectiveReaderSession {
     ) -> bool {
         if self.completion.pending.is_some()
             || self.words.blocks_completion()
+            || self.status_state().pending
             || intent.document_id != identity.base.document_id
             || intent.page != identity.base.page
             || identity.base.analysis != ReaderAnalysis::Available(intent.analysis_id)

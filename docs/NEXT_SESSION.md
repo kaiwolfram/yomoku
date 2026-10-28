@@ -1,5 +1,5 @@
 # Resume here
-Updated: 2026-10-28. Retained effective completion lifecycle done; live switch next.
+Updated: 2026-10-28. Effective manual status lifecycle done; live switch next.
 ## Working
 - Pure Crux routes/Library/Settings; Render-only UI; FIFO SQLite/analysis; Library start.
 - Chapter-local UTF-8 position/whole-book percentage/five presets persist; reflow
@@ -35,7 +35,7 @@ Updated: 2026-10-28. Retained effective completion lifecycle done; live switch n
 - Direct off-main cancelFileImport bypasses FIFO; COMMIT may wait. Silent full-file
   rollback; winning/prior commits stay. Android ignores late reads and awaits BOTH
   native return + outcome before clearing/draining. Dedicated cancellation executor.
-- dataSync lease tracks counts/name; encoding/timeout release it, timeout Cancels.
+- dataSync lease tracks name/counts; encoding/timeout release, timeout Cancels.
   OS limits apply; permission never blocks; notification opens Library.
 - Bounded EPUB parser ignores CSS; migration 0014 atomically saves original source,
   ordered content/formatting/ruby/images/B/registration. Snapshot loads verify all
@@ -48,33 +48,32 @@ Updated: 2026-10-28. Retained effective completion lifecycle done; live switch n
 - Serial bounds-first decode: <=32768-edge/100 MP source, <=2048-edge sample,
   16 MiB shared page pixels; repeats share bitmaps. Ratio frames <=8192px preserve
   U+FFFC positions/styles/word/link identity; unsupported images keep alt/Retry.
-- Viewer: bounded 1–8x zoom/pan; modal never completes. Covers: 4 MiB/64-entry LRU.
-- Noto Serif JP/credits; global font/spacing (16sp/150% default)/furigana persist (0015/16).
+- Viewer: 1–8x zoom/pan; no completion. Covers: 4 MiB/64-entry LRU.
+- Noto Serif JP/credits; font/spacing (16sp/150%)/furigana persist (0015/16).
 - Custom entries (0017): exact-surface CRUD core/FIFO/FFI/Android; frozen selections,
   built-in gates, literal drafts/Cancel/retries; no history/status writes.
 - Furigana: persisted switch/retries, source-first/B fallback independent of status;
   half-size readings, strict UTF-16, full crossing readings/fitted width/headroom.
 - Effective segmentation: B + A/B/C/manual; contiguous JP B matches, local/newer
   precedence/reversal; exact metadata provenance, unmatched unresolved.
-- Pure effective furigana: source priority/crossings; unresolved manual has no B fallback.
-- Effective APIs: eligibility/start-owned counts/live statuses; frozen word/custom
-  provenance/base, unresolved surface-only; shared CRUD/built-in gates.
+- Effective APIs: counts/statuses/frozen provenance; unresolved surface-only/shared CRUD.
 - Effective completion (0018): full key/occurrences/time frozen durably; page-only
   registration/New-only Known/history/time/position/finish atomic. Exact replay
   survives reversal/deletion/reopen; legacy calls reject its ID. Live reader uses B.
 - Atomic override registration: winning parts only; retry no-op; reversal keeps history.
 - Compact effective_session: one full key + view, fresh revisions, stale/foreign/
   duplicate guards, retry/Missing B; prototype Kotlin codecs, page/selection 60/68 B.
-- Native effective_storage shares FIFO/dictionary; tokens/word/custom/completion.
-  Retained compact word state: frozen keys, fresh attempts, retry/Cancel/stale guards.
-- Retained native completion: freeze before time drain, fresh callbacks/exact retries,
-  word/custom gates; rollback/reversal/reopen/lost-success replay count once.
+- Native effective_storage shares FIFO/dictionary; all effective commands.
+  Compact word state: frozen keys, fresh attempts, retry/Cancel/stale guards.
+- Retained completion: freeze before time drain; exact retries/reopen/reversal count once.
+- Effective status: same-transaction key/surface/ID guards; five choices/no-op retries,
+  deletion/replacement safe; retained attempts + word/custom/completion gates.
 ## Next tasks (ordered)
-1. Switch live core/FFI/Android completion/token/furigana/word/custom together using
-   effective_storage + retained page/word/completion requests + EFFECTIVE_READER_PAYLOAD.md.
+1. Switch live core/FFI/Android completion/token/status/furigana/word/custom together
+   via effective_storage + retained requests; see EFFECTIVE_READER_PAYLOAD.md.
 2. Add typed reads/choices/save/reverse with rendered-key/intervening-edit retry guards.
 3. Add Android A/B/C/manual + All/This occurrence; measure real-book/JNI/device cost.
 Physical arm64 deferred; Nostr empty; Q188 unresolved before forwarding.
 ## Verification
-- PASS: 560 Rust (17 ignored); Clippy/Rustfmt/Kotlin format/diff; Full + host JNI.
+- PASS: 571 Rust (17 ignored); Clippy/Rustfmt/Kotlin format/diff; Full + host JNI.
 - Codegen identical. APK/device/lint/release/arm64 not rerun. DEVELOPMENT.md end.

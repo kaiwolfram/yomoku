@@ -695,6 +695,15 @@ discard a failed retry without database writes. No migration or historical data
 semantics change; a new explicit load/edit may supersede the failed retry. Live
 app integration remains pending.
 
+
+Effective manual status changes add no tables or event semantics. Full rendered
+resolution, eligible visible segment and live exact-surface vocabulary ID validate
+inside the same immediate transaction as the shared manual update/event helper.
+Same-status retries add no events. A missing vocabulary entry remains absent; an
+old ID cannot update a newly registered replacement. Reversed/stale partitions
+and off-page selections fail before mutation. The native retained request freezes
+choice/timestamp/key across explicit retries and never auto-replays after restart.
+
 ## Read-only reader token/status projection
 
 `load_reader_tokens(document_id, page)` reads live immutable text, the original

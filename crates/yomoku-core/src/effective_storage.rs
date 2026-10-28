@@ -5,7 +5,7 @@ use std::sync::Arc;
 
 use crate::{
     completion::{AnalyzedCompletionOutcome, PageCompletionIntent},
-    document::ReaderDocument,
+    document::{ReaderDocument, VocabularyId},
     effective_reader::{
         EffectivePageCompletion, EffectiveReaderTokenSnapshot, EffectiveReaderWordDetails,
     },
@@ -13,13 +13,20 @@ use crate::{
         EffectivePageCommand, EffectivePageRequest, EffectiveReaderSelection,
         EffectiveSelectionCommand,
     },
-    reader::ReaderCustomEntry,
+    reader::{ReaderCustomEntry, ReaderVocabulary},
+    vocabulary::VocabularyStatus,
 };
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum EffectiveStorageOperation {
     LoadTokens(EffectivePageRequest),
     LoadWord(EffectiveSelectionCommand),
+    SetStatus {
+        command: EffectiveSelectionCommand,
+        vocabulary_id: VocabularyId,
+        status: VocabularyStatus,
+        occurred_at_unix_ms: i64,
+    },
     SaveCustomEntry {
         command: EffectiveSelectionCommand,
         english_meaning: String,
@@ -40,6 +47,7 @@ pub enum EffectiveStorageOperation {
 pub enum EffectiveStorageResult {
     TokensLoaded(EffectivePageRequest, EffectiveReaderTokenSnapshot),
     WordLoaded(EffectiveReaderSelection, Box<EffectiveReaderWordDetails>),
+    StatusChanged(EffectiveReaderSelection, Option<ReaderVocabulary>),
     CustomEntryChanged(EffectiveReaderSelection, Option<ReaderCustomEntry>),
     CompletionPrepared(Arc<EffectivePageCompletion>),
     PageCompleted(ReaderDocument, AnalyzedCompletionOutcome),

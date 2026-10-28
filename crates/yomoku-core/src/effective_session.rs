@@ -6,6 +6,8 @@
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
+mod statuses;
+pub use statuses::{EffectiveStatusRequest, EffectiveStatusState};
 mod words;
 pub use words::{EffectiveReaderWordState, EffectiveWordDetails, EffectiveWordRequest};
 mod completions;
@@ -151,6 +153,7 @@ pub struct EffectiveReaderSession {
     current: Option<RetainedPage>,
     words: words::WordState,
     completion: completions::CompletionState,
+    status: statuses::StatusState,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

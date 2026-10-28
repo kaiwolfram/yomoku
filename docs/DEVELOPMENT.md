@@ -4659,3 +4659,49 @@ native retained-lifecycle slice. Live events/views and completion/token/word/cus
 furigana still use B; adopt the retained requests together next, then guarded
 override controls. APK/device/Android lint/release/performance/process-death/arm64
 were not rerun. No unresolved implementation blocker.
+
+
+## Effective manual status commands and retained lifecycle
+
+2026-10-28, repository root, existing pinned offline Rust/JDK:
+
+```sh
+export PATH=/home/kai/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin:$PATH
+export JAVA_HOME=/home/kai/repos/yomoku/.local/jdk-17/jdk-17.0.21+9
+cargo test -p yomoku-core --test effective_session --all-features --locked --offline
+cargo test -p yomoku-storage effective_status --all-features --locked --offline
+cargo test -p yomoku-runtime effective_worker_retained_status --all-features --locked --offline
+cargo test --workspace --all-features --locked --offline --quiet
+cargo clippy --workspace --all-targets --all-features --locked --offline -- -D warnings
+cargo fmt --all -- --check
+tools/format-kotlin.sh --check
+tools/test-sudachi.sh
+tools/test-kotlin-bridge.sh
+cargo run -p yomoku-ffi --bin generate-kotlin --features facet_typegen --locked --offline -- target/generated/kotlin-repeat
+# Compare after generation exits.
+diff -r target/generated/kotlin target/generated/kotlin-repeat
+git diff --check
+```
+
+PASS: 11 new cases (six pure retained-status, four SQLite and one actual FIFO
+worker), 571 workspace Rust tests (17 opt-in ignored), strict Clippy and Rustfmt.
+Fifteen Full fixtures plus one runtime fixture pass EACH owned/mapped (32 runs).
+All five manual choices share the existing status/history helper with validation
+of the complete rendered key, visible segment and live exact-surface ID in one
+immediate transaction. Tests verify literal supplementary/combining/NUL surfaces,
+same-status no-ops, repeated spellings/selected details, deleted/replaced IDs,
+stale/reversed/off-page selections, statement/deferred-commit rollback and exact
+retry after reopen/lost success. No dictionary/analyzer loads or reading writes.
+Accepted status choices retain frozen values across invalidation with fresh
+native callback attempts; pending status/word/custom/completion mutually gate.
+
+Host Kotlin/JNI passes real-Full imports/direct cancellation, word/custom CRUD,
+seven Unicode fixtures and 100 handle lifecycles. Repeat code generation is
+byte-identical; Kotlin formatting and diff check pass. Existing Crux middleware
+teardown messages remain informational.
+
+No dependency, migration, shell schema or live Android change. Live reader still
+uses original B; include status in the coordinated token/word/custom/completion/
+furigana switch next. APK/device/Android lint/release/performance/process-death/
+physical arm64 not rerun. No implementation blocker or initial check failures.
+Logs: `/tmp/yomoku-effective-status-{core,storage,worker,tests,clippy,full,bridge,format,codegen}.log`.

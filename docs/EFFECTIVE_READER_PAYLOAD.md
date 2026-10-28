@@ -122,3 +122,16 @@ No completion Cancel or restart replay is introduced: a failed follow-up read ca
 hide a successful commit, so the exact reservation must return AlreadyRecorded.
 Seven pure cases and a real FIFO failure/reversal/reopen/lost-response case verify
 this lifecycle. No new shell schema or payload measurement; the live switch remains.
+
+
+Manual status choices also have retained native ownership. `EffectiveStatusRequest`
+shares the accepted selection key and freezes the vocabulary ID, literal surface,
+choice and timestamp; each dispatch/retry gets a fresh checked native attempt.
+`SetStatus`/`StatusChanged` reuse the existing native-only FIFO envelope. Storage
+validates full resolution, visibility and the live exact-surface ID in the same
+immediate transaction as manual status/history. Missing entries stay absent;
+replacement IDs and stale/reversed partitions fail closed. Successful results
+update repeated visible spellings and selected-word details only for the retained
+revision. Pending choices gate word/custom/completion until success or explicit
+failed-request Cancel/new choice. No shell schema or payload-size change. Include
+status with token/word/custom/completion/furigana in the coordinated live switch.

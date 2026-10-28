@@ -14,6 +14,7 @@ mod completions;
 mod custom_dictionary;
 mod documents;
 mod effective_completions;
+mod effective_status;
 mod encounters;
 mod epub;
 #[path = "../../yomoku-import/tests/support/epub.rs"]

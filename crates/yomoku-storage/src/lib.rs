@@ -7,6 +7,7 @@ mod completions;
 pub mod custom_dictionary;
 pub mod dictionary;
 mod documents;
+mod effective_status;
 mod encounters;
 mod epub;
 mod epub_assets;

@@ -288,6 +288,154 @@ fn finish_word(
 }
 
 #[test]
+fn effective_worker_retained_status_rolls_back_retries_and_never_loads_dictionaries() {
+    let fixture = Fixture::new();
+    let mut storage = fixture.storage();
+    storage
+        .register_vocabulary(&[Surface::new("食べ").unwrap()], 110)
+        .unwrap();
+    let id = storage
+        .vocabulary_entry(&Surface::new("食べ").unwrap())
+        .unwrap()
+        .unwrap()
+        .id;
+    let original = storage
+        .chapter_analysis(fixture.imported.analysis_id)
+        .unwrap();
+    let reader = storage
+        .load_document_reader_snapshot(fixture.base.document_id)
+        .unwrap();
+    drop(storage);
+    let router = || {
+        let (effects, _) = StorageEffects::with_dictionaries(
+            fixture.path(),
+            Box::new(|| panic!("manual statuses must not load Sudachi")),
+            Box::new(|| panic!("manual statuses must not open the word dictionary")),
+        )
+        .unwrap();
+        Core::<Probe>::new().handle_effects_using(effects)
+    };
+    let worker = router();
+    let mut session = EffectiveReaderSession::default();
+    load(&worker, &mut session, fixture.base);
+    let selection = select(&session, "食べ").selection();
+    let before = session.page().unwrap().clone();
+    let events = || {
+        fixture
+            .sql()
+            .query_row(
+                "SELECT COUNT(*) FROM vocabulary_status_events WHERE cause = 'manual'",
+                [],
+                |r| r.get::<_, i64>(0),
+            )
+            .unwrap()
+    };
+    fixture.sql().execute_batch("CREATE TRIGGER fail_status AFTER INSERT ON vocabulary_status_events WHEN NEW.cause = 'manual' BEGIN SELECT RAISE(ABORT, 'fixture'); END;").unwrap();
+    let request = session
+        .begin_status_change(selection, id, VocabularyStatus::Known, 500)
+        .unwrap();
+    let StorageResult::Failed(error) = run(&worker, request.operation()) else {
+        panic!("expected injected failure")
+    };
+    assert!(session.finish_status_request(&request, Err(error)));
+    assert!(session.status_state().pending);
+    assert_eq!(session.page(), Some(&before));
+    assert_eq!(events(), 0);
+    assert_eq!(
+        fixture
+            .storage()
+            .vocabulary_entry(&Surface::new("食べ").unwrap())
+            .unwrap()
+            .unwrap()
+            .status,
+        VocabularyStatus::New
+    );
+    drop(worker);
+    fixture
+        .sql()
+        .execute_batch("DROP TRIGGER fail_status")
+        .unwrap();
+    let worker = router();
+    let retry = session.retry_status_change().unwrap();
+    assert_ne!(request, retry);
+    assert_eq!(request.operation(), retry.operation());
+    let StorageResult::Effective(result) = run(&worker, retry.operation()) else {
+        panic!("expected success")
+    };
+    // Lose the successful response and require an exact explicit retry.
+    assert!(matches!(result, Output::StatusChanged(..)));
+    assert!(session.finish_status_request(&retry, Err(DocumentError::Unavailable)));
+    let replay = session.retry_status_change().unwrap();
+    assert_eq!(replay.operation(), retry.operation());
+    assert!(!session.finish_status_request(&retry, Ok(result)));
+    let StorageResult::Effective(result) = run(&worker, replay.operation()) else {
+        panic!("expected no-op retry")
+    };
+    assert!(session.finish_status_request(&replay, Ok(result)));
+    assert_eq!(events(), 1);
+    assert!(!session.status_state().pending);
+    let repeats: Vec<_> = session
+        .page()
+        .unwrap()
+        .tokens
+        .iter()
+        .filter(|t| t.surface == "食べ")
+        .collect();
+    assert_eq!(repeats.len(), 2);
+    assert!(repeats
+        .iter()
+        .all(|t| t.vocabulary.unwrap().status == VocabularyStatus::Known
+            && t.reading.is_none()
+            && t.dictionary_form.is_none()));
+
+    let stale = session
+        .begin_status_change(selection, id, VocabularyStatus::Learning, 501)
+        .unwrap();
+    fixture
+        .storage()
+        .reverse_segmentation_override(fixture.rule)
+        .unwrap();
+    session.invalidate();
+    assert_eq!(
+        run(&worker, stale.operation()),
+        StorageResult::Failed(DocumentError::InvalidDocument)
+    );
+    assert!(session.finish_status_request(&stale, Err(DocumentError::InvalidDocument)));
+    assert!(session.page().is_none());
+    assert!(session.cancel_status_retry());
+    assert_eq!(events(), 1);
+    let mut storage = fixture.storage();
+    assert_eq!(
+        storage
+            .chapter_analysis(fixture.imported.analysis_id)
+            .unwrap(),
+        original
+    );
+    assert_eq!(
+        storage
+            .load_document_reader_snapshot(fixture.base.document_id)
+            .unwrap(),
+        reader
+    );
+    for table in [
+        "reading_completions",
+        "reading_occurrences",
+        "pending_reading_time",
+        "completion_commands",
+        "effective_completion_commands",
+    ] {
+        assert_eq!(
+            fixture
+                .sql()
+                .query_row(&format!("SELECT COUNT(*) FROM {table}"), [], |r| r
+                    .get::<_, i64>(0))
+                .unwrap(),
+            0
+        );
+    }
+}
+
+#[test]
 fn effective_worker_retained_word_lifecycle_compacts_results_and_retries_frozen_custom_commands() {
     let fixture = Fixture::new();
     let router = fixture.router();

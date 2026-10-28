@@ -43,31 +43,9 @@ impl Storage {
         let transaction = self
             .connection
             .transaction_with_behavior(TransactionBehavior::Immediate)?;
-        let stored = transaction
-            .query_row(
-                "SELECT id, surface, status, registered_at_unix_ms FROM vocabulary WHERE id = ?1",
-                [i64::from(id)],
-                entry_columns,
-            )
-            .optional()?;
-        let Some(mut entry) = stored.map(validate_entry).transpose()? else {
-            return Ok(None);
-        };
-        if entry.status != status {
-            transaction.execute(
-                "UPDATE vocabulary SET status = ?1 WHERE id = ?2",
-                (encode_status(status), i64::from(id)),
-            )?;
-            transaction.execute(
-                "INSERT INTO vocabulary_status_events
-                 (semantics_version, vocabulary_id, old_status, new_status, cause, occurred_at_unix_ms)
-                 VALUES (1, ?1, ?2, ?3, 'manual', ?4)",
-                (i64::from(id), encode_status(entry.status), encode_status(status), occurred_at_unix_ms),
-            )?;
-            entry.status = status;
-        }
+        let entry = set_vocabulary_status_in(&transaction, id, status, occurred_at_unix_ms)?;
         transaction.commit()?;
-        Ok(Some(entry))
+        Ok(entry)
     }
 }
 
@@ -159,4 +137,43 @@ pub(crate) fn register_vocabulary_in<'a>(
         created += 1;
     }
     Ok(created)
+}
+
+/// Caller owns the transaction, including any selection/provenance validation.
+pub(crate) fn set_vocabulary_status_in(
+    connection: &Connection,
+    id: VocabularyId,
+    status: VocabularyStatus,
+    occurred_at_unix_ms: i64,
+) -> Result<Option<VocabularyEntry>, StorageError> {
+    validate_timestamp(occurred_at_unix_ms)?;
+    let stored = connection
+        .query_row(
+            "SELECT id, surface, status, registered_at_unix_ms FROM vocabulary WHERE id = ?1",
+            [i64::from(id)],
+            entry_columns,
+        )
+        .optional()?;
+    let Some(mut entry) = stored.map(validate_entry).transpose()? else {
+        return Ok(None);
+    };
+    if entry.status != status {
+        connection.execute(
+            "UPDATE vocabulary SET status = ?1 WHERE id = ?2",
+            (encode_status(status), i64::from(id)),
+        )?;
+        connection.execute(
+            "INSERT INTO vocabulary_status_events
+         (semantics_version, vocabulary_id, old_status, new_status, cause, occurred_at_unix_ms)
+         VALUES (1, ?1, ?2, ?3, 'manual', ?4)",
+            (
+                i64::from(id),
+                encode_status(entry.status),
+                encode_status(status),
+                occurred_at_unix_ms,
+            ),
+        )?;
+        entry.status = status;
+    }
+    Ok(Some(entry))
 }

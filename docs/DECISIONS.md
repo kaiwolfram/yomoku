@@ -3110,3 +3110,25 @@ AlreadyRecorded replay. Only a consumed success returns position/time/notice inp
 duplicate or stale callbacks cannot return another success. A new session does not
 auto-replay reservations. No dependency, migration, shell codec or live reader change.
 Coordinated core/FFI/Android adoption remains the next implementation slice.
+
+
+## 2026-10-28 — Effective manual status validation and retained ownership
+
+Include manual five-status choices in the coordinated effective-reader switch.
+The original status worker accepts a vocabulary ID without effective provenance;
+add a native effective command rather than translating an effective segment index
+into an original-B selection. Reuse the existing manual status/history helper in
+one immediate SQLite transaction with complete resolved-key, visible eligible
+segment and live exact-surface ID validation. Same-status requests stay no-ops;
+deleted vocabulary stays absent and an old ID cannot mutate its replacement.
+No analyzer/dictionary load, registration, encounters, position or time changes.
+
+The existing retained session owns the accepted status key/ID/choice/timestamp.
+Checked fresh callback attempts protect explicit exact retries from old results.
+Keep committed presentation until success, then update repeated visible spellings
+and selected-word details only for the same retained revision. Invalidation retires
+presentation without abandoning accepted I/O. Failed requests require explicit
+retry, another explicit choice or Cancel; in-flight requests must drain. Pending
+status gates word/custom/completion, and their accepted obligations gate status.
+The live app must still apply its shared FIFO/time/lifecycle gates. No dependency,
+migration, shell schema or current Android behavior change in this native slice.

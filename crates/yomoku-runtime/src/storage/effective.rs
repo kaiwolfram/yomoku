@@ -35,6 +35,21 @@ pub(super) fn execute(
             }
             Ok(EffectiveStorageResult::TokensLoaded(request, snapshot))
         }
+        EffectiveStorageOperation::SetStatus {
+            command,
+            vocabulary_id,
+            status,
+            occurred_at_unix_ms,
+        } => storage
+            .set_effective_reader_status(
+                command.key(),
+                command.selection().segment_index,
+                vocabulary_id,
+                status,
+                occurred_at_unix_ms,
+            )
+            .map(|entry| EffectiveStorageResult::StatusChanged(command.selection(), entry))
+            .map_err(|error| map_word_error(error, dictionary)),
         EffectiveStorageOperation::LoadWord(command) => {
             let selection = command.selection();
             let result = storage.load_effective_reader_word(

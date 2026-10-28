@@ -950,9 +950,10 @@ app has not adopted it yet. There is no new worker, persistent retry or schema.
 
 The same retained session now owns completion from acceptance through final-time
 drain, reservation and commit. `begin_completion` freezes the rendered key/intent
-and invalidates shell callbacks immediately; word I/O and accepted custom retries
-must drain first. Pending completion blocks new word/custom work. The owning app
-must drain accepted AND coalesced checkpoints before `dispatch_completion`; core
+and invalidates shell callbacks immediately. Word I/O, accepted custom retries and
+pending status choices must drain first. Pending completion blocks new word/custom/
+status work. The owning app must drain accepted AND coalesced checkpoints before
+`dispatch_completion`; core
 does not read clocks or storage. Each native `EffectiveCompletionRequest` gets a
 fresh checked attempt, even on exact retries. Preparation authenticates the returned
 key/intent; commit retries share the same reservation allocation across invalidation
@@ -963,6 +964,20 @@ success returns its frozen command and Recorded/AlreadyRecorded outcome to the a
 for position/time/notice handling. No unfinished command auto-replays on restart.
 Actual FIFO tests verify checkpoint ordering, rollback and a lost-success response.
 This component is still separate from live app events/views and Android.
+
+Manual status commands also use the native effective protocol. `SetStatus` carries
+an accepted shared-key selection plus the vocabulary ID, choice and timestamp.
+Storage validates the complete resolution and visible exact-surface ID in the same
+immediate transaction as the shared manual status/history helper. No analyzer or
+word dictionary loads; missing vocabulary stays absent and replacement IDs are
+rejected. The retained session issues fresh native `EffectiveStatusRequest`
+attempts and preserves frozen values for explicit retries across invalidation.
+Only the matching retained revision receives successful live status/deletion
+updates, including repeated spellings and selected-word details. Failure preserves
+committed presentation. A new explicit choice or Cancel can release a failed
+request; in-flight writes must drain. Status pending gates word/custom/completion;
+accepted word/custom/completion obligations gate status. This completes the native
+status path needed by the coordinated live switch, without adding shell schemas.
 
 `Storage::create_analyzed_paste` composes the existing private transaction helpers
 for document creation, validated Mode B analysis and exact-surface registration.
