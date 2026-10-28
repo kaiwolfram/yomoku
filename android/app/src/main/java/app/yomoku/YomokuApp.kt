@@ -229,6 +229,8 @@ private fun YomokuPreview() {
                 libraryWordError = null,
                 libraryDeleteTarget = null,
                 libraryDeleteError = null,
+                librarySelection = null,
+                libraryBulkDeleteTargets = null,
                 libraryRename = null,
                 loadedDocument = null,
                 storageBusy = false,

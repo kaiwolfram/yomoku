@@ -12,6 +12,8 @@ fn starts_in_library() {
             library_word_error: None,
             library_delete_target: None,
             library_delete_error: None,
+            library_selection: None,
+            library_bulk_delete_targets: None,
             reader_time: None,
             reading_time_save_pending: false,
             completion_save_pending: false,

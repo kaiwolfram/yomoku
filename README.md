@@ -22,6 +22,9 @@ Yomoku is under active development. The working app supports:
 - Opening imported text in a centered, scrollable reader, with saved text
   positions and Library progress percentages.
 - Searching Library titles with a retained query and a clear action.
+- Renaming documents and confirmed single or bulk deletion. Long press selects
+  documents; Select All includes offscreen matching titles. Deletion preserves
+  vocabulary and reading history; reimports start with fresh progress.
 - Library sorting by Last read, Title or Import date, with distinct-word status
   bars that refresh after global status changes and page completion.
 - Bundled Noto Serif JP reader text, with regular/bold weights, EPUB emphasis

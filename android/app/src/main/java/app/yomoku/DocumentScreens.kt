@@ -1,7 +1,7 @@
 package app.yomoku
 
 import androidx.compose.foundation.ScrollState
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -16,6 +16,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
@@ -37,6 +38,8 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import app.yomoku.shared.DocumentError
 import app.yomoku.shared.Event
@@ -75,22 +78,33 @@ internal fun LibraryScreen(
         remember(view.libraryWordDistributions) {
             view.libraryWordDistributions?.associateBy { it.documentId }
         }
+    val selection = view.librarySelection
+    val canSelect =
+        libraryActionsEnabled &&
+            !view.storageBusy &&
+            !view.readingTimeSavePending &&
+            !view.completionSavePending
+    val selectLabel = stringResource(R.string.library_select_document)
     LibraryDeleteDialog(view, dispatch, enabled = libraryActionsEnabled)
     LibraryRenameDialog(view, dispatch, enabled = libraryActionsEnabled)
     Column(Modifier.fillMaxSize().padding(16.dp)) {
-        Button(onClick = { dispatch(Event.OpenPaste) }, enabled = !view.storageBusy) {
-            Text(stringResource(R.string.paste_title))
-        }
-        if (onImportFiles != null) {
-            Button(
-                onClick = onImportFiles,
-                enabled =
-                    !view.storageBusy &&
-                        !view.readingTimeSavePending &&
-                        !view.completionSavePending,
-            ) {
-                Text(stringResource(R.string.import_files))
+        if (selection == null) {
+            Button(onClick = { dispatch(Event.OpenPaste) }, enabled = !view.storageBusy) {
+                Text(stringResource(R.string.paste_title))
             }
+            if (onImportFiles != null) {
+                Button(
+                    onClick = onImportFiles,
+                    enabled =
+                        !view.storageBusy &&
+                            !view.readingTimeSavePending &&
+                            !view.completionSavePending,
+                ) {
+                    Text(stringResource(R.string.import_files))
+                }
+            }
+        } else {
+            LibrarySelectionActions(view, dispatch, libraryActionsEnabled)
         }
         StorageStatus(view)
         if (view.libraryWordError != null) {
@@ -154,17 +168,38 @@ internal fun LibraryScreen(
         }
         LazyColumn(modifier = Modifier.weight(1f).testTag("library_documents")) {
             items(view.documents, key = { it.documentId.value }) { document ->
+                val isSelected = selection?.contains(document.documentId) == true
                 Row(
                     modifier =
                         Modifier.fillMaxWidth()
-                            .clickable(enabled = !view.storageBusy) {
-                                dispatch(Event.OpenReader(document.documentId))
-                            }
+                            .combinedClickable(
+                                enabled = if (selection == null) !view.storageBusy else canSelect,
+                                onLongClickLabel = selectLabel,
+                                onLongClick = {
+                                    if (canSelect)
+                                        dispatch(
+                                            Event.ToggleLibraryDocumentSelection(
+                                                document.documentId
+                                            )
+                                        )
+                                },
+                                onClick = {
+                                    dispatch(
+                                        if (selection == null) Event.OpenReader(document.documentId)
+                                        else
+                                            Event.ToggleLibraryDocumentSelection(
+                                                document.documentId
+                                            )
+                                    )
+                                },
+                            )
+                            .semantics { if (selection != null) selected = isSelected }
                             .padding(vertical = 8.dp)
                             .testTag("document_${document.documentId.value}"),
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
+                    if (selection != null) Checkbox(checked = isSelected, onCheckedChange = null)
                     LibraryCover(document.documentId.value, coverLoader)
                     Column(Modifier.weight(1f)) {
                         Row(
@@ -195,36 +230,41 @@ internal fun LibraryScreen(
                             documentId = document.documentId.value,
                         )
                     }
-                    Column {
-                        TextButton(
-                            onClick = {
-                                dispatch(Event.RequestDocumentRename(document.documentId))
-                            },
-                            enabled =
-                                libraryActionsEnabled &&
-                                    !view.storageBusy &&
-                                    !view.readingTimeSavePending &&
-                                    !view.completionSavePending,
-                            modifier =
-                                Modifier.testTag("rename_document_${document.documentId.value}"),
-                        ) {
-                            Text(stringResource(R.string.library_rename))
+                    if (selection == null)
+                        Column {
+                            TextButton(
+                                onClick = {
+                                    dispatch(Event.RequestDocumentRename(document.documentId))
+                                },
+                                enabled =
+                                    libraryActionsEnabled &&
+                                        !view.storageBusy &&
+                                        !view.readingTimeSavePending &&
+                                        !view.completionSavePending,
+                                modifier =
+                                    Modifier.testTag(
+                                        "rename_document_${document.documentId.value}"
+                                    ),
+                            ) {
+                                Text(stringResource(R.string.library_rename))
+                            }
+                            TextButton(
+                                onClick = {
+                                    dispatch(Event.RequestDocumentDeletion(document.documentId))
+                                },
+                                enabled =
+                                    libraryActionsEnabled &&
+                                        !view.storageBusy &&
+                                        !view.readingTimeSavePending &&
+                                        !view.completionSavePending,
+                                modifier =
+                                    Modifier.testTag(
+                                        "delete_document_${document.documentId.value}"
+                                    ),
+                            ) {
+                                Text(stringResource(R.string.library_delete))
+                            }
                         }
-                        TextButton(
-                            onClick = {
-                                dispatch(Event.RequestDocumentDeletion(document.documentId))
-                            },
-                            enabled =
-                                libraryActionsEnabled &&
-                                    !view.storageBusy &&
-                                    !view.readingTimeSavePending &&
-                                    !view.completionSavePending,
-                            modifier =
-                                Modifier.testTag("delete_document_${document.documentId.value}"),
-                        ) {
-                            Text(stringResource(R.string.library_delete))
-                        }
-                    }
                 }
             }
         }

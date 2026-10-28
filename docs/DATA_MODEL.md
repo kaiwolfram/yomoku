@@ -18,7 +18,7 @@ draft edits perform no I/O. Success updates the full Library and any import summ
 before query/sort projection, preserving word counts. Navigation retires the editor
 while an accepted callback still reconciles its matching ID/title. No migration.
 
-## Confirmed single-document deletion
+## Confirmed document deletion
 
 `Storage::delete_document` holds one immediate transaction, deleting canonical
 chapter text for the exact live document's source, then its Library row. Existing
@@ -35,7 +35,28 @@ atomic registration and allocates fresh document/source/chapter IDs with zero
 progress, no finish marker, no recency or partial time; existing vocabulary/history
 survive. The runtime dispatches this through the existing FIFO without dictionaries.
 Core requires a retained visible Library target plus matching explicit confirmation;
-Cancel performs no I/O. Bulk/Select All deletion remains pending.
+Cancel performs no I/O.
+
+`Storage::delete_documents` performs the same cleanup for every selected ID in one
+immediate transaction, reusing bound statements without an unbounded parameter
+list. `delete_document` delegates to it. Duplicate/absent IDs are harmless; an empty
+selection writes nothing. A later cascade/statement or deferred-COMMIT failure
+restores the entire selection, including earlier documents. Retries after a lost
+success cannot delete a fresh reimport because document IDs are never reused.
+
+Pure core retains an optional sorted unique ID selection and a separate frozen
+list of confirmation titles/IDs. Long press starts selection; row taps toggle only
+currently matching IDs. Select All adds every matching title from the full Library,
+including offscreen rows. Search/sort retain selected hidden rows, and the count and
+scrollable confirmation list expose the complete selection. Confirmation must match
+the exact frozen ID vector; in-flight edits/Cancel/double submissions are rejected.
+Failure retains that selection and separate error for explicit Retry/Cancel. Cancel
+of the prompt returns to selection; Cancel/Back exits selection. Navigation and
+accepted content operations retire selection, while read-only Library status scans
+preserve it. Accepted callbacks reconcile only their frozen IDs. Success removes
+those rows from the full Library, retires matching summaries/cached reads and
+invalidates status counts, retaining query/sort. Selection/prompt survive Activity
+recreation, but are not persisted across a fresh native session. No migration.
 
 ## EPUB canonical content and atomic repository (migration 0014)
 

@@ -3394,3 +3394,26 @@ lost-response retries are write-free. Update matching import summaries and retir
 cached loaded documents after success. Disable Android actions during file batches
 using the existing Library gate. No dependency or migration; bulk deletion stays
 separate and unchecked.
+
+## 2026-10-28 — Confirmed Library bulk deletion
+
+Implement the remaining Library deletion slice independently of the coordinated
+effective-reader switch. Reuse single-document cleanup in one immediate transaction
+for the entire frozen selection; never chain independently committed deletes.
+Reuse bound statements to support selections beyond a SQL parameter-list limit.
+Keep absent/duplicate IDs idempotent and retain the existing history/vocabulary/
+provenance/global-rule semantics. A failure on a later document or deferred COMMIT
+must restore earlier deletions too. No migration, dependency or new deletion policy.
+
+Keep selection and confirmation in pure core across Activity recreation. Long press
+starts selection, taps toggle visible rows, and Select All adds all current title
+matches, including rows not composed on screen. Preserve selected hidden rows across
+search/sort; display the complete selected count and scrollable frozen title list in
+confirmation. Do not include unselected/unmatched rows merely because they exist in
+the Library. Cancel of the prompt returns to selection; Cancel/Back exits selection.
+Navigation/accepted content operations clear presentation, while accepted callbacks
+still reconcile only their exact ID vector. Read-only Library status scans preserve
+selection and confirmation. Freeze targets through failures/explicit retries and
+disable selection edits/Cancel/double submission during accepted writes. Use the
+existing file-batch and reader-save UI gates. Reimports use fresh IDs, so a repeated
+old selection cannot delete them.

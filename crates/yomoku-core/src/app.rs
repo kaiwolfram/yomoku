@@ -79,6 +79,9 @@ pub struct Model {
     library_delete_target: Option<LibraryDocument>,
     library_delete_error: Option<DocumentError>,
     pending_document_delete: Option<DocumentId>,
+    library_selection: Option<Vec<DocumentId>>,
+    library_bulk_delete_targets: Option<Vec<LibraryDocument>>,
+    pending_documents_delete: Option<Vec<DocumentId>>,
     library_rename: Option<LibraryRenameState>,
     pending_document_rename: Option<(DocumentId, String)>,
     loaded_document: Option<ReaderDocument>,
@@ -131,6 +134,14 @@ pub enum Event {
     RequestDocumentDeletion(DocumentId),
     CancelDocumentDeletion,
     ConfirmDocumentDeletion(DocumentId),
+    /// Long press starts selection; subsequent row taps toggle visible IDs.
+    ToggleLibraryDocumentSelection(DocumentId),
+    /// Add all matching titles, including rows outside the rendered viewport.
+    SelectAllLibraryDocuments,
+    CancelLibrarySelection,
+    RequestSelectedDocumentDeletion,
+    /// Confirm only the exact frozen IDs shown by the retained prompt.
+    ConfirmSelectedDocumentDeletion(Vec<DocumentId>),
     RequestDocumentRename(DocumentId),
     EditDocumentTitle {
         document_id: DocumentId,
@@ -218,6 +229,9 @@ pub struct ViewModel {
     pub library_word_error: Option<DocumentError>,
     pub library_delete_target: Option<LibraryDocument>,
     pub library_delete_error: Option<DocumentError>,
+    /// None outside selection mode; Some(empty) keeps selection controls visible.
+    pub library_selection: Option<Vec<DocumentId>>,
+    pub library_bulk_delete_targets: Option<Vec<LibraryDocument>>,
     pub library_rename: Option<LibraryRenameState>,
     pub loaded_document: Option<ReaderDocument>,
     pub storage_busy: bool,
@@ -488,6 +502,23 @@ impl App for Yomoku {
                 }
                 Some(StorageOperation::DeleteDocument(*id))
             }
+            Event::ConfirmSelectedDocumentDeletion(ids) => {
+                if !model.library_visible()
+                    || ids.is_empty()
+                    || !model
+                        .library_bulk_delete_targets
+                        .as_ref()
+                        .is_some_and(|targets| {
+                            targets
+                                .iter()
+                                .map(|target| target.document_id)
+                                .eq(ids.iter().copied())
+                        })
+                {
+                    return Command::done();
+                }
+                Some(StorageOperation::DeleteDocuments(ids.clone()))
+            }
             Event::LoadLibraryWordDistributions => {
                 if model.destination != Destination::Library
                     || model.content_route != ContentRoute::Main
@@ -659,11 +690,20 @@ impl App for Yomoku {
             } else if operation != StorageOperation::LoadLibraryWordDistributions {
                 model.library_rename = None;
             }
-            if let StorageOperation::DeleteDocument(id) = operation {
-                model.pending_document_delete = Some(id);
-                model.library_delete_error = None;
-            } else if operation != StorageOperation::LoadLibraryWordDistributions {
-                model.clear_library_delete();
+            match &operation {
+                StorageOperation::DeleteDocument(id) => {
+                    model.pending_document_delete = Some(*id);
+                    model.library_delete_error = None;
+                }
+                StorageOperation::DeleteDocuments(ids) => {
+                    model.pending_documents_delete = Some(ids.clone());
+                    model.library_delete_error = None;
+                }
+                StorageOperation::LoadLibraryWordDistributions => {}
+                _ => {
+                    model.clear_library_delete();
+                    model.library_selection = None;
+                }
             }
             if operation == StorageOperation::LoadLibraryWordDistributions {
                 model.loading_library_words = true;
@@ -674,6 +714,7 @@ impl App for Yomoku {
                 operation,
                 StorageOperation::LoadLibraryWordDistributions
                     | StorageOperation::DeleteDocument(_)
+                    | StorageOperation::DeleteDocuments(_)
                     | StorageOperation::RenameDocument { .. }
             ) {
                 model.document_error = None;
@@ -759,8 +800,69 @@ impl App for Yomoku {
                 .and(Command::request_from_shell(operation).then_send(Event::StorageFinished));
         }
         match event {
+            Event::ToggleLibraryDocumentSelection(id) => {
+                if !model.can_select_library_documents()
+                    || !model
+                        .library_sort
+                        .project(&model.documents, &model.library_title_query)
+                        .iter()
+                        .any(|entry| entry.document_id == id)
+                {
+                    return Command::done();
+                }
+                let selection = model.library_selection.get_or_insert_with(Vec::new);
+                match selection.binary_search(&id) {
+                    Ok(index) => {
+                        selection.remove(index);
+                    }
+                    Err(index) => selection.insert(index, id),
+                }
+            }
+            Event::SelectAllLibraryDocuments => {
+                if !model.can_select_library_documents() || model.library_selection.is_none() {
+                    return Command::done();
+                }
+                let matching = model
+                    .library_sort
+                    .project(&model.documents, &model.library_title_query);
+                let selection = model.library_selection.as_mut().expect("selection checked");
+                selection.extend(matching.iter().map(|entry| entry.document_id));
+                selection.sort_unstable();
+                selection.dedup();
+            }
+            Event::CancelLibrarySelection => {
+                if model.library_selection.is_none() || model.pending_documents_delete.is_some() {
+                    return Command::done();
+                }
+                model.library_selection = None;
+                model.clear_library_delete();
+            }
+            Event::RequestSelectedDocumentDeletion => {
+                if !model.can_select_library_documents() {
+                    return Command::done();
+                }
+                let Some(selection) = model
+                    .library_selection
+                    .as_ref()
+                    .filter(|ids| !ids.is_empty())
+                else {
+                    return Command::done();
+                };
+                let targets: Vec<_> = model
+                    .documents
+                    .iter()
+                    .filter(|entry| selection.binary_search(&entry.document_id).is_ok())
+                    .cloned()
+                    .collect();
+                if targets.len() != selection.len() {
+                    return Command::done();
+                }
+                model.library_bulk_delete_targets = Some(targets);
+                model.library_delete_error = None;
+            }
             Event::RequestDocumentRename(id) => {
                 if !model.library_visible()
+                    || model.library_selection.is_some()
                     || model.storage_busy
                     || model.pending_time_checkpoint.is_some()
                     || model.queued_time_checkpoint.is_some()
@@ -804,6 +906,7 @@ impl App for Yomoku {
             }
             Event::RequestDocumentDeletion(id) => {
                 if !model.library_visible()
+                    || model.library_selection.is_some()
                     || model.storage_busy
                     || model.pending_time_checkpoint.is_some()
                     || model.queued_time_checkpoint.is_some()
@@ -824,7 +927,9 @@ impl App for Yomoku {
                 model.library_rename = None;
             }
             Event::CancelDocumentDeletion => {
-                if model.pending_document_delete.is_some() {
+                if model.pending_document_delete.is_some()
+                    || model.pending_documents_delete.is_some()
+                {
                     return Command::done();
                 }
                 model.clear_library_delete();
@@ -848,6 +953,7 @@ impl App for Yomoku {
                 model.library_sort = sort;
             }
             Event::SelectDestination(destination) => {
+                model.library_selection = None;
                 model.library_rename = None;
                 model.clear_library_delete();
                 if destination == Destination::Library {
@@ -869,6 +975,7 @@ impl App for Yomoku {
                 model.clear_reader_time();
             }
             Event::OpenPaste => {
+                model.library_selection = None;
                 model.library_rename = None;
                 model.clear_library_delete();
                 model.completion_notice = None;
@@ -889,6 +996,7 @@ impl App for Yomoku {
             }
             Event::CloseDocument => model.close_document(),
             Event::OpenSettings => {
+                model.library_selection = None;
                 model.library_rename = None;
                 model.clear_library_delete();
                 model.settings_open = true;
@@ -915,6 +1023,7 @@ impl App for Yomoku {
                 let word_load = model.pending_word_load.take();
                 let custom_change = model.pending_custom_change.take();
                 let document_delete = model.pending_document_delete.take();
+                let documents_delete = model.pending_documents_delete.take();
                 let document_rename = model.pending_document_rename.take();
                 let import_outcome = match &result {
                     StorageResult::Created(_) => Some(ImportOutcome::Created),
@@ -954,23 +1063,12 @@ impl App for Yomoku {
                     }
                     StorageResult::DocumentDeleted(id) => {
                         if document_delete == Some(id) {
-                            model.documents.retain(|entry| entry.document_id != id);
-                            model.invalidate_library_words();
-                            model.clear_library_delete();
-                            if model
-                                .import_summary
-                                .as_ref()
-                                .is_some_and(|summary| summary.document_id == id)
-                            {
-                                model.import_summary = None;
-                            }
-                            if model
-                                .loaded_document
-                                .as_ref()
-                                .is_some_and(|document| document.document_id == id)
-                            {
-                                model.loaded_document = None;
-                            }
+                            model.apply_document_deletion(&[id]);
+                        }
+                    }
+                    StorageResult::DocumentsDeleted(ids) => {
+                        if documents_delete.as_ref() == Some(&ids) {
+                            model.apply_document_deletion(&ids);
                         }
                     }
                     // No live event dispatches the native effective protocol yet.
@@ -1241,6 +1339,10 @@ impl App for Yomoku {
                             {
                                 draft.error = Some(error);
                             }
+                        } else if documents_delete.is_some() {
+                            if model.library_bulk_delete_targets.is_some() {
+                                model.library_delete_error = Some(error);
+                            }
                         } else if let Some(id) = document_delete {
                             if model
                                 .library_delete_target
@@ -1283,6 +1385,7 @@ impl App for Yomoku {
             Event::RefreshLibrary
             | Event::SaveDocumentTitle(_)
             | Event::ConfirmDocumentDeletion(_)
+            | Event::ConfirmSelectedDocumentDeletion(_)
             | Event::LoadLibraryWordDistributions
             | Event::CreatePaste(_)
             | Event::ImportTxt(_)
@@ -1322,6 +1425,8 @@ impl App for Yomoku {
             library_word_error: model.library_word_error,
             library_delete_target: model.library_delete_target.clone(),
             library_delete_error: model.library_delete_error,
+            library_selection: model.library_selection.clone(),
+            library_bulk_delete_targets: model.library_bulk_delete_targets.clone(),
             library_rename: model.library_rename.clone(),
             library_document_count: model.documents.len() as u64,
             loaded_document: model.loaded_document.clone(),
@@ -1369,7 +1474,42 @@ impl Model {
 
     fn clear_library_delete(&mut self) {
         self.library_delete_target = None;
+        self.library_bulk_delete_targets = None;
         self.library_delete_error = None;
+    }
+
+    fn can_select_library_documents(&self) -> bool {
+        self.library_visible()
+            && !self.storage_busy
+            && self.pending_time_checkpoint.is_none()
+            && self.queued_time_checkpoint.is_none()
+            && self.pending_completion.is_none()
+            && self.library_delete_target.is_none()
+            && self.library_bulk_delete_targets.is_none()
+            && self.library_rename.is_none()
+    }
+
+    fn apply_document_deletion(&mut self, ids: &[DocumentId]) {
+        let ids: std::collections::BTreeSet<_> = ids.iter().copied().collect();
+        self.documents
+            .retain(|entry| !ids.contains(&entry.document_id));
+        self.invalidate_library_words();
+        self.clear_library_delete();
+        self.library_selection = None;
+        if self
+            .import_summary
+            .as_ref()
+            .is_some_and(|summary| ids.contains(&summary.document_id))
+        {
+            self.import_summary = None;
+        }
+        if self
+            .loaded_document
+            .as_ref()
+            .is_some_and(|document| ids.contains(&document.document_id))
+        {
+            self.loaded_document = None;
+        }
     }
 
     fn invalidate_library_words(&mut self) {
@@ -1409,6 +1549,7 @@ impl Model {
     }
 
     fn close_document(&mut self) {
+        self.library_selection = None;
         self.library_rename = None;
         self.clear_library_delete();
         self.invalidate_library_words();

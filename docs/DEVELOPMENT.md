@@ -5389,3 +5389,83 @@ android,device,wide}.log`.
 No dependency or migration. The effective-reader switch/override controls and bulk
 Library deletion remain pending. Separate Full-loader matrix, release/process-death,
 physical arm64 and performance checks were not rerun/measured for this slice.
+
+## Library bulk deletion
+
+2026-10-28, repository root, pinned offline Rust/JDK:
+
+```sh
+export PATH=/home/kai/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin:$PATH
+export JAVA_HOME=/home/kai/repos/yomoku/.local/jdk-17/jdk-17.0.21+9
+export GRADLE_USER_HOME=/home/kai/repos/yomoku/.local/gradle
+export ANDROID_HOME=/home/kai/Android/Sdk
+cargo test --workspace --all-features --locked --offline --quiet
+cargo clippy --workspace --all-targets --all-features --locked --offline -- -D warnings
+cargo fmt --all -- --check
+tools/format-kotlin.sh --check
+"$JAVA_HOME/bin/java" -jar .local/ktfmt-0.64.jar --kotlinlang-style --dry-run --set-exit-if-changed tests/kotlin/BulkDocumentDeletionBridgeTest.kt
+tools/test-kotlin-bridge.sh
+# After native builds/generation finish:
+cargo run -p yomoku-ffi --bin generate-kotlin --features facet_typegen --locked --offline -- target/generated/kotlin-repeat
+diff -r target/generated/kotlin target/generated/kotlin-repeat
+./android/gradlew -p android :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug --offline --console=plain
+./android/gradlew -p android :app:connectedDebugAndroidTest '-Pandroid.testInstrumentationRunnerArguments.class=app.yomoku.DocumentDeletionTest,app.yomoku.DocumentRenameTest,app.yomoku.LibraryWordsTest,app.yomoku.LibrarySortTest,app.yomoku.LibrarySearchTest,app.yomoku.LibraryCoversTest,app.yomoku.NavigationTest,app.yomoku.PasteReaderTest#pasteReturnsToLibraryAndOpensFirstLogicalPageWithBackAndRecreation,app.yomoku.TxtPickerTest#cancelBlockedReadRetainsCompletedFilesAndFreshBatchIgnoresLateProviderResult' --offline --console=plain
+git diff --check
+```
+
+PASS: eight new Rust cases (four core/three SQLite/one FIFO); 676 workspace tests
+(17 opt-in ignored), strict Clippy/Rustfmt/Kotlin formatting, real-Full host JNI,
+byte-identical repeat codegen, both-ABI app/test APKs and strict Android lint.
+Core checks cover 250 title matches, hidden selections, exact frozen confirmation,
+Cancel, navigation, double submission, independent errors and explicit retries.
+Storage verifies one transaction across paste/TXT/SRT/multi-chapter EPUB, retained
+history/time/vocabulary/provenance/global state, fresh reimport IDs/progress/finish,
+empty/duplicate/absent IDs, write-free retries and a 1,100-document selection.
+Later-document text/asset/document failures and deferred-COMMIT failure roll back
+every earlier deletion; reopen and explicit Retry succeed. The real FIFO fixture
+verifies the same late-document failure and no analyzer activity during deletion.
+JNI checks retained exact selections/Unicode titles, read-only Cancel/invalid
+confirmation, shared encounter/status retention, fresh reimports and session reopen.
+Existing import/direct-cancel/selected-word/custom/codecs/100-handle checks pass.
+
+Initial fixture needed an explicit position reset before saving reread time. Kotlin
+-Werror caught an unnecessary safe call; instrumentation used an unavailable Espresso
+helper, replaced with the existing Activity back dispatcher; lint required plural
+resources for selection/confirmation counts. Corrected before final passing runs.
+Gradle/ADB/emulator needed local-socket/AVD escalation. The initial sandboxed emulator
+could not update its AVD snapshot state; the normal escalated launch succeeded.
+Existing Crux teardown diagnostics remain informational. No dependency or migration.
+Logs: `/tmp/yomoku-library-bulk-{tests,storage,fifo,clippy,bridge,codegen,format,
+format-check,android-final,device,emulator}.log`.
+
+Device follow-up after correcting the offscreen-row fixture:
+
+```sh
+./android/gradlew -p android :app:connectedDebugAndroidTest :app:lintDebug '-Pandroid.testInstrumentationRunnerArguments.class=app.yomoku.DocumentDeletionTest#longPressSelectAllIncludesOffscreenRowsAndBulkRetryIsAtomicAcrossRecreation' --offline --console=plain
+/home/kai/Android/Sdk/platform-tools/adb -s emulator-5554 shell wm size 2560x1600
+/home/kai/Android/Sdk/platform-tools/adb -s emulator-5554 shell wm density 240
+/home/kai/Android/Sdk/platform-tools/adb -s emulator-5554 shell cmd uimode night yes
+./android/gradlew -p android :app:connectedDebugAndroidTest '-Pandroid.testInstrumentationRunnerArguments.class=app.yomoku.DocumentDeletionTest#longPressSelectAllIncludesOffscreenRowsAndBulkRetryIsAtomicAcrossRecreation' --offline --console=plain
+/home/kai/Android/Sdk/platform-tools/adb -s emulator-5554 shell wm size reset
+/home/kai/Android/Sdk/platform-tools/adb -s emulator-5554 shell wm density reset
+/home/kai/Android/Sdk/platform-tools/adb -s emulator-5554 shell cmd uimode night no
+```
+
+The eleven existing focused phone regressions pass in the first 12-case run.
+The new bulk case initially assumed sorting reset the list's scroll position;
+the test now explicitly scrolls to the first row and asserts the oldest row is
+offscreen rather than assuming its node is disposed. The corrected case passes
+on API-36 x86_64 phone/light and 2560x1600/240dpi wide/dark. It verifies long press,
+tap toggles/zero-selection gating, Select All across 16 offscreen/filtered titles,
+retained native session/confirmation/failure across Activity recreation, Cancel,
+Back, later-document failure with no partial deletion, exact Retry, retained query/
+sort/history/status/survivor and a fresh reimport without progress/finish/recency.
+Lint passes with the corrected fixture. Original 1080x2400/420dpi/light display was
+restored. Twelve distinct phone cases and one wide case pass across the initial
+and corrected runs; no remaining blocker. Only the test fixture/docs changed after
+the passing native/JNI/production APK checks. Additional logs:
+`/tmp/yomoku-library-bulk-{device-corrected,wide}.log`.
+
+No dependency/migration. Coordinated effective-reader/Library adoption and Android
+override controls remain next. Separate Full-loader matrix, release/process-death,
+physical arm64 and real-book/performance checks were not rerun/measured.

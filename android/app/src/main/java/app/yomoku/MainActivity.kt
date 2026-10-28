@@ -41,10 +41,17 @@ class MainActivity : ComponentActivity() {
         setContent {
             YomokuTheme {
                 BackHandler(
-                    enabled = core.view.settingsOpen || core.view.contentRoute != ContentRoute.MAIN
+                    enabled =
+                        core.view.settingsOpen ||
+                            core.view.contentRoute != ContentRoute.MAIN ||
+                            core.view.librarySelection != null
                 ) {
                     core.dispatch(
-                        if (core.view.settingsOpen) Event.CloseSettings else Event.CloseDocument
+                        when {
+                            core.view.settingsOpen -> Event.CloseSettings
+                            core.view.contentRoute != ContentRoute.MAIN -> Event.CloseDocument
+                            else -> Event.CancelLibrarySelection
+                        }
                     )
                 }
                 YomokuApp(

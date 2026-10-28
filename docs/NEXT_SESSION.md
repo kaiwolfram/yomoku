@@ -1,11 +1,13 @@
 # Resume here
-Updated: 2026-10-28. Rename verified; coordinated effective switch next.
+Updated: 2026-10-28. Library bulk deletion verified; coordinated effective switch next.
 ## Working
 - Rename: retained literal draft/Cancel/Retry; title-only atomic save, no-op retries.
-  Single deletion preserves history/vocabulary/rules; reimport fresh. Bulk pending.
+- Single/bulk deletion: one transaction, history/vocabulary/rules retained; reimport fresh.
+  Long press selects; Select All adds all matching titles, including offscreen rows.
+  Filter/sort retain selection; confirmation freezes titles/IDs; Cancel/Back and Retry.
 - Library title-only search/Clear + Last read/Title/Import date; query/sort retained.
   Read order (0019) on explicit open only; newest unknown/unopened afterward.
-  Pure search/sort; duplicates preserve recency; legacy history unknown.
+  Duplicates preserve recency; legacy history unknown.
 - Live bars use original B/live statuses; read-only FIFO; explicit Retry; batches defer scans.
   Effective Library API shares eligibility/resolution; distinct across chapters; deleted absent;
   Missing/zero differ. Stored text/rules, no source/assets/Full/writes. Switch with reader.
@@ -69,12 +71,10 @@ Updated: 2026-10-28. Rename verified; coordinated effective switch next.
 ## Next tasks (ordered)
 1. Switch live core/FFI/Android completion/token/status/furigana/word/custom + Library membership
    (effective_library_word_distributions) via retained requests/command/finish_request + render
-   adapters; see EFFECTIVE_READER_PAYLOAD.md. No live adoption in this slice.
+   adapters; see EFFECTIVE_READER_PAYLOAD.md. No live adoption yet.
 2. Wire compact override actions/state to Android A/B/C/manual + All/This/reversal.
-3. Library confirmed bulk/Select All deletion; rename + single deletion are wired.
-Measure real-book/JNI/device + Library scan cost, including on-demand whole chapters.
+3. Measure real-book/JNI/device + Library scan cost, including on-demand whole chapters.
 Physical arm64 deferred; Nostr empty; Q188 unresolved before forwarding.
 ## Verification
-- Native PASS: 668 Rust (17 ignored), JNI/codecs/repeat codegen, Clippy/fmt/APKs/lint.
-- PASS: 11 phone tests + rename wide/dark; display restored. No blocker.
-  Fixtures/preview constructor corrected. Commands/results: DEVELOPMENT.md end.
+- PASS: 676 Rust (17 ignored), JNI/repeat codegen, Clippy/fmt/both-ABI APKs/lint.
+- PASS: 12 phone cases + bulk wide/dark; display restored. No blocker. DEVELOPMENT.md end.

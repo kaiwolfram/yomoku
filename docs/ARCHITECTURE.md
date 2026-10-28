@@ -895,7 +895,17 @@ custom entries and overrides. No dictionary load or rescan occurs. Core retains 
 visible target across Activity recreation; matching explicit confirmation is required,
 Cancel has no effect and failures allow explicit Retry. Android disables delete during
 file batches and unresolved saves. Success reconciles the full Library and invalidates
-status counts without changing query/sort. Rename and bulk/Select All remain pending. Storage
+status counts without changing query/sort. Bulk deletion shares the same cleanup:
+`DeleteDocuments`/`DocumentsDeleted` carry a frozen ID vector over the existing typed
+FIFO/JNI, and one transaction covers the entire selection. A failure on a later
+document or at COMMIT restores earlier deletions. Single deletion delegates to that
+repository path. Pure core retains selection, confirmation titles/IDs and explicit
+retry errors; no selection or SQL I/O lives in Compose. Long press starts selection,
+row taps toggle, Select All adds every title matching the current query across the
+full Library, and selection persists across filtering/sorting/recreation. The UI
+shows the total selected count and all confirmation titles, including hidden rows.
+Cancel of the prompt returns to selection; Cancel/Back or navigation retires it.
+File-batch/save gates also cover bulk actions. Rename is described above. Storage
 tests cover migrations, reopen, rollback, Unicode, concurrency, ID allocation,
 settings, vocabulary, analysis anchors and completion history. Base-analysis identity and anchored completion intents reach core/FFI; token/override
 repositories have no segmentation UI operations.

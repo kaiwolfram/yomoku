@@ -231,6 +231,10 @@ fn execute(
             storage.delete_document(id).map_err(map_error)?;
             Ok(StorageResult::DocumentDeleted(id))
         }
+        StorageOperation::DeleteDocuments(ids) => {
+            storage.delete_documents(&ids).map_err(map_error)?;
+            Ok(StorageResult::DocumentsDeleted(ids))
+        }
         StorageOperation::RenameDocument { document_id, title } => {
             if !storage
                 .rename_document(document_id, &title)

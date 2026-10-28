@@ -2632,3 +2632,28 @@ No dependency/migration. Progress/data/architecture/decisions/handoff updated;
 effective-reader/Library adoption, override controls and bulk deletion remain next.
 Release/process-death/physical arm64/performance were not rerun. Exact commands
 and final device results: DEVELOPMENT.md end.
+
+## 2026-10-28 — Confirmed Library bulk deletion
+
+Completed the remaining Library deletion slice with long-press selection, row tap
+toggles, Select All over every matching title (including offscreen rows), retained
+hidden selections and a frozen scrollable confirmation list. Core owns selection/
+confirmation/error state across Activity recreation, exact Retry, Cancel/Back and
+shared busy/save gates. Existing FIFO/JNI executes one immediate transaction across
+the entire selection; a later-document or deferred-COMMIT failure restores earlier
+deletions. Single deletion shares that cleanup. History/vocabulary/provenance/rules
+survive; empty/absent/repeated IDs are harmless and reimports get fresh progress.
+
+Eight new Rust cases; 676 workspace tests (17 ignored), strict Clippy/fmt/Kotlin,
+real-Full JNI, identical repeat codegen, both-ABI APKs and Android lint pass.
+Eleven existing phone regressions pass in the initial suite; the new bulk case
+passes after correcting its scroll/virtualization assumption, then passes wide/dark.
+Twelve distinct phone cases total; original emulator display/theme restored.
+Initial reread-time/safe-call/back-helper/plural-resource fixture/build errors were
+corrected. Gradle/ADB/emulator needed local-socket/AVD escalation. No blocker.
+
+Updated progress/handoff/decisions/data/architecture/README/development docs. No
+dependency/migration. Next: coordinated effective-reader/Library adoption, Android
+override controls and real-book/device measurements. Physical arm64 remains deferred;
+release/process-death/separate Full-loader matrix/performance not rerun. Exact commands,
+results and initial/corrected device-run distinction: DEVELOPMENT.md end.
