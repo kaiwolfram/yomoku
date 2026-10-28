@@ -43,6 +43,9 @@ class LibraryCoversTest {
             (bounds.right - bounds.left).value / (bounds.bottom - bounds.top).value,
             0.12f,
         )
+        // Returning from the reader can retain the row's finishing click ripple.
+        compose.mainClock.advanceTimeBy(500)
+        compose.waitForIdle()
         val pixels = node.captureToImage().toPixelMap()
         val center = pixels[pixels.width / 2, pixels.height / 2]
         assertEquals(1f, center.blue, 0.02f)

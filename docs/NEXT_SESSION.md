@@ -1,7 +1,8 @@
 # Resume here
-Updated: 2026-10-28. Native callback adapter done; coordinated live switch next.
+Updated: 2026-10-28. Library title search done; coordinated live switch next.
 ## Working
 - Pure Crux routes/Library/Settings; Render-only UI; FIFO SQLite/analysis; Library start.
+- Library title-only search/Clear retains query across navigation/recreation; no writes.
 - Chapter-local UTF-8 position/whole-book percentage/five presets persist; reflow
   preserves offsets. Scroll resets; 720dp column; controls below content; 48dp swipes.
   Previous only saves position; busy gates reject doubles; deliberate rereads count.
@@ -75,5 +76,5 @@ Updated: 2026-10-28. Native callback adapter done; coordinated live switch next.
 3. Measure real-book/JNI/device cost, including whole-chapter on-demand generation.
 Physical arm64 deferred; Nostr empty; Q188 unresolved before forwarding.
 ## Verification
-- PASS: 622 Rust (17 ignored); Clippy/fmt/diff; host JNI/repeat codegen. Commands: DEVELOPMENT.md end.
-- Prior: 10 focused phone tests/APKs/lint; device/release/arm64 not rerun. No blocker.
+- PASS: 626 Rust (17 ignored), Clippy/fmt/diff, host JNI/repeat codegen, APKs/lint.
+- PASS: 6 phone + 1 wide/dark; test fixes/commands: DEVELOPMENT.md end. Release/arm64 not rerun; no blocker.

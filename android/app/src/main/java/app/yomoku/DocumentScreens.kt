@@ -81,8 +81,31 @@ internal fun LibraryScreen(
                 Text(stringResource(R.string.retry))
             }
         }
+        OutlinedTextField(
+            value = view.libraryTitleQuery,
+            onValueChange = { dispatch(Event.SearchLibraryTitles(it)) },
+            label = { Text(stringResource(R.string.library_search_titles)) },
+            singleLine = true,
+            trailingIcon = {
+                if (view.libraryTitleQuery.isNotEmpty()) {
+                    TextButton(
+                        onClick = { dispatch(Event.SearchLibraryTitles("")) },
+                        modifier = Modifier.testTag("clear_library_search"),
+                    ) {
+                        Text(stringResource(R.string.library_clear_search))
+                    }
+                }
+            },
+            modifier = Modifier.fillMaxWidth().testTag("library_title_search"),
+        )
         if (!view.storageBusy && view.documents.isEmpty() && view.documentError == null) {
-            Text(stringResource(R.string.library_empty))
+            Text(
+                stringResource(
+                    if (view.libraryDocumentCount == 0UL) R.string.library_empty
+                    else R.string.library_search_empty
+                ),
+                modifier = Modifier.testTag("library_empty_message"),
+            )
         }
         LazyColumn(modifier = Modifier.weight(1f).testTag("library_documents")) {
             items(view.documents, key = { it.documentId.value }) { document ->

@@ -3260,3 +3260,22 @@ explicit. No schema, migration, dependency, worker or automatic replay. Verify a
 request families on the existing real FIFO before adopting them in live events.
 When manual status observes deleted vocabulary, clear its selected-word encounter
 count alongside the missing status, matching erased history and the existing B UI.
+
+## 2026-10-28 — Library title search
+
+Take the existing plan's title-search portion as a small independent slice;
+leave the coordinated effective-reader switch as the next reader task. Filter
+the core's retained Library summaries during view projection. Do not add a SQL
+query or scan stored content. Match literal substrings after locale-independent
+Unicode lowercasing on both title/query; retain whitespace, punctuation, combining
+marks and supplementary characters without normalization or wildcard syntax.
+Preserve the underlying collection/order, errors, import outcomes and progress.
+
+Keep the literal query for the owning core session across tabs, Settings,
+reader navigation and Activity recreation; reset on a new session. Ignore search
+events while Library is hidden. Search/clear can render during an outstanding
+storage operation without changing its busy ownership. Return the total Library
+count separately so zero matches and no imports have different empty messages.
+This changes ephemeral Event/ViewModel codecs only; no migration, dependency,
+durable preference or sorting policy. Sort controls and five-status bars remain
+unchecked in the plan.

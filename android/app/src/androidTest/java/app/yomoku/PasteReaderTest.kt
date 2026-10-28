@@ -362,6 +362,9 @@ class PasteReaderTest {
         compose.waitForIdle()
         compose.runOnUiThread { compose.activity.onBackPressedDispatcher.onBackPressed() }
         compose.onNodeWithTag("screen_title").assertTextEquals("Library")
+        compose
+            .onNodeWithTag("library_documents")
+            .performScrollToKey(core().view.documents.single { it.title == title }.documentId.value)
         compose.onNodeWithTag(documentTag).performScrollTo().performClick()
         awaitStorage()
         compose.onNodeWithTag("reader_text").assertIsDisplayed().assertTextEquals(firstPage)

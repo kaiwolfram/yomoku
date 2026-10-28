@@ -70,6 +70,7 @@ pub struct Model {
     destination: Destination,
     settings_open: bool,
     documents: Vec<LibraryDocument>,
+    library_title_query: String,
     loaded_document: Option<ReaderDocument>,
     storage_busy: bool,
     document_error: Option<DocumentError>,
@@ -111,6 +112,8 @@ pub enum Event {
     OpenSettings,
     CloseSettings,
     RefreshLibrary,
+    /// Literal, Unicode-lowercase substring search over Library titles only.
+    SearchLibraryTitles(String),
     CreatePaste(String),
     LoadPaste(DocumentId),
     OpenPaste,
@@ -179,7 +182,12 @@ pub enum Event {
 pub struct ViewModel {
     pub destination: Destination,
     pub settings_open: bool,
+    /// Matching titles in the existing Library order; an empty query shows all.
     pub documents: Vec<LibraryDocument>,
+    /// Session-local query; the model retains the complete unfiltered Library.
+    pub library_title_query: String,
+    /// Unfiltered count distinguishes an empty Library from an empty search.
+    pub library_document_count: u64,
     pub loaded_document: Option<ReaderDocument>,
     pub storage_busy: bool,
     pub document_error: Option<DocumentError>,
@@ -658,6 +666,15 @@ impl App for Yomoku {
                 .and(Command::request_from_shell(operation).then_send(Event::StorageFinished));
         }
         match event {
+            Event::SearchLibraryTitles(query) => {
+                if model.destination != Destination::Library
+                    || model.content_route != ContentRoute::Main
+                    || model.settings_open
+                {
+                    return Command::done();
+                }
+                model.library_title_query = query;
+            }
             Event::SelectDestination(destination) => {
                 model.completion_notice = None;
                 model.book_completion_notice = None;
@@ -1023,7 +1040,19 @@ impl App for Yomoku {
         ViewModel {
             destination: model.destination,
             settings_open: model.settings_open,
-            documents: model.documents.clone(),
+            documents: {
+                let query = model.library_title_query.to_lowercase();
+                model
+                    .documents
+                    .iter()
+                    .filter(|document| {
+                        query.is_empty() || document.title.to_lowercase().contains(&query)
+                    })
+                    .cloned()
+                    .collect()
+            },
+            library_title_query: model.library_title_query.clone(),
+            library_document_count: model.documents.len() as u64,
             loaded_document: model.loaded_document.clone(),
             storage_busy: model.storage_busy,
             document_error: model.document_error,

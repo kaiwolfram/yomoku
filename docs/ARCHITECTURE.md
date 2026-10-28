@@ -16,6 +16,17 @@ Successful paste, EPUB, TXT or SRT import returns to Library without opening the
 StorageFinished is internal: both Serde and Facet skip it, so hosts cannot inject
 storage results. No SQL, paths, threads or platform I/O enter core.
 
+`SearchLibraryTitles` synchronously updates a session-local query while Library
+is visible, including during an outstanding refresh/import. The model retains
+all Library summaries; `ViewModel.documents` projects matching titles in their
+existing order, alongside the literal query and unfiltered document count.
+Matching uses locale-independent Unicode lowercasing and literal substrings;
+content is never searched. Refresh/import callbacks update the full collection
+before projection. Search neither dispatches storage nor clears errors, and
+survives Settings/tab/reader navigation and retained Activity recreation. A fresh
+native session starts with an empty query. Compose binds the field/clear action
+to typed events and distinguishes an empty Library from zero matching titles.
+
 `yomoku-import` is a separate pure content-extraction boundary. Its EPUB parser
 reads Stored/Deflate ZIP entries from a borrowed byte slice, without filesystem
 extraction/network access. Container/OPF metadata selects the first package and

@@ -4994,3 +4994,64 @@ completion/token/status/word/custom/furigana together using `command`/`finish_re
 and existing render adapters. Then add compact override controls. Separate Full
 loader matrix, APK/device/lint/release/performance/process-death/physical arm64 were
 not rerun. No implementation blocker.
+
+## Library title search
+
+2026-10-28, repository root, pinned offline Rust/JDK:
+
+```sh
+export PATH=/home/kai/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin:$PATH
+export JAVA_HOME=/home/kai/repos/yomoku/.local/jdk-17/jdk-17.0.21+9
+export GRADLE_USER_HOME=/home/kai/repos/yomoku/.local/gradle
+export ANDROID_HOME=/home/kai/Android/Sdk
+cargo test -p yomoku-core --test library_search --test app --all-features --locked --offline
+cargo test --workspace --all-features --locked --offline --quiet
+cargo clippy --workspace --all-targets --all-features --locked --offline -- -D warnings
+cargo fmt --all -- --check
+tools/format-kotlin.sh --check
+"$JAVA_HOME/bin/java" -jar .local/ktfmt-0.64.jar --kotlinlang-style --dry-run --set-exit-if-changed tests/kotlin/LibrarySearchBridgeTest.kt
+tools/test-kotlin-bridge.sh
+cargo run -p yomoku-ffi --bin generate-kotlin --features facet_typegen --locked --offline -- target/generated/kotlin-repeat
+# Compare after generation exits; do not generate during a native build.
+diff -r target/generated/kotlin target/generated/kotlin-repeat
+./android/gradlew -p android :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug --offline --console=plain
+./android/gradlew -p android :app:connectedDebugAndroidTest '-Pandroid.testInstrumentationRunnerArguments.class=app.yomoku.LibrarySearchTest,app.yomoku.NavigationTest,app.yomoku.LibraryCoversTest,app.yomoku.PasteReaderTest#pasteReturnsToLibraryAndOpensFirstLogicalPageWithBackAndRecreation' --offline --console=plain
+/home/kai/Android/Sdk/platform-tools/adb -s emulator-5554 shell wm size 2560x1600
+/home/kai/Android/Sdk/platform-tools/adb -s emulator-5554 shell wm density 240
+/home/kai/Android/Sdk/platform-tools/adb -s emulator-5554 shell cmd uimode night yes
+./android/gradlew -p android :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=app.yomoku.LibrarySearchTest --offline --console=plain
+/home/kai/Android/Sdk/platform-tools/adb -s emulator-5554 shell wm size reset
+/home/kai/Android/Sdk/platform-tools/adb -s emulator-5554 shell wm density reset
+/home/kai/Android/Sdk/platform-tools/adb -s emulator-5554 shell cmd uimode night no
+git diff --check
+```
+
+PASS: four new core cases; 626 workspace Rust tests (17 opt-in ignored), strict
+Clippy/Rustfmt/Kotlin formatting and byte-identical repeat codegen. The new actual
+JNI case verifies title-only literal substring matching, Unicode/combining/NUL/
+wildcards, explicit clearing, retained refresh, reset on a fresh native session,
+unchanged SQLite bytes and no additional dictionary loading. Existing real-Full
+TXT/SRT/EPUB imports/cancellation/custom/Unicode/100-handle regressions pass.
+
+Both-ABI debug app/instrumentation APKs and strict Android lint pass. All six
+focused API-36 x86_64 phone cases above pass, covering title search/clear/empty
+results, retained navigation/recreation/refresh, covers and paste/reader return.
+The search case also passes wide/dark at 2560x1600/240dpi. Display size, density
+and light mode were restored afterward.
+
+Initial phone verification found two test assumptions exposed by the smaller
+Library list: returning to an uncomposed row needs stable-key lazy scrolling,
+and cover pixel sampling must settle the row click animation. Corrected both
+tests without weakening image assertions; rebuilt/linted and all six passed.
+Gradle's sandbox wildcard-IP error required the usual local-socket escalation.
+A direct ADB instrumentation attempt found no installed test package after
+Gradle cleanup; using the Gradle test task installed it and passed the wide case.
+Existing Crux teardown/JDK diagnostics remain informational. Logs:
+`/tmp/yomoku-library-search-{tests,clippy,bridge,format-check,host-format-check,
+codegen,android,device-initial,device,wide,emulator}.log`.
+
+No dependency or migration. Search adds ephemeral Event/ViewModel fields only;
+the full Library stays in core and matching titles are projected without writes.
+The coordinated effective-reader switch remains next; Library sorts/status bars
+are still unchecked. Release, separate Full-loader matrix, performance,
+process-death and physical arm64 were not rerun. No remaining blocker.

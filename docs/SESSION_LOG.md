@@ -2518,3 +2518,20 @@
   next adopt the effective session and captured native events in app/FFI/Android
   together, then expose override controls. APK/device/lint/release/performance/
   process-death/Full-loader matrix/physical arm64 not rerun. No blocker.
+
+## 2026-10-28 — Library title search
+
+- Added core-owned title filtering and Android Search titles/Clear controls.
+  Literal Unicode queries survive navigation/refresh/import/recreation; full
+  summaries remain retained. No content search, storage effect or dictionary load.
+- PASS: four new core cases; 626 Rust tests (17 ignored), strict Clippy/format,
+  host Kotlin/JNI including unchanged DB bytes, repeat codegen, both-ABI debug
+  app/test APKs and lint. Six phone regressions plus wide/dark search pass.
+- Initial phone run exposed off-screen lazy-row targeting and transient cover
+  pixel sampling in existing tests; stable-key scrolling/animation settling fix
+  both. Gradle required usual sandbox socket escalation. Direct instrumentation
+  found no test package after Gradle cleanup; the Gradle wide run passed.
+- Updated README/plan/handoff/architecture/decisions/development. No dependency or
+  migration; Event/ViewModel codecs now include search state. Effective-reader
+  switch remains the next reader task; sorting/status bars remain unchecked.
+  Release/performance/Full-loader matrix/physical arm64 not rerun; no blocker.
