@@ -1,5 +1,24 @@
 # Data model
 
+## Confirmed single-document deletion
+
+`Storage::delete_document` holds one immediate transaction, deleting canonical
+chapter text for the exact live document's source, then its Library row. Existing
+foreign keys remove live analyses/tokens, ruby/cues, EPUB metadata/placements/assets,
+original file bytes/dedup hashes, reading positions and pending partial time.
+Keep source/chapter IDs and original titles, completion commands and frozen effective
+reservations, completed time/occurrences/analysis provenance, vocabulary/status
+events, custom entries and segmentation rules. Global rules remain reversible after
+their origin is deleted. Never reset AUTOINCREMENT or the Library recency clock.
+
+Absent IDs are idempotent no-ops, including an explicit retry after a lost success.
+Statement/cascade/COMMIT failure restores the whole document. Reimport follows normal
+atomic registration and allocates fresh document/source/chapter IDs with zero
+progress, no finish marker, no recency or partial time; existing vocabulary/history
+survive. The runtime dispatches this through the existing FIFO without dictionaries.
+Core requires a retained visible Library target plus matching explicit confirmation;
+Cancel performs no I/O. Rename and bulk/Select All deletion remain pending.
+
 ## EPUB canonical content and atomic repository (migration 0014)
 
 `yomoku-import::epub::EpubDocument` has an optional metadata title, ordered
@@ -74,9 +93,9 @@ their durable identities, without ZIP parsing or analysis. Verify digests, expec
 counts, contiguous indexes, UTF-8 anchors, image placeholders/references and position
 ownership. Corruption fails without repair. Library progress sums preceding chapter
 bytes plus the current chapter offset over total canonical book bytes; backward
-movement can decrease it. Live deletion cascades EPUB metadata/assets; deleting
-chapter text drops source ruby, while provenance/analyses/global vocabulary survive.
-Reimport allocates fresh IDs/position/finish state. Production deletion remains planned.
+movement can decrease it. Live deletion cascades EPUB metadata/assets and live
+analysis/ruby; historical analysis provenance and global vocabulary survive.
+Reimport allocates fresh IDs/position/finish state; see deletion above.
 
 Ordered-chapter reader repositories now support the saved EPUB content; see below.
 EPUB runtime/FFI imports and mixed Android selection are connected.
@@ -333,7 +352,7 @@ Process death preserves only committed per-file data; a fresh helper starts empt
 and never automatically resumes unfinished selections. No schema change.
 Deleting live content removes file identity/ruby;
 retained source/chapter/history and global vocabulary survive, and reimport starts
-with fresh IDs, position and finish state. Production deletion is still planned.
+with fresh IDs, position and finish state; see the production deletion API above.
 
 ## Immutable word/name dictionary index
 
@@ -508,8 +527,8 @@ replacement/reversal together. No override API edits text, statuses or past even
 
 Original selected bytes and source/chapter metadata survive content deletion, so
 global edits remain inspectable/reversible. Load validates their shape/ownership
-and, while canonical text exists, their exact source span. No production deletion
-API is introduced. Existing documents are not analyzed/rescanned by migration.
+and, while canonical text exists, their exact source span. Confirmed document deletion
+retains these rules. Existing documents are not analyzed/rescanned by migration.
 Real analyzer output and atomic paste registration are implemented separately.
 The pure `segmentation` module now derives effective boundaries without modifying
 these snapshots. `segmentation_from_snapshot` creates an exact partition from

@@ -28,6 +28,9 @@ use yomoku_storage::Storage;
 
 const TIMEOUT: Duration = Duration::from_secs(10);
 
+#[path = "imports/document_deletion.rs"]
+mod document_deletion;
+
 struct Database(PathBuf);
 impl Database {
     fn new() -> Self {

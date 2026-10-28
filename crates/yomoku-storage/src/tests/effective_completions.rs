@@ -379,19 +379,9 @@ fn effective_completions_reservation_survives_reversal_metadata_changes_reopen_a
     );
     let history = rows(&storage, "reading_occurrences");
     storage
-        .connection
-        .execute(
-            "DELETE FROM documents WHERE id = ?1",
-            [i64::from(imported.document.document_id)],
-        )
+        .delete_document(imported.document.document_id)
         .unwrap();
-    storage
-        .connection
-        .execute(
-            "DELETE FROM chapter_texts WHERE chapter_id = ?1",
-            [i64::from(imported.document.chapter.chapter_id)],
-        )
-        .unwrap();
+
     drop(storage);
     let mut storage = Storage::open(database.path()).unwrap();
     assert_eq!(

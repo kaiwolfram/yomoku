@@ -877,7 +877,14 @@ Migration 0007 persists immutable chapter analysis/token snapshots and reversibl
 segmentation overrides. Identical snapshot retries reuse IDs; conflicting output
 under the same revision/mode key errors. Override replacement/deactivation commits
 atomically, keeps base output intact and preserves global rules after source content
-deletion. No production document edit/rename/delete API exists. Storage
+deletion. Confirmed single-document deletion now runs on the same FIFO: one immediate
+transaction removes live chapter text then the Library row, cascading content/assets/
+analyses/dedup/position/partial time while retaining historical provenance, vocabulary,
+custom entries and overrides. No dictionary load or rescan occurs. Core retains the
+visible target across Activity recreation; matching explicit confirmation is required,
+Cancel has no effect and failures allow explicit Retry. Android disables delete during
+file batches and unresolved saves. Success reconciles the full Library and invalidates
+status counts without changing query/sort. Rename and bulk/Select All remain pending. Storage
 tests cover migrations, reopen, rollback, Unicode, concurrency, ID allocation,
 settings, vocabulary, analysis anchors and completion history. Base-analysis identity and anchored completion intents reach core/FFI; token/override
 repositories have no segmentation UI operations.

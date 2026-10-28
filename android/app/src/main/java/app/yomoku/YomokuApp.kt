@@ -49,7 +49,7 @@ internal fun YomokuApp(
     onReaderInteraction: () -> Unit = {},
     imageLoader: EpubImageLoader? = null,
     coverLoader: EpubCoverLoader? = null,
-    libraryWordLoadingEnabled: Boolean = true,
+    libraryActionsEnabled: Boolean = true,
     onImportFiles: (() -> Unit)? = null,
 ) {
     val context = LocalContext.current
@@ -152,7 +152,7 @@ internal fun YomokuApp(
                                 dispatch,
                                 onImportFiles,
                                 coverLoader,
-                                libraryWordLoadingEnabled,
+                                libraryActionsEnabled,
                             )
                         else ->
                             Text(
@@ -225,6 +225,8 @@ private fun YomokuPreview() {
                 "",
                 LibrarySort.LASTREAD,
                 0UL,
+                null,
+                null,
                 null,
                 null,
                 null,

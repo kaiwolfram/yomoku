@@ -3351,3 +3351,25 @@ write caches, history, position or recency. Global rules remain valid after thei
 origin document is deleted. Existing shared resolution does require canonical
 text and stored-analysis reads; include that cost in the planned measurements.
 No migration, dependency, public wire-schema or new product behavior.
+
+## 2026-10-28 — Confirmed single-document deletion
+
+Continue the existing Library deletion task with one independently testable action;
+leave rename and bulk/Select All unchecked. Store the confirmation target and its
+separate retry error in pure core so Activity recreation keeps the exact title/ID.
+Only a visible Library row can open the prompt; confirmation must match its ID.
+Cancel is read-only, and in-flight confirmation rejects duplicate submissions/Cancel.
+Navigation retires presentation; an accepted callback still reconciles only its ID.
+Keep title query/sort and unrelated errors. Defer deletion controls during a file
+batch using the existing Library action gate, alongside automatic status scans.
+
+Use the existing SQLite FIFO and one immediate transaction to delete all canonical
+chapter text for that live document, then its Library row. Existing cascade rules
+remove live analysis/ruby/cues/EPUB resources/original bytes/dedup/position/partial
+time; source/chapter provenance, original title, completed-reading commands/time/
+occurrences, global vocabulary/statuses/custom entries and overrides survive.
+This implements the specified document-deletion semantics without a new migration.
+Missing IDs are idempotent no-ops for explicit lost-response retries. Do not load
+content/dictionaries before deleting or reset allocation/recency high-water marks.
+Normal reimport creates fresh IDs, zero progress, no finish/recency/partial time;
+existing vocabulary/history remain intact. No dependency or architecture change.

@@ -22,6 +22,7 @@ use crate::typography::ReaderTypography;
 pub enum StorageOperation {
     List,
     LoadLibraryWordDistributions,
+    DeleteDocument(DocumentId),
     CreatePaste(String),
     LoadPaste(DocumentId),
     /// Explicit entry records Library recency and resets a finished book atomically.
@@ -94,6 +95,7 @@ pub enum DocumentError {
 pub enum StorageResult {
     Listed(Vec<LibraryDocument>, PageLength, ReaderTypography),
     LibraryWordDistributionsLoaded(Vec<LibraryWordDistribution>),
+    DocumentDeleted(DocumentId),
     /// Import results reference Library state; content is loaded separately.
     Created(LibraryDocument),
     /// Exact duplicate: preserve persisted title/position and reference it once.

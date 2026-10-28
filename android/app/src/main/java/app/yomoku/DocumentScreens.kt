@@ -50,10 +50,10 @@ internal fun LibraryScreen(
     dispatch: (Event) -> Unit,
     onImportFiles: (() -> Unit)? = null,
     coverLoader: EpubCoverLoader? = null,
-    loadWordDistributions: Boolean = true,
+    libraryActionsEnabled: Boolean = true,
 ) {
     LaunchedEffect(
-        loadWordDistributions,
+        libraryActionsEnabled,
         view.libraryWordDistributions,
         view.libraryWordError,
         view.storageBusy,
@@ -61,7 +61,7 @@ internal fun LibraryScreen(
         view.completionSavePending,
     ) {
         if (
-            loadWordDistributions &&
+            libraryActionsEnabled &&
                 view.libraryWordDistributions == null &&
                 view.libraryWordError == null &&
                 !view.storageBusy &&
@@ -75,6 +75,7 @@ internal fun LibraryScreen(
         remember(view.libraryWordDistributions) {
             view.libraryWordDistributions?.associateBy { it.documentId }
         }
+    LibraryDeleteDialog(view, dispatch, enabled = libraryActionsEnabled)
     Column(Modifier.fillMaxSize().padding(16.dp)) {
         Button(onClick = { dispatch(Event.OpenPaste) }, enabled = !view.storageBusy) {
             Text(stringResource(R.string.paste_title))
@@ -95,7 +96,7 @@ internal fun LibraryScreen(
             Text(stringResource(R.string.library_words_error))
             TextButton(
                 onClick = { dispatch(Event.LoadLibraryWordDistributions) },
-                enabled = loadWordDistributions && !view.storageBusy,
+                enabled = libraryActionsEnabled && !view.storageBusy,
                 modifier = Modifier.testTag("retry_library_words"),
             ) {
                 Text(stringResource(R.string.retry))
@@ -192,6 +193,17 @@ internal fun LibraryScreen(
                             loading = distributions == null && view.libraryWordError == null,
                             documentId = document.documentId.value,
                         )
+                    }
+                    TextButton(
+                        onClick = { dispatch(Event.RequestDocumentDeletion(document.documentId)) },
+                        enabled =
+                            libraryActionsEnabled &&
+                                !view.storageBusy &&
+                                !view.readingTimeSavePending &&
+                                !view.completionSavePending,
+                        modifier = Modifier.testTag("delete_document_${document.documentId.value}"),
+                    ) {
+                        Text(stringResource(R.string.library_delete))
                     }
                 }
             }

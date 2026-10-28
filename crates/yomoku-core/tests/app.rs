@@ -9,6 +9,8 @@ fn starts_in_library() {
         ViewModel {
             library_word_distributions: None,
             library_word_error: None,
+            library_delete_target: None,
+            library_delete_error: None,
             reader_time: None,
             reading_time_save_pending: false,
             completion_save_pending: false,

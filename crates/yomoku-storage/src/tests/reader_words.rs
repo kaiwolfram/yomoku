@@ -362,13 +362,7 @@ fn document_deletion_preserves_counts_vocabulary_deletion_erases_them_without_lo
         .vocabulary
         .unwrap()
         .id;
-    storage
-        .connection
-        .execute(
-            "DELETE FROM documents WHERE id = ?1",
-            [i64::from(first.document.document_id)],
-        )
-        .unwrap();
+    storage.delete_document(first.document.document_id).unwrap();
     assert!(storage
         .load_reader_word(&dictionary, key(&first), 0)
         .unwrap()

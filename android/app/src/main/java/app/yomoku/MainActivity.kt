@@ -53,7 +53,7 @@ class MainActivity : ComponentActivity() {
                     core::onReaderInteraction,
                     core.images,
                     core.covers,
-                    libraryWordLoadingEnabled = !fileImports.active,
+                    libraryActionsEnabled = !fileImports.active,
                 ) {
                     // Providers frequently label SRT as text/plain or application/octet-stream.
                     // Validate the literal display-name extension in FileImports.

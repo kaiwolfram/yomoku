@@ -1,9 +1,11 @@
 # Resume here
-Updated: 2026-10-28. Effective Library storage ready; coordinated live switch next.
+Updated: 2026-10-28. Single deletion verified; coordinated effective switch next.
 ## Working
+- Confirmed single deletion: retained target/Cancel/Retry; atomic live-content cleanup,
+  history/vocabulary/rules preserved; reimport fresh. Bulk/rename remain pending.
 - Library title-only search/Clear + Last read/Title/Import date; query/sort retained.
   Read order (0019) on explicit open only; newest unknown/unopened afterward.
-  Pure sort/search; duplicates preserve recency, legacy history stays unknown.
+  Pure search/sort; duplicates preserve recency; legacy history unknown.
 - Live bars use original B/live statuses; read-only FIFO; explicit Retry; batches defer scans.
   Effective Library API shares eligibility/resolution; distinct across chapters; deleted absent;
   Missing/zero differ. Stored text/rules, no source/assets/Full/writes. Switch with reader.
@@ -47,10 +49,8 @@ Updated: 2026-10-28. Effective Library storage ready; coordinated live switch ne
 - Serial bounds-first decode: <=32768-edge/100 MP source, <=2048-edge sample,
   16 MiB shared page pixels; repeats share bitmaps. Ratio frames <=8192px preserve
   U+FFFC positions/styles/word/link identity; unsupported images keep alt/Retry.
-- Custom entries (0017): exact-surface CRUD, frozen selections/built-in gates,
-  literal drafts/Cancel/retries; no history/status writes.
-- Furigana: persisted switch/retries, source-first/B fallback independent of status;
-  half-size readings, strict UTF-16, full crossing readings/fitted width/headroom.
+- Custom entries (0017): literal CRUD/Cancel/retries, built-in gates; no history/status writes.
+- Furigana: persisted switch/retries, source-first/B fallback; strict UTF-16/full crossings.
 - Effective segmentation: B + A/B/C/manual; contiguous JP B matches, local/newer
   precedence/reversal; exact metadata provenance, unmatched unresolved.
 - Effective completion (0018): full key/occurrences/time frozen durably; page-only
@@ -58,7 +58,6 @@ Updated: 2026-10-28. Effective Library storage ready; coordinated live switch ne
   survives reversal/deletion/reopen; legacy calls reject its ID. Live reader uses B.
 - Compact effective_session: one full key + view, revisions/stale/retry/Missing B;
   Kotlin page/selection 60/68 B; native effective_storage shares FIFO/dictionary/word state.
-- Retained completion: freeze before time drain; exact retries/reopen/reversal count once.
 - Status/overrides: atomic key/surface/ID/rule-revision guards, five choices,
   stored A/B/C; atomic edits/register/reverse, stale/ABA/concurrent guards.
   Fresh attempts/exact retries/shared gates; stale/lost success requires reload.
@@ -67,14 +66,15 @@ Updated: 2026-10-28. Effective Library storage ready; coordinated live switch ne
 - Compact override prompt/actions: fresh same-page identities; default All, literal
   choices/reverse/retry/Cancel; generated codecs. Retained furigana + strict Android
   effectiveDisplayTokens adapters ready (crossings/unresolved/source preference). Not live.
-- EffectiveReaderRequest.command/finish_request retains attempts/retries; stale results rejected.
 ## Next tasks (ordered)
 1. Switch live core/FFI/Android completion/token/status/furigana/word/custom + Library membership
    (effective_library_word_distributions) via retained requests/command/finish_request + render
    adapters; see EFFECTIVE_READER_PAYLOAD.md. No live adoption in this slice.
 2. Wire compact override actions/state to Android A/B/C/manual + All/This/reversal.
-3. Measure real-book/JNI/device + Library scan cost, including on-demand whole chapters.
+3. Library rename + confirmed bulk/Select All deletion; single deletion is wired.
+Measure real-book/JNI/device + Library scan cost, including on-demand whole chapters.
 Physical arm64 deferred; Nostr empty; Q188 unresolved before forwarding.
 ## Verification
-- This slice PASS: 652 Rust (17 ignored), Full A/B/C fixture owned+mapped, Clippy/fmt/diff.
-- Prior: host JNI/codegen/APKs/lint; 8 phone + 1 wide/dark. No blocker. Commands: DEVELOPMENT.md end.
+- Native PASS: 660 Rust (17 ignored), JNI/codecs/repeat codegen, Clippy/fmt/APKs/lint.
+- PASS: 9 phone regressions + deletion phone/wide-dark; display restored. No blocker.
+  Initial empty-Library fixture fixed; emulator restarted. Commands: DEVELOPMENT.md end.

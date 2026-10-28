@@ -2584,3 +2584,30 @@ reruns. Plan, architecture/data/decisions and handoff updated; no blocker.
 Next switch live core/FFI/Android and the Library FIFO membership call together,
 then wire compact override controls. Android/JNI/release/hardware/performance
 not rerun; exact commands/results: DEVELOPMENT.md end.
+
+## 2026-10-28 — Confirmed single-document deletion
+
+Implemented the existing Library plan's single-delete slice end to end. Core retains
+an exact visible confirmation target across recreation, gates duplicate submissions,
+and provides Cancel/explicit Retry with separate errors. Typed FIFO/JNI invokes one
+atomic SQLite transaction; all live content/assets/analysis/dedup/position/partial
+time are removed while historical source/chapter identities, completion provenance/
+time/occurrences, vocabulary/status/custom entries and reversible global rules stay.
+Reimport starts with fresh IDs, zero progress and no finish/recency/partial time.
+Android disables actions during file batches and unresolved saves; query/sort survive.
+
+Eight new Rust cases; 660 workspace tests (17 ignored); all 294 storage cases after
+converting original/effective completion replay and word-count simulations to real
+deletion; strict Clippy/fmt, real-Full host JNI, byte-identical codegen, both-ABI APKs
+and Android lint pass. Nine existing phone regressions pass; corrected deletion UI
+case passes phone and wide/dark, including Cancel/recreation/forced rollback/Retry/
+history/unrelated-row/fresh-reimport checks. Initial fixtures needed type/module/
+position corrections and a Kotlin warning fix. The device test initially assumed
+an empty title filter after deleting the only document; adding a survivor verified
+the intended case. The emulator exited after the first suite; restart restored the
+corrected runs. Display size/density/light mode restored. No remaining blocker.
+
+Progress/architecture/data/decisions/handoff updated. Rename and bulk/Select All
+remain unchecked; coordinated effective-reader/Library adoption remains first.
+No migration/dependency. Release, separate Full-loader matrix, performance,
+process-death and physical arm64 not rerun. Commands/results: DEVELOPMENT.md end.

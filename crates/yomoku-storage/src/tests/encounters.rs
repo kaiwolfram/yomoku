@@ -406,8 +406,7 @@ fn document_deletion_retains_occurrences_but_vocabulary_deletion_erases_only_its
         .record_analyzed_page_completion(completion, imported.analysis_id)
         .unwrap();
     storage
-        .connection
-        .execute_batch("DELETE FROM documents; DELETE FROM chapter_texts;")
+        .delete_document(imported.document.document_id)
         .unwrap();
     assert_eq!(count(&storage, "chapter_analyses"), 0);
     assert_eq!(count(&storage, "reading_occurrences"), 3);

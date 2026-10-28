@@ -227,6 +227,10 @@ fn execute(
                 storage.library_word_distributions().map_err(map_error)?,
             ))
         }
+        StorageOperation::DeleteDocument(id) => {
+            storage.delete_document(id).map_err(map_error)?;
+            Ok(StorageResult::DocumentDeleted(id))
+        }
         StorageOperation::CreatePaste(_) => {
             let paste = paste.expect("validated paste");
             if let Some(imports) = imports.as_mut() {

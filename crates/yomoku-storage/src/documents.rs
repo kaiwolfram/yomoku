@@ -11,6 +11,29 @@ use yomoku_core::{
 use crate::{analysis::read_reader_analysis, settings::read_page_length, Storage, StorageError};
 
 impl Storage {
+    /// Remove live content and Library state atomically, retaining source/chapter
+    /// provenance, global vocabulary, overrides and completed-reading history.
+    /// An absent ID is an idempotent no-op, including an explicit lost-response retry.
+    pub fn delete_document(&mut self, document_id: DocumentId) -> Result<(), StorageError> {
+        let transaction = self
+            .connection
+            .transaction_with_behavior(TransactionBehavior::Immediate)?;
+        transaction.execute(
+            "DELETE FROM chapter_texts WHERE chapter_id IN (
+                SELECT c.id FROM chapters c JOIN documents d ON d.source_id = c.source_id
+                WHERE d.id = ?1)",
+            [i64::from(document_id)],
+        )?;
+        // Existing foreign keys remove positions, pending time, file bytes,
+        // dedup identities and EPUB assets. Text deletion removes live analyses.
+        transaction.execute(
+            "DELETE FROM documents WHERE id = ?1",
+            [i64::from(document_id)],
+        )?;
+        transaction.commit()?;
+        Ok(())
+    }
+
     /// Read recency for a live document, without opening/resetting it.
     pub fn last_read_sequence(&self, document_id: DocumentId) -> Result<Option<i64>, StorageError> {
         read_last_read_sequence_in(&self.connection, document_id)

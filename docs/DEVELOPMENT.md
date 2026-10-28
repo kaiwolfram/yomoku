@@ -5236,3 +5236,89 @@ switch the existing FIFO call to `effective_library_word_distributions` with the
 coordinated core/FFI/Android reader adoption. APK/lint/device, host Kotlin/JNI,
 separate full-loader matrix, release/process-death/physical arm64 and real-book
 performance were not rerun/measured for this Rust storage slice.
+
+
+## Confirmed single-document deletion
+
+2026-10-28, repository root, pinned offline Rust/JDK:
+
+```sh
+export PATH=/home/kai/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin:$PATH
+export JAVA_HOME=/home/kai/repos/yomoku/.local/jdk-17/jdk-17.0.21+9
+export GRADLE_USER_HOME=/home/kai/repos/yomoku/.local/gradle
+export ANDROID_HOME=/home/kai/Android/Sdk
+cargo test -p yomoku-core --test document_deletion --all-features --locked --offline
+cargo test --workspace --all-features --locked --offline --quiet
+# After converting older deletion simulations to the production repository API:
+cargo test -p yomoku-storage --all-features --locked --offline --quiet
+cargo clippy --workspace --all-targets --all-features --locked --offline -- -D warnings
+cargo fmt --all -- --check
+tools/format-kotlin.sh --check
+"$JAVA_HOME/bin/java" -jar .local/ktfmt-0.64.jar --kotlinlang-style --dry-run --set-exit-if-changed tests/kotlin/DocumentDeletionBridgeTest.kt
+tools/test-kotlin-bridge.sh
+# Wait for native builds/generation to exit before repeating generation.
+cargo run -p yomoku-ffi --bin generate-kotlin --features facet_typegen --locked --offline -- target/generated/kotlin-repeat
+diff -r target/generated/kotlin target/generated/kotlin-repeat
+./android/gradlew -p android :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug --offline --console=plain
+./android/gradlew -p android :app:connectedDebugAndroidTest '-Pandroid.testInstrumentationRunnerArguments.class=app.yomoku.DocumentDeletionTest,app.yomoku.LibraryWordsTest,app.yomoku.LibrarySortTest,app.yomoku.LibrarySearchTest,app.yomoku.LibraryCoversTest,app.yomoku.NavigationTest,app.yomoku.PasteReaderTest#pasteReturnsToLibraryAndOpensFirstLogicalPageWithBackAndRecreation,app.yomoku.TxtPickerTest#cancelBlockedReadRetainsCompletedFilesAndFreshBatchIgnoresLateProviderResult' --offline --console=plain
+git diff --check
+```
+
+PASS: four pure-core, three SQLite and one actual FIFO case; 660 workspace Rust
+tests (17 opt-in ignored), all 294 storage cases after replacing older simulated
+deletions, strict Clippy/Rustfmt/Kotlin formatting and byte-identical repeat codegen.
+The SQLite cases verify completed/partial time, occurrence/status/analysis history,
+custom entries, reversible global rules and source/chapter provenance; exact-byte
+idempotent deletion/reopen; fresh reimport IDs/progress/finish/recency; unrelated
+documents; TXT ruby/SRT cues/multi-chapter EPUB assets; cascade/statement/deferred
+COMMIT rollback and retry. Existing original/effective completion replay and word
+count regressions now call the production deletion API.
+
+Real-Full host JNI verifies confirmation/Cancel without database changes, successful
+deletion without dictionary loads, shared vocabulary/encounter counts, fresh reimport
+and reopened sessions. Existing imports/direct cancellation/selected-word/custom/
+Unicode/100-handle JNI cases pass. Both-ABI app/test APKs and strict Android lint pass.
+
+No migration/dependency. Deletion follows the specified history/vocabulary retention
+policy, using one existing-FIFO transaction and native core confirmation state.
+Rename, bulk/Select All and the coordinated effective-reader switch remain pending.
+Separate Full-loader matrix, release/process-death, physical arm64 and performance
+were not rerun/measured.
+
+Device follow-up commands after correcting the test fixture:
+
+```sh
+./android/gradlew -p android :app:connectedDebugAndroidTest :app:lintDebug -Pandroid.testInstrumentationRunnerArguments.class=app.yomoku.DocumentDeletionTest --offline --console=plain
+/home/kai/Android/Sdk/platform-tools/adb -s emulator-5554 shell wm size 2560x1600
+/home/kai/Android/Sdk/platform-tools/adb -s emulator-5554 shell wm density 240
+/home/kai/Android/Sdk/platform-tools/adb -s emulator-5554 shell cmd uimode night yes
+./android/gradlew -p android :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=app.yomoku.DocumentDeletionTest --offline --console=plain
+/home/kai/Android/Sdk/platform-tools/adb -s emulator-5554 shell wm size reset
+/home/kai/Android/Sdk/platform-tools/adb -s emulator-5554 shell wm density reset
+/home/kai/Android/Sdk/platform-tools/adb -s emulator-5554 shell cmd uimode night no
+```
+
+The nine existing phone Library/bar/search/sort/cover/navigation/paste/batch-cancel
+regressions pass. The new phone deletion case passes after its initial assertion
+confused a fully empty Library with an empty title filter; it now seeds a surviving
+document and checks both retained history and that unrelated live row. Actual UI
+coverage includes confirmation text, Cancel, retained Activity recreation before
+confirmation and after a forced SQLite failure, explicit Retry, filtered-row removal,
+retained query and fresh reimport without progress/finish/recency. Lint passes again
+with the corrected fixture.
+
+Initial compilation caught the import-layer TextEncoding type, a test module path,
+a reread checkpoint needing the persisted position reset, and an unnecessary Kotlin
+safe call under -Werror. All were corrected before passing native/JNI reruns.
+Gradle/ADB required the usual local-socket escalation. The emulator exited after the
+first phone suite, so the first corrected-case launch reported no devices; restarting
+medium_phone restored it and the corrected case passed. Existing Crux teardown
+messages are informational. Logs: `/tmp/yomoku-library-delete-{tests,storage,focused,
+clippy,bridge,codegen,format,format-check,android,device-initial,device-disconnected,
+device,wide,emulator}.log`.
+
+The deletion case also passes at 2560x1600/240dpi in dark mode on API-36 x86_64.
+Original display size/density and light mode were restored. Ten distinct focused
+phone cases and this wide case pass across the initial/corrected runs; no remaining
+implementation blocker. No production code changed after the passing native/JNI
+suite; only the corrected device fixture and documentation changed afterward.
