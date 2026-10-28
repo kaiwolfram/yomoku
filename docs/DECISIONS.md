@@ -3243,3 +3243,20 @@ an unresolved manual token. Compile this production helper in the host Kotlin/JN
 test runner so boundary guards can be tested without an emulator. No dependency,
 migration or new shell schema. Keep the live switch unchecked until token/status/
 word/custom/completion/furigana all adopt the retained protocol together.
+
+## 2026-10-28 — Common retained reader callback adapter
+
+Before the coordinated live switch, give accepted effective requests one native
+Crux dispatch/response adapter. Capture the original request in the callback;
+never reconstruct ownership from returned tokens or mutable app selection. Route
+ordinary FIFO failures as well as native effective outputs through each existing
+retained lifecycle. Unexpected envelopes fail closed; stale/duplicate callbacks
+return None and must not release a newer shared busy obligation. Invalid token
+responses consume only the captured outstanding read and require an explicit fresh
+revision. Retain write reservations/payloads for their existing exact retry policy.
+
+Keep shared clock/FIFO/lifecycle gates in the app and leave retry/follow-up dispatch
+explicit. No schema, migration, dependency, worker or automatic replay. Verify all
+request families on the existing real FIFO before adopting them in live events.
+When manual status observes deleted vocabulary, clear its selected-word encounter
+count alongside the missing status, matching erased history and the existing B UI.

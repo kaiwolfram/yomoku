@@ -2500,3 +2500,21 @@
   migration or wire-schema change. Live reader still uses B; next switch app/FFI/
   Android commands and render adapters together, then add compact override controls
   and measure real-book/device costs. Full matrix/release/arm64 not rerun; no blocker.
+
+## 2026-10-28 — Native effective reader callback adapter
+
+- Added a common Rust-only Crux request/callback adapter for all retained effective
+  operations. Captured attempts route FIFO errors/native results to the matching
+  lifecycle; bad envelopes fail closed, old callbacks cannot release newer work,
+  and write reservations keep exact retry ownership. No automatic follow-ups.
+- Fixed selected-word encounter counts remaining visible after status observed
+  deleted vocabulary; status and erased count now agree, preserving candidates.
+- PASS: eight new regressions, 622 Rust tests (17 ignored), strict Clippy/Rustfmt,
+  actual worker rollback/reopen/final-time/custom/completion/override coverage,
+  host Kotlin/JNI Full imports/cancellation/custom/Unicode/100 handle lifecycles,
+  byte-identical repeat codegen and diff check. No failed checks.
+- Updated plan/handoff/architecture/decisions/payload/development. No dependency,
+  migration, wire-schema or Android source change. Live switch remains unchecked;
+  next adopt the effective session and captured native events in app/FFI/Android
+  together, then expose override controls. APK/device/lint/release/performance/
+  process-death/Full-loader matrix/physical arm64 not rerun. No blocker.

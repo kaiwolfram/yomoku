@@ -1,5 +1,5 @@
 # Resume here
-Updated: 2026-10-28. Effective render adapters done; live switch next.
+Updated: 2026-10-28. Native callback adapter done; coordinated live switch next.
 ## Working
 - Pure Crux routes/Library/Settings; Render-only UI; FIFO SQLite/analysis; Library start.
 - Chapter-local UTF-8 position/whole-book percentage/five presets persist; reflow
@@ -9,8 +9,7 @@ Updated: 2026-10-28. Effective render adapters done; live switch next.
   title/status/progress without Full/rescan/writes. Summary returns Library; no auto-open.
 - Loads are read-only; explicit finished-book open resets to page 1 atomically.
   Finish survives movement/time/reflow; deletion resets it, preserving history.
-- App/FIFO/JNI retains ordered chapters and frozen original B/Missing identities;
-  plain loads preserve them; Previous crosses chapters.
+- Ordered chapters/frozen B/Missing identities survive loads; Previous crosses chapters.
 - Token reads atomically load original B/live statuses/metadata + clipped UTF-8
   ranges; completion owns token start. Deleted IDs absent. Whole-chapter validation.
   Full page/base/result identities gate callbacks; movement/reflow/refresh invalidate.
@@ -59,22 +58,22 @@ Updated: 2026-10-28. Effective render adapters done; live switch next.
 - Compact effective_session: one full key + view, revisions/stale/retry/Missing B;
   Kotlin page/selection 60/68 B; native effective_storage shares FIFO/dictionary/word state.
 - Retained completion: freeze before time drain; exact retries/reopen/reversal count once.
-- Effective status: atomic key/surface/ID guards; five choices/no-op retries/gates.
-- Guarded overrides: stored A/B/C/shared key/rule revision; atomic edits/register/
-  reverse, stale/ABA/concurrent guards. Retained fresh attempts/exact retries/shared
-  gates; stale/lost success requires explicit reload. Rollbacks retry.
+- Status/overrides: atomic key/surface/ID/rule-revision guards, five choices,
+  stored A/B/C; atomic edits/register/reverse, stale/ABA/concurrent guards.
+  Fresh attempts/exact retries/shared gates; stale/lost success requires reload.
 - Explicit A/C uses the FIFO/import analyzer cache, whole chapter/original profile;
   stored reuse skips Full. Rechecks key/revision at commit; metadata requires reload.
 - Compact override prompt/actions: fresh same-page identities; default All, literal
   choices/reverse/retry/Cancel; generated codecs. Retained furigana + strict Android
   effectiveDisplayTokens adapters ready (crossings/unresolved/source preference). Not live.
+- EffectiveReaderRequest.command captures native attempts; finish_request routes FIFO
+  errors/results, rejects stale callbacks, retains exact retries. Deleted counts clear.
 ## Next tasks (ordered)
 1. Switch live core/FFI/Android completion/token/status/furigana/word/custom together
-   via effective_storage + retained requests + render adapters; see EFFECTIVE_READER_PAYLOAD.md.
+   via retained requests/command/finish_request + render adapters; see EFFECTIVE_READER_PAYLOAD.md.
 2. Wire compact override actions/state to Android A/B/C/manual + All/This/reversal.
 3. Measure real-book/JNI/device cost, including whole-chapter on-demand generation.
 Physical arm64 deferred; Nostr empty; Q188 unresolved before forwarding.
 ## Verification
-- PASS: 614 Rust (17 ignored); Clippy/fmt/diff; Kotlin/JNI/codegen; debug APKs/lint.
-- Commands/logs: DEVELOPMENT.md end. Live reader uses B; effective adapters only.
-- PASS: 10 focused phone tests; full matrix/release/arm64 not rerun. No blocker.
+- PASS: 622 Rust (17 ignored); Clippy/fmt/diff; host JNI/repeat codegen. Commands: DEVELOPMENT.md end.
+- Prior: 10 focused phone tests/APKs/lint; device/release/arm64 not rerun. No blocker.

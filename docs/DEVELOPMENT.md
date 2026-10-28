@@ -4949,3 +4949,48 @@ next adopt the retained protocol and these render adapters in Event/ViewModel/
 FFI/Compose together, then wire override controls. Separate Full-loader matrix,
 full device matrix, performance/process-death/release/physical arm64 not rerun.
 No implementation blocker.
+
+## Native effective reader callback adapter
+
+2026-10-28, repository root, pinned offline Rust/JDK:
+
+```sh
+export PATH=/home/kai/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin:$PATH
+export JAVA_HOME=/home/kai/repos/yomoku/.local/jdk-17/jdk-17.0.21+9
+cargo test -p yomoku-core --test effective_session --all-features --locked --offline
+cargo test -p yomoku-runtime effective_worker_ --all-features --locked --offline
+cargo test --workspace --all-features --locked --offline --quiet
+cargo clippy --workspace --all-targets --all-features --locked --offline -- -D warnings
+cargo fmt --all -- --check
+tools/test-kotlin-bridge.sh
+cargo run -p yomoku-ffi --bin generate-kotlin --features facet_typegen --locked --offline -- target/generated/kotlin-repeat
+# Compare only after both generation commands finish.
+diff -r target/generated/kotlin target/generated/kotlin-repeat
+git diff --check
+```
+
+PASS: eight new cases (seven pure, one actual FIFO); 622 workspace Rust tests
+(17 opt-in ignored), strict Clippy/Rustfmt and byte-identical repeat codegen.
+All 53 retained-session and 15 focused effective-worker tests pass. Existing worker
+token/word/custom/completion helpers now exercise native Crux callback capture and
+the common response adapter, including SQLite rollback/reopen/lost success, final
+checkpoint ordering and exact reservations. Additional cases cover wrong envelopes,
+foreign/late/duplicate attempts, explicit retries and invalid token results consuming
+only their own outstanding read. The new worker case also verifies status observing
+deleted vocabulary clears the selected-word count, read-only DB bytes, override
+save/reload/reversal and preserved completion partitions. Dictionary data is local;
+the effective worker fixtures panic if Sudachi is loaded unexpectedly.
+
+Host Kotlin/JNI passes real-Full TXT/SRT/EPUB imports/direct cancellation,
+word/name/custom CRUD/retry, compact schemas/Unicode and 100 handle lifecycles.
+Existing Crux middleware teardown diagnostics remain informational. No failed checks.
+Logs: `/tmp/yomoku-effective-callback-{tests,clippy,bridge,codegen}.log`.
+
+No dependency, migration, public wire-schema or Android source change. No new
+automatic follow-up/retry: app clock/FIFO/lifecycle gates still apply. The live
+reader uses B. Continue in `app.rs`: retain the effective session, use native-only
+finished events carrying captured requests, and switch Event/ViewModel/FFI/Android
+completion/token/status/word/custom/furigana together using `command`/`finish_request`
+and existing render adapters. Then add compact override controls. Separate Full
+loader matrix, APK/device/lint/release/performance/process-death/physical arm64 were
+not rerun. No implementation blocker.

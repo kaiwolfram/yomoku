@@ -29,8 +29,8 @@ use yomoku_core::{
     document::{ChapterText, OverrideId, PasteText, TextAnchor, TextOffset, TextRange},
     effective_reader::EffectiveReaderWordDetails,
     effective_session::{
-        EffectiveReaderSelection, EffectiveReaderSession, EffectiveSelectionCommand,
-        EffectiveWordRequest,
+        EffectiveReaderProgress, EffectiveReaderRequest, EffectiveReaderSelection,
+        EffectiveReaderSession, EffectiveSelectionCommand, EffectiveWordRequest,
     },
     effective_storage::{EffectiveStorageOperation as Op, EffectiveStorageResult as Output},
     pagination::PageLength,
@@ -43,6 +43,7 @@ use yomoku_storage::{AnalyzedPaste, Storage};
 use super::StorageEffects;
 
 mod analysis;
+mod requests;
 
 const TIMEOUT: Duration = Duration::from_secs(10);
 type Router = HandleEffectLayer<Core<Probe>, StorageEffects>;
@@ -51,6 +52,7 @@ type Router = HandleEffectLayer<Core<Probe>, StorageEffects>;
 struct Probe;
 enum Event {
     Request(StorageOperation),
+    ReaderRequest(EffectiveReaderRequest),
     Finished(StorageResult),
 }
 impl App for Probe {
@@ -61,6 +63,13 @@ impl App for Probe {
 
     fn update(&self, event: Event, model: &mut Self::Model) -> Command<Effect, Event> {
         match event {
+            Event::ReaderRequest(request) => {
+                let expected = request.clone();
+                request.command(move |captured, result| {
+                    assert_eq!(captured, expected);
+                    Event::Finished(result)
+                })
+            }
             Event::Request(operation) => {
                 Command::request_from_shell(operation).then_send(Event::Finished)
             }
@@ -226,8 +235,12 @@ impl Drop for Fixture {
 }
 
 fn enqueue(router: &Router, operation: StorageOperation) -> mpsc::Receiver<thread::ThreadId> {
+    enqueue_event(router, Event::Request(operation))
+}
+
+fn enqueue_event(router: &Router, event: Event) -> mpsc::Receiver<thread::ThreadId> {
     let (sender, receiver) = mpsc::channel();
-    let effects = router.update(Event::Request(operation), move |effects| {
+    let effects = router.update(event, move |effects| {
         assert!(effects
             .iter()
             .all(|effect| matches!(effect, Effect::Render(_))));
@@ -251,13 +264,21 @@ fn run(router: &Router, operation: Op) -> StorageResult {
 
 fn load(router: &Router, session: &mut EffectiveReaderSession, base: ReaderTokenKey) {
     let request = session.begin_load(base).unwrap();
-    let StorageResult::Effective(Output::TokensLoaded(returned, snapshot)) =
-        run(router, Op::LoadTokens(request))
-    else {
-        panic!("expected tokens")
-    };
-    assert_eq!(returned, request);
-    assert!(session.accept(returned, snapshot));
+    assert_eq!(
+        finish_request(router, session, EffectiveReaderRequest::Tokens(request)),
+        EffectiveReaderProgress::TokensLoaded
+    );
+}
+
+fn finish_request(
+    router: &Router,
+    session: &mut EffectiveReaderSession,
+    request: EffectiveReaderRequest,
+) -> EffectiveReaderProgress {
+    wait(enqueue_event(router, Event::ReaderRequest(request.clone())));
+    session
+        .finish_request(&request, router.view().pop().unwrap())
+        .unwrap()
 }
 
 fn select(session: &EffectiveReaderSession, surface: &str) -> EffectiveSelectionCommand {
@@ -291,12 +312,14 @@ fn finish_word(
     session: &mut EffectiveReaderSession,
     request: &EffectiveWordRequest,
 ) {
-    let result = match run(router, request.operation()) {
-        StorageResult::Effective(result) => Ok(result),
-        StorageResult::Failed(error) => Err(error),
-        result => panic!("unexpected word result: {result:?}"),
-    };
-    assert!(session.finish_word_request(request, result));
+    assert_eq!(
+        finish_request(
+            router,
+            session,
+            EffectiveReaderRequest::Word(request.clone())
+        ),
+        EffectiveReaderProgress::WordFinished
+    );
 }
 
 #[test]
@@ -1254,12 +1277,14 @@ fn finish_completion(
     session: &mut EffectiveReaderSession,
     request: &EffectiveCompletionRequest,
 ) -> CompletionProgress {
-    let result = match run(router, request.operation()) {
-        StorageResult::Effective(result) => Ok(result),
-        StorageResult::Failed(error) => Err(error),
-        result => panic!("unexpected completion result: {result:?}"),
+    let EffectiveReaderProgress::Completion(progress) = finish_request(
+        router,
+        session,
+        EffectiveReaderRequest::Completion(request.clone()),
+    ) else {
+        panic!("expected completion progress")
     };
-    session.finish_completion_request(request, result).unwrap()
+    progress
 }
 
 #[test]

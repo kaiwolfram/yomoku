@@ -187,3 +187,21 @@ retain the same chapter segment/full surface, contextual metadata stays per
 occurrence, and unresolved manual parts stay selectable without metadata. Its
 geometry is shared with the existing B renderer and compiled by the host Kotlin
 test runner. No wire-schema/size change or live reader switch is included.
+
+## Native callback dispatch
+
+`EffectiveReaderRequest` wraps the accepted token/word/custom/status/completion/
+override attempts. Its `command` method sends the existing storage effect and
+captures the originating request in a native Crux callback. `finish_request`
+routes both `StorageResult::Failed` and effective results to that exact lifecycle.
+Unexpected envelopes fail closed; a stale/duplicate callback returns None and
+cannot release newer app busy state. Token result validation also consumes only
+the captured read on failure, requiring a fresh explicit load revision.
+
+Requests/progress have no shell codec and keep the existing shared full keys and
+retry reservations. Completion progress never dispatches a commit or retries
+automatically. The app must still enforce shared FIFO/time/lifecycle gates before
+acceptance and drain both final checkpoint slots before dispatching preparation.
+The real FIFO tests use this adapter for token, word/custom and completion flows;
+status/deletion and override save/reload/reversal also run through it. Live app
+adoption and device measurements remain pending.

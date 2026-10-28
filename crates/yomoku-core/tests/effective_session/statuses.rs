@@ -125,6 +125,35 @@ fn status_changes_update_live_word_and_page_without_guessing_manual_metadata() {
 }
 
 #[test]
+fn status_observing_deleted_vocabulary_clears_the_selected_words_encounter_count() {
+    let (mut session, selection, details) = loaded();
+    let candidates = details.candidates.clone();
+    let request = session.begin_word_load(selection).unwrap();
+    assert!(session.finish_word_request(
+        &request,
+        Ok(Output::WordLoaded(selection, Box::new(details)))
+    ));
+    assert_eq!(session.word_state().details.unwrap().encountered, 7);
+    let request = begin(&mut session, selection);
+    assert!(session.finish_status_request(&request, Ok(Output::StatusChanged(selection, None))));
+    let details = session.word_state().details.unwrap();
+    assert!(details.token.vocabulary.is_none());
+    assert_eq!(details.encountered, 0);
+    assert_eq!(details.candidates, candidates);
+    assert!(session
+        .page()
+        .unwrap()
+        .tokens
+        .last()
+        .unwrap()
+        .vocabulary
+        .is_none());
+    assert!(session
+        .begin_status_change(selection, entry().id, VocabularyStatus::Known, 501)
+        .is_none());
+}
+
+#[test]
 fn status_gates_stale_missing_foreign_and_invalid_choices_without_changing_page() {
     let (mut session, selection, _) = loaded();
     for index in [0, 1, 3, u64::MAX] {

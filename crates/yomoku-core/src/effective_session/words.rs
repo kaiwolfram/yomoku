@@ -107,6 +107,9 @@ impl EffectiveReaderSession {
             })
         {
             details.token.vocabulary = vocabulary;
+            if vocabulary.is_none() {
+                details.encountered = 0;
+            }
         }
     }
 

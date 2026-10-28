@@ -1207,3 +1207,23 @@ exact retries; new callback attempts remain separate. Retry/Cancel authenticate
 the accepted obligation, and in-flight writes still drain. Generated Kotlin
 round trips exercise these standalone schemas; no live Event/ViewModel or Android
 flow uses them yet. No migration, dependency or durable prompt registry.
+
+## Native effective reader callbacks
+
+`effective_session::EffectiveReaderRequest` groups accepted token, word/custom,
+status, completion and override attempts. `command` captures the originating
+request in a native Crux callback while dispatching the existing storage effect.
+`EffectiveReaderSession::finish_request` routes standard FIFO failures and native
+results back to the matching retained lifecycle. Malformed envelopes fail closed;
+stale/duplicate attempts return None, so the app must leave newer busy state alone.
+For tokens, both the captured and returned request must match before acceptance;
+invalid responses consume only their own read, requiring explicit fresh loading.
+
+The wrapper has no Serde/Facet shell representation and adds no worker, I/O,
+registry or persisted state. Progress distinguishes consumed token failures and
+completion/override outcomes; word/status errors remain in their existing retained
+state. It never dispatches retries or completion follow-ups automatically. Shared
+time/FIFO/lifecycle gates still belong to the app; final checkpoint slots must drain
+before preparation dispatch. Selected-word status observations of deleted entries
+also clear their erased encounter count. The native FIFO regression harness uses
+this adapter; live Event/ViewModel/Android adoption remains pending.
