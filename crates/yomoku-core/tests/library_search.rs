@@ -15,6 +15,7 @@ fn documents() -> Vec<LibraryDocument> {
     .into_iter()
     .enumerate()
     .map(|(index, title)| LibraryDocument {
+        last_read_sequence: None,
         document_id: (index as i64 + 1).try_into().unwrap(),
         title: title.into(),
         progress_percent: index as u64 * 20,
@@ -49,13 +50,13 @@ fn search_projects_literal_unicode_titles_without_changing_rows_or_order() {
     load(&core);
     let original = core.view();
     for (query, expected) in [
-        ("rust", vec![0, 1]),
+        ("rust", vec![1, 0]),
         ("猫", vec![0]),
         ("𠮷か\u{3099}\0%_", vec![2]),
         ("%_", vec![2]),
         ("  ", vec![]),
         ("no matching title", vec![]),
-        ("", vec![0, 1, 2, 3]),
+        ("", vec![3, 2, 1, 0]),
     ] {
         let effects = core.process_event(Event::SearchLibraryTitles(query.into()));
         assert!(matches!(effects.as_slice(), [Effect::Render(_)]));
@@ -66,7 +67,7 @@ fn search_projects_literal_unicode_titles_without_changing_rows_or_order() {
             view.documents,
             expected
                 .into_iter()
-                .map(|index| original.documents[index].clone())
+                .map(|index| documents()[index].clone())
                 .collect::<Vec<_>>()
         );
         assert_eq!(view.document_error, original.document_error);
@@ -104,7 +105,10 @@ fn search_during_refresh_retains_full_library_and_survives_failures_and_navigati
         assert_eq!(core.view().library_title_query, "猫");
     }
     core.process_event(Event::SearchLibraryTitles(String::new()));
-    assert_eq!(core.view().documents, documents());
+    assert_eq!(
+        core.view().documents,
+        documents().into_iter().rev().collect::<Vec<_>>()
+    );
     assert_eq!(Core::<Yomoku>::new().view().library_title_query, "");
 }
 
@@ -154,5 +158,5 @@ fn import_and_duplicate_results_obey_search_without_hiding_canonical_updates() {
     let view = core.view();
     assert_eq!(view.library_document_count, 5);
     assert_eq!(view.documents[2], existing);
-    assert_eq!(view.documents[4], created);
+    assert_eq!(view.documents[0], created);
 }

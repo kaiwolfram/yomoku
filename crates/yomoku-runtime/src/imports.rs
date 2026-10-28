@@ -417,11 +417,15 @@ impl Imports {
                     .library_summary()
                     .map_err(|_| DocumentError::InvalidDocument)?,
             )),
-            Ok(PasteImportOutcome::Existing(document)) => Ok(StorageResult::Existing(
-                document
+            Ok(PasteImportOutcome::Existing(document)) => {
+                let mut summary = document
                     .library_summary()
-                    .map_err(|_| DocumentError::InvalidDocument)?,
-            )),
+                    .map_err(|_| DocumentError::InvalidDocument)?;
+                summary.last_read_sequence = storage
+                    .last_read_sequence(document.document_id)
+                    .map_err(map_error)?;
+                Ok(StorageResult::Existing(summary))
+            }
             Err(PasteImportError::Analysis(error)) => {
                 // A later attempt loads fresh state after any engine failure.
                 self.analyzer = None;

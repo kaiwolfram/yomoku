@@ -5055,3 +5055,69 @@ the full Library stays in core and matching titles are projected without writes.
 The coordinated effective-reader switch remains next; Library sorts/status bars
 are still unchecked. Release, separate Full-loader matrix, performance,
 process-death and physical arm64 were not rerun. No remaining blocker.
+
+
+## Library sorting and durable recency
+
+2026-10-28, repository root, pinned offline Rust/JDK:
+
+```sh
+export PATH=/home/kai/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin:$PATH
+export JAVA_HOME=/home/kai/repos/yomoku/.local/jdk-17/jdk-17.0.21+9
+export GRADLE_USER_HOME=/home/kai/repos/yomoku/.local/gradle
+export ANDROID_HOME=/home/kai/Android/Sdk
+cargo test -p yomoku-storage library_order --all-features --locked --offline
+cargo test --workspace --all-features --locked --offline --quiet
+cargo clippy --workspace --all-targets --all-features --locked --offline -- -D warnings
+cargo fmt --all -- --check
+tools/format-kotlin.sh --check
+"$JAVA_HOME/bin/java" -jar .local/ktfmt-0.64.jar --kotlinlang-style --dry-run --set-exit-if-changed tests/kotlin/LibrarySearchBridgeTest.kt tests/kotlin/LibrarySortBridgeTest.kt
+tools/test-kotlin-bridge.sh
+cargo run -p yomoku-ffi --bin generate-kotlin --features facet_typegen --locked --offline -- target/generated/kotlin-repeat
+# Compare after generation exits; do not generate during a native build.
+diff -r target/generated/kotlin target/generated/kotlin-repeat
+./android/gradlew -p android :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug --offline --console=plain
+./android/gradlew -p android :app:connectedDebugAndroidTest '-Pandroid.testInstrumentationRunnerArguments.class=app.yomoku.LibrarySortTest,app.yomoku.LibrarySearchTest,app.yomoku.NavigationTest,app.yomoku.LibraryCoversTest,app.yomoku.PasteReaderTest#pasteReturnsToLibraryAndOpensFirstLogicalPageWithBackAndRecreation' --offline --console=plain
+/home/kai/Android/Sdk/platform-tools/adb -s emulator-5554 shell wm size 2560x1600
+/home/kai/Android/Sdk/platform-tools/adb -s emulator-5554 shell wm density 240
+/home/kai/Android/Sdk/platform-tools/adb -s emulator-5554 shell cmd uimode night yes
+./android/gradlew -p android :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=app.yomoku.LibrarySortTest,app.yomoku.LibrarySearchTest --offline --console=plain
+/home/kai/Android/Sdk/platform-tools/adb -s emulator-5554 shell wm size reset
+/home/kai/Android/Sdk/platform-tools/adb -s emulator-5554 shell wm density reset
+/home/kai/Android/Sdk/platform-tools/adb -s emulator-5554 shell cmd uimode night no
+git diff --check
+```
+
+PASS: four new pure-core and seven new SQLite cases; 637 workspace Rust tests
+(17 opt-in ignored), strict Clippy/Rustfmt/Kotlin formatting and byte-identical
+repeat codegen. Coverage includes default recent/unopened order, Unicode/title
+ties, filtered sorts, retained selection during refresh/errors/navigation, update
+reconciliation, migration/data preservation, concurrent entry, counter exhaustion,
+statement/deferred-commit rollback and read-only queries. Exact TXT/SRT/EPUB file
+references preserve recency without decoding, analysis or database writes.
+
+Real-Full host JNI verifies every sort, title filtering, retained navigation,
+explicit-open promotion, duplicate paste preservation, fresh-session default and
+durable recency after reopening, with unchanged SQLite bytes during sort/search
+and no added dictionary loading. Existing imports/direct cancellation, word/name/
+custom CRUD/Unicode codecs and 100 native handle lifecycles pass.
+Both-ABI debug app/test APKs and strict Android lint pass. All seven phone tests
+above pass on medium_phone, Android 16/API 36, including actual menu selection,
+visible row order, retained recreation, search, covers and paste/reader navigation.
+Both sorting/search cases also pass at 2560x1600/240dpi in dark mode. Display size,
+density and light mode were restored afterward.
+
+Initial verification caught old schema-version/order/snapshot assumptions, a
+historical v16 fixture using a current-only snapshot query, generated enum spelling
+and the preview's positional constructor. Updated those fixtures/preview; the new
+short-Japanese TXT fixture now explicitly selects UTF-8 as required. All passing
+reruns followed those fixes. Emulator/Gradle required the usual AVD/local-socket
+escalation. Existing Crux teardown diagnostics remain informational. Logs:
+`/tmp/yomoku-library-sort-{tests,storage,clippy,bridge,format-check,host-format-check,
+codegen,android,device,wide,emulator}.log`.
+
+Migration 0019 stores bounded ordinal recency without wall timestamps; sort choice
+remains ephemeral and fresh sessions default to Last read. No dependency change.
+The coordinated effective-reader switch remains next; Library status bars remain
+unchecked. Separate Full-loader matrix, release/performance/process-death and
+physical arm64 were not rerun here. No remaining implementation blocker.

@@ -156,6 +156,7 @@ fn all_typography_preferences_persist_without_changing_logical_pages_or_document
                 assert_eq!(
                     after,
                     yomoku_core::reader::DocumentReaderSnapshot {
+                        last_read_sequence: None,
                         typography,
                         ..before.clone()
                     }

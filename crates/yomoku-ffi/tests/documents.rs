@@ -85,7 +85,7 @@ fn async_native_pastes_list_load_reopen_and_release_listeners() {
         .documents
         .is_empty());
     let text = "  題𠮷📖  \r\nか\u{3099}👩‍👩‍👧‍👦\0終\n";
-    let created = dispatch(&native, &callbacks, Event::CreatePaste(text.into()));
+    let mut created = dispatch(&native, &callbacks, Event::CreatePaste(text.into()));
     assert_eq!(created.documents.len(), 1);
     assert_eq!(created.documents[0].title, "  題𠮷📖  ");
     assert_eq!(created.destination, Destination::Library);
@@ -123,6 +123,7 @@ fn async_native_pastes_list_load_reopen_and_release_listeners() {
     assert!(callbacks.recv_timeout(Duration::from_secs(10)).is_err());
     assert!(life.upgrade().is_none());
     let (reopened, callbacks, _) = bridge(&db.path());
+    created.documents[0].last_read_sequence = Some(1);
     assert_eq!(
         dispatch(&reopened, &callbacks, Event::RefreshLibrary).documents,
         created.documents

@@ -4,6 +4,7 @@ import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -15,6 +16,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -22,7 +25,10 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
@@ -34,6 +40,7 @@ import androidx.compose.ui.unit.dp
 import app.yomoku.shared.DocumentError
 import app.yomoku.shared.Event
 import app.yomoku.shared.ImportOutcome
+import app.yomoku.shared.LibrarySort
 import app.yomoku.shared.ViewModel
 
 @Composable
@@ -98,6 +105,7 @@ internal fun LibraryScreen(
             },
             modifier = Modifier.fillMaxWidth().testTag("library_title_search"),
         )
+        LibrarySortMenu(view.librarySort) { dispatch(Event.SortLibrary(it)) }
         if (!view.storageBusy && view.documents.isEmpty() && view.documentError == null) {
             Text(
                 stringResource(
@@ -146,6 +154,37 @@ internal fun LibraryScreen(
                         )
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun LibrarySortMenu(sort: LibrarySort, onSort: (LibrarySort) -> Unit) {
+    var expanded by remember { mutableStateOf(false) }
+    val labels =
+        mapOf(
+            LibrarySort.LASTREAD to R.string.library_sort_last_read,
+            LibrarySort.TITLE to R.string.library_sort_title,
+            LibrarySort.IMPORTDATE to R.string.library_sort_import_date,
+        )
+    Box {
+        TextButton(
+            onClick = { expanded = true },
+            modifier = Modifier.testTag("library_sort"),
+        ) {
+            Text(stringResource(R.string.library_sort, stringResource(labels.getValue(sort))))
+        }
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            labels.forEach { (option, label) ->
+                DropdownMenuItem(
+                    text = { Text(stringResource(label)) },
+                    onClick = {
+                        expanded = false
+                        onSort(option)
+                    },
+                    modifier = Modifier.testTag("library_sort_${option.name}"),
+                )
             }
         }
     }

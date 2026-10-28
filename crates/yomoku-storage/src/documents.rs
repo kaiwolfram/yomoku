@@ -11,6 +11,11 @@ use yomoku_core::{
 use crate::{analysis::read_reader_analysis, settings::read_page_length, Storage, StorageError};
 
 impl Storage {
+    /// Read recency for a live document, without opening/resetting it.
+    pub fn last_read_sequence(&self, document_id: DocumentId) -> Result<Option<i64>, StorageError> {
+        read_last_read_sequence_in(&self.connection, document_id)
+    }
+
     /// Permanent finish state of a live document, independent of its position.
     /// None means the document is absent. Reading this never changes progress.
     pub fn finished_at_least_once(
@@ -27,7 +32,7 @@ impl Storage {
             .map_err(StorageError::from)
     }
 
-    /// Stable allocation order until Library sorting is implemented.
+    /// Read-only summaries in stable import order; the core projects Library sorts.
     pub fn list_documents(&self) -> Result<Vec<LibraryDocument>, StorageError> {
         let mut statement = self.connection.prepare(
             "WITH chapter_lengths AS (
@@ -44,7 +49,8 @@ impl Storage {
                      c.bytes, d.finished_at_least_once, d.source_id, c.source_id,
                      totals.complete,
                      (SELECT COALESCE(SUM(prior.bytes), 0) FROM chapter_lengths prior
-                      WHERE prior.source_id = d.source_id AND prior.chapter_index < c.chapter_index)
+                      WHERE prior.source_id = d.source_id AND prior.chapter_index < c.chapter_index),
+                     d.last_read_sequence
               FROM documents d
               LEFT JOIN totals ON totals.source_id = d.source_id
               LEFT JOIN reading_positions p ON p.document_id = d.id
@@ -64,6 +70,7 @@ impl Storage {
                 row.get::<_, Option<i64>>(8)?,
                 row.get::<_, Option<bool>>(9)?,
                 row.get::<_, i64>(10)?,
+                row.get::<_, Option<i64>>(11)?,
             ))
         })?;
         rows.map(|row| {
@@ -79,9 +86,11 @@ impl Storage {
                 position_source,
                 complete,
                 preceding_bytes,
+                last_read_sequence,
             ) = row?;
             let total_bytes = total_bytes.ok_or(StorageError::InvalidDocument)?;
-            if complete != Some(true)
+            if last_read_sequence.is_some_and(|value| value <= 0)
+                || complete != Some(true)
                 || position_chapter.is_some()
                     && (position_source != Some(source)
                         || !matches!((offset, chapter_bytes), (Some(offset), Some(bytes)) if (0..=bytes).contains(&offset)))
@@ -92,6 +101,7 @@ impl Storage {
                 .checked_add(offset.unwrap_or(0))
                 .ok_or(StorageError::InvalidDocument)?;
             Ok(LibraryDocument {
+                last_read_sequence,
                 document_id: DocumentId::try_from(id).map_err(|_| StorageError::InvalidDocument)?,
                 title,
                 finished_at_least_once,
@@ -145,7 +155,8 @@ impl Storage {
         Ok(Some(snapshot))
     }
 
-    /// Explicit reader entry. A finished book starts at page 1 with the reset
+    /// Explicit reader entry records Library recency. A finished book starts at
+    /// page 1 with the reset
     /// persisted in the same transaction as the returned snapshot. Ordinary
     /// reads and completion reloads must keep using the read-only load methods.
     pub fn open_reader_snapshot(
@@ -174,6 +185,7 @@ impl Storage {
             analysis: read_reader_analysis(&transaction, document.chapter.chapter_id)?,
             document,
         };
+        record_reader_entry_in(&transaction, document_id)?;
         transaction.commit()?;
         Ok(Some(snapshot))
     }
@@ -333,4 +345,39 @@ pub(crate) fn create_single_text_in(
             text: text.to_owned(),
         },
     })
+}
+
+/// Caller holds an immediate transaction. Recency commits with validated reader entry.
+pub(crate) fn record_reader_entry_in(
+    connection: &Connection,
+    document_id: DocumentId,
+) -> Result<(), StorageError> {
+    if connection.execute(
+        "UPDATE library_read_clock SET sequence = sequence + 1 WHERE id = 1 AND sequence < 9223372036854775807",
+        [],
+    )? != 1 {
+        return Err(StorageError::InvalidDocument);
+    }
+    if connection.execute(
+        "UPDATE documents SET last_read_sequence = (SELECT sequence FROM library_read_clock WHERE id = 1) WHERE id = ?1",
+        [i64::from(document_id)],
+    )? != 1 {
+        return Err(StorageError::InvalidDocument);
+    }
+    Ok(())
+}
+
+pub(crate) fn read_last_read_sequence_in(
+    connection: &Connection,
+    document_id: DocumentId,
+) -> Result<Option<i64>, StorageError> {
+    let value: Option<i64> = connection.query_row(
+        "SELECT last_read_sequence FROM documents WHERE id = ?1",
+        [i64::from(document_id)],
+        |row| row.get(0),
+    )?;
+    if value.is_some_and(|value| value <= 0) {
+        return Err(StorageError::InvalidDocument);
+    }
+    Ok(value)
 }

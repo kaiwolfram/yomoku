@@ -16,6 +16,7 @@ fn starts_in_library() {
             settings_open: false,
             documents: vec![],
             library_title_query: String::new(),
+            library_sort: Default::default(),
             library_document_count: 0,
             loaded_document: None,
             storage_busy: false,

@@ -45,10 +45,11 @@ pub(crate) fn find_imported_in(
         return Ok(None);
     };
     let document = load_reader_document_in(connection, id)?.ok_or(StorageError::InvalidDocument)?;
-    document
+    let mut summary = document
         .library_summary()
-        .map(Some)
-        .map_err(|_| StorageError::InvalidDocument)
+        .map_err(|_| StorageError::InvalidDocument)?;
+    summary.last_read_sequence = crate::documents::read_last_read_sequence_in(connection, id)?;
+    Ok(Some(summary))
 }
 
 /// Exact live file identity; callers may load a format-independent reference in

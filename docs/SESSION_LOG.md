@@ -2535,3 +2535,16 @@
   migration; Event/ViewModel codecs now include search state. Effective-reader
   switch remains the next reader task; sorting/status bars remain unchecked.
   Release/performance/Full-loader matrix/physical arm64 not rerun; no blocker.
+
+
+## 2026-10-28 — Library sorting and durable recency
+
+Implemented Last read (default), Title and Import date controls over the existing
+core-owned title search. Migration 0019 atomically records explicit-reader-entry
+order; legacy/unopened values stay unknown and duplicate imports preserve recency.
+Four pure/seven SQLite cases, 637 workspace Rust tests (17 ignored), strict lint/
+format/codegen, real-Full JNI, both-ABI APKs/Android lint, seven phone regressions
+and two wide/dark cases pass. Fixed old fixtures/generated enum/preview assumptions before passing reruns.
+Architecture/data/decision docs updated. Effective-reader live switch stays next;
+Library status bars remain unchecked. No blocker; physical
+arm64, release and performance remain deferred. Commands: DEVELOPMENT.md end.

@@ -37,6 +37,7 @@ import androidx.compose.ui.unit.dp
 import app.yomoku.shared.ContentRoute
 import app.yomoku.shared.Destination
 import app.yomoku.shared.Event
+import app.yomoku.shared.LibrarySort
 import app.yomoku.shared.ViewModel
 import app.yomoku.theme.YomokuTheme
 
@@ -215,6 +216,7 @@ private fun YomokuPreview() {
                 false,
                 emptyList(),
                 "",
+                LibrarySort.LASTREAD,
                 0UL,
                 null,
                 false,

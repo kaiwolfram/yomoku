@@ -877,9 +877,17 @@ fn explicit_finished_open_rolls_back_on_reset_analysis_or_commit_failure_then_re
         );
         assert!(opened.document.finished_at_least_once);
         storage.connection.execute_batch("CREATE TRIGGER fail_open BEFORE INSERT ON reading_positions BEGIN SELECT RAISE(ABORT, 'fixture'); END;").unwrap();
+        let repeated = storage.open_document_reader_snapshot(id).unwrap().unwrap();
         assert_eq!(
-            storage.open_document_reader_snapshot(id).unwrap(),
-            Some(opened)
+            repeated.last_read_sequence,
+            Some(opened.last_read_sequence.unwrap() + 1)
+        );
+        assert_eq!(
+            repeated,
+            DocumentReaderSnapshot {
+                last_read_sequence: repeated.last_read_sequence,
+                ..opened
+            }
         );
     }
 }

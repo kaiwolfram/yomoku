@@ -37,6 +37,7 @@ pub struct ReaderSnapshot {
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
 pub struct DocumentReaderSnapshot {
+    pub last_read_sequence: Option<i64>,
     pub typography: crate::typography::ReaderTypography,
     pub document: ReaderDocument,
     pub page_length: PageLength,
@@ -55,6 +56,9 @@ impl DocumentReaderSnapshot {
     /// Entries are keyed by chapter identity, not by their vector order.
     pub fn validate(&self) -> Result<(), InvalidTextValue> {
         self.document.validate()?;
+        if self.last_read_sequence.is_some_and(|value| value <= 0) {
+            return Err(InvalidTextValue);
+        }
         if self.analyses.len() != self.document.chapters.len() {
             return Err(InvalidTextValue);
         }
@@ -303,6 +307,7 @@ impl ReaderDocument {
             .checked_add(position.offset.into())
             .ok_or(InvalidTextValue)?;
         Ok(LibraryDocument {
+            last_read_sequence: None,
             document_id: self.document_id,
             title: self.title.clone(),
             progress_percent: progress_percent(offset, total)?,
@@ -329,6 +334,7 @@ impl PastedDocument {
             position.validate(&self.chapter)?;
         }
         Ok(LibraryDocument {
+            last_read_sequence: None,
             document_id: self.document_id,
             title: self.title.clone(),
             finished_at_least_once: self.finished_at_least_once,

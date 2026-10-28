@@ -1,8 +1,10 @@
 # Resume here
-Updated: 2026-10-28. Library title search done; coordinated live switch next.
+Updated: 2026-10-28. Library search/sorts done; coordinated live switch next.
 ## Working
-- Pure Crux routes/Library/Settings; Render-only UI; FIFO SQLite/analysis; Library start.
-- Library title-only search/Clear retains query across navigation/recreation; no writes.
+- Pure Crux/Render-only UI; FIFO SQLite/analysis; Library start.
+- Library title-only search/Clear + Last read/Title/Import date; query/sort retained.
+  Read order (0019) on explicit open only; newest unknown/unopened afterward.
+  Pure sort/search; duplicates preserve recency, legacy history stays unknown.
 - Chapter-local UTF-8 position/whole-book percentage/five presets persist; reflow
   preserves offsets. Scroll resets; 720dp column; controls below content; 48dp swipes.
   Previous only saves position; busy gates reject doubles; deliberate rereads count.
@@ -45,10 +47,9 @@ Updated: 2026-10-28. Library title search done; coordinated live switch next.
 - Serial bounds-first decode: <=32768-edge/100 MP source, <=2048-edge sample,
   16 MiB shared page pixels; repeats share bitmaps. Ratio frames <=8192px preserve
   U+FFFC positions/styles/word/link identity; unsupported images keep alt/Retry.
-- Viewer: 1–8x zoom/pan; no completion. Covers: 4 MiB/64-entry LRU.
-- Noto Serif JP/credits; typography/furigana persist (0015/16).
-- Custom entries (0017): exact-surface CRUD core/FIFO/FFI/Android; frozen selections,
-  built-in gates, literal drafts/Cancel/retries; no history/status writes.
+- Viewer: 1–8x zoom/pan. Covers: 4 MiB/64-entry LRU. Noto/typography/furigana (0015/16).
+- Custom entries (0017): exact-surface CRUD, frozen selections/built-in gates,
+  literal drafts/Cancel/retries; no history/status writes.
 - Furigana: persisted switch/retries, source-first/B fallback independent of status;
   half-size readings, strict UTF-16, full crossing readings/fitted width/headroom.
 - Effective segmentation: B + A/B/C/manual; contiguous JP B matches, local/newer
@@ -67,8 +68,7 @@ Updated: 2026-10-28. Library title search done; coordinated live switch next.
 - Compact override prompt/actions: fresh same-page identities; default All, literal
   choices/reverse/retry/Cancel; generated codecs. Retained furigana + strict Android
   effectiveDisplayTokens adapters ready (crossings/unresolved/source preference). Not live.
-- EffectiveReaderRequest.command captures native attempts; finish_request routes FIFO
-  errors/results, rejects stale callbacks, retains exact retries. Deleted counts clear.
+- EffectiveReaderRequest.command/finish_request retains attempts/retries; stale results rejected.
 ## Next tasks (ordered)
 1. Switch live core/FFI/Android completion/token/status/furigana/word/custom together
    via retained requests/command/finish_request + render adapters; see EFFECTIVE_READER_PAYLOAD.md.
@@ -76,5 +76,5 @@ Updated: 2026-10-28. Library title search done; coordinated live switch next.
 3. Measure real-book/JNI/device cost, including whole-chapter on-demand generation.
 Physical arm64 deferred; Nostr empty; Q188 unresolved before forwarding.
 ## Verification
-- PASS: 626 Rust (17 ignored), Clippy/fmt/diff, host JNI/repeat codegen, APKs/lint.
-- PASS: 6 phone + 1 wide/dark; test fixes/commands: DEVELOPMENT.md end. Release/arm64 not rerun; no blocker.
+- PASS: 637 Rust (17 ignored), Clippy/fmt/diff, host JNI/repeat codegen, APKs/lint.
+- PASS: 7 phone + 2 wide/dark; commands/fixed issues: DEVELOPMENT.md end. Release/arm64 not rerun; no blocker.

@@ -586,8 +586,9 @@ fn custom_dictionary_migration_preserves_v16_reader_state_and_rolls_back_failed_
     let mut old = Storage { connection };
     let imported = import(&mut old, "造語 𠮷");
     old.save_page_length(PageLength::Characters750).unwrap();
+    // The v16 fixture predates Library recency; use its historical snapshot API.
     let snapshot = old
-        .load_document_reader_snapshot(key(&imported).document_id)
+        .load_reader_snapshot(key(&imported).document_id)
         .unwrap();
     old.connection
         .execute_batch("CREATE TABLE custom_dictionary_entries (fixture TEXT)")
@@ -606,10 +607,10 @@ fn custom_dictionary_migration_preserves_v16_reader_state_and_rolls_back_failed_
         .unwrap();
     drop(connection);
     let mut storage = Storage::open(database.path()).unwrap();
-    assert_eq!(storage.schema_version().unwrap(), 18);
+    assert_eq!(storage.schema_version().unwrap(), 19);
     assert_eq!(
         storage
-            .load_document_reader_snapshot(key(&imported).document_id)
+            .load_reader_snapshot(key(&imported).document_id)
             .unwrap(),
         snapshot
     );

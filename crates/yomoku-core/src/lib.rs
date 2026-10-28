@@ -12,6 +12,7 @@ pub mod effective_reader;
 pub mod effective_session;
 pub mod effective_storage;
 pub mod imports;
+pub mod library;
 pub mod pagination;
 pub mod reader;
 pub mod reader_formatting;

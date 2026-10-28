@@ -1321,7 +1321,8 @@ ImportSummary is separate transient confirmation state containing the committed
 document ID/title and Created/Existing outcome. DismissImportSummary clears it;
 Settings and refresh preserve it, while tab selection, opening paste/reader or
 accepting a new import clear it. It is never persisted or restored in a new core.
-Listing is allocation order until the planned Library sorting task. Failed opens
+Storage listing remains allocation order; the pure core applies the chosen Library sort.
+Failed opens
 can retry. No path or SQLite diagnostic string is exposed in application state.
 The bridge constructor takes the path separately; Android uses filesDir/yomoku.sqlite3.
 Submitted writes finish even if the session closes; shutdown does not block UI.
@@ -1427,3 +1428,37 @@ actions, including same-span reopen and frozen retry/Cancel. These values never
 enter SQLite or replace transaction-local provenance/rule validation. No migration,
 history rewrite, new durable command or automatic replay; live Android adoption
 remains pending.
+
+
+## Library read order (migration 0019)
+
+`documents.last_read_sequence` is nullable, otherwise a positive signed 64-bit
+integer. `library_read_clock` has exactly one allocated row (`id = 1`) with a
+nonnegative signed 64-bit integer `sequence`. One successful explicit reader
+entry advances the clock and writes that document's sequence. Both legacy and
+whole-document explicit-open repositories do this inside their existing immediate
+transaction, after confirming a live document and with snapshot validation/finished
+position reset before commit. Concurrent connections allocate distinct orders;
+statement, validation or deferred commit failure rolls everything back. A missing
+clock/exhausted counter fails without reuse/wrap. Storage remains bounded to one
+clock row and one value per live document; it is not a reading-event log.
+
+Migration leaves existing recency NULL and preserves all text/positions/finished
+markers/history/vocabulary. It does not invent historical read dates from progress
+or encounter records. Deleting a live document removes its recency but keeps the
+clock high-water mark; reimport gets a fresh ID with unknown/unopened recency.
+New documents also start with NULL. Duplicate file references and paste summaries
+preserve the existing value without advancing it. Ordinary reader loads/listing,
+word/custom/status operations, time, completion reloads and position updates do not
+record reader entry.
+
+`LibraryDocument` and `DocumentReaderSnapshot` carry `last_read_sequence`; pure
+content-only `library_summary()` projections start with None, so repositories attach
+stored metadata and core position-only reconciliation preserves the retained value.
+This is same-build shell data, not a persisted codec change. Last read sorts known
+sequences descending, then unknown entries by document ID descending. Import date
+sorts committed import allocation IDs descending (no synthetic wall timestamps).
+Title sorts Unicode-lowercased text ascending and breaks ties by descending ID.
+The selected `LibrarySort` and literal title query remain ephemeral core-session
+state; sort/search are pure projections over the full retained Library and do not
+write SQLite or load dictionaries. Fresh sessions default to Last read.

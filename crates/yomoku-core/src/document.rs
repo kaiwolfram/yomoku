@@ -324,6 +324,8 @@ impl TextAnchor {
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
 pub struct LibraryDocument {
+    /// Durable explicit-reader-entry order; None for unopened/legacy documents.
+    pub last_read_sequence: Option<i64>,
     pub document_id: DocumentId,
     pub title: String,
     pub progress_percent: u64,

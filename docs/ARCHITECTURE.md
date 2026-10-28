@@ -18,14 +18,34 @@ storage results. No SQL, paths, threads or platform I/O enter core.
 
 `SearchLibraryTitles` synchronously updates a session-local query while Library
 is visible, including during an outstanding refresh/import. The model retains
-all Library summaries; `ViewModel.documents` projects matching titles in their
-existing order, alongside the literal query and unfiltered document count.
+all Library summaries; `ViewModel.documents` projects matching titles in the
+selected sort order, alongside the literal query and unfiltered document count.
 Matching uses locale-independent Unicode lowercasing and literal substrings;
 content is never searched. Refresh/import callbacks update the full collection
 before projection. Search neither dispatches storage nor clears errors, and
 survives Settings/tab/reader navigation and retained Activity recreation. A fresh
 native session starts with an empty query. Compose binds the field/clear action
 to typed events and distinguishes an empty Library from zero matching titles.
+
+`SortLibrary` synchronously selects Last read (default), Title or Import date,
+including during an outstanding storage operation. The selection lives in the
+owning core session alongside search and resets to Last read in a new session.
+Pure `library::LibrarySort` filters/case-folds titles once before sorting; ties
+use descending document IDs. Import date uses committed import allocation order
+(newest first), independent of device wall time. Last read puts known recency
+first, newest first, then unknown/unopened books by newest import. Title uses
+ascending locale-independent Unicode lowercase text without normalization.
+
+Migration 0019 adds a nullable document read sequence and a singleton clock.
+Successful explicit reader entry increments it in the same immediate transaction
+as snapshot validation and any finished-book position reset. Legacy recency stays
+unknown rather than being inferred from position/completion events. Ordinary
+loads, movements, reflow, lookups, imports (including duplicates) and sort/search
+never advance recency. Snapshots/Library summaries carry it through generated
+Kotlin; position-only core updates preserve it. Reopen restores ordering without
+loading a dictionary. Clock/write/validation/commit failures roll back entry and
+recency together; exhaustion fails closed. Android renders the current sort in
+an accessible menu and uses the existing stable document keys.
 
 `yomoku-import` is a separate pure content-extraction boundary. Its EPUB parser
 reads Stored/Deflate ZIP entries from a borrowed byte slice, without filesystem

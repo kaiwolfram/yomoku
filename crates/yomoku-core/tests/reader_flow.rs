@@ -50,6 +50,7 @@ fn snapshot(
     analysis: ReaderAnalysis,
 ) -> StorageResult {
     StorageResult::Loaded(DocumentReaderSnapshot {
+        last_read_sequence: None,
         typography: Default::default(),
         analyses: vec![ReaderChapterAnalysis {
             chapter_id: document.chapter.chapter_id,
@@ -2853,6 +2854,7 @@ fn ordered_snapshot_rejects_missing_duplicate_and_foreign_chapter_analysis() {
             &core,
             &mut effects,
             StorageResult::Loaded(DocumentReaderSnapshot {
+                last_read_sequence: None,
                 typography: Default::default(),
                 document: document.clone(),
                 page_length: PageLength::default(),
@@ -2877,6 +2879,7 @@ fn ordered_snapshot_rejects_missing_duplicate_and_foreign_chapter_analysis() {
         &core,
         &mut effects,
         StorageResult::Loaded(DocumentReaderSnapshot {
+            last_read_sequence: None,
             typography: Default::default(),
             document: document.clone(),
             page_length: PageLength::default(),

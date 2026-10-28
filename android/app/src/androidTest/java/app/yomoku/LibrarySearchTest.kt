@@ -49,7 +49,7 @@ class LibrarySearchTest {
         compose.runOnUiThread { core().dispatch(Event.DismissImportSummary) }
         val all = core().view.documents
         search(prefix.lowercase())
-        assertEquals(imported, core().view.documents)
+        assertEquals(imported.reversed(), core().view.documents)
         compose.onNodeWithTag("clear_library_search").assertIsDisplayed()
         search("$prefix 猫𠮷")
         assertEquals(listOf(imported[1]), core().view.documents)

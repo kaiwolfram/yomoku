@@ -676,7 +676,7 @@ fn upgrades_version_six_without_rescanning_and_failed_migration_preserves_data()
         .unwrap();
     drop(connection);
     let mut storage = Storage::open(database.path()).unwrap();
-    assert_eq!(storage.schema_version().unwrap(), 18);
+    assert_eq!(storage.schema_version().unwrap(), 19);
     assert_eq!(
         storage.load_paste(document.document_id).unwrap(),
         Some(document)

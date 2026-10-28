@@ -122,4 +122,8 @@
     <string name="image_viewer_zoom_out">Zoom out</string>
     <string name="image_viewer_reset">Reset</string>
     <string name="image_viewer_zoom">%1$d%%</string>
+    <string name="library_sort">Sort: %1$s</string>
+    <string name="library_sort_last_read">Last read</string>
+    <string name="library_sort_title">Title</string>
+    <string name="library_sort_import_date">Import date</string>
 </resources>

@@ -13,7 +13,9 @@ use yomoku_import::epub::SpanKind;
 
 use crate::{
     analysis::read_reader_analysis,
-    documents::{load_paste_in, write_position_in},
+    documents::{
+        load_paste_in, read_last_read_sequence_in, record_reader_entry_in, write_position_in,
+    },
     epub::load_epub_in,
     settings::read_page_length,
     Storage, StorageError,
@@ -35,8 +37,8 @@ impl Storage {
         Ok(Some(snapshot))
     }
 
-    /// Explicit entry resets a finished document to its first chapter's start.
-    /// Read-only loads and completion reloads retain the saved position.
+    /// Explicit entry records Library recency and resets a finished document to
+    /// its first chapter's start. Read-only/completion loads retain both values.
     pub fn open_document_reader_snapshot(
         &mut self,
         document_id: DocumentId,
@@ -59,6 +61,7 @@ impl Storage {
                 document.reading_position = Some(start);
             }
         }
+        record_reader_entry_in(&transaction, document_id)?;
         let snapshot = snapshot_in(&transaction, document)?;
         transaction.commit()?;
         Ok(Some(snapshot))
@@ -105,6 +108,7 @@ fn snapshot_in(
         })
         .collect::<Result<_, StorageError>>()?;
     Ok(DocumentReaderSnapshot {
+        last_read_sequence: read_last_read_sequence_in(connection, document.document_id)?,
         typography: crate::settings::read_reader_typography(connection)?,
         document,
         page_length: read_page_length(connection)?,

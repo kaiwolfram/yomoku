@@ -22,7 +22,7 @@ pub enum StorageOperation {
     List,
     CreatePaste(String),
     LoadPaste(DocumentId),
-    /// Explicit reader entry; resets a finished document to page 1 atomically.
+    /// Explicit entry records Library recency and resets a finished book atomically.
     OpenReader(DocumentId),
     SaveReadingPosition {
         document_id: DocumentId,

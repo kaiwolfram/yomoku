@@ -3279,3 +3279,29 @@ count separately so zero matches and no imports have different empty messages.
 This changes ephemeral Event/ViewModel codecs only; no migration, dependency,
 durable preference or sorting policy. Sort controls and five-status bars remain
 unchecked in the plan.
+
+
+## 2026-10-28 — Library sorting and durable read order
+
+Continue the existing Library checklist with Last read (default), Title and
+Import date controls as a small independent slice. Keep the coordinated effective
+reader switch next in the reader plan. Retain the selected sort beside the title
+query for the core session, including Activity recreation, navigation and refresh;
+a fresh session defaults to Last read. Sort/search remain pure core projections
+and may update presentation while storage is busy without taking busy ownership.
+
+Define recency by successful explicit reader entry, including an immediate exit
+without page completion. Advance an ordinal clock in that entry's existing SQLite
+transaction, so wall-clock adjustments cannot reorder reading sessions and failed
+opens cannot promote a book. Use a singleton high-water mark plus a nullable value
+per live document (migration 0019), with checked exhaustion and no expanding event
+log. Do not infer old recency from position or reading history; legacy values stay
+unknown until explicitly opened. Position/time/completion reloads and duplicate
+imports preserve order without advancing it.
+
+Order known recency newest first, then unknown/unopened books newest import first.
+Use existing autoincrement document IDs as exact committed import order for Import
+date; no date is displayed, so do not invent/backfill wall timestamps. Title sorts
+by locale-independent Unicode lowercasing without normalization, ascending, with
+newest import as a deterministic tie-breaker. The Android menu names the current
+choice. No dependency, destructive-data behavior or new reader interaction.

@@ -43,8 +43,8 @@ internal fun verifyLibrarySearchBridge() {
             val calls = dictionary.calls.get()
             for ((query, expected) in
                 listOf(
-                    "rust" to listOf(original[0]),
-                    "𠮷か\u3099\u0000%_" to listOf(original[1]),
+                    "rust" to listOf(original[1]),
+                    "𠮷か\u3099\u0000%_" to listOf(original[0]),
                     "本文だけの検索語" to emptyList(),
                     "" to original,
                 )) {
@@ -57,7 +57,7 @@ internal fun verifyLibrarySearchBridge() {
             dispatch(Event.SearchLibraryTitles("RUST"), false)
             val refreshed = dispatch(Event.RefreshLibrary, true)
             check(
-                refreshed.libraryTitleQuery == "RUST" && refreshed.documents == listOf(original[0])
+                refreshed.libraryTitleQuery == "RUST" && refreshed.documents == listOf(original[1])
             )
             check(dictionary.calls.get() == calls && effects.isEmpty())
             check(database.readBytes().contentEquals(before))

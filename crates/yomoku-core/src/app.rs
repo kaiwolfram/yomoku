@@ -16,6 +16,7 @@ use crate::{
     completion::{AnalyzedCompletionOutcome, CompletionNotice, PageCompletionIntent},
     document::{CompletionCommandId, DocumentId, LibraryDocument, ReaderDocument, TextAnchor},
     imports::{EpubImport, SrtImport, TxtImport},
+    library::LibrarySort,
     pagination::{LogicalPages, PageLength, ReadingPosition},
     reader::{
         ReaderAnalysis, ReaderChapterAnalysis, ReaderPage, ReaderStatusChange, ReaderTokenKey,
@@ -71,6 +72,7 @@ pub struct Model {
     settings_open: bool,
     documents: Vec<LibraryDocument>,
     library_title_query: String,
+    library_sort: LibrarySort,
     loaded_document: Option<ReaderDocument>,
     storage_busy: bool,
     document_error: Option<DocumentError>,
@@ -114,6 +116,7 @@ pub enum Event {
     RefreshLibrary,
     /// Literal, Unicode-lowercase substring search over Library titles only.
     SearchLibraryTitles(String),
+    SortLibrary(LibrarySort),
     CreatePaste(String),
     LoadPaste(DocumentId),
     OpenPaste,
@@ -182,10 +185,12 @@ pub enum Event {
 pub struct ViewModel {
     pub destination: Destination,
     pub settings_open: bool,
-    /// Matching titles in the existing Library order; an empty query shows all.
+    /// Matching titles in the selected Library order; an empty query shows all.
     pub documents: Vec<LibraryDocument>,
     /// Session-local query; the model retains the complete unfiltered Library.
     pub library_title_query: String,
+    /// Session-local selection; read recency itself is durable.
+    pub library_sort: LibrarySort,
     /// Unfiltered count distinguishes an empty Library from an empty search.
     pub library_document_count: u64,
     pub loaded_document: Option<ReaderDocument>,
@@ -675,6 +680,15 @@ impl App for Yomoku {
                 }
                 model.library_title_query = query;
             }
+            Event::SortLibrary(sort) => {
+                if model.destination != Destination::Library
+                    || model.content_route != ContentRoute::Main
+                    || model.settings_open
+                {
+                    return Command::done();
+                }
+                model.library_sort = sort;
+            }
             Event::SelectDestination(destination) => {
                 model.completion_notice = None;
                 model.book_completion_notice = None;
@@ -956,6 +970,13 @@ impl App for Yomoku {
                         model.reader_typography = Some(snapshot.typography);
                         let document = snapshot.document;
                         model.update_library(&document);
+                        if let Some(entry) = model
+                            .documents
+                            .iter_mut()
+                            .find(|entry| entry.document_id == document.document_id)
+                        {
+                            entry.last_read_sequence = snapshot.last_read_sequence;
+                        }
                         model.apply_page_length(snapshot.page_length);
                         if pending_reader == Some(document.document_id)
                             && model.content_route == ContentRoute::Reader
@@ -1040,18 +1061,11 @@ impl App for Yomoku {
         ViewModel {
             destination: model.destination,
             settings_open: model.settings_open,
-            documents: {
-                let query = model.library_title_query.to_lowercase();
-                model
-                    .documents
-                    .iter()
-                    .filter(|document| {
-                        query.is_empty() || document.title.to_lowercase().contains(&query)
-                    })
-                    .cloned()
-                    .collect()
-            },
+            documents: model
+                .library_sort
+                .project(&model.documents, &model.library_title_query),
             library_title_query: model.library_title_query.clone(),
+            library_sort: model.library_sort,
             library_document_count: model.documents.len() as u64,
             loaded_document: model.loaded_document.clone(),
             storage_busy: model.storage_busy,
@@ -1221,7 +1235,9 @@ impl Model {
                     .iter_mut()
                     .find(|entry| entry.document_id == document.document_id)
                 {
+                    let last_read_sequence = entry.last_read_sequence;
                     *entry = summary;
+                    entry.last_read_sequence = last_read_sequence;
                 }
             }
             Err(_) => self.document_error = Some(DocumentError::InvalidDocument),
