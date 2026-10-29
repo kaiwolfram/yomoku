@@ -2896,3 +2896,24 @@ metadata generation caused one JNI symbol-load failure; sequential full host
 retry passes. Gradle/AVD required sandbox escalation. Existing long-page HWUI
 stall remains unresolved; physical arm64 and actual effective device/diverse/
 image-heavy costs remain unverified. Commands/results/logs: DEVELOPMENT end.
+
+## 2026-10-29 — Serialized effective-reader activation candidate
+
+Added Rust-only runtime/FFI effective factories using the existing native
+dictionary loaders, SQLite FIFO and analyzer lifecycle. Five new Bincode/SQLite
+regressions exercise shell events, actual Render callbacks and compact views:
+manual/global/local edits, A/C generation and stored A/B/C reuse, reversal/reopen,
+effective Library membership, live statuses, literal Unicode custom Retry after
+dismissal/reopen, stale selections, Missing B and legacy command rejection.
+Completion retry preserves five occurrences and 321 ms after rule reversal;
+furigana does not invent manual readings. Full retained keys stay native.
+
+PASS: all 709 Rust tests (17 ignored), strict Clippy/Rustfmt/diff. Initial
+Crux API/status iterator and Settings-gate fixture errors were corrected.
+The complete existing real-Full host Kotlin/JNI suite and bidirectional Unicode
+codecs pass (production B); existing teardown diagnostics remain nonfatal.
+Updated architecture, decisions, plan and handoff. No dependency, wire/durable
+schema or BoltFFI export change. NativeBridge/Android remain B; activation and
+compact production JNI/device fixture migration remain unchecked. APK/device,
+separate Full-loader matrix, physical arm64 and performance were not rerun.
+Existing long-page HWUI stall remains unresolved. Details: DEVELOPMENT end.

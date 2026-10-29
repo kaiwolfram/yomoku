@@ -6100,3 +6100,50 @@ phone run skips that task to avoid concurrent metadata generation. Display size,
 density and system light mode were restored; the task-started emulator was stopped.
 Wide log: `/tmp/yomoku-boundary-selection-wide.log`; result copies:
 `/tmp/yomoku-boundary-selection-{phone,final-phone,wide}-results`.
+
+## Serialized effective-reader activation candidate
+
+2026-10-29, repository root, pinned offline tools:
+
+```sh
+export PATH=/home/kai/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin:$PATH
+export JAVA_HOME=/home/kai/repos/yomoku/.local/jdk-17/jdk-17.0.21+9
+cargo test -p yomoku-ffi --test effective_reader --all-features --locked --offline
+cargo test --workspace --all-features --locked --offline --quiet
+cargo clippy --workspace --all-targets --all-features --locked --offline -- -D warnings
+cargo fmt --all -- --check
+tools/test-kotlin-bridge.sh
+git diff --check
+```
+
+PASS: five new serialized FFI/SQLite cases and all 709 workspace tests (17 opt-in
+ignored), strict Clippy/Rustfmt/diff. The Rust-only effective factory uses the
+existing dictionary loaders, FIFO and lifecycle; tests deserialize actual Render
+callbacks and compact views instead of bypassing the bridge via Core::update.
+Deterministic synthetic analysis and a tiny SQLite dictionary cover A/C generation
+on the worker, stored A/B/C choices, All/default/local scope, manual edits and
+reversal/reopen, original-B anchors, read-only Library membership and word loads,
+all statuses/repetitions, literal NUL/combining/supplementary custom fields,
+rollback and exact custom Retry after dismissal, deletion and stale selection.
+Missing B and legacy commands fail closed. Completion failure/retry freezes five
+occurrences and 321 ms despite an intervening reversal; furigana does not guess
+manual readings and a new bridge does not replay completed work.
+
+Initial fixture compilation used the wrong Crux request/effect types and a
+nonexistent status iterator; fixed to bridge::Request/ShellEffectFfi and explicit
+five statuses. The initial typography fixture omitted the Settings gate; fixed
+to open/close Settings. The final five cases and complete workspace pass.
+
+PASS: the complete existing real-Full host Kotlin/JNI suite and bidirectional
+Rust/Kotlin Unicode codecs, including native navigation, persistence, file imports,
+cancellation, selected words/custom CRUD, Library/document operations and 100
+handle lifecycles. Existing nonfatal teardown diagnostics remain; the sequential
+suite and final codec verification exit zero. This still exercises production B;
+the new effective candidate is covered through the Rust serialized bridge only.
+
+NativeBridge/Android production still use original B. This is serialized Rust
+coverage, not effective JNI/device activation. No Kotlin, BoltFFI export,
+dependency, durable schema or wire-type change. APK/lint/device, separate Full
+owned/mapped fixtures, physical arm64 and performance were not rerun/measured.
+The existing long-page HWUI stall remains unresolved. Logs:
+`/tmp/yomoku-effective-ffi-{tests,clippy,host}.log`.

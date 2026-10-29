@@ -9,7 +9,8 @@ use crux_core::{
 };
 use yomoku_runtime::{
     effect_router, effect_router_with_analyzed_imports, effect_router_with_dictionaries,
-    AnalyzerLifecycle, AnalyzerLoader, EffectRouter, WordDictionaryLoader,
+    effect_router_with_effective_reader, AnalyzerLifecycle, AnalyzerLoader, EffectRouter,
+    WordDictionaryLoader,
 };
 
 pub mod native;
@@ -44,6 +45,26 @@ pub struct YomokuBridge {
 }
 
 impl YomokuBridge {
+    /// Serialized effective-reader activation candidate. Uses the same native
+    /// worker/lifecycle as production; no shell toggle or extra wire protocol.
+    /// NativeBridge remains on original B until coordinated activation.
+    pub fn with_effective_reader(
+        database_path: std::path::PathBuf,
+        loader: AnalyzerLoader,
+        word_loader: WordDictionaryLoader,
+        on_effects: impl Fn(Result<Vec<u8>, FfiError>) + Send + Sync + 'static,
+    ) -> Result<(Self, AnalyzerLifecycle), FfiError> {
+        let (router, lifecycle) =
+            effect_router_with_effective_reader(database_path, loader, word_loader)
+                .map_err(|_| FfiError::WorkerUnavailable)?;
+        Ok((
+            Self {
+                bridge: router.bridge(move |result| on_effects(result.map_err(Into::into))),
+            },
+            lifecycle,
+        ))
+    }
+
     pub fn with_dictionaries(
         database_path: std::path::PathBuf,
         loader: AnalyzerLoader,

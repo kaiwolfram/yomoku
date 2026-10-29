@@ -3617,3 +3617,19 @@ Keep production on B for this independently verified staging step. The following
 activation step must switch the production native model and Android consumers
 together and verify actual JNI/SQLite reader, edits, Library and completion flow.
 No dependency, SQLite migration, historical rewrite or destructive semantic change.
+
+## 2026-10-29 — Serialized effective-reader activation candidate
+
+Provide a Rust-only effective factory at the EffectRouter and YomokuBridge layers
+before switching NativeBridge. Existing effective app/FIFO tests bypassed the
+Bincode boundary, while production JNI fixtures still send B indices and legacy
+completion events. Exercise the actual serialized events/callbacks/views against
+SQLite using the same dictionary loaders, FIFO and analyzer lifecycle; keep the
+full retained requests inside native code.
+
+Use deterministic synthetic analysis and a small SQLite dictionary in the new
+FFI regressions to make partition provenance, scope, exact retries, literal Unicode,
+read-only loads and frozen completion outcomes independently reproducible.
+Production remains B; this factory is the concrete constructor for the subsequent
+coordinated NativeBridge/Android activation and fixture migration. No additional
+BoltFFI export, shell setting, dependency, wire schema or durable migration.

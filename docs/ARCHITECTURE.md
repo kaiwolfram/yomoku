@@ -1119,6 +1119,17 @@ the deduplicating entry point; file identity must hash original
 file bytes separately when format importers exist.
 
 `yomoku-ffi::YomokuBridge` wraps the router in Crux's Bincode bridge.
+`YomokuBridge::with_effective_reader` and
+`effect_router_with_effective_reader` construct the effective activation candidate
+using `Model::with_effective_reader`, the existing dictionary loaders, FIFO and
+analyzer lifecycle. This Rust-only factory exercises serialized shell events,
+Render callbacks and compact views against SQLite without a new wire schema or
+BoltFFI export. It is not yet selected by NativeBridge. Five serialized regressions
+cover edits/reversal/reopen and Library membership, A/C generation/stored choices,
+word/status/custom retry and Unicode, frozen completion retry/time/furigana,
+Missing analysis and stale/legacy command rejection. These are host Rust bridge
+checks, not effective JNI/device activation evidence.
+
 BoltFFI 0.30.1 NativeBridge takes a database path, owned EffectsListener and
 required DictionaryProvider. It exposes update/resolve/view and set_foreground,
 and reports worker creation failure as WorkerUnavailable. DictionaryProvider is

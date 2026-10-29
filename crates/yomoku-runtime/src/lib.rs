@@ -6,7 +6,7 @@ use crux_core::{
     render::RenderOperation,
     Core,
 };
-use yomoku_core::app::{Effect, Yomoku};
+use yomoku_core::app::{Effect, Model, Yomoku};
 
 mod epub_assets;
 mod storage;
@@ -69,6 +69,24 @@ pub fn effect_router_with_dictionaries(
         StorageEffects::with_dictionaries(database_path, loader, word_loader)?;
     Ok((
         Core::<Yomoku>::new()
+            .handle_effects_using(effects)
+            .map_effect(),
+        lifecycle,
+    ))
+}
+
+/// Effective-reader activation candidate, sharing the production dictionary
+/// loaders, SQLite FIFO and lifecycle. NativeBridge switches to this router only
+/// when its shell and serialized-reader regressions migrate together.
+pub fn effect_router_with_effective_reader(
+    database_path: std::path::PathBuf,
+    loader: AnalyzerLoader,
+    word_loader: WordDictionaryLoader,
+) -> std::io::Result<(EffectRouter, AnalyzerLifecycle)> {
+    let (effects, lifecycle) =
+        StorageEffects::with_dictionaries(database_path, loader, word_loader)?;
+    Ok((
+        Core::new_with(Yomoku, Model::with_effective_reader())
             .handle_effects_using(effects)
             .map_effect(),
         lifecycle,
