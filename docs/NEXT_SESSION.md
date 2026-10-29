@@ -1,79 +1,62 @@
 # Resume here
-Updated: 2026-10-29. Serialized effective FFI candidate verified; activation next.
-- Single/bulk deletion: one transaction, history/vocabulary/rules retained; reimport fresh.
-  Long press selects; Select All adds all matching titles, including offscreen rows.
-- Library title-only search/Clear + Last read/Title/Import date; query/sort retained.
-- Live bars use original B/live statuses; read-only FIFO; explicit Retry; batches defer scans.
-  Effective Library API shares eligibility/resolution + transaction-local status lookups;
-  Missing/zero differ. Staged app routes effective read on same FIFO/cache/Retry gates;
-  drafts/deletion prompts retained. Stored text/rules, no source/assets/Full/writes.
-- UTF-8 offsets/five presets persist; reflow preserves offsets; scroll resets.
-  Previous saves position only; forward counts deliberate rereads; busy rejects doubles.
-- Atomic SHA-256 imports store original B/unique registrations. Existing preserves
-  title/status/progress without Full/rescan/writes. Summary returns Library; no auto-open.
-- Loads are read-only; explicit finished-book open resets to page 1 atomically.
-  Finish survives movement/time/reflow; deletion resets it, preserving history.
-- Token reads atomically load original B/live statuses/metadata + clipped UTF-8
-  ranges; completion owns token start. Deleted IDs absent. Whole-chapter validation.
-  Strict UTF-8→UTF-16 failure falls back to plain text. Loads wait for pending saves.
-- Five statuses atomically update history; same-status no-op/deleted entries absent.
-- Clock uses elapsedRealtime/15s checkpoints, restore-before-Resume, five-minute
-  idle/background cap and movement epochs. Absolute revisions freeze retries,
-  coalesce maxima and drain before movement/exit. CoreSession close retains callbacks
-  until busy/BOTH pending/direct Cancel clear; retries teardown. Kill may lose pending.
-- Completion freezes page/position/preset/B/time, drains final time then FIFO reserves
-  ID + duration. One transaction writes occurrences, New-only Known/history/time/
-  position/finish. Exact retries; AlreadyRecorded/zero silent, positive toast once.
-- TXT/SRT preserve bytes/filename/encoding/B and canonical ruby/cues; first import wins.
-- Mixed FileImports reads off main; encoding/Skip/errors survive recreation; no restart queue.
-- Direct off-main cancelFileImport bypasses FIFO; COMMIT may wait. Silent full-file
-  rollback; winning/prior commits stay. Android ignores late reads and awaits BOTH
-  native return + outcome before clearing/draining. Dedicated cancellation executor.
-- EPUB (0014): atomic source/formatting/ruby/images/B; ignores CSS, no reparse on load.
-- Keyed styles/HTTP(S) clip to page UTF-8. Images: alt/metadata, no BLOB state;
-  FIFO validates owner/media/SHA/32 MiB.
-- Image bounds/budgets and ratio frames preserve U+FFFC/style/word/link identity;
-  repeats share pixels; unsupported images keep alt/Retry. Limits: ARCHITECTURE.
-- Furigana: persisted switch/retries, source-first/B fallback; strict UTF-16/full crossings.
-- Effective segmentation: B + A/B/C/manual; contiguous JP B matches, local/newer
-  precedence/reversal; exact metadata provenance, unmatched unresolved.
-- Effective completion (0018): full key/occurrences/time frozen durably; page-only
-  registration/New-only Known/history/time/position/finish atomic. Exact replay
-  survives reversal/deletion/reopen; legacy calls reject its ID. Live reader uses B.
-- Compact effective_session: one shared full key + view, revisions/stale/retry/Missing B;
-  Kotlin identity/selection 60/68 B; native protocol uses existing FIFO/dictionaries.
-- Status/overrides: atomic key/surface/ID/rule-revision guards, five choices,
-  stored A/B/C; atomic edits/register/reverse, stale/ABA/concurrent guards.
-- Explicit A/C uses the FIFO/import analyzer cache, whole chapter/original profile;
-  stored reuse skips Full. Rechecks key/revision at commit; metadata requires reload.
-- ReaderBoundaryEditor: typed A/B/C/manual/All/This/reversal/Retry/Cancel/reload;
-  literal scalar cuts + Rust whitespace; session/prompt-scoped saveable drafts.
-- Native Model::with_effective_reader stages tokens/words/status/custom/edits/Library/
-  furigana/completion through retained FIFO/time gates. Both final-time slots drain; exact
-  retries/finish/notices/departure. Production B; legacy word/write events fail in opt-in.
-- Compact app words/status/custom/overrides retain FIFO/prompt writes, literal Retry/Cancel,
-  repeats/deletion/built-in gates. Dismissed writes/errors retained; Library/time gates.
-- Android compact words/navigation use retained session UUID and current revisions;
-  final sample before Next/Finish/swipes; Previous position only. Shared native gates.
-- Compact original-B edit spans load in the same transaction without extra analysis/read.
-  Whole crossing anchors; strict Unicode, contiguous JP-only endpoint selection; editor
-  typed actions/Retry/Cancel/reload, saveable native session/page ownership. Staged only.
-- Rust-only YomokuBridge::with_effective_reader now constructs the activation candidate
-  with existing loaders/FIFO/lifecycle. Five serialized Bincode/SQLite cases cover modes,
-  scope/edits/reversal/reopen, Library, words/status/custom, furigana and frozen completion.
+Updated: 2026-10-29. Production effective reader activated; boundary editing is live.
+
+## Current slice
+- NativeBridge constructs YomokuBridge::with_effective_reader with the existing
+  verified dictionary providers, FIFO/cache, lifecycle and compact codecs.
+- Reader/words/status/custom/furigana/Library/completion share effective partitions.
+  Original B stays immutable and supplies contiguous Japanese editor anchors.
+  No full chapter keys cross JNI; selections carry native page revision/segment.
+- A/B/C and manual edits support default All versus This occurrence and reversal.
+  Explicit missing A/C generation uses the import analyzer cache; stored reuse and
+  reopen need no Full. Accepted writes keep native exact Retry/Cancel obligations.
+- Success retires editor/page; reader shows explicit Reload. Normal invalidation
+  and explicit token loads clear that page's reload marker, fixing same-book reopen
+  after edits/completion. Pending writes/errors/retry payloads remain intact.
+- Android token-read attempts follow base/position/preset, including same-anchor
+  position saves/reflow. Same-context failures still require explicit Retry.
+- Completion freezes effective occurrences/time before FIFO prepare/commit;
+  duplicate/retry/reversal cannot reinterpret history. Positive-only toast and
+  finish/confetti remain shared; explicit finished-book open resets to page 1.
+- Imports stay atomic/deduplicated; summaries return Library without opening.
+  Deletion retains global vocabulary/history/rules; reimport starts fresh.
+- Time uses elapsedRealtime, 15s saves, five-minute idle/background cap and exact
+  frozen/coalesced retries. Final samples and both time slots drain before movement,
+  completion/exit/native close. Killing a process can lose pending in-memory work.
+- TXT/SRT preserve original bytes/encoding; EPUB preserves ordered canonical
+  chapters/styles/ruby/assets/B without reparsing on load. Images remain bounded
+  FIFO asset reads; no BLOBs in Crux state. Strict Unicode spans fail to plain text.
+- Library query/sort/rename/deletion drafts and five-status bars retain shared gates.
+  Bars resolve effective membership read-only; no dictionaries, registrations or
+  persistent count cache. Stored/live statuses and Missing/zero remain distinct.
+
 ## Next tasks (ordered)
-1. Switch NativeBridge to YomokuBridge::with_effective_reader; migrate legacy JNI/device
-   fixtures to compact selection/completion events and verify actual effective edits,
-   reopen/reversal, Library, words/status/custom/furigana and completion together.
-2. Investigate emulator long-page HWUI stall (old reader also fails); details below.
-3. Measure JNI/device/diverse/image-heavy costs; host baselines in performance doc.
-Physical arm64 deferred; Nostr empty; Q188 unresolved before forwarding.
+1. Investigate the emulator long-page HWUI stall and rerun the four unresolved
+   cases: ReaderWords movingBothDirectionsDismissesDetailsAndNeverRestoresTheSelection;
+   ReaderNavigation controlsAndSwipesPersistBothDirectionsResetScrollAndCountOnlyForward,
+   failedForwardDisablesControlsAndRetryCommitsExactlyOnce, and
+   finishCheckmarkPersistsThroughRetryRecreationAndRereadsWhileReopeningResetsPosition.
+   Previous ReaderScreen also fails; JDB main waits in HardwareRenderer draw.
+2. Measure actual effective JNI/device/diverse/image-heavy costs. Host baselines
+   and reproducible scratch TXT/EPUB harness: EFFECTIVE_READER_PERFORMANCE.md.
+3. Continue phase 5 with the immutable event/provenance audit and lifetime
+   occurrence/time aggregation; keep status/history semantics versioned.
+Physical arm64 remains deferred; Nostr configuration empty; Q188 is required
+before forwarding. These do not block local reader/history work.
+
 ## Verification / blockers
-- Current PASS: 709 Rust (17 ignored), strict Clippy/fmt/diff, real-Full host JNI/codecs.
-  Command: cargo test -p yomoku-ffi --test effective_reader --all-features --locked --offline
-- Prior PASS (not rerun this slice): Kotlin fmt, both-ABI APKs/lint;
-  28 phone + 5 final guards, 13 wide-dark cases. Display restored/emulator stopped.
-- Long-page ReaderWords movement times out in Compose with old ReaderScreen too.
-  ReaderNavigation controls then stalls; JDB main waits in HardwareRenderer draw.
-  swangle repeats with Vulkan disabled; swiftshader crashes at boot. No product fix.
-- Production B; no schema/dependency/wire change this slice. Full commands/logs: DEVELOPMENT end.
+- PASS: 710 Rust (17 opt-in ignored), strict Clippy/fmt/diff, full final real-Full
+  host JNI/codecs, unchanged 17 generated Kotlin files, both-ABI APKs/Android lint,
+  Android/new host-test formatting. No dependency/wire/durable schema change.
+- PASS: 57 distinct phone cases across runs; final 19-case selection passes all
+  four corrected failures and the 12 compact-word guards. Three final wide/dark
+  cases pass (2560x1600, 240 dpi). Phone/light restored and task emulator stopped.
+- The four long-page cases above remain unverified this slice; no full-device-matrix
+  claim. Separate Full owned/mapped matrix, release/process death, physical arm64
+  and actual effective device performance were not rerun/measured.
+- Initial System UI ANR/display overrides required reset/reboot. Reinstalls can
+  exhaust the 6 GiB AVD after dictionary extraction. Final checks use direct ADB
+  instrumentation against installed APKs; only this task's test app was removed
+  to free space. Keep native/BoltFFI generation sequential with host JNI execution.
+- Commands/results/failures/logs: DEVELOPMENT.md, final activation section;
+  `/tmp/yomoku-activation-*`. Normal AVD uses swangle with `-feature -Vulkan`.

@@ -51,6 +51,7 @@ fun main(args: Array<String>) {
     verifySrtImportBridge()
     verifyEpubImportBridge()
     verifyReaderWordBridge()
+    verifyEffectiveReaderBridge()
     verifyLibrarySearchBridge()
     verifyLibrarySortBridge()
     verifyLibraryWordsBridge()

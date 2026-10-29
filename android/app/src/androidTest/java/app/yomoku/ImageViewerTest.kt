@@ -40,7 +40,7 @@ class ImageViewerTest {
                 !view.readingTimeSavePending &&
                 !view.completionSavePending &&
                 view.readerTime != null &&
-                view.readerTokens != null
+                view.effectiveReaderTokens != null
         }
         compose.waitUntil(30_000) {
             compose.onAllNodesWithTag("reader_image_0").fetchSemanticsNodes().size == 1
@@ -112,7 +112,7 @@ class ImageViewerTest {
     fun linkedImageOpensViewerPinchPanAndBackNeverNavigateOrCountReading() {
         importAndOpen()
         val before = core().view.reader!!
-        val tokens = core().view.readerTokens
+        val tokens = core().view.effectiveReaderTokens
         val monitor =
             instrumentation.addMonitor(
                 IntentFilter(Intent.ACTION_VIEW).apply {
@@ -145,7 +145,7 @@ class ImageViewerTest {
             assertEquals("Panning should reveal the blue half", 1f, sample.blue, 0.02f)
             assertEquals(0f, sample.red, 0.02f)
             assertEquals(before.position, core().view.reader!!.position)
-            assertEquals(tokens, core().view.readerTokens)
+            assertEquals(tokens, core().view.effectiveReaderTokens)
             assertFalse(core().view.reader!!.finishedAtLeastOnce)
             assertEquals(0, monitor.hits)
             instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_BACK)
@@ -197,9 +197,8 @@ class ImageViewerTest {
             compose.runOnUiThread {
                 core()
                     .dispatch(
-                        Event.CompleteReaderPage(
-                            page.documentId,
-                            page.anchor,
+                        Event.CompleteEffectiveReaderPage(
+                            core().view.effectiveReaderTokens!!.identity,
                             page.position,
                             System.currentTimeMillis(),
                         )

@@ -1493,7 +1493,7 @@ retained native session key, complete compact prompt identity and literal surfac
 These UI drafts are not accepted overrides or write reservations. Exact pending
 writes/retries and provenance remain native; no SQLite/schema change is involved.
 
-The staged Android reader now opens that editor from validated original-B span
+The production Android reader opens that editor from validated original-B span
 selection. `EffectiveReaderPage.original_boundaries` carries page-only Japanese B
 anchors/surfaces/display ranges from the same read transaction as effective tokens.
 The two endpoint indices saved by the selector are presentation drafts scoped to
@@ -1576,12 +1576,11 @@ in any chapter yields None, while corrupt analysis/rules/statuses fail the read.
 Deleted origin documents do not disable global rules for remaining books.
 Canonical text is needed for resolution, but original file/image BLOBs and
 dictionaries are not read. No writes or new table/persistent cache/schema. The
-staged effective app selects this read through a skipped native operation,
-returning the existing compact distribution result/cache. Production still selects
-original B until the coordinated Android/reader activation. No shell schema change.
+production effective app selects this read through a skipped native operation,
+returning the existing compact distribution result/cache. No shell schema change.
 
 
-## Staged effective application payloads (no migration)
+## Production effective application payloads (no migration)
 
 The application view now has optional `effective_reader_tokens`, containing the
 existing compact EffectiveReaderPage. CompleteEffectiveReaderPage carries that
@@ -1591,7 +1590,7 @@ literal Unicode. Full resolved chapters and durable reservations remain native.
 The skipped EffectiveStorageFinished event captures a boxed native request and
 moves the storage result; it has no shell representation.
 
-The staged application also projects optional `effective_reader_word` and
+The application also projects optional `effective_reader_word` and
 `effective_reader_status` using the compact retained-session schemas. New effective
 word/status/custom events authenticate visible page/segment selections. Retry and
 Cancel carry no mutable payload: native accepted commands own the exact key,
@@ -1600,9 +1599,9 @@ callbacks. Pending writes and custom errors survive dismissal/invalidation;
 departure waits for explicit success/Cancel and final-time drain. No history,
 registration or status event is created by lookup/custom CRUD.
 
-Only the native `Model::with_effective_reader()` integration constructor enables
-this staged path. Production uses its existing B model pending migration
-of Android consumers. Accepted
+NativeBridge selects the native `Model::with_effective_reader()` integration
+constructor. Android uses compact page revisions/segment selections for this path.
+Accepted
 completion/time obligations are ephemeral model state backed by the existing
 version-1 durable reservations and exact replay semantics; new sessions never
 resume unfinished work automatically. No data/migration/destructive change.
@@ -1615,3 +1614,9 @@ save/reverse/generation participates in the shared pending-write gate and retire
 the rendered page immediately. Explicit reload follows success or stale context.
 Registration/history/rollback semantics remain those of the existing guarded
 repositories; no migration, history rewrite or automatic restart replay is added.
+
+The override reload requirement is ephemeral page presentation state, not durable
+edit provenance. It clears on normal page invalidation and explicit token loads;
+accepted override outcomes mark their retired before-image again. Pending writes
+and exact native retry payloads remain independent. A close/reopen must not carry
+an earlier edit's reload requirement onto the new reader page. No data change.

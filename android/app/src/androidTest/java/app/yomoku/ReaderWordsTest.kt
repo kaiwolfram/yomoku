@@ -47,7 +47,7 @@ class ReaderWordsTest {
                 !view.readingTimeSavePending &&
                 !view.completionSavePending &&
                 view.readerTime != null &&
-                view.readerTokens != null
+                view.effectiveReaderTokens != null
         }
         compose.waitForIdle()
     }
@@ -62,18 +62,17 @@ class ReaderWordsTest {
         val id = core().view.documents.single { it.title == title }.documentId
         compose.runOnUiThread { core().dispatch(Event.OpenReader(id)) }
         awaitWords()
-        val cat = core().view.readerTokens!!.tokens.first { it.surface == "猫" }.vocabulary!!
-        val key = key()
+        val snapshot = core().view.effectiveReaderTokens!!
+        val token = snapshot.tokens.first { it.surface == "猫" }
+        val cat = token.vocabulary!!
         compose.runOnUiThread {
             core()
                 .dispatch(
-                    Event.SetReaderStatus(
-                        ReaderStatusChange(
-                            key,
-                            cat.id,
-                            VocabularyStatus.NEW,
-                            System.currentTimeMillis(),
-                        )
+                    Event.SetEffectiveReaderStatus(
+                        EffectiveReaderSelection(snapshot.identity, token.segmentIndex),
+                        cat.id,
+                        VocabularyStatus.NEW,
+                        System.currentTimeMillis(),
                     )
                 )
         }
@@ -103,9 +102,11 @@ class ReaderWordsTest {
 
     private fun activateSurface(surface: String) {
         val page = core().view.reader!!
-        val snapshot = core().view.readerTokens!!
+        val snapshot = core().view.effectiveReaderTokens!!
         val span =
-            readerDisplayTokens(page, key(), snapshot)!!.first { it.token.surface == surface }
+            effectiveDisplayTokens(page, snapshot.identity, snapshot)!!.first {
+                it.token.surface == surface
+            }
         val node = compose.onNodeWithTag("reader_text").performScrollTo()
         val layouts = mutableListOf<androidx.compose.ui.text.TextLayoutResult>()
         node.fetchSemanticsNode().config[SemanticsActions.GetTextLayoutResult].action!!(layouts)
@@ -123,13 +124,14 @@ class ReaderWordsTest {
         activateSurface(surface)
         compose.waitUntil(30_000) {
             !core().view.storageBusy &&
-                (core().view.readerWord != null || core().view.readerWordError != null)
+                (core().view.effectiveReaderWord?.details != null ||
+                    core().view.effectiveReaderWord?.error != null)
         }
         compose.waitForIdle()
     }
 
     private fun assertCats(status: VocabularyStatus) {
-        val cats = core().view.readerTokens!!.tokens.filter { it.surface == "猫" }
+        val cats = core().view.effectiveReaderTokens!!.tokens.filter { it.surface == "猫" }
         assertEquals(2, cats.size)
         assertTrue(cats.all { it.vocabulary!!.status == status })
         compose.onNodeWithTag("word_status_$status").assertIsSelected()
@@ -140,9 +142,14 @@ class ReaderWordsTest {
                 .config[SemanticsProperties.Text]
                 .single()
         val catRanges =
-            readerDisplayTokens(core().view.reader!!, key(), core().view.readerTokens!!)!!.filter {
-                it.token.surface == "猫"
-            }
+            effectiveDisplayTokens(
+                    core().view.reader!!,
+                    core().view.effectiveReaderTokens!!.identity,
+                    core().view.effectiveReaderTokens!!,
+                )!!
+                .filter {
+                    it.token.surface == "猫"
+                }
         for (span in catRanges) {
             val link = text.getLinkAnnotations(span.start, span.end).single().item
             val dark =
@@ -188,7 +195,7 @@ class ReaderWordsTest {
     fun customEntryCreateEditDeleteSurvivesRecreationAndIsGlobalWithoutChangingReaderHistory() {
         openCustomDocument()
         val original = core().view.reader
-        val tokens = core().view.readerTokens
+        val tokens = core().view.effectiveReaderTokens!!
         val meaning = " literal meaning 📖 "
         val reading = " か\u3099𠮷 "
         database().use { db ->
@@ -214,8 +221,8 @@ class ReaderWordsTest {
             compose.onNodeWithTag("word_custom_reading").assertTextEquals("Reading: $reading")
             compose.onNodeWithTag("word_custom_meaning_input").assertDoesNotExist()
             assertEquals(original, core().view.reader)
-            assertEquals(tokens, core().view.readerTokens)
-            assertEquals(0UL, core().view.readerWord!!.encountered)
+            assertEquals(tokens, core().view.effectiveReaderTokens)
+            assertEquals(0UL, core().view.effectiveReaderWord!!.details!!.encountered)
             assertEquals(history, count(db, "SELECT count(*) FROM reading_completions"))
             assertEquals(statuses, count(db, "SELECT count(*) FROM vocabulary_status_events"))
             assertEquals(vocabulary, count(db, "SELECT count(*) FROM vocabulary"))
@@ -237,15 +244,19 @@ class ReaderWordsTest {
             enterCustom("edited meaning", "ぬぬ")
             customAction("word_custom_save")
             awaitWords()
-            compose.onNodeWithText("Close").performClick()
+            compose.onNodeWithText("Close").performScrollTo().performClick()
             tapSurface("東京")
             compose.onNodeWithTag("word_definitions").assertExists()
             compose.onNodeWithTag("word_names").assertExists()
             compose.onNodeWithTag("word_custom_entry").assertDoesNotExist()
-            compose.onNodeWithText("Close").performClick()
+            compose.onNodeWithText("Close").performScrollTo().performClick()
             // A second original occurrence uses the same global exact-surface definition.
             val span =
-                readerDisplayTokens(core().view.reader!!, key(), core().view.readerTokens!!)!!
+                effectiveDisplayTokens(
+                        core().view.reader!!,
+                        core().view.effectiveReaderTokens!!.identity,
+                        core().view.effectiveReaderTokens!!,
+                    )!!
                     .last { it.token.surface == customSurface }
             val text =
                 compose
@@ -299,9 +310,13 @@ class ReaderWordsTest {
                 .onNodeWithTag("word_custom_edit")
                 .performScrollTo()
                 .assertTextEquals("Add meaning and reading")
-            assertNull(core().view.readerWord!!.customEntry)
+            assertNull(core().view.effectiveReaderWord!!.details!!.customEntry)
             assertEquals(original, core().view.reader)
-            assertEquals(tokens, core().view.readerTokens)
+            val reloaded = core().view.effectiveReaderTokens!!
+            assertEquals(tokens.tokens, reloaded.tokens)
+            assertEquals(tokens.originalBoundaries, reloaded.originalBoundaries)
+            assertEquals(tokens.identity.base, reloaded.identity.base)
+            assertTrue(reloaded.identity.revision > tokens.identity.revision)
             assertEquals(history, count(db, "SELECT count(*) FROM reading_completions"))
             assertEquals(statuses, count(db, "SELECT count(*) FROM vocabulary_status_events"))
             assertEquals(vocabulary, count(db, "SELECT count(*) FROM vocabulary"))
@@ -312,7 +327,7 @@ class ReaderWordsTest {
     fun customEntrySaveAndDeleteFailuresRetainDataAndOnlyRetryOnExplicitActions() {
         openCustomDocument()
         val original = core().view.reader
-        val tokens = core().view.readerTokens
+        val tokens = core().view.effectiveReaderTokens
         database().use { db ->
             try {
                 db.execSQL(
@@ -322,18 +337,20 @@ class ReaderWordsTest {
                 customAction("word_custom_save")
                 awaitWords()
                 compose
-                    .onNodeWithTag("word_custom_error")
+                    .onNodeWithTag("effective_custom_error")
                     .performScrollTo()
-                    .assertTextEquals("Could not save entry. Your changes are still here.")
+                    .assertTextEquals(
+                        "Custom entry change failed. Retry or cancel the pending change."
+                    )
                 compose
                     .onNodeWithTag("word_custom_meaning_input")
                     .assertTextEquals("English meaning", "original attempted meaning")
-                assertNull(core().view.readerWord!!.customEntry)
+                assertNull(core().view.effectiveReaderWord!!.details!!.customEntry)
                 db.execSQL("DROP TRIGGER fail_custom_ui")
                 // A later clock write must not retry the mutation or hide its error.
                 compose.runOnUiThread { core().setReaderActive(false) }
                 awaitWords()
-                assertNotNull(core().view.readerCustomEntryError)
+                assertNotNull(core().view.effectiveReaderWord?.customEntryError)
                 assertEquals(
                     0,
                     count(
@@ -344,26 +361,28 @@ class ReaderWordsTest {
                 compose
                     .onNodeWithTag("word_custom_meaning_input")
                     .performScrollTo()
-                    .performTextReplacement("a different draft")
-                customAction("word_custom_retry")
+                    .assertIsNotEnabled()
+                customAction("effective_custom_retry")
                 awaitWords()
                 compose
                     .onNodeWithTag("word_custom_meaning")
                     .performScrollTo()
                     .assertTextEquals("original attempted meaning")
-                compose.onNodeWithTag("word_custom_error").assertDoesNotExist()
+                compose.onNodeWithTag("effective_custom_error").assertDoesNotExist()
                 db.execSQL(
                     "CREATE TRIGGER fail_custom_ui BEFORE DELETE ON custom_dictionary_entries WHEN OLD.surface = '$customSurface' BEGIN SELECT RAISE(ABORT, 'test delete'); END"
                 )
                 customAction("word_custom_delete")
                 awaitWords()
                 compose
-                    .onNodeWithTag("word_custom_error")
+                    .onNodeWithTag("effective_custom_error")
                     .performScrollTo()
-                    .assertTextEquals("Could not delete entry. Your saved entry is still here.")
+                    .assertTextEquals(
+                        "Custom entry change failed. Retry or cancel the pending change."
+                    )
                 assertEquals(
                     "original attempted meaning",
-                    core().view.readerWord!!.customEntry!!.englishMeaning,
+                    core().view.effectiveReaderWord!!.details!!.customEntry!!.englishMeaning,
                 )
                 db.execSQL("DROP TRIGGER fail_custom_ui")
                 compose.waitForIdle()
@@ -374,14 +393,14 @@ class ReaderWordsTest {
                         "SELECT count(*) FROM custom_dictionary_entries WHERE surface = '$customSurface'",
                     ),
                 )
-                customAction("word_custom_retry")
+                customAction("effective_custom_retry")
                 awaitWords()
-                compose.onNodeWithTag("word_custom_error").assertDoesNotExist()
+                compose.onNodeWithTag("effective_custom_error").assertDoesNotExist()
                 compose.onNodeWithTag("word_custom_meaning").assertDoesNotExist()
-                assertNull(core().view.readerCustomEntryError)
+                assertNull(core().view.effectiveReaderWord?.customEntryError)
                 assertEquals(original, core().view.reader)
-                assertEquals(tokens, core().view.readerTokens)
-                assertEquals(0UL, core().view.readerWord!!.encountered)
+                assertEquals(tokens, core().view.effectiveReaderTokens)
+                assertEquals(0UL, core().view.effectiveReaderWord!!.details!!.encountered)
             } finally {
                 db.execSQL("DROP TRIGGER IF EXISTS fail_custom_ui")
             }
@@ -399,12 +418,13 @@ class ReaderWordsTest {
             compose.activity.setContent {
                 YomokuTheme {
                     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
-                        ReaderCustomDictionary(
-                            frame.readerWord!!,
-                            !frame.storageBusy &&
+                        EffectiveReaderCustomDictionary(
+                            frame.effectiveReaderWord!!.details!!,
+                            frame.effectiveReaderWord!!,
+                            !frame.effectiveReaderWord!!.customEntryPending &&
+                                !frame.storageBusy &&
                                 !frame.readingTimeSavePending &&
                                 !frame.completionSavePending,
-                            frame.readerCustomEntryError,
                             { events.add(it) },
                             { interactions++ },
                         )
@@ -427,21 +447,41 @@ class ReaderWordsTest {
         assertTrue(events.isEmpty())
         compose.runOnUiThread { frame = base }
         customAction("word_custom_save")
-        val selection = ReaderWordSelection(base.readerWord!!.key, base.readerWord.token.tokenIndex)
-        assertEquals(listOf(Event.SaveReaderCustomEntry(selection, "draft 📖", "か\u3099")), events)
-        compose.runOnUiThread {
-            frame = base.copy(readerCustomEntryError = DocumentError.UNAVAILABLE)
-        }
-        compose.onNodeWithTag("word_custom_retry").assertExists()
-        compose.runOnUiThread { frame = frame.copy(readingTimeSavePending = true) }
-        compose.onNodeWithTag("word_custom_retry").assertIsNotEnabled()
-        assertEquals(1, events.size)
-        val other = base.readerTokens!!.tokens.last { it.surface == customSurface }
+        val selection = base.effectiveReaderWord!!.details!!.selection
+        assertEquals(
+            listOf(Event.SaveEffectiveReaderCustomEntry(selection, "draft 📖", "か\u3099")),
+            events,
+        )
         compose.runOnUiThread {
             frame =
                 base.copy(
-                    readerWord = base.readerWord.copy(token = other),
-                    readerCustomEntryError = null,
+                    effectiveReaderWord =
+                        base.effectiveReaderWord.copy(
+                            customEntryError = DocumentError.UNAVAILABLE,
+                            customEntryPending = true,
+                        )
+                )
+        }
+        compose.onNodeWithTag("word_custom_save").assertIsNotEnabled()
+        compose.runOnUiThread { frame = frame.copy(readingTimeSavePending = true) }
+        compose.onNodeWithTag("word_custom_save").assertIsNotEnabled()
+        assertEquals(1, events.size)
+        val other = base.effectiveReaderTokens!!.tokens.last { it.surface == customSurface }
+        compose.runOnUiThread {
+            frame =
+                base.copy(
+                    effectiveReaderWord =
+                        base.effectiveReaderWord.copy(
+                            details =
+                                base.effectiveReaderWord.details.copy(
+                                    token = other,
+                                    selection =
+                                        EffectiveReaderSelection(
+                                            base.effectiveReaderTokens.identity,
+                                            other.segmentIndex,
+                                        ),
+                                )
+                        )
                 )
         }
         compose.onNodeWithTag("word_custom_meaning_input").assertDoesNotExist()
@@ -451,10 +491,18 @@ class ReaderWordsTest {
         customAction("word_custom_cancel")
         val committed =
             base.copy(
-                readerWord =
-                    base.readerWord.copy(
-                        token = other,
-                        customEntry = ReaderCustomEntry(customSurface, "saved", "ぬぬ"),
+                effectiveReaderWord =
+                    base.effectiveReaderWord.copy(
+                        details =
+                            base.effectiveReaderWord.details.copy(
+                                token = other,
+                                selection =
+                                    EffectiveReaderSelection(
+                                        base.effectiveReaderTokens.identity,
+                                        other.segmentIndex,
+                                    ),
+                                customEntry = ReaderCustomEntry(customSurface, "saved", "ぬぬ"),
+                            )
                     )
             )
         for (blocked in
@@ -476,7 +524,14 @@ class ReaderWordsTest {
         val id = openDocument()
         val original = core().view.reader!!
         val catId =
-            core().view.readerTokens!!.tokens.first { it.surface == "猫" }.vocabulary!!.id.value
+            core()
+                .view
+                .effectiveReaderTokens!!
+                .tokens
+                .first { it.surface == "猫" }
+                .vocabulary!!
+                .id
+                .value
         database().use { db ->
             val eventsSql =
                 "SELECT count(*) FROM vocabulary_status_events WHERE vocabulary_id = $catId"
@@ -508,7 +563,7 @@ class ReaderWordsTest {
                 )
                 compose.onNodeWithTag("word_status_LEARNING").performClick()
                 compose.waitUntil(30_000) {
-                    !core().view.storageBusy && core().view.documentError != null
+                    !core().view.storageBusy && core().view.effectiveReaderStatus?.error != null
                 }
                 assertCats(VocabularyStatus.NEW)
                 assertEquals(baseline + 5, count(db, eventsSql))
@@ -517,12 +572,13 @@ class ReaderWordsTest {
             }
             compose.waitForIdle()
             assertEquals(baseline + 5, count(db, eventsSql))
-            compose.onNodeWithTag("word_status_LEARNING").performClick()
+            compose.onNodeWithTag("word_status_LEARNING").assertIsNotEnabled()
+            compose.onNodeWithTag("effective_status_retry").performScrollTo().performClick()
             awaitWords()
             assertCats(VocabularyStatus.LEARNING)
-            assertNull(core().view.documentError)
+            assertNull(core().view.effectiveReaderStatus?.error)
             assertEquals(baseline + 6, count(db, eventsSql))
-            compose.onNodeWithText("Close").performClick()
+            compose.onNodeWithText("Close").performScrollTo().performClick()
             compose.onNodeWithTag("reader_word_panel").assertDoesNotExist()
             compose.runOnUiThread { core().dispatch(Event.LoadReaderTokens(key())) }
             awaitWords()
@@ -547,10 +603,11 @@ class ReaderWordsTest {
     fun popupShowsWholeSupplementarySurfaceAndDeletedVocabularyCannotBeRegisteredByTap() {
         openDocument()
         val supplementarySurface =
-            core().view.readerTokens!!.tokens.first { it.surface.contains("𠮷") }.surface
+            core().view.effectiveReaderTokens!!.tokens.first { it.surface.contains("𠮷") }.surface
         tapSurface(supplementarySurface)
-        compose.onNodeWithText("Close").performClick()
-        val cat = core().view.readerTokens!!.tokens.first { it.surface == "猫" }.vocabulary!!
+        compose.onNodeWithText("Close").performScrollTo().performClick()
+        val cat =
+            core().view.effectiveReaderTokens!!.tokens.first { it.surface == "猫" }.vocabulary!!
         database().use { db ->
             db.execSQL("DELETE FROM vocabulary WHERE id = ${cat.id.value}")
             compose.runOnUiThread { core().dispatch(Event.LoadReaderTokens(key())) }
@@ -604,7 +661,7 @@ class ReaderWordsTest {
             assertEquals(original, session.view.reader)
             assertNull(session.view.completionNotice)
             assertTrue(
-                session.view.readerTokens!!
+                session.view.effectiveReaderTokens!!
                     .tokens
                     .filter { it.surface == "猫" }
                     .all { it.vocabulary!!.status == VocabularyStatus.NEW }
@@ -627,11 +684,18 @@ class ReaderWordsTest {
             val before = count(db, "SELECT count(*) FROM vocabulary_status_events")
             val completions = count(db, "SELECT count(*) FROM reading_completions")
             val tokyoId =
-                core().view.readerTokens!!.tokens.first { it.surface == "東京" }.vocabulary!!.id.value
+                core()
+                    .view
+                    .effectiveReaderTokens!!
+                    .tokens
+                    .first { it.surface == "東京" }
+                    .vocabulary!!
+                    .id
+                    .value
             val encountered =
                 count(db, "SELECT count(*) FROM reading_occurrences WHERE vocabulary_id = $tokyoId")
             tapSurface("東京")
-            val details = core().view.readerWord!!
+            val details = core().view.effectiveReaderWord!!.details!!
             assertTrue(details.candidates.words.isNotEmpty())
             assertTrue(details.candidates.names.isNotEmpty())
             compose
@@ -654,9 +718,9 @@ class ReaderWordsTest {
             compose.runOnUiThread { core().dispatch(Event.LoadReaderTokens(key())) }
             awaitWords()
             compose.onNodeWithTag("reader_word_panel").assertDoesNotExist()
-            assertNull(core().view.readerWordSelection)
+            assertNull(core().view.effectiveReaderWord?.selection)
             tapSurface("食べ")
-            assertEquals("食べる", core().view.readerWord!!.token.dictionaryForm)
+            assertEquals("食べる", core().view.effectiveReaderWord!!.details!!.token.dictionaryForm)
             compose.onNodeWithTag("word_definitions").assertExists()
             assertTrue(
                 compose
@@ -667,9 +731,8 @@ class ReaderWordsTest {
             compose.runOnUiThread {
                 core()
                     .dispatch(
-                        Event.CompleteReaderPage(
-                            original.documentId,
-                            original.anchor,
+                        Event.CompleteEffectiveReaderPage(
+                            core().view.effectiveReaderTokens!!.identity,
                             original.position,
                             System.currentTimeMillis(),
                         )
@@ -692,12 +755,12 @@ class ReaderWordsTest {
             compose.waitUntil(30_000) { !core().view.storageBusy }
             compose.runOnUiThread { core().dispatch(Event.CloseSettings) }
             awaitWords()
-            assertNull(core().view.readerWordSelection)
+            assertNull(core().view.effectiveReaderWord?.selection)
             compose.onNodeWithTag("reader_word_panel").assertDoesNotExist()
             tapSurface("東京")
             compose.activityRule.scenario.recreate()
             awaitWords()
-            assertNull(core().view.readerWordSelection)
+            assertNull(core().view.effectiveReaderWord?.selection)
             compose.onNodeWithTag("reader_word_panel").assertDoesNotExist()
         }
     }
@@ -737,15 +800,15 @@ class ReaderWordsTest {
             openDocument()
             activateSurface("東京")
             assertTrue(entered.await(30, TimeUnit.SECONDS))
-            assertNull(session.view.readerWord)
+            assertNull(session.view.effectiveReaderWord?.details)
             compose.onNodeWithText("Loading dictionary…").assertExists()
-            compose.onNodeWithText("Close").performClick()
+            compose.onNodeWithText("Close").performScrollTo().performClick()
             compose.onNodeWithTag("reader_word_panel").assertDoesNotExist()
-            assertNull(session.view.readerWordSelection)
+            assertNull(session.view.effectiveReaderWord?.selection)
             release.countDown()
             awaitWords()
-            assertNull(session.view.readerWord)
-            assertNull(session.view.readerWordError)
+            assertNull(session.view.effectiveReaderWord?.details)
+            assertNull(session.view.effectiveReaderWord?.error)
             compose.onNodeWithTag("reader_word_panel").assertDoesNotExist()
             tapSurface("東京")
             compose.onNodeWithTag("word_definitions").assertExists()
@@ -770,9 +833,8 @@ class ReaderWordsTest {
         compose.runOnUiThread {
             core()
                 .dispatch(
-                    Event.CompleteReaderPage(
-                        first.documentId,
-                        first.anchor,
+                    Event.CompleteEffectiveReaderPage(
+                        core().view.effectiveReaderTokens!!.identity,
                         first.position,
                         System.currentTimeMillis(),
                     )
@@ -780,10 +842,10 @@ class ReaderWordsTest {
         }
         awaitWords()
         compose.onNodeWithTag("reader_word_panel").assertDoesNotExist()
-        assertNull(core().view.readerWordSelection)
+        assertNull(core().view.effectiveReaderWord?.selection)
         val second = core().view.reader!!
         assertEquals(2UL, second.pageNumber)
-        tapSurface(core().view.readerTokens!!.tokens.first().surface)
+        tapSurface(core().view.effectiveReaderTokens!!.tokens.first().surface)
         compose.runOnUiThread {
             core()
                 .dispatch(
@@ -792,8 +854,8 @@ class ReaderWordsTest {
         }
         awaitWords()
         assertEquals(first.anchor, core().view.reader!!.anchor)
-        assertNull(core().view.readerWordSelection)
-        assertNull(core().view.readerWord)
+        assertNull(core().view.effectiveReaderWord?.selection)
+        assertNull(core().view.effectiveReaderWord?.details)
         compose.onNodeWithTag("reader_word_panel").assertDoesNotExist()
     }
 
@@ -841,22 +903,31 @@ class ReaderWordsTest {
             assertEquals(1, calls.get())
             compose.onNodeWithTag("retry_word_details").performScrollTo().performClick()
             compose.waitUntil(30_000) {
-                !session.view.storageBusy && session.view.readerWord != null
+                !session.view.storageBusy && session.view.effectiveReaderWord?.details != null
             }
             compose.onNodeWithTag("word_definitions").assertExists()
             assertEquals(2, calls.get())
             // Use a successful empty candidate payload to check the distinct no-match view.
             val base = session.view
             val empty =
-                base.readerWord!!.copy(
-                    candidates =
-                        base.readerWord.candidates.copy(words = emptyList(), names = emptyList())
-                )
+                base.effectiveReaderWord!!
+                    .details!!
+                    .copy(
+                        candidates =
+                            base.effectiveReaderWord.details.candidates.copy(
+                                words = emptyList(),
+                                names = emptyList(),
+                            )
+                    )
             var frame by mutableStateOf(base)
             val events = mutableListOf<Event>()
             compose.runOnUiThread {
                 compose.activity.setContent {
-                    YomokuTheme { ReaderWords(frame, { events.add(it) }, {}) }
+                    YomokuTheme {
+                        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+                            EffectiveReaderWords(frame, core().sessionKey, { events.add(it) }, {})
+                        }
+                    }
                 }
             }
             val text =
@@ -866,17 +937,27 @@ class ReaderWordsTest {
                     .config[SemanticsProperties.Text]
                     .single()
             val span =
-                readerDisplayTokens(base.reader!!, key(), base.readerTokens!!)!!.first {
-                    it.token.surface == "猫"
-                }
+                effectiveDisplayTokens(
+                        base.reader!!,
+                        base.effectiveReaderTokens!!.identity,
+                        base.effectiveReaderTokens,
+                    )!!
+                    .first {
+                        it.token.surface == "猫"
+                    }
             val link = text.getLinkAnnotations(span.start, span.end).single().item
             compose.runOnUiThread { link.linkInteractionListener!!.onClick(link) }
-            compose.runOnUiThread { frame = frame.copy(readerWord = empty) }
+            compose.runOnUiThread {
+                frame =
+                    frame.copy(
+                        effectiveReaderWord = frame.effectiveReaderWord!!.copy(details = empty)
+                    )
+            }
             compose.onNodeWithTag("word_no_match").performScrollTo().assertIsDisplayed()
             compose.onNodeWithTag("word_encountered").assertTextEquals("Encountered 0 times")
             compose.onNodeWithTag("word_lookup_error").assertDoesNotExist()
             compose.onNodeWithTag("retry_word_details").assertDoesNotExist()
-            assertEquals(1, events.filterIsInstance<Event.LoadReaderWord>().size)
+            assertEquals(1, events.filterIsInstance<Event.LoadEffectiveReaderWord>().size)
         } finally {
             compose.runOnUiThread {
                 compose.activity.setContent {}
@@ -892,21 +973,30 @@ class ReaderWordsTest {
         openDocument()
         val base = core().view
         val expectedKey = key()
-        var frame by mutableStateOf(base.copy(readerTokens = null, storageBusy = true))
+        var frame by mutableStateOf(base.copy(effectiveReaderTokens = null, storageBusy = true))
         val events = mutableListOf<Event>()
         compose.runOnUiThread {
             compose.activity.setContent {
                 YomokuTheme {
-                    ReaderWords(
-                        frame,
-                        {
-                            events.add(it)
-                            if (it is Event.LoadReaderWord) {
-                                frame = frame.copy(readerWordSelection = it.value)
-                            }
-                        },
-                        {},
-                    )
+                    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+                        EffectiveReaderWords(
+                            frame,
+                            core().sessionKey,
+                            {
+                                events.add(it)
+                                if (it is Event.LoadEffectiveReaderWord) {
+                                    frame =
+                                        frame.copy(
+                                            effectiveReaderWord =
+                                                frame.effectiveReaderWord!!.copy(
+                                                    selection = it.value
+                                                )
+                                        )
+                                }
+                            },
+                            {},
+                        )
+                    }
                 }
             }
         }
@@ -922,7 +1012,7 @@ class ReaderWordsTest {
         compose.runOnUiThread { frame = frame.copy(documentError = null) }
         compose.waitForIdle()
         assertEquals(1, events.size)
-        compose.onNodeWithTag("retry_word_lookup").performClick()
+        compose.onNodeWithTag("retry_word_lookup").performScrollTo().performClick()
         assertEquals(
             listOf(Event.LoadReaderTokens(expectedKey), Event.LoadReaderTokens(expectedKey)),
             events,
@@ -937,28 +1027,33 @@ class ReaderWordsTest {
                 .config[SemanticsProperties.Text]
                 .single()
         val cat =
-            readerDisplayTokens(base.reader!!, expectedKey, base.readerTokens!!)!!.first {
-                it.token.surface == "猫"
-            }
+            effectiveDisplayTokens(
+                    base.reader!!,
+                    base.effectiveReaderTokens!!.identity,
+                    base.effectiveReaderTokens,
+                )!!
+                .first {
+                    it.token.surface == "猫"
+                }
         val link = text.getLinkAnnotations(cat.start, cat.end).single().item
         compose.runOnUiThread {
             frame = frame.copy(readingTimeSavePending = true)
             link.linkInteractionListener!!.onClick(link)
         }
         compose.onNodeWithTag("reader_word_panel").assertIsDisplayed()
-        assertTrue(events.filterIsInstance<Event.LoadReaderWord>().isEmpty())
+        assertTrue(events.filterIsInstance<Event.LoadEffectiveReaderWord>().isEmpty())
         compose.runOnUiThread { frame = frame.copy(readingTimeSavePending = false) }
         compose.waitForIdle()
-        assertEquals(1, events.filterIsInstance<Event.LoadReaderWord>().size)
+        assertEquals(1, events.filterIsInstance<Event.LoadEffectiveReaderWord>().size)
         compose.runOnUiThread { frame = frame.copy(readingTimeSavePending = true) }
         for (status in VocabularyStatus.entries) compose
             .onNodeWithTag("word_status_$status")
             .assertIsNotEnabled()
-        compose.runOnUiThread { frame = frame.copy(readerTokens = null) }
+        compose.runOnUiThread { frame = frame.copy(effectiveReaderTokens = null) }
         compose.onNodeWithTag("reader_word_panel").assertDoesNotExist()
         compose.runOnUiThread { frame = base }
         compose.onNodeWithTag("reader_word_panel").assertDoesNotExist()
-        assertEquals(1, events.filterIsInstance<Event.LoadReaderWord>().size)
+        assertEquals(1, events.filterIsInstance<Event.LoadEffectiveReaderWord>().size)
         assertEquals(2, events.filterIsInstance<Event.LoadReaderTokens>().size)
     }
 }

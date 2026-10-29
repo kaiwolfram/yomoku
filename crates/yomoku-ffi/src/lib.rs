@@ -45,9 +45,8 @@ pub struct YomokuBridge {
 }
 
 impl YomokuBridge {
-    /// Serialized effective-reader activation candidate. Uses the same native
-    /// worker/lifecycle as production; no shell toggle or extra wire protocol.
-    /// NativeBridge remains on original B until coordinated activation.
+    /// Production effective reader with retained native provenance, sharing the
+    /// import/dictionary worker and lifecycle without a shell toggle.
     pub fn with_effective_reader(
         database_path: std::path::PathBuf,
         loader: AnalyzerLoader,

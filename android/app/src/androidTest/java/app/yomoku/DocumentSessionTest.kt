@@ -4,11 +4,11 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import app.yomoku.nativebridge.DictionaryProvider
 import app.yomoku.shared.DocumentError
+import app.yomoku.shared.EffectiveReaderSelection
 import app.yomoku.shared.Event
 import app.yomoku.shared.ImportOutcome
 import app.yomoku.shared.PageLength
 import app.yomoku.shared.ReaderRuby
-import app.yomoku.shared.ReaderStatusChange
 import app.yomoku.shared.ReaderTokenKey
 import app.yomoku.shared.TextEncoding
 import app.yomoku.shared.TextOffset
@@ -111,7 +111,7 @@ class DocumentSessionTest {
             dispatch(core, Event.CloseSettings)
             val key = ReaderTokenKey(id, page.anchor, opened.readerAnalysis!!)
             val tokenView = dispatch(core, Event.LoadReaderTokens(key))
-            val tokens = tokenView.readerTokens!!
+            val tokens = tokenView.effectiveReaderTokens!!
             val cats = tokens.tokens.filter { it.surface == "猫" }
             assertEquals(2, cats.size)
             assertEquals(page.sourceRuby.single(), tokenView.readerFurigana.first())
@@ -123,13 +123,11 @@ class DocumentSessionTest {
             val familiar =
                 dispatch(
                     core,
-                    Event.SetReaderStatus(
-                        ReaderStatusChange(
-                            key,
-                            cats.first().vocabulary!!.id,
-                            VocabularyStatus.FAMILIAR,
-                            1234,
-                        )
+                    Event.SetEffectiveReaderStatus(
+                        EffectiveReaderSelection(tokens.identity, cats.first().segmentIndex),
+                        cats.first().vocabulary!!.id,
+                        VocabularyStatus.FAMILIAR,
+                        1234,
                     ),
                 )
             assertEquals(tokenView.readerFurigana, familiar.readerFurigana)
@@ -179,7 +177,7 @@ class DocumentSessionTest {
             assertEquals(ruby.ruby, reopened.sourceRuby)
             assertTrue(reopenedView.readerTypography!!.furigana)
             assertEquals(reopened.sourceRuby, reopenedView.readerFurigana)
-            val restored = dispatch(core, Event.LoadReaderTokens(key)).readerTokens!!
+            val restored = dispatch(core, Event.LoadReaderTokens(key)).effectiveReaderTokens!!
             assertTrue(
                 restored.tokens
                     .filter { it.surface == "猫" }
@@ -211,7 +209,7 @@ class DocumentSessionTest {
             val opened = dispatch(core, Event.OpenReader(first))
             val page = opened.reader!!
             val key = ReaderTokenKey(first, page.anchor, opened.readerAnalysis!!)
-            val tokens = dispatch(core, Event.LoadReaderTokens(key)).readerTokens!!
+            val tokens = dispatch(core, Event.LoadReaderTokens(key)).effectiveReaderTokens!!
             val cats = tokens.tokens.filter { it.surface == "猫" }
             assertEquals(2, cats.size)
             val id = cats.first().vocabulary!!.id
@@ -220,7 +218,15 @@ class DocumentSessionTest {
                 val changed =
                     dispatch(
                         core,
-                        Event.SetReaderStatus(ReaderStatusChange(key, id, status, 1234L)),
+                        Event.SetEffectiveReaderStatus(
+                            EffectiveReaderSelection(
+                                core.view.effectiveReaderTokens!!.identity,
+                                cats.first().segmentIndex,
+                            ),
+                            id,
+                            status,
+                            1234L,
+                        ),
                     )
                 assertNull(changed.documentError)
                 assertEquals(page, changed.reader)
@@ -234,10 +240,10 @@ class DocumentSessionTest {
                             token.copy(vocabulary = token.vocabulary!!.copy(status = status))
                         } else token
                     }
-                assertEquals(expected, changed.readerTokens!!.tokens)
+                assertEquals(expected, changed.effectiveReaderTokens!!.tokens)
                 assertEquals(
-                    changed.readerTokens,
-                    dispatch(core, Event.LoadReaderTokens(key)).readerTokens,
+                    changed.effectiveReaderTokens.tokens,
+                    dispatch(core, Event.LoadReaderTokens(key)).effectiveReaderTokens!!.tokens,
                 )
             }
             val second =
@@ -248,7 +254,8 @@ class DocumentSessionTest {
             val secondOpened = dispatch(core, Event.OpenReader(second))
             val secondKey =
                 ReaderTokenKey(second, secondOpened.reader!!.anchor, secondOpened.readerAnalysis!!)
-            val secondTokens = dispatch(core, Event.LoadReaderTokens(secondKey)).readerTokens!!
+            val secondTokens =
+                dispatch(core, Event.LoadReaderTokens(secondKey)).effectiveReaderTokens!!
             assertEquals(id, secondTokens.tokens.single { it.surface == "猫" }.vocabulary!!.id)
             assertEquals(
                 VocabularyStatus.IGNORED,
@@ -256,12 +263,18 @@ class DocumentSessionTest {
             )
             dispatch(
                 core,
-                Event.SetReaderStatus(
-                    ReaderStatusChange(secondKey, id, VocabularyStatus.LEARNING, 2345L)
+                Event.SetEffectiveReaderStatus(
+                    EffectiveReaderSelection(
+                        secondTokens.identity,
+                        secondTokens.tokens.single { it.surface == "猫" }.segmentIndex,
+                    ),
+                    id,
+                    VocabularyStatus.LEARNING,
+                    2345L,
                 ),
             )
             dispatch(core, Event.OpenReader(first))
-            val shared = dispatch(core, Event.LoadReaderTokens(key)).readerTokens!!
+            val shared = dispatch(core, Event.LoadReaderTokens(key)).effectiveReaderTokens!!
             assertTrue(
                 shared.tokens
                     .filter { it.surface == "猫" }

@@ -110,7 +110,7 @@ fn effective_application_fifo_library_membership_status_refresh_reversal_and_reo
         view.library_word_distributions
     );
 
-    // The production constructor still returns B even when the split is active.
+    // The legacy constructor still returns B even when the split is active.
     fixture
         .sql()
         .execute(

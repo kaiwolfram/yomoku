@@ -24,7 +24,7 @@ import app.yomoku.shared.Event
 import app.yomoku.shared.ReaderTokenKey
 import app.yomoku.shared.ViewModel
 
-/** Compact effective consumers; production activation is coordinated with the native model. */
+/** Production word consumers using compact selections owned by the native session. */
 @Composable
 internal fun EffectiveReaderWords(
     view: ViewModel,
@@ -65,8 +65,8 @@ private fun EffectiveReaderWordContent(
         remember(override?.reloadRequired) {
             base.takeIf { override?.reloadRequired == true }
         }
-    var requested by remember(base) { mutableStateOf(false) }
-    LaunchedEffect(base, snapshot, canRead, view.documentError) {
+    var requested by remember(base, page.position, view.pageLength) { mutableStateOf(false) }
+    LaunchedEffect(base, page.position, view.pageLength, snapshot, canRead, view.documentError) {
         if (snapshot != null) requested = true
         else if (
             base != null &&
@@ -164,7 +164,11 @@ private fun EffectiveReaderWordContent(
             enabled = canRead,
             modifier = Modifier.testTag("retry_word_lookup"),
         ) {
-            Text(stringResource(R.string.retry_word_lookup))
+            Text(
+                stringResource(
+                    if (base == reloadBase) R.string.boundary_reload else R.string.retry_word_lookup
+                )
+            )
         }
     }
     val display = tokens?.singleOrNull { it.selection == selected }

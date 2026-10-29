@@ -4,9 +4,9 @@ import android.os.Looper
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import app.yomoku.nativebridge.DictionaryProvider
+import app.yomoku.shared.EffectiveReaderSelection
 import app.yomoku.shared.Event
 import app.yomoku.shared.ReaderTokenKey
-import app.yomoku.shared.ReaderWordSelection
 import app.yomoku.shared.ViewModel
 import java.io.File
 import java.util.concurrent.atomic.AtomicBoolean
@@ -63,19 +63,19 @@ class ReaderWordDetailsSessionTest {
             val opened = dispatch(core, Event.OpenReader(id))
             val page = opened.reader!!
             val key = ReaderTokenKey(id, page.anchor, opened.readerAnalysis!!)
-            val tokens = dispatch(core, Event.LoadReaderTokens(key)).readerTokens!!
+            val tokens = dispatch(core, Event.LoadReaderTokens(key)).effectiveReaderTokens!!
             assertEquals(0, wordCalls.get())
             val tokyo = tokens.tokens.first { it.surface == "東京" }
-            val selection = ReaderWordSelection(key, tokyo.tokenIndex)
-            val failed = dispatch(core, Event.LoadReaderWord(selection))
-            assertNotNull(failed.readerWordError)
+            val selection = EffectiveReaderSelection(tokens.identity, tokyo.segmentIndex)
+            val failed = dispatch(core, Event.LoadEffectiveReaderWord(selection))
+            assertNotNull(failed.effectiveReaderWord?.error)
             assertNull(failed.documentError)
-            assertNull(failed.readerWord)
+            assertNull(failed.effectiveReaderWord?.details)
             fail.set(false)
-            val loaded = dispatch(core, Event.LoadReaderWord(selection))
-            val details = loaded.readerWord!!
-            assertEquals(selection, loaded.readerWordSelection)
-            assertNull(loaded.readerWordError)
+            val loaded = dispatch(core, Event.LoadEffectiveReaderWord(selection))
+            val details = loaded.effectiveReaderWord!!.details!!
+            assertEquals(selection, loaded.effectiveReaderWord.selection)
+            assertNull(loaded.effectiveReaderWord.error)
             assertEquals(tokyo, details.token)
             assertEquals(0UL, details.encountered)
             assertTrue(details.candidates.words.isNotEmpty())
@@ -90,29 +90,43 @@ class ReaderWordDetailsSessionTest {
             assertEquals(2, wordCalls.get())
             val inflected = tokens.tokens.first { it.surface == "食べ" }
             val baseDetails =
-                dispatch(core, Event.LoadReaderWord(ReaderWordSelection(key, inflected.tokenIndex)))
-                    .readerWord!!
+                dispatch(
+                        core,
+                        Event.LoadEffectiveReaderWord(
+                            EffectiveReaderSelection(tokens.identity, inflected.segmentIndex)
+                        ),
+                    )
+                    .effectiveReaderWord!!
+                    .details!!
             assertEquals("食べる", baseDetails.candidates.dictionaryForm)
             assertTrue(baseDetails.candidates.words.isNotEmpty())
             assertEquals(2, wordCalls.get())
-            dispatch(core, Event.CompleteReaderPage(id, page.anchor, page.position, 5678L))
+            dispatch(core, Event.CompleteEffectiveReaderPage(tokens.identity, page.position, 5678L))
             val reopened = dispatch(core, Event.OpenReader(id))
-            assertNull(reopened.readerWord)
-            assertNull(reopened.readerWordSelection)
+            assertNull(reopened.effectiveReaderWord?.details)
+            assertNull(reopened.effectiveReaderWord?.selection)
             val rereadKey = ReaderTokenKey(id, reopened.reader!!.anchor, reopened.readerAnalysis!!)
             val rereadToken =
-                dispatch(core, Event.LoadReaderTokens(rereadKey)).readerTokens!!.tokens.first {
-                    it.surface == "東京"
-                }
+                dispatch(core, Event.LoadReaderTokens(rereadKey))
+                    .effectiveReaderTokens!!
+                    .tokens
+                    .first {
+                        it.surface == "東京"
+                    }
             val counted =
                 dispatch(
                     core,
-                    Event.LoadReaderWord(ReaderWordSelection(rereadKey, rereadToken.tokenIndex)),
+                    Event.LoadEffectiveReaderWord(
+                        EffectiveReaderSelection(
+                            core.view.effectiveReaderTokens!!.identity,
+                            rereadToken.segmentIndex,
+                        )
+                    ),
                 )
-            assertEquals(2UL, counted.readerWord!!.encountered)
+            assertEquals(2UL, counted.effectiveReaderWord!!.details!!.encountered)
             dispatch(core, Event.OpenSettings)
             instrumentation.runOnMainSync {
-                assertNull(core.view.readerWordSelection)
+                assertNull(core.view.effectiveReaderWord?.selection)
                 assertFalse(core.view.storageBusy)
             }
         } finally {
@@ -134,44 +148,59 @@ class ReaderWordDetailsSessionTest {
             val id = dispatch(core, Event.CreatePaste("ヌヌヌヌヌヌ 東京")).documents.single().documentId
             val opened = dispatch(core, Event.OpenReader(id))
             val key = ReaderTokenKey(id, opened.reader!!.anchor, opened.readerAnalysis!!)
-            val tokens = dispatch(core, Event.LoadReaderTokens(key)).readerTokens!!
+            val tokens = dispatch(core, Event.LoadReaderTokens(key)).effectiveReaderTokens!!
             val token = tokens.tokens.first { it.surface == "ヌヌヌヌヌヌ" }
-            val selection = ReaderWordSelection(key, token.tokenIndex)
-            val missing = dispatch(core, Event.LoadReaderWord(selection))
-            assertTrue(missing.readerWord!!.candidates.words.isEmpty())
-            assertTrue(missing.readerWord.candidates.names.isEmpty())
+            val selection = EffectiveReaderSelection(tokens.identity, token.segmentIndex)
+            val missing = dispatch(core, Event.LoadEffectiveReaderWord(selection))
+            assertTrue(missing.effectiveReaderWord!!.details!!.candidates.words.isEmpty())
+            assertTrue(missing.effectiveReaderWord.details.candidates.names.isEmpty())
             val meaning = " literal meaning 📖\u0000 "
             val reading = " か\u3099𠮷\u0000 "
-            val saved = dispatch(core, Event.SaveReaderCustomEntry(selection, meaning, reading))
-            val entry = saved.readerWord!!.customEntry!!
+            val saved =
+                dispatch(core, Event.SaveEffectiveReaderCustomEntry(selection, meaning, reading))
+            val entry = saved.effectiveReaderWord!!.details!!.customEntry!!
             assertEquals(token.surface, entry.surface)
             assertEquals(meaning, entry.englishMeaning)
             assertEquals(reading, entry.reading)
-            assertEquals(tokens, saved.readerTokens)
+            assertEquals(tokens, saved.effectiveReaderTokens)
             assertEquals(opened.reader, saved.reader)
-            assertEquals(0UL, saved.readerWord.encountered)
-            val failed = dispatch(core, Event.SaveReaderCustomEntry(selection, " ", reading))
-            assertNotNull(failed.readerCustomEntryError)
-            assertEquals(entry, failed.readerWord!!.customEntry)
-            assertNull(failed.readerWordError)
+            assertEquals(0UL, saved.effectiveReaderWord.details.encountered)
+            val failed =
+                dispatch(core, Event.SaveEffectiveReaderCustomEntry(selection, " ", reading))
+            assertNull(failed.effectiveReaderWord?.customEntryError)
+            assertEquals(entry, failed.effectiveReaderWord!!.details!!.customEntry)
+            assertNull(failed.effectiveReaderWord.error)
             assertNull(failed.documentError)
-            val edited = dispatch(core, Event.SaveReaderCustomEntry(selection, "edited", reading))
-            assertNull(edited.readerCustomEntryError)
-            assertEquals("edited", edited.readerWord!!.customEntry!!.englishMeaning)
+            val edited =
+                dispatch(core, Event.SaveEffectiveReaderCustomEntry(selection, "edited", reading))
+            assertNull(edited.effectiveReaderWord?.customEntryError)
+            assertEquals(
+                "edited",
+                edited.effectiveReaderWord!!.details!!.customEntry!!.englishMeaning,
+            )
             val builtin =
-                ReaderWordSelection(key, tokens.tokens.first { it.surface == "東京" }.tokenIndex)
-            val builtins = dispatch(core, Event.LoadReaderWord(builtin)).readerWord!!
+                EffectiveReaderSelection(
+                    tokens.identity,
+                    tokens.tokens.first { it.surface == "東京" }.segmentIndex,
+                )
+            val builtins =
+                dispatch(core, Event.LoadEffectiveReaderWord(builtin))
+                    .effectiveReaderWord!!
+                    .details!!
             assertTrue(builtins.candidates.words.isNotEmpty())
             assertTrue(builtins.candidates.names.isNotEmpty())
             assertNull(builtins.customEntry)
             assertEquals(
                 builtins,
-                dispatch(core, Event.SaveReaderCustomEntry(builtin, "override", reading))
-                    .readerWord,
+                dispatch(core, Event.SaveEffectiveReaderCustomEntry(builtin, "override", reading))
+                    .effectiveReaderWord
+                    ?.details,
             )
             assertEquals(
                 builtins,
-                dispatch(core, Event.DeleteReaderCustomEntry(builtin)).readerWord,
+                dispatch(core, Event.DeleteEffectiveReaderCustomEntry(builtin))
+                    .effectiveReaderWord
+                    ?.details,
             )
             instrumentation.runOnMainSync { core.close() }
             instrumentation.runOnMainSync { core = CoreSession(database.path, provider) }
@@ -179,14 +208,27 @@ class ReaderWordDetailsSessionTest {
             val reopened = dispatch(core, Event.OpenReader(id))
             assertEquals(opened.reader, reopened.reader)
             val restored = dispatch(core, Event.LoadReaderTokens(key))
-            assertEquals(tokens, restored.readerTokens)
-            val loaded = dispatch(core, Event.LoadReaderWord(selection)).readerWord!!
+            assertEquals(tokens, restored.effectiveReaderTokens)
+            val reopenedSelection =
+                EffectiveReaderSelection(
+                    restored.effectiveReaderTokens!!.identity,
+                    token.segmentIndex,
+                )
+            val loaded =
+                dispatch(core, Event.LoadEffectiveReaderWord(reopenedSelection))
+                    .effectiveReaderWord!!
+                    .details!!
             assertEquals("edited", loaded.customEntry!!.englishMeaning)
             assertEquals(reading, loaded.customEntry.reading)
-            val deleted = dispatch(core, Event.DeleteReaderCustomEntry(selection))
-            assertNull(deleted.readerCustomEntryError)
-            assertNull(deleted.readerWord!!.customEntry)
-            assertNull(dispatch(core, Event.LoadReaderWord(selection)).readerWord!!.customEntry)
+            val deleted = dispatch(core, Event.DeleteEffectiveReaderCustomEntry(reopenedSelection))
+            assertNull(deleted.effectiveReaderWord?.customEntryError)
+            assertNull(deleted.effectiveReaderWord!!.details!!.customEntry)
+            assertNull(
+                dispatch(core, Event.LoadEffectiveReaderWord(reopenedSelection))
+                    .effectiveReaderWord!!
+                    .details!!
+                    .customEntry
+            )
         } finally {
             instrumentation.runOnMainSync { core.close() }
             directory.deleteRecursively()

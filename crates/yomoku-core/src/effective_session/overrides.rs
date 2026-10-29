@@ -201,6 +201,10 @@ pub(super) struct OverrideState {
 }
 
 impl OverrideState {
+    pub(super) fn clear_reload_requirement(&mut self) {
+        self.reload_required = false;
+    }
+
     pub(super) fn mutation_pending(&self) -> bool {
         self.pending.as_ref().is_some_and(|r| r.action.is_write())
     }

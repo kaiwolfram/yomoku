@@ -125,11 +125,11 @@ internal fun verifyEpubImportBridge() {
             val analysis = checkNotNull(moved.readerAnalysis) as ReaderAnalysis.Available
             check(analysis != opened.readerAnalysis)
             val key = ReaderTokenKey(id, checkNotNull(moved.reader).anchor, analysis)
-            val tokens = checkNotNull(listener.dispatch(bridge, Event.LoadReaderTokens(key)).readerTokens)
+            val tokens = checkNotNull(listener.dispatch(bridge, Event.LoadReaderTokens(key)).effectiveReaderTokens)
             val dogs = tokens.tokens.filter { it.surface == "犬" }
             check(dogs.size == 2 && dogs.all { it.vocabulary?.status == VocabularyStatus.NEW })
             check(dogs.all { it.anchor.chapterId == second.chapterId })
-            listener.dispatch(bridge, Event.SetReaderStatus(ReaderStatusChange(key, checkNotNull(dogs[0].vocabulary).id, VocabularyStatus.LEARNING, 1000L)))
+            listener.dispatch(bridge, Event.SetEffectiveReaderStatus(EffectiveReaderSelection(tokens.identity, dogs[0].segmentIndex), checkNotNull(dogs[0].vocabulary).id, VocabularyStatus.LEARNING, 1000L))
             val savedPosition = position.copy(offset = TextOffset("犬 ".toByteArray(Charsets.UTF_8).size.toLong()))
             val saved = listener.dispatch(bridge, Event.SaveReadingPosition(savedPosition))
             check(saved.documents.single().progressPercent in 1uL..99uL)
@@ -154,7 +154,7 @@ internal fun verifyEpubImportBridge() {
             val opened = listener.dispatch(bridge, Event.OpenReader(id))
             check(opened.readerAnalysis == originalAnalysis && checkNotNull(opened.reader).pageNumber == 2uL)
             val key = ReaderTokenKey(id, checkNotNull(opened.reader).anchor, originalAnalysis)
-            val tokens = checkNotNull(listener.dispatch(bridge, Event.LoadReaderTokens(key)).readerTokens)
+            val tokens = checkNotNull(listener.dispatch(bridge, Event.LoadReaderTokens(key)).effectiveReaderTokens)
             check(tokens.tokens.filter { it.surface == "犬" }.all { it.vocabulary?.status == VocabularyStatus.LEARNING })
             for (event in listOf(
                 Event.ImportTxt(TxtImport(bytes.map { it.toUByte() }, "", TextEncoding.SHIFTJIS)),

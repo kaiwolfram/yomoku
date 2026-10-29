@@ -70,7 +70,7 @@ class DocumentRenameTest {
         }
         compose.onNodeWithTag("document_${id.value}").performClick()
         compose.waitUntil(90_000) {
-            core().view.readerTokens != null &&
+            core().view.effectiveReaderTokens != null &&
                 core().view.readerTime != null &&
                 !core().view.storageBusy
         }

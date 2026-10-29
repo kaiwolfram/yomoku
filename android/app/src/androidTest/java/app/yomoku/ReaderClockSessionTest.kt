@@ -291,7 +291,7 @@ class ReaderClockSessionTest {
                     )
                 f.now = 1_000L
                 f.core.dispatch(Event.CompleteEffectiveReaderPage(identity, page.position, 123L))
-                // Production B rejects this staged intent. The sample must already be frozen,
+                // An unissued revision is rejected. The sample must already be frozen,
                 // so immediate teardown at a later clock cannot charge the intervening time.
                 f.now = 2_000L
                 f.core.close()
@@ -313,10 +313,25 @@ class ReaderClockSessionTest {
             dispatch(f.core, Event.SetPageLength(PageLength.CHARACTERS1500))
             dispatch(f.core, Event.CloseSettings)
             f.start()
+            val loaded = f.core.view
+            dispatch(
+                f.core,
+                Event.LoadReaderTokens(
+                    ReaderTokenKey(
+                        loaded.reader!!.documentId,
+                        loaded.reader.anchor,
+                        loaded.readerAnalysis!!,
+                    )
+                ),
+            )
             onMain {
                 val page = f.core.view.reader!!
                 val complete =
-                    Event.CompleteReaderPage(page.documentId, page.anchor, page.position, 123L)
+                    Event.CompleteEffectiveReaderPage(
+                        f.core.view.effectiveReaderTokens!!.identity,
+                        page.position,
+                        123L,
+                    )
                 f.now = 1_000L
                 f.core.dispatch(complete)
                 f.core.dispatch(complete)

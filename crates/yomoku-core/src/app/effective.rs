@@ -1,13 +1,11 @@
-//! Stage the coordinated reader switch through the actual application gates.
-//! Production continues to construct Model::default until all consumers migrate.
+//! Effective reader integration through the shared application gates.
 
 use super::*;
 use crate::effective_session::{EffectiveCompletionProgress, EffectiveReaderProgress};
 
 impl Model {
     /// Native integration entry point, not a persisted setting or a shell toggle.
-    /// The remaining Android consumers must migrate before
-    /// production constructs this model. Legacy word/write events fail closed.
+    /// Production uses this model. Legacy word/write events fail closed.
     pub fn with_effective_reader() -> Self {
         Self {
             effective_reader: Some(EffectiveReaderSession::default()),

@@ -73,11 +73,11 @@ internal fun verifySrtImportBridge() {
             val analysis = checkNotNull(opened.readerAnalysis) as ReaderAnalysis.Available
             val page = checkNotNull(opened.reader)
             val key = ReaderTokenKey(id, page.anchor, analysis)
-            val tokens = checkNotNull(listener.dispatch(bridge, Event.LoadReaderTokens(key)).readerTokens)
+            val tokens = checkNotNull(listener.dispatch(bridge, Event.LoadReaderTokens(key)).effectiveReaderTokens)
             val cats = tokens.tokens.filter { it.surface == "猫" }
             check(cats.size == 2 && cats.all { it.vocabulary?.status == VocabularyStatus.NEW })
             val vocabularyId = checkNotNull(cats.first().vocabulary).id
-            listener.dispatch(bridge, Event.SetReaderStatus(ReaderStatusChange(key, vocabularyId, VocabularyStatus.FAMILIAR, 1000L)))
+            listener.dispatch(bridge, Event.SetEffectiveReaderStatus(EffectiveReaderSelection(tokens.identity, cats.first().segmentIndex), vocabularyId, VocabularyStatus.FAMILIAR, 1000L))
             val position = page.position.copy(offset = TextOffset("猫".toByteArray(Charsets.UTF_8).size.toLong()))
             listener.dispatch(bridge, Event.SaveReadingPosition(position))
             check(dictionary.calls.get() == 2)
@@ -102,7 +102,7 @@ internal fun verifySrtImportBridge() {
             val opened = listener.dispatch(bridge, Event.OpenReader(id))
             check(opened.readerAnalysis == analysis)
             val page = checkNotNull(opened.reader)
-            val tokens = checkNotNull(listener.dispatch(bridge, Event.LoadReaderTokens(ReaderTokenKey(id, page.anchor, analysis))).readerTokens)
+            val tokens = checkNotNull(listener.dispatch(bridge, Event.LoadReaderTokens(ReaderTokenKey(id, page.anchor, analysis))).effectiveReaderTokens)
             check(tokens.tokens.filter { it.surface == "猫" }.all { it.vocabulary?.status == VocabularyStatus.FAMILIAR })
             val crossFormat = listener.dispatch(bridge, Event.ImportTxt(TxtImport(bytes.map { it.toUByte() }, "different.txt", TextEncoding.SHIFTJIS)))
             check(crossFormat.importSummary?.documentId == id && crossFormat.importSummary.outcome == ImportOutcome.EXISTING)
@@ -182,7 +182,7 @@ private fun verifySrtCancellationBridge() {
             val opened = listener.dispatch(bridge, Event.OpenReader(imported))
             val page = checkNotNull(opened.reader)
             val key = ReaderTokenKey(imported, page.anchor, checkNotNull(opened.readerAnalysis))
-            val tokens = checkNotNull(listener.dispatch(bridge, Event.LoadReaderTokens(key)).readerTokens)
+            val tokens = checkNotNull(listener.dispatch(bridge, Event.LoadReaderTokens(key)).effectiveReaderTokens)
             check(tokens.tokens.filter { it.surface == "犬" }.let { it.size == 2 && it.all { token -> token.vocabulary?.status == VocabularyStatus.NEW } })
             check(delegate.calls.get() == 1)
             bridge.cancelFileImport() // No effect on a committed file or on reader work.

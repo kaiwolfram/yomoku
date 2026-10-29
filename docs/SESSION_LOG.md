@@ -2917,3 +2917,30 @@ schema or BoltFFI export change. NativeBridge/Android remain B; activation and
 compact production JNI/device fixture migration remain unchecked. APK/device,
 separate Full-loader matrix, physical arm64 and performance were not rerun.
 Existing long-page HWUI stall remains unresolved. Details: DEVELOPMENT end.
+
+## 2026-10-29 — Production effective reader and boundary controls
+
+Activated NativeBridge's effective factory using the existing dictionary
+providers/FIFO/cache/lifecycle. Migrated production JNI/device fixtures to compact
+page revisions and segment selections. Real Full A/B/C generation/stored reuse,
+default All/local/manual edits, reversal/reopen, effective Library, words/status/
+custom/furigana and frozen completion now execute through the production path.
+Success exposes explicit Reload. Fixed two issues found on device: a retired-page
+reload marker surviving same-book reopening, and a token-read guard suppressing
+normal same-anchor position/preset refreshes. Exact accepted retries stay native.
+
+PASS: 710 Rust/17 opt-in ignored, strict Clippy/Rustfmt, full final real-Full host
+JNI/codecs/100 handles, unchanged 17 generated Kotlin files, both-ABI APKs/Android
+lint and formatting/diff. PASS: 57 distinct phone cases and three wide/dark cases;
+final 19-case phone rerun passes all four initially failed regressions plus full
+compact-word/production coverage. Corrected fixture layout/scroll/revision
+assumptions; emulator System UI/install-space recovery is recorded in DEVELOPMENT.
+Display/light restored, task-started emulator stopped. No dependency, wire/durable
+schema, historical rewrite or destructive semantic change. Updated README,
+architecture/data/decisions, checked activation and refreshed the 62-line handoff.
+
+Next: investigate four pre-existing long-page HWUI stalls, measure actual effective
+JNI/device/diverse/image-heavy costs, then phase-5 history aggregation. Separate
+Full-loader matrix, release/process-death, physical arm64 and performance were not
+rerun/measured. Nostr empty/Q188 remain unrelated pending inputs. See DEVELOPMENT
+end for exact commands, failures, reruns and `/tmp/yomoku-activation-*` logs.

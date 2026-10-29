@@ -1,8 +1,7 @@
 //! Compact effective-reader identities backed by one retained Rust page.
 //!
-//! Application page/word/status/custom/completion integration is staged through a native opt-in
-//! model ahead of the coordinated production switch. Full chapter provenance
-//! never belongs in shell callbacks.
+//! Production page/word/status/custom/completion integration retains full chapter
+//! provenance in the native model, outside shell callbacks.
 
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
@@ -201,6 +200,10 @@ impl EffectiveReaderSession {
         self.current = None;
         self.dismiss_word();
         self.dismiss_override();
+        // A reload requirement belongs to the retired page. Normal movement,
+        // close/reopen and explicit page loads must not carry it to a new page.
+        // Override outcomes set it again after retiring their before-image.
+        self.overrides.clear_reload_requirement();
     }
 
     /// Accept only the outstanding request and its document/page/original-B

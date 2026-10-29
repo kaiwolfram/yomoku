@@ -11,6 +11,7 @@ import app.yomoku.shared.ReaderFontSize
 import app.yomoku.shared.ReaderLineSpacing
 import app.yomoku.shared.ReaderAnalysis
 import app.yomoku.shared.PageLength
+import app.yomoku.shared.EffectiveReaderSelection
 import app.yomoku.shared.Event
 import app.yomoku.shared.Requests
 import app.yomoku.shared.ShellEffect
@@ -21,7 +22,6 @@ import app.yomoku.shared.PendingReadingTime
 import app.yomoku.shared.ReaderClockAction
 import app.yomoku.shared.ReaderClockSample
 import app.yomoku.shared.ReaderTokenKey
-import app.yomoku.shared.ReaderStatusChange
 import app.yomoku.shared.VocabularyStatus
 import java.nio.file.Files
 import java.util.concurrent.LinkedBlockingQueue
@@ -95,8 +95,8 @@ internal fun verifyDocumentBridge() {
             check(opened.readerTime == null)
             val tokenKey = ReaderTokenKey(id, page.anchor, analysis)
             val tokensView = listener.dispatch(bridge, Event.LoadReaderTokens(tokenKey))
-            val tokens = checkNotNull(tokensView.readerTokens)
-            check(tokens.documentId == id && tokens.page == page.anchor && tokens.analysis == analysis)
+            val tokens = checkNotNull(tokensView.effectiveReaderTokens)
+            check(tokens.identity.base == tokenKey)
             check(tokens.tokens.isNotEmpty())
             check(tokens.tokens.all { it.vocabulary?.status == VocabularyStatus.NEW })
             for (token in tokens.tokens) {
@@ -113,8 +113,9 @@ internal fun verifyDocumentBridge() {
             val vocabularyId = checkNotNull(selected.vocabulary).id
             for (status in listOf(VocabularyStatus.LEARNING, VocabularyStatus.FAMILIAR,
                 VocabularyStatus.KNOWN, VocabularyStatus.IGNORED, VocabularyStatus.NEW)) {
-                val change = ReaderStatusChange(tokenKey, vocabularyId, status, 4321L)
-                val changed = listener.dispatch(bridge, Event.SetReaderStatus(change))
+                val current = checkNotNull(ViewModel.bincodeDeserialize(bridge.view()).effectiveReaderTokens)
+                val change = Event.SetEffectiveReaderStatus(EffectiveReaderSelection(current.identity, selected.segmentIndex), vocabularyId, status, 4321L)
+                val changed = listener.dispatch(bridge, change)
                 check(changed.documentError == null && changed.reader == page)
                 check(changed.readerTime == null && changed.completionNotice == null)
                 check(changed.loadedDocument == opened.loadedDocument)
@@ -123,11 +124,12 @@ internal fun verifyDocumentBridge() {
                         token.copy(vocabulary = checkNotNull(token.vocabulary).copy(status = status))
                     } else token
                 }
-                check(changed.readerTokens?.tokens == expected)
-                val repeated = listener.dispatch(bridge, Event.SetReaderStatus(change))
-                check(repeated.readerTokens == changed.readerTokens)
+                check(changed.effectiveReaderTokens?.tokens == expected)
+                val repeated = listener.dispatch(bridge, change)
+                check(repeated.effectiveReaderTokens == changed.effectiveReaderTokens)
                 val refreshed = listener.dispatch(bridge, Event.LoadReaderTokens(tokenKey))
-                check(refreshed.readerTokens == changed.readerTokens)
+                check(refreshed.effectiveReaderTokens?.tokens == changed.effectiveReaderTokens.tokens)
+                check(refreshed.effectiveReaderTokens.identity != changed.effectiveReaderTokens.identity)
                 check(dictionary.calls.get() == 2)
             }
             val initialTime = checkNotNull(listener.dispatch(bridge, Event.RestoreReadingTime).readerTime)
@@ -242,12 +244,13 @@ internal fun verifyDocumentBridge() {
             check(unavailableDictionary.calls.get() == 0)
             check(ViewModel.bincodeDeserialize(bridge.view()).reader?.position == document.readingPosition)
             val page = checkNotNull(opened.reader)
-            val request = Event.CompleteReaderPage(page.documentId, page.anchor, page.position, 1234L)
+            val current = reopened.dispatch(bridge, Event.LoadReaderTokens(ReaderTokenKey(page.documentId, page.anchor, analysis)))
+            val request = Event.CompleteEffectiveReaderPage(checkNotNull(current.effectiveReaderTokens).identity, page.position, 1234L)
             val completed = reopened.dispatch(bridge, request, callbackCount = 2)
             check(completed.documentError == null && !completed.completionSavePending)
             check(completed.readerTime == null && completed.readerAnalysis == null)
             check(completed.contentRoute == ContentRoute.MAIN && completed.reader == null)
-            check(completed.readerTokens == null)
+            check(completed.effectiveReaderTokens == null)
             check(completed.bookCompletionNotice == completed.completionNotice?.commandId)
             val notice = checkNotNull(completed.completionNotice)
             check(notice.newlyKnown > 0UL && notice.commandId.value > 0L)
@@ -267,12 +270,11 @@ internal fun verifyDocumentBridge() {
             check(reopened.dispatch(bridge, Event.RestoreReadingTime).readerTime?.pending?.value == 0L)
             val rereadPage = checkNotNull(reopenedBook.reader)
             val knownTokens = checkNotNull(reopened.dispatch(bridge, Event.LoadReaderTokens(
-                ReaderTokenKey(document.documentId, rereadPage.anchor, analysis))).readerTokens)
+                ReaderTokenKey(document.documentId, rereadPage.anchor, analysis))).effectiveReaderTokens)
             check(knownTokens.tokens.all { it.vocabulary?.status == VocabularyStatus.KNOWN })
             check(knownTokens.tokens.map { it.surface }.isNotEmpty())
             check(unavailableDictionary.calls.get() == 0)
-            val reread = reopened.dispatch(bridge, Event.CompleteReaderPage(rereadPage.documentId,
-                rereadPage.anchor, rereadPage.position, 5678L), callbackCount = 2)
+            val reread = reopened.dispatch(bridge, Event.CompleteEffectiveReaderPage(knownTokens.identity, rereadPage.position, 5678L), callbackCount = 2)
             check(reread.documentError == null && reread.completionNotice == null)
             check(reread.reader == null && reread.contentRoute == ContentRoute.MAIN)
             check(reread.bookCompletionNotice != null && reread.bookCompletionNotice != completed.bookCompletionNotice)

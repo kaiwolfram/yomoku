@@ -89,7 +89,7 @@ class DocumentDeletionTest {
         compose.onNodeWithTag("document_deletion_dialog").assertDoesNotExist()
         compose.onNodeWithTag("document_${id.value}").performClick()
         compose.waitUntil(90_000) {
-            core().view.readerTokens != null &&
+            core().view.effectiveReaderTokens != null &&
                 core().view.readerTime != null &&
                 !core().view.storageBusy
         }
@@ -170,7 +170,7 @@ class DocumentDeletionTest {
         val first = checkNotNull(core().view.importSummary).documentId
         compose.runOnUiThread { core().dispatch(Event.OpenReader(first)) }
         compose.waitUntil(90_000) {
-            core().view.readerTokens != null &&
+            core().view.effectiveReaderTokens != null &&
                 core().view.readerTime != null &&
                 !core().view.storageBusy
         }

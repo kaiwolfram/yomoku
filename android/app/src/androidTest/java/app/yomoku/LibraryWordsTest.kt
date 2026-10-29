@@ -43,17 +43,17 @@ class LibraryWordsTest {
         }
     }
 
-    private fun open(id: DocumentId): ReaderTokenSnapshot {
+    private fun open(id: DocumentId): EffectiveReaderPage {
         compose.onNodeWithTag("library_documents").performScrollToKey(id.value)
         compose.onNodeWithTag("document_${id.value}").performClick()
         compose.waitUntil(90_000) {
             val view = core().view
             view.reader?.documentId == id &&
-                view.readerTokens != null &&
+                view.effectiveReaderTokens != null &&
                 view.readerTime != null &&
                 !view.storageBusy
         }
-        return checkNotNull(core().view.readerTokens)
+        return checkNotNull(core().view.effectiveReaderTokens)
     }
 
     private fun checkBar(id: DocumentId, counts: WordStatusCounts) {
@@ -120,20 +120,18 @@ class LibraryWordsTest {
             core().dispatch(Event.SearchLibraryTitles(prefix))
         }
         val snapshot = open(ids[0])
-        val key = ReaderTokenKey(snapshot.documentId, snapshot.page, snapshot.analysis)
+
         val surfaces = snapshot.tokens.distinctBy { it.surface }
         assertEquals(6, surfaces.size)
         surfaces.forEachIndexed { index, token ->
             compose.runOnUiThread {
                 core()
                     .dispatch(
-                        Event.SetReaderStatus(
-                            ReaderStatusChange(
-                                key,
-                                checkNotNull(token.vocabulary).id,
-                                VocabularyStatus.entries[index % 5],
-                                System.currentTimeMillis(),
-                            )
+                        Event.SetEffectiveReaderStatus(
+                            EffectiveReaderSelection(snapshot.identity, token.segmentIndex),
+                            checkNotNull(token.vocabulary).id,
+                            VocabularyStatus.entries[index % 5],
+                            System.currentTimeMillis(),
                         )
                     )
             }

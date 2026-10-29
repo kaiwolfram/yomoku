@@ -35,7 +35,7 @@ class ReaderTypographySettingsTest {
         compose.waitUntil(60_000) {
             !core().view.storageBusy &&
                 core().view.readerTime != null &&
-                core().view.readerTokens != null
+                core().view.effectiveReaderTokens != null
         }
         compose.waitForIdle()
     }
@@ -86,7 +86,7 @@ class ReaderTypographySettingsTest {
             awaitReader()
             val page = core().view.reader!!
             val oldLines = layout("reader_text").lineCount
-            val tokens = core().view.readerTokens
+            val tokens = core().view.effectiveReaderTokens
             compose.onNodeWithText("Settings").performClick()
             awaitSaved()
             val database = File(compose.activity.filesDir, "yomoku.sqlite3")
@@ -124,7 +124,7 @@ class ReaderTypographySettingsTest {
             closeSettings()
             awaitReader()
             assertEquals(page, core().view.reader)
-            assertEquals(tokens, core().view.readerTokens)
+            assertEquals(tokens, core().view.effectiveReaderTokens)
             val layout = layout("reader_text")
             assertEquals(20.sp, layout.layoutInput.style.fontSize)
             assertTrue(layout.layoutInput.style.lineHeight.value >= 35f)
@@ -249,16 +249,19 @@ class ReaderTypographySettingsTest {
                 val index = layout.layoutInput.text.text.indexOf("猫")
                 node.performTouchInput { click(layout.getBoundingBox(index).center) }
                 compose.waitUntil(30_000) {
-                    core().view.readerWordSelection != null && !core().view.storageBusy
+                    core().view.effectiveReaderWord?.selection != null && !core().view.storageBusy
                 }
                 compose.onNodeWithTag("reader_word_panel").assertExists()
                 assertEquals(
                     "猫",
                     core()
                         .view
-                        .readerTokens!!
+                        .effectiveReaderTokens!!
                         .tokens
-                        .single { it.tokenIndex == core().view.readerWordSelection!!.tokenIndex }
+                        .single {
+                            it.segmentIndex ==
+                                core().view.effectiveReaderWord?.selection!!.segmentIndex
+                        }
                         .surface,
                 )
                 compose.onNodeWithText("Close").performClick()

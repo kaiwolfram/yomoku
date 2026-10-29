@@ -75,9 +75,9 @@ pub fn effect_router_with_dictionaries(
     ))
 }
 
-/// Effective-reader activation candidate, sharing the production dictionary
-/// loaders, SQLite FIFO and lifecycle. NativeBridge switches to this router only
-/// when its shell and serialized-reader regressions migrate together.
+/// Production effective reader, sharing the import and dictionary
+/// loaders, SQLite FIFO and lifecycle. NativeBridge selects this router; legacy
+/// factories remain available for isolated original-B regressions.
 pub fn effect_router_with_effective_reader(
     database_path: std::path::PathBuf,
     loader: AnalyzerLoader,

@@ -180,7 +180,7 @@ impl NativeBridge {
                 .map_err(|_| DocumentError::Unavailable)?;
             Ok(Box::new(NativeAnalyzer(analyzer)) as Box<dyn PasteAnalyzer>)
         });
-        let (bridge, lifecycle) = YomokuBridge::with_dictionaries(
+        let (bridge, lifecycle) = YomokuBridge::with_effective_reader(
             database_path.into(),
             loader,
             word_loader,

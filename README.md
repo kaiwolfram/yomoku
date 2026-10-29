@@ -41,6 +41,9 @@ Yomoku is under active development. The working app supports:
   persisted progress in both directions and scroll reset on page navigation.
 - Forward completion records repeated Japanese encounters, promotes New words to
   Known and shows a positive-count toast; deliberate rereads count again.
+- A/B/C boundary choices and manual split/merge, with All occurrences (default)
+  or This occurrence, saved rules and reversal. Reads reuse stored analysis;
+  explicit missing A/C generation uses the existing Full worker.
 - Japanese words have status highlights and open a panel with their full surface,
   analyzer reading/base form, expanded English definitions, separate name readings
   and lifetime encounter count. Five direct status choices persist globally across
@@ -56,8 +59,8 @@ a read-only path. The lazy FIFO/typed JNI supplies the word panel with all appli
 readings/senses, compact grammatical labels, names and exact-surface lifetime counts.
 Lookup failures require explicit retry; dismissal, navigation and recreation discard
 the transient selection and late results.
-Compose reads stored Mode B tokens through typed core/FIFO/FFI, validates the
-current page identity and
+Compose reads effective tokens resolved from original Mode B and stored overrides
+through typed core/FIFO/FFI, validates the native page revision and
 converts exact UTF-8 spans to UTF-16 without splitting Unicode scalars. Status
 choices update all visible repetitions after the status/history transaction commits;
 same-status selections add no history. Deleted vocabulary stays unregistered.
@@ -107,8 +110,9 @@ the same viewer/cover pipeline. This basic SVG support satisfies v1 scope;
 complex styles/resources retain the existing fallback. TXT/EPUB source ruby now
 travels through validated chapter/page snapshots and typed JNI, preserving exact
 text positions. A default-off furigana preference persists through SQLite and the
-typed bridge. Pure core now projects source-preferred readings with original
-Mode B analyzer fallback, independent of vocabulary status, through generated JNI.
+typed bridge. Pure core now projects source-preferred readings with
+exact effective analyzer fallback, independent of vocabulary status, through
+generated JNI. Unresolved manual spans never receive guessed readings.
 Settings exposes the furigana switch; Compose paints readings above canonical
 text while preserving word/link taps, logical pages and saved offsets.
 The pure [SRT parser](crates/yomoku-import/src/srt.rs) has host fixtures for cue

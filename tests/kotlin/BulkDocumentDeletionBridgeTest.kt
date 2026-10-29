@@ -30,7 +30,7 @@ internal fun verifyBulkDocumentDeletionBridge() {
                 repeat(callbacks) { checkNotNull(effects.poll(60, TimeUnit.SECONDS)) }
                 return ViewModel.bincodeDeserialize(bridge.view()).also { check(!it.storageBusy) }
             }
-            fun word(id: DocumentId): ReaderWordDetails {
+            fun word(id: DocumentId): EffectiveWordDetails {
                 val opened = dispatch(Event.OpenReader(id), 1)
                 val key =
                     ReaderTokenKey(
@@ -38,18 +38,18 @@ internal fun verifyBulkDocumentDeletionBridge() {
                         checkNotNull(opened.reader).anchor,
                         checkNotNull(opened.readerAnalysis),
                     )
-                val tokens = checkNotNull(dispatch(Event.LoadReaderTokens(key), 1).readerTokens)
+                val tokens = checkNotNull(dispatch(Event.LoadReaderTokens(key), 1).effectiveReaderTokens)
                 return checkNotNull(
                     dispatch(
-                            Event.LoadReaderWord(
-                                ReaderWordSelection(
-                                    key,
-                                    tokens.tokens.first { it.surface == "猫" }.tokenIndex,
+                            Event.LoadEffectiveReaderWord(
+                                EffectiveReaderSelection(
+                                    tokens.identity,
+                                    tokens.tokens.first { it.surface == "猫" }.segmentIndex,
                                 )
                             ),
                             1,
                         )
-                        .readerWord
+                        .effectiveReaderWord?.details
                 )
             }
             dispatch(Event.RefreshLibrary, 1)
@@ -61,7 +61,8 @@ internal fun verifyBulkDocumentDeletionBridge() {
             val survivor =
                 checkNotNull(dispatch(Event.CreatePaste("Survivor\n猫"), 1).importSummary).documentId
             val page = checkNotNull(dispatch(Event.OpenReader(first), 1).reader)
-            dispatch(Event.CompleteReaderPage(first, page.anchor, page.position, 500), 2)
+            val snapshot = checkNotNull(dispatch(Event.LoadReaderTokens(ReaderTokenKey(first, page.anchor, checkNotNull(ViewModel.bincodeDeserialize(bridge.view()).readerAnalysis))), 1).effectiveReaderTokens)
+            dispatch(Event.CompleteEffectiveReaderPage(snapshot.identity, page.position, 500), 2)
             val beforeWord = word(survivor)
             check(beforeWord.encountered == 2UL)
             dispatch(Event.CloseDocument)

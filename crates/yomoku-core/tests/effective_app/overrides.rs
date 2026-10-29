@@ -163,7 +163,71 @@ fn override_choice_generation_and_reversal_retire_page_and_require_explicit_relo
         assert!(state.reload_required && !state.pending && state.prompt.is_none());
         assert!(f.core.view().effective_reader_tokens.is_none());
         assert!(f.load().revision > page.revision);
+        assert!(
+            !f.core
+                .view()
+                .effective_reader_override
+                .unwrap()
+                .reload_required
+        );
     }
+}
+
+#[test]
+fn retired_override_reload_requirement_does_not_follow_same_book_reopening() {
+    let f = Fixture::new(false);
+    let page = f.load();
+    let identity = prompt(&f, page);
+    let mut effects = f.core.process_event(save(identity));
+    resolve(
+        &f.core,
+        &mut effects,
+        StorageResult::Effective(Output::OverrideSaved {
+            id: 6.try_into().unwrap(),
+            registered: 2,
+        }),
+    );
+    assert!(
+        f.core
+            .view()
+            .effective_reader_override
+            .unwrap()
+            .reload_required
+    );
+    f.core.process_event(Event::CloseDocument);
+    assert!(
+        !f.core
+            .view()
+            .effective_reader_override
+            .unwrap()
+            .reload_required
+    );
+    let mut effects = f
+        .core
+        .process_event(Event::OpenReader(f.document.document_id));
+    resolve(
+        &f.core,
+        &mut effects,
+        StorageResult::Loaded(DocumentReaderSnapshot {
+            document: f.document.clone(),
+            page_length: PageLength::default(),
+            typography: Default::default(),
+            analyses: vec![ReaderChapterAnalysis {
+                chapter_id: f.document.chapters[0].chapter_id,
+                analysis: page.base.analysis,
+            }],
+            last_read_sequence: None,
+        }),
+    );
+    assert!(
+        !f.core
+            .view()
+            .effective_reader_override
+            .unwrap()
+            .reload_required
+    );
+    assert!(f.load().revision > page.revision);
+    assert!(f.core.process_event(save(identity)).is_empty());
 }
 
 #[test]

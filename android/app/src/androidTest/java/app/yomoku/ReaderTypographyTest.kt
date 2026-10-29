@@ -96,7 +96,7 @@ class ReaderTypographyTest {
         compose.runOnUiThread { core().dispatch(Event.OpenReader(id)) }
         fun checkReaderFont() {
             compose.waitUntil(30_000) {
-                !core().view.storageBusy && core().view.readerTokens != null
+                !core().view.storageBusy && core().view.effectiveReaderTokens != null
             }
             val layouts = mutableListOf<TextLayoutResult>()
             compose

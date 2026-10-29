@@ -6147,3 +6147,167 @@ dependency, durable schema or wire-type change. APK/lint/device, separate Full
 owned/mapped fixtures, physical arm64 and performance were not rerun/measured.
 The existing long-page HWUI stall remains unresolved. Logs:
 `/tmp/yomoku-effective-ffi-{tests,clippy,host}.log`.
+
+## Production effective-reader activation
+
+2026-10-29, repository root, pinned offline tools:
+
+```sh
+export PATH=/home/kai/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin:$PATH
+export JAVA_HOME=/home/kai/repos/yomoku/.local/jdk-17/jdk-17.0.21+9
+export GRADLE_USER_HOME=/home/kai/repos/yomoku/.local/gradle
+export ANDROID_HOME=/home/kai/Android/Sdk
+cargo test --workspace --all-features --locked --offline --quiet
+cargo clippy --workspace --all-targets --all-features --locked --offline -- -D warnings
+cargo fmt --all -- --check
+# Keep native/BoltFFI generation sequential with host JNI execution.
+./android/gradlew -p android :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug --offline --console=plain
+tools/test-kotlin-bridge.sh
+tools/format-kotlin.sh --check
+"$JAVA_HOME/bin/java" -jar .local/ktfmt-0.64.jar --kotlinlang-style --dry-run --set-exit-if-changed tests/kotlin/EffectiveReaderBridgeTest.kt
+# All 17 generated Kotlin file hashes must match before/after regeneration.
+git diff --check
+
+# Existing medium_phone AVD, swangle with Vulkan disabled; restore phone baseline first.
+"$ANDROID_HOME/platform-tools/adb" -s emulator-5554 shell wm size reset
+"$ANDROID_HOME/platform-tools/adb" -s emulator-5554 shell wm density reset
+"$ANDROID_HOME/platform-tools/adb" -s emulator-5554 shell cmd uimode night no
+"$ANDROID_HOME/platform-tools/adb" -s emulator-5554 install -r -t android/app/build/outputs/apk/debug/app-debug.apk
+"$ANDROID_HOME/platform-tools/adb" -s emulator-5554 install -r -t android/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+"$ANDROID_HOME/platform-tools/adb" -s emulator-5554 shell am instrument -w -r -e class app.yomoku.EffectiveReaderProductionTest app.yomoku.test/androidx.test.runner.AndroidJUnitRunner
+
+# 43 real-native regressions; omit the documented pre-existing long-page stall.
+reader_cases=$(python3 - <<'PY'
+from pathlib import Path
+import re
+root = Path('android/app/src/androidTest/java/app/yomoku')
+classes = ['CoreSessionTest', 'DocumentSessionTest', 'ReaderWordDetailsSessionTest',
+    'ReaderClockSessionTest', 'LibraryWordsTest', 'DocumentRenameTest',
+    'DocumentDeletionTest', 'ReaderFormattingTest', 'ReaderFuriganaTest',
+    'ReaderImagesTest', 'ImageViewerTest', 'ReaderTypographySettingsTest',
+    'ReaderTypographyTest']
+cases = ['app.yomoku.' + name for name in classes]
+for method in re.findall(r'@Test\s+fun (\w+)', (root / 'ReaderWordsTest.kt').read_text()):
+    if method != 'movingBothDirectionsDismissesDetailsAndNeverRestoresTheSelection':
+        cases.append('app.yomoku.ReaderWordsTest#' + method)
+cases += ['app.yomoku.ReaderNavigationTest#positiveCompletionToastIsConsumedOnceAndZeroIsSilent',
+    'app.yomoku.ReaderNavigationTest#celebrationAnimatesOncePerCommandAndDoesNotReplayAfterRecreation']
+print(','.join(cases))
+PY
+)
+"$ANDROID_HOME/platform-tools/adb" -s emulator-5554 shell am instrument -w -r -e class "$reader_cases" app.yomoku.test/androidx.test.runner.AndroidJUnitRunner
+# Wide/dark production controls:
+"$ANDROID_HOME/platform-tools/adb" -s emulator-5554 shell wm size 2560x1600
+"$ANDROID_HOME/platform-tools/adb" -s emulator-5554 shell wm density 240
+"$ANDROID_HOME/platform-tools/adb" -s emulator-5554 shell cmd uimode night yes
+"$ANDROID_HOME/platform-tools/adb" -s emulator-5554 shell am instrument -w -r -e class app.yomoku.EffectiveReaderProductionTest app.yomoku.test/androidx.test.runner.AndroidJUnitRunner
+"$ANDROID_HOME/platform-tools/adb" -s emulator-5554 shell wm size reset
+"$ANDROID_HOME/platform-tools/adb" -s emulator-5554 shell wm density reset
+"$ANDROID_HOME/platform-tools/adb" -s emulator-5554 shell cmd uimode night no
+```
+
+PASS: all 710 workspace Rust tests (17 opt-in ignored), including the new pure
+same-book reopen regression and strengthened explicit-reload assertions; strict
+Clippy/Rustfmt/diff. PASS: complete real-Full host Kotlin/JNI suite on the final
+native implementation, including real A/B/C generation/stored reuse, default All
+and local/manual edits, reversal/reopen, effective Library/furigana/completion,
+existing imports/cancellation/words/status/custom/document operations and 100
+handle lifecycles. Both directions of all seven Unicode codecs pass; all 17
+schema-generated Kotlin files remain byte-identical. Existing nonfatal native
+teardown diagnostics remain; the complete host command exits zero.
+
+PASS: both-ABI debug app/test APKs, strict Android lint, Android Kotlin formatting
+and new host-test formatting. No dependency, generated wire, durable schema or
+history rewrite. NativeBridge now selects the effective factory. Original B stays
+immutable; full retained keys and accepted retry payloads remain native.
+
+PASS: both new actual production JNI/Full/SQLite/Compose cases on API-36 x86_64
+phone/light (1080×2400, 420 dpi). The editor case checks real A/B/C generation and
+stored reuse, default All/local/manual edits, reversal and close/new-native-session
+reopen, original B anchors, unresolved metadata and live Library membership without
+reading history or Full reloading. The rollback/completion case checks exact
+failed-edit Retry, effective furigana without guessed manual readings,
+frozen five-occurrence/321 ms completion after intervening rule reversal, one
+commit, retained-session finished-book reopening and normal initial loading.
+Its clock is fixed for deterministic duration; existing clock regressions validate
+actual platform sample/drain behavior separately.
+
+Initial fixture compilation corrected compact enum/field types and Kotlin's
+warnings-as-errors. Actual native success retires the prompt, so the production
+fixture uses the reader's existing reload action rather than a stale editor.
+That action now says Reload after an edit. Device completion/reopen exposed a
+native reload marker surviving into a new reader; normal invalidation/explicit
+load now clears the marker while accepted writes/errors/retries remain intact.
+Pure and actual JNI/Compose checks cover the correction. One host fixture needed
+RefreshLibrary before checking summaries in its new bridge; another still sent a
+legacy rename-test completion and now loads/authenticates the compact identity.
+
+The initial emulator boot retained wide/night settings and System UI became
+unresponsive; reset display/night and rebooted. An initial test wait also required
+tokens while a failed write deliberately retained a retired page; corrected the
+wait to accept pending overrides. An interrupted run and a later APK reinstall
+failed with device-offline/INSTALL_FAILED_INSUFFICIENT_STORAGE. Android cache
+trimming and removal of this task's newly installed test app/private dictionary
+copies allowed the final APK to install. Subsequent runs use direct Android
+instrumentation against the built APKs, avoiding repeated large UTP reinstalls.
+This does not alter product data or deletion semantics. Gradle/ADB/AVD need the
+previously documented local-socket/KVM/AVD-write escalation.
+
+Logs: `/tmp/yomoku-activation-{rust-final,reload-core,clippy-final,native-final,host-final-native,format-check,host-format-check,production-verified,regressions,emulator}.log`.
+The pre-fix completion/reopen failure is retained as
+`/tmp/yomoku-activation-production-reopen-failure.log`; native regression selection
+is `/tmp/yomoku-activation-regression-classes.txt`. The existing long-page HWUI
+stall remains unresolved: the four previously documented long-page cases are
+excluded, so this session cannot establish that the full device matrix passes.
+Separate Full owned/mapped fixtures, release/process-death, physical arm64 and
+actual effective JNI/device/diverse/image-heavy performance were not measured.
+
+The 43-case phone regression run initially finished with 39 passes/four failures.
+The real typography/position case found a same-anchor position save retiring
+native tokens while Android's one-attempt guard still remembered the old read.
+Scope that guard to base/position/preset and preserve explicit Retry for failures
+within the same context. A new compact case also verifies unchanged-anchor reflow
+and that clearing an error cannot replay a failed read. The three remaining
+fixture corrections add a scrolling Column around compact components (preventing
+overlapping buttons), scroll to Close after the new native Retry controls, and
+compare token/boundary/base payloads while asserting a fresh revision after
+recreation/reopening. All other 39 regressions passed; final reruns are recorded
+below rather than treating that initial run as a passing matrix.
+
+PASS: the final 19-case phone selection, without failures/skips, on the final APK:
+all 12 compact-word cases (including the new same-page/preset/error-clear guard),
+both actual production editor/completion cases, all four initially failed
+regressions and the isolated empty-candidate fixture whose layout also changed.
+Together with the initial 39 passing regressions, 57 distinct phone cases pass.
+The four initial failures are covered by passing final reruns; no unrun case is
+counted. Exact passed-case manifest:
+`/tmp/yomoku-activation-passed-phone-cases.txt`. Final Kotlin-only build/lint:
+`/tmp/yomoku-activation-ui-final-build.log`; final phone log:
+`/tmp/yomoku-activation-final-phone.log`.
+
+```sh
+# After the last Kotlin-only corrections, reuse the already verified native ABIs.
+./android/gradlew -p android :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug -x :app:buildRustBridge --offline --console=plain
+final_cases=(
+  app.yomoku.EffectiveReaderWordsTest
+  app.yomoku.EffectiveReaderProductionTest
+  'app.yomoku.ReaderTypographySettingsTest#controlsCommitRetryPreserveExactOffsetAndPersistAcrossRecreationAndDocuments'
+  'app.yomoku.ReaderWordsTest#loadingWaitsForStorageAndErrorsRequireExplicitRetryWhilePendingSavesDisableChoices'
+  'app.yomoku.ReaderWordsTest#tappingAndFiveChoicesPersistWithoutLookupHistoryAndFailedChoiceCanRepeat'
+  'app.yomoku.ReaderWordsTest#customEntryCreateEditDeleteSurvivesRecreationAndIsGlobalWithoutChangingReaderHistory'
+  'app.yomoku.ReaderWordsTest#dictionaryFailureNeedsExplicitRetryAndEmptyMatchesAreSuccessful'
+)
+printf -v final_selection '%s,' "${final_cases[@]}"
+"$ANDROID_HOME/platform-tools/adb" -s emulator-5554 shell am instrument -w -r -e class "${final_selection%,}" app.yomoku.test/androidx.test.runner.AndroidJUnitRunner
+# Additional wide/dark same-page guard (alongside the production class above):
+"$ANDROID_HOME/platform-tools/adb" -s emulator-5554 shell am instrument -w -r -e class 'app.yomoku.EffectiveReaderProductionTest,app.yomoku.EffectiveReaderWordsTest#samePagePositionAndPresetChangesReloadTokensWithoutReplayingFailedReads' app.yomoku.test/androidx.test.runner.AndroidJUnitRunner
+```
+
+PASS: all three final wide/dark cases (2560×1600, 240 dpi), no failures/skips:
+both production JNI/Full/SQLite editor/completion flows and the compact same-page
+position/preset reload guard. Log: `/tmp/yomoku-activation-wide.log`. Restored and
+verified physical phone size 1080×2400/density 420, reset system light, and stopped
+the task-started emulator. Final aggregate: 57 distinct phone plus three wide
+cases; 710 Rust pass/17 opt-in ignored, full final host JNI/codecs, both-ABI APKs,
+strict Clippy/Android lint/formatting/diff and unchanged generated Kotlin. The
+known four long-page emulator cases and performance/hardware gaps remain as above.

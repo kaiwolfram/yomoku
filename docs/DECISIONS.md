@@ -3633,3 +3633,34 @@ read-only loads and frozen completion outcomes independently reproducible.
 Production remains B; this factory is the concrete constructor for the subsequent
 coordinated NativeBridge/Android activation and fixture migration. No additional
 BoltFFI export, shell setting, dependency, wire schema or durable migration.
+
+## 2026-10-29 — Production effective reader activation
+
+Select `YomokuBridge::with_effective_reader` in NativeBridge's existing constructor.
+Keep the existing verified Full/word providers, FIFO, lifecycle and generated wire
+contracts. Android already selects compact consumers from native word-state
+presence; migrate JNI/device fixtures to current page revisions and effective
+segment selections instead of converting them to original-B indices. Original B
+stays immutable and supplies the editor's contiguous Japanese anchor spans.
+
+Successful override writes/generation retire the native prompt and rendered page.
+Use the reader's existing explicit reload affordance, labeled Reload for that
+retired page; read failures retain Retry word lookup. Pending writes still expose
+native exact Retry/Cancel. Do not preserve a stale editable prompt after success,
+automatically reload/rebase, or guess metadata for manual segments. No dependency,
+wire/durable migration, history rewrite or destructive semantic change.
+
+Production-device completion/reopen verification exposed a reload marker carried
+from an earlier edited page into a newly opened reader. Clear that presentation
+requirement on normal page invalidation and explicit page load; override outcomes
+set it again after retiring their before-image. Keep pending accepted writes,
+errors and retry payloads intact. Closing/reopening the same book must permit the
+normal initial read without requiring a second manual reload.
+
+A normal position save can keep the same logical page anchor while retiring its
+native token revision. Scope Android's one-attempt token-read guard to base,
+exact reading position and page-length preset. Reload normally when those change;
+keep explicit Retry after failures in the same context and explicit Reload after
+boundary edits. Clock saves, error clearing and typography alone must not replay
+a failed read. A compact component regression covers same-anchor position/preset
+changes; the real typography/position fixture exercises production invalidation.

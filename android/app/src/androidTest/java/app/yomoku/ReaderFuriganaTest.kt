@@ -35,7 +35,7 @@ class ReaderFuriganaTest {
 
     private fun awaitReader() {
         compose.waitUntil(90_000) {
-            core().view.readerTokens != null &&
+            core().view.effectiveReaderTokens != null &&
                 core().view.readerTime != null &&
                 !core().view.storageBusy
         }
@@ -114,7 +114,7 @@ class ReaderFuriganaTest {
             compose.runOnUiThread { core().dispatch(Event.OpenReader(id)) }
             awaitReader()
             val page = core().view.reader!!
-            val tokens = core().view.readerTokens
+            val tokens = core().view.effectiveReaderTokens
             assertTrue(core().view.readerFurigana.isEmpty())
             val plainHeight = layout("reader_text_0").size.height
             settings()
@@ -147,7 +147,7 @@ class ReaderFuriganaTest {
             closeSettings()
             awaitReader()
             assertEquals(page, core().view.reader)
-            assertEquals(tokens, core().view.readerTokens)
+            assertEquals(tokens, core().view.effectiveReaderTokens)
             val readings = core().view.readerFurigana
             assertTrue(readings.containsAll(page.sourceRuby))
             assertTrue(readings.any { it.reading == "ネコ" })
@@ -158,11 +158,11 @@ class ReaderFuriganaTest {
             )
             tap("reader_text_0", "猫。")
             compose.onNodeWithTag("word_surface").assertTextEquals("猫")
-            val selection = core().view.readerWordSelection!!
+            val selection = core().view.effectiveReaderWord?.selection!!
             for (status in VocabularyStatus.entries) {
                 compose.onNodeWithTag("word_status_$status").performClick()
                 awaitSaved()
-                assertEquals(selection, core().view.readerWordSelection)
+                assertEquals(selection, core().view.effectiveReaderWord?.selection)
                 assertEquals(readings, core().view.readerFurigana)
             }
             compose.onNodeWithText("Close").performClick()
@@ -179,7 +179,7 @@ class ReaderFuriganaTest {
             try {
                 tap("reader_text_0", "外部")
                 assertEquals(1, monitor.hits)
-                assertNull(core().view.readerWordSelection)
+                assertNull(core().view.effectiveReaderWord?.selection)
             } finally {
                 instrumentation.removeMonitor(monitor)
             }

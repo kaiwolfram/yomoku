@@ -38,7 +38,7 @@ class ReaderImagesTest {
                 !view.readingTimeSavePending &&
                 !view.completionSavePending &&
                 view.readerTime != null &&
-                view.readerTokens != null
+                view.effectiveReaderTokens != null
         }
         compose.waitForIdle()
     }
@@ -164,7 +164,7 @@ class ReaderImagesTest {
             tapWord("note")
             assertEquals(1, monitor.hits)
             assertEquals(first.position, core().view.reader!!.position)
-            assertNull(core().view.readerWordSelection)
+            assertNull(core().view.effectiveReaderWord?.selection)
         } finally {
             instrumentation.removeMonitor(monitor)
         }

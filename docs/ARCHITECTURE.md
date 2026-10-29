@@ -68,8 +68,8 @@ return to Library invalidate the snapshot. One SQLite statement deduplicates
 exact Japanese surfaces across every chapter's first stored B before joining
 live vocabulary. No analyzer, source/assets, registration, writes or token cache
 is involved. Deleted entries are absent; Missing B and zero counts differ.
-Membership matches the current B reader and must adopt resolved effective
-partitions with the coordinated reader switch before boundary controls go live.
+The legacy repository retains B membership; production selects the effective
+repository below, matching reader and completion eligibility.
 Android draws the five proportional colors and exposes exact accessible counts.
 
 `Storage::effective_library_word_distributions` is the separate storage read for
@@ -84,12 +84,12 @@ snapshot; it is discarded on success/failure and every refresh reads afresh.
 It never loads source archives, image
 assets or dictionaries, registers entries or writes. Resolve one chapter at a
 time; host measurements and their corpus limits are in
-EFFECTIVE_READER_PERFORMANCE.md. The staged effective app routes the existing
+EFFECTIVE_READER_PERFORMANCE.md. The production effective app routes the existing
 Library event to native-only `LoadEffectiveLibraryWordDistributions` on that same
 FIFO, returning the existing compact result. Shared cache/visibility/busy/time/
 mutation gates, separate error/explicit Retry, rename drafts and frozen deletion
-prompts are preserved. Production Model::default still selects original B until
-Android and the reader switch together. Neither operation can load dictionaries.
+prompts are preserved. NativeBridge selects Model::with_effective_reader; the
+legacy B repository remains independently testable. Neither operation can load dictionaries.
 
 `yomoku-import` is a separate pure content-extraction boundary. Its EPUB parser
 reads Stored/Deflate ZIP entries from a borrowed byte slice, without filesystem
@@ -980,15 +980,15 @@ It shares exact-surface counts, word/name candidate lookup and missing-match cus
 entry loading with the original-B API. Only exact analyzer metadata supplies a base
 form; manual spans remain unresolved. Reversal/replacement/metadata changes reject
 stale selections, while status/count/custom-entry changes stay live. This internal
-domain/repository key supports serialized completion reservations but is not yet
-exposed through the bridge.
+domain/repository key supports serialized completion reservations and remains
+native behind compact page/selection identities.
 Effective custom-entry CRUD shares that transaction-local selection validator.
 Save/delete hold an immediate SQLite transaction across validation, dictionary
 gating and mutation; read-only loads use a normal read transaction. Both original
 and effective APIs share exact-surface built-in protection and custom row helpers.
 Manual spans never inherit an original token's base form. No registration, analyzer
 metadata, historical event, schema or bridge changes are made by these operations.
-Current live reader token/word/furigana/completion paths continue using original B.
+Production reader token/word/furigana/completion paths use these effective APIs.
 A separate effective completion repository now prepares an opaque pure-domain
 `EffectivePageCompletion` after checkpoint drain, validating the full rendered key
 and reserving exact page/time/occurrence provenance in migration 0018. Commit authenticates
@@ -1120,15 +1120,15 @@ file bytes separately when format importers exist.
 
 `yomoku-ffi::YomokuBridge` wraps the router in Crux's Bincode bridge.
 `YomokuBridge::with_effective_reader` and
-`effect_router_with_effective_reader` construct the effective activation candidate
-using `Model::with_effective_reader`, the existing dictionary loaders, FIFO and
-analyzer lifecycle. This Rust-only factory exercises serialized shell events,
-Render callbacks and compact views against SQLite without a new wire schema or
-BoltFFI export. It is not yet selected by NativeBridge. Five serialized regressions
-cover edits/reversal/reopen and Library membership, A/C generation/stored choices,
-word/status/custom retry and Unicode, frozen completion retry/time/furigana,
-Missing analysis and stale/legacy command rejection. These are host Rust bridge
-checks, not effective JNI/device activation evidence.
+`effect_router_with_effective_reader` construct the production reader using
+`Model::with_effective_reader`, the existing dictionary loaders, FIFO and analyzer
+lifecycle. NativeBridge selects this factory without a shell setting, extra
+BoltFFI export or new wire schema. Serialized Rust tests cover retained requests
+and exact retry guards; production Kotlin/JNI and Android fixtures use compact
+page revisions and effective segment selections for words/status/custom/completion.
+Original B remains immutable as the default and editor anchor basis. A/C snapshots
+and saved rules are reused without Full on reopen; only explicit missing A/C
+generation requests analysis. Full keys and accepted retry payloads stay native.
 
 BoltFFI 0.30.1 NativeBridge takes a database path, owned EffectsListener and
 required DictionaryProvider. It exposes update/resolve/view and set_foreground,
@@ -1356,15 +1356,14 @@ also clear their erased encounter count. The native FIFO regression harness uses
 this adapter; live Event/ViewModel/Android adoption remains pending.
 
 
-## Staged application effective pages and completion
+## Production application effective pages and completion
 
-`Model::with_effective_reader()` is a native integration constructor; production
-FFI still uses `Model::default()`. It is not a user preference or shell toggle.
-The opt-in model routes existing LoadReaderTokens through one lifetime retained
-session and projects `effective_reader_tokens`. Source-preferred furigana
+`Model::with_effective_reader()` is the production native integration constructor.
+It is not a user preference or shell toggle. The model routes existing
+`LoadReaderTokens` through one lifetime retained session and projects `effective_reader_tokens`. Source-preferred furigana
 borrows that compact page. Legacy word/status/custom/completion events fail closed
-in this model until their consumers migrate. Library membership is also staged
-through that model; Android activation remains necessary before production use.
+in this model. Library membership uses the effective repository through the same
+model and FIFO.
 
 `CompleteEffectiveReaderPage` authenticates the compact displayed revision and
 exact reading position. It freezes the full partition before both accepted and
@@ -1383,13 +1382,13 @@ completions share position, final-page return, positive-only word notice and
 new-success-only celebration handling. AlreadyRecorded stays silent. No automatic
 restart replay, worker, dictionary access, persistent registry or schema change.
 
-The staged app also accepts `LoadEffectiveReaderWord`,
+The app also accepts `LoadEffectiveReaderWord`,
 `SetEffectiveReaderStatus` and effective custom-entry save/delete events. Each
 selection contains only page revision/base and effective segment index; full keys
 and literal retry payloads stay in the retained session. Optional
 `effective_reader_word` and `effective_reader_status` project compact details,
 errors, busy state and pending write obligations. Legacy selection events still
-fail closed. Production remains original B pending Library/Android adoption.
+fail closed. Android uses the compact selection events in production.
 
 Word/status/custom requests use the same captured FIFO callback and allow clock
 checkpoints to coalesce while busy. Failed writes retain exact native commands;
@@ -1403,7 +1402,7 @@ Custom CRUD never changes registration/status/history. Built-in protection and
 stale provenance checks remain transaction-local in storage. Only word/custom
 lookup loads the lazy word/name index; no new analyzer access or worker is added.
 
-The staged app routes `EffectiveReaderOverride(EffectiveOverrideAction)` and
+The app routes `EffectiveReaderOverride(EffectiveOverrideAction)` and
 projects `effective_reader_override` using the existing compact prompt/state.
 Open authenticates the current page revision; subsequent actions authenticate the
 retained prompt. Stored A/B/C choices, literal manual parts, explicit A/C generation
@@ -1416,7 +1415,7 @@ require an explicit page/context reload; no automatic rebase/replay is added.
 Override outcomes invalidate Library distribution caches. Full contexts/rule
 revisions remain native; existing transaction-local storage guards still apply.
 
-## Staged Android effective word consumers
+## Production Android effective word consumers
 
 `EffectiveReaderWords` accepts the compact app ViewModel, explicit retained native
 session key, existing dispatch/interaction callbacks and image loader. It uses
@@ -1438,14 +1437,14 @@ and use Rust whitespace validation without changing unresolved analyzer metadata
 The app/reader now passes `CoreSession.sessionKey`, a UUID retained with the native
 handle across Activity recreation and renewed for each replacement. The optional
 effective word-state projection selects this renderer, including when tokens are
-missing/retired. Production still constructs the B model. Next/Finish validate the
+missing/retired. NativeBridge constructs the effective model. Next/Finish validate the
 effective projection and carry its compact identity and exact departing position;
 Previous uses the position-only event and remains available after token failure.
 Storage/time/completion and pending effective mutations gate movement. Navigation
 callbacks reject retired revisions/sessions, and swipes observe current identities
 even when page geometry stays unchanged. Effective completion samples/pauses the
 platform clock before dispatch through the existing native drain/Retry lifecycle.
-`EffectiveReaderBoundaries` now exposes the prepared editor in the staged reader.
+`EffectiveReaderBoundaries` exposes the editor in the production reader.
 The atomic page read projects `original_boundaries` while original B is already
 loaded, without another analyzer or analysis read. Each page-only span retains its
 whole anchor/surface and clipped display range, independently of effective edits.
@@ -1455,5 +1454,19 @@ fail closed. Selection is scoped to the native session/page revision; accepted
 prompt/write/retry ownership remains native. Shared time/FIFO/mutation gates apply
 to opening and submitting the editor; pending failures remain reachable after page
 retirement. Reload explicitly retires the old prompt and requests a new page.
-Coordinated production core/FFI/Android activation remains next. The ephemeral page
+The production core/FFI/Android path uses these controls. The ephemeral page
 wire schema adds only these visible spans; no durable schema/dependency change.
+
+Effective override reload requirements belong only to the retired page. Normal
+page invalidation, close/reopen and explicit token loads clear the presentation
+marker; override success/stale/Cancel outcomes set it after retiring their
+before-image. Accepted writes/errors/retry payloads remain owned independently.
+This permits normal initial token reads on a newly opened reader, including the
+same book after effective completion. Successful edits retire the prompt; the
+reader exposes an explicit Reload action rather than silently reloading.
+
+Android's one-attempt token-read guard includes the exact reading position and
+page-length preset as well as the base page/analysis. A normal same-anchor position
+save or reflow can retire native tokens and must trigger a new read. Error clearing,
+clock saves and typography do not change that ownership or replay a failed read;
+boundary retirement continues to require explicit Reload.

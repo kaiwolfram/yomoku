@@ -654,4 +654,45 @@ class EffectiveReaderWordsTest {
         assertTrue(text().getLinkAnnotations(0, text().length).isEmpty())
         assertTrue(events.none { it is Event.LoadEffectiveReaderWord })
     }
+
+    @Test
+    fun samePagePositionAndPresetChangesReloadTokensWithoutReplayingFailedReads() {
+        val ready = frame.value.copy(pageLength = PageLength.CHARACTERS500)
+        frame.value = ready
+        show()
+        compose.waitForIdle()
+        assertTrue(events.isEmpty())
+        compose.runOnUiThread {
+            frame.value = ready.copy(effectiveReaderTokens = null, storageBusy = true)
+        }
+        compose.waitForIdle()
+        assertTrue(events.isEmpty())
+        val page = ready.reader!!
+        val position = page.position.copy(offset = TextOffset(9))
+        compose.runOnUiThread {
+            frame.value =
+                frame.value.copy(
+                    storageBusy = false,
+                    reader = page.copy(position = position),
+                    readerTime = ready.readerTime!!.copy(position = position),
+                )
+        }
+        compose.waitForIdle()
+        val load = Event.LoadReaderTokens(ready.effectiveReaderTokens!!.identity.base)
+        assertEquals(listOf(load), events)
+        // A failed read on this same context still needs an explicit Retry.
+        compose.runOnUiThread {
+            frame.value = frame.value.copy(documentError = DocumentError.UNAVAILABLE)
+        }
+        compose.waitForIdle()
+        compose.runOnUiThread { frame.value = frame.value.copy(documentError = null) }
+        compose.waitForIdle()
+        assertEquals(listOf(load), events)
+        // Reflow can retain the same page anchor and exact position.
+        compose.runOnUiThread {
+            frame.value = frame.value.copy(pageLength = PageLength.CHARACTERS250)
+        }
+        compose.waitForIdle()
+        assertEquals(listOf(load, load), events)
+    }
 }

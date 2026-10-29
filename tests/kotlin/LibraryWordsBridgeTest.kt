@@ -39,7 +39,7 @@ internal fun verifyLibraryWordsBridge() {
                 check(dictionary.calls.get() == calls)
                 return checkNotNull(view.libraryWordDistributions)
             }
-            fun open(id: DocumentId): ReaderTokenSnapshot {
+            fun open(id: DocumentId): EffectiveReaderPage {
                 val view = dispatch(Event.OpenReader(id), true)
                 val page = checkNotNull(view.reader)
                 return checkNotNull(
@@ -49,7 +49,7 @@ internal fun verifyLibraryWordsBridge() {
                             ),
                             true,
                         )
-                        .readerTokens
+                        .effectiveReaderTokens
                 )
             }
             dispatch(Event.RefreshLibrary, true)
@@ -67,16 +67,14 @@ internal fun verifyLibraryWordsBridge() {
             val snapshot = open(ids[0])
             val surfaces = snapshot.tokens.distinctBy { it.surface }
             check(surfaces.size >= 5)
-            val key = ReaderTokenKey(snapshot.documentId, snapshot.page, snapshot.analysis)
+
             surfaces.forEachIndexed { index, token ->
                 dispatch(
-                    Event.SetReaderStatus(
-                        ReaderStatusChange(
-                            key,
+                    Event.SetEffectiveReaderStatus(
+                            EffectiveReaderSelection(snapshot.identity, token.segmentIndex),
                             checkNotNull(token.vocabulary).id,
                             VocabularyStatus.entries[index % 5],
                             100L + index,
-                        )
                     ),
                     true,
                 )
@@ -98,7 +96,7 @@ internal fun verifyLibraryWordsBridge() {
             open(ids[1])
             val page = checkNotNull(ViewModel.bincodeDeserialize(bridge.view()).reader)
             bridge.update(
-                Event.CompleteReaderPage(ids[1], page.anchor, page.position, 500).bincodeSerialize()
+                Event.CompleteEffectiveReaderPage(checkNotNull(ViewModel.bincodeDeserialize(bridge.view()).effectiveReaderTokens).identity, page.position, 500).bincodeSerialize()
             )
             repeat(2) {
                 checkNotNull(effects.poll(60, TimeUnit.SECONDS))

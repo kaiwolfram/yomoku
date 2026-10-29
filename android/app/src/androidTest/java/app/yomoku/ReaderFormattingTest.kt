@@ -33,7 +33,7 @@ class ReaderFormattingTest {
                 !view.readingTimeSavePending &&
                 !view.completionSavePending &&
                 view.readerTime != null &&
-                view.readerTokens != null
+                view.effectiveReaderTokens != null
         }
         compose.waitForIdle()
     }
@@ -97,7 +97,7 @@ class ReaderFormattingTest {
             tap("site")
             assertEquals(1, monitor.hits)
             assertEquals(first.anchor, core().view.reader!!.anchor)
-            assertNull(core().view.readerWordSelection)
+            assertNull(core().view.effectiveReaderWord?.selection)
             tap("note")
             tap("script")
             assertEquals(1, monitor.hits)

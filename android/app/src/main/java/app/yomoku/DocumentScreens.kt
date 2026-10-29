@@ -344,7 +344,7 @@ internal fun ReaderScreen(
     val scroll =
         remember(sessionKey, view.reader?.documentId, view.reader?.anchor) { ScrollState(0) }
     val page = view.reader
-    // Native state selects the staged consumers. A missing/retired effective page never uses B.
+    // Native state selects compact consumers. A missing/retired effective page never uses B.
     val effective = view.effectiveReaderWord != null
     val snapshot = view.effectiveReaderTokens
     val identity = snapshot?.identity

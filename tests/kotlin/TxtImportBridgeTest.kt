@@ -84,7 +84,7 @@ internal fun verifyTxtImportBridge() {
             bridge.update(Event.CloseSettings.bincodeSerialize())
             val key = ReaderTokenKey(id, page.anchor, analysis)
             val tokenView = listener.dispatch(bridge, Event.LoadReaderTokens(key))
-            val tokens = checkNotNull(tokenView.readerTokens)
+            val tokens = checkNotNull(tokenView.effectiveReaderTokens)
             val cats = tokens.tokens.filter { it.surface == "猫" }
             check(cats.size == 2 && cats.all { it.vocabulary?.status == VocabularyStatus.NEW })
             check(tokenView.readerFurigana.first() == page.sourceRuby.single())
@@ -92,7 +92,7 @@ internal fun verifyTxtImportBridge() {
             check(tokenView.readerFurigana.single { it.range == cats[1].displayRange }.reading == cats[1].reading)
             check(tokenView.readerFurigana.size == tokens.tokens.count { it.reading != null })
             val vocabularyId = checkNotNull(cats.first().vocabulary).id
-            val familiar = listener.dispatch(bridge, Event.SetReaderStatus(ReaderStatusChange(key, vocabularyId, VocabularyStatus.FAMILIAR, 1000L)))
+            val familiar = listener.dispatch(bridge, Event.SetEffectiveReaderStatus(EffectiveReaderSelection(tokens.identity, cats.first().segmentIndex), vocabularyId, VocabularyStatus.FAMILIAR, 1000L))
             check(familiar.readerFurigana == tokenView.readerFurigana)
             val position = page.position.copy(offset = TextOffset("猫".toByteArray(Charsets.UTF_8).size.toLong()))
             listener.dispatch(bridge, Event.SaveReadingPosition(position))
@@ -123,7 +123,7 @@ internal fun verifyTxtImportBridge() {
             check(opened.readerTypography?.furigana == true)
             check(opened.readerFurigana == page.sourceRuby) // no Full and no token snapshot yet
             val tokenView = listener.dispatch(bridge, Event.LoadReaderTokens(ReaderTokenKey(id, page.anchor, analysis)))
-            val tokens = checkNotNull(tokenView.readerTokens)
+            val tokens = checkNotNull(tokenView.effectiveReaderTokens)
             check(tokens.tokens.filter { it.surface == "猫" }.all { it.vocabulary?.status == VocabularyStatus.FAMILIAR })
             check(tokenView.readerFurigana.first() == page.sourceRuby.single())
             val secondCat = tokens.tokens.filter { it.surface == "猫" }[1]
@@ -204,7 +204,7 @@ private fun verifyTxtCancellationBridge() {
             val opened = listener.dispatch(bridge, Event.OpenReader(imported))
             val page = checkNotNull(opened.reader)
             val key = ReaderTokenKey(imported, page.anchor, checkNotNull(opened.readerAnalysis))
-            val tokens = checkNotNull(listener.dispatch(bridge, Event.LoadReaderTokens(key)).readerTokens)
+            val tokens = checkNotNull(listener.dispatch(bridge, Event.LoadReaderTokens(key)).effectiveReaderTokens)
             check(tokens.tokens.filter { it.surface == "犬" }.let { it.size == 2 && it.all { token -> token.vocabulary?.status == VocabularyStatus.NEW } })
             check(delegate.calls.get() == 1)
             bridge.cancelTxtImport() // No effect on a committed file or on reader work.
