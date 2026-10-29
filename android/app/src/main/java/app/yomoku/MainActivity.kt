@@ -56,6 +56,7 @@ class MainActivity : ComponentActivity() {
                 }
                 YomokuApp(
                     core.view,
+                    core.sessionKey,
                     core::dispatch,
                     core::onReaderInteraction,
                     core.images,

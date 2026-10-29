@@ -1,12 +1,8 @@
 # Resume here
-Updated: 2026-10-29. Android effective words isolated; coordinated activation next.
-## Working
-- Rename: retained literal draft/Cancel/Retry; title-only atomic save, no-op retries.
+Updated: 2026-10-29. Android effective navigation staged; span/editor then activation.
 - Single/bulk deletion: one transaction, history/vocabulary/rules retained; reimport fresh.
   Long press selects; Select All adds all matching titles, including offscreen rows.
-  Filter/sort retain selection; confirmation freezes titles/IDs; Cancel/Back and Retry.
 - Library title-only search/Clear + Last read/Title/Import date; query/sort retained.
-  Read order (0019) on explicit open only; newest unknown/unopened afterward.
 - Live bars use original B/live statuses; read-only FIFO; explicit Retry; batches defer scans.
   Effective Library API shares eligibility/resolution + transaction-local status lookups;
   Missing/zero differ. Staged app routes effective read on same FIFO/cache/Retry gates;
@@ -64,16 +60,20 @@ Updated: 2026-10-29. Android effective words isolated; coordinated activation ne
 - Compact effective app word/status/custom: retained FIFO, literal Retry/Cancel, five statuses,
   repeats/deletion/built-in gates. Dismissed writes/errors retained; time drains before movement.
 - Compact app overrides: FIFO/prompt writes, Retry/Cancel/reload, Library/time gates.
-- Android EffectiveReaderWords isolated: compact ranges/word/status/custom, native
-  Retry/Cancel after dismissal, session/revision guards, literal drafts/Rust whitespace.
+- Android compact word/status/custom + navigation wired with retained CoreSession UUID;
+  Next/Finish/swipes use validated effective identity, Previous position only. Native
+  mutation/time gates; current gesture revisions; final clock sample before completion.
 ## Next tasks (ordered)
-1. Wire EffectiveReaderWords with a retained native-session key; migrate Android
-   navigation/completion/clock intent and original-B span selection/ReaderBoundaryEditor.
-   Then activate core/FFI/Android together; Model::with_effective_reader stays staged.
-2. Measure JNI/device/diverse/image-heavy costs; host baselines in performance doc.
+1. Add original-B span selection and wire ReaderBoundaryEditor; activate core/FFI/
+   Android together. Native Model::with_effective_reader stays staged until ready.
+2. Investigate emulator long-page HWUI stall (old reader also fails); details below.
+3. Measure JNI/device/diverse/image-heavy costs; host baselines in performance doc.
 Physical arm64 deferred; Nostr empty; Q188 unresolved before forwarding.
-## Verification
+## Verification / blockers
 - PASS: 70 focused Rust, real-Full host JNI/codecs, Kotlin fmt, both-ABI APKs/lint.
-- PASS: 27 distinct phone cases; 11 compact wide-dark cases. Emulator restored/stopped.
-- Prior full Rust/Clippy: 702 (17 ignored). Commands/logs: DEVELOPMENT end.
-- Gradle socket escalation passes; no blocker/schema/dependency change. Production B.
+- PASS: 36 distinct phone cases + 4 wide-dark shell cases; emulator restored/stopped.
+- Long-page ReaderWords movement times out in Compose with old ReaderScreen too.
+  ReaderNavigation controls then stalls; JDB main waits in HardwareRenderer draw.
+  swangle repeats with Vulkan disabled; swiftshader crashes at boot. No product fix.
+- Full device matrix incomplete; exact cases, commands/logs: DEVELOPMENT end.
+- Prior full Rust/Clippy: 702 (17 ignored). Production B; no schema/dependency change.

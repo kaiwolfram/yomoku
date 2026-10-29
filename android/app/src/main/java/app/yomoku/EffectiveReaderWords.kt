@@ -24,7 +24,7 @@ import app.yomoku.shared.Event
 import app.yomoku.shared.ReaderTokenKey
 import app.yomoku.shared.ViewModel
 
-/** Compact effective consumers, staged until navigation and boundary selection migrate together. */
+/** Compact effective consumers; production activation awaits boundary selection/editor wiring. */
 @Composable
 internal fun EffectiveReaderWords(
     view: ViewModel,

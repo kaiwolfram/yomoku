@@ -5,6 +5,7 @@ import androidx.test.platform.app.InstrumentationRegistry
 import app.yomoku.shared.Destination
 import app.yomoku.shared.Event
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertThrows
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -29,6 +30,7 @@ class CoreSessionTest {
                             ),
                         )
                         .use { independent ->
+                            assertNotEquals(core.sessionKey, independent.sessionKey)
                             assertEquals(Destination.LIBRARY, core.view.destination)
                             for (destination in Destination.entries + Destination.LIBRARY) {
                                 core.dispatch(Event.SelectDestination(destination))

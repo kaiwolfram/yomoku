@@ -45,6 +45,7 @@ import app.yomoku.theme.YomokuTheme
 @Composable
 internal fun YomokuApp(
     view: ViewModel,
+    sessionKey: String,
     dispatch: (Event) -> Unit,
     onReaderInteraction: () -> Unit = {},
     imageLoader: EpubImageLoader? = null,
@@ -145,7 +146,13 @@ internal fun YomokuApp(
                         view.contentRoute == ContentRoute.PASTE ->
                             PasteScreen(view, pasteText, { pasteText = it }, dispatch)
                         view.contentRoute == ContentRoute.READER ->
-                            ReaderScreen(view, dispatch, onReaderInteraction, imageLoader)
+                            ReaderScreen(
+                                view,
+                                sessionKey,
+                                dispatch,
+                                onReaderInteraction,
+                                imageLoader,
+                            )
                         view.destination == Destination.LIBRARY ->
                             LibraryScreen(
                                 view,
@@ -249,6 +256,7 @@ private fun YomokuPreview() {
                 effectiveReaderTokens = null,
                 readerFurigana = emptyList(),
             ),
+            sessionKey = "preview",
             dispatch = {},
         )
     }

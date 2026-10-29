@@ -5,8 +5,10 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import app.yomoku.shared.ContentRoute
 import app.yomoku.shared.DocumentError
+import app.yomoku.shared.EffectivePageIdentity
 import app.yomoku.shared.Event
 import app.yomoku.shared.PageLength
+import app.yomoku.shared.ReaderTokenKey
 import app.yomoku.shared.TextOffset
 import app.yomoku.shared.ViewModel
 import java.io.File
@@ -271,6 +273,34 @@ class ReaderClockSessionTest {
                 assertTrue(it.moveToFirst())
                 assertEquals(2_000L, it.getLong(0))
                 assertEquals(3L, it.getLong(1))
+            }
+            f.assertNoHistory()
+        }
+    }
+
+    @Test
+    fun stagedEffectiveCompletionSamplesBeforeIntentEvenWhenNativeRejectsItsIdentity() {
+        Fixture().use { f ->
+            f.start()
+            onMain {
+                val page = f.core.view.reader!!
+                val identity =
+                    EffectivePageIdentity(
+                        ULong.MAX_VALUE,
+                        ReaderTokenKey(page.documentId, page.anchor, f.core.view.readerAnalysis!!),
+                    )
+                f.now = 1_000L
+                f.core.dispatch(Event.CompleteEffectiveReaderPage(identity, page.position, 123L))
+                // Production B rejects this staged intent. The sample must already be frozen,
+                // so immediate teardown at a later clock cannot charge the intervening time.
+                f.now = 2_000L
+                f.core.close()
+            }
+            awaitClosed(f.core)
+            f.db.rawQuery("SELECT milliseconds FROM pending_reading_time", null).use {
+                assertTrue(it.moveToFirst())
+                assertEquals(1_000L, it.getLong(0))
+                assertFalse(it.moveToNext())
             }
             f.assertNoHistory()
         }

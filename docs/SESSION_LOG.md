@@ -2841,3 +2841,33 @@ plan/handoff/architecture/decisions/payload/development. Next connect the compon
 with a retained session key, Android navigation/completion and original-B span/
 editor, then activate core/FFI/Android together. Broader Rust/Clippy, release/
 process death, physical arm64 and effective performance not rerun/measured.
+
+## 2026-10-29 — Staged Android effective navigation and retained session ownership
+
+Connected compact word consumers to the actual app shell with a UUID retained by
+CoreSession across Activity recreation. Effective Next/Finish/swipes carry the
+validated compact page identity and exact position; Previous stays position-only.
+Missing/retired/malformed pages never complete with B. Shared time/storage and
+effective mutation gates block movement; gestures use current revisions and
+replacement sessions retire selections. Android samples final time before the
+effective completion intent. Production stays B until original-B span selection/
+editor and coordinated activation are ready.
+
+PASS: 70 focused Rust cases, real-Full host Kotlin/JNI/codecs, Kotlin formatting,
+both-ABI APKs/lint and 36 distinct phone cases. The final 15-case phone run passes
+all six clock cases (one new), four compact shell cases, native-key independence/
+recreation and notice/celebration checks. All four shell cases also pass wide/dark.
+Display settings restored; task-started emulator stopped.
+Initial null-assertion warnings and a mistaken assumption that Compose button
+semantics retain frozen callbacks were corrected. No schema/dependency change.
+
+Long-page device checks remain blocked: ReaderWords movement times out before
+navigation, reproducing with the previous ReaderScreen implementation; the next
+ReaderNavigation case stalls waiting for Activity idle. JDB observes main blocked
+in HardwareRenderer.syncAndDrawFrame. Fresh processes/Vulkan-disabled swangle
+repeat; swiftshader crashes at boot. Baseline source was restored to the new
+implementation and final APK/lint/phone checks pass. No speculative product fix.
+Next add original-B span selection/editor and activate together; investigate the
+long-page renderer and finish device/performance coverage. Commands/logs and
+precise unverified cases: DEVELOPMENT end. Full Rust/Clippy, release/process death,
+physical arm64 and effective performance were not rerun/measured.

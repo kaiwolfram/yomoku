@@ -13,6 +13,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.yomoku.shared.Destination
 import app.yomoku.shared.Event
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertThrows
 import org.junit.Rule
@@ -57,9 +58,12 @@ class NavigationTest {
         compose.activityRule.scenario.onActivity {
             original = ViewModelProvider(it)[CoreSessionOwner::class.java].session
         }
+        val sessionKey = original.sessionKey
         compose.activityRule.scenario.recreate()
         compose.activityRule.scenario.onActivity {
-            assertSame(original, ViewModelProvider(it)[CoreSessionOwner::class.java].session)
+            val retained = ViewModelProvider(it)[CoreSessionOwner::class.java].session
+            assertSame(original, retained)
+            assertEquals(sessionKey, retained.sessionKey)
         }
         compose.onNodeWithTag("screen_title").assertTextEquals("Settings")
         compose.onNodeWithText("Back").performClick()

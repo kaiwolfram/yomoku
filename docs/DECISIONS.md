@@ -3575,3 +3575,23 @@ Retry/Cancel reachable after panel dismissal or page retirement; Android never
 reconstructs accepted write payloads. Custom validation uses Rust Unicode
 White_Space and strict scalars while retaining the literal submitted fields.
 No new library, wire/schema change, user setting or production activation.
+
+## 2026-10-29 — Stage effective Android navigation with retained handle ownership
+
+Give each Android `CoreSession` a fresh UUID string, retained with the native
+handle across Activity recreation and passed explicitly through the app/reader.
+Never save or restore it independently of the handle. Use it for compact word
+selection/drafts, scroll reset and stale navigation callback guards.
+
+Choose the effective renderer from the native optional word-state projection,
+which remains present when its token page is missing/retired. Next/Finish require
+a validated available effective page and dispatch its compact revision/base plus
+the exact departing position. Previous keeps its existing position-only event;
+it remains usable when token loading fails. Gate movement on storage/time/
+completion and accepted effective mutations. Use current gesture callbacks so
+same-page revision changes cannot leave swipes targeting an old partition.
+Sample/pause the Android clock before effective completion, using the existing
+native checkpoint drain and exact completion Retry path. No new Kotlin history,
+time or retry payload ownership. Production remains B until original-B span
+selection/editor and core/FFI/Android activation are ready together. No dependency,
+wire/durable schema or product-setting change.

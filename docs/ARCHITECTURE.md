@@ -1424,6 +1424,15 @@ keep reachable payload-free Retry/Cancel controls. Session replacement/page
 revision changes discard local selections/drafts; retained link callbacks cannot
 reopen a selection from an older revision. Custom fields preserve literal Unicode
 and use Rust whitespace validation without changing unresolved analyzer metadata.
-This component is isolated pending coordinated navigation/completion, original-B
-span selection/editor and production core/FFI/Android activation. Existing
-production `ReaderWords` still uses B. No durable/wire schema or dependency change.
+The app/reader now passes `CoreSession.sessionKey`, a UUID retained with the native
+handle across Activity recreation and renewed for each replacement. The optional
+effective word-state projection selects this renderer, including when tokens are
+missing/retired. Production still constructs the B model. Next/Finish validate the
+effective projection and carry its compact identity and exact departing position;
+Previous uses the position-only event and remains available after token failure.
+Storage/time/completion and pending effective mutations gate movement. Navigation
+callbacks reject retired revisions/sessions, and swipes observe current identities
+even when page geometry stays unchanged. Effective completion samples/pauses the
+platform clock before dispatch through the existing native drain/Retry lifecycle.
+Original-B span selection/editor and coordinated production core/FFI/Android
+activation remain next. No durable/wire schema or dependency change.

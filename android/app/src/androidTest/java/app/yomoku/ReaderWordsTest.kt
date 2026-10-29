@@ -578,7 +578,12 @@ class ReaderWordsTest {
             session.setReaderActive(true)
             compose.activity.setContent {
                 YomokuTheme {
-                    ReaderScreen(session.view, session::dispatch, session::onReaderInteraction)
+                    ReaderScreen(
+                        session.view,
+                        session.sessionKey,
+                        session::dispatch,
+                        session::onReaderInteraction,
+                    )
                 }
             }
         }
@@ -719,7 +724,12 @@ class ReaderWordsTest {
             session.setReaderActive(true)
             compose.activity.setContent {
                 YomokuTheme {
-                    ReaderScreen(session.view, session::dispatch, session::onReaderInteraction)
+                    ReaderScreen(
+                        session.view,
+                        session.sessionKey,
+                        session::dispatch,
+                        session::onReaderInteraction,
+                    )
                 }
             }
         }
@@ -808,7 +818,12 @@ class ReaderWordsTest {
             session.setReaderActive(true)
             compose.activity.setContent {
                 YomokuTheme {
-                    ReaderScreen(session.view, session::dispatch, session::onReaderInteraction)
+                    ReaderScreen(
+                        session.view,
+                        session.sessionKey,
+                        session::dispatch,
+                        session::onReaderInteraction,
+                    )
                 }
             }
         }

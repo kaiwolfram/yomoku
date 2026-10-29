@@ -5933,3 +5933,89 @@ opt-in matrix, release/process death, physical arm64 and actual effective JNI/de
 performance were not rerun/measured. Logs:
 `/tmp/yomoku-effective-ui-{core,host,android,device,phone,tablet,format-check}.log`.
 The three device-result directories share that prefix under `/tmp`.
+
+## Staged Android effective navigation and retained session ownership
+
+2026-10-29, repository root, pinned offline tools:
+
+```sh
+export PATH=/home/kai/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin:$PATH
+export JAVA_HOME=/home/kai/repos/yomoku/.local/jdk-17/jdk-17.0.21+9
+export GRADLE_USER_HOME=/home/kai/repos/yomoku/.local/gradle
+export ANDROID_HOME=/home/kai/Android/Sdk
+cargo test -p yomoku-core --test effective_app --test effective_session --all-features --locked --offline
+tools/test-kotlin-bridge.sh
+tools/format-kotlin.sh --check
+./android/gradlew -p android :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug --offline --console=plain
+# Final passing phone selection (15 cases):
+./android/gradlew -p android :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=app.yomoku.EffectiveReaderNavigationTest,app.yomoku.ReaderClockSessionTest,app.yomoku.CoreSessionTest,app.yomoku.NavigationTest,app.yomoku.ReaderNavigationTest#positiveCompletionToastIsConsumedOnceAndZeroIsSilent,app.yomoku.ReaderNavigationTest#celebrationAnimatesOncePerCommandAndDoesNotReplayAfterRecreation --offline --console=plain
+/home/kai/Android/Sdk/platform-tools/adb -s emulator-5554 shell wm size 2560x1600
+/home/kai/Android/Sdk/platform-tools/adb -s emulator-5554 shell wm density 240
+/home/kai/Android/Sdk/platform-tools/adb -s emulator-5554 shell cmd uimode night yes
+./android/gradlew -p android :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=app.yomoku.EffectiveReaderNavigationTest --offline --console=plain
+/home/kai/Android/Sdk/platform-tools/adb -s emulator-5554 shell wm size reset
+/home/kai/Android/Sdk/platform-tools/adb -s emulator-5554 shell wm density reset
+/home/kai/Android/Sdk/platform-tools/adb -s emulator-5554 shell cmd uimode night no
+git diff --check
+```
+
+PASS: 70 focused Rust tests, complete real-Full host Kotlin/JNI and codec suite,
+Kotlin formatting/diff, both-ABI app/test APKs and strict Android lint. No native,
+generated-code, schema or dependency change. Existing nonfatal host teardown
+diagnostics remain; the complete host suite exits zero.
+
+PASS: 36 distinct phone cases across the runs: all 11 compact word cases, ten
+production word cases, four new actual-shell fixtures, six real JNI/SQLite clock
+cases (one new), native session-key independence, two navigation/lifecycle cases
+and two completion-notice/celebration cases. The final 15-case selection passes
+without failures/skips. The four shell cases also pass wide/dark (2560×1600,
+240 dpi); phone is 1080×2400, 420 dpi, system light. Display settings restored and
+the task-started emulator stopped. No physical-arm64 or performance claim.
+
+The new fixtures verify actual app routing to effective word consumers, exact
+compact revision/position for Next/Finish/buttons/swipes, position-only Previous,
+unresolved/empty valid partitions, Missing/foreign/malformed/retired pages, native
+mutation/time gates, same-page revision updates and selection reset on native
+session replacement. The new clock case checks that even a rejected staged
+completion samples before dispatch and drains exactly 1,000 ms on immediate close
+at 2,000 ms, without history/status writes. Existing clock tests cover accepted
+B completion/final saves. Native effective acceptance/drain remains covered by
+the focused Rust cases; production FFI stays B until span/editor activation.
+
+Two initial unnecessary null assertions failed Kotlin's warnings-as-errors; fixed.
+An initial fixture incorrectly assumed Material button semantics retain frozen
+callbacks; they call the current button callback. Corrected the test to assert
+the current revision, busy gates, live gesture revision and session selection reset.
+The final runs contain these corrections. Gradle/ADB/AVD needed socket escalation.
+
+The full 40-case device selection did NOT pass. Long-page
+`ReaderWordsTest#movingBothDirectionsDismissesDetailsAndNeverRestoresTheSelection`
+repeatedly times out in Compose while opening its long document. The following
+`ReaderNavigationTest#controlsAndSwipesPersistBothDirectionsResetScrollAndCountOnlyForward`
+stalls after scrolling, waiting for Activity idle; stopped the test process.
+JDB shows main in `HardwareRenderer.nSyncAndDrawFrame` and instrumentation in
+`ActivityScenario.onActivity`/`Instrumentation.waitForIdleSync`, at navigation
+test line 138. Temporary debugger forwarding was removed.
+
+Diagnostic comparison restored the previous ReaderScreen function from the
+session-start HEAD (only an unused sessionKey parameter added for caller
+compatibility). The same single ReaderWords long-page case still fails with
+ComposeNotIdleException (57.772 s); baseline result is retained below. Restored
+the new source byte-for-byte, rebuilt and passed the final phone selection.
+This establishes a failure with the previous reader too; no speculative product
+rendering fix was made. Full long-page verification remains unresolved.
+
+Original swangle and fresh swangle with `-feature -Vulkan` both reproduce the
+failure. `-gpu swiftshader` crashes at boot (exit 139); one attempted test run
+therefore reports no online device. Final passing phone/wide runs use:
+`emulator -avd medium_phone -no-window -no-audio -no-snapshot -gpu swangle -feature -Vulkan -camera-back none -camera-front none -accel on -cores 2`.
+The remaining long-page navigation cases `failedForwardDisablesControlsAndRetryCommitsExactlyOnce`
+and `finishCheckmarkPersistsThroughRetryRecreationAndRereadsWhileReopeningResetsPosition`
+were not reached in this session. Investigate rendering and rerun these four
+long-page cases before claiming the complete device matrix passes.
+
+Logs: `/tmp/yomoku-effective-navigation-{core,host,android,format-check,device,phone,swiftshader-device,long-pages,baseline,final-phone,wide}.log`.
+Result directories: `/tmp/yomoku-effective-navigation-{initial,retry,final-phone,wide}-results`;
+baseline XML: `/tmp/yomoku-effective-navigation-baseline-results.xml`.
+Full Rust/Clippy, Full owned/mapped opt-in matrix, release/process death,
+physical arm64 and effective JNI/device/diverse-book costs were not rerun/measured.

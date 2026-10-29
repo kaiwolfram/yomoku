@@ -275,5 +275,12 @@ original-B keys. Native-session/revision ownership retires local selections,
 drafts and old link callbacks. Unresolved metadata stays absent; crossing surfaces
 stay complete. Pending custom/status writes retain payload-free native Retry/Cancel
 controls after panel dismissal/page retirement. No new payload, schema or size
-measurement. Production activation, navigation/completion and original-B span
-selection/editor integration remain pending; this is an isolated Android consumer.
+measurement. The actual Android shell now passes a retained `CoreSession` UUID
+through app/reader consumers, selects the effective component from native state,
+and sends compact completion identities for Next/Finish/swipes. Position-only
+Previous is unchanged. Available/validated pages and shared mutation/time gates
+control forward actions; missing/retired pages never use original-B completion.
+Session/revision guards reject retained callbacks, and same-page revision changes
+update gestures. The platform samples final time before the effective intent.
+Production activation and original-B span selection/editor integration remain
+pending. No new payload or durable schema; production FFI still constructs B.

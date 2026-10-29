@@ -30,6 +30,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -45,6 +46,8 @@ import app.yomoku.shared.DocumentError
 import app.yomoku.shared.Event
 import app.yomoku.shared.ImportOutcome
 import app.yomoku.shared.LibrarySort
+import app.yomoku.shared.ReaderAnalysis
+import app.yomoku.shared.ReaderTokenKey
 import app.yomoku.shared.ViewModel
 
 @Composable
@@ -333,49 +336,87 @@ internal fun PasteScreen(
 @Composable
 internal fun ReaderScreen(
     view: ViewModel,
+    sessionKey: String,
     dispatch: (Event) -> Unit,
     onInteraction: () -> Unit,
     imageLoader: EpubImageLoader? = null,
 ) {
-    val scroll = remember(view.reader?.documentId, view.reader?.anchor) { ScrollState(0) }
+    val scroll =
+        remember(sessionKey, view.reader?.documentId, view.reader?.anchor) { ScrollState(0) }
     val page = view.reader
+    // Native state selects the staged consumers. A missing/retired effective page never uses B.
+    val effective = view.effectiveReaderWord != null
+    val snapshot = view.effectiveReaderTokens
+    val identity = snapshot?.identity
+    val effectivePageReady =
+        remember(page, view.readerAnalysis, snapshot) {
+            page != null &&
+                snapshot != null &&
+                view.readerAnalysis is ReaderAnalysis.Available &&
+                identity?.base ==
+                    ReaderTokenKey(page.documentId, page.anchor, view.readerAnalysis) &&
+                effectiveDisplayTokens(page, snapshot.identity, snapshot) != null
+        }
+    val effectiveIdle =
+        view.effectiveReaderWord?.let { !it.busy && !it.customEntryPending } != false &&
+            view.effectiveReaderStatus?.let { !it.busy && !it.pending } != false &&
+            view.effectiveReaderOverride?.let { !it.busy && !it.pending } != false
     val canNavigate =
         page != null &&
+            !view.settingsOpen &&
             !view.storageBusy &&
             !view.readingTimeSavePending &&
-            !view.completionSavePending
-    val canAdvance = canNavigate && page.position.offset != page.anchor.range.end
+            !view.completionSavePending &&
+            (!effective || effectiveIdle)
+    val canAdvance =
+        canNavigate &&
+            page.position.offset != page.anchor.range.end &&
+            (!effective || effectivePageReady)
     val canGoBack = canNavigate && page.pageNumber > 1UL
+    val navigationKey = Triple(sessionKey, page, identity)
+    val currentKey by rememberUpdatedState(navigationKey)
+    val currentCanAdvance by rememberUpdatedState(canAdvance)
+    val currentCanGoBack by rememberUpdatedState(canGoBack)
     val next = {
-        if (canAdvance) {
+        if (canAdvance && currentCanAdvance && currentKey == navigationKey) {
             dispatch(
-                Event.CompleteReaderPage(
-                    page.documentId,
-                    page.anchor,
-                    page.position,
-                    System.currentTimeMillis(),
-                )
+                if (effective) {
+                    Event.CompleteEffectiveReaderPage(
+                        snapshot!!.identity,
+                        page.position,
+                        System.currentTimeMillis(),
+                    )
+                } else {
+                    Event.CompleteReaderPage(
+                        page.documentId,
+                        page.anchor,
+                        page.position,
+                        System.currentTimeMillis(),
+                    )
+                }
             )
         }
     }
     val previous = {
-        if (canGoBack) {
+        if (canGoBack && currentCanGoBack && currentKey == navigationKey) {
             dispatch(Event.PreviousReaderPage(page.documentId, page.anchor, page.position))
         }
     }
+    val currentNext by rememberUpdatedState(next)
+    val currentPrevious by rememberUpdatedState(previous)
     val swipeThreshold = with(LocalDensity.current) { 48.dp.toPx() }
     Column(
         modifier =
             Modifier.widthIn(max = 720.dp)
                 .fillMaxSize()
-                .pointerInput(page, canNavigate) {
+                .pointerInput(sessionKey, page, canNavigate) {
                     var horizontal = 0f
                     detectHorizontalDragGestures(
                         onDragStart = { horizontal = 0f },
                         onDragCancel = { horizontal = 0f },
                         onDragEnd = {
-                            if (horizontal <= -swipeThreshold) next()
-                            else if (horizontal >= swipeThreshold) previous()
+                            if (horizontal <= -swipeThreshold) currentNext()
+                            else if (horizontal >= swipeThreshold) currentPrevious()
                         },
                         onHorizontalDrag = { change, amount ->
                             if (canNavigate) {
@@ -396,7 +437,11 @@ internal fun ReaderScreen(
             if (page.finishedAtLeastOnce) {
                 FinishedCheckmark(Modifier.testTag("reader_finished"))
             }
-            ReaderWords(view, dispatch, onInteraction, imageLoader)
+            if (effective) {
+                EffectiveReaderWords(view, sessionKey, dispatch, onInteraction, imageLoader)
+            } else {
+                ReaderWords(view, dispatch, onInteraction, imageLoader)
+            }
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,

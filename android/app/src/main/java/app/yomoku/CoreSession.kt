@@ -16,6 +16,7 @@ import app.yomoku.shared.ReaderClockSample
 import app.yomoku.shared.Requests
 import app.yomoku.shared.ShellEffect
 import app.yomoku.shared.ViewModel
+import java.util.UUID
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 
@@ -27,6 +28,8 @@ internal class CoreSession(
     private val checkpointIntervalMs: Long = 15_000L,
     private val cancellationExecutor: ExecutorService = Executors.newSingleThreadExecutor(),
 ) : AutoCloseable {
+    // Retained with this handle across Activity recreation; never restored into a new handle.
+    val sessionKey: String = UUID.randomUUID().toString()
     private val mainHandler = Handler(Looper.getMainLooper())
     var isClosed = false
         private set
@@ -112,6 +115,7 @@ internal class CoreSession(
             Event.OpenPaste,
             is Event.SelectDestination,
             is Event.CompleteReaderPage,
+            is Event.CompleteEffectiveReaderPage,
             is Event.PreviousReaderPage,
             is Event.OpenReader,
             is Event.LoadPaste,
