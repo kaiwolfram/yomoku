@@ -1566,8 +1566,10 @@ registered in vocabulary contribute. Missing B
 in any chapter yields None, while corrupt analysis/rules/statuses fail the read.
 Deleted origin documents do not disable global rules for remaining books.
 Canonical text is needed for resolution, but original file/image BLOBs and
-dictionaries are not read. No writes or new table/persistent cache/schema. The live Library
-still calls its original-B API until the reader also adopts effective boundaries.
+dictionaries are not read. No writes or new table/persistent cache/schema. The
+staged effective app selects this read through a skipped native operation,
+returning the existing compact distribution result/cache. Production still selects
+original B until the coordinated Android/reader activation. No shell schema change.
 
 
 ## Staged effective application payloads (no migration)
@@ -1591,7 +1593,7 @@ registration or status event is created by lookup/custom CRUD.
 
 Only the native `Model::with_effective_reader()` integration constructor enables
 this staged path. Production uses its existing B model pending migration
-of Library and Android consumers. Accepted
+of Android consumers. Accepted
 completion/time obligations are ephemeral model state backed by the existing
 version-1 durable reservations and exact replay semantics; new sessions never
 resume unfinished work automatically. No data/migration/destructive change.

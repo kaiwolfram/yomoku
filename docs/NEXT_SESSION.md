@@ -1,5 +1,5 @@
 # Resume here
-Updated: 2026-10-29. Effective app overrides staged; Library/Android next.
+Updated: 2026-10-29. Effective app Library staged; Android activation next.
 ## Working
 - Rename: retained literal draft/Cancel/Retry; title-only atomic save, no-op retries.
 - Single/bulk deletion: one transaction, history/vocabulary/rules retained; reimport fresh.
@@ -9,7 +9,8 @@ Updated: 2026-10-29. Effective app overrides staged; Library/Android next.
   Read order (0019) on explicit open only; newest unknown/unopened afterward.
 - Live bars use original B/live statuses; read-only FIFO; explicit Retry; batches defer scans.
   Effective Library API shares eligibility/resolution + transaction-local status lookups;
-  Missing/zero differ. Stored text/rules, no source/assets/Full/writes. Switch with reader.
+  Missing/zero differ. Staged app routes effective read on same FIFO/cache/Retry gates;
+  drafts/deletion prompts retained. Stored text/rules, no source/assets/Full/writes.
 - Chapter-local UTF-8 position/whole-book percentage/five presets persist; reflow
   preserves offsets. Scroll resets; 720dp column; controls below content; 48dp swipes.
   Previous only saves position; busy gates reject doubles; deliberate rereads count.
@@ -62,19 +63,17 @@ Updated: 2026-10-29. Effective app overrides staged; Library/Android next.
   effective furigana + CompleteEffectiveReaderPage; captured FIFO callbacks, both final-time
   slots before preparation, exact retry/finish/notice/departure. Production default stays B;
   legacy word/status/custom/completion events reject in opt-in model.
-- Compact effective app word/status/custom events/views use retained FIFO requests;
-  literal retries/Cancel, five statuses/repeats/deletion and built-in gates. Pending
-  writes/errors survive dismissal; time drains before deferred movement after Retry/Cancel.
+- Compact effective app word/status/custom: retained FIFO, literal Retry/Cancel, five statuses,
+  repeats/deletion/built-in gates. Dismissed writes/errors retained; time drains before movement.
 - Compact app override actions/state use retained FIFO requests; prompt-scoped writes,
   exact Retry/Cancel, explicit reload, Library invalidation and final-time/movement gates.
 ## Next tasks (ordered)
-1. Add effective Library operation to the staged app/FIFO; preserve cache/retry gates.
-   Keep Model::with_effective_reader native staging only.
-2. Switch production core/FFI/Android together using effectiveDisplayTokens and compact
+1. Switch production core/FFI/Android together using effectiveDisplayTokens and compact
    events; expose ReaderBoundaryEditor with original-B span selection. See payload doc.
-3. Measure JNI/device/diverse/image-heavy costs; host baselines in performance doc.
+   Model::with_effective_reader stays native staging until all Android consumers migrate.
+2. Measure JNI/device/diverse/image-heavy costs; host baselines in performance doc.
 Physical arm64 deferred; Nostr empty; Q188 unresolved before forwarding.
 ## Verification
-- PASS: 699 Rust (17 opt-in ignored), strict Clippy/fmt, real-Full host JNI/codecs.
+- PASS: 702 Rust (17 opt-in ignored), strict Clippy/fmt, real-Full host JNI/codecs.
 - PASS: both-ABI APKs/lint. Device not rerun; prior 11 cases pass. Commands: DEVELOPMENT end.
-- Initial fixture/compile assertions fixed; no blocker/schema/dependency change. Production B.
+- Gradle socket escalation passes; no blocker/schema/dependency change. Production B.

@@ -227,6 +227,13 @@ fn execute(
                 storage.library_word_distributions().map_err(map_error)?,
             ))
         }
+        StorageOperation::LoadEffectiveLibraryWordDistributions => {
+            Ok(StorageResult::LibraryWordDistributionsLoaded(
+                storage
+                    .effective_library_word_distributions()
+                    .map_err(map_error)?,
+            ))
+        }
         StorageOperation::DeleteDocument(id) => {
             storage.delete_document(id).map_err(map_error)?;
             Ok(StorageResult::DocumentDeleted(id))

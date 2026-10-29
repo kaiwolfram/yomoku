@@ -3544,3 +3544,15 @@ Retry/Cancel authenticate the frozen prompt even after page retirement, with a
 fresh attempt on Retry. Success/stale outcomes require explicit page/context
 reload; never rebase or automatically replay. Invalidate Library distributions on
 override outcomes. No dependency, schema, worker, history or product-setting change.
+
+
+## 2026-10-29 — Stage effective Library membership through the app FIFO
+
+Let the native effective-model constructor choose the existing effective Library
+repository through a skipped `LoadEffectiveLibraryWordDistributions` operation.
+Use the same FIFO, compact result, retained cache and error/explicit Retry path as
+original B. Keep all visibility, busy, pending-write/time gates and preserve
+literal rename drafts, selection and frozen deletion prompts during reads.
+Do not serialize this native staging choice or add a user mode. Production remains
+original B until Android switches with the reader. No dictionary, dependency,
+schema, worker, automatic retry or data semantics change.

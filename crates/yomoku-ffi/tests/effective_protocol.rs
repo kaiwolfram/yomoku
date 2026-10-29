@@ -10,6 +10,11 @@ use yomoku_core::{
 
 #[test]
 fn effective_worker_protocol_has_no_shell_codec() {
+    assert!(BincodeFfiFormat::serialize(
+        &mut vec![],
+        &StorageOperation::LoadEffectiveLibraryWordDistributions
+    )
+    .is_err());
     let base = ReaderTokenKey {
         document_id: 1.try_into().unwrap(),
         page: TextAnchor {

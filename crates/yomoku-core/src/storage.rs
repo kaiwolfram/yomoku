@@ -61,11 +61,25 @@ pub enum StorageOperation {
     ImportTxt(TxtImport),
     ImportSrt(SrtImport),
     ImportEpub(EpubImport),
+    /// Native staging read, using the same compact result and app cache gates
+    /// as original B. Activate production with the effective reader consumers.
+    #[serde(skip)]
+    #[cfg_attr(feature = "facet_typegen", facet(skip))]
+    LoadEffectiveLibraryWordDistributions,
     /// Native-only protocol. Neither full keys nor reserved completions have a
     /// shell codec; the generated event/view schemas remain compact.
     #[serde(skip)]
     #[cfg_attr(feature = "facet_typegen", facet(skip))]
     Effective(#[cfg_attr(feature = "facet_typegen", facet(opaque))] EffectiveStorageOperation),
+}
+
+impl StorageOperation {
+    pub(crate) fn loads_library_words(&self) -> bool {
+        matches!(
+            self,
+            Self::LoadLibraryWordDistributions | Self::LoadEffectiveLibraryWordDistributions
+        )
+    }
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]

@@ -84,8 +84,12 @@ snapshot; it is discarded on success/failure and every refresh reads afresh.
 It never loads source archives, image
 assets or dictionaries, registers entries or writes. Resolve one chapter at a
 time; host measurements and their corpus limits are in
-EFFECTIVE_READER_PERFORMANCE.md. The live FIFO still calls
-the original-B API until reader and Library membership switch together.
+EFFECTIVE_READER_PERFORMANCE.md. The staged effective app routes the existing
+Library event to native-only `LoadEffectiveLibraryWordDistributions` on that same
+FIFO, returning the existing compact result. Shared cache/visibility/busy/time/
+mutation gates, separate error/explicit Retry, rename drafts and frozen deletion
+prompts are preserved. Production Model::default still selects original B until
+Android and the reader switch together. Neither operation can load dictionaries.
 
 `yomoku-import` is a separate pure content-extraction boundary. Its EPUB parser
 reads Stored/Deflate ZIP entries from a borrowed byte slice, without filesystem
@@ -1348,8 +1352,8 @@ FFI still uses `Model::default()`. It is not a user preference or shell toggle.
 The opt-in model routes existing LoadReaderTokens through one lifetime retained
 session and projects `effective_reader_tokens`. Source-preferred furigana
 borrows that compact page. Legacy word/status/custom/completion events fail closed
-in this model until their consumers migrate. Library membership and Android
-activation must change together with those consumers before using it in production.
+in this model until their consumers migrate. Library membership is also staged
+through that model; Android activation remains necessary before production use.
 
 `CompleteEffectiveReaderPage` authenticates the compact displayed revision and
 exact reading position. It freezes the full partition before both accepted and

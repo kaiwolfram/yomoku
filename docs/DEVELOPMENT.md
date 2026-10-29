@@ -5822,3 +5822,50 @@ Production remains B pending effective Library and Android activation. Device,
 separate Full owned/mapped opt-in matrix, release/process death, physical arm64 and
 effective JNI/device/diverse-book performance were not rerun/measured.
 Logs: `/tmp/yomoku-effective-overrides-{initial,core,worker,tests,clippy,host,android,format,codegen}.log`.
+
+
+## Staged effective application Library membership
+
+2026-10-29, repository root, pinned offline tools:
+
+```sh
+export PATH=/home/kai/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin:$PATH
+export JAVA_HOME=/home/kai/repos/yomoku/.local/jdk-17/jdk-17.0.21+9
+export GRADLE_USER_HOME=/home/kai/repos/yomoku/.local/gradle
+export ANDROID_HOME=/home/kai/Android/Sdk
+cargo test -p yomoku-core --test library_words --test effective_app --all-features --locked --offline
+cargo test -p yomoku-runtime effective_application_fifo --all-features --locked --offline
+cargo test --workspace --all-features --locked --offline --quiet
+cargo clippy --workspace --all-targets --all-features --locked --offline -- -D warnings
+cargo fmt --all -- --check
+tools/test-kotlin-bridge.sh
+tools/format-kotlin.sh --check
+./android/gradlew -p android :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug --offline --console=plain
+cargo run -p yomoku-ffi --bin generate-kotlin --features facet_typegen --locked --offline -- target/generated/kotlin
+# Compare SHA-256 of every generated .kt before/after this regeneration.
+git diff --check
+```
+
+PASS: all 702 workspace tests (17 opt-in ignored), strict Clippy/Rustfmt/diff,
+Kotlin formatting, both-ABI app/test APKs and strict Android lint. Five core
+Library cases now exercise both native models (one new); six real app/SQLite/FIFO
+cases pass (two new). The new native operation rejects shell serialization in the
+existing FFI protocol test. Regeneration preserves SHA-256 for all 17 `.kt` files;
+the new operation is absent from the generated Kotlin schema.
+
+PASS: the complete real-Full host Kotlin/JNI suite and Rust-Kotlin-Rust codec
+verification. Existing nonfatal teardown diagnostics remain; the suite exits zero.
+
+The new cases verify effective split membership with registered/absent parts,
+deduplicated repetitions, fresh live status/deletion, reversal/reopen, production
+B isolation, Missing versus zero, whole-chapter corruption and explicit recovery.
+Each real scan compares unchanged database bytes; no analyzer/word dictionary is
+loaded. Shared core contracts cover cache invalidation, separate errors, explicit
+Retry, hidden/busy rejection and retained literal rename/frozen bulk-delete prompts.
+
+Gradle initially failed on sandbox wildcard-IP/local sockets; the escalated rerun
+passes. No schema/dependency change. Production remains B until coordinated
+Android activation. Device/emulator, separate Full owned/mapped opt-in matrix,
+release/process death, physical arm64 and effective JNI/device/diverse-book
+performance were not rerun/measured.
+Logs: `/tmp/yomoku-effective-library-{core,worker,tests,clippy,host,android,format,codegen}.log`.

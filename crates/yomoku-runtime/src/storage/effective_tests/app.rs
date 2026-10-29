@@ -7,6 +7,8 @@ use yomoku_core::{
 
 type AppRouter = HandleEffectLayer<Core<Yomoku>, StorageEffects>;
 
+mod library;
+
 fn router(fixture: &Fixture) -> AppRouter {
     let (effects, _) = StorageEffects::with_dictionaries(
         fixture.path(),

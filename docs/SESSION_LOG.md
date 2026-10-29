@@ -2801,3 +2801,23 @@ change or blocker. Updated plan/handoff/architecture/data/decisions/payload/deve
 Next add the effective Library operation, then activate core/FFI/Android together.
 Device, separate Full opt-in loader matrix, release/process death, physical arm64
 and performance were not rerun. Exact commands/logs: DEVELOPMENT end.
+
+
+## 2026-10-29 — Staged effective application Library membership
+
+Connected the existing Library event to the effective distribution repository via
+one native-only operation on the existing FIFO. Reused compact results, retained
+cache and separate explicit-Retry errors. Preserved visibility/busy/time/mutation
+gates, literal rename drafts, selection and frozen deletion prompts. Production
+Model::default still uses original B pending coordinated Android activation.
+
+Five core Library cases now run against both models (one new), and two new real
+app/SQLite/FIFO cases cover split membership, live status/deletion, reversal/reopen,
+Missing/zero, corrupt-data failure/recovery and unchanged scan bytes. All 702 Rust
+tests (17 opt-in ignored), strict Clippy/fmt, real-Full host Kotlin/JNI, Kotlin
+formatting, unchanged generated Kotlin, both-ABI APKs and Android lint pass. Native operation has no shell codec.
+Gradle required the usual local-socket sandbox escalation. No schema/dependency
+change or blocker. Updated plan/handoff/architecture/data/decisions/payload/development.
+Next activate core/FFI/Android together and expose original-B span selection/editor.
+Device, separate Full opt-in matrix, release/process death, physical arm64 and
+effective device/diverse-book performance were not rerun. Commands/logs: DEVELOPMENT end.

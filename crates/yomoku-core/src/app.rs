@@ -581,7 +581,11 @@ impl App for Yomoku {
                 {
                     return Command::done();
                 }
-                Some(StorageOperation::LoadLibraryWordDistributions)
+                Some(if model.effective_reader.is_some() {
+                    StorageOperation::LoadEffectiveLibraryWordDistributions
+                } else {
+                    StorageOperation::LoadLibraryWordDistributions
+                })
             }
             Event::CreatePaste(text) => Some(StorageOperation::CreatePaste(text.clone())),
             Event::ImportTxt(input) => Some(StorageOperation::ImportTxt(input.clone())),
@@ -723,6 +727,7 @@ impl App for Yomoku {
             model.time_checkpoint_can_wait = match &operation {
                 StorageOperation::List
                 | StorageOperation::LoadLibraryWordDistributions
+                | StorageOperation::LoadEffectiveLibraryWordDistributions
                 | StorageOperation::LoadPaste(_)
                 | StorageOperation::SavePageLength(_)
                 | StorageOperation::SaveReaderTypography(_)
@@ -745,7 +750,7 @@ impl App for Yomoku {
                 if let Some(draft) = model.library_rename.as_mut() {
                     draft.error = None;
                 }
-            } else if operation != StorageOperation::LoadLibraryWordDistributions {
+            } else if !operation.loads_library_words() {
                 model.library_rename = None;
             }
             match &operation {
@@ -757,13 +762,14 @@ impl App for Yomoku {
                     model.pending_documents_delete = Some(ids.clone());
                     model.library_delete_error = None;
                 }
-                StorageOperation::LoadLibraryWordDistributions => {}
+                StorageOperation::LoadLibraryWordDistributions
+                | StorageOperation::LoadEffectiveLibraryWordDistributions => {}
                 _ => {
                     model.clear_library_delete();
                     model.library_selection = None;
                 }
             }
-            if operation == StorageOperation::LoadLibraryWordDistributions {
+            if operation.loads_library_words() {
                 model.loading_library_words = true;
                 model.library_word_distributions = None;
                 model.library_word_error = None;
@@ -771,6 +777,7 @@ impl App for Yomoku {
             if !matches!(
                 operation,
                 StorageOperation::LoadLibraryWordDistributions
+                    | StorageOperation::LoadEffectiveLibraryWordDistributions
                     | StorageOperation::DeleteDocument(_)
                     | StorageOperation::DeleteDocuments(_)
                     | StorageOperation::RenameDocument { .. }

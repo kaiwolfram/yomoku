@@ -258,3 +258,10 @@ retains only selected-span choices and winning-rule facts; full contexts/rule
 revisions/frozen retries stay native. Shared FIFO/time gates include override
 writes; success/stale results require explicit reload. Production remains B until
 the Library and Android consumers switch together. No durable schema change.
+
+
+The staged app now routes the existing Library event to native-only
+`LoadEffectiveLibraryWordDistributions` on the same FIFO and reuses the existing
+compact result, cache and error fields. Serde/Facet skip the new operation;
+generated Kotlin and application wire schemas are unchanged. Production still
+uses B pending Android activation. No new device/performance claim.

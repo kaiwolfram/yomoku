@@ -6,7 +6,7 @@ use crate::effective_session::{EffectiveCompletionProgress, EffectiveReaderProgr
 
 impl Model {
     /// Native integration entry point, not a persisted setting or a shell toggle.
-    /// The remaining Library/Android consumers must migrate before
+    /// The remaining Android consumers must migrate before
     /// production constructs this model. Legacy word/write events fail closed.
     pub fn with_effective_reader() -> Self {
         Self {
