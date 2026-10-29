@@ -235,6 +235,17 @@ identity/selection sizes remain 60/68 bytes. Full callback results move into the
 session without a chapter clone; accepted commands retain shared keys as before.
 
 Production FFI still constructs Model::default, and Android/Library still use B.
-Remaining word/status/custom/override app consumers and Library membership must
+Remaining override app consumers and Library membership must
 migrate before activating this constructor. This is not a user-visible mode.
 No durable schema/payload change, dictionary load or JNI/device performance claim.
+
+The staged application now also routes compact word/status/custom events and
+projects optional `effective_reader_word`/`effective_reader_status`. Word details
+contain only the selected visible token, dictionary candidates/count/custom entry
+and retry/error facts. Status projects pending/busy/error. Neither view sends a
+chapter key. Generated Kotlin fixtures exchange all eight new event variants and
+both populated view fields with maximum IDs/revisions, unresolved metadata and
+literal supplementary/combining/NUL text. Retry/Cancel have no payload; retained
+native commands supply exact values, with a fresh native callback attempt.
+The 60/68-byte identity/selection encoding is unchanged. This changes same-build
+application codecs only; no durable data schema or new device/performance claim.

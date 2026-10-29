@@ -3506,3 +3506,22 @@ Share original/effective position/finish/notice application. Preparation success
 chains commit; failures require explicit retry. AlreadyRecorded is silent, final
 new success returns Library with the existing celebration, and no restart replay
 is added. No dependency, schema, new worker, data semantics or dictionary load.
+
+## 2026-10-29 — Stage compact application word/status/custom consumers
+
+Continue the native effective-model staging slice with typed compact word lookup,
+manual status and custom CRUD events/views. Reuse the retained session and existing
+FIFO adapter; keep production on B until override/Library/Android migrate together.
+Lookup retains no reading writes, custom CRUD changes only literal dictionary
+fallback fields, and storage still validates full provenance/built-in protection.
+
+Expose explicit payload-free Retry/Cancel events for accepted failed status/custom
+writes, as for existing timer/completion retries. Rust retains exact selections,
+values and timestamps; each dispatch gets a fresh callback attempt. Preserve pending
+custom errors even after dismissal so the remaining obligation stays reviewable.
+Defer movement/exit while writes are pending, including failures, and block refresh,
+reflow and other storage work except timer saves. Checkpoints keep coalescing during
+word/status/custom I/O and drain even after failure; departure waits until both time
+slots and writes clear. Cancel never abandons in-flight work. Keep compact status
+facts separately visible after a word panel closes. No new setting, dependency,
+migration, worker, automatic retry/replay or production activation.

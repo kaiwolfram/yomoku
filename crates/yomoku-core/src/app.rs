@@ -20,7 +20,9 @@ use crate::{
     },
     document::{CompletionCommandId, DocumentId, LibraryDocument, ReaderDocument, TextAnchor},
     effective_session::{
-        EffectivePageIdentity, EffectiveReaderPage, EffectiveReaderRequest, EffectiveReaderSession,
+        EffectivePageIdentity, EffectiveReaderPage, EffectiveReaderRequest,
+        EffectiveReaderSelection, EffectiveReaderSession, EffectiveReaderWordState,
+        EffectiveStatusState,
     },
     imports::{EpubImport, SrtImport, TxtImport},
     library::{valid_document_title, LibraryRenameState, LibrarySort, LibraryWordDistribution},
@@ -222,6 +224,24 @@ pub enum Event {
         position: ReadingPosition,
         completed_at_unix_ms: i64,
     },
+    LoadEffectiveReaderWord(EffectiveReaderSelection),
+    SaveEffectiveReaderCustomEntry {
+        selection: EffectiveReaderSelection,
+        english_meaning: String,
+        reading: String,
+    },
+    DeleteEffectiveReaderCustomEntry(EffectiveReaderSelection),
+    /// Retry frozen literal values, or explicitly release a failed write.
+    RetryEffectiveReaderCustomEntry,
+    CancelEffectiveReaderCustomEntry,
+    SetEffectiveReaderStatus {
+        selection: EffectiveReaderSelection,
+        vocabulary_id: crate::document::VocabularyId,
+        status: crate::vocabulary::VocabularyStatus,
+        occurred_at_unix_ms: i64,
+    },
+    RetryEffectiveReaderStatus,
+    CancelEffectiveReaderStatus,
     #[serde(skip)]
     #[cfg_attr(feature = "facet_typegen", facet(skip))]
     EffectiveStorageFinished(
@@ -277,6 +297,8 @@ pub struct ViewModel {
     pub reader_tokens: Option<ReaderTokenSnapshot>,
     /// Native opt-in integration path; production activation waits for all consumers.
     pub effective_reader_tokens: Option<EffectiveReaderPage>,
+    pub effective_reader_word: Option<EffectiveReaderWordState>,
+    pub effective_reader_status: Option<EffectiveStatusState>,
     /// Enabled source-preferred readings, in page-local UTF-8 ranges. No I/O.
     pub reader_furigana: Vec<crate::reader_ruby::ReaderRuby>,
     pub reader_word_selection: Option<ReaderWordSelection>,
@@ -359,7 +381,8 @@ impl App for Yomoku {
         }
         if (model.pending_time_checkpoint.is_some()
             || model.queued_time_checkpoint.is_some()
-            || model.completion_pending())
+            || model.completion_pending()
+            || model.effective_mutation_pending())
             && matches!(
                 event,
                 Event::CloseDocument
@@ -662,6 +685,11 @@ impl App for Yomoku {
             // One in-flight command per session prevents duplicate submissions and
             // stale load/list callbacks from replacing a newer snapshot.
             if model.storage_busy
+                || (model.effective_mutation_pending()
+                    && !matches!(
+                        event,
+                        Event::CheckpointReadingTime(_) | Event::RetryReadingTimeCheckpoint
+                    ))
                 || (model.queued_time_checkpoint.is_some()
                     && !matches!(
                         event,
@@ -1107,8 +1135,8 @@ impl App for Yomoku {
                             model.apply_document_deletion(&ids);
                         }
                     }
-                    // No live event dispatches the native effective protocol yet.
-                    // Its coordinated reader switch must handle these together.
+                    // Effective results must arrive through their captured request,
+                    // never through this uncaptured legacy callback envelope.
                     StorageResult::Effective(_) => {
                         model.document_error = Some(DocumentError::InvalidDocument);
                     }
@@ -1241,8 +1269,10 @@ impl App for Yomoku {
                         if model.completion_pending() {
                             return self.update(Event::RetryReaderCompletion, model);
                         }
-                        if let Some(event) = model.deferred_reader_event.take() {
-                            return self.update(event, model);
+                        if !model.effective_mutation_pending() {
+                            if let Some(event) = model.deferred_reader_event.take() {
+                                return self.update(event, model);
+                            }
                         }
                     }
                     StorageResult::PageCompletionPrepared(prepared) => {
@@ -1408,6 +1438,14 @@ impl App for Yomoku {
             | Event::PreviousReaderPage { .. }
             | Event::ObserveReaderClock(_)
             | Event::CompleteEffectiveReaderPage { .. }
+            | Event::LoadEffectiveReaderWord(_)
+            | Event::SaveEffectiveReaderCustomEntry { .. }
+            | Event::DeleteEffectiveReaderCustomEntry(_)
+            | Event::RetryEffectiveReaderCustomEntry
+            | Event::CancelEffectiveReaderCustomEntry
+            | Event::SetEffectiveReaderStatus { .. }
+            | Event::RetryEffectiveReaderStatus
+            | Event::CancelEffectiveReaderStatus
             | Event::EffectiveStorageFinished(..) => unreachable!(),
         }
         render::render()
@@ -1450,6 +1488,14 @@ impl App for Yomoku {
                 .effective_reader
                 .as_ref()
                 .and_then(|session| session.page().cloned()),
+            effective_reader_word: model
+                .effective_reader
+                .as_ref()
+                .map(|session| session.word_state()),
+            effective_reader_status: model
+                .effective_reader
+                .as_ref()
+                .map(|session| session.status_state()),
             reader_furigana: model
                 .reader_typography
                 .filter(|typography| typography.furigana)
@@ -1535,6 +1581,9 @@ impl Model {
     }
 
     fn clear_reader_word(&mut self) {
+        if let Some(session) = &mut self.effective_reader {
+            session.dismiss_word();
+        }
         self.reader_word_selection = None;
         self.reader_word = None;
         self.reader_word_error = None;

@@ -21,6 +21,9 @@ use yomoku_core::{
     vocabulary::Surface,
 };
 
+#[path = "effective_app/words.rs"]
+mod words;
+
 struct Fixture {
     core: Core<Yomoku>,
     document: ReaderDocument,

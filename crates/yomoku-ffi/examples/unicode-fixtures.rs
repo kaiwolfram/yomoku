@@ -245,7 +245,49 @@ fn main() -> Result<(), Box<dyn Error>> {
     };
     let mut effective_view = crux_core::Core::<yomoku_core::app::Yomoku>::new().view();
     effective_view.effective_reader_tokens = Some(effective_page.clone());
+    effective_view.effective_reader_word = Some(effective_word.clone());
+    effective_view.effective_reader_status =
+        Some(yomoku_core::effective_session::EffectiveStatusState {
+            pending: true,
+            busy: false,
+            error: Some(yomoku_core::storage::DocumentError::Unavailable),
+        });
     effective_view.completion_save_pending = true;
+    use yomoku_core::app::Event as AppEvent;
+    for (index, event) in [
+        AppEvent::LoadEffectiveReaderWord(effective_selection),
+        AppEvent::SaveEffectiveReaderCustomEntry {
+            selection: effective_selection,
+            english_meaning: " literal\0meaning 📖 ".into(),
+            reading: " よみか\u{3099}\0 ".into(),
+        },
+        AppEvent::DeleteEffectiveReaderCustomEntry(effective_selection),
+        AppEvent::RetryEffectiveReaderCustomEntry,
+        AppEvent::CancelEffectiveReaderCustomEntry,
+        AppEvent::SetEffectiveReaderStatus {
+            selection: effective_selection,
+            vocabulary_id: i64::MAX.try_into()?,
+            status: yomoku_core::vocabulary::VocabularyStatus::Ignored,
+            occurred_at_unix_ms: i64::MAX,
+        },
+        AppEvent::RetryEffectiveReaderStatus,
+        AppEvent::CancelEffectiveReaderStatus,
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        if writing {
+            fs::write(
+                dir.join(format!("effective-word-event-{index}.bin")),
+                encode(&event),
+            )?;
+        } else {
+            let returned: AppEvent = BincodeFfiFormat::deserialize(&fs::read(
+                dir.join(format!("effective-word-event-{index}-return.bin")),
+            )?)?;
+            assert_eq!(returned, event);
+        }
+    }
     if writing {
         fs::write(
             dir.join("effective-completion-event.bin"),

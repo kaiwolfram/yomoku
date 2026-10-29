@@ -1,5 +1,5 @@
 # Resume here
-Updated: 2026-10-29. Effective app page/completion path staged; remaining consumers next.
+Updated: 2026-10-29. Effective app word/status/custom staged; overrides/Library next.
 ## Working
 - Rename: retained literal draft/Cancel/Retry; title-only atomic save, no-op retries.
 - Single/bulk deletion: one transaction, history/vocabulary/rules retained; reimport fresh.
@@ -30,20 +30,16 @@ Updated: 2026-10-29. Effective app page/completion path staged; remaining consum
 - Completion freezes page/position/preset/B/time, drains final time then FIFO reserves
   ID + duration. One transaction writes occurrences, New-only Known/history/time/
   position/finish. Exact retries; AlreadyRecorded/zero silent, positive toast once.
-- TXT/SRT strict UTF-8/Shift-JIS preserve original bytes/filename/encoding/B and
-  canonical ruby/SRT cues; exact duplicate's first interpretation wins.
-- Retained mixed FileImports reads off main by extension, accepts generic MIME;
-  TXT/SRT encoding/Skip/errors and progress survive recreation. No restart queue.
+- TXT/SRT preserve bytes/filename/encoding/B and canonical ruby/cues; first import wins.
+- Mixed FileImports reads off main; encoding/Skip/errors survive recreation; no restart queue.
 - Direct off-main cancelFileImport bypasses FIFO; COMMIT may wait. Silent full-file
   rollback; winning/prior commits stay. Android ignores late reads and awaits BOTH
   native return + outcome before clearing/draining. Dedicated cancellation executor.
 - Bounded EPUB parser ignores CSS; migration 0014 atomically saves original source,
   ordered content/formatting/ruby/images/B/registration. Snapshot loads verify all
   source/assets without parsing; limited host EPUB costs measured, device pending.
-- ReaderDocument carries keyed validated heading/emphasis/strong/HTTP(S) spans;
-  ReaderPage clips to page-local UTF-8; generated JNI/Compose preserve exact text.
-- Keyed image placeholders/alt/metadata; no BLOBs in state. One-shot FIFO reads
-  verify live ownership/media/SHA-256/32 MiB cap.
+- Keyed heading/emphasis/strong/HTTP(S) spans clip to page UTF-8; JNI preserves text.
+- Image placeholders/alt/metadata, no BLOB state; FIFO validates owner/media/SHA/32 MiB.
 - Serial bounds-first decode: <=32768-edge/100 MP source, <=2048-edge sample,
   16 MiB shared page pixels; repeats share bitmaps. Ratio frames <=8192px preserve
   U+FFFC positions/styles/word/link identity; unsupported images keep alt/Retry.
@@ -65,16 +61,20 @@ Updated: 2026-10-29. Effective app page/completion path staged; remaining consum
 - Native Model::with_effective_reader(): LoadReaderTokens + compact effective_reader_tokens,
   effective furigana + CompleteEffectiveReaderPage; captured FIFO callbacks, both final-time
   slots before preparation, exact retry/finish/notice/departure. Production default stays B;
-  legacy word/status/custom/completion events reject in opt-in model until migration.
+  legacy word/status/custom/completion events reject in opt-in model.
+- Compact effective app word/status/custom events/views use retained FIFO requests;
+  literal retries/Cancel, five statuses/repeats/deletion and built-in gates. Pending
+  writes/errors survive dismissal; time drains before deferred movement after Retry/Cancel.
 ## Next tasks (ordered)
-1. Integrate compact word/status/custom/override events/views into app/effective.rs using
-   retained requests; preserve shared FIFO/time/retry gates. Add effective Library operation.
+1. Integrate compact override events/views into app/effective.rs using retained requests;
+   preserve shared FIFO/time/retry gates. Add effective Library operation.
    Model::with_effective_reader is native staging only; do not activate production yet.
 2. Switch production core/FFI/Android together using effectiveDisplayTokens and compact
    events; expose ReaderBoundaryEditor with original-B span selection. See payload doc.
 3. Measure JNI/device/diverse/image-heavy costs; host baselines in performance doc.
 Physical arm64 deferred; Nostr empty; Q188 unresolved before forwarding.
 ## Verification
-- PASS: 685 Rust (17 opt-in ignored), strict Clippy/fmt, host Kotlin/JNI/codecs.
-- PASS: both-ABI APKs/lint, 11 phone bridge/navigation/clock cases. Commands: DEVELOPMENT end.
+- PASS: 694 Rust (17 opt-in ignored), strict Clippy/fmt, host Kotlin/JNI/new codecs.
+- PASS: both-ABI APKs/lint. Device not rerun; prior 11 cases pass. Commands: DEVELOPMENT end.
+- Initial existing import teardown assertion failed; focused/full reruns pass.
 - No schema/dependency change; production reader/Library still B. No blocker.

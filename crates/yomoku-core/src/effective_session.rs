@@ -1,6 +1,6 @@
 //! Compact effective-reader identities backed by one retained Rust page.
 //!
-//! Application page/completion integration is staged through a native opt-in
+//! Application page/word/status/custom/completion integration is staged through a native opt-in
 //! model ahead of the coordinated production switch. Full chapter provenance
 //! never belongs in shell callbacks.
 

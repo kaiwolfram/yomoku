@@ -6,7 +6,7 @@ use crate::effective_session::{EffectiveCompletionProgress, EffectiveReaderProgr
 
 impl Model {
     /// Native integration entry point, not a persisted setting or a shell toggle.
-    /// The remaining word/status/custom/Library consumers must migrate before
+    /// The remaining override/Library/Android consumers must migrate before
     /// production constructs this model. Legacy word/write events fail closed.
     pub fn with_effective_reader() -> Self {
         Self {
@@ -21,6 +21,22 @@ impl Model {
                 .effective_reader
                 .as_ref()
                 .is_some_and(|session| session.completion_state().pending)
+    }
+
+    pub(super) fn effective_mutation_pending(&self) -> bool {
+        self.effective_reader
+            .as_ref()
+            .is_some_and(|session| session.mutation_pending())
+    }
+
+    fn can_start_effective_selection(&self, selection: EffectiveReaderSelection) -> bool {
+        !self.storage_busy
+            && !self.settings_open
+            && self.pending_time_checkpoint.is_none()
+            && self.queued_time_checkpoint.is_none()
+            && !self.completion_pending()
+            && self.deferred_reader_event.is_none()
+            && self.current_token_key() == Some(selection.page.base)
     }
 
     pub(super) fn invalidate_effective_page(&mut self) {
@@ -77,7 +93,19 @@ impl Yomoku {
         model: &mut Model,
     ) -> Option<Command<Effect, Event>> {
         if model.effective_reader.is_none() {
-            return matches!(event, Event::CompleteEffectiveReaderPage { .. }).then(Command::done);
+            return matches!(
+                event,
+                Event::CompleteEffectiveReaderPage { .. }
+                    | Event::LoadEffectiveReaderWord(_)
+                    | Event::SaveEffectiveReaderCustomEntry { .. }
+                    | Event::DeleteEffectiveReaderCustomEntry(_)
+                    | Event::RetryEffectiveReaderCustomEntry
+                    | Event::CancelEffectiveReaderCustomEntry
+                    | Event::SetEffectiveReaderStatus { .. }
+                    | Event::RetryEffectiveReaderStatus
+                    | Event::CancelEffectiveReaderStatus
+            )
+            .then(Command::done);
         }
         // Until migrated, old token indices must never select/complete an
         // effective partition. This native opt-in cannot silently fall back to B.
@@ -92,12 +120,113 @@ impl Yomoku {
             return Some(Command::done());
         }
         match event {
+            Event::LoadEffectiveReaderWord(selection) => {
+                if !model.can_start_effective_selection(*selection)
+                    || model.effective_mutation_pending()
+                {
+                    return Some(Command::done());
+                }
+                let request = model
+                    .effective_reader
+                    .as_mut()
+                    .expect("opt-in checked")
+                    .begin_word_load(*selection);
+                Some(request.map_or_else(Command::done, |request| {
+                    self.dispatch_effective(EffectiveReaderRequest::Word(request), model)
+                }))
+            }
+            Event::SaveEffectiveReaderCustomEntry {
+                selection,
+                english_meaning,
+                reading,
+            } => {
+                if !model.can_start_effective_selection(*selection) {
+                    return Some(Command::done());
+                }
+                let request = model
+                    .effective_reader
+                    .as_mut()
+                    .expect("opt-in checked")
+                    .begin_custom_entry_save(*selection, english_meaning.clone(), reading.clone());
+                Some(request.map_or_else(Command::done, |request| {
+                    self.dispatch_effective(EffectiveReaderRequest::Word(request), model)
+                }))
+            }
+            Event::DeleteEffectiveReaderCustomEntry(selection) => {
+                if !model.can_start_effective_selection(*selection) {
+                    return Some(Command::done());
+                }
+                let request = model
+                    .effective_reader
+                    .as_mut()
+                    .expect("opt-in checked")
+                    .begin_custom_entry_delete(*selection);
+                Some(request.map_or_else(Command::done, |request| {
+                    self.dispatch_effective(EffectiveReaderRequest::Word(request), model)
+                }))
+            }
+            Event::SetEffectiveReaderStatus {
+                selection,
+                vocabulary_id,
+                status,
+                occurred_at_unix_ms,
+            } => {
+                if !model.can_start_effective_selection(*selection) {
+                    return Some(Command::done());
+                }
+                let request = model
+                    .effective_reader
+                    .as_mut()
+                    .expect("opt-in checked")
+                    .begin_status_change(*selection, *vocabulary_id, *status, *occurred_at_unix_ms);
+                Some(request.map_or_else(Command::done, |request| {
+                    self.dispatch_effective(EffectiveReaderRequest::Status(request), model)
+                }))
+            }
+            Event::RetryEffectiveReaderCustomEntry | Event::RetryEffectiveReaderStatus => {
+                if model.storage_busy
+                    || model.pending_time_checkpoint.is_some()
+                    || model.queued_time_checkpoint.is_some()
+                {
+                    return Some(Command::done());
+                }
+                let session = model.effective_reader.as_mut().expect("opt-in checked");
+                let request = if matches!(event, Event::RetryEffectiveReaderCustomEntry) {
+                    session
+                        .retry_custom_entry()
+                        .map(EffectiveReaderRequest::Word)
+                } else {
+                    session
+                        .retry_status_change()
+                        .map(EffectiveReaderRequest::Status)
+                };
+                Some(request.map_or_else(Command::done, |request| {
+                    self.dispatch_effective(request, model)
+                }))
+            }
+            Event::CancelEffectiveReaderCustomEntry | Event::CancelEffectiveReaderStatus => {
+                if model.storage_busy {
+                    return Some(Command::done());
+                }
+                let session = model.effective_reader.as_mut().expect("opt-in checked");
+                let cancelled = if matches!(event, Event::CancelEffectiveReaderCustomEntry) {
+                    session.cancel_custom_entry_retry()
+                } else {
+                    session.cancel_status_retry()
+                };
+                Some(if cancelled {
+                    self.drain_effective(model)
+                } else {
+                    Command::done()
+                })
+            }
             Event::LoadReaderTokens(base) => {
                 if model.storage_busy
                     || model.settings_open
                     || model.pending_time_checkpoint.is_some()
                     || model.queued_time_checkpoint.is_some()
                     || model.completion_pending()
+                    || model.effective_mutation_pending()
                     || model.deferred_reader_event.is_some()
                     || model.current_token_key() != Some(*base)
                 {
@@ -187,7 +316,12 @@ impl Yomoku {
         model: &mut Model,
     ) -> Command<Effect, Event> {
         model.storage_busy = true;
-        model.time_checkpoint_can_wait = matches!(request, EffectiveReaderRequest::Tokens(_));
+        model.time_checkpoint_can_wait = matches!(
+            request,
+            EffectiveReaderRequest::Tokens(_)
+                | EffectiveReaderRequest::Word(_)
+                | EffectiveReaderRequest::Status(_)
+        );
         model.effective_request = Some(request.clone());
         model.document_error = None;
         render::render().and(
@@ -210,7 +344,7 @@ impl Yomoku {
             .effective_reader
             .as_mut()
             .and_then(|session| session.finish_request(request, result));
-        // A dismissed token read has lost its page lifecycle but still owns the
+        // A dismissed read has lost its presentation lifecycle but still owns the
         // app's FIFO slot. Release only its captured request, never newer work.
         model.effective_request = None;
         model.storage_busy = false;
@@ -218,6 +352,13 @@ impl Yomoku {
         match progress {
             Some(EffectiveReaderProgress::TokensFailed(error)) => {
                 model.document_error = Some(error);
+            }
+            Some(
+                EffectiveReaderProgress::WordFinished | EffectiveReaderProgress::StatusFinished,
+            ) => {
+                // Word reads/status writes can observe changes made by another session,
+                // including deleted entries. Never retain a stale Library distribution.
+                model.invalidate_library_words();
             }
             Some(EffectiveReaderProgress::Completion(EffectiveCompletionProgress::Prepared)) => {
                 return self.update(Event::RetryReaderCompletion, model);
@@ -235,11 +376,15 @@ impl Yomoku {
             }
             _ => {}
         }
+        self.drain_effective(model)
+    }
+
+    fn drain_effective(&self, model: &mut Model) -> Command<Effect, Event> {
         if model.pending_time_checkpoint.is_none() {
             if let Some(checkpoint) = model.queued_time_checkpoint {
                 return self.update(Event::CheckpointReadingTime(checkpoint), model);
             }
-            if !model.completion_pending() {
+            if !model.completion_pending() && !model.effective_mutation_pending() {
                 if let Some(event) = model.deferred_reader_event.take() {
                     return self.update(event, model);
                 }

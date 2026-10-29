@@ -1346,7 +1346,7 @@ this adapter; live Event/ViewModel/Android adoption remains pending.
 `Model::with_effective_reader()` is a native integration constructor; production
 FFI still uses `Model::default()`. It is not a user preference or shell toggle.
 The opt-in model routes existing LoadReaderTokens through one lifetime retained
-session and projects only `effective_reader_tokens`. Source-preferred furigana
+session and projects `effective_reader_tokens`. Source-preferred furigana
 borrows that compact page. Legacy word/status/custom/completion events fail closed
 in this model until their consumers migrate. Library membership and Android
 activation must change together with those consumers before using it in production.
@@ -1367,3 +1367,23 @@ failed checkpoints, and drain before deferred departure. Original/effective
 completions share position, final-page return, positive-only word notice and
 new-success-only celebration handling. AlreadyRecorded stays silent. No automatic
 restart replay, worker, dictionary access, persistent registry or schema change.
+
+The staged app also accepts `LoadEffectiveReaderWord`,
+`SetEffectiveReaderStatus` and effective custom-entry save/delete events. Each
+selection contains only page revision/base and effective segment index; full keys
+and literal retry payloads stay in the retained session. Optional
+`effective_reader_word` and `effective_reader_status` project compact details,
+errors, busy state and pending write obligations. Legacy selection events still
+fail closed. Production remains original B pending override/Library/Android adoption.
+
+Word/status/custom requests use the same captured FIFO callback and allow clock
+checkpoints to coalesce while busy. Failed writes retain exact native commands;
+explicit Retry gets a fresh attempt, and Cancel releases only failed work. Pending
+writes defer departure and block page refresh/reflow/import/other selections;
+clock checkpoints still drain on failure. Dismissal/settings hide word details but
+preserve pending custom errors and writes until success/Cancel. Deferred movement
+waits for both time slots and writes. Word reads/status results refresh repeated
+surface observations and invalidate Library bars, including vocabulary deletion.
+Custom CRUD never changes registration/status/history. Built-in protection and
+stale provenance checks remain transaction-local in storage. Only word/custom
+lookup loads the lazy word/name index; no new analyzer access or worker is added.

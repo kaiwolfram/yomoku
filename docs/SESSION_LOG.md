@@ -2760,3 +2760,24 @@ Next integrate app word/status/custom/override + effective Library, then activat
 core/FFI/Android together and expose the prepared boundary editor. Physical arm64,
 separate Full opt-in loader matrix, release/process death and effective device
 performance were not rerun. Exact commands/logs/failures: DEVELOPMENT end.
+
+## 2026-10-29 — Staged effective application word/status/custom consumers
+
+Integrated compact selected-word, five-status and custom CRUD events/views into
+the native effective app model through retained requests and the existing FIFO.
+Reads preserve unresolved metadata and live deletion/counts; custom writes preserve
+literal fields and built-in gates. Failed status/custom writes retain exact Retry/
+Cancel obligations and pending custom errors after dismissal. Clock saves coalesce
+and drain on failures; deferred movement waits for time and write resolution.
+Stale/late callbacks cannot consume newer work. Production remains original B.
+
+Seven new pure app and two real app/SQLite/FIFO cases pass; 694 workspace tests
+(17 opt-in ignored), strict Clippy/fmt, real-Full host Kotlin/JNI, eight new event/
+populated-view codec exchanges, 18-file identical regeneration, both-ABI APKs and
+Android lint pass. Initial fixture compile issues were corrected. The first full
+run hit an existing import lifecycle teardown assertion; isolated/full reruns pass.
+Gradle needed the usual local-socket escalation. No dependency/schema change or
+blocker. Updated plan/handoff/architecture/data/decisions/payload/development.
+Next integrate app override consumers + effective Library, then activate core/FFI/
+Android together. Device, separate Full opt-in matrix, release/process death,
+physical arm64 and performance were not rerun. Exact commands/logs: DEVELOPMENT end.

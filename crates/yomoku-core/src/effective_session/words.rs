@@ -95,6 +95,18 @@ impl WordState {
 }
 
 impl EffectiveReaderSession {
+    /// Accepted writes survive dismissal/invalidation until success or Cancel.
+    pub fn mutation_pending(&self) -> bool {
+        self.status_state().pending || self.custom_entry_pending()
+    }
+
+    fn custom_entry_pending(&self) -> bool {
+        self.words
+            .pending
+            .as_ref()
+            .is_some_and(|request| request.action != Action::Load)
+    }
+
     pub(super) fn observe_word_status(
         &mut self,
         page: super::EffectivePageIdentity,
@@ -120,11 +132,7 @@ impl EffectiveReaderSession {
             error: self.words.error,
             custom_entry_error: self.words.custom_error,
             busy: self.words.in_flight,
-            custom_entry_pending: self
-                .words
-                .pending
-                .as_ref()
-                .is_some_and(|request| request.action != Action::Load),
+            custom_entry_pending: self.custom_entry_pending(),
         }
     }
 
@@ -134,7 +142,9 @@ impl EffectiveReaderSession {
         self.words.selection = None;
         self.words.details = None;
         self.words.error = None;
-        self.words.custom_error = None;
+        if !self.custom_entry_pending() {
+            self.words.custom_error = None;
+        }
     }
 
     /// The app also applies its shared FIFO/time/completion busy gates before
@@ -262,6 +272,7 @@ impl EffectiveReaderSession {
         match result {
             Ok(details) => {
                 self.words.pending = None;
+                self.words.custom_error = None;
                 if visible {
                     if let Some(details) = details {
                         // A read observes live status, including deletion. Repeated
@@ -299,9 +310,7 @@ impl EffectiveReaderSession {
             Err(error) => {
                 // Keep the frozen command for explicit retry; the last committed
                 // entry remains displayed until success.
-                if visible {
-                    self.words.custom_error = Some(error);
-                }
+                self.words.custom_error = Some(error);
             }
         }
         true

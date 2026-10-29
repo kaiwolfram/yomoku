@@ -1580,9 +1580,18 @@ literal Unicode. Full resolved chapters and durable reservations remain native.
 The skipped EffectiveStorageFinished event captures a boxed native request and
 moves the storage result; it has no shell representation.
 
+The staged application also projects optional `effective_reader_word` and
+`effective_reader_status` using the compact retained-session schemas. New effective
+word/status/custom events authenticate visible page/segment selections. Retry and
+Cancel carry no mutable payload: native accepted commands own the exact key,
+vocabulary ID/choice/time or literal custom meaning/reading. Fresh attempts protect
+callbacks. Pending writes and custom errors survive dismissal/invalidation;
+departure waits for explicit success/Cancel and final-time drain. No history,
+registration or status event is created by lookup/custom CRUD.
+
 Only the native `Model::with_effective_reader()` integration constructor enables
-this page/completion path. Production uses its existing B model pending migration
-of all word/status/custom/override, Library and Android consumers. Accepted
+this staged path. Production uses its existing B model pending migration
+of override, Library and Android consumers. Accepted
 completion/time obligations are ephemeral model state backed by the existing
 version-1 durable reservations and exact replay semantics; new sessions never
 resume unfinished work automatically. No data/migration/destructive change.

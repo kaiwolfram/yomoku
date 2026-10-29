@@ -1,6 +1,7 @@
 package app.yomoku.tests
 
 import app.yomoku.shared.ChapterText
+import app.yomoku.shared.DocumentError
 import app.yomoku.shared.DocumentId
 import app.yomoku.shared.EffectiveReaderPage
 import app.yomoku.shared.EffectiveReaderSelection
@@ -134,6 +135,38 @@ fun verifyTextBoundaries(directory: String) {
     check(effectiveWord.error == null && effectiveWord.customEntryError != null)
     check(effectiveWord.bincodeSerialize().contentEquals(effectiveWordBytes))
     File(dir, "effective-word-return.bin").writeBytes(effectiveWord.bincodeSerialize())
+    check(view.effectiveReaderWord == effectiveWord)
+    val effectiveStatus = checkNotNull(view.effectiveReaderStatus)
+    check(effectiveStatus.pending && !effectiveStatus.busy)
+    check(effectiveStatus.error == DocumentError.UNAVAILABLE)
+    for (index in 0..7) {
+        val bytes = File(dir, "effective-word-event-$index.bin").readBytes()
+        val event = Event.bincodeDeserialize(bytes)
+        when (index) {
+            0 -> check((event as Event.LoadEffectiveReaderWord).value == effectiveSelection)
+            1 -> {
+                event as Event.SaveEffectiveReaderCustomEntry
+                check(event.selection == effectiveSelection)
+                check(event.englishMeaning == customEntry.englishMeaning)
+                check(event.reading == customEntry.reading)
+            }
+            2 ->
+                check((event as Event.DeleteEffectiveReaderCustomEntry).value == effectiveSelection)
+            3 -> check(event is Event.RetryEffectiveReaderCustomEntry)
+            4 -> check(event is Event.CancelEffectiveReaderCustomEntry)
+            5 -> {
+                event as Event.SetEffectiveReaderStatus
+                check(event.selection == effectiveSelection)
+                check(event.vocabularyId.value == Long.MAX_VALUE)
+                check(event.status == VocabularyStatus.IGNORED)
+                check(event.occurredAtUnixMs == Long.MAX_VALUE)
+            }
+            6 -> check(event is Event.RetryEffectiveReaderStatus)
+            7 -> check(event is Event.CancelEffectiveReaderStatus)
+        }
+        check(event.bincodeSerialize().contentEquals(bytes))
+        File(dir, "effective-word-event-$index-return.bin").writeBytes(event.bincodeSerialize())
+    }
 
     val selections = listOf("", "日本語", "𠮷野家😀", "か\u3099", "👩‍👩‍👧‍👦", "第二行\n\n", "端")
     for ((index, selected) in selections.withIndex()) {

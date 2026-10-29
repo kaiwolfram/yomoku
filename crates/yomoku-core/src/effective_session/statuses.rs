@@ -7,6 +7,7 @@ use crate::{
     storage::DocumentError,
     vocabulary::VocabularyStatus,
 };
+use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct EffectiveStatusRequest {
@@ -29,8 +30,9 @@ impl EffectiveStatusRequest {
     }
 }
 
-/// Native facts for the live app's shared busy/error projection at integration.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+/// Compact facts for the app's shared pending/busy/error projection.
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
 pub struct EffectiveStatusState {
     pub pending: bool,
     pub busy: bool,

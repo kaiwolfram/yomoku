@@ -5716,3 +5716,58 @@ next; no schema/dependency/data-destructive change. No new performance claim.
 Separate Full owned/mapped opt-in matrix, tablet/dark, process death, release,
 physical arm64 and effective JNI/device measurements were not rerun.
 Logs: `/tmp/yomoku-effective-app-{focused,worker,tests,clippy,host,android,device,format}.log`.
+
+## Staged effective application word/status/custom consumers
+
+2026-10-29, repository root, pinned offline tools:
+
+```sh
+export PATH=/home/kai/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin:$PATH
+export JAVA_HOME=/home/kai/repos/yomoku/.local/jdk-17/jdk-17.0.21+9
+export GRADLE_USER_HOME=/home/kai/repos/yomoku/.local/gradle
+export ANDROID_HOME=/home/kai/Android/Sdk
+cargo test -p yomoku-core --test effective_app --test effective_session --all-features --locked --offline
+cargo test -p yomoku-runtime effective_application_fifo --all-features --locked --offline
+cargo test --workspace --all-features --locked --offline --quiet
+cargo test -p yomoku-runtime --test imports load_engine_and_invalid_output_failures_roll_back_and_retry_fresh --all-features --locked --offline
+# Repeat workspace tests after the initial transient import teardown assertion.
+cargo test --workspace --all-features --locked --offline --quiet
+cargo clippy --workspace --all-targets --all-features --locked --offline -- -D warnings
+cargo fmt --all -- --check
+tools/test-kotlin-bridge.sh
+tools/format-kotlin.sh --check
+"$JAVA_HOME/bin/java" -jar .local/ktfmt-0.64.jar --kotlinlang-style --dry-run --set-exit-if-changed tests/kotlin/TextBoundaryTest.kt
+./android/gradlew -p android :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug --offline --console=plain
+git diff --check
+```
+
+PASS: 13 pure actual-app cases (seven new), 53 retained-session cases, three real
+actual-app/FIFO/SQLite cases (two new), all 694 workspace tests (17 opt-in ignored),
+strict Clippy/Rustfmt/diff, real-Full host Kotlin/JNI suite, eight new compact event
+and populated word/status ViewModel Rust-Kotlin-Rust exchanges, Kotlin formatting,
+both-ABI app/test APKs and strict Android lint. After the final exported comment
+change, two identical generate-kotlin runs compare SHA-256 for all 18 generated
+files; all identical. Identity/selection remain 60/68 bytes.
+
+The app tests cover visible revision/segment guards, malformed/read failure and
+explicit retry, unresolved manual metadata, all five statuses/repeated spellings,
+deleted vocabulary/counts, custom literal Unicode/NUL fields, built-in gates,
+rollback/reopen, exact retry/Cancel, pending error preservation after dismissal,
+late native callback ownership, coalesced final time and deferred departure/reflow.
+The real status fixture has panic dictionary loaders and checks no reading writes;
+the real custom fixture compares unchanged DB bytes on lookup/built-in rejection,
+reopens committed literal entries, and verifies no registration/status/history.
+
+Initial test compilation needed an explicit submodule path, the actual custom
+repository API (the assertion uses SQLite to read global literal entries), and a
+borrow fix in the test fixture. The first full run hit the existing import test's
+immediate post-drop lifecycle assertion at imports.rs:439; its isolated rerun and
+the entire second workspace run pass. No unrelated production change was made.
+Gradle initially failed on sandbox wildcard-IP/local sockets; the escalated rerun
+passes. Existing nonfatal host teardown diagnostics remain. No remaining blocker.
+
+Production still constructs Model::default; override app events/effective Library
+and Android activation remain next. No schema/dependency change. Device/emulator,
+separate Full owned/mapped opt-in matrix, release/process-death, physical arm64,
+effective JNI/device performance and diverse/image-heavy costs were not rerun.
+Logs: `/tmp/yomoku-effective-words-{core,worker,tests,tests-retry,import-retry,clippy,host,android,format,codegen}.log`.
