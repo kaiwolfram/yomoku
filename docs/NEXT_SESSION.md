@@ -1,5 +1,5 @@
 # Resume here
-Updated: 2026-10-29. Effective app Library staged; Android activation next.
+Updated: 2026-10-29. Android effective words isolated; coordinated activation next.
 ## Working
 - Rename: retained literal draft/Cancel/Retry; title-only atomic save, no-op retries.
 - Single/bulk deletion: one transaction, history/vocabulary/rules retained; reimport fresh.
@@ -21,9 +21,8 @@ Updated: 2026-10-29. Effective app Library staged; Android activation next.
 - Token reads atomically load original B/live statuses/metadata + clipped UTF-8
   ranges; completion owns token start. Deleted IDs absent. Whole-chapter validation.
   Strict UTF-8→UTF-16 failure falls back to plain text. Loads wait for pending saves.
-- Five manual statuses atomically update history; same-status no-op. Deleted entries
-  never register. Reads/choices need explicit retry. Phone sheet/wide panel shows
-  original/base, senses/POS/names/counts. Read-only opening; movement dismisses.
+- Five statuses atomically update history; same-status no-op/deleted entries absent.
+  Read-only phone/wide details: original/base/senses/POS/names/counts; Retry; movement dismisses.
 - Clock uses elapsedRealtime/15s checkpoints, restore-before-Resume, five-minute
   idle/background cap and movement epochs. Absolute revisions freeze retries,
   coalesce maxima and drain before movement/exit. CoreSession close retains callbacks
@@ -36,9 +35,8 @@ Updated: 2026-10-29. Effective app Library staged; Android activation next.
 - Direct off-main cancelFileImport bypasses FIFO; COMMIT may wait. Silent full-file
   rollback; winning/prior commits stay. Android ignores late reads and awaits BOTH
   native return + outcome before clearing/draining. Dedicated cancellation executor.
-- Bounded EPUB parser ignores CSS; migration 0014 atomically saves original source,
-  ordered content/formatting/ruby/images/B/registration. Snapshot loads verify all
-  source/assets without parsing; limited host EPUB costs measured, device pending.
+- EPUB (0014) ignores CSS; atomic source/content/formatting/ruby/images/B/registration.
+  Snapshot verifies source/assets without parsing; host costs measured, device pending.
 - Keyed heading/emphasis/strong/HTTP(S) spans clip to page UTF-8; JNI preserves text.
 - Image placeholders/alt/metadata, no BLOB state; FIFO validates owner/media/SHA/32 MiB.
 - Serial bounds-first decode: <=32768-edge/100 MP source, <=2048-edge sample,
@@ -65,15 +63,17 @@ Updated: 2026-10-29. Effective app Library staged; Android activation next.
   legacy word/status/custom/completion events reject in opt-in model.
 - Compact effective app word/status/custom: retained FIFO, literal Retry/Cancel, five statuses,
   repeats/deletion/built-in gates. Dismissed writes/errors retained; time drains before movement.
-- Compact app override actions/state use retained FIFO requests; prompt-scoped writes,
-  exact Retry/Cancel, explicit reload, Library invalidation and final-time/movement gates.
+- Compact app overrides: FIFO/prompt writes, Retry/Cancel/reload, Library/time gates.
+- Android EffectiveReaderWords isolated: compact ranges/word/status/custom, native
+  Retry/Cancel after dismissal, session/revision guards, literal drafts/Rust whitespace.
 ## Next tasks (ordered)
-1. Switch production core/FFI/Android together using effectiveDisplayTokens and compact
-   events; expose ReaderBoundaryEditor with original-B span selection. See payload doc.
-   Model::with_effective_reader stays native staging until all Android consumers migrate.
+1. Wire EffectiveReaderWords with a retained native-session key; migrate Android
+   navigation/completion/clock intent and original-B span selection/ReaderBoundaryEditor.
+   Then activate core/FFI/Android together; Model::with_effective_reader stays staged.
 2. Measure JNI/device/diverse/image-heavy costs; host baselines in performance doc.
 Physical arm64 deferred; Nostr empty; Q188 unresolved before forwarding.
 ## Verification
-- PASS: 702 Rust (17 opt-in ignored), strict Clippy/fmt, real-Full host JNI/codecs.
-- PASS: both-ABI APKs/lint. Device not rerun; prior 11 cases pass. Commands: DEVELOPMENT end.
+- PASS: 70 focused Rust, real-Full host JNI/codecs, Kotlin fmt, both-ABI APKs/lint.
+- PASS: 27 distinct phone cases; 11 compact wide-dark cases. Emulator restored/stopped.
+- Prior full Rust/Clippy: 702 (17 ignored). Commands/logs: DEVELOPMENT end.
 - Gradle socket escalation passes; no blocker/schema/dependency change. Production B.

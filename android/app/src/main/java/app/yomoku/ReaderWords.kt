@@ -57,8 +57,8 @@ import app.yomoku.shared.Event
 import app.yomoku.shared.ReaderStatusChange
 import app.yomoku.shared.ReaderTextSpan
 import app.yomoku.shared.ReaderTextStyle
-import app.yomoku.shared.ReaderToken
 import app.yomoku.shared.ReaderTokenKey
+import app.yomoku.shared.ReaderVocabulary
 import app.yomoku.shared.ReaderWordSelection
 import app.yomoku.shared.ViewModel
 import app.yomoku.shared.VocabularyStatus
@@ -81,6 +81,37 @@ internal fun readerAnnotatedText(
     formatting: List<ReaderTextSpan> = emptyList(),
     linkColor: Color = foreground,
     onExternalLink: (String) -> Unit = {},
+    onToken: (ULong) -> Unit,
+): AnnotatedString =
+    readerAnnotatedSpans(
+        text,
+        tokens.map {
+            ReaderAnnotatedToken(it.token.tokenIndex, it.token.vocabulary?.status, it.start, it.end)
+        },
+        dark,
+        foreground,
+        formatting,
+        linkColor,
+        onExternalLink,
+        onToken,
+    )
+
+internal data class ReaderAnnotatedToken(
+    val index: ULong,
+    val status: VocabularyStatus?,
+    val start: Int,
+    val end: Int,
+)
+
+/** Shared formatting/geometry only; each reader owns its selection identity. */
+internal fun readerAnnotatedSpans(
+    text: String,
+    tokens: List<ReaderAnnotatedToken>,
+    dark: Boolean,
+    foreground: Color,
+    formatting: List<ReaderTextSpan>,
+    linkColor: Color,
+    onExternalLink: (String) -> Unit,
     onToken: (ULong) -> Unit,
 ): AnnotatedString = buildAnnotatedString {
     append(text)
@@ -122,29 +153,28 @@ internal fun readerAnnotatedText(
             }
         }
     }
-    for ((token, start, end) in tokens) {
+    for ((index, status, start, end) in tokens) {
         addStyle(
-            SpanStyle(background = vocabularyBackground(token.vocabulary?.status, dark)),
+            SpanStyle(background = vocabularyBackground(status, dark)),
             start,
             end,
         )
         // Source website links own their tap area; the remaining token fragments
-        // retain the full original dictionary identity and vocabulary highlight.
+        // retain their owning selection identity and vocabulary highlight.
         for (range in readerUncoveredRanges(start, end, external)) {
             addLink(
                 LinkAnnotation.Clickable(
-                    tag = "reader_token_${token.tokenIndex}",
+                    tag = "reader_token_${index}",
                     styles =
                         TextLinkStyles(
                             style =
                                 SpanStyle(
                                     color = foreground,
-                                    background =
-                                        vocabularyBackground(token.vocabulary?.status, dark),
+                                    background = vocabularyBackground(status, dark),
                                     textDecoration = TextDecoration.None,
                                 )
                         ),
-                    linkInteractionListener = { onToken(token.tokenIndex) },
+                    linkInteractionListener = { onToken(index) },
                 ),
                 range.first,
                 range.last + 1,
@@ -249,23 +279,48 @@ internal fun ReaderWords(
     val selected = tokens?.singleOrNull { it.token.tokenIndex == selectedIndex }?.token
     if (selected != null && key != null) {
         ReaderWordPanel(
-            selected,
-            view,
+            ReaderWordHeader(
+                selected.surface,
+                selected.reading,
+                selected.dictionaryForm,
+                selected.vocabulary,
+            ),
             canWrite,
             onInteraction,
             onClose = {
                 selectedIndex = null
                 dispatch(Event.DismissReaderWord)
             },
-            onRetry = { selection?.let { dispatch(Event.LoadReaderWord(it)) } },
-            dispatch = dispatch,
-        ) { status ->
-            selected.vocabulary?.let {
-                dispatch(
-                    Event.SetReaderStatus(
-                        ReaderStatusChange(key, it.id, status, System.currentTimeMillis())
+            onStatus = { status ->
+                selected.vocabulary?.let {
+                    dispatch(
+                        Event.SetReaderStatus(
+                            ReaderStatusChange(key, it.id, status, System.currentTimeMillis())
+                        )
                     )
-                )
+                }
+            },
+        ) {
+            StorageStatus(view)
+            val details =
+                view.readerWord?.takeIf {
+                    it.token == selected && it.key == view.readerWordSelection?.key
+                }
+            if (details != null) {
+                ReaderDictionary(details)
+                if (details.candidates.words.isEmpty() && details.candidates.names.isEmpty()) {
+                    ReaderCustomDictionary(
+                        details,
+                        canWrite,
+                        view.readerCustomEntryError,
+                        dispatch,
+                        onInteraction,
+                    )
+                }
+            } else {
+                ReaderWordLookupState(view.readerWordError != null, canWrite, onInteraction) {
+                    selection?.let { dispatch(Event.LoadReaderWord(it)) }
+                }
             }
         }
     }
@@ -273,15 +328,13 @@ internal fun ReaderWords(
 
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)
-private fun ReaderWordPanel(
-    token: ReaderToken,
-    view: ViewModel,
+internal fun ReaderWordPanel(
+    token: ReaderWordHeader,
     enabled: Boolean,
     onInteraction: () -> Unit,
     onClose: () -> Unit,
-    onRetry: () -> Unit,
-    dispatch: (Event) -> Unit,
     onStatus: (VocabularyStatus) -> Unit,
+    details: @Composable () -> Unit,
 ) {
     val close = {
         onInteraction()
@@ -349,41 +402,8 @@ private fun ReaderWordPanel(
                     )
                 }
             }
-            StorageStatus(view)
             TextButton(onClick = close) { Text(stringResource(R.string.close)) }
-            val details =
-                view.readerWord?.takeIf {
-                    it.token == token && it.key == view.readerWordSelection?.key
-                }
-            if (details != null) {
-                ReaderDictionary(details)
-                if (details.candidates.words.isEmpty() && details.candidates.names.isEmpty()) {
-                    ReaderCustomDictionary(
-                        details,
-                        enabled,
-                        view.readerCustomEntryError,
-                        dispatch,
-                        onInteraction,
-                    )
-                }
-            } else if (view.readerWordError != null) {
-                Text(
-                    stringResource(R.string.word_lookup_failed),
-                    modifier = Modifier.testTag("word_lookup_error"),
-                )
-                TextButton(
-                    onClick = {
-                        onInteraction()
-                        onRetry()
-                    },
-                    enabled = enabled,
-                    modifier = Modifier.testTag("retry_word_details"),
-                ) {
-                    Text(stringResource(R.string.retry_word_lookup))
-                }
-            } else {
-                Text(stringResource(R.string.word_lookup_loading))
-            }
+            details()
         }
     }
     if (wide) {
@@ -415,6 +435,37 @@ private fun ReaderWordPanel(
         ) {
             content()
         }
+    }
+}
+
+internal data class ReaderWordHeader(
+    val surface: String,
+    val reading: String?,
+    val dictionaryForm: String?,
+    val vocabulary: ReaderVocabulary?,
+)
+
+@Composable
+internal fun ReaderWordLookupState(
+    failed: Boolean,
+    enabled: Boolean,
+    onInteraction: () -> Unit,
+    onRetry: () -> Unit,
+) {
+    if (failed) {
+        Text(stringResource(R.string.word_lookup_failed), Modifier.testTag("word_lookup_error"))
+        TextButton(
+            onClick = {
+                onInteraction()
+                onRetry()
+            },
+            enabled = enabled,
+            modifier = Modifier.testTag("retry_word_details"),
+        ) {
+            Text(stringResource(R.string.retry_word_lookup))
+        }
+    } else {
+        Text(stringResource(R.string.word_lookup_loading))
     }
 }
 

@@ -174,4 +174,6 @@
     <string name="boundary_read_failed">Could not load word boundaries. Reload to try again.</string>
     <string name="boundary_reload_required">Reload the page before editing word boundaries.</string>
     <string name="boundary_reload">Reload</string>
+    <string name="word_custom_pending_failed">Custom entry change failed. Retry or cancel the pending change.</string>
+    <string name="word_status_pending_failed">Status change failed. Retry or cancel the pending change.</string>
 </resources>

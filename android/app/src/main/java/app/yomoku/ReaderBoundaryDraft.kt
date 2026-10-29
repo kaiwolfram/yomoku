@@ -51,7 +51,7 @@ private constructor(
 
 // Match Rust str::trim/Surface::new (Unicode White_Space). Kotlin's isBlank also
 // includes U+001C..U+001F and omits U+0085 on the JVM, changing valid literal parts.
-private fun rustWhitespace(char: Char): Boolean =
+internal fun rustWhitespace(char: Char): Boolean =
     char in '\u0009'..'\u000D' ||
         char == '\u0020' ||
         char == '\u0085' ||

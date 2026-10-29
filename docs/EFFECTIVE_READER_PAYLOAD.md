@@ -265,3 +265,15 @@ The staged app now routes the existing Library event to native-only
 compact result, cache and error fields. Serde/Facet skip the new operation;
 generated Kotlin and application wire schemas are unchanged. Production still
 uses B pending Android activation. No new device/performance claim.
+
+## Staged Android word consumers
+
+`EffectiveReaderWords` now consumes compact effective page/word/status/custom app
+state directly. It renders strict effective ranges and dispatches only compact
+selection events; shared annotation/dictionary/panel presentation never fabricates
+original-B keys. Native-session/revision ownership retires local selections,
+drafts and old link callbacks. Unresolved metadata stays absent; crossing surfaces
+stay complete. Pending custom/status writes retain payload-free native Retry/Cancel
+controls after panel dismissal/page retirement. No new payload, schema or size
+measurement. Production activation, navigation/completion and original-B span
+selection/editor integration remain pending; this is an isolated Android consumer.

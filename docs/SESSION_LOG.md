@@ -2821,3 +2821,23 @@ change or blocker. Updated plan/handoff/architecture/data/decisions/payload/deve
 Next activate core/FFI/Android together and expose original-B span selection/editor.
 Device, separate Full opt-in matrix, release/process death, physical arm64 and
 effective device/diverse-book performance were not rerun. Commands/logs: DEVELOPMENT end.
+
+## 2026-10-29 — Staged Android effective word consumers
+
+Added isolated compact effective word rendering, dictionary lookup, five statuses
+and literal custom CRUD with native Retry/Cancel reachable after dismissal/page
+retirement. Shared annotation/dictionary/phone-wide presentation with original B;
+kept effective revisions/segments separate. Native-session replacement and stale
+links retire local selections/drafts. Strict ranges, unresolved/crossing surfaces,
+Rust whitespace, pending-write/time gates and explicit reload/later navigation
+are covered. Production remains B pending coordinated activation.
+
+PASS: 70 focused Rust, real-Full host JNI/codecs, Kotlin formatting/diff, both-ABI
+APKs and Android lint. All 16 production word/span regressions and 11 new compact
+phone cases pass (initial 23 + final 11); all 11 compact cases pass wide/dark.
+Emulator restored/stopped. Initial Long fixture compile error corrected; usual
+Gradle socket escalation passes. No blocker/schema/dependency change. Updated
+plan/handoff/architecture/decisions/payload/development. Next connect the component
+with a retained session key, Android navigation/completion and original-B span/
+editor, then activate core/FFI/Android together. Broader Rust/Clippy, release/
+process death, physical arm64 and effective performance not rerun/measured.

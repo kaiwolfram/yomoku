@@ -5869,3 +5869,67 @@ Android activation. Device/emulator, separate Full owned/mapped opt-in matrix,
 release/process death, physical arm64 and effective JNI/device/diverse-book
 performance were not rerun/measured.
 Logs: `/tmp/yomoku-effective-library-{core,worker,tests,clippy,host,android,format,codegen}.log`.
+
+## Staged Android effective word consumers
+
+2026-10-29, repository root, pinned offline tools:
+
+```sh
+export PATH=/home/kai/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin:$PATH
+export JAVA_HOME=/home/kai/repos/yomoku/.local/jdk-17/jdk-17.0.21+9
+export GRADLE_USER_HOME=/home/kai/repos/yomoku/.local/gradle
+export ANDROID_HOME=/home/kai/Android/Sdk
+cargo test -p yomoku-core --test effective_app --test effective_session --all-features --locked --offline
+tools/test-kotlin-bridge.sh
+tools/format-kotlin.sh --check
+./android/gradlew -p android :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug --offline --console=plain
+./android/gradlew -p android :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=app.yomoku.EffectiveReaderWordsTest,app.yomoku.ReaderWordsTest,app.yomoku.ReaderWordSpansTest --offline --console=plain
+# After adding the final cases, run the complete compact component suite:
+./android/gradlew -p android :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=app.yomoku.EffectiveReaderWordsTest --offline --console=plain
+/home/kai/Android/Sdk/platform-tools/adb -s emulator-5554 shell wm size 2560x1600
+/home/kai/Android/Sdk/platform-tools/adb -s emulator-5554 shell wm density 240
+/home/kai/Android/Sdk/platform-tools/adb -s emulator-5554 shell cmd uimode night yes
+./android/gradlew -p android :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=app.yomoku.EffectiveReaderWordsTest --offline --console=plain
+/home/kai/Android/Sdk/platform-tools/adb -s emulator-5554 shell wm size reset
+/home/kai/Android/Sdk/platform-tools/adb -s emulator-5554 shell wm density reset
+/home/kai/Android/Sdk/platform-tools/adb -s emulator-5554 shell cmd uimode night no
+git diff --check
+```
+
+PASS: 17 actual-app and 53 retained-session Rust tests, real-Full host Kotlin/JNI
+and Rust-Kotlin-Rust codec fixtures, Kotlin formatting/diff checks, both-ABI debug
+app/test APKs and strict Android lint. The initial phone run passes all 23 cases
+(seven compact fixtures plus 16 existing production word/span regressions). After
+adding the remaining cases/guards, all 11 compact cases pass on the phone: 27
+distinct phone cases pass in total, with no skipped/failed cases.
+
+The isolated compact fixtures verify maximum compact revisions/segment/vocabulary
+IDs, unresolved manual and full crossing surfaces, all five statuses/repetitions/
+deleted vocabulary, built-in protection, literal custom save/edit/delete/Cancel,
+Rust whitespace differences, exact native Retry/Cancel after dismissal/retirement,
+time/storage/completion/override gates, explicit page reload and later navigation,
+malformed/Missing projections, stale link callbacks and native-session replacement.
+The production regressions exercise real imports/dictionaries/SQLite, lifecycle,
+manual status/custom errors/retries and unchanged history/word-span rendering.
+
+PASS: all 11 compact cases also pass in the wide dark configuration
+(2560×1600, 240 dpi). Phone baseline is 1080×2400, 420 dpi, system light.
+Size/density/system-light were restored and the task-started emulator was stopped.
+No skipped/failed cases in either compact run. These use an isolated ComponentActivity
+and compact typed fixtures; they do not activate the effective native app in Android.
+
+Initial compilation corrected an Int fixture offset to Long. Review added explicit
+reload ownership and a guard against carrying that requirement onto later pages.
+Final phone/wide runs include those guards plus Rust/JVM whitespace differences,
+full crossing surface, built-in gate and live status/deletion cases. Gradle first
+failed on sandbox wildcard-IP/local sockets; escalation passes. Existing host
+teardown diagnostics remain nonfatal; the host suite exits zero. No remaining
+blocker, schema, dependency or generated-code change.
+
+Production still uses original B. Next wire this component with a retained session
+key, migrate Android navigation/completion and original-B span selection/editor,
+then activate core/FFI/Android together. Full workspace/Clippy, separate Full-loader
+opt-in matrix, release/process death, physical arm64 and actual effective JNI/device
+performance were not rerun/measured. Logs:
+`/tmp/yomoku-effective-ui-{core,host,android,device,phone,tablet,format-check}.log`.
+The three device-result directories share that prefix under `/tmp`.

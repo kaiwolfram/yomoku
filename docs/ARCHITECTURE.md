@@ -1404,3 +1404,26 @@ I/O and both time slots drain before deferred departure. Success/stale outcomes
 require an explicit page/context reload; no automatic rebase/replay is added.
 Override outcomes invalidate Library distribution caches. Full contexts/rule
 revisions remain native; existing transaction-local storage guards still apply.
+
+## Staged Android effective word consumers
+
+`EffectiveReaderWords` accepts the compact app ViewModel, explicit retained native
+session key, existing dispatch/interaction callbacks and image loader. It uses
+`effectiveDisplayTokens` for strict UTF-8/UTF-16 projection, revision/segment
+selection and complete crossing surfaces. Shared annotation styling preserves
+source formatting/link ownership, status backgrounds, image positions and ruby.
+Shared dictionary and phone/wide panel presentation accept display fields only;
+effective selections are never converted to original-B word identities.
+
+Word lookup/status/custom events use the compact native app lifecycle. Reads wait
+for shared storage/time/completion/mutation gates; failures need explicit Retry.
+Attempt token reads once per base identity; page retirement needs explicit reload.
+Scope the override reload marker to its retired page, allowing later navigation.
+Panel dismissal retires presentation, while pending native status/custom writes
+keep reachable payload-free Retry/Cancel controls. Session replacement/page
+revision changes discard local selections/drafts; retained link callbacks cannot
+reopen a selection from an older revision. Custom fields preserve literal Unicode
+and use Rust whitespace validation without changing unresolved analyzer metadata.
+This component is isolated pending coordinated navigation/completion, original-B
+span selection/editor and production core/FFI/Android activation. Existing
+production `ReaderWords` still uses B. No durable/wire schema or dependency change.

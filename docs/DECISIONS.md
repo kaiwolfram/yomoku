@@ -3556,3 +3556,22 @@ literal rename drafts, selection and frozen deletion prompts during reads.
 Do not serialize this native staging choice or add a user mode. Production remains
 original B until Android switches with the reader. No dictionary, dependency,
 schema, worker, automatic retry or data semantics change.
+
+## 2026-10-29 — Stage compact Android word consumers before activation
+
+Keep production on original B until Android navigation/completion and original-B
+span selection/editor are ready for the coordinated switch. Add an independent
+`EffectiveReaderWords` component accepting the compact app ViewModel and an
+explicit retained-native-session key. Share only annotation styling, dictionary
+presentation and the phone/wide word-panel frame with the original reader; never
+convert effective indices into original-B selections.
+
+Scope selections and literal custom drafts to the native session and page revision.
+Authenticate retained link callbacks against the current compact selection before
+dispatch. Preserve unresolved metadata and full crossing surfaces, render invalid
+projections as plain text with explicit reload, and load/retry through existing
+compact events and shared FIFO/time gates. Keep native pending status/custom
+Retry/Cancel reachable after panel dismissal or page retirement; Android never
+reconstructs accepted write payloads. Custom validation uses Rust Unicode
+White_Space and strict scalars while retaining the literal submitted fields.
+No new library, wire/schema change, user setting or production activation.

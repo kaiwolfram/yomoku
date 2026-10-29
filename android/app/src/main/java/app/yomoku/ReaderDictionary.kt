@@ -10,6 +10,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import app.yomoku.shared.DictionaryCandidates
 import app.yomoku.shared.ReaderWordDetails
 import app.yomoku.shared.Reading
 import app.yomoku.shared.ReadingMatch
@@ -60,12 +61,15 @@ private fun translationText(translation: Translation): String {
 }
 
 @Composable
-internal fun ReaderDictionary(details: ReaderWordDetails) {
+internal fun ReaderDictionary(details: ReaderWordDetails) =
+    ReaderDictionary(details.encountered, details.candidates)
+
+@Composable
+internal fun ReaderDictionary(encountered: ULong, candidates: DictionaryCandidates) {
     Text(
-        stringResource(R.string.word_encountered, details.encountered.toString()),
+        stringResource(R.string.word_encountered, encountered.toString()),
         modifier = Modifier.testTag("word_encountered"),
     )
-    val candidates = details.candidates
     if (candidates.words.isEmpty() && candidates.names.isEmpty()) {
         Text(stringResource(R.string.word_no_match), Modifier.testTag("word_no_match"))
     }
