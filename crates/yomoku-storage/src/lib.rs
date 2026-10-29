@@ -22,6 +22,7 @@ pub mod reader_words;
 mod reading_time;
 mod settings;
 mod srt;
+mod statistics;
 mod txt;
 mod vocabulary;
 

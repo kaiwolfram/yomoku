@@ -3000,3 +3000,19 @@ PASS: 43 focused history tests, all 713 workspace Rust tests (17 opt-in ignored)
 strict Clippy/Rustfmt/diff. No production/native-wire/Kotlin change or new
 dependency; Android/JNI/Full-loader/release/arm64 were not rerun. No blocker.
 Next: read-only lifetime occurrence/time aggregation, then status timeline.
+
+## 2026-10-29 — Read-only lifetime occurrence/time totals
+
+Added pure LifetimeReadingTotals and one-statement SQLite aggregation from complete
+analyzed event rows. Repetitions/rereads count; time sums once per command,
+including zero-Japanese pages. Imports/pending time/unused reservations/legacy
+events are excluded. Document deletion preserves both totals; vocabulary history
+cascades recalculate occurrences without erasing page time or recounting JSON.
+Unknown versions, corrupt durations and integer overflow error without writes.
+
+PASS: seven dedicated tests plus schema-5–19 upgrade/deletion totals; all 720
+workspace Rust tests (17 opt-in ignored), workspace build, strict Clippy/Rustfmt/diff.
+No failures/blockers, new dependency/migration/wire change or Android/JNI/Full-loader
+rerun. Statistics tab remains a placeholder. Updated README, architecture/data/
+decisions, checked the aggregation item and refreshed the handoff.
+Next: status timeline and durable Known dictionary-form links, then timeframe buckets.

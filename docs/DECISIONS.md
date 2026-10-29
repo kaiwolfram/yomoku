@@ -3733,3 +3733,18 @@ live document deletion. Unused reservations never count as completed reading.
 Audit all history-bearing upgrade starting points, late migration rollback/retry,
 allocation high-water marks and real effective payload retention with executable
 fixtures. No dependency, durable schema, wire or destructive semantic change.
+
+## 2026-10-29 — Read-only lifetime occurrence/time aggregation
+
+Use a pure totals value and a single SQLite statement in the separate storage
+crate. Select complete analyzed events (including zero-Japanese pages) for both
+occurrence and time totals, following the existing no-inferred-legacy-statistics
+contract. Count surviving occurrence rows rather than vocabulary surfaces, analyzer
+tokens or effective reservation JSON. Sum completed durations once per command,
+independently of repetitions, so vocabulary deletion recalculates word counts
+without erasing page time. Pending time and unused reservations contribute zero.
+One statement supplies a consistent snapshot without caches, registration, Full
+loading, content reads or a new worker. Reject unsupported included header versions
+and negative durations; exact signed-integer SUM overflow returns a storage error.
+Keep shell serialization/effects, timeframe/status projections and Compose charts
+for their own slices. No dependency, migration or data-destructive change.

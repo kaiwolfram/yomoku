@@ -1234,8 +1234,8 @@ frozen base analysis only; segmentation-override resolution remains future work.
 range, exact surface and optional reading/dictionary form. Command provenance
 retains source/chapter/date through reading_completions. It has no live text/token
 FK; document deletion preserves encounters. Its vocabulary FK cascades deletion,
-erasing only that entry's encounters. The entry/command index supports future
-lifetime aggregation; aggregate/UI APIs are not implemented here.
+erasing only that entry's encounters. The entry/command index supports selected-word
+counts and lifetime aggregation below; Statistics UI remains future work.
 
 Unique departing-page surfaces register only if absent (e.g. actual reading after
 vocabulary deletion); untouched pages are not rescanned. The pure New-only policy
@@ -1445,6 +1445,38 @@ marks and byte-identical rollback on late upgrade failures from 9/10/13/17/18.
 A real v18 effective fixture preserves exact completed and unused reservations
 through upgrade/deletion; unknown event versions fail SQL constraints, completed
 retries remain idempotent and unused reservations are never auto-replayed.
+
+## Read-only lifetime reading totals (phase 5, no migration)
+
+Pure `statistics::LifetimeReadingTotals` carries unsigned `japanese_occurrences`
+and `active_time_ms`, with no I/O, clock, shell codec or application effect.
+`Storage::lifetime_reading_totals(&self)` derives both values in one SQLite statement
+and therefore one read snapshot. The complete analyzed history is the intersection
+of `reading_completions` and `completion_analyses`, independent of live documents,
+text, analyses or current vocabulary statuses. Original and effective commands
+share the projection. No dictionaries, JSON payloads or canonical text are loaded.
+
+Count actual `reading_occurrences` rows joined to that completed set. Repetitions
+and deliberate rereads each count; metadata may be unresolved. Sum completed
+active milliseconds separately, once per command: joining time to occurrence rows
+would multiply repeated-word time and omit zero-Japanese pages. Empty history
+returns zeros. Imports/registrations, pending-time checkpoints, issued IDs, unused
+effective reservations and legacy events without analysis markers contribute zero.
+No historical rows are backfilled, reinterpreted or cached.
+
+Document deletion retains both totals. Vocabulary deletion's existing FK cascade
+immediately removes its occurrences from the count, without erasing completed page
+time or reconstructing occurrences from frozen JSON. Reimport/re-registration does
+not restore erased counts; only a new actual completion contributes new rows.
+
+Require v1 completion/analysis/effective-reservation headers and nonnegative
+durations for included commands; inconsistent history returns `InvalidCompletion`.
+SQLite integer COUNT/SUM stays exact up to signed 64-bit totals. SUM overflow
+returns a storage error, never floating-point approximation, wrapping or truncation.
+The query performs no writes and works with `PRAGMA query_only = true`.
+Seven dedicated tests plus every schema-5–19 upgrade verify these contracts,
+including duplicate/concurrent success, failure rollback, reopen and deletion.
+Core/worker/FFI/UI transport, date buckets and status timelines remain separate work.
 
 ## Required future schema constraints
 - Future import repositories must extend the identity/immutable-text and durable

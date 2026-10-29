@@ -37,6 +37,7 @@ mod registered_overrides;
 mod segmentation;
 mod settings;
 mod srt;
+mod statistics;
 mod txt;
 mod vocabulary;
 

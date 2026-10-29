@@ -1246,8 +1246,9 @@ history. Library/document/reader projections carry it through generated FFI;
 Android shows an accessible checkmark independent of the current percentage.
 Explicit reopening persists page 1, while completion reloads and retained Activity
 recreation preserve the active position. Final-page Finish Book/swipe completion
-returns to Library and celebrates each newly Recorded command, including rereads;
-effective segmentation edits and statistics aggregation remain
+returns to Library and celebrates each newly Recorded command, including rereads.
+Effective segmentation edits are connected as described below. Read-only lifetime
+aggregation is implemented; statistics timelines, buckets, transport and UI remain
 separate tasks. Add analysis/import crates only with
 actual behavior; Sudachi Full defaults to B, JMdict/JMnedict remain offline data, and future Nostr I/O stays in Rust. Configuration is empty.
 ## Guarded effective boundary repositories
@@ -1489,3 +1490,18 @@ page-length preset as well as the base page/analysis. A normal same-anchor posit
 save or reflow can retire native tokens and must trigger a new read. Error clearing,
 clock saves and typography do not change that ownership or replay a failed read;
 boundary retirement continues to require explicit Reload.
+
+## Read-only lifetime statistics
+
+`yomoku-core::statistics::LifetimeReadingTotals` is a pure occurrence/time value,
+without shell serialization or storage effects. The separate SQLite repository
+exposes `Storage::lifetime_reading_totals(&self)`: one statement reads a consistent
+snapshot of completed analyzed commands and their surviving occurrence rows.
+Time is summed independently per command, preserving zero-word pages without
+multiplying time by repeated words. It reads no live content/analysis, dictionary
+or effective JSON and writes no caches or history. Legacy events without analysis
+markers, pending checkpoints and unused reservations are excluded. Document
+deletion preserves totals; vocabulary-history cascades reduce occurrences while
+retaining completed time. Header-version/duration checks and exact-integer overflow
+errors fail without repair. Date/status projections and runtime/FFI/Compose
+statistics integration remain future slices; the Statistics tab is a placeholder.

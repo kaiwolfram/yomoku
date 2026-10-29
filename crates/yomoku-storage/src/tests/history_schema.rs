@@ -150,6 +150,11 @@ fn every_history_schema_upgrades_without_reinterpreting_events_or_deleted_source
         drop(connection);
 
         let mut storage = Storage::open(database.path()).unwrap();
+        let expected_totals = yomoku_core::statistics::LifetimeReadingTotals {
+            japanese_occurrences: if version >= 10 { 2 } else { 0 },
+            active_time_ms: if version >= 10 { 1234 } else { 0 },
+        };
+        assert_eq!(storage.lifetime_reading_totals().unwrap(), expected_totals);
         assert_eq!(
             history_snapshot(&storage.connection, MIGRATIONS.len()),
             before,
@@ -193,9 +198,11 @@ fn every_history_schema_upgrades_without_reinterpreting_events_or_deleted_source
             ]]
         );
         assert_integrity(&storage.connection);
+        assert_eq!(storage.lifetime_reading_totals().unwrap(), expected_totals);
         drop(storage);
 
         let mut storage = Storage::open(database.path()).unwrap();
+        assert_eq!(storage.lifetime_reading_totals().unwrap(), expected_totals);
         assert_eq!(
             history_snapshot(&storage.connection, MIGRATIONS.len()),
             before,

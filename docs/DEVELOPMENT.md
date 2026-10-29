@@ -6496,3 +6496,29 @@ effective payloads across upgrade/deletion. No failed verification or blocker.
 No production code/schema/FFI/Kotlin change; Android, JNI, generated bindings,
 Full-loader matrix, release/process-death and physical arm64 were not rerun.
 Logs: `/tmp/yomoku-history-schema-{tests,clippy}.log`.
+
+## Read-only lifetime reading aggregation
+
+Verified 2026-10-29 from the repository root:
+
+```sh
+export PATH=/home/kai/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin:$PATH
+cargo test -p yomoku-storage statistics --locked --offline
+cargo test --workspace --all-features --locked --offline --quiet
+cargo clippy --workspace --all-targets --all-features --locked --offline -- -D warnings
+cargo build --workspace --locked --offline
+cargo fmt --all -- --check
+git diff --check
+```
+
+PASS: seven new aggregation tests; 720 workspace Rust tests, 17 opt-in ignored;
+workspace build, strict Clippy/Rustfmt/diff. The schema-5–19 matrix also verifies
+current totals after upgrade, deletion and reopen. Counts/time preserve repeats,
+original/effective rereads, all statuses, literal Unicode and zero-word pages;
+pending/unused/legacy work is excluded. Query-only/unchanged-file checks, failure
+rollback/concurrent duplicate delivery, document/vocabulary deletion, unknown
+versions/corrupt time and exact signed-integer overflow pass. No failed check.
+No dependency/migration/FFI/Kotlin change; Android, JNI, generated bindings,
+Full-loader matrix, release/process-death and physical arm64 were not rerun.
+Statistics transport/charts remain unimplemented; this is a pure value and native
+read-only repository slice. Logs: `/tmp/yomoku-lifetime-statistics-{tests,clippy,build}.log`.

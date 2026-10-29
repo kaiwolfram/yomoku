@@ -78,6 +78,11 @@ on each newly recorded completion, including rereads with zero new words.
 Nostr, Statistics and Vocabulary tabs currently
 show placeholders.
 
+The Rust statistics repository now derives read-only lifetime Japanese-occurrence
+and completed-time totals from analyzed history. Repetitions/rereads count, pending
+pages stay excluded, and deletion semantics recalculate from saved event rows.
+Statistics transport, timelines and charts remain planned.
+
 The pure [EPUB parser](crates/yomoku-import/src/epub.rs) extracts spine-ordered
 chapters, title, headings/emphasis, source ruby, positioned images/covers and
 links while ignoring CSS. Its [atomic repository](crates/yomoku-storage/src/epub.rs)
