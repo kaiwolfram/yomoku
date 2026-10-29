@@ -1,7 +1,8 @@
 //! Compact effective-reader identities backed by one retained Rust page.
 //!
-//! This is a prerequisite for the coordinated live-reader switch. It is not yet
-//! wired into the app. Full chapter provenance never belongs in shell callbacks.
+//! Application page/completion integration is staged through a native opt-in
+//! model ahead of the coordinated production switch. Full chapter provenance
+//! never belongs in shell callbacks.
 
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;

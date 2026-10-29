@@ -3482,3 +3482,27 @@ Restore only for the same retained native session, full compact prompt identity
 and literal surface; replacing/restarting a session discards old drafts even if
 revision numbers repeat. Pending write payloads never enter saved Android state.
 All pointer/key/scroll interaction in the dialog reports reader activity.
+
+
+## 2026-10-29 — Stage effective page/completion application integration
+
+Integrate the retained session into the actual application gates in an independently
+testable slice. Use a native `Model::with_effective_reader()` constructor; keep
+production Model::default until remaining word/status/custom/override, Library and
+Android consumers can switch together. This is an implementation staging point,
+not a product setting. Reject legacy word/status/custom/completion events in the
+opt-in model rather than interpreting B token indices as effective segments.
+
+Reuse LoadReaderTokens and RetryReaderCompletion. Add compact page presentation
+and an explicitly revision-anchored CompleteEffectiveReaderPage event. Freeze
+before final-time drain; prepare after both timer slots clear. Capture each native
+request in its callback and retain it as the app's FIFO owner. A dismissed token
+read can lose its page lifecycle while still owning that FIFO slot, so release the
+matching app request and drain queued time even when finish_request returns None.
+Never release another request's busy state. Move full results rather than cloning
+chapter keys; box the native callback request to bound Event variant size.
+
+Share original/effective position/finish/notice application. Preparation success
+chains commit; failures require explicit retry. AlreadyRecorded is silent, final
+new success returns Library with the existing celebration, and no restart replay
+is added. No dependency, schema, new worker, data semantics or dictionary load.

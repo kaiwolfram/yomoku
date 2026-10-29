@@ -221,3 +221,20 @@ complete prompt identity/text; pending write payloads stay in Rust. Explicit
 reload handles retired contexts. No wire-schema/payload-size change or live
 Event/ViewModel/reader adoption is included. The parent still must open validated
 original-B spans and enforce shared FIFO/time gates during the coordinated switch.
+
+
+## Staged application page/completion integration
+
+The native `Model::with_effective_reader()` now exercises retained page loads,
+source-preferred furigana and compact-identity completion through real app events,
+shared FIFO/time gates and native callbacks. ViewModel adds optional
+`effective_reader_tokens`; CompleteEffectiveReaderPage contains only identity,
+position and timestamp. Rust/Kotlin fixtures exchange the event and a populated
+application view with maximum revision/IDs and literal Unicode. Existing standalone
+identity/selection sizes remain 60/68 bytes. Full callback results move into the
+session without a chapter clone; accepted commands retain shared keys as before.
+
+Production FFI still constructs Model::default, and Android/Library still use B.
+Remaining word/status/custom/override app consumers and Library membership must
+migrate before activating this constructor. This is not a user-visible mode.
+No durable schema/payload change, dictionary load or JNI/device performance claim.

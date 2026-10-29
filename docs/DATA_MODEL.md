@@ -1568,3 +1568,21 @@ Deleted origin documents do not disable global rules for remaining books.
 Canonical text is needed for resolution, but original file/image BLOBs and
 dictionaries are not read. No writes or new table/persistent cache/schema. The live Library
 still calls its original-B API until the reader also adopts effective boundaries.
+
+
+## Staged effective application payloads (no migration)
+
+The application view now has optional `effective_reader_tokens`, containing the
+existing compact EffectiveReaderPage. CompleteEffectiveReaderPage carries that
+page identity, exact current ReadingPosition and completion timestamp. Generated
+same-build shell codecs cover these fields, including maximum revision/IDs and
+literal Unicode. Full resolved chapters and durable reservations remain native.
+The skipped EffectiveStorageFinished event captures a boxed native request and
+moves the storage result; it has no shell representation.
+
+Only the native `Model::with_effective_reader()` integration constructor enables
+this page/completion path. Production uses its existing B model pending migration
+of all word/status/custom/override, Library and Android consumers. Accepted
+completion/time obligations are ephemeral model state backed by the existing
+version-1 durable reservations and exact replay semantics; new sessions never
+resume unfinished work automatically. No data/migration/destructive change.

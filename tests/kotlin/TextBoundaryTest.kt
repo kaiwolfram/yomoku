@@ -6,12 +6,14 @@ import app.yomoku.shared.EffectiveReaderPage
 import app.yomoku.shared.EffectiveReaderSelection
 import app.yomoku.shared.EffectiveReaderWordState
 import app.yomoku.shared.EffectiveTokenEligibility
-import app.yomoku.shared.ReaderDocument
+import app.yomoku.shared.Event
 import app.yomoku.shared.ReaderAnalysis
+import app.yomoku.shared.ReaderDocument
 import app.yomoku.shared.ReaderPage
 import app.yomoku.shared.TextAnchor
 import app.yomoku.shared.TextOffset
 import app.yomoku.shared.TextRange
+import app.yomoku.shared.ViewModel
 import app.yomoku.shared.VocabularyStatus
 import java.io.File
 
@@ -67,7 +69,10 @@ fun verifyTextBoundaries(directory: String) {
     check(ruby.chapterId == illustrated.chapters.single().chapterId)
     check(ruby.ruby.single().reading == "よし𠮷か\u3099\u0000")
     check(ruby.ruby.single().range.start.value == 4L)
-    check(ruby.ruby.single().range.end.value == "😀𠮷か\u3099".toByteArray(Charsets.UTF_8).size.toLong())
+    check(
+        ruby.ruby.single().range.end.value ==
+            "😀𠮷か\u3099".toByteArray(Charsets.UTF_8).size.toLong()
+    )
     check(illustratedPage.sourceRuby == ruby.ruby)
     check(illustratedPage.text == illustrated.chapters.single().text)
     check(illustratedPage.bincodeSerialize().contentEquals(pageBytes))
@@ -89,9 +94,26 @@ fun verifyTextBoundaries(directory: String) {
     check(effective.identity.bincodeSerialize().size == 60)
     check(effective.bincodeSerialize().contentEquals(effectiveBytes))
     File(dir, "effective-page-return.bin").writeBytes(effective.bincodeSerialize())
+
+    val completionBytes = File(dir, "effective-completion-event.bin").readBytes()
+    val completion = Event.bincodeDeserialize(completionBytes) as Event.CompleteEffectiveReaderPage
+    check(completion.identity == effective.identity)
+    check(completion.position == illustratedPage.position)
+    check(completion.completedAtUnixMs == Long.MAX_VALUE)
+    check(completion.bincodeSerialize().contentEquals(completionBytes))
+    File(dir, "effective-completion-event-return.bin").writeBytes(completion.bincodeSerialize())
+    val viewBytes = File(dir, "effective-app-view.bin").readBytes()
+    val view = ViewModel.bincodeDeserialize(viewBytes)
+    check(view.effectiveReaderTokens == effective && view.readerTokens == null)
+    check(view.completionSavePending && !view.storageBusy)
+    check(view.bincodeSerialize().contentEquals(viewBytes))
+    File(dir, "effective-app-view-return.bin").writeBytes(view.bincodeSerialize())
     val effectiveSelectionBytes = File(dir, "effective-selection.bin").readBytes()
     val effectiveSelection = EffectiveReaderSelection.bincodeDeserialize(effectiveSelectionBytes)
-    check(effectiveSelection.page == effective.identity && effectiveSelection.segmentIndex == ULong.MAX_VALUE)
+    check(
+        effectiveSelection.page == effective.identity &&
+            effectiveSelection.segmentIndex == ULong.MAX_VALUE
+    )
     check(effectiveSelectionBytes.size == 68)
     check(effectiveSelection.bincodeSerialize().contentEquals(effectiveSelectionBytes))
     File(dir, "effective-selection-return.bin").writeBytes(effectiveSelection.bincodeSerialize())

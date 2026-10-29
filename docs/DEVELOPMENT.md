@@ -5653,3 +5653,66 @@ Full workspace/Clippy, separate Full owned/mapped matrix, process death, release
 physical arm64 and diverse-book performance were not rerun for this UI slice.
 Logs: `/tmp/yomoku-boundary-{core,host,android,device,tablet,format-check}.log`;
 initial failures: `/tmp/yomoku-boundary-device-{initial,restore-holder}.log`.
+
+
+## Staged effective application pages and completion
+
+2026-10-29, repository root, pinned offline tools:
+
+```sh
+export PATH=/home/kai/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin:$PATH
+export JAVA_HOME=/home/kai/repos/yomoku/.local/jdk-17/jdk-17.0.21+9
+export GRADLE_USER_HOME=/home/kai/repos/yomoku/.local/gradle
+export ANDROID_HOME=/home/kai/Android/Sdk
+cargo test -p yomoku-core --test effective_app --all-features --locked --offline
+cargo test -p yomoku-runtime effective_application_fifo --all-features --locked --offline
+cargo test --workspace --all-features --locked --offline --quiet
+cargo clippy --workspace --all-targets --all-features --locked --offline -- -D warnings
+cargo fmt --all -- --check
+tools/test-kotlin-bridge.sh
+tools/format-kotlin.sh --check
+"$JAVA_HOME/bin/java" -jar .local/ktfmt-0.64.jar --kotlinlang-style --dry-run --set-exit-if-changed tests/kotlin/TextBoundaryTest.kt
+./android/gradlew -p android :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug --offline --console=plain
+./android/gradlew -p android :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=app.yomoku.CoreSessionTest,app.yomoku.ReaderNavigationTest,app.yomoku.ReaderClockSessionTest --offline --console=plain
+git diff --check
+```
+
+PASS: 685 Rust tests (17 opt-in ignored), including six new actual-app cases and
+one actual-app/FIFO/SQLite case; strict Clippy/Rustfmt/diff, host Kotlin/JNI suite
+with real Full imports, new event/populated-view Rust-Kotlin-Rust fixtures,
+Kotlin formatting, both-ABI app/test APKs and strict Android lint.
+Kotlin regeneration compares SHA-256 for all 18 generated files before/after the
+same generate-kotlin command; every file is identical.
+PASS: all 11 existing bridge/navigation/clock cases on API-36 x86_64 phone
+(1080×2400, 420 dpi), including retry/finish/reread/positive-only notices,
+celebration/recreation, idle/movement and final-time close draining. No skipped or
+failed cases. The emulator started for this run was shut down afterward.
+
+The pure cases verify effective-only page reads/furigana, unresolved manual
+metadata, no legacy B completion fallback, both final-time slots, failed saves/
+preparation/commit, frozen exact retries, deferred departure, stale/malformed/
+dismissed callbacks, busy-slot ownership, movement/reflow/refresh and Missing B.
+The real worker fixture uses actual Yomoku app events, a failed commit trigger,
+rule reversal and retry: six frozen effective occurrences, four newly Known and
+1,250 ms record once. Fresh app/reopen never auto-replays; an explicit reread uses
+the reversed B partition and records four more occurrences with a fresh command.
+Dictionary loaders panic if called. Existing production B regressions also pass.
+
+Initial compile errors required parent-module method visibility and an opaque
+native Facet field. Clippy found the combined native Event variant too large;
+boxing its captured request fixes it without changing shell codecs. Fixture
+expectations were corrected to omit non-Japanese punctuation. A deferred-departure
+case exposed a read still accepting its page before timer drain: invalidate the
+page when deferring, retain only its matching app FIFO obligation, then drain.
+All corrected before final Rust checks. Gradle first failed inside the sandbox
+on wildcard-IP/local sockets; rerunning outside succeeds. ADB/emulator likewise
+needed local-socket/AVD escalation. Existing host teardown diagnostics (Inner
+cannot be upgraded after resolving effect) remain nonfatal; the suite exits zero.
+
+Production still constructs Model::default. Model::with_effective_reader is a
+native staging constructor, not a user setting. Remaining word/status/custom/
+override app consumers, effective Library membership and Android activation are
+next; no schema/dependency/data-destructive change. No new performance claim.
+Separate Full owned/mapped opt-in matrix, tablet/dark, process death, release,
+physical arm64 and effective JNI/device measurements were not rerun.
+Logs: `/tmp/yomoku-effective-app-{focused,worker,tests,clippy,host,android,device,format}.log`.

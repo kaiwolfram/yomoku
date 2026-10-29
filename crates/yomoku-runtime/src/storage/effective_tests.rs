@@ -43,6 +43,7 @@ use yomoku_storage::{AnalyzedPaste, Storage};
 use super::StorageEffects;
 
 mod analysis;
+mod app;
 mod requests;
 
 const TIMEOUT: Duration = Duration::from_secs(10);

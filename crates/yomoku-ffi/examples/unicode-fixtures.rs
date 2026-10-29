@@ -238,7 +238,20 @@ fn main() -> Result<(), Box<dyn Error>> {
     let selection_bytes = encode(&effective_selection);
     assert_eq!(identity_bytes.len(), 60);
     assert_eq!(selection_bytes.len(), 68);
+    let effective_completion = yomoku_core::app::Event::CompleteEffectiveReaderPage {
+        identity: effective_page.identity,
+        position: illustrated_page.position,
+        completed_at_unix_ms: i64::MAX,
+    };
+    let mut effective_view = crux_core::Core::<yomoku_core::app::Yomoku>::new().view();
+    effective_view.effective_reader_tokens = Some(effective_page.clone());
+    effective_view.completion_save_pending = true;
     if writing {
+        fs::write(
+            dir.join("effective-completion-event.bin"),
+            encode(&effective_completion),
+        )?;
+        fs::write(dir.join("effective-app-view.bin"), encode(&effective_view))?;
         fs::write(dir.join("effective-page.bin"), encode(&effective_page))?;
         fs::write(dir.join("effective-selection.bin"), &selection_bytes)?;
         fs::write(dir.join("effective-word.bin"), encode(&effective_word))?;
@@ -248,6 +261,13 @@ fn main() -> Result<(), Box<dyn Error>> {
             selection_bytes.len()
         );
     } else {
+        let returned: yomoku_core::app::Event = BincodeFfiFormat::deserialize(&fs::read(
+            dir.join("effective-completion-event-return.bin"),
+        )?)?;
+        assert_eq!(returned, effective_completion);
+        let returned: yomoku_core::app::ViewModel =
+            BincodeFfiFormat::deserialize(&fs::read(dir.join("effective-app-view-return.bin"))?)?;
+        assert_eq!(returned, effective_view);
         let returned: EffectiveReaderPage =
             BincodeFfiFormat::deserialize(&fs::read(dir.join("effective-page-return.bin"))?)?;
         assert_eq!(returned, effective_page);

@@ -1,5 +1,5 @@
 # Resume here
-Updated: 2026-10-28. Android boundary editor component ready; live switch next.
+Updated: 2026-10-29. Effective app page/completion path staged; remaining consumers next.
 ## Working
 - Rename: retained literal draft/Cancel/Retry; title-only atomic save, no-op retries.
 - Single/bulk deletion: one transaction, history/vocabulary/rules retained; reimport fresh.
@@ -7,7 +7,6 @@ Updated: 2026-10-28. Android boundary editor component ready; live switch next.
   Filter/sort retain selection; confirmation freezes titles/IDs; Cancel/Back and Retry.
 - Library title-only search/Clear + Last read/Title/Import date; query/sort retained.
   Read order (0019) on explicit open only; newest unknown/unopened afterward.
-  Duplicates preserve recency; legacy history unknown.
 - Live bars use original B/live statuses; read-only FIFO; explicit Retry; batches defer scans.
   Effective Library API shares eligibility/resolution + transaction-local status lookups;
   Missing/zero differ. Stored text/rules, no source/assets/Full/writes. Switch with reader.
@@ -20,7 +19,6 @@ Updated: 2026-10-28. Android boundary editor component ready; live switch next.
   Finish survives movement/time/reflow; deletion resets it, preserving history.
 - Token reads atomically load original B/live statuses/metadata + clipped UTF-8
   ranges; completion owns token start. Deleted IDs absent. Whole-chapter validation.
-  Full page/base/result identities gate callbacks; movement/reflow/refresh invalidate.
   Strict UTF-8→UTF-16 failure falls back to plain text. Loads wait for pending saves.
 - Five manual statuses atomically update history; same-status no-op. Deleted entries
   never register. Reads/choices need explicit retry. Phone sheet/wide panel shows
@@ -32,9 +30,8 @@ Updated: 2026-10-28. Android boundary editor component ready; live switch next.
 - Completion freezes page/position/preset/B/time, drains final time then FIFO reserves
   ID + duration. One transaction writes occurrences, New-only Known/history/time/
   position/finish. Exact retries; AlreadyRecorded/zero silent, positive toast once.
-  Only new final-book completion returns Library + 1.4s confetti. Images count no words.
 - TXT/SRT strict UTF-8/Shift-JIS preserve original bytes/filename/encoding/B and
-  canonical Aozora ruby or SRT cues; exact duplicate's first interpretation wins.
+  canonical ruby/SRT cues; exact duplicate's first interpretation wins.
 - Retained mixed FileImports reads off main by extension, accepts generic MIME;
   TXT/SRT encoding/Skip/errors and progress survive recreation. No restart queue.
 - Direct off-main cancelFileImport bypasses FIFO; COMMIT may wait. Silent full-file
@@ -45,9 +42,8 @@ Updated: 2026-10-28. Android boundary editor component ready; live switch next.
   source/assets without parsing; limited host EPUB costs measured, device pending.
 - ReaderDocument carries keyed validated heading/emphasis/strong/HTTP(S) spans;
   ReaderPage clips to page-local UTF-8; generated JNI/Compose preserve exact text.
-  Website taps open browser with token identity; other links inert. No CSS/TOC.
 - Keyed image placeholders/alt/metadata; no BLOBs in state. One-shot FIFO reads
-  verify live ownership/media/SHA-256/32 MiB cap without dictionary/core writes.
+  verify live ownership/media/SHA-256/32 MiB cap.
 - Serial bounds-first decode: <=32768-edge/100 MP source, <=2048-edge sample,
   16 MiB shared page pixels; repeats share bitmaps. Ratio frames <=8192px preserve
   U+FFFC positions/styles/word/link identity; unsupported images keep alt/Retry.
@@ -58,23 +54,27 @@ Updated: 2026-10-28. Android boundary editor component ready; live switch next.
 - Effective completion (0018): full key/occurrences/time frozen durably; page-only
   registration/New-only Known/history/time/position/finish atomic. Exact replay
   survives reversal/deletion/reopen; legacy calls reject its ID. Live reader uses B.
-- Compact effective_session: one full key + view, revisions/stale/retry/Missing B;
-  Kotlin page/selection 60/68 B; native effective_storage shares FIFO/dictionary/word state.
+- Compact effective_session: one shared full key + view, revisions/stale/retry/Missing B;
+  Kotlin identity/selection 60/68 B; native protocol uses existing FIFO/dictionaries.
 - Status/overrides: atomic key/surface/ID/rule-revision guards, five choices,
   stored A/B/C; atomic edits/register/reverse, stale/ABA/concurrent guards.
-  Fresh attempts/exact retries/shared gates; stale/lost success requires reload.
 - Explicit A/C uses the FIFO/import analyzer cache, whole chapter/original profile;
   stored reuse skips Full. Rechecks key/revision at commit; metadata requires reload.
-- Compact prompts/actions: fresh IDs, All default; furigana/effectiveDisplayTokens adapters ready.
-- ReaderBoundaryEditor: typed A/B/C/manual, All/This, reversal, native Retry/Cancel/reload;
-  literal scalar cuts + Rust whitespace, session/prompt-scoped saveable drafts. Isolated UI;
-  no live exposure. Caller must supply stable session key and shared time/FIFO gates.
+- ReaderBoundaryEditor: typed A/B/C/manual/All/This/reversal/Retry/Cancel/reload;
+  literal scalar cuts + Rust whitespace; session/prompt-scoped saveable drafts. Isolated UI.
+- Native Model::with_effective_reader(): LoadReaderTokens + compact effective_reader_tokens,
+  effective furigana + CompleteEffectiveReaderPage; captured FIFO callbacks, both final-time
+  slots before preparation, exact retry/finish/notice/departure. Production default stays B;
+  legacy word/status/custom/completion events reject in opt-in model until migration.
 ## Next tasks (ordered)
-1. Switch live core/FFI/Android completion/token/status/furigana/word/custom + effective Library
-   membership via retained requests/command/finish_request + render adapters; EFFECTIVE_READER_PAYLOAD.md.
-2. Expose prepared ReaderBoundaryEditor with original-B span selection + compact events/state.
-3. Measure JNI/device/diverse/image-heavy costs; TXT/EPUB/100-copy host results in performance doc.
+1. Integrate compact word/status/custom/override events/views into app/effective.rs using
+   retained requests; preserve shared FIFO/time/retry gates. Add effective Library operation.
+   Model::with_effective_reader is native staging only; do not activate production yet.
+2. Switch production core/FFI/Android together using effectiveDisplayTokens and compact
+   events; expose ReaderBoundaryEditor with original-B span selection. See payload doc.
+3. Measure JNI/device/diverse/image-heavy costs; host baselines in performance doc.
 Physical arm64 deferred; Nostr empty; Q188 unresolved before forwarding.
 ## Verification
-- PASS: 53 retained-session Rust, host Kotlin/JNI, 8 UI cases each phone/tablet, APKs/lint/fmt.
-- No native/schema changes; broad 678 Rust not rerun. DEVELOPMENT end: commands/failures. No blocker.
+- PASS: 685 Rust (17 opt-in ignored), strict Clippy/fmt, host Kotlin/JNI/codecs.
+- PASS: both-ABI APKs/lint, 11 phone bridge/navigation/clock cases. Commands: DEVELOPMENT end.
+- No schema/dependency change; production reader/Library still B. No blocker.

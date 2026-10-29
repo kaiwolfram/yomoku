@@ -1339,3 +1339,31 @@ time/FIFO/lifecycle gates still belong to the app; final checkpoint slots must d
 before preparation dispatch. Selected-word status observations of deleted entries
 also clear their erased encounter count. The native FIFO regression harness uses
 this adapter; live Event/ViewModel/Android adoption remains pending.
+
+
+## Staged application effective pages and completion
+
+`Model::with_effective_reader()` is a native integration constructor; production
+FFI still uses `Model::default()`. It is not a user preference or shell toggle.
+The opt-in model routes existing LoadReaderTokens through one lifetime retained
+session and projects only `effective_reader_tokens`. Source-preferred furigana
+borrows that compact page. Legacy word/status/custom/completion events fail closed
+in this model until their consumers migrate. Library membership and Android
+activation must change together with those consumers before using it in production.
+
+`CompleteEffectiveReaderPage` authenticates the compact displayed revision and
+exact reading position. It freezes the full partition before both accepted and
+coalesced final-time slots drain, then dispatches retained preparation and commit
+through the existing FIFO. One captured native request owns the app busy slot.
+Its callback moves the storage result into `finish_request`, without cloning a
+chapter; boxed native request ownership keeps shell Event size bounded. Dismissed
+reads release only their own slot and still drain queued time. Duplicate/foreign
+callbacks cannot clear newer work. Departure/reflow/refresh invalidates callbacks
+before I/O, including departures deferred behind a timer save.
+
+Preparation success dispatches commit; failures require explicit exact retry.
+Accepted completions gate movement/settings writes/clock resumption, survive
+failed checkpoints, and drain before deferred departure. Original/effective
+completions share position, final-page return, positive-only word notice and
+new-success-only celebration handling. AlreadyRecorded stays silent. No automatic
+restart replay, worker, dictionary access, persistent registry or schema change.

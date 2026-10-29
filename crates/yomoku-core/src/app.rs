@@ -8,13 +8,20 @@ use crux_core::{
 };
 use serde::{Deserialize, Serialize};
 
+mod effective;
+
 use crate::{
     active_time::{
         ActiveReadingTime, ReaderClockAction, ReaderClockSample, ReadingTimeUpdate,
         SavedReadingTime,
     },
-    completion::{AnalyzedCompletionOutcome, CompletionNotice, PageCompletionIntent},
+    completion::{
+        AnalyzedCompletionOutcome, CompletionNotice, PageCompletion, PageCompletionIntent,
+    },
     document::{CompletionCommandId, DocumentId, LibraryDocument, ReaderDocument, TextAnchor},
+    effective_session::{
+        EffectivePageIdentity, EffectiveReaderPage, EffectiveReaderRequest, EffectiveReaderSession,
+    },
     imports::{EpubImport, SrtImport, TxtImport},
     library::{valid_document_title, LibraryRenameState, LibrarySort, LibraryWordDistribution},
     pagination::{LogicalPages, PageLength, ReadingPosition},
@@ -115,6 +122,8 @@ pub struct Model {
     reader_word_selection: Option<ReaderWordSelection>,
     reader_word: Option<ReaderWordDetails>,
     reader_word_error: Option<DocumentError>,
+    effective_reader: Option<EffectiveReaderSession>,
+    effective_request: Option<EffectiveReaderRequest>,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -207,6 +216,18 @@ pub enum Event {
     ImportTxt(TxtImport),
     ImportSrt(SrtImport),
     ImportEpub(EpubImport),
+    /// Compact rendered identity; full effective provenance stays in the model.
+    CompleteEffectiveReaderPage {
+        identity: EffectivePageIdentity,
+        position: ReadingPosition,
+        completed_at_unix_ms: i64,
+    },
+    #[serde(skip)]
+    #[cfg_attr(feature = "facet_typegen", facet(skip))]
+    EffectiveStorageFinished(
+        #[cfg_attr(feature = "facet_typegen", facet(opaque))] Box<EffectiveReaderRequest>,
+        StorageResult,
+    ),
     #[serde(skip)]
     #[cfg_attr(feature = "facet_typegen", facet(skip))]
     StorageFinished(StorageResult),
@@ -254,6 +275,8 @@ pub struct ViewModel {
     pub book_completion_notice: Option<CompletionCommandId>,
     /// None until explicitly loaded for the current document/page/base analysis.
     pub reader_tokens: Option<ReaderTokenSnapshot>,
+    /// Native opt-in integration path; production activation waits for all consumers.
+    pub effective_reader_tokens: Option<EffectiveReaderPage>,
     /// Enabled source-preferred readings, in page-local UTF-8 ranges. No I/O.
     pub reader_furigana: Vec<crate::reader_ruby::ReaderRuby>,
     pub reader_word_selection: Option<ReaderWordSelection>,
@@ -280,6 +303,12 @@ impl App for Yomoku {
     type Effect = Effect;
 
     fn update(&self, event: Event, model: &mut Model) -> Command<Effect, Event> {
+        if let Event::EffectiveStorageFinished(request, result) = event {
+            return self.finish_effective(&request, result, model);
+        }
+        if let Some(command) = self.update_effective(&event, model) {
+            return command;
+        }
         if let Event::PreviousReaderPage {
             document_id,
             page,
@@ -288,7 +317,7 @@ impl App for Yomoku {
         {
             if model.content_route != ContentRoute::Reader
                 || model.settings_open
-                || model.pending_completion.is_some()
+                || model.completion_pending()
                 || !model.reader.as_ref().is_some_and(|reader| {
                     reader.document_id == document_id
                         && reader.anchor == page
@@ -330,7 +359,7 @@ impl App for Yomoku {
         }
         if (model.pending_time_checkpoint.is_some()
             || model.queued_time_checkpoint.is_some()
-            || model.pending_completion.is_some())
+            || model.completion_pending())
             && matches!(
                 event,
                 Event::CloseDocument
@@ -343,6 +372,7 @@ impl App for Yomoku {
                 return Command::done();
             }
             model.deferred_reader_event = Some(event);
+            model.invalidate_effective_page();
             return render::render();
         }
         if let Some(StorageOperation::SaveReadingTime { checkpoint, .. }) =
@@ -366,7 +396,7 @@ impl App for Yomoku {
         if model.storage_busy {
             if let Event::CheckpointReadingTime(update) = event {
                 if !model.time_checkpoint_can_wait
-                    || model.pending_completion.is_some()
+                    || model.completion_pending()
                     || !model.is_current_time(update)
                 {
                     return Command::done();
@@ -389,7 +419,7 @@ impl App for Yomoku {
                 position,
                 completed_at_unix_ms,
             } => {
-                if model.pending_completion.is_some()
+                if model.completion_pending()
                     || model.deferred_reader_event.is_some()
                     || (model.storage_busy
                         && model.pending_time_checkpoint.is_none()
@@ -626,10 +656,8 @@ impl App for Yomoku {
             _ => None,
         };
         if let Some(operation) = operation {
-            let draining_completion_time = matches!(
-                model.pending_completion,
-                Some(StorageOperation::PreparePageCompletion(_))
-            ) && matches!(event, Event::CheckpointReadingTime(checkpoint)
+            let draining_completion_time = model.completion_pending()
+                && matches!(event, Event::CheckpointReadingTime(checkpoint)
                 if model.queued_time_checkpoint == Some(checkpoint));
             // One in-flight command per session prevents duplicate submissions and
             // stale load/list callbacks from replacing a newer snapshot.
@@ -641,7 +669,7 @@ impl App for Yomoku {
                     ))
                 || (model.pending_time_checkpoint.is_some()
                     && !matches!(event, Event::RetryReadingTimeCheckpoint))
-                || (model.pending_completion.is_some()
+                || (model.completion_pending()
                     && !matches!(
                         event,
                         Event::CompleteReaderPage { .. }
@@ -750,10 +778,12 @@ impl App for Yomoku {
                     | StorageOperation::SaveReadingPosition { .. }
                     | StorageOperation::PreparePageCompletion(_)
             ) {
+                model.invalidate_effective_page();
                 model.clear_reader_word();
             }
             if let StorageOperation::LoadReaderTokens(key) = operation {
                 model.pending_token_load = Some(key);
+                model.invalidate_effective_page();
                 model.reader_tokens = None;
                 model.clear_reader_word();
             }
@@ -790,6 +820,7 @@ impl App for Yomoku {
                 model.pending_reader = Some(id);
                 model.reader = None;
                 model.reader_analysis = None;
+                model.invalidate_effective_page();
                 model.reader_tokens = None;
                 model.clear_reader_word();
                 model.reader_document = None;
@@ -866,7 +897,7 @@ impl App for Yomoku {
                     || model.storage_busy
                     || model.pending_time_checkpoint.is_some()
                     || model.queued_time_checkpoint.is_some()
-                    || model.pending_completion.is_some()
+                    || model.completion_pending()
                 {
                     return Command::done();
                 }
@@ -910,7 +941,7 @@ impl App for Yomoku {
                     || model.storage_busy
                     || model.pending_time_checkpoint.is_some()
                     || model.queued_time_checkpoint.is_some()
-                    || model.pending_completion.is_some()
+                    || model.completion_pending()
                 {
                     return Command::done();
                 }
@@ -967,6 +998,7 @@ impl App for Yomoku {
                 model.content_route = ContentRoute::Main;
                 model.reader = None;
                 model.reader_analysis = None;
+                model.invalidate_effective_page();
                 model.reader_tokens = None;
                 model.clear_reader_word();
                 model.reader_document = None;
@@ -986,6 +1018,7 @@ impl App for Yomoku {
                 model.content_route = ContentRoute::Paste;
                 model.reader = None;
                 model.reader_analysis = None;
+                model.invalidate_effective_page();
                 model.reader_tokens = None;
                 model.clear_reader_word();
                 model.reader_document = None;
@@ -1012,6 +1045,9 @@ impl App for Yomoku {
                 }
             }
             Event::StorageFinished(result) => {
+                if model.effective_request.is_some() {
+                    return Command::done();
+                }
                 let failed = matches!(result, StorageResult::Failed(_));
                 model.storage_busy = false;
                 model.time_checkpoint_can_wait = false;
@@ -1202,7 +1238,7 @@ impl App for Yomoku {
                                     .then_send(Event::StorageFinished),
                             );
                         }
-                        if model.pending_completion.is_some() {
+                        if model.completion_pending() {
                             return self.update(Event::RetryReaderCompletion, model);
                         }
                         if let Some(event) = model.deferred_reader_event.take() {
@@ -1220,46 +1256,8 @@ impl App for Yomoku {
                         else {
                             return render::render();
                         };
-                        // The frozen page identifies this completion, not the permanent
-                        // marker (which is already true on every deliberate reread).
-                        let final_page = document.chapters.last().is_some_and(|chapter| {
-                            prepared.completion.page.source_id == chapter.source_id
-                                && prepared.completion.page.chapter_id == chapter.chapter_id
-                                && prepared.completion.page.range.end.byte_index(&chapter.text)
-                                    == Ok(chapter.text.len())
-                        });
-                        model.completion_notice = match outcome {
-                            AnalyzedCompletionOutcome::Recorded { newly_known }
-                                if newly_known > 0 =>
-                            {
-                                Some(CompletionNotice {
-                                    command_id: prepared.completion.command_id,
-                                    newly_known,
-                                })
-                            }
-                            _ => None,
-                        };
-                        // Completion consumed every bucket on the page, even if
-                        // its resulting position equals the departing EOF.
-                        model.reader_time = None;
-                        model.reader_clock = None;
-                        model.apply_position(document);
-                        if final_page {
-                            // Successful Finish Book always returns to Library after
-                            // the same final-clock drain and atomic completion.
-                            model.close_document();
-                            model.destination = Destination::Library;
-                            model.settings_open = false;
-                            model.deferred_reader_event = None;
-                            if let AnalyzedCompletionOutcome::Recorded { newly_known } = outcome {
-                                model.book_completion_notice = Some(prepared.completion.command_id);
-                                model.completion_notice =
-                                    (newly_known > 0).then_some(CompletionNotice {
-                                        command_id: prepared.completion.command_id,
-                                        newly_known,
-                                    });
-                            }
-                        } else if let Some(event) = model.deferred_reader_event.take() {
+                        model.apply_completion(prepared.completion, document, outcome);
+                        if let Some(event) = model.deferred_reader_event.take() {
                             return self.update(event, model);
                         }
                     }
@@ -1285,6 +1283,7 @@ impl App for Yomoku {
                         model.content_route = ContentRoute::Main;
                         model.reader = None;
                         model.reader_analysis = None;
+                        model.invalidate_effective_page();
                         model.reader_tokens = None;
                         model.clear_reader_word();
                         model.reader_document = None;
@@ -1407,7 +1406,9 @@ impl App for Yomoku {
             | Event::CompleteReaderPage { .. }
             | Event::RetryReaderCompletion
             | Event::PreviousReaderPage { .. }
-            | Event::ObserveReaderClock(_) => unreachable!(),
+            | Event::ObserveReaderClock(_)
+            | Event::CompleteEffectiveReaderPage { .. }
+            | Event::EffectiveStorageFinished(..) => unreachable!(),
         }
         render::render()
     }
@@ -1441,20 +1442,25 @@ impl App for Yomoku {
             reader_time: model.reader_time.map(|saved| saved.value),
             reading_time_save_pending: model.pending_time_checkpoint.is_some()
                 || model.queued_time_checkpoint.is_some(),
-            completion_save_pending: model.pending_completion.is_some(),
+            completion_save_pending: model.completion_pending(),
             completion_notice: model.completion_notice,
             book_completion_notice: model.book_completion_notice,
             reader_tokens: model.reader_tokens.clone(),
+            effective_reader_tokens: model
+                .effective_reader
+                .as_ref()
+                .and_then(|session| session.page().cloned()),
             reader_furigana: model
                 .reader_typography
                 .filter(|typography| typography.furigana)
                 .and(model.reader.as_ref())
                 .and_then(|page| {
-                    page.furigana(
-                        model.reader_analysis.unwrap_or(ReaderAnalysis::Missing),
-                        model.reader_tokens.as_ref(),
-                    )
-                    .ok()
+                    let analysis = model.reader_analysis.unwrap_or(ReaderAnalysis::Missing);
+                    if let Some(session) = &model.effective_reader {
+                        session.furigana(page, analysis).ok()
+                    } else {
+                        page.furigana(analysis, model.reader_tokens.as_ref()).ok()
+                    }
                 })
                 .unwrap_or_default(),
             reader_word_selection: model.reader_word_selection,
@@ -1483,7 +1489,7 @@ impl Model {
             && !self.storage_busy
             && self.pending_time_checkpoint.is_none()
             && self.queued_time_checkpoint.is_none()
-            && self.pending_completion.is_none()
+            && !self.completion_pending()
             && self.library_delete_target.is_none()
             && self.library_bulk_delete_targets.is_none()
             && self.library_rename.is_none()
@@ -1558,6 +1564,7 @@ impl Model {
         self.content_route = ContentRoute::Main;
         self.reader = None;
         self.reader_analysis = None;
+        self.invalidate_effective_page();
         self.reader_tokens = None;
         self.clear_reader_word();
         self.reader_document = None;
@@ -1573,7 +1580,7 @@ impl Model {
             || sample.document_id != saved.value.document_id
             || sample.position != saved.position()
             || !self.is_current_time(saved.value)
-            || self.pending_completion.is_some()
+            || self.completion_pending()
             || self.deferred_reader_event.is_some()
             || (self.storage_busy
                 && self.pending_time_checkpoint.is_none()
@@ -1621,6 +1628,7 @@ impl Model {
         {
             match ReaderPage::open_document(&document, self.page_length.unwrap_or_default()) {
                 Ok(reader) => {
+                    self.invalidate_effective_page();
                     self.reader_tokens = None;
                     self.clear_reader_word();
                     if self.reader_time.is_some_and(|saved| {
@@ -1681,6 +1689,7 @@ impl Model {
             match ReaderPage::at_document(document, reader.position, length) {
                 Ok(page) => {
                     if page.anchor != reader.anchor {
+                        self.invalidate_effective_page();
                         self.reader_tokens = None;
                         self.clear_reader_word();
                     }

@@ -29,8 +29,8 @@ fn main() -> Result<(), Box<dyn Error>> {
         .register_type::<DocumentId>()?
         .register_type::<TextAnchor>()?
         .register_type::<ChapterText>()?
-        // Prerequisite schemas: no live event/view uses these until the
-        // coordinated effective-reader switch, but codecs are verified now.
+        // Compact schemas also used by staged native application integration.
+        // Production activation waits for the coordinated reader switch.
         .register_type::<EffectiveReaderPage>()?
         .register_type::<EffectiveReaderSelection>()?
         .register_type::<EffectiveReaderWordState>()?

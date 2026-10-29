@@ -2733,3 +2733,30 @@ Next coordinate live core/FFI/Android reader/completion/Library membership, then
 expose the editor with validated original-B span selection and retained events.
 Full workspace/Clippy/separate Full-loader matrix, process death, release,
 physical arm64 and performance measurements were not rerun for this UI slice.
+
+
+## 2026-10-29 — Staged effective application pages and completion
+
+Added a native integration constructor to the actual Yomoku app model. Its token
+loads use retained effective keys/compact views and source-preferred furigana;
+revision-anchored completion freezes the rendered partition before draining both
+final-time slots, then prepares/commits through captured FIFO requests. Explicit
+exact retries survive checkpoint/preparation/commit failures and rule reversal.
+Dismissed reads still release their own FIFO/time obligations; stale callbacks
+cannot release newer work. Shared original/effective position/finish/notices keep
+AlreadyRecorded silent. Legacy word/status/custom/completion events reject in the
+opt-in model. Production activation remains pending all remaining consumers.
+
+Six pure app cases and one real app/SQLite/FIFO fixture pass; 685 workspace tests
+(17 opt-in ignored), strict Clippy/fmt, real-Full host Kotlin/JNI/new codec fixtures,
+18-file identical Kotlin regeneration, both-ABI APKs and Android lint pass.
+All 11 API-36 x86_64 phone bridge/navigation/clock regressions pass; the emulator
+started for this run was shut down afterward.
+Resolved initial Facet/visibility compile errors, Clippy Event-size finding via
+boxed native request, punctuation fixture expectation and deferred-read invalidation.
+Gradle/ADB/emulator needed usual local-socket/AVD escalation. No schema/dependency
+change or blocker. Updated plan/handoff/architecture/data/decisions/payload/development.
+Next integrate app word/status/custom/override + effective Library, then activate
+core/FFI/Android together and expose the prepared boundary editor. Physical arm64,
+separate Full opt-in loader matrix, release/process death and effective device
+performance were not rerun. Exact commands/logs/failures: DEVELOPMENT end.
