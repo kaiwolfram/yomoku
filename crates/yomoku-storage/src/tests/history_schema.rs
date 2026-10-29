@@ -136,6 +136,33 @@ fn assert_integrity(connection: &Connection) {
     assert!(rows(connection, "PRAGMA foreign_key_check").is_empty());
 }
 
+fn expected_status_timeline(version: usize) -> Vec<yomoku_core::statistics::StatusTimelinePoint> {
+    use yomoku_core::{library::WordStatusCounts, statistics::StatusTimelinePoint};
+    let mut points = Vec::new();
+    if version >= 6 {
+        for (date, new, learning, known) in [
+            (100, 1, 0, 0),
+            (200, 0, 1, 0),
+            (250, 1, 0, 0),
+            (300, 0, 0, 1),
+        ] {
+            if date == 300 && version < 10 {
+                continue;
+            }
+            points.push(StatusTimelinePoint {
+                occurred_at_unix_ms: date,
+                counts: WordStatusCounts {
+                    new,
+                    learning,
+                    known,
+                    ..WordStatusCounts::default()
+                },
+            });
+        }
+    }
+    points
+}
+
 #[test]
 fn every_history_schema_upgrades_without_reinterpreting_events_or_deleted_source_metadata() {
     for version in 5..=MIGRATIONS.len() {
@@ -155,6 +182,11 @@ fn every_history_schema_upgrades_without_reinterpreting_events_or_deleted_source
             active_time_ms: if version >= 10 { 1234 } else { 0 },
         };
         assert_eq!(storage.lifetime_reading_totals().unwrap(), expected_totals);
+        assert_eq!(
+            storage.vocabulary_status_timeline().unwrap(),
+            expected_status_timeline(version),
+            "v{version}"
+        );
         assert_eq!(
             history_snapshot(&storage.connection, MIGRATIONS.len()),
             before,
@@ -199,10 +231,20 @@ fn every_history_schema_upgrades_without_reinterpreting_events_or_deleted_source
         );
         assert_integrity(&storage.connection);
         assert_eq!(storage.lifetime_reading_totals().unwrap(), expected_totals);
+        assert_eq!(
+            storage.vocabulary_status_timeline().unwrap(),
+            expected_status_timeline(version),
+            "deleted v{version}"
+        );
         drop(storage);
 
         let mut storage = Storage::open(database.path()).unwrap();
         assert_eq!(storage.lifetime_reading_totals().unwrap(), expected_totals);
+        assert_eq!(
+            storage.vocabulary_status_timeline().unwrap(),
+            expected_status_timeline(version),
+            "reopened v{version}"
+        );
         assert_eq!(
             history_snapshot(&storage.connection, MIGRATIONS.len()),
             before,

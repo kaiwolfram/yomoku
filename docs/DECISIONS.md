@@ -3748,3 +3748,30 @@ loading, content reads or a new worker. Reject unsupported included header versi
 and negative durations; exact signed-integer SUM overflow returns a storage error.
 Keep shell serialization/effects, timeframe/status projections and Compose charts
 for their own slices. No dependency, migration or data-destructive change.
+
+## 2026-10-29 — Five-status history replay and causal chart dates
+
+Implement the independently testable five-status portion of the phase-5 timeline
+before Known dictionary-form counts. The latter require durable analyzer links
+for registered-but-unread surfaces, surviving document deletion; do not infer them
+from completed encounters or silently count only live analyses.
+
+Replay surviving v1 registration/manual/completion transitions in immutable event
+ID order through the pure core. Validate per-entry registration/old→new chains;
+storage validates causes and completion provenance in the same read statement.
+Use exact signed deltas grouped by timestamp, then absolute unsigned counts for
+each of the five statuses, reusing `WordStatusCounts`. Do not derive history from
+current cached statuses, content, JSON or dictionary loads. All simultaneous
+changes coalesce into one point. Vocabulary-history cascades erase its entire
+contribution; document deletion leaves the projection intact.
+
+Existing write contracts permit nonnegative wall-clock dates without requiring
+monotonicity, and frozen completion dates may precede committed status changes.
+For chart projection only, take the maximum of each entry's recorded event date
+and preceding projected event date. This preserves its causal order, nonnegative
+counts and final actual status; it leaves unrelated entries' dates and all stored
+events unchanged. Sorting raw wall dates could otherwise move an unregistered
+entry or apply an obsolete transition last. Core validates before mutation and
+storage returns no partial points on invalid history. Retain only entry state and
+per-date deltas; do not copy the complete event stream or introduce a cache.
+No dependency/version/schema/wire or data-destructive semantic change.

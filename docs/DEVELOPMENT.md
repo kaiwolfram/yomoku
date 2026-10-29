@@ -6522,3 +6522,33 @@ No dependency/migration/FFI/Kotlin change; Android, JNI, generated bindings,
 Full-loader matrix, release/process-death and physical arm64 were not rerun.
 Statistics transport/charts remain unimplemented; this is a pure value and native
 read-only repository slice. Logs: `/tmp/yomoku-lifetime-statistics-{tests,clippy,build}.log`.
+
+## Read-only five-status vocabulary timeline
+
+Verified 2026-10-29 from the repository root:
+
+```sh
+export PATH=/home/kai/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin:$PATH
+cargo test -p yomoku-core --test statistics --locked --offline
+cargo test -p yomoku-storage statistics --locked --offline
+cargo test --workspace --all-features --locked --offline --quiet
+cargo clippy --workspace --all-targets --all-features --locked --offline -- -D warnings
+cargo build --workspace --locked --offline
+cargo fmt --all -- --check
+git diff --check
+```
+
+PASS: six new pure tests, eight new SQLite timeline tests (15 total storage
+statistics tests), extended schema-5–19 upgrade/deletion/reopen projections; 734
+workspace Rust tests, 17 opt-in ignored; workspace build, strict Clippy/Rustfmt/diff.
+Coverage includes import registration jumps, all five statuses, exact Unicode and
+inflections, simultaneous changes, unread manual Known, original/effective page
+completion, repetitions/rereads, manual demotion, concurrent duplicate callbacks,
+failure/uncommitted isolation, vocabulary-history erasure and fresh IDs without
+rescans, regressing wall/frozen completion dates, invalid chains/versions/provenance,
+query-only operation and exact unchanged DB bytes. No failed check or blocker.
+
+No dependency/migration/FFI/Kotlin change; Android, JNI, generated bindings,
+Full-loader matrix, release/process-death and physical arm64 were not rerun.
+Known dictionary-form links/counts, timeframe buckets and statistics transport/UI
+remain open. Logs: `/tmp/yomoku-status-statistics-{tests,workspace,clippy,build}.log`.

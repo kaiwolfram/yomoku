@@ -1476,7 +1476,48 @@ returns a storage error, never floating-point approximation, wrapping or truncat
 The query performs no writes and works with `PRAGMA query_only = true`.
 Seven dedicated tests plus every schema-5–19 upgrade verify these contracts,
 including duplicate/concurrent success, failure rollback, reopen and deletion.
-Core/worker/FFI/UI transport, date buckets and status timelines remain separate work.
+Core/worker/FFI/UI transport and date buckets remain separate work.
+
+## Read-only five-status vocabulary timeline (phase 5, no migration)
+
+`Storage::vocabulary_status_timeline(&self)` streams `vocabulary_status_events`
+in primary-key order through the pure `statistics::StatusTimelineBuilder`.
+One statement supplies a consistent read snapshot, including v1 completion,
+analysis and optional effective-reservation headers for completion-caused changes.
+Registration/manual events must have no completion reference; completions must be
+New→Known with valid analyzed provenance. Unknown versions/causes/statuses,
+negative dates, nonincreasing IDs, missing/duplicate registrations, no-op changes
+and broken old→new chains fail without returning partial points or repairing data.
+
+Each retained vocabulary ID contributes exactly one count after its New
+registration. Actual changes move that count between the five statuses. Same-time
+changes, including import registrations and registration-plus-completion, yield
+one point with absolute `WordStatusCounts`; before the first point all counts
+are zero. Empty input returns no points. Current cached vocabulary statuses,
+occurrences, effective JSON, live document/analysis rows and dictionaries are not
+counter sources. Repeated tokens/imports and rereads without status changes add no
+points; pending time, reservations and failed/uncommitted writes add no changes.
+
+Wall timestamps may regress and completion dates are frozen before storage work.
+Preserve causal order independently for each entry: its projected timestamp is
+the maximum of its recorded date and preceding projected date. A later committed
+change never precedes that entry's earlier state; unrelated entries keep their
+own dates. Raw stored timestamps/history remain exact and immutable. Deltas at
+projected dates use exact integers and produce nonnegative unsigned counts.
+Replay retains state per surviving entry and deltas per distinct projected date,
+not every historical row. Timeframe/date-bucket policy is still unimplemented.
+
+Deleting a document leaves the entire timeline, including unread manual Known
+entries. Vocabulary deletion erases all that ID's registration/transitions and
+therefore recalculates its full history; no existing content is rescanned.
+A later explicit import or actual completion registers a fresh ID as New.
+Known surface counts are present in each point; Known dictionary-form counts
+remain unimplemented pending durable automatic links for unread surfaces that
+survive document deletion. The phase-5 combined feature is not yet complete.
+
+Six pure tests and eight SQLite tests cover these semantics; the existing
+schema-5–19 matrix verifies timelines after upgrade, document deletion and reopen.
+The read API works with `PRAGMA query_only = true` and leaves DB bytes unchanged.
 
 ## Required future schema constraints
 - Future import repositories must extend the identity/immutable-text and durable

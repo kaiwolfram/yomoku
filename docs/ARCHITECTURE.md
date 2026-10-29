@@ -1503,5 +1503,22 @@ or effective JSON and writes no caches or history. Legacy events without analysi
 markers, pending checkpoints and unused reservations are excluded. Document
 deletion preserves totals; vocabulary-history cascades reduce occurrences while
 retaining completed time. Header-version/duration checks and exact-integer overflow
-errors fail without repair. Date/status projections and runtime/FFI/Compose
-statistics integration remain future slices; the Statistics tab is a placeholder.
+errors fail without repair. Runtime/FFI/Compose statistics integration remains
+future work; the Statistics tab is a placeholder.
+
+`StatusTimelineBuilder` in the pure core streams surviving registration and
+status changes in durable event-ID order, validates each entry's causal chain and
+accumulates date deltas. `Storage::vocabulary_status_timeline(&self)` supplies the
+events from one SQLite read statement, validating v1 semantics, causes and any
+completion provenance headers. It reads neither live content/analysis nor JSON,
+dictionary data or cached counts. The result has absolute five-status counts after
+all changes at each timestamp, without timeframe filtering or date bins. Memory
+holds one state per surviving entry and one delta per distinct projected date,
+rather than a copy of every event. Document deletion preserves the input;
+vocabulary history cascades recalculate it without rescans.
+
+For a regressing wall clock or delayed frozen completion, clamp only that entry's
+projected date to its preceding event's projected date. This retains causal state,
+nonnegative counts and the final committed status without changing durable dates
+or shifting unrelated entries. Known dictionary-form links/counts, timeframe
+buckets and UI transport remain separate tasks.

@@ -3016,3 +3016,25 @@ No failures/blockers, new dependency/migration/wire change or Android/JNI/Full-l
 rerun. Statistics tab remains a placeholder. Updated README, architecture/data/
 decisions, checked the aggregation item and refreshed the handoff.
 Next: status timeline and durable Known dictionary-form links, then timeframe buckets.
+
+## 2026-10-29 — Five-status vocabulary history timeline
+
+Added pure streaming status replay and a one-statement read-only repository
+projection of registration/manual/completion history. Import registrations create
+jumps; actual transitions move absolute counts between all five statuses, with
+one point per timestamp. Per-entry causal projection handles regressing clocks
+and frozen completion dates without rewriting raw events. Version/cause/provenance
+and old→new chains validate without repair. Document deletion retains even unread
+manual Known history; vocabulary erasure recalculates its full history, never
+rescans, and later registration starts a fresh ID/New.
+
+PASS: six new core/eight new SQLite tests; schema-5–19 timeline projections after
+upgrade/deletion/reopen; all 734 workspace Rust tests (17 opt-in ignored), workspace
+build, strict Clippy/Rustfmt/diff. No failures/blockers or dependency/migration/wire
+change. Android/JNI/Full-loader/release/physical-arm64 were not rerun.
+
+Split the combined timeline plan item to check off only the verified five-status
+portion. Known dictionary-form counts remain unchecked, requiring durable links
+for registered-but-unread entries after document deletion. Date buckets and UI
+remain open; next session starts with that link/count prerequisite. Updated
+README, architecture/data/decisions/development and the brief handoff.

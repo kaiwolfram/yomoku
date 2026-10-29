@@ -1,6 +1,12 @@
-use yomoku_core::statistics::LifetimeReadingTotals;
+use yomoku_core::{
+    document::VocabularyId,
+    statistics::{
+        LifetimeReadingTotals, StatusTimelineBuilder, StatusTimelinePoint, VocabularyStatusChange,
+    },
+    vocabulary::VocabularyStatus,
+};
 
-use crate::{Storage, StorageError};
+use crate::{vocabulary::decode_status, Storage, StorageError};
 
 // One statement gives both totals the same SQLite snapshot. Sum time separately
 // from occurrences: joining before SUM would multiply repeated words' time and
@@ -26,6 +32,68 @@ const LIFETIME_SQL: &str = "
         )";
 
 impl Storage {
+    /// Replay surviving registration/manual/completion history in a single read
+    /// snapshot. Counts are absolute, coalesced per timestamp, without date bins.
+    /// Document deletion preserves points; vocabulary deletion recalculates them.
+    /// No content, analyzer, dictionary links, cached counts or JSON is loaded.
+    pub fn vocabulary_status_timeline(&self) -> Result<Vec<StatusTimelinePoint>, StorageError> {
+        let mut statement = self.connection.prepare(
+            "SELECT e.id, e.vocabulary_id, e.semantics_version, e.old_status,
+                    e.new_status, e.cause, e.occurred_at_unix_ms, e.completion_command_id,
+                    c.semantics_version, a.semantics_version, r.semantics_version
+             FROM vocabulary_status_events e
+             LEFT JOIN reading_completions c ON c.command_id = e.completion_command_id
+             LEFT JOIN completion_analyses a ON a.command_id = e.completion_command_id
+             LEFT JOIN effective_completion_commands r ON r.command_id = e.completion_command_id
+             ORDER BY e.id",
+        )?;
+        let mut rows = statement.query([])?;
+        let mut timeline = StatusTimelineBuilder::default();
+        while let Some(row) = rows.next()? {
+            let version: i64 = row.get(2)?;
+            let old: Option<String> = row.get(3)?;
+            let old = old.as_deref().map(decode_status).transpose()?;
+            let new = decode_status(&row.get::<_, String>(4)?)?;
+            let cause: String = row.get(5)?;
+            let command: Option<i64> = row.get(7)?;
+            let completion_version: Option<i64> = row.get(8)?;
+            let analysis_version: Option<i64> = row.get(9)?;
+            let effective_version: Option<i64> = row.get(10)?;
+            let valid_cause = match cause.as_str() {
+                "registration" => {
+                    old.is_none() && new == VocabularyStatus::New && command.is_none()
+                }
+                "manual" => old.is_some() && old != Some(new) && command.is_none(),
+                "completion" => {
+                    old == Some(VocabularyStatus::New)
+                        && new == VocabularyStatus::Known
+                        && command.is_some()
+                        && completion_version == Some(1)
+                        && analysis_version == Some(1)
+                        && effective_version.is_none_or(|version| version == 1)
+                }
+                _ => false,
+            };
+            if version != 1 || !valid_cause {
+                return Err(StorageError::InvalidVocabulary);
+            }
+            timeline
+                .push(VocabularyStatusChange {
+                    event_id: u64::try_from(row.get::<_, i64>(0)?)
+                        .map_err(|_| StorageError::InvalidVocabulary)?,
+                    vocabulary_id: VocabularyId::try_from(row.get::<_, i64>(1)?)
+                        .map_err(|_| StorageError::InvalidVocabulary)?,
+                    occurred_at_unix_ms: row.get(6)?,
+                    old_status: old,
+                    new_status: new,
+                })
+                .map_err(|_| StorageError::InvalidVocabulary)?;
+        }
+        timeline
+            .finish()
+            .map_err(|_| StorageError::InvalidVocabulary)
+    }
+
     /// Derive exact lifetime totals from committed analyzed history, including
     /// deleted documents. No registration, cached counters, analyzer or writes.
     /// Legacy events without analysis markers have no inferred statistics.

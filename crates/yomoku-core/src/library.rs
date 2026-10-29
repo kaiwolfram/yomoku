@@ -16,8 +16,8 @@ pub fn valid_document_title(title: &str) -> bool {
     !title.trim().is_empty()
 }
 
-/// Live registered exact surfaces, each counted once under the chosen document
-/// segmentation. Missing/deleted vocabulary is absent, never implicitly New.
+/// Registered exact surfaces, counted once per entry in a Library projection or
+/// historical instant. Missing/deleted vocabulary is absent, never implicitly New.
 #[derive(Clone, Copy, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
 #[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
 pub struct WordStatusCounts {
