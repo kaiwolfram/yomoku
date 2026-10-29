@@ -23,6 +23,7 @@ mod epub;
 #[path = "../../yomoku-import/tests/support/epub.rs"]
 mod epub_fixture;
 mod finished;
+mod history_schema;
 mod import_dedup;
 mod imports;
 mod library_order;

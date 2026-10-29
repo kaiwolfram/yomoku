@@ -1416,6 +1416,36 @@ independent of the permanent marker and positive-only toast. Compose acknowledge
 the matching ID before a local 1.4-second confetti animation, so recreation cannot
 replay a consumed command. Neither animation nor its notice is persisted.
 
+## Historical event contract audit (phase 5, schema 0019)
+
+The existing tables provide explicit immutable event semantics through repository
+APIs; no history-edit API or new migration is needed for lifetime aggregation.
+
+| Historical data | Version and interpretation |
+| --- | --- |
+| `reading_completions` | `semantics_version = 1`; dated command, document/source/chapter, byte/page anchors and completed active milliseconds |
+| `completion_analyses` | `semantics_version = 1`; complete analyzed event marker and original analysis/profile/mode, including zero-Japanese completions |
+| `reading_occurrences` | Inherits the command's analyzed contract; one row per eligible start-owned occurrence, with exact surface and nullable reading/dictionary form |
+| `effective_completion_commands` | Independent `semantics_version = 1` JSON reservation; its presence selects effective segment indices and preserves per-segment metadata/rule provenance |
+| `vocabulary_status_events` | `semantics_version = 1`; dated registration/manual/completion transition, with completion provenance only for New→Known promotions |
+| `sources` / `chapters` | Durable source kind/original title and ordered chapter identities; no dependency on live Library/text/analysis rows |
+
+Unused command IDs and effective reservations are not reading events. A completion
+without `completion_analyses` is legacy position/time history, not a zero-word
+analyzed page; migrations must never infer missing occurrences or promotions.
+Nullable occurrence metadata remains unresolved, independently of later dictionary
+or rule changes. Frozen JSON is provenance, not an alternate statistics counter:
+vocabulary deletion removes its occurrence/status rows while preserving commands,
+completed time and source identities. Document deletion retains all that history.
+
+Executable audit fixtures upgrade every history-bearing schema (5–19), compare
+all historical fields (only legacy time defaults to zero), delete live content,
+reopen and join original source/chapter metadata. They also verify ID high-water
+marks and byte-identical rollback on late upgrade failures from 9/10/13/17/18.
+A real v18 effective fixture preserves exact completed and unused reservations
+through upgrade/deletion; unknown event versions fail SQL constraints, completed
+retries remain idempotent and unused reservations are never auto-replayed.
+
 ## Required future schema constraints
 - Future import repositories must extend the identity/immutable-text and durable
   chapter/byte-offset contract above to multiple chapters.

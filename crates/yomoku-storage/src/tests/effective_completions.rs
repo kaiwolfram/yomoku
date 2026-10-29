@@ -678,3 +678,89 @@ fn effective_completions_migration_preserves_old_history_and_failed_upgrade_roll
         AnalyzedCompletionOutcome::AlreadyRecorded
     );
 }
+
+#[test]
+fn versioned_effective_history_and_uncommitted_reservations_survive_upgrade_and_deletion() {
+    let database = TestDatabase::new();
+    let mut storage = Storage::open(database.path()).unwrap();
+    let (imported, rule) = setup(&mut storage, "食べた 猫 猫");
+    let committed = prepare(&mut storage, &imported);
+    storage
+        .record_effective_page_completion(&committed)
+        .unwrap();
+    let beginning = ReadingPosition {
+        source_id: imported.document.chapter.source_id,
+        chapter_id: imported.document.chapter.chapter_id,
+        offset: TextOffset::START,
+    };
+    storage
+        .save_document_reading_position(imported.document.document_id, beginning)
+        .unwrap();
+    let uncommitted = prepare(&mut storage, &imported);
+    // Later boundary/status changes must not rewrite either frozen payload.
+    storage
+        .reverse_segmentation_override(yomoku_core::document::OverrideId::try_from(rule).unwrap())
+        .unwrap();
+    let cat = storage
+        .vocabulary_entry(&Surface::new("猫").unwrap())
+        .unwrap()
+        .unwrap();
+    storage
+        .set_vocabulary_status(cat.id, VocabularyStatus::Learning, 700)
+        .unwrap();
+    for table in [
+        "reading_completions",
+        "completion_analyses",
+        "effective_completion_commands",
+        "vocabulary_status_events",
+    ] {
+        assert!(
+            storage
+                .connection
+                .execute(&format!("UPDATE {table} SET semantics_version = 2"), [])
+                .is_err(),
+            "{table}"
+        );
+    }
+    let tables = [
+        "sources",
+        "chapters",
+        "completion_commands",
+        "reading_completions",
+        "completion_analyses",
+        "reading_occurrences",
+        "effective_completion_commands",
+        "vocabulary",
+        "vocabulary_status_events",
+        "segmentation_overrides",
+        "segmentation_override_parts",
+    ];
+    let before = tables.map(|table| rows(&storage, table));
+    // Exact v18 table shape, with real serialized effective commands: one
+    // completed and one reserved only. Upgrade must never auto-replay either.
+    storage.connection.execute_batch("DROP TABLE library_read_clock; ALTER TABLE documents DROP COLUMN last_read_sequence; DELETE FROM schema_migrations WHERE version = 19;").unwrap();
+    drop(storage);
+    let mut storage = Storage::open(database.path()).unwrap();
+    assert_eq!(tables.map(|table| rows(&storage, table)), before);
+    storage
+        .delete_document(imported.document.document_id)
+        .unwrap();
+    assert_eq!(tables.map(|table| rows(&storage, table)), before);
+    drop(storage);
+    let mut storage = Storage::open(database.path()).unwrap();
+    assert_eq!(tables.map(|table| rows(&storage, table)), before);
+    assert_eq!(
+        storage
+            .record_effective_page_completion(&committed)
+            .unwrap(),
+        AnalyzedCompletionOutcome::AlreadyRecorded
+    );
+    // A reservation with no committed event remains incomplete after deletion.
+    assert!(matches!(
+        storage.record_effective_page_completion(&uncommitted),
+        Err(StorageError::InvalidCompletion)
+    ));
+    assert_eq!(tables.map(|table| rows(&storage, table)), before);
+    assert!(rows(&storage, "chapter_analyses").is_empty());
+    assert!(rows(&storage, "analyzed_tokens").is_empty());
+}

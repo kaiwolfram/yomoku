@@ -3720,3 +3720,16 @@ bound for arbitrarily large files. No dependency/version/schema/size-limit chang
 Picker/notification fixtures must wait for automatic Library word counts before
 direct start or picker-button actions. A transient idle view before that scan is
 not readiness. During an active import batch, counts intentionally remain absent.
+
+## 2026-10-29 — Phase-5 historical event contract audit
+
+Retain the existing schema-0019 versioned tables: completion/status/analysis headers
+and effective JSON reservations each have explicit v1 semantics. Occurrences inherit
+the analyzed command contract; reservation presence distinguishes effective indices
+from original analyzer indices. Repository APIs append history and expose no edits.
+Do not rebuild tables or backfill legacy encounters merely to begin aggregation.
+Source kind/original title and chapter order remain independently joinable after
+live document deletion. Unused reservations never count as completed reading.
+Audit all history-bearing upgrade starting points, late migration rollback/retry,
+allocation high-water marks and real effective payload retention with executable
+fixtures. No dependency, durable schema, wire or destructive semantic change.

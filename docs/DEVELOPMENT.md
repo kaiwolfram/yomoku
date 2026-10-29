@@ -6474,3 +6474,25 @@ cleaned up, phone/light restored; host corpora remain in /tmp for reproduction.
 Logs: /tmp/yomoku-effective-measure-{android,format-check,smoke,boxed-oom,
 regressions-initial,regressions,mixed-final,final}.log. The regressions log contains
 the corrected later Mixed fixture's earlier failure; use mixed-final for its pass.
+
+## Phase-5 historical event/provenance audit
+
+Verified 2026-10-29 from the repository root:
+
+```sh
+export PATH=/home/kai/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin:$PATH
+cargo test -p yomoku-storage history --locked --offline
+cargo test --workspace --all-features --locked --offline --quiet
+cargo clippy --workspace --all-targets --all-features --locked --offline -- -D warnings
+cargo fmt --all -- --check
+git diff --check
+```
+
+PASS: 43 focused history tests; 713 workspace Rust tests, 17 opt-in ignored;
+strict Clippy/Rustfmt/diff. Three new audit tests cover all schema versions 5–19,
+late failure/retry from 9/10/13/17/18, exact retained historical fields and source
+joins after deletion/reopen, ID high-water marks, and real v18 completed/unused
+effective payloads across upgrade/deletion. No failed verification or blocker.
+No production code/schema/FFI/Kotlin change; Android, JNI, generated bindings,
+Full-loader matrix, release/process-death and physical arm64 were not rerun.
+Logs: `/tmp/yomoku-history-schema-{tests,clippy}.log`.

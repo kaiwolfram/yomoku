@@ -2987,3 +2987,16 @@ Next: phase-5 immutable event/provenance audit, lifetime aggregation, then optim
 Android profiling/diverse-Library costs. Physical arm64 and Nostr empty/Q188 remain
 separate deferred inputs. Exact commands, failures and results: DEVELOPMENT.md and
 EFFECTIVE_READER_PERFORMANCE.md.
+
+## 2026-10-29 — Phase-5 immutable history/provenance audit
+
+Finalized the existing v1 event/provenance contracts without a new migration.
+Added schema-5–19 upgrade fixtures preserving dated completions/statuses, repeated
+occurrences, nullable metadata, deleted source/chapter joins and ID high-water
+marks. Late failures roll back unchanged and retry; actual completed and unused
+v18 effective reservations survive upgrade/deletion without replay.
+
+PASS: 43 focused history tests, all 713 workspace Rust tests (17 opt-in ignored),
+strict Clippy/Rustfmt/diff. No production/native-wire/Kotlin change or new
+dependency; Android/JNI/Full-loader/release/arm64 were not rerun. No blocker.
+Next: read-only lifetime occurrence/time aggregation, then status timeline.
