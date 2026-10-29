@@ -45,7 +45,16 @@ class ReaderNavigationTest {
     private fun awaitReady() {
         compose.waitUntil(30_000) {
             val view = core().view
-            !view.storageBusy && !view.readingTimeSavePending && !view.completionSavePending
+            !view.storageBusy &&
+                !view.readingTimeSavePending &&
+                !view.completionSavePending &&
+                (view.settingsOpen ||
+                    view.contentRoute != ContentRoute.MAIN ||
+                    view.libraryWordDistributions != null ||
+                    view.libraryWordError != null) &&
+                (view.settingsOpen ||
+                    view.contentRoute != ContentRoute.READER ||
+                    (view.readerTime != null && view.effectiveReaderTokens != null))
         }
         compose.waitForIdle()
     }
@@ -56,6 +65,7 @@ class ReaderNavigationTest {
         compose.runOnUiThread { core().dispatch(Event.SetPageLength(PageLength.CHARACTERS500)) }
         awaitReady()
         compose.runOnUiThread { core().dispatch(Event.CloseSettings) }
+        awaitReady()
         val title = "Navigation ${System.nanoTime()}"
         compose.runOnUiThread {
             core()
@@ -67,6 +77,7 @@ class ReaderNavigationTest {
         val id = core().view.documents.single { it.title == title }.documentId
         compose.runOnUiThread { core().dispatch(Event.OpenReader(id)) }
         compose.waitUntil(30_000) { !core().view.storageBusy && core().view.readerTime != null }
+        awaitReady()
         return id.value
     }
 
@@ -138,6 +149,7 @@ class ReaderNavigationTest {
             assertEquals(1UL, core().view.reader!!.pageNumber)
             assertEquals(1L, completions(db, id))
             // Swipes do not require reaching the content bottom.
+            awaitReady()
             compose.onNodeWithTag("reader_scroll").performTouchInput { swipeLeft() }
             awaitReady()
             assertEquals(2UL, core().view.reader!!.pageNumber)

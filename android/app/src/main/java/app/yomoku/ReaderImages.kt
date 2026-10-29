@@ -30,6 +30,9 @@ import androidx.compose.ui.platform.ViewConfiguration
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.TextLayoutResult
+import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.DpSize
 import app.yomoku.shared.ReaderInlineImage
 import app.yomoku.shared.ReaderPage
@@ -58,9 +61,78 @@ private fun ReaderTextBlock(
             }
         }
     CompositionLocalProvider(LocalViewConfiguration provides configuration) {
-        ReaderRubyText(text, readerTextStyle(typography), ruby, modifier)
+        val style = readerTextStyle(typography)
+        // Cutting a bidi paragraph can change its embedding context. Preserve the complete
+        // layout for those fragments and for explicit paragraph styling.
+        val canSplit =
+            remember(text) {
+                text.paragraphStyles.isEmpty() &&
+                    text.text.codePoints().noneMatch {
+                        when (Character.getDirectionality(it)) {
+                            Character.DIRECTIONALITY_RIGHT_TO_LEFT,
+                            Character.DIRECTIONALITY_RIGHT_TO_LEFT_ARABIC,
+                            Character.DIRECTIONALITY_LEFT_TO_RIGHT_EMBEDDING,
+                            Character.DIRECTIONALITY_RIGHT_TO_LEFT_EMBEDDING,
+                            Character.DIRECTIONALITY_LEFT_TO_RIGHT_OVERRIDE,
+                            Character.DIRECTIONALITY_RIGHT_TO_LEFT_OVERRIDE,
+                            Character.DIRECTIONALITY_POP_DIRECTIONAL_FORMAT,
+                            Character.DIRECTIONALITY_LEFT_TO_RIGHT_ISOLATE,
+                            Character.DIRECTIONALITY_RIGHT_TO_LEFT_ISOLATE,
+                            Character.DIRECTIONALITY_FIRST_STRONG_ISOLATE,
+                            Character.DIRECTIONALITY_POP_DIRECTIONAL_ISOLATE -> true
+                            else -> false
+                        }
+                    }
+            }
+        if (text.length <= 1024 || !canSplit) {
+            ReaderRubyText(text, style, ruby, modifier)
+        } else {
+            // Measure once without creating link nodes, then bound each interactive layout.
+            // Split at visual line ends so this does not add logical pages or hard breaks.
+            val measurer = rememberTextMeasurer()
+            BoxWithConstraints(Modifier.fillMaxWidth()) {
+                val width = constraints.maxWidth
+                val layout =
+                    remember(text, style, measurer, width) {
+                        measurer.measure(text, style, constraints = Constraints(maxWidth = width))
+                    }
+                val ranges = remember(layout) { readerTextBlockRanges(layout) }
+                Column {
+                    for ((index, range) in ranges.withIndex()) {
+                        val block =
+                            remember(text, range) {
+                                text.subSequence(range.first, range.last + 1)
+                            }
+                        ReaderRubyText(
+                            block,
+                            style,
+                            ruby.mapNotNull { it.clip(range.first, range.last + 1) },
+                            if (index == 0) modifier
+                            else Modifier.testTag("reader_text_block_${range.first}"),
+                        )
+                    }
+                }
+            }
+        }
     }
 }
+
+/** Never split after a hard break: a trailing newline would add an extra empty visual line. */
+internal fun readerTextBlockRanges(layout: TextLayoutResult): List<IntRange> = buildList {
+    val text = layout.layoutInput.text
+    var start = 0
+    for (line in 0 until layout.lineCount - 1) {
+        val end = layout.getLineEnd(line)
+        if (end - start >= 512 && !readerHardBreak(text[end - 1])) {
+            add(start until end)
+            start = end
+        }
+    }
+    if (start < text.length) add(start until text.length)
+}
+
+private fun readerHardBreak(character: Char): Boolean =
+    character == '\n' || character == '\r' || character == '\u2028' || character == '\u2029'
 
 /** Keep canonical text/anchors intact; only replace verified whole placeholder scalars. */
 internal fun readerImageParts(

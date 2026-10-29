@@ -2944,3 +2944,24 @@ JNI/device/diverse/image-heavy costs, then phase-5 history aggregation. Separate
 Full-loader matrix, release/process-death, physical arm64 and performance were not
 rerun/measured. Nostr empty/Q188 remain unrelated pending inputs. See DEVELOPMENT
 end for exact commands, failures, reruns and `/tmp/yomoku-activation-*` logs.
+
+## 2026-10-29 — Long-page reader rendering and regression closure
+
+Removed per-word dynamic style rewriting with static spans and explicit empty
+link styles; bounded long LTR interactive layouts at measured soft line endings.
+Canonical Unicode/wrapping/glyph positions/spacing/crossing selections remain
+intact; bidi/paragraph-styled text retains its complete layout. Corrected native
+test synchronization with automatic Library counts and effective token loads.
+
+PASS: final 23 phone/light and nine wide/dark cases, including all four formerly
+blocked long-page cases, two new geometry guards, palettes/status/Retry,
+navigation/recreation/finish, typography, EPUB formatting/images/furigana.
+Both-ABI APKs with unchanged native binaries, strict Android lint, Kotlin
+formatting and diff pass. No Rust/JNI/dependency/wire/schema change; prior native
+suites were not rerun. Initial failures/corrections and rebuildable dictionary
+space recovery are recorded in DEVELOPMENT.md; reader DB/data were preserved.
+Phone/light restored, debugger forward removed, task emulator stopped.
+
+Next: actual effective JNI/device/diverse/image-heavy measurements, phase-5
+immutable event/provenance audit, then lifetime occurrence/time aggregation.
+Physical arm64 remains deferred; Nostr empty/Q188 do not block local work.

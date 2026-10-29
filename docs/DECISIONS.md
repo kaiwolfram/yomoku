@@ -3664,3 +3664,33 @@ keep explicit Retry after failures in the same context and explicit Reload after
 boundary edits. Clock saves, error clearing and typography alone must not replay
 a failed read. A compact component regression covers same-anchor position/preset
 changes; the real typography/position fixture exercises production invalidation.
+
+## 2026-10-29 — Bound interactive layouts on long reader pages
+
+Debugger samples of the long-page failure found main-thread work in Compose's
+`TextLinkScope.applyAnnotators`/`replaceStyle` and Android span geometry for each
+word link, in addition to the previously observed HWUI wait. Move the fixed word
+foreground/background/decoration into ordinary spans. Give clickable word links
+explicit empty `TextLinkStyles`: null lets Material inject website styling and
+reintroduce the annotation work. Keep real link nodes for taps/accessibility.
+
+For text fragments over 1,024 UTF-16 units, measure at the actual column width,
+then slice after a soft visual line ending once the current block reaches 512
+units. This bounds repeated link geometry within long paragraphs. Never insert
+characters or split a scalar; annotated slicing preserves selection callbacks,
+source styling and crossing-token identity. Bidirectional text, direction controls
+and explicit paragraph styles keep their complete layout; do not force paragraph
+direction on a partial range, which can introduce an extra visual paragraph.
+Clip/repeat whole ruby readings using the existing rule. Skip
+hard-break split points to avoid adding an empty visual line. Logical pagination,
+position, completion/time/history and native wire/storage contracts do not change.
+
+Navigation/typography fixtures must wait for Library's automatic distribution
+load before direct import/open commands, including after closing Settings and
+returning from a reader. A transient idle snapshot can precede that Compose load;
+the existing busy gate correctly rejects commands sent during the subsequent read.
+
+Primary implementation references: AndroidX
+[TextLinkScope](https://github.com/androidx/androidx/blob/androidx-main/compose/foundation/foundation/src/commonMain/kotlin/androidx/compose/foundation/text/TextLinkScope.kt)
+and Material [Text](https://github.com/androidx/androidx/blob/androidx-main/compose/material3/material3/src/commonMain/kotlin/androidx/compose/material3/Text.kt).
+No dependency/version or data-destructive semantic change.

@@ -6311,3 +6311,89 @@ the task-started emulator. Final aggregate: 57 distinct phone plus three wide
 cases; 710 Rust pass/17 opt-in ignored, full final host JNI/codecs, both-ABI APKs,
 strict Clippy/Android lint/formatting/diff and unchanged generated Kotlin. The
 known four long-page emulator cases and performance/hardware gaps remain as above.
+
+## Long-page interactive text layouts
+
+2026-10-29, pinned offline Android tools, API-36 x86_64 medium_phone:
+
+```sh
+export JAVA_HOME=/home/kai/repos/yomoku/.local/jdk-17/jdk-17.0.21+9
+export GRADLE_USER_HOME=/home/kai/repos/yomoku/.local/gradle
+export ANDROID_HOME=/home/kai/Android/Sdk
+tools/format-kotlin.sh --check
+# Kotlin-only change: retain the verified native binaries and both packaged ABIs.
+./android/gradlew -p android :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug -x :app:buildRustBridge --offline --console=plain
+"$ANDROID_HOME/platform-tools/adb" -s emulator-5554 install -r -t android/app/build/outputs/apk/debug/app-debug.apk
+"$ANDROID_HOME/platform-tools/adb" -s emulator-5554 install -r -t android/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+cases='app.yomoku.ReaderLongPageTest,app.yomoku.ReaderWordSpansTest,app.yomoku.ReaderWordsTest#movingBothDirectionsDismissesDetailsAndNeverRestoresTheSelection,app.yomoku.ReaderWordsTest#tappingAndFiveChoicesPersistWithoutLookupHistoryAndFailedChoiceCanRepeat,app.yomoku.ReaderNavigationTest,app.yomoku.ReaderTypographySettingsTest,app.yomoku.ReaderFormattingTest,app.yomoku.ReaderImagesTest,app.yomoku.ReaderFuriganaTest'
+"$ANDROID_HOME/platform-tools/adb" -s emulator-5554 shell am instrument -w -r -e class "$cases" app.yomoku.test/androidx.test.runner.AndroidJUnitRunner
+git diff --check
+```
+
+Diagnostic baseline: the existing long word case stalls; debugger samples show
+main in Compose `TextLinkScope.applyAnnotators`/`replaceStyle` and Android span
+geometry, extending the previous HWUI-only observation. Stop the diagnostic
+process after sampling; it is not a passing/timed benchmark. Explicit empty
+`TextLinkStyles` prevents Material website-style injection; static spans carry
+vocabulary colors/decoration. Long left-to-right fragments render in annotated
+blocks at measured soft line boundaries. Bidi/direction controls and explicit
+paragraph styling retain their complete layout. No native/schema/dependency change.
+
+Initial iterations exposed/corrected an invalid Compose import; null link styles
+causing Material defaults; a geometry assertion comparing invisible trailing-space
+advance instead of glyph positions; and forced partial paragraph direction adding
+an extra visual line. The final tests compare exact concatenated Unicode, every
+line's offsets, edge glyph coordinates/baselines, crossing callback identity and
+unchanged complete bidi layout. Native navigation fixtures also needed to await
+Library's automatic distribution load and effective tokens after movement; the
+shared native gates correctly reject commands sent during those reads. Typography
+fixtures wait for the same Library load before their direct imports.
+
+The initial 12-case run passed ten, including long word selection, completion
+Retry and finish/reopen. Controls/swipes then passed with explicit token readiness;
+both typography cases passed with Library readiness. These intermediate results
+do not substitute for final APK verification. Logs retain failed iterations.
+
+Gradle's sandbox local-socket failure requires escalation as before. APK installs
+again hit the 6-GiB AVD's space limit; cache trimming was insufficient. Stopped the
+test process and removed only the two immutable dictionary extractions under
+`no_backup/{sudachi,dictionaries}` before reinstalling. The app republishes them
+from verified APK assets. Reader SQLite/documents/settings were preserved; no
+app data wipe/uninstall/AVD reset. Keep test execution separate from APK installs.
+
+Logs: `/tmp/yomoku-long-page-{baseline,focused,block-focused,final-focused,corrected,render-regressions,final-build,format-check,final-phone,emulator}.log`.
+The diagnostic JDB port forward was removed. Rust/JNI suites, separate Full-loader
+matrix, release/process-death, physical arm64 and actual effective JNI/device/
+diverse/image-heavy performance are not rerun/measured by this Kotlin slice.
+
+PASS: final 23-case phone/light run, without failures/skips, on the final APK.
+All four formerly unresolved long-page cases pass, as do the two new Unicode/bidi
+geometry regressions, five span/palette guards, actual five-status persistence/
+failure Retry, all five reader-navigation cases, both typography Settings cases,
+EPUB formatting, four image cases and both furigana cases. Phone viewport verified
+as 1080×2400 / 420 dpi / system light. Final log:
+`/tmp/yomoku-long-page-final-phone.log` (363.512 s). This is test-suite duration,
+not an application performance measurement. Both-ABI debug app/test APKs, strict
+Android lint, Kotlin formatting and diff pass; native binaries were unchanged.
+
+PASS: final nine-case wide/dark run, no failures/skips, at 2560×1600 / 240 dpi:
+both Unicode/bidi geometry cases, five span/palette cases and both actual native
+word/status cases, including long-page movement/dismissal. Log:
+`/tmp/yomoku-long-page-final-wide.log` (69.947 s, suite duration only).
+
+```sh
+"$ANDROID_HOME/platform-tools/adb" -s emulator-5554 shell wm size 2560x1600
+"$ANDROID_HOME/platform-tools/adb" -s emulator-5554 shell wm density 240
+"$ANDROID_HOME/platform-tools/adb" -s emulator-5554 shell cmd uimode night yes
+wide_cases='app.yomoku.ReaderLongPageTest,app.yomoku.ReaderWordSpansTest,app.yomoku.ReaderWordsTest#movingBothDirectionsDismissesDetailsAndNeverRestoresTheSelection,app.yomoku.ReaderWordsTest#tappingAndFiveChoicesPersistWithoutLookupHistoryAndFailedChoiceCanRepeat'
+"$ANDROID_HOME/platform-tools/adb" -s emulator-5554 shell am instrument -w -r -e class "$wide_cases" app.yomoku.test/androidx.test.runner.AndroidJUnitRunner
+"$ANDROID_HOME/platform-tools/adb" -s emulator-5554 shell wm size reset
+"$ANDROID_HOME/platform-tools/adb" -s emulator-5554 shell wm density reset
+"$ANDROID_HOME/platform-tools/adb" -s emulator-5554 shell cmd uimode night no
+"$ANDROID_HOME/platform-tools/adb" -s emulator-5554 emu kill
+```
+
+Verified restored physical phone size 1080×2400/density 420 and system light,
+then stopped this task's emulator. All four formerly blocked long-page cases
+now pass on the final phone APK. This closes that focused verification gap;
+it does not establish the full device/lifecycle/hardware/performance matrix.

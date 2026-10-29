@@ -24,9 +24,14 @@ class ReaderTypographySettingsTest {
 
     private fun awaitSaved() {
         compose.waitUntil(30_000) {
-            !core().view.storageBusy &&
-                !core().view.readingTimeSavePending &&
-                !core().view.completionSavePending
+            val view = core().view
+            !view.storageBusy &&
+                !view.readingTimeSavePending &&
+                !view.completionSavePending &&
+                (view.settingsOpen ||
+                    view.contentRoute != ContentRoute.MAIN ||
+                    view.libraryWordDistributions != null ||
+                    view.libraryWordError != null)
         }
         compose.waitForIdle()
     }

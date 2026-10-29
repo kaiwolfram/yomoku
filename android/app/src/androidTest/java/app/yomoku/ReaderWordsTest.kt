@@ -156,7 +156,14 @@ class ReaderWordsTest {
                 compose.activity.resources.configuration.uiMode and
                     android.content.res.Configuration.UI_MODE_NIGHT_MASK ==
                     android.content.res.Configuration.UI_MODE_NIGHT_YES
-            assertEquals(vocabularyBackground(status, dark), link.styles!!.style!!.background)
+            assertEquals(androidx.compose.ui.text.TextLinkStyles(), link.styles)
+            assertEquals(
+                vocabularyBackground(status, dark),
+                text.spanStyles
+                    .first { it.start == span.start && it.end == span.end }
+                    .item
+                    .background,
+            )
         }
     }
 

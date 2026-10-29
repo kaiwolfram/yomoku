@@ -1425,6 +1425,17 @@ source formatting/link ownership, status backgrounds, image positions and ruby.
 Shared dictionary and phone/wide panel presentation accept display fields only;
 effective selections are never converted to original-B word identities.
 
+Vocabulary colors and decoration are ordinary static spans. Clickable word links
+carry explicit empty `TextLinkStyles`, preventing Material from adding website
+styles and avoiding Compose's per-link annotation rewriting. Long text fragments
+(over 1,024 UTF-16 units) are measured once at the actual column width and rendered
+in smaller interactive layouts, split at a soft visual line end after 512 units.
+Canonical text, logical pages, native identities and source offsets stay intact.
+Annotated slices retain their original callbacks; crossing tokens/readings keep
+their whole identity/reading. Bidirectional text, direction controls and explicit
+paragraph styles retain the complete layout to preserve embedding context.
+Images keep their existing source order. No scroll position is persisted.
+
 Word lookup/status/custom events use the compact native app lifecycle. Reads wait
 for shared storage/time/completion/mutation gates; failures need explicit Retry.
 Attempt token reads once per base identity; page retirement needs explicit reload.

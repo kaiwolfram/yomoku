@@ -1,7 +1,12 @@
 # Resume here
-Updated: 2026-10-29. Production effective reader activated; boundary editing is live.
+Updated: 2026-10-29. Focused long-page reader stalls resolved; effective reader live.
 
 ## Current slice
+- Word links now use static spans/explicit empty TextLinkStyles. Long LTR fragments
+  render as annotated blocks at measured soft line ends, preserving Unicode,
+  wrapping/spacing/crossing selections. Bidi/paragraph styles keep complete layouts.
+  All four formerly blocked long-page cases pass; fixtures await Library counts
+  and effective tokens before commands. No logical pagination/position change.
 - NativeBridge constructs YomokuBridge::with_effective_reader with the existing
   verified dictionary providers, FIFO/cache, lifecycle and compact codecs.
 - Reader/words/status/custom/furigana/Library/completion share effective partitions.
@@ -31,32 +36,31 @@ Updated: 2026-10-29. Production effective reader activated; boundary editing is 
   persistent count cache. Stored/live statuses and Missing/zero remain distinct.
 
 ## Next tasks (ordered)
-1. Investigate the emulator long-page HWUI stall and rerun the four unresolved
-   cases: ReaderWords movingBothDirectionsDismissesDetailsAndNeverRestoresTheSelection;
-   ReaderNavigation controlsAndSwipesPersistBothDirectionsResetScrollAndCountOnlyForward,
-   failedForwardDisablesControlsAndRetryCommitsExactlyOnce, and
-   finishCheckmarkPersistsThroughRetryRecreationAndRereadsWhileReopeningResetsPosition.
-   Previous ReaderScreen also fails; JDB main waits in HardwareRenderer draw.
-2. Measure actual effective JNI/device/diverse/image-heavy costs. Host baselines
+1. Measure actual effective JNI/device/diverse/image-heavy costs. Host baselines
    and reproducible scratch TXT/EPUB harness: EFFECTIVE_READER_PERFORMANCE.md.
-3. Continue phase 5 with the immutable event/provenance audit and lifetime
-   occurrence/time aggregation; keep status/history semantics versioned.
+2. Phase 5: audit immutable event/provenance versions and migration tests; verify
+   deleted documents retain historical source metadata.
+3. Add read-only lifetime occurrence/time aggregation with repetition/reread,
+   incomplete-page exclusion and duplicate-completion coverage.
 Physical arm64 remains deferred; Nostr configuration empty; Q188 is required
 before forwarding. These do not block local reader/history work.
 
 ## Verification / blockers
-- PASS: 710 Rust (17 opt-in ignored), strict Clippy/fmt/diff, full final real-Full
-  host JNI/codecs, unchanged 17 generated Kotlin files, both-ABI APKs/Android lint,
-  Android/new host-test formatting. No dependency/wire/durable schema change.
-- PASS: 57 distinct phone cases across runs; final 19-case selection passes all
-  four corrected failures and the 12 compact-word guards. Three final wide/dark
-  cases pass (2560x1600, 240 dpi). Phone/light restored and task emulator stopped.
-- The four long-page cases above remain unverified this slice; no full-device-matrix
-  claim. Separate Full owned/mapped matrix, release/process death, physical arm64
-  and actual effective device performance were not rerun/measured.
-- Initial System UI ANR/display overrides required reset/reboot. Reinstalls can
-  exhaust the 6 GiB AVD after dictionary extraction. Final checks use direct ADB
-  instrumentation against installed APKs; only this task's test app was removed
-  to free space. Keep native/BoltFFI generation sequential with host JNI execution.
-- Commands/results/failures/logs: DEVELOPMENT.md, final activation section;
-  `/tmp/yomoku-activation-*`. Normal AVD uses swangle with `-feature -Vulkan`.
+- PASS this slice: final 23-case API-36 x86_64 phone/light selection, including all
+  four long-page cases, two new Unicode/bidi geometry guards and span/status/
+  navigation/typography/formatting/images/furigana. Both-ABI APKs (unchanged native
+  binaries), strict Android lint/Kotlin formatting/diff pass. No wire/schema change.
+- PASS: nine wide/dark cases (2560x1600, 240 dpi): both geometry guards, five spans,
+  actual status persistence/Retry and long-page word dismissal/navigation. Restored
+  phone size/density/light and stopped this task's emulator.
+- Prior 710 Rust/17 ignored and full real-Full host JNI/codecs are the preceding
+  slice's baseline, not rerun for this Kotlin-only change. No full-matrix claim.
+  Separate Full-loader matrix, release/process death, physical arm64 and actual
+  effective device performance remain unmeasured/unrerun. Dense bidi fragments
+  retain complete layouts; no scaling claim for that correctness fallback.
+- Low AVD space required removing only rebuildable immutable dictionary extractions
+  before APK installs; reader DB/documents/settings preserved. Use direct ADB
+  instrumentation against installed APKs. No debugger port remains forwarded.
+  Keep native/BoltFFI generation sequential with host JNI execution.
+- Commands/results/failures: DEVELOPMENT.md, final long-page section; logs
+  `/tmp/yomoku-long-page-*`. Normal AVD uses swangle with `-feature -Vulkan`.

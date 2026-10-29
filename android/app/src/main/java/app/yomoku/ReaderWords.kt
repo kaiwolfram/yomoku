@@ -162,18 +162,19 @@ internal fun readerAnnotatedSpans(
         // Source website links own their tap area; the remaining token fragments
         // retain their owning selection identity and vocabulary highlight.
         for (range in readerUncoveredRanges(start, end, external)) {
+            // These styles never depend on hover/focus/press. Keep them outside the link:
+            // Compose otherwise remaps the full annotation list for every word on each
+            // interaction, making long logical pages quadratic in their token count.
+            addStyle(
+                SpanStyle(color = foreground, textDecoration = TextDecoration.None),
+                range.first,
+                range.last + 1,
+            )
             addLink(
                 LinkAnnotation.Clickable(
                     tag = "reader_token_${index}",
-                    styles =
-                        TextLinkStyles(
-                            style =
-                                SpanStyle(
-                                    color = foreground,
-                                    background = vocabularyBackground(status, dark),
-                                    textDecoration = TextDecoration.None,
-                                )
-                        ),
+                    // Empty explicitly: null lets Material install its dynamic website style.
+                    styles = TextLinkStyles(),
                     linkInteractionListener = { onToken(index) },
                 ),
                 range.first,

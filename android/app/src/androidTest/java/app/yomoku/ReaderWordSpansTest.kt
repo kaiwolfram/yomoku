@@ -2,6 +2,7 @@ package app.yomoku
 
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.LinkAnnotation
+import androidx.compose.ui.text.TextLinkStyles
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -65,8 +66,15 @@ class ReaderWordSpansTest {
         assertEquals(page.text, text.text)
         val links = text.getLinkAnnotations(0, text.length)
         assertEquals(2, links.size)
-        assertEquals(Color(0xFFA9CCFF), links.first().item.styles!!.style!!.background)
-        assertEquals(Color.Unspecified, links.last().item.styles!!.style!!.background)
+        assertTrue(links.all { it.item.styles == TextLinkStyles() })
+        assertEquals(
+            Color(0xFFA9CCFF),
+            text.spanStyles.first { it.start == 3 && it.end == 7 }.item.background,
+        )
+        assertEquals(
+            Color.Unspecified,
+            text.spanStyles.first { it.start == 8 && it.end == 9 }.item.background,
+        )
         links.first().item.linkInteractionListener!!.onClick(links.first().item)
         assertEquals(listOf(7UL), taps)
 
