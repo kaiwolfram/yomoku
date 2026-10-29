@@ -79,6 +79,163 @@ fn app_selection(view: &ViewModel, surface: &str) -> EffectiveReaderSelection {
 }
 
 #[test]
+fn effective_application_fifo_override_rollback_exact_retry_reload_and_reverse() {
+    use yomoku_core::effective_session::EffectiveOverrideAction as Action;
+    let fixture = Fixture::new();
+    let original_position = fixture
+        .storage()
+        .load_document_reader_snapshot(fixture.base.document_id)
+        .unwrap()
+        .unwrap()
+        .document
+        .reading_position;
+    let router = router(&fixture); // Stored choices/manual edits load neither dictionary.
+    let view = load_app(&router, &fixture);
+    let open = |view: &ViewModel| {
+        AppEvent::EffectiveReaderOverride(Action::Open {
+            page: view.effective_reader_tokens.as_ref().unwrap().identity,
+            anchor: TextAnchor {
+                range: TextRange {
+                    start: TextOffset::START,
+                    end: ("食べた".len() as i64).try_into().unwrap(),
+                },
+                ..fixture.base.page
+            },
+        })
+    };
+    let reload = || dispatch(&router, AppEvent::LoadReaderTokens(fixture.base));
+    let before = std::fs::read(fixture.path()).unwrap();
+    let view = dispatch(&router, open(&view));
+    assert_eq!(std::fs::read(fixture.path()).unwrap(), before);
+    let prompt = view.effective_reader_override.unwrap().prompt.unwrap();
+    assert_eq!(prompt.default_scope, OverrideScope::AllOccurrences);
+    assert_eq!(prompt.choices.len(), 1);
+    assert_eq!(prompt.choices[0].mode, SplitMode::B);
+    assert_eq!(prompt.winning_rules[0].id, fixture.rule);
+    fixture.sql().execute_batch("CREATE TRIGGER fail_app_override BEFORE INSERT ON segmentation_overrides BEGIN SELECT RAISE(ABORT, 'fixture'); END;").unwrap();
+    let view = dispatch(
+        &router,
+        AppEvent::EffectiveReaderOverride(Action::Choose {
+            identity: prompt.identity,
+            mode: SplitMode::B,
+            scope: OverrideScope::ThisOccurrence,
+            registered_at_unix_ms: 601,
+        }),
+    );
+    assert!(view.effective_reader_override.unwrap().pending);
+    assert!(view.effective_reader_tokens.is_none());
+    assert_eq!(
+        fixture
+            .sql()
+            .query_row("SELECT COUNT(*) FROM segmentation_overrides", [], |r| r
+                .get::<_, i64>(0))
+            .unwrap(),
+        1
+    );
+    fixture
+        .sql()
+        .execute_batch("DROP TRIGGER fail_app_override")
+        .unwrap();
+    let view = dispatch(
+        &router,
+        AppEvent::EffectiveReaderOverride(Action::Retry {
+            identity: prompt.identity,
+        }),
+    );
+    let state = view.effective_reader_override.unwrap();
+    assert!(state.reload_required && !state.pending);
+    assert!(view.effective_reader_tokens.is_none());
+    let view = reload();
+    assert_eq!(
+        view.effective_reader_tokens.as_ref().unwrap().tokens[0].surface,
+        "食べた"
+    );
+    assert_eq!(
+        view.effective_reader_tokens.as_ref().unwrap().tokens[1].surface,
+        "食べ"
+    );
+    let view = dispatch(&router, open(&view));
+    let prompt = view.effective_reader_override.unwrap().prompt.unwrap();
+    let local = prompt
+        .winning_rules
+        .iter()
+        .find(|r| r.scope == OverrideScope::ThisOccurrence)
+        .unwrap()
+        .id;
+    dispatch(
+        &router,
+        AppEvent::EffectiveReaderOverride(Action::Reverse {
+            identity: prompt.identity,
+            id: local,
+        }),
+    );
+    let view = reload();
+    assert_eq!(
+        view.effective_reader_tokens.as_ref().unwrap().tokens[0].surface,
+        "食べ"
+    );
+
+    // Literal manual parts persist through a new app/storage connection.
+    let page = view.effective_reader_tokens.as_ref().unwrap();
+    let token = page
+        .tokens
+        .iter()
+        .find(|t| t.surface == "𠮷か\u{3099}\0")
+        .unwrap();
+    let view = dispatch(
+        &router,
+        AppEvent::EffectiveReaderOverride(Action::Open {
+            page: page.identity,
+            anchor: token.anchor,
+        }),
+    );
+    let identity = view.effective_reader_override.unwrap().identity.unwrap();
+    let view = dispatch(
+        &router,
+        AppEvent::EffectiveReaderOverride(Action::Save {
+            identity,
+            scope: OverrideScope::AllOccurrences,
+            parts: vec!["𠮷".into(), "か\u{3099}\0".into()],
+            registered_at_unix_ms: 602,
+        }),
+    );
+    assert!(!view.effective_reader_override.unwrap().pending);
+    let fresh = self::router(&fixture);
+    let view = load_app(&fresh, &fixture);
+    let tokens = view.effective_reader_tokens.unwrap().tokens;
+    assert!(tokens.iter().any(|t| t.surface == "𠮷"));
+    assert!(tokens.iter().any(|t| t.surface == "か\u{3099}\0"));
+    let sql = fixture.sql();
+    for table in ["reading_completions", "reading_occurrences"] {
+        assert_eq!(
+            sql.query_row(&format!("SELECT COUNT(*) FROM {table}"), [], |r| r
+                .get::<_, i64>(0))
+                .unwrap(),
+            0
+        );
+    }
+    assert_eq!(
+        sql.query_row(
+            "SELECT COUNT(*) FROM vocabulary_status_events WHERE cause = 'manual'",
+            [],
+            |r| r.get::<_, i64>(0)
+        )
+        .unwrap(),
+        0
+    );
+    assert_eq!(
+        fixture
+            .storage()
+            .load_document_reader_snapshot(fixture.base.document_id)
+            .unwrap()
+            .unwrap()
+            .document
+            .reading_position,
+        original_position
+    );
+}
+
+#[test]
 fn effective_application_fifo_custom_lookup_save_retry_delete_and_builtin_gates() {
     let fixture = Fixture::new();
     let router = word_router(&fixture);

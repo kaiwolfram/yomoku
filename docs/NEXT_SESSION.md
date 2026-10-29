@@ -1,5 +1,5 @@
 # Resume here
-Updated: 2026-10-29. Effective app word/status/custom staged; overrides/Library next.
+Updated: 2026-10-29. Effective app overrides staged; Library/Android next.
 ## Working
 - Rename: retained literal draft/Cancel/Retry; title-only atomic save, no-op retries.
 - Single/bulk deletion: one transaction, history/vocabulary/rules retained; reimport fresh.
@@ -65,16 +65,16 @@ Updated: 2026-10-29. Effective app word/status/custom staged; overrides/Library 
 - Compact effective app word/status/custom events/views use retained FIFO requests;
   literal retries/Cancel, five statuses/repeats/deletion and built-in gates. Pending
   writes/errors survive dismissal; time drains before deferred movement after Retry/Cancel.
+- Compact app override actions/state use retained FIFO requests; prompt-scoped writes,
+  exact Retry/Cancel, explicit reload, Library invalidation and final-time/movement gates.
 ## Next tasks (ordered)
-1. Integrate compact override events/views into app/effective.rs using retained requests;
-   preserve shared FIFO/time/retry gates. Add effective Library operation.
-   Model::with_effective_reader is native staging only; do not activate production yet.
+1. Add effective Library operation to the staged app/FIFO; preserve cache/retry gates.
+   Keep Model::with_effective_reader native staging only.
 2. Switch production core/FFI/Android together using effectiveDisplayTokens and compact
    events; expose ReaderBoundaryEditor with original-B span selection. See payload doc.
 3. Measure JNI/device/diverse/image-heavy costs; host baselines in performance doc.
 Physical arm64 deferred; Nostr empty; Q188 unresolved before forwarding.
 ## Verification
-- PASS: 694 Rust (17 opt-in ignored), strict Clippy/fmt, host Kotlin/JNI/new codecs.
+- PASS: 699 Rust (17 opt-in ignored), strict Clippy/fmt, real-Full host JNI/codecs.
 - PASS: both-ABI APKs/lint. Device not rerun; prior 11 cases pass. Commands: DEVELOPMENT end.
-- Initial existing import teardown assertion failed; focused/full reruns pass.
-- No schema/dependency change; production reader/Library still B. No blocker.
+- Initial fixture/compile assertions fixed; no blocker/schema/dependency change. Production B.

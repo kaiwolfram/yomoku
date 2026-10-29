@@ -20,9 +20,9 @@ use crate::{
     },
     document::{CompletionCommandId, DocumentId, LibraryDocument, ReaderDocument, TextAnchor},
     effective_session::{
-        EffectivePageIdentity, EffectiveReaderPage, EffectiveReaderRequest,
-        EffectiveReaderSelection, EffectiveReaderSession, EffectiveReaderWordState,
-        EffectiveStatusState,
+        EffectiveOverrideAction, EffectivePageIdentity, EffectiveReaderOverrideState,
+        EffectiveReaderPage, EffectiveReaderRequest, EffectiveReaderSelection,
+        EffectiveReaderSession, EffectiveReaderWordState, EffectiveStatusState,
     },
     imports::{EpubImport, SrtImport, TxtImport},
     library::{valid_document_title, LibraryRenameState, LibrarySort, LibraryWordDistribution},
@@ -242,6 +242,7 @@ pub enum Event {
     },
     RetryEffectiveReaderStatus,
     CancelEffectiveReaderStatus,
+    EffectiveReaderOverride(EffectiveOverrideAction),
     #[serde(skip)]
     #[cfg_attr(feature = "facet_typegen", facet(skip))]
     EffectiveStorageFinished(
@@ -299,6 +300,7 @@ pub struct ViewModel {
     pub effective_reader_tokens: Option<EffectiveReaderPage>,
     pub effective_reader_word: Option<EffectiveReaderWordState>,
     pub effective_reader_status: Option<EffectiveStatusState>,
+    pub effective_reader_override: Option<EffectiveReaderOverrideState>,
     /// Enabled source-preferred readings, in page-local UTF-8 ranges. No I/O.
     pub reader_furigana: Vec<crate::reader_ruby::ReaderRuby>,
     pub reader_word_selection: Option<ReaderWordSelection>,
@@ -1446,6 +1448,7 @@ impl App for Yomoku {
             | Event::SetEffectiveReaderStatus { .. }
             | Event::RetryEffectiveReaderStatus
             | Event::CancelEffectiveReaderStatus
+            | Event::EffectiveReaderOverride(_)
             | Event::EffectiveStorageFinished(..) => unreachable!(),
         }
         render::render()
@@ -1496,6 +1499,10 @@ impl App for Yomoku {
                 .effective_reader
                 .as_ref()
                 .map(|session| session.status_state()),
+            effective_reader_override: model
+                .effective_reader
+                .as_ref()
+                .map(|session| session.override_view()),
             reader_furigana: model
                 .reader_typography
                 .filter(|typography| typography.furigana)

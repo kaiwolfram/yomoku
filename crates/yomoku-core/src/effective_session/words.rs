@@ -97,7 +97,9 @@ impl WordState {
 impl EffectiveReaderSession {
     /// Accepted writes survive dismissal/invalidation until success or Cancel.
     pub fn mutation_pending(&self) -> bool {
-        self.status_state().pending || self.custom_entry_pending()
+        self.status_state().pending
+            || self.custom_entry_pending()
+            || self.overrides.mutation_pending()
     }
 
     fn custom_entry_pending(&self) -> bool {

@@ -5771,3 +5771,54 @@ and Android activation remain next. No schema/dependency change. Device/emulator
 separate Full owned/mapped opt-in matrix, release/process-death, physical arm64,
 effective JNI/device performance and diverse/image-heavy costs were not rerun.
 Logs: `/tmp/yomoku-effective-words-{core,worker,tests,tests-retry,import-retry,clippy,host,android,format,codegen}.log`.
+
+## Staged effective application override consumers
+
+2026-10-29, repository root, pinned offline tools:
+
+```sh
+export PATH=/home/kai/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin:$PATH
+export JAVA_HOME=/home/kai/repos/yomoku/.local/jdk-17/jdk-17.0.21+9
+export GRADLE_USER_HOME=/home/kai/repos/yomoku/.local/gradle
+export ANDROID_HOME=/home/kai/Android/Sdk
+cargo test -p yomoku-core --test effective_app --test effective_session --all-features --locked --offline
+cargo test -p yomoku-runtime effective_application_fifo --all-features --locked --offline
+cargo test --workspace --all-features --locked --offline --quiet
+cargo clippy --workspace --all-targets --all-features --locked --offline -- -D warnings
+cargo fmt --all -- --check
+tools/test-kotlin-bridge.sh
+tools/format-kotlin.sh --check
+"$JAVA_HOME/bin/java" -jar .local/ktfmt-0.64.jar --kotlinlang-style --dry-run --set-exit-if-changed tests/kotlin/EffectiveOverrideCodecTest.kt
+./android/gradlew -p android :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug --offline --console=plain
+cargo run -p yomoku-ffi --bin generate-kotlin --features facet_typegen --locked --offline -- target/generated/kotlin
+# Repeat generation and compare SHA-256 of every generated Kotlin file.
+git diff --check
+```
+
+PASS: 17 pure app cases (four new), 53 retained-session cases and all 699 workspace
+tests (17 opt-in ignored), including four real app/SQLite/FIFO cases (one new).
+Strict Clippy/Rustfmt/diff, Kotlin formatting, both-ABI app/test APKs and strict
+Android lint pass. Two identical generator runs compare SHA-256 for all 18
+generated Kotlin files; every file is unchanged.
+
+PASS: the complete real-Full host Kotlin/JNI suite and Rust-Kotlin-Rust codec
+verification, including all 15 override app events and five populated app views.
+The existing nonfatal host teardown diagnostics remain; the suite exits zero.
+
+The new app cases cover current-page/prompt guards, dismissal/malformed reads,
+stored choices/manual edits/explicit A/C dispatch/reversal, immediate invalidation,
+stale reload, exact frozen Retry/Cancel and both time slots before deferred exit.
+The actual worker case checks read-only prompt bytes, rolled-back saves, exact
+retry, local-over-global precedence, reversal, supplementary/combining/NUL manual
+parts, fresh-session persistence, and unchanged reading history/manual statuses/
+position. Dictionary loaders panic if this stored-choice/manual path loads them.
+
+Initial checks corrected a stale-action rendering assertion, retained identity
+expectation after dismissal, a moved test value, a missing ViewModel field in an
+existing default-view fixture and the optional initial saved-position expectation.
+All corrected before the final full Rust run. Gradle initially failed on sandbox
+wildcard-IP/local sockets; the escalated rerun passes. No schema/dependency change.
+Production remains B pending effective Library and Android activation. Device,
+separate Full owned/mapped opt-in matrix, release/process death, physical arm64 and
+effective JNI/device/diverse-book performance were not rerun/measured.
+Logs: `/tmp/yomoku-effective-overrides-{initial,core,worker,tests,clippy,host,android,format,codegen}.log`.

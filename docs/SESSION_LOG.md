@@ -2781,3 +2781,23 @@ blocker. Updated plan/handoff/architecture/data/decisions/payload/development.
 Next integrate app override consumers + effective Library, then activate core/FFI/
 Android together. Device, separate Full opt-in matrix, release/process death,
 physical arm64 and performance were not rerun. Exact commands/logs: DEVELOPMENT end.
+
+## 2026-10-29 — Staged effective application override consumers
+
+Connected compact override actions/state to the native effective app model and
+existing FIFO. Current-page/prompt guards, stored choices/manual save, explicit
+A/C generation and reversal use retained requests. Accepted writes retire the
+page, keep exact Retry/Cancel obligations and defer movement; clock checkpoints
+coalesce during I/O and both time slots drain before departure. Read dismissal
+keeps FIFO ownership. Success/stale results require explicit reload and invalidate
+Library bars. Production remains B pending effective Library/Android integration.
+
+Four new pure app and one real app/SQLite/FIFO cases pass; all 699 workspace tests
+(17 opt-in ignored), strict Clippy/fmt, real-Full host Kotlin/JNI, 15 new app event/
+five populated-view codec exchanges, 18-file identical regeneration, both-ABI APKs
+and Android lint pass. Initial fixture/compile assertions corrected; full rerun
+passes. Gradle needed the usual local-socket escalation. No schema/dependency
+change or blocker. Updated plan/handoff/architecture/data/decisions/payload/development.
+Next add the effective Library operation, then activate core/FFI/Android together.
+Device, separate Full opt-in loader matrix, release/process death, physical arm64
+and performance were not rerun. Exact commands/logs: DEVELOPMENT end.

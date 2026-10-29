@@ -21,6 +21,8 @@ use yomoku_core::{
     vocabulary::Surface,
 };
 
+#[path = "effective_app/overrides.rs"]
+mod overrides;
 #[path = "effective_app/words.rs"]
 mod words;
 

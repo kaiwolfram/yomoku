@@ -35,6 +35,7 @@ fn starts_in_library() {
             effective_reader_tokens: None,
             effective_reader_word: None,
             effective_reader_status: None,
+            effective_reader_override: None,
             reader_furigana: Vec::new(),
             reader_word_selection: None,
             reader_word: None,

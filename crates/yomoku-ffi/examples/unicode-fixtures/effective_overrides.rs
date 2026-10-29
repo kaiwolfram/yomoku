@@ -95,6 +95,14 @@ pub fn exchange(
             &format!("effective-override-state-{i}"),
             &state,
         )?;
+        let mut view = crux_core::Core::<yomoku_core::app::Yomoku>::new().view();
+        view.effective_reader_override = Some(state);
+        exchange_value(
+            dir,
+            writing,
+            &format!("effective-override-app-view-{i}"),
+            &view,
+        )?;
     }
     let mut actions = vec![Action::Open { page, anchor }];
     for scope in [OverrideScope::AllOccurrences, OverrideScope::ThisOccurrence] {
@@ -131,6 +139,12 @@ pub fn exchange(
             writing,
             &format!("effective-override-action-{i}"),
             &action,
+        )?;
+        exchange_value(
+            dir,
+            writing,
+            &format!("effective-override-app-event-{i}"),
+            &yomoku_core::app::Event::EffectiveReaderOverride(action),
         )?;
     }
     Ok(())

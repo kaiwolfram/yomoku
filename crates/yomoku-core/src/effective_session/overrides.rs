@@ -63,7 +63,7 @@ pub struct EffectiveReaderOverrideState {
     pub reload_required: bool,
 }
 
-/// Prototype shell commands for coordinated live integration. Every command
+/// Compact shell commands for coordinated live integration. Every command
 /// after Open authenticates the exact retained prompt, including retry/Cancel.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
@@ -201,8 +201,12 @@ pub(super) struct OverrideState {
 }
 
 impl OverrideState {
+    pub(super) fn mutation_pending(&self) -> bool {
+        self.pending.as_ref().is_some_and(|r| r.action.is_write())
+    }
+
     pub(super) fn blocks_reader(&self) -> bool {
-        self.in_flight || self.pending.as_ref().is_some_and(|r| r.action.is_write())
+        self.in_flight || self.mutation_pending()
     }
 }
 

@@ -1374,7 +1374,7 @@ selection contains only page revision/base and effective segment index; full key
 and literal retry payloads stay in the retained session. Optional
 `effective_reader_word` and `effective_reader_status` project compact details,
 errors, busy state and pending write obligations. Legacy selection events still
-fail closed. Production remains original B pending override/Library/Android adoption.
+fail closed. Production remains original B pending Library/Android adoption.
 
 Word/status/custom requests use the same captured FIFO callback and allow clock
 checkpoints to coalesce while busy. Failed writes retain exact native commands;
@@ -1387,3 +1387,16 @@ surface observations and invalidate Library bars, including vocabulary deletion.
 Custom CRUD never changes registration/status/history. Built-in protection and
 stale provenance checks remain transaction-local in storage. Only word/custom
 lookup loads the lazy word/name index; no new analyzer access or worker is added.
+
+The staged app routes `EffectiveReaderOverride(EffectiveOverrideAction)` and
+projects `effective_reader_override` using the existing compact prompt/state.
+Open authenticates the current page revision; subsequent actions authenticate the
+retained prompt. Stored A/B/C choices, literal manual parts, explicit A/C generation
+and winning-rule reversal use the same captured FIFO callback. Reads may be
+dismissed without releasing their I/O slot. Accepted edits/generation invalidate
+the page immediately; storage failures retain exact Retry/Cancel obligations and
+defer movement/reflow/import until resolved. Clock saves coalesce during override
+I/O and both time slots drain before deferred departure. Success/stale outcomes
+require an explicit page/context reload; no automatic rebase/replay is added.
+Override outcomes invalidate Library distribution caches. Full contexts/rule
+revisions remain native; existing transaction-local storage guards still apply.

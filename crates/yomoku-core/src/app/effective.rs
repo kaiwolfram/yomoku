@@ -6,7 +6,7 @@ use crate::effective_session::{EffectiveCompletionProgress, EffectiveReaderProgr
 
 impl Model {
     /// Native integration entry point, not a persisted setting or a shell toggle.
-    /// The remaining override/Library/Android consumers must migrate before
+    /// The remaining Library/Android consumers must migrate before
     /// production constructs this model. Legacy word/write events fail closed.
     pub fn with_effective_reader() -> Self {
         Self {
@@ -30,13 +30,22 @@ impl Model {
     }
 
     fn can_start_effective_selection(&self, selection: EffectiveReaderSelection) -> bool {
+        self.can_start_effective_page(selection.page)
+    }
+
+    fn can_start_effective_page(&self, page: EffectivePageIdentity) -> bool {
         !self.storage_busy
             && !self.settings_open
             && self.pending_time_checkpoint.is_none()
             && self.queued_time_checkpoint.is_none()
             && !self.completion_pending()
             && self.deferred_reader_event.is_none()
-            && self.current_token_key() == Some(selection.page.base)
+            && self.current_token_key() == Some(page.base)
+            && self.effective_reader.as_ref().is_some_and(|session| {
+                session
+                    .page()
+                    .is_some_and(|current| current.identity == page)
+            })
     }
 
     pub(super) fn invalidate_effective_page(&mut self) {
@@ -104,6 +113,7 @@ impl Yomoku {
                     | Event::SetEffectiveReaderStatus { .. }
                     | Event::RetryEffectiveReaderStatus
                     | Event::CancelEffectiveReaderStatus
+                    | Event::EffectiveReaderOverride(_)
             )
             .then(Command::done);
         }
@@ -120,6 +130,52 @@ impl Yomoku {
             return Some(Command::done());
         }
         match event {
+            Event::EffectiveReaderOverride(action) => {
+                use EffectiveOverrideAction as Action;
+                match action {
+                    // Dismiss presentation even during I/O; accepted work keeps
+                    // its native identity and the captured app FIFO obligation.
+                    Action::Dismiss { .. } => {}
+                    Action::Cancel { .. } => {
+                        if model.storage_busy {
+                            return Some(Command::done());
+                        }
+                    }
+                    Action::Retry { .. } => {
+                        if model.storage_busy
+                            || model.pending_time_checkpoint.is_some()
+                            || model.queued_time_checkpoint.is_some()
+                        {
+                            return Some(Command::done());
+                        }
+                    }
+                    _ => {
+                        let page = match action {
+                            Action::Open { page, .. } => *page,
+                            Action::Choose { identity, .. }
+                            | Action::Save { identity, .. }
+                            | Action::Generate { identity, .. }
+                            | Action::Reverse { identity, .. } => identity.page,
+                            _ => unreachable!(),
+                        };
+                        if !model.can_start_effective_page(page)
+                            || model.effective_mutation_pending()
+                        {
+                            return Some(Command::done());
+                        }
+                    }
+                }
+                let request = model
+                    .effective_reader
+                    .as_mut()
+                    .expect("opt-in checked")
+                    .handle_override_action(action.clone());
+                Some(if let Some(request) = request {
+                    self.dispatch_effective(EffectiveReaderRequest::Override(request), model)
+                } else {
+                    self.drain_effective(model)
+                })
+            }
             Event::LoadEffectiveReaderWord(selection) => {
                 if !model.can_start_effective_selection(*selection)
                     || model.effective_mutation_pending()
@@ -321,6 +377,7 @@ impl Yomoku {
             EffectiveReaderRequest::Tokens(_)
                 | EffectiveReaderRequest::Word(_)
                 | EffectiveReaderRequest::Status(_)
+                | EffectiveReaderRequest::Override(_)
         );
         model.effective_request = Some(request.clone());
         model.document_error = None;
@@ -358,6 +415,11 @@ impl Yomoku {
             ) => {
                 // Word reads/status writes can observe changes made by another session,
                 // including deleted entries. Never retain a stale Library distribution.
+                model.invalidate_library_words();
+            }
+            Some(EffectiveReaderProgress::Override(_)) => {
+                // A successful write or stale/lost response may have changed
+                // membership. A read can also observe another session's edits.
                 model.invalidate_library_words();
             }
             Some(EffectiveReaderProgress::Completion(EffectiveCompletionProgress::Prepared)) => {

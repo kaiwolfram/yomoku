@@ -3525,3 +3525,22 @@ word/status/custom I/O and drain even after failure; departure waits until both 
 slots and writes clear. Cancel never abandons in-flight work. Keep compact status
 facts separately visible after a word panel closes. No new setting, dependency,
 migration, worker, automatic retry/replay or production activation.
+
+## 2026-10-29 — Stage compact application override consumers
+
+Wrap the existing `EffectiveOverrideAction` in one app event and expose its compact
+retained state directly. Authenticate Open against the current page revision and
+subsequent actions against the retained prompt identity. Keep full contexts,
+intervening-rule revisions and exact retry payloads native. Continue production B
+until effective Library and Android consumers can switch together.
+
+Include save/reverse/on-demand generation in the shared accepted-write gate;
+generation can change metadata and therefore needs the same invalidation/reload
+policy. Reads may dismiss immediately while retaining their app FIFO obligation.
+Writes retire the page before dispatch, survive dismissal/failure and defer
+movement/import/reflow until success or explicit Cancel. Allow clock checkpoints
+to coalesce during override I/O and drain both slots before deferred movement.
+Retry/Cancel authenticate the frozen prompt even after page retirement, with a
+fresh attempt on Retry. Success/stale outcomes require explicit page/context
+reload; never rebase or automatically replay. Invalidate Library distributions on
+override outcomes. No dependency, schema, worker, history or product-setting change.

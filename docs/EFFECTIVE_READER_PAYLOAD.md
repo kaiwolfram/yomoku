@@ -235,8 +235,8 @@ identity/selection sizes remain 60/68 bytes. Full callback results move into the
 session without a chapter clone; accepted commands retain shared keys as before.
 
 Production FFI still constructs Model::default, and Android/Library still use B.
-Remaining override app consumers and Library membership must
-migrate before activating this constructor. This is not a user-visible mode.
+Remaining Library membership and Android consumers must migrate before activating
+this constructor. This is not a user-visible mode.
 No durable schema/payload change, dictionary load or JNI/device performance claim.
 
 The staged application now also routes compact word/status/custom events and
@@ -249,3 +249,12 @@ literal supplementary/combining/NUL text. Retry/Cancel have no payload; retained
 native commands supply exact values, with a fresh native callback attempt.
 The 60/68-byte identity/selection encoding is unchanged. This changes same-build
 application codecs only; no durable data schema or new device/performance claim.
+
+The staged app also wraps all 15 compact override actions in
+`Event::EffectiveReaderOverride` and exposes optional `effective_reader_override`.
+Generated Kotlin fixtures exchange all action events and five populated app views
+(ready prompt, busy, failed write, invalid selection and stale/reload). The prompt
+retains only selected-span choices and winning-rule facts; full contexts/rule
+revisions/frozen retries stay native. Shared FIFO/time gates include override
+writes; success/stale results require explicit reload. Production remains B until
+the Library and Android consumers switch together. No durable schema change.

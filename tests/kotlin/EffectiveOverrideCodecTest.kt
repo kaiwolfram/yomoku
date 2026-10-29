@@ -4,8 +4,10 @@ import app.yomoku.shared.DocumentError
 import app.yomoku.shared.EffectiveOverrideAction
 import app.yomoku.shared.EffectiveOverrideFailure
 import app.yomoku.shared.EffectiveReaderOverrideState
+import app.yomoku.shared.Event
 import app.yomoku.shared.OverrideScope
 import app.yomoku.shared.SplitMode
+import app.yomoku.shared.ViewModel
 import java.io.File
 
 fun verifyEffectiveOverrideCodecs(dir: File) {
@@ -16,6 +18,12 @@ fun verifyEffectiveOverrideCodecs(dir: File) {
             check(state.bincodeSerialize().contentEquals(bytes))
             File(dir, "effective-override-state-$index-return.bin")
                 .writeBytes(state.bincodeSerialize())
+            val viewBytes = File(dir, "effective-override-app-view-$index.bin").readBytes()
+            val view = ViewModel.bincodeDeserialize(viewBytes)
+            check(view.effectiveReaderOverride == state)
+            check(view.bincodeSerialize().contentEquals(viewBytes))
+            File(dir, "effective-override-app-view-$index-return.bin")
+                .writeBytes(view.bincodeSerialize())
             state
         }
     val ready = states[0]
@@ -74,5 +82,11 @@ fun verifyEffectiveOverrideCodecs(dir: File) {
         check(action.bincodeSerialize().contentEquals(bytes))
         File(dir, "effective-override-action-$index-return.bin")
             .writeBytes(action.bincodeSerialize())
+        val eventBytes = File(dir, "effective-override-app-event-$index.bin").readBytes()
+        val event = Event.bincodeDeserialize(eventBytes) as Event.EffectiveReaderOverride
+        check(event.value == action)
+        check(event.bincodeSerialize().contentEquals(eventBytes))
+        File(dir, "effective-override-app-event-$index-return.bin")
+            .writeBytes(event.bincodeSerialize())
     }
 }

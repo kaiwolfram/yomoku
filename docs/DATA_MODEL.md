@@ -1591,7 +1591,16 @@ registration or status event is created by lookup/custom CRUD.
 
 Only the native `Model::with_effective_reader()` integration constructor enables
 this staged path. Production uses its existing B model pending migration
-of override, Library and Android consumers. Accepted
+of Library and Android consumers. Accepted
 completion/time obligations are ephemeral model state backed by the existing
 version-1 durable reservations and exact replay semantics; new sessions never
 resume unfinished work automatically. No data/migration/destructive change.
+
+The app now also exposes `EffectiveReaderOverride` and optional
+`effective_reader_override` with the existing compact action/prompt/state schema.
+Every post-open action includes its retained prompt identity; full chapter keys,
+rule revisions and exact write retry payloads remain native. Accepted override
+save/reverse/generation participates in the shared pending-write gate and retires
+the rendered page immediately. Explicit reload follows success or stale context.
+Registration/history/rollback semantics remain those of the existing guarded
+repositories; no migration, history rewrite or automatic restart replay is added.
