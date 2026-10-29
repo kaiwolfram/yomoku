@@ -6397,3 +6397,80 @@ Verified restored physical phone size 1080×2400/density 420 and system light,
 then stopped this task's emulator. All four formerly blocked long-page cases
 now pass on the final phone APK. This closes that focused verification gap;
 it does not establish the full device/lifecycle/hardware/performance matrix.
+
+## Android effective-reader measurements and large import buffers
+
+2026-10-29, pinned offline tools and the existing API-36 x86_64 medium_phone AVD
+(KVM, two cores, swangle, Vulkan disabled). Native bridge/generated bindings are
+unchanged; reuse the verified native output. Production URI imports now retain a
+private primitive byte buffer through a read-only typed list, rather than a boxed
+object/list slot per byte. The measurement test uses the same conversion.
+
+```sh
+export JAVA_HOME=/home/kai/repos/yomoku/.local/jdk-17/jdk-17.0.21+9
+export GRADLE_USER_HOME=/home/kai/repos/yomoku/.local/gradle
+export ANDROID_HOME=/home/kai/Android/Sdk
+./android/gradlew -p android :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug -x :app:buildRustBridge --offline --console=plain
+tools/format-kotlin.sh --check
+git diff --check
+"$ANDROID_HOME/platform-tools/adb" -s emulator-5554 install -r -t android/app/build/outputs/apk/debug/app-debug.apk
+"$ANDROID_HOME/platform-tools/adb" -s emulator-5554 install -r -t android/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+"$ANDROID_HOME/platform-tools/adb" -s emulator-5554 shell wm size reset
+"$ANDROID_HOME/platform-tools/adb" -s emulator-5554 shell wm density reset
+"$ANDROID_HOME/platform-tools/adb" -s emulator-5554 shell cmd uimode night no
+"$ANDROID_HOME/platform-tools/adb" -s emulator-5554 shell am instrument -w -r -e class app.yomoku.FileImportBytesTest,app.yomoku.MixedFilePickerTest,app.yomoku.TxtPickerTest,app.yomoku.ImportNotificationsTest,app.yomoku.DocumentSessionTest,app.yomoku.AnalyzedImportSessionTest,app.yomoku.EffectiveReaderPerformanceTest app.yomoku.test/androidx.test.runner.AndroidJUnitRunner
+# Corpus staging and the opt-in command: EFFECTIVE_READER_PERFORMANCE.md.
+```
+
+The new 18 MiB codec regression checks all byte values by SHA-256 at the exact
+wire payload offset, serializes the same event twice, checks literal supplementary
+Unicode filenames and round-trips TXT/SRT/EPUB with both text encodings on a small
+all-values fixture. No large boxed reference oracle or new dependencies.
+
+Initial failures/corrections:
+- A stored C snapshot can cross a selected B span and not appear as a choice for
+  that span. The benchmark now verifies the alternate's actual chapter/mode row,
+  not an invalid assumption about selectable boundaries.
+- The real 17,940,673-byte EPUB exhausted the 192 MiB Java heap while eagerly
+  mapping file bytes to boxed UByte objects, before native import. Fixed the shared
+  production/harness conversion; input/wire/identity/cancellation policy unchanged.
+- Picker/notification startup fixtures raced automatic Library distributions;
+  wait for counts/error as well as idle, allowing absent counts during active
+  batches. Cancellation/recreation and system-picker Cancel pass after this fix.
+- Repeated mixed-picker runs correctly deduplicated its constant SRT content.
+  Include the run prefix in both input and canonical-text expectation; preserve
+  the separate intentional duplicate case and all persistence assertions.
+- Gradle's local lock socket needed sandbox escalation. ADB `exec-in ... tee`
+  stalled/truncated input copies; use push plus app-owned cp and check corpus hashes.
+- Low AVD space blocked updating the main APK. Removed only the two rebuildable,
+  immutable Full/index extractions, then installed successfully. Reader database,
+  documents and settings were preserved; normal providers republish dictionaries.
+
+PASS: 12 distinct phone/light import regressions (18 MiB codec, mixed picker,
+all four TXT picker cases, both notification cases, three document-session cases
+and atomic/deduplicated native import), plus the measurement's default opt-in skip.
+The corrected MixedFilePickerTest passes in its focused final run; the preceding
+13-case selection passed the other eleven regressions and default skip. Only its
+constant-SRT assertion failed before the fixture correction; no blanket passing
+claim for that earlier selection. Both-ABI APKs (unchanged native binaries), strict
+Android lint and Kotlin formatting pass. No Rust/host-JNI/generation/Full-loader
+matrix was rerun for this Kotlin-only change.
+
+PASS: final isolated opt-in benchmark, 281.686 s, both verified real books and
+synthetic image EPUB, five timed samples after one warmup per read metric. All
+48 CSV rows/raw samples validate against their rounded min/median/max. Real EPUB
+imports successfully after the fix; fresh revisions, unchanged read hashes, zero
+completion/occurrence/pending-time rows, bounded image outputs and all scratch
+cleanup guards pass. Results and debug-native-profile limits are in
+EFFECTIVE_READER_PERFORMANCE.md. No optimized-build, Compose/frame, peak-memory,
+diverse many-book, process-death or physical-arm64 result is claimed. The main
+APK SHA-256 and unchanged JNI library hash are recorded with the results.
+
+Final source changes: FileImports.kt; FileImportBytesTest.kt and
+EffectiveReaderPerformanceTest.kt; TXT/mixed-picker/notification fixture waits and
+repeatable SRT data. Progress/architecture/decisions/performance docs and CSV updated.
+No database migration. Public emulator corpus copies and task-started emulator
+cleaned up, phone/light restored; host corpora remain in /tmp for reproduction.
+Logs: /tmp/yomoku-effective-measure-{android,format-check,smoke,boxed-oom,
+regressions-initial,regressions,mixed-final,final}.log. The regressions log contains
+the corrected later Mixed fixture's earlier failure; use mixed-final for its pass.

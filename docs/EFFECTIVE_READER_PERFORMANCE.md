@@ -1,4 +1,4 @@
-# Effective reader host measurements
+# Effective reader measurements
 
 Measured 2026-10-28 with the opt-in `yomoku-analysis` example
 `measure_effective_reader`. It accepts existing TXT/EPUB files, imports through
@@ -202,7 +202,162 @@ TMPDIR="$PWD/.local/effective-measure" target/release/examples/measure_effective
   .local/sudachi/full-20261015/system_full.dic 5 --epub-copies 100 /tmp/yomoku-kusamakura.epub
 ```
 
-Peak allocations, diverse/image-heavy book Libraries, mapped-loader performance,
-JNI/Android/FIFO latency, guarded on-demand generation, process death and physical
-arm64 remain unmeasured. The coordinated live-reader/Library switch and Android
-override controls remain pending.
+These host runs leave peak allocations, diverse/image-heavy book Libraries,
+mapped-loader performance, JNI/Android/FIFO latency, guarded on-demand generation,
+process death and physical arm64 unmeasured. Production activation and the first
+Android measurements were subsequently completed; see below for their narrower
+scope and build-profile limits.
+
+## Android JNI/FIFO measurement harness
+
+`EffectiveReaderPerformanceTest` is opt-in (`-e yomokuMeasure true`). Each input
+imports into its own newly created, file-backed scratch database under the app's
+no-backup directory. It never opens the user's reader database or writes input
+files. It closes the native handle before removing only its scratch directory.
+Without the argument, JUnit skips the measurement before reading or creating data.
+The production picker and harness now share `FileImportBytes`, a primitive-buffer
+view for the existing typed byte list. The former eager boxed list exhausted the
+192 MiB Java heap on the real 17.9 MB EPUB before native import began. No dependency,
+schema or generated binding changes; full-byte serialization remains identical.
+
+The harness uses production `CoreSession`/NativeBridge, verified mapped Full and
+word-index providers, the normal native SQLite FIFO and generated Kotlin codecs.
+No Activity/Compose content is created and the reader clock remains inactive.
+For every command, it timestamps main-thread dispatch and the first idle view
+callback. Total latency includes native update/serialization, FIFO scheduling,
+repository work, callback delivery and Kotlin view decoding. Dispatch latency
+covers only the synchronous `core.dispatch` call, not all main-thread CPU work
+(in particular, it excludes the later callback's decoding). Waiting for the test
+thread to wake and post-sample assertions are outside the interval. No polling
+interval is added to command timings.
+
+Each read metric has one excluded warmup followed by the requested samples;
+report minimum/median/maximum and raw total samples to instrumentation stdout.
+Imports and explicit generation are single setup observations, not distributions.
+Arguments: `yomokuMeasureIterations` (1–100, default 5) and optional comma-separated
+`yomokuMeasureFiles` (basenames of TXT/EPUB files staged under
+`no_backup/effective-measure-inputs`). Supplied files are read as bytes through the
+normal typed import event. Primitive-buffer view construction occurs before timing;
+event serialization is timed. A generated image-heavy EPUB runs after those inputs.
+
+For each fixture, choose the largest chapter by Unicode scalar count and save
+its beginning. Measure saved-position opening, fresh effective-page loads, word
+lookups and a **single-document** Library scan in three phases: B only; stored
+A/B/C in that largest chapter; and a manual All-occurrences rule splitting one
+multi-scalar original B token at its first scalar boundary. Other EPUB chapters
+retain only B. Explicit A/C generation uses the guarded production command and
+the import analyzer cache. Storage checks confirm the alternate exists even if
+C crosses the selected B span and cannot be offered as a choice for that span.
+The rule phase requires a multi-scalar Japanese B token on that selected first page.
+
+Image-bearing pages also measure the complete batch of distinct asset reads and
+decodes through `core.images`, without drawing. Requests use the reader's existing
+16 MiB aggregate page budget divided among assets; every result must decode and
+their total bitmap allocation must remain within that budget. Retain all outputs
+until the final callback, then recycle them outside timing. The loader serializes
+reads/decodes; this is not a display, zoom or frame-time measurement.
+
+Fresh page revisions reject no-op/cached token samples. Database SHA-256 must
+remain unchanged across page/word/image reads and separately across Library reads.
+Full must not reopen during B-only reads or word lookups. Final queries require
+zero completions, occurrences and pending-time rows. These are correctness guards,
+not latency thresholds.
+
+### Reproduce on Android
+
+Prepare and hash-check the two public corpora using the host commands above.
+Build/install the normal debug APK and instrumentation APK as in DEVELOPMENT.md;
+then stage only these public input copies. These commands require a debuggable
+installed app and an already booted emulator/device. Do not overlap measurements
+with builds, other tests or profilers.
+
+```sh
+export JAVA_HOME="$PWD/.local/jdk-17/jdk-17.0.21+9"
+export GRADLE_USER_HOME="$PWD/.local/gradle"
+export ANDROID_HOME=/home/kai/Android/Sdk
+# Test-only changes can reuse the verified native output, as in this session.
+./android/gradlew -p android :app:assembleDebugAndroidTest :app:lintDebug \
+  -x :app:buildRustBridge --offline --console=plain
+"$ANDROID_HOME/platform-tools/adb" -s emulator-5554 install -r -t \
+  android/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+"$ANDROID_HOME/platform-tools/adb" -s emulator-5554 push \
+  /tmp/yomoku-aozora-cat.txt /tmp/yomoku-kusamakura.epub /data/local/tmp/
+"$ANDROID_HOME/platform-tools/adb" -s emulator-5554 shell run-as app.yomoku \
+  mkdir -p no_backup/effective-measure-inputs
+"$ANDROID_HOME/platform-tools/adb" -s emulator-5554 shell run-as app.yomoku \
+  cp /data/local/tmp/yomoku-aozora-cat.txt no_backup/effective-measure-inputs/aozora-cat.txt
+"$ANDROID_HOME/platform-tools/adb" -s emulator-5554 shell run-as app.yomoku \
+  cp /data/local/tmp/yomoku-kusamakura.epub no_backup/effective-measure-inputs/kusamakura.epub
+"$ANDROID_HOME/platform-tools/adb" -s emulator-5554 shell am instrument -w -r \
+  -e class app.yomoku.EffectiveReaderPerformanceTest \
+  -e yomokuMeasure true -e yomokuMeasureIterations 5 \
+  -e yomokuMeasureFiles aozora-cat.txt,kusamakura.epub \
+  app.yomoku.test/androidx.test.runner.AndroidJUnitRunner \
+  > /tmp/yomoku-effective-measure-final.log
+```
+
+Check the runner's `OK (1 test)` result, not just ADB's exit code. Omitting
+`yomokuMeasureFiles` runs only the synthetic EPUB; omitting `yomokuMeasure` verifies
+the default skip. Public input copies remain for reuse; remove only those staged
+files when finished.
+
+### Android results, 2026-10-29
+
+API-36 x86_64 `medium_phone`, KVM/two vCPUs, swangle with Vulkan disabled, phone
+1080×2400/420 dpi/light. Build fingerprint:
+`google/sdk_gphone64_x86_64/emu64xa:16/BE2A.250530.026.D1/13818094:user/release-keys`.
+This is the normal **debug APK and debug Rust bridge**, not an optimized native
+build: the existing build script invokes `boltffi pack android` without `--release`.
+Use this as a development baseline. No competing builds/tests/profilers ran during
+the final isolated instrumentation process; OS caches, CPU frequency and GC remain
+uncontrolled. The runner passed in 281.686 s, including setup and correctness guards.
+
+APK SHA-256: `c12217931e750ede3074c8e4acd58cb716f69795bd0efef4448e8ded60823a55`.
+Unchanged generated x86_64 JNI library SHA-256:
+`0c6021c2fc3cce23c561922a0427e15e0863c3763f9be1906d6c363e5ae80eab`.
+The two real files have exactly the source hashes/canonical counts recorded above.
+Initial B-only scratch databases are 15,151,104 bytes (TXT) and 22,675,456 (EPUB).
+The generated 7,032-byte EPUB has two equal 322-character chapters, 12 distinct
+solid-color 2048×1536 PNGs and 24 placements. All 12 assets occur on the measured
+page. Archive timestamps vary across generated runs; canonical content, dimensions
+and colors follow the checked-in fixture. It is not a photographic-image corpus.
+
+[CSV results](measurements/effective-reader-android-2026-10-29.csv) retain all 48
+metric rows: minimum/median/maximum total and dispatch latency plus raw total samples.
+Nine rows are single setup observations; the other 39 have five timed samples each.
+Median **total** milliseconds:
+
+| Fixture | Phase | Open saved position | Effective page | Word lookup | Library |
+| --- | --- | ---: | ---: | ---: | ---: |
+| Aozora TXT | b_only | 95.287 | 903.412 | 1083.342 | 1062.296 |
+| Aozora TXT | largest_chapter_abc | 97.751 | 2056.963 | 2187.124 | 2222.522 |
+| Aozora TXT | global_rule | 96.817 | 2126.799 | 2292.085 | 2314.239 |
+| Kusamakura EPUB | b_only | 725.421 | 770.235 | 776.471 | 325.734 |
+| Kusamakura EPUB | largest_chapter_abc | 730.011 | 825.744 | 829.344 | 380.217 |
+| Kusamakura EPUB | global_rule | 723.908 | 828.633 | 828.853 | 391.177 |
+| Synthetic images | b_only | 11.744 | 13.101 | 13.709 | 2.178 |
+| Synthetic images | largest_chapter_abc | 12.985 | 13.564 | 17.205 | 2.719 |
+| Synthetic images | global_rule | 11.472 | 14.345 | 18.058 | 3.125 |
+
+Complete 12-asset read/decode batch min/median/max milliseconds: B-only
+247.122/251.645/253.185; largest-chapter A/B/C 249.515/253.775/256.336;
+global rule 249.583/250.540/269.198. All bitmap outputs satisfy the aggregate page
+budget. The real EPUB's measured largest-chapter page contains no images.
+
+Single setup observations, in TXT / EPUB / synthetic order: import
+24,387 / 20,313 / 13,208 ms; A generation 11,479 / 1,960 / 29 ms;
+C generation 12,167 / 2,000 / 28 ms. Imports include provider access/Full loading
+and native storage/analysis. The real EPUB's synchronous dispatch alone takes
+2,270 ms; avoiding the former Java-heap crash does not establish responsive import
+serialization. The 18 MiB byte-identity/repeated-encoding regression and all twelve
+selected import regressions pass. No larger-file guarantee is implied.
+
+These measurements expose material large-chapter/page/word/Library costs in the
+current debug app. They do not isolate repository, native encoding, callback decode
+or GC contributions, nor compare to an optimized Android build. The earlier
+release host timings use another environment and, for EPUB A/B/C, another setup
+(all chapters); do not interpret their difference as JNI overhead. Profile an
+optimized Android build before selecting a performance change. Peak allocations,
+diverse many-book Libraries, actual Compose/frame/zoom latency, process death and
+physical arm64 remain separate work. Reader/history behavior and validation are
+unchanged by this slice.

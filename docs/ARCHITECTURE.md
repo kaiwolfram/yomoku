@@ -124,8 +124,9 @@ loader. Forward completion moves to the next page/chapter or the last chapter's
 EOF. Only the last page of the entire document marks it finished; transaction,
 replay, original-token ownership and New-only status semantics remain unchanged.
 The loader currently verifies all EPUB content/assets on every reader operation;
-limited host EPUB/page measurements are in EFFECTIVE_READER_PERFORMANCE.md;
-device/image-heavy-book costs remain unmeasured. Reader snapshots omit source bytes/image
+host and opt-in Android JNI/FIFO measurements are in EFFECTIVE_READER_PERFORMANCE.md.
+Optimized Android, peak memory and diverse large-Library costs remain unmeasured.
+Reader snapshots omit source bytes/image
 payloads; keyed chapter formatting now travels with canonical text.
 Pure `ReaderChapterFormatting` validates owned chapter keys, scalar ranges, heading
 levels and HTTP(S) targets. `ReaderPage` clips these spans to page-local UTF-8
@@ -346,6 +347,13 @@ Android mixed selection, reader text formatting/website links and raster/static
 SVG images with the shared viewer and Library cover thumbnails are connected;
 source-preferred furigana and its Settings switch/layout are connected; advanced
 SVG resources are outside v1 scope.
+
+Android URI reads own a private `ByteArray`. `FileImportBytes` exposes it as the
+existing read-only `List<UByte>` required by generated typed events without
+retaining one boxed object per byte. Encoding choices and exact retries share that
+buffer; callers must not mutate it. Serialization still writes the identical
+full-byte event. This avoids the demonstrated Java-heap failure on a 17.9 MB EPUB;
+it does not introduce streaming, a new size limit or a changed native import API.
 
 Its SRT parser
 accepts decoded text and returns canonical LF text plus ordered UTF-8 cue ranges.

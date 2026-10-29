@@ -58,7 +58,11 @@ class ImportNotificationsTest {
                 Manifest.permission.POST_NOTIFICATIONS,
             )
         manager.cancelAll()
-        compose.waitUntil(30_000) { !owner().session.view.storageBusy }
+        compose.waitUntil(30_000) {
+            val view = owner().session.view
+            !view.storageBusy &&
+                (view.libraryWordDistributions != null || view.libraryWordError != null)
+        }
     }
 
     @Test

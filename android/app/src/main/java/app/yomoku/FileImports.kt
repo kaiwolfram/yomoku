@@ -19,6 +19,14 @@ import app.yomoku.shared.TextEncoding
 import app.yomoku.shared.TxtImport
 import java.util.concurrent.Executors
 
+/** Takes ownership of a private file buffer without retaining one boxed UByte per byte. */
+internal class FileImportBytes(private val bytes: ByteArray) : AbstractList<UByte>(), RandomAccess {
+    override val size: Int
+        get() = bytes.size
+
+    override fun get(index: Int): UByte = bytes[index].toUByte()
+}
+
 internal data class FileImportResult(
     val filename: String,
     val outcome: ImportOutcome? = null,
@@ -178,7 +186,7 @@ internal class FileImports(
                             resolver.openInputStream(uri)?.use { it.readBytes() }
                                 ?: error("Cannot open document")
                         if (generation != readGeneration) return@execute
-                        FileInput(bytes.map { it.toUByte() }, name, format)
+                        FileInput(FileImportBytes(bytes), name, format)
                     }
                 } catch (_: Exception) {
                     handler.post {

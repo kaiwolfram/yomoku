@@ -2965,3 +2965,25 @@ Phone/light restored, debugger forward removed, task emulator stopped.
 Next: actual effective JNI/device/diverse/image-heavy measurements, phase-5
 immutable event/provenance audit, then lifetime occurrence/time aggregation.
 Physical arm64 remains deferred; Nostr empty/Q188 do not block local work.
+
+## 2026-10-29 — Android effective-reader measurements and large-file import heap fix
+
+Added opt-in scratch CoreSession/JNI/FIFO/codec measurements for the two pinned
+real books and a 12-asset image page, with five-sample distributions and raw CSV.
+The real 17.9 MB EPUB exposed retained boxed UByte allocation exhausting Android's
+192 MiB Java heap. Production URI imports now own a primitive buffer behind the
+same typed list; bytes/encoding/retries/atomic identity and native APIs stay intact.
+
+PASS: 18 MiB byte-identity/repeated-encoding regression, eleven other distinct
+phone import cases, benchmark default skip and final isolated benchmark; both-ABI
+APKs with unchanged native output, strict lint/formatting/diff. Corrected fixture
+Library-read races and constant SRT bytes that correctly deduplicated on reruns.
+Real EPUB import now succeeds. Debug page medians: TXT 903/2057 ms and EPUB
+770/826 ms for B-only/largest-chapter A/B/C; image batch ~251–254 ms. No optimized,
+frame-time or peak-memory claim. Reader data preserved during dictionary-only
+installation-space recovery; scratch/input copies removed and emulator stopped.
+
+Next: phase-5 immutable event/provenance audit, lifetime aggregation, then optimized
+Android profiling/diverse-Library costs. Physical arm64 and Nostr empty/Q188 remain
+separate deferred inputs. Exact commands, failures and results: DEVELOPMENT.md and
+EFFECTIVE_READER_PERFORMANCE.md.

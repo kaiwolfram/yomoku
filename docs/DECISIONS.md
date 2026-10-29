@@ -3694,3 +3694,29 @@ Primary implementation references: AndroidX
 [TextLinkScope](https://github.com/androidx/androidx/blob/androidx-main/compose/foundation/foundation/src/commonMain/kotlin/androidx/compose/foundation/text/TextLinkScope.kt)
 and Material [Text](https://github.com/androidx/androidx/blob/androidx-main/compose/material3/material3/src/commonMain/kotlin/androidx/compose/material3/Text.kt).
 No dependency/version or data-destructive semantic change.
+
+## 2026-10-29 — Measure Android effective reads and retain primitive import bytes
+
+Use an opt-in instrumentation harness through the production CoreSession/native
+FIFO/codecs, with one disposable database per public corpus and no Activity or
+reader clock. Time dispatch through the idle callback, and report synchronous
+dispatch separately; that column does not measure the later callback's main-thread
+decode cost. Keep setup observations separate from warmed read distributions and
+record the native build profile. Verify fresh page revisions, read-only database
+hashes, absent reading history/time and scratch-handle cleanup. Image measurements
+use the existing asset/decode queue and aggregate page budget without drawing.
+Do not infer optimized-build, physical-device, frame-time or peak-memory results.
+
+The 17,940,673-byte real EPUB exhausted the emulator's 192 MiB Java heap while
+eagerly constructing `List<UByte>`, before native import. Replace that conversion
+in the actual URI picker and measurement setup with `FileImportBytes`, a read-only
+list view owning the private primitive buffer. The serializer may box a byte
+transiently; the pending file no longer retains an object plus list slot per byte.
+Encoding selections/retries retain the same exact buffer; no caller mutates it.
+Keep the existing typed event/wire format, original-byte identity, atomic import,
+cancellation and error policy. This is not a streaming import or a universal heap
+bound for arbitrarily large files. No dependency/version/schema/size-limit change.
+
+Picker/notification fixtures must wait for automatic Library word counts before
+direct start or picker-button actions. A transient idle view before that scan is
+not readiness. During an active import batch, counts intentionally remain absent.

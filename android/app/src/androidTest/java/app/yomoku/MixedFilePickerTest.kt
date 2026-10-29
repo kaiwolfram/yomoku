@@ -34,7 +34,11 @@ class MixedFilePickerTest {
 
     @Test
     fun mixedPickerPreservesFormatsEncodingAndFailuresWithoutOpeningReader() {
-        compose.waitUntil(30_000) { !owner().session.view.storageBusy }
+        compose.waitUntil(30_000) {
+            val view = owner().session.view
+            !view.storageBusy &&
+                (view.libraryWordDistributions != null || view.libraryWordError != null)
+        }
         val prefix = "mixed-${System.nanoTime()}"
         val book = FileImportFixtures.epub("$prefix metadata title")
         val ambiguous = "$prefix choice ".toByteArray() + byteArrayOf(0xc2.toByte(), 0xa9.toByte())
@@ -44,7 +48,7 @@ class MixedFilePickerTest {
                 FileImportFixtures.uri("$prefix-duplicate.txt", book),
                 FileImportFixtures.uri(
                     "$prefix.SRT",
-                    "\uFEFF1\n00:00:01,000 --> 00:00:02,000\n<i>猫</i>。\n\n2\n00:00:03,000 --> 00:00:04,000\n犬。"
+                    "\uFEFF1\n00:00:01,000 --> 00:00:02,000\n$prefix <i>猫</i>。\n\n2\n00:00:03,000 --> 00:00:04,000\n犬。"
                         .toByteArray(),
                 ),
                 FileImportFixtures.uri("$prefix-invalid.epub", byteArrayOf(0xff.toByte())),
@@ -171,7 +175,7 @@ class MixedFilePickerTest {
                         )
                         .use {
                             assertTrue(it.moveToFirst())
-                            assertEquals("猫。\n\n犬。", it.getString(0))
+                            assertEquals("$prefix 猫。\n\n犬。", it.getString(0))
                         }
                 }
             compose.onNodeWithTag("file_import_summary").assertIsDisplayed()

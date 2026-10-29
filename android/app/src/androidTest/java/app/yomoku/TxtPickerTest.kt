@@ -40,7 +40,13 @@ class TxtPickerTest {
     private fun owner() = ViewModelProvider(compose.activity)[CoreSessionOwner::class.java]
 
     private fun awaitIdle() {
-        compose.waitUntil(30_000) { !owner().session.view.storageBusy }
+        compose.waitUntil(30_000) {
+            val view = owner().session.view
+            !view.storageBusy &&
+                (owner().fileImports.active ||
+                    view.libraryWordDistributions != null ||
+                    view.libraryWordError != null)
+        }
         compose.waitForIdle()
     }
 
