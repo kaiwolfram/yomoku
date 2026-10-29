@@ -91,7 +91,7 @@ class EffectiveReaderWordsTest {
             readerTime = ReadingTimeUpdate(page.documentId, page.position, PendingReadingTime(0)),
             readingTimeSavePending = false,
             completionSavePending = false,
-            effectiveReaderTokens = EffectiveReaderPage(identity, tokens),
+            effectiveReaderTokens = EffectiveReaderPage(identity, tokens, emptyList()),
             effectiveReaderWord =
                 EffectiveReaderWordState(busy = false, customEntryPending = false),
             effectiveReaderStatus = EffectiveStatusState(false, false),
@@ -471,7 +471,7 @@ class EffectiveReaderWordsTest {
         frame.value =
             base.copy(
                 reader = page,
-                effectiveReaderTokens = EffectiveReaderPage(identity, listOf(token)),
+                effectiveReaderTokens = EffectiveReaderPage(identity, listOf(token), emptyList()),
             )
         show()
         assertEquals("か\u3099", text().text)

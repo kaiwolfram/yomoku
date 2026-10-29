@@ -5,7 +5,8 @@ use yomoku_core::{
     },
     document::{ChapterText, TextAnchor, TextRange},
     effective_reader::{
-        EffectiveReaderChapter, EffectiveReaderTokenSnapshot, EffectiveTokenEligibility,
+        original_boundaries_on_page, EffectiveReaderChapter, EffectiveReaderTokenSnapshot,
+        EffectiveTokenEligibility,
     },
     effective_session::{EffectiveReaderSelection, EffectiveReaderSession},
     reader::{ReaderAnalysis, ReaderTokenKey, ReaderVocabulary},
@@ -86,6 +87,7 @@ fn snapshot_with_manual_split(manual: bool) -> EffectiveReaderTokenSnapshot {
         range: range(4, chapter.text.len() - 3),
     };
     EffectiveReaderTokenSnapshot {
+        original_boundaries: original_boundaries_on_page(&chapter, &original, page).unwrap(),
         document_id: 1.try_into().unwrap(),
         page,
         tokens: resolved.tokens_on_page(page).unwrap(),
@@ -118,6 +120,7 @@ fn compact_page_preserves_literal_visible_data_and_authenticates_only_visible_se
     let snapshot = snapshot();
     let full_key = snapshot.key().unwrap();
     let expected = snapshot.tokens.clone();
+    let boundaries = snapshot.original_boundaries.clone();
     let mut session = EffectiveReaderSession::default();
     let request = session.begin_load(base(&snapshot)).unwrap();
     assert_eq!(request.base(), base(&snapshot));
@@ -125,6 +128,12 @@ fn compact_page_preserves_literal_visible_data_and_authenticates_only_visible_se
     let page = session.page().unwrap();
     assert_eq!(session.resolve(page.identity), Some(&full_key));
     assert_eq!(page.tokens.len(), 2);
+    assert_eq!(page.original_boundaries, boundaries);
+    assert_eq!(boundaries.len(), 2);
+    assert_eq!(boundaries[0].surface, "𠮷か\u{3099}\0");
+    assert_eq!(boundaries[1].surface, "猫犬");
+    assert_eq!(boundaries[0].display_range, range(0, 7));
+    assert_eq!(boundaries[1].display_range, range(10, 13));
     for (token, expected) in page.tokens.iter().zip(&expected) {
         assert_eq!(token.segment_index, expected.segment_index);
         assert_eq!(token.anchor, expected.anchor);
@@ -230,9 +239,12 @@ fn missing_analysis_is_plain_and_unselectable_without_fallback() {
     // A missing analysis cannot smuggle selectable tokens into the plain page.
     assert!(!session.accept(request, snapshot.clone()));
     snapshot.tokens.clear();
+    assert!(!session.accept(request, snapshot.clone()));
+    snapshot.original_boundaries.clear();
     assert!(session.accept(request, snapshot));
     let page = session.page().unwrap();
     assert!(page.tokens.is_empty());
+    assert!(page.original_boundaries.is_empty());
     assert!(session.resolve(page.identity).is_none());
     assert!(session
         .resolve_selection(EffectiveReaderSelection {
@@ -377,4 +389,105 @@ fn accepted_commands_share_one_key_and_survive_invalidation_without_authorizing_
         session.resolve(session.page().unwrap().identity).unwrap(),
         page.key()
     );
+}
+
+#[test]
+fn edit_boundaries_stay_original_after_manual_splits_and_reversal() {
+    let original = snapshot_with_manual_split(false);
+    let edited = snapshot_with_manual_split(true);
+    assert_ne!(original.tokens, edited.tokens);
+    assert_eq!(original.original_boundaries, edited.original_boundaries);
+    let mut session = EffectiveReaderSession::default();
+    let request = session.begin_load(base(&edited)).unwrap();
+    let expected = edited.original_boundaries.clone();
+    assert!(session.accept(request, edited));
+    assert_eq!(session.page().unwrap().original_boundaries, expected);
+    let request = session.begin_load(base(&original)).unwrap();
+    assert!(session.page().is_none());
+    assert!(session.accept(request, original));
+    assert_eq!(session.page().unwrap().original_boundaries, expected);
+}
+
+#[test]
+fn original_boundary_projection_validates_the_whole_b_snapshot_and_every_page() {
+    use yomoku_core::pagination::{LogicalPages, PageLength};
+    let chapter = ChapterText {
+        source_id: 1.try_into().unwrap(),
+        chapter_id: 2.try_into().unwrap(),
+        text: "𠮷か\u{3099}\0猫。 English\n\n".repeat(230),
+    };
+    let mut tokens = Vec::new();
+    let unit = "𠮷か\u{3099}\0猫。 English\n\n";
+    for offset in (0..chapter.text.len()).step_by(unit.len()) {
+        for (start, surface, japanese) in [
+            (0, "𠮷か\u{3099}\0猫", true),
+            (14, "。", false),
+            (18, "English", false),
+        ] {
+            tokens.push(AnalyzedToken {
+                anchor: TextAnchor {
+                    source_id: chapter.source_id,
+                    chapter_id: chapter.chapter_id,
+                    range: range(offset + start, offset + start + surface.len()),
+                },
+                surface: surface.into(),
+                is_japanese: japanese,
+                reading: None,
+                dictionary_form: None,
+            });
+        }
+    }
+    let original = ChapterAnalysis {
+        profile: AnalysisProfile {
+            engine_revision: "fixture@1".into(),
+            dictionary_revision: "full@1".into(),
+        },
+        mode: SplitMode::B,
+        tokens,
+    };
+    for length in PageLength::ALL {
+        for page in LogicalPages::new(std::slice::from_ref(&chapter), length)
+            .unwrap()
+            .pages()
+        {
+            let boundaries = original_boundaries_on_page(&chapter, &original, *page).unwrap();
+            let expected = original
+                .tokens
+                .iter()
+                .filter(|token| {
+                    token.is_japanese
+                        && token.anchor.range.start < page.range.end
+                        && token.anchor.range.end > page.range.start
+                })
+                .collect::<Vec<_>>();
+            assert_eq!(boundaries.len(), expected.len());
+            for (boundary, token) in boundaries.iter().zip(expected) {
+                assert_eq!(boundary.anchor, token.anchor);
+                assert_eq!(boundary.surface, token.surface);
+            }
+        }
+    }
+    let page = TextAnchor {
+        source_id: chapter.source_id,
+        chapter_id: chapter.chapter_id,
+        range: range(4, 7),
+    };
+    let crossing = original_boundaries_on_page(&chapter, &original, page).unwrap();
+    assert_eq!(crossing[0].surface, "𠮷か\u{3099}\0猫");
+    assert_eq!(crossing[0].display_range, range(0, 3));
+    let mut bad = original.clone();
+    bad.mode = SplitMode::A;
+    assert!(original_boundaries_on_page(&chapter, &bad, page).is_err());
+    bad = original.clone();
+    bad.tokens.last_mut().unwrap().surface = "corrupt off page".into();
+    assert!(original_boundaries_on_page(&chapter, &bad, page).is_err());
+    assert!(original_boundaries_on_page(
+        &chapter,
+        &original,
+        TextAnchor {
+            range: range(1, 7),
+            ..page
+        }
+    )
+    .is_err());
 }

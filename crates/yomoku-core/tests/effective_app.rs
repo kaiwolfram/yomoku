@@ -132,6 +132,7 @@ impl Fixture {
     fn snapshot(&self) -> EffectiveReaderTokenSnapshot {
         let resolved = self.resolved();
         EffectiveReaderTokenSnapshot {
+            original_boundaries: vec![],
             document_id: self.document.document_id,
             page: self.base().page,
             tokens: resolved.tokens_on_page(self.base().page).unwrap(),
@@ -599,6 +600,7 @@ fn missing_analysis_stays_plain_and_cannot_complete_or_rescan() {
         StorageResult::Effective(Output::TokensLoaded(
             request,
             EffectiveReaderTokenSnapshot {
+                original_boundaries: vec![],
                 document_id: f.document.document_id,
                 page: f.base().page,
                 segmentation: None,

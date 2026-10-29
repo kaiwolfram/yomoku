@@ -6019,3 +6019,84 @@ Result directories: `/tmp/yomoku-effective-navigation-{initial,retry,final-phone
 baseline XML: `/tmp/yomoku-effective-navigation-baseline-results.xml`.
 Full Rust/Clippy, Full owned/mapped opt-in matrix, release/process death,
 physical arm64 and effective JNI/device/diverse-book costs were not rerun/measured.
+
+## Staged original-B span selection and boundary editor integration
+
+2026-10-29, repository root, pinned offline tools:
+
+```sh
+export PATH=/home/kai/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin:$PATH
+export JAVA_HOME=/home/kai/repos/yomoku/.local/jdk-17/jdk-17.0.21+9
+export GRADLE_USER_HOME=/home/kai/repos/yomoku/.local/gradle
+export ANDROID_HOME=/home/kai/Android/Sdk
+cargo test --workspace --all-features --locked --offline --quiet
+cargo test -p yomoku-runtime effective_application_fifo_override_rollback_exact_retry_reload_and_reverse --all-features --locked --offline
+cargo clippy --workspace --all-targets --all-features --locked --offline -- -D warnings
+cargo fmt --all -- --check
+tools/test-kotlin-bridge.sh
+tools/format-kotlin.sh --check
+"$JAVA_HOME/bin/java" -jar .local/ktfmt-0.64.jar --kotlinlang-style --dry-run --set-exit-if-changed tests/kotlin/EffectiveReaderDisplayTest.kt tests/kotlin/TextBoundaryTest.kt
+cargo run -p yomoku-storage --example measure_effective_reader_payload --locked --offline
+cargo run -p yomoku-ffi --bin generate-kotlin --features facet_typegen --locked --offline -- target/generated/kotlin
+# Compare SHA-256 of all generated .kt files before/after generation.
+./android/gradlew -p android :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug --offline --console=plain
+./android/gradlew -p android :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=app.yomoku.EffectiveReaderBoundariesTest,app.yomoku.ReaderBoundaryEditorTest,app.yomoku.EffectiveReaderNavigationTest,app.yomoku.EffectiveReaderWordsTest --offline --console=plain
+# Final Kotlin guard; reuse the verified native binaries to avoid concurrent generation:
+./android/gradlew -p android :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug :app:connectedDebugAndroidTest -x :app:buildRustBridge -Pandroid.testInstrumentationRunnerArguments.class=app.yomoku.EffectiveReaderBoundariesTest --offline --console=plain
+/home/kai/Android/Sdk/platform-tools/adb -s emulator-5554 shell wm size 2560x1600
+/home/kai/Android/Sdk/platform-tools/adb -s emulator-5554 shell wm density 240
+/home/kai/Android/Sdk/platform-tools/adb -s emulator-5554 shell cmd uimode night yes
+./android/gradlew -p android :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=app.yomoku.EffectiveReaderBoundariesTest,app.yomoku.ReaderBoundaryEditorTest --offline --console=plain
+/home/kai/Android/Sdk/platform-tools/adb -s emulator-5554 shell wm size reset
+/home/kai/Android/Sdk/platform-tools/adb -s emulator-5554 shell wm density reset
+/home/kai/Android/Sdk/platform-tools/adb -s emulator-5554 shell cmd uimode night no
+git diff --check
+```
+
+PASS: all 704 workspace tests (17 opt-in ignored), strict Clippy/Rustfmt/diff,
+Kotlin formatting, both-ABI debug app/test APKs and strict Android lint. Two new
+pure cases plus expanded core/SQLite/FIFO assertions verify original B after
+manual splits/reversal/reopen, every preset, whole crossing tokens, literal
+supplementary/combining/NUL text, whole-chapter corruption, Missing B, unchanged
+read-only bytes and no extra analyzer/dictionary load. The real app/FIFO case
+now opens edits using the returned B anchors and checks they survive writes/reopen.
+
+PASS: the complete real-Full host Kotlin/JNI and Rust-Kotlin-Rust codec suite,
+including populated original-B spans, strict Unicode/contiguity/identity projection
+and unchanged 60/68-byte page/selection identities. All 17 generated Kotlin files
+remain byte-identical on regeneration. Existing nonfatal teardown diagnostics
+remain; the sequential host suite exits zero. Synthetic visible-page JSON now
+includes B edit spans: 100,885 B for the 1k-character fixture and 50,135 B for both
+10k/100k fixtures; identity/selection and full-key sizes stay unchanged. See
+EFFECTIVE_READER_PAYLOAD.md. These are sizes, not device performance measurements.
+
+PASS: 28 phone cases (five new selector/editor integrations, eight independent
+editor cases, four navigation and 11 word cases), without failures/skips. New
+fixtures use the actual shell with compact native projections, maximum typed IDs,
+original crossing Unicode spans independent of effective tokens, contiguous
+endpoints/gap rejection, typed A/B/C/manual/scope/reversal, native Retry/Cancel
+and explicit reload after retirement, FIFO/time/mutation gates and saveable
+native-session/page ownership. They do not activate the production native model.
+
+Initial checks corrected test enum/API names, a Missing-B fixture's new field,
+a Kotlin unnecessary-safe-call warning and generated-event fixture property names.
+The first host attempt raced Android's BoltFFI metadata generation and failed to
+load a native callback symbol; the sequential complete retry passes. Keep these
+generation steps sequential. Gradle needs local-socket escalation; emulator startup
+needs AVD write access. No dependency/durable schema/destructive-semantic change.
+
+Production still constructs Model::default (B). Next activate native/FFI/Android
+and verify actual effective JNI/SQLite reader/edit/Library/completion flows. The
+existing long-page HWUI stall above remains unresolved; long-page cases, separate
+Full owned/mapped matrix, release/process death, physical arm64 and actual effective
+JNI/device/diverse/image-heavy timings were not rerun/measured.
+Logs: `/tmp/yomoku-boundary-selection-{tests,worker,clippy-final,host,host-retry,android,phone,final-phone,format-check,host-format-check,payload,emulator}.log`.
+
+PASS: the final malformed-effective-page guard is included in all five phone
+selector/editor reruns and all 13 wide/dark selector/editor cases, with no failures
+or skips. Wide is 2560×1600 / 240 dpi / dark; phone is 1080×2400 / 420 dpi / light.
+The wide run uses the normal buildRustBridge task; only the Kotlin-only final
+phone run skips that task to avoid concurrent metadata generation. Display size,
+density and system light mode were restored; the task-started emulator was stopped.
+Wide log: `/tmp/yomoku-boundary-selection-wide.log`; result copies:
+`/tmp/yomoku-boundary-selection-{phone,final-phone,wide}-results`.

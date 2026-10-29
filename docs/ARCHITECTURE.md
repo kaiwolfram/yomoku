@@ -1434,5 +1434,15 @@ Storage/time/completion and pending effective mutations gate movement. Navigatio
 callbacks reject retired revisions/sessions, and swipes observe current identities
 even when page geometry stays unchanged. Effective completion samples/pauses the
 platform clock before dispatch through the existing native drain/Retry lifecycle.
-Original-B span selection/editor and coordinated production core/FFI/Android
-activation remain next. No durable/wire schema or dependency change.
+`EffectiveReaderBoundaries` now exposes the prepared editor in the staged reader.
+The atomic page read projects `original_boundaries` while original B is already
+loaded, without another analyzer or analysis read. Each page-only span retains its
+whole anchor/surface and clipped display range, independently of effective edits.
+Android validates strict UTF-8/UTF-16 projection and lets users select one B token
+or two endpoints of a contiguous Japanese range. Gaps, malformed data and Missing B
+fail closed. Selection is scoped to the native session/page revision; accepted
+prompt/write/retry ownership remains native. Shared time/FIFO/mutation gates apply
+to opening and submitting the editor; pending failures remain reachable after page
+retirement. Reload explicitly retires the old prompt and requests a new page.
+Coordinated production core/FFI/Android activation remains next. The ephemeral page
+wire schema adds only these visible spans; no durable schema/dependency change.

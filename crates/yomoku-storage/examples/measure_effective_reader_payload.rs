@@ -5,7 +5,8 @@ use yomoku_core::{
     analysis::{AnalysisProfile, AnalyzedToken, ChapterAnalysis, SplitMode},
     document::{ChapterText, PastedDocument, TextAnchor, TextOffset, TextRange},
     effective_reader::{
-        EffectiveReaderChapter, EffectiveReaderTokenKey, EffectiveReaderTokenSnapshot,
+        original_boundaries_on_page, EffectiveReaderChapter, EffectiveReaderTokenKey,
+        EffectiveReaderTokenSnapshot,
     },
     effective_session::{EffectiveReaderSelection, EffectiveReaderSession},
     pagination::PageLength,
@@ -78,6 +79,8 @@ fn main() {
         assert!(session.accept(
             request,
             EffectiveReaderTokenSnapshot {
+                original_boundaries: original_boundaries_on_page(&chapter, &original, page.anchor)
+                    .unwrap(),
                 document_id: document.document_id,
                 page: page.anchor,
                 segmentation: Some(key.segmentation.clone()),

@@ -90,6 +90,20 @@ fn effective_reader_tokens_use_live_exact_surface_statuses_without_registration(
         .load_effective_reader_tokens(imported.document.document_id, page)
         .unwrap()
         .unwrap();
+    let expected_boundaries = original
+        .as_ref()
+        .unwrap()
+        .tokens
+        .iter()
+        .map(
+            |token| yomoku_core::effective_reader::OriginalBoundaryToken {
+                anchor: token.anchor,
+                display_range: token.display_range,
+                surface: token.surface.clone(),
+            },
+        )
+        .collect::<Vec<_>>();
+    assert_eq!(snapshot.original_boundaries, expected_boundaries);
     assert_eq!(
         snapshot
             .tokens
@@ -146,6 +160,7 @@ fn effective_reader_tokens_use_live_exact_surface_statuses_without_registration(
         VocabularyStatus::Ignored
     );
     assert_eq!(updated.segmentation, snapshot.segmentation);
+    assert_eq!(updated.original_boundaries, snapshot.original_boundaries);
     storage
         .connection
         .execute(
@@ -176,6 +191,7 @@ fn effective_reader_tokens_use_live_exact_surface_statuses_without_registration(
         ["食べた", "食べた"]
     );
     assert_ne!(reversed.segmentation, snapshot.segmentation);
+    assert_eq!(reversed.original_boundaries, snapshot.original_boundaries);
     // A previously returned result remains the original frozen projection.
     assert_eq!(snapshot.tokens[0].surface, "食べ");
 }
@@ -215,6 +231,7 @@ fn effective_reader_tokens_keep_missing_deleted_and_invalid_states_distinct() {
         .unwrap()
         .unwrap();
     assert_eq!(snapshot.segmentation, None);
+    assert!(snapshot.original_boundaries.is_empty());
     assert!(snapshot.tokens.is_empty());
     assert_eq!(preserved_rows(&storage), before);
     storage

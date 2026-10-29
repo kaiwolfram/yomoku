@@ -29,7 +29,7 @@ use crate::{
     document::{TextAnchor, TextRange},
     effective_reader::{
         EffectiveReaderToken, EffectiveReaderTokenKey, EffectiveReaderTokenSnapshot,
-        EffectiveTokenEligibility,
+        EffectiveTokenEligibility, OriginalBoundaryToken,
     },
     reader::{ReaderAnalysis, ReaderTokenKey, ReaderVocabulary},
 };
@@ -97,6 +97,7 @@ impl From<EffectiveReaderToken> for EffectivePageToken {
 pub struct EffectiveReaderPage {
     pub identity: EffectivePageIdentity,
     pub tokens: Vec<EffectivePageToken>,
+    pub original_boundaries: Vec<OriginalBoundaryToken>,
 }
 
 /// Rust-only attempt token, issued before dispatch. It cannot be reconstructed
@@ -222,7 +223,8 @@ impl EffectiveReaderSession {
         if snapshot.document_id != request.0.base.document_id
             || snapshot.page != request.0.base.page
             || analysis != request.0.base.analysis
-            || (snapshot.segmentation.is_none() && !snapshot.tokens.is_empty())
+            || (snapshot.segmentation.is_none()
+                && (!snapshot.tokens.is_empty() || !snapshot.original_boundaries.is_empty()))
         {
             return false;
         }
@@ -239,6 +241,7 @@ impl EffectiveReaderSession {
             view: EffectiveReaderPage {
                 identity: request.0,
                 tokens: snapshot.tokens.into_iter().map(Into::into).collect(),
+                original_boundaries: snapshot.original_boundaries,
             },
         });
         self.pending = None;

@@ -3,7 +3,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    analysis::{ChapterAnalysis, InvalidAnalysis, StoredOverride},
+    analysis::{ChapterAnalysis, InvalidAnalysis, SplitMode, StoredOverride},
     completion::PageCompletion,
     dictionary::DictionaryCandidates,
     document::{
@@ -50,6 +50,54 @@ pub struct EffectiveReaderTokenSnapshot {
     pub page: TextAnchor,
     pub segmentation: Option<EffectiveChapterSegmentation>,
     pub tokens: Vec<EffectiveReaderToken>,
+    pub original_boundaries: Vec<OriginalBoundaryToken>,
+}
+
+/// Original Japanese B spans for editing, independent of the effective partition.
+/// Full edge tokens are retained; only their display range is clipped to the page.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
+pub struct OriginalBoundaryToken {
+    pub anchor: TextAnchor,
+    pub display_range: TextRange,
+    pub surface: String,
+}
+
+pub fn original_boundaries_on_page(
+    chapter: &ChapterText,
+    original: &ChapterAnalysis,
+    page: TextAnchor,
+) -> Result<Vec<OriginalBoundaryToken>, InvalidAnalysis> {
+    original.validate(chapter)?;
+    if original.mode != SplitMode::B || page.slice(chapter).map_err(|_| InvalidAnalysis)?.is_empty()
+    {
+        return Err(InvalidAnalysis);
+    }
+    original
+        .tokens
+        .iter()
+        .filter(|token| {
+            token.is_japanese
+                && token.anchor.range.start < page.range.end
+                && token.anchor.range.end > page.range.start
+        })
+        .map(|token| {
+            Ok(OriginalBoundaryToken {
+                anchor: token.anchor,
+                display_range: TextRange {
+                    start: (i64::from(token.anchor.range.start.max(page.range.start))
+                        - i64::from(page.range.start))
+                    .try_into()
+                    .map_err(|_| InvalidAnalysis)?,
+                    end: (i64::from(token.anchor.range.end.min(page.range.end))
+                        - i64::from(page.range.start))
+                    .try_into()
+                    .map_err(|_| InvalidAnalysis)?,
+                },
+                surface: token.surface.clone(),
+            })
+        })
+        .collect()
 }
 
 /// Frozen page and complete resolved provenance, deliberately separate from an

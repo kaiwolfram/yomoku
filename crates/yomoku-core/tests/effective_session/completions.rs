@@ -114,6 +114,7 @@ impl Fixture {
     ) -> yomoku_core::effective_session::EffectivePageIdentity {
         let resolved = self.resolved();
         let snapshot = EffectiveReaderTokenSnapshot {
+            original_boundaries: vec![],
             document_id: self.intent.document_id,
             page: self.intent.page,
             tokens: resolved.tokens_on_page(self.intent.page).unwrap(),
@@ -231,6 +232,7 @@ fn completion_rejects_stale_missing_and_mismatched_intents_without_retiring_the_
     let mut missing = snapshot();
     missing.segmentation = None;
     missing.tokens.clear();
+    missing.original_boundaries.clear();
     let request = session.begin_load(base(&missing)).unwrap();
     assert!(session.accept(request, missing));
     assert!(!session.begin_completion(session.page().unwrap().identity, fixture.intent));

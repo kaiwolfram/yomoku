@@ -93,16 +93,24 @@ fn effective_application_fifo_override_rollback_exact_retry_reload_and_reverse()
         .reading_position;
     let router = router(&fixture); // Stored choices/manual edits load neither dictionary.
     let view = load_app(&router, &fixture);
+    let original_boundaries = view
+        .effective_reader_tokens
+        .as_ref()
+        .unwrap()
+        .original_boundaries
+        .clone();
     let open = |view: &ViewModel| {
         AppEvent::EffectiveReaderOverride(Action::Open {
             page: view.effective_reader_tokens.as_ref().unwrap().identity,
-            anchor: TextAnchor {
-                range: TextRange {
-                    start: TextOffset::START,
-                    end: ("食べた".len() as i64).try_into().unwrap(),
-                },
-                ..fixture.base.page
-            },
+            anchor: view
+                .effective_reader_tokens
+                .as_ref()
+                .unwrap()
+                .original_boundaries
+                .iter()
+                .find(|token| token.surface == "食べた")
+                .unwrap()
+                .anchor,
         })
     };
     let reload = || dispatch(&router, AppEvent::LoadReaderTokens(fixture.base));
@@ -148,6 +156,13 @@ fn effective_application_fifo_override_rollback_exact_retry_reload_and_reverse()
     assert!(state.reload_required && !state.pending);
     assert!(view.effective_reader_tokens.is_none());
     let view = reload();
+    assert_eq!(
+        view.effective_reader_tokens
+            .as_ref()
+            .unwrap()
+            .original_boundaries,
+        original_boundaries
+    );
     assert_eq!(
         view.effective_reader_tokens.as_ref().unwrap().tokens[0].surface,
         "食べた"
@@ -204,6 +219,13 @@ fn effective_application_fifo_override_rollback_exact_retry_reload_and_reverse()
     assert!(!view.effective_reader_override.unwrap().pending);
     let fresh = self::router(&fixture);
     let view = load_app(&fresh, &fixture);
+    assert_eq!(
+        view.effective_reader_tokens
+            .as_ref()
+            .unwrap()
+            .original_boundaries,
+        original_boundaries
+    );
     let tokens = view.effective_reader_tokens.unwrap().tokens;
     assert!(tokens.iter().any(|t| t.surface == "𠮷"));
     assert!(tokens.iter().any(|t| t.surface == "か\u{3099}\0"));

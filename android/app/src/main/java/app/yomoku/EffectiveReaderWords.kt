@@ -24,7 +24,7 @@ import app.yomoku.shared.Event
 import app.yomoku.shared.ReaderTokenKey
 import app.yomoku.shared.ViewModel
 
-/** Compact effective consumers; production activation awaits boundary selection/editor wiring. */
+/** Compact effective consumers; production activation is coordinated with the native model. */
 @Composable
 internal fun EffectiveReaderWords(
     view: ViewModel,
@@ -34,12 +34,15 @@ internal fun EffectiveReaderWords(
     imageLoader: EpubImageLoader? = null,
 ) {
     // Compact revisions belong to one native session. A replacement cannot reuse a selection/draft.
-    key(sessionKey) { EffectiveReaderWordContent(view, dispatch, onInteraction, imageLoader) }
+    key(sessionKey) {
+        EffectiveReaderWordContent(view, sessionKey, dispatch, onInteraction, imageLoader)
+    }
 }
 
 @Composable
 private fun EffectiveReaderWordContent(
     view: ViewModel,
+    sessionKey: String,
     dispatch: (Event) -> Unit,
     onInteraction: () -> Unit,
     imageLoader: EpubImageLoader?,
@@ -165,6 +168,16 @@ private fun EffectiveReaderWordContent(
         }
     }
     val display = tokens?.singleOrNull { it.selection == selected }
+    EffectiveReaderBoundaries(
+        view,
+        sessionKey,
+        canRead,
+        { event ->
+            if (event == Event.DismissReaderWord) selected = null
+            dispatch(event)
+        },
+        onInteraction,
+    )
     if (display != null) {
         val token = display.token
         ReaderWordPanel(

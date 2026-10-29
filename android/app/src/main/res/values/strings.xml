@@ -1,4 +1,7 @@
 <resources>
+    <string name="boundary_select">Edit word boundaries</string>
+    <string name="boundary_select_help">Select an original Mode B word, then another to extend the span. Select again to start a new span.</string>
+    <string name="boundary_selection_gap">Select consecutive Japanese words without punctuation or spaces between them.</string>
     <string name="reader_font_notices_title">Reader font credits</string>
     <string name="reader_font_attribution">Noto Serif JP, licensed under the SIL Open Font License 1.1. Complete attribution and license follow.</string>
     <string name="svg_notices_title">SVG renderer credits</string>

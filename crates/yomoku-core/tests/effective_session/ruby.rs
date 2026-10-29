@@ -111,6 +111,7 @@ fn pending_failed_foreign_missing_and_invalidated_pages_leave_source_ruby_usable
     assert!(!session.accept(
         refresh,
         EffectiveReaderTokenSnapshot {
+            original_boundaries: vec![],
             document_id: key.document_id,
             page: key.page,
             segmentation: None,
@@ -126,6 +127,7 @@ fn pending_failed_foreign_missing_and_invalidated_pages_leave_source_ruby_usable
     assert!(session.accept(
         request,
         EffectiveReaderTokenSnapshot {
+            original_boundaries: vec![],
             document_id: key.document_id,
             page: key.page,
             segmentation: None,

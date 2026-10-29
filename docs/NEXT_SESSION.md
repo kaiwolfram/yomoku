@@ -1,5 +1,5 @@
 # Resume here
-Updated: 2026-10-29. Android effective navigation staged; span/editor then activation.
+Updated: 2026-10-29. Android span/editor staged; coordinated activation next.
 - Single/bulk deletion: one transaction, history/vocabulary/rules retained; reimport fresh.
   Long press selects; Select All adds all matching titles, including offscreen rows.
 - Library title-only search/Clear + Last read/Title/Import date; query/sort retained.
@@ -31,10 +31,9 @@ Updated: 2026-10-29. Android effective navigation staged; span/editor then activ
 - Direct off-main cancelFileImport bypasses FIFO; COMMIT may wait. Silent full-file
   rollback; winning/prior commits stay. Android ignores late reads and awaits BOTH
   native return + outcome before clearing/draining. Dedicated cancellation executor.
-- EPUB (0014) ignores CSS; atomic source/content/formatting/ruby/images/B/registration.
-  Snapshot verifies source/assets without parsing; host costs measured, device pending.
-- Keyed heading/emphasis/strong/HTTP(S) spans clip to page UTF-8; JNI preserves text.
-- Image placeholders/alt/metadata, no BLOB state; FIFO validates owner/media/SHA/32 MiB.
+- EPUB (0014): atomic source/formatting/ruby/images/B; ignores CSS, no reparse on load.
+- Keyed styles/HTTP(S) clip to page UTF-8. Images: alt/metadata, no BLOB state;
+  FIFO validates owner/media/SHA/32 MiB.
 - Serial bounds-first decode: <=32768-edge/100 MP source, <=2048-edge sample,
   16 MiB shared page pixels; repeats share bitmaps. Ratio frames <=8192px preserve
   U+FFFC positions/styles/word/link identity; unsupported images keep alt/Retry.
@@ -52,28 +51,30 @@ Updated: 2026-10-29. Android effective navigation staged; span/editor then activ
 - Explicit A/C uses the FIFO/import analyzer cache, whole chapter/original profile;
   stored reuse skips Full. Rechecks key/revision at commit; metadata requires reload.
 - ReaderBoundaryEditor: typed A/B/C/manual/All/This/reversal/Retry/Cancel/reload;
-  literal scalar cuts + Rust whitespace; session/prompt-scoped saveable drafts. Isolated UI.
-- Native Model::with_effective_reader(): LoadReaderTokens + compact effective_reader_tokens,
-  effective furigana + CompleteEffectiveReaderPage; captured FIFO callbacks, both final-time
-  slots before preparation, exact retry/finish/notice/departure. Production default stays B;
-  legacy word/status/custom/completion events reject in opt-in model.
-- Compact effective app word/status/custom: retained FIFO, literal Retry/Cancel, five statuses,
-  repeats/deletion/built-in gates. Dismissed writes/errors retained; time drains before movement.
-- Compact app overrides: FIFO/prompt writes, Retry/Cancel/reload, Library/time gates.
-- Android compact word/status/custom + navigation wired with retained CoreSession UUID;
-  Next/Finish/swipes use validated effective identity, Previous position only. Native
-  mutation/time gates; current gesture revisions; final clock sample before completion.
+  literal scalar cuts + Rust whitespace; session/prompt-scoped saveable drafts.
+- Native Model::with_effective_reader stages tokens/words/status/custom/edits/Library/
+  furigana/completion through retained FIFO/time gates. Both final-time slots drain; exact
+  retries/finish/notices/departure. Production B; legacy word/write events fail in opt-in.
+- Compact app words/status/custom/overrides retain FIFO/prompt writes, literal Retry/Cancel,
+  repeats/deletion/built-in gates. Dismissed writes/errors retained; Library/time gates.
+- Android compact words/navigation use retained session UUID and current revisions;
+  final sample before Next/Finish/swipes; Previous position only. Shared native gates.
+- Compact original-B edit spans load in the same transaction without extra analysis/read.
+  Whole crossing anchors; strict Unicode, contiguous JP-only endpoint selection; editor
+  typed actions/Retry/Cancel/reload, saveable native session/page ownership. Staged only.
 ## Next tasks (ordered)
-1. Add original-B span selection and wire ReaderBoundaryEditor; activate core/FFI/
-   Android together. Native Model::with_effective_reader stays staged until ready.
+1. Activate core/FFI/Android together using Model::with_effective_reader; verify actual
+   JNI/SQLite edits/reopen/reversal, Library, word/status/custom/furigana and completion.
 2. Investigate emulator long-page HWUI stall (old reader also fails); details below.
 3. Measure JNI/device/diverse/image-heavy costs; host baselines in performance doc.
 Physical arm64 deferred; Nostr empty; Q188 unresolved before forwarding.
 ## Verification / blockers
-- PASS: 70 focused Rust, real-Full host JNI/codecs, Kotlin fmt, both-ABI APKs/lint.
-- PASS: 36 distinct phone cases + 4 wide-dark shell cases; emulator restored/stopped.
+- PASS: 704 Rust (17 ignored), strict Clippy/fmt/diff; real-Full host JNI/codecs and
+  repeatable generation; Kotlin fmt, both-ABI APKs/lint. 28 phone + 5 final guard cases.
+- PASS: 13 wide-dark selector/editor cases; display restored and emulator stopped.
 - Long-page ReaderWords movement times out in Compose with old ReaderScreen too.
   ReaderNavigation controls then stalls; JDB main waits in HardwareRenderer draw.
   swangle repeats with Vulkan disabled; swiftshader crashes at boot. No product fix.
 - Full device matrix incomplete; exact cases, commands/logs: DEVELOPMENT end.
-- Prior full Rust/Clippy: 702 (17 ignored). Production B; no schema/dependency change.
+- Production B; no durable schema/dependency change. Only ephemeral page wire grows;
+  synthetic 500-character page JSON = 50,135 B, independent of 10k/100k chapter size.

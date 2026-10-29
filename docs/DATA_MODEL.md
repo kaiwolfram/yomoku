@@ -1493,6 +1493,15 @@ retained native session key, complete compact prompt identity and literal surfac
 These UI drafts are not accepted overrides or write reservations. Exact pending
 writes/retries and provenance remain native; no SQLite/schema change is involved.
 
+The staged Android reader now opens that editor from validated original-B span
+selection. `EffectiveReaderPage.original_boundaries` carries page-only Japanese B
+anchors/surfaces/display ranges from the same read transaction as effective tokens.
+The two endpoint indices saved by the selector are presentation drafts scoped to
+the retained native session and full page identity; they never become vocabulary
+or effective segment IDs. Storage still validates original-B contiguity and full
+effective provenance when opening/mutating the prompt. No historical/durable format
+changes; production activation remains pending.
+
 
 ## Library read order (migration 0019)
 

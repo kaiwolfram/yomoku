@@ -177,6 +177,11 @@ fn main() -> Result<(), Box<dyn Error>> {
     // Standalone prerequisite schemas use the actual generated shell codec.
     // Maximum revisions/indices and literal unresolved metadata stay lossless.
     let effective_page = EffectiveReaderPage {
+        original_boundaries: vec![yomoku_core::effective_reader::OriginalBoundaryToken {
+            anchor: illustrated_page.anchor,
+            display_range: illustrated_page.anchor.range,
+            surface: image_text.into(),
+        }],
         identity: EffectivePageIdentity {
             revision: u64::MAX,
             base: yomoku_core::reader::ReaderTokenKey {

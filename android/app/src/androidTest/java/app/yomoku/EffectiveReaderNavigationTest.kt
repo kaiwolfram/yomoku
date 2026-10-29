@@ -75,7 +75,7 @@ class EffectiveReaderNavigationTest {
             readerTime = ReadingTimeUpdate(page.documentId, page.position, PendingReadingTime(0)),
             readingTimeSavePending = false,
             completionSavePending = false,
-            effectiveReaderTokens = EffectiveReaderPage(identity, listOf(token)),
+            effectiveReaderTokens = EffectiveReaderPage(identity, listOf(token), emptyList()),
             effectiveReaderWord =
                 EffectiveReaderWordState(busy = false, customEntryPending = false),
             effectiveReaderStatus = EffectiveStatusState(pending = false, busy = false),

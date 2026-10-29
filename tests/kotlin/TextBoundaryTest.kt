@@ -85,6 +85,8 @@ fun verifyTextBoundaries(directory: String) {
     check(effective.identity.base.page == illustratedPage.anchor)
     check(effective.tokens.map { it.segmentIndex } == listOf(0uL, 1uL))
     check(effective.tokens.all { it.surface == illustratedPage.text })
+    check(effective.originalBoundaries.single().surface == illustratedPage.text)
+    check(effective.originalBoundaries.single().anchor == illustratedPage.anchor)
     check(effective.tokens[0].eligibility == EffectiveTokenEligibility.ANALYZERJAPANESE)
     check(effective.tokens[0].reading == "読み𠮷か\u3099\u0000")
     check(effective.tokens[0].dictionaryForm == "原形𠮷か\u3099\u0000")

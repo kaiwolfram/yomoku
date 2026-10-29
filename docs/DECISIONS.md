@@ -3595,3 +3595,25 @@ native checkpoint drain and exact completion Retry path. No new Kotlin history,
 time or retry payload ownership. Production remains B until original-B span
 selection/editor and core/FFI/Android activation are ready together. No dependency,
 wire/durable schema or product-setting change.
+
+## 2026-10-29 — Original-B edit span selection in the staged reader
+
+Expose only visible Japanese original-B anchors, surfaces and clipped display
+ranges alongside the compact effective page. Project them while original B is
+already loaded in the page's read transaction; keep effective boundaries/metadata
+and full native provenance unchanged. Do not infer B edges from edited segments
+or perform an extra whole-chapter analysis/read for Android selection.
+
+Use an explicit boundary action to select one original token or two endpoints of
+a contiguous Japanese span. Both crossing edge tokens remain whole. Reject gaps,
+malformed Unicode/ranges and Missing B. Save only presentation endpoint indices,
+scoped to the retained native session and complete compact page identity. The
+prepared editor owns scope/cut drafts; native prompt identities, exact accepted
+writes/retries and transaction guards remain authoritative. Opening/submitting
+uses shared storage/time/completion/mutation gates; failed accepted commands stay
+reachable after page retirement, and reload is explicit.
+
+Keep production on B for this independently verified staging step. The following
+activation step must switch the production native model and Android consumers
+together and verify actual JNI/SQLite reader, edits, Library and completion flow.
+No dependency, SQLite migration, historical rewrite or destructive semantic change.

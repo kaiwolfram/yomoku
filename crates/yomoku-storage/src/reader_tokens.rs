@@ -8,7 +8,7 @@ use yomoku_core::{
 };
 
 use crate::{
-    analysis::{read_analysis, read_effective_reader_chapter_in, read_reader_analysis},
+    analysis::{read_analysis, read_effective_reader_with_boundaries_in, read_reader_analysis},
     reader_documents::load_reader_document_in,
     vocabulary::{decode_status, read_entry_by_surface},
     Storage, StorageError,
@@ -134,7 +134,11 @@ pub(crate) fn load_effective_reader_tokens_in(
     {
         return Err(StorageError::InvalidAnalysis);
     }
-    let effective = read_effective_reader_chapter_in(connection, chapter)?;
+    let (effective, original_boundaries) =
+        match read_effective_reader_with_boundaries_in(connection, chapter, Some(page))? {
+            Some((effective, boundaries)) => (Some(effective), boundaries),
+            None => (None, Vec::new()),
+        };
     let mut tokens = effective
         .as_ref()
         .map(|effective| effective.tokens_on_page(page))
@@ -164,6 +168,7 @@ pub(crate) fn load_effective_reader_tokens_in(
         page,
         segmentation: effective.map(|chapter| chapter.into_segmentation()),
         tokens,
+        original_boundaries,
     };
     Ok(Some(snapshot))
 }

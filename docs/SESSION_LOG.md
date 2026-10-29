@@ -2871,3 +2871,28 @@ Next add original-B span selection/editor and activate together; investigate the
 long-page renderer and finish device/performance coverage. Commands/logs and
 precise unverified cases: DEVELOPMENT end. Full Rust/Clippy, release/process death,
 physical arm64 and effective performance were not rerun/measured.
+
+## 2026-10-29 — Staged original-B span selection and boundary editor integration
+
+Added page-only original-B edit spans to the atomic effective read/compact bridge,
+without another analysis read or retained whole original chapter. Strict Kotlin
+projection preserves full crossing Unicode anchors; endpoint selection rejects
+Japanese-span gaps, Missing/malformed data and stale session/page ownership. The
+staged shell now opens ReaderBoundaryEditor and routes typed modes/scope/manual/
+reversal, native Retry/Cancel and explicit reload, with shared FIFO/time/mutation
+gates and retained write errors. Production remains B; activation is next.
+
+PASS: 704 Rust tests (17 ignored), expanded read-only SQLite/actual app FIFO checks,
+strict Clippy/fmt/diff, complete real-Full host JNI/codecs, 17 byte-identical
+generated Kotlin files, Kotlin formatting, both-ABI APKs and lint. All 28 phone
+cases, five final guard phone reruns and 13 wide/dark cases pass without skips or
+failures. Display restored and task-started emulator stopped. Updated architecture,
+data/payload notes, decisions, plan and handoff. Synthetic page JSON includes B
+edit spans (50,135 B at 500 characters, equal at 10k/100k chapter sizes); 60/68-byte
+identity/selection and durable schema stay unchanged.
+
+Corrected initial fixture/API/nullability errors. Concurrent host/Android BoltFFI
+metadata generation caused one JNI symbol-load failure; sequential full host
+retry passes. Gradle/AVD required sandbox escalation. Existing long-page HWUI
+stall remains unresolved; physical arm64 and actual effective device/diverse/
+image-heavy costs remain unverified. Commands/results/logs: DEVELOPMENT end.

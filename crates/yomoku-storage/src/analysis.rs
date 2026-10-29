@@ -7,7 +7,9 @@ use yomoku_core::{
     document::{
         AnalysisId, ChapterId, ChapterText, OverrideId, SourceId, TextAnchor, TextOffset, TextRange,
     },
-    effective_reader::EffectiveReaderChapter,
+    effective_reader::{
+        original_boundaries_on_page, EffectiveReaderChapter, OriginalBoundaryToken,
+    },
     reader::ReaderAnalysis,
     segmentation::{
         resolve_segmentation, segmentation_from_snapshot, ChapterSegmentation,
@@ -23,11 +25,28 @@ pub(crate) fn read_effective_reader_chapter_in<'a>(
     connection: &Connection,
     chapter: &'a ChapterText,
 ) -> Result<Option<EffectiveReaderChapter<'a>>, StorageError> {
+    Ok(
+        read_effective_reader_with_boundaries_in(connection, chapter, None)?
+            .map(|(effective, _)| effective),
+    )
+}
+
+/// Project edit spans while original B is already loaded in the same transaction.
+pub(crate) fn read_effective_reader_with_boundaries_in<'a>(
+    connection: &Connection,
+    chapter: &'a ChapterText,
+    page: Option<TextAnchor>,
+) -> Result<Option<(EffectiveReaderChapter<'a>, Vec<OriginalBoundaryToken>)>, StorageError> {
     let ReaderAnalysis::Available(id) = read_reader_analysis(connection, chapter.chapter_id)?
     else {
         return Ok(None);
     };
     let original = read_analysis(connection, id)?.ok_or(StorageError::InvalidAnalysis)?;
+    let boundaries = page
+        .map(|page| original_boundaries_on_page(chapter, &original, page))
+        .transpose()
+        .map_err(|_| StorageError::InvalidAnalysis)?
+        .unwrap_or_default();
     let mut statement = connection.prepare(
         "SELECT id FROM chapter_analyses WHERE chapter_id = ?1
          AND engine_revision = ?2 AND dictionary_revision = ?3
@@ -55,7 +74,7 @@ pub(crate) fn read_effective_reader_chapter_in<'a>(
         .collect::<Result<Vec<_>, StorageError>>()?;
     let rules = read_active_rules(connection, chapter)?;
     EffectiveReaderChapter::resolve(chapter, id, &original, &alternates, &rules)
-        .map(Some)
+        .map(|effective| Some((effective, boundaries)))
         .map_err(|_| StorageError::InvalidAnalysis)
 }
 

@@ -117,6 +117,7 @@ fn assert_retained_ruby(
     assert!(session.accept(
         request,
         EffectiveReaderTokenSnapshot {
+            original_boundaries: vec![],
             document_id: page.document_id,
             page: anchor,
             segmentation: Some(effective.segmentation().clone()),

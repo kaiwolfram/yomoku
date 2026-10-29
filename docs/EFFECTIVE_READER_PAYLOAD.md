@@ -82,13 +82,20 @@ Live status changes do not change full provenance; an explicit refresh still ret
 old UI callbacks. Source-preferred furigana must come from the existing pure effective
 projection during the coordinated switch, not from guessed token metadata.
 
-The example now also measures compact JSON at revision 1, absent vocabulary:
+The example now also measures compact JSON at revision 1, absent vocabulary,
+including visible original-B edit spans (2026-10-29):
 
 | Chapter characters | Compact page JSON | Identity JSON | Selection JSON |
 | ---: | ---: | ---: | ---: |
-| 1,000 | 66,233 | 136 | 163 |
-| 10,000 | 32,983 | 136 | 163 |
-| 100,000 | 32,983 | 136 | 163 |
+| 1,000 | 100,885 | 136 | 163 |
+| 10,000 | 50,135 | 136 | 163 |
+| 100,000 | 50,135 | 136 | 163 |
+
+`original_boundaries` contains only Japanese original B spans intersecting the
+page: full anchor/surface plus clipped display range, without metadata/statuses
+or chapter provenance. It is independent of effective splits/merges and remains
+bounded by the visible page. Previously the compact page omitted these edit
+spans (66,233 / 32,983 / 32,983 bytes); identity/selection sizes are unchanged.
 
 The generated Bincode shell codec uses **60 bytes** for an available-B identity
 and **68 bytes** for a selection (56/64 with Missing B). Rust→generated Kotlin→Rust
