@@ -1204,7 +1204,7 @@ An app-level keyed Compose effect consumes positive CompletionNotice and display
 a short Android Toast once; zero stays silent and recreation does not replay it.
 Settings exposes five radio choices, disabled while unknown/busy, and offline
 Sudachi licenses/notices and JMdict/JMnedict credits. Dialog visibility survives Activity recreation.
-Nostr/Vocabulary remain placeholders. Busy/error/retry state comes from
+Nostr remains a placeholder. Busy/error/retry state comes from
 Rust; the unsaved form draft and notice dialog visibility use rememberSaveable.
 The draft is retained through Settings/recreation.
 Navigation uses a bottom bar below 600dp and a scrollable rail above; Settings,
@@ -1631,7 +1631,7 @@ offset; separate pages require an unchanged dataset/query. Frequency/date sorts
 can examine all matching histories and require a temporary sort; large-history
 performance is not measured. Retained worker/core/FFI state must invalidate pages
 on relevant mutations and protect stale callbacks before Compose integration.
-The retained native transport is implemented below; the Vocabulary UI remains open.
+The retained native transport and Compose browser are implemented below.
 
 
 ## Retained Vocabulary transport
@@ -1653,7 +1653,30 @@ matching counts restart at zero; pages otherwise assume an unchanged dataset.
 Settings retains state and postpones new coalesced reads while hidden. Reentry
 refreshes pages with retained query choices. Imports, original/effective statuses,
 completions and effective edits/observations invalidate pages. Native state lives
-in the existing retained session and is lost on process death. Compose infinite
-scroll, phone/tablet recreation verification and bulk selection/writes remain open.
+in the existing retained session and is lost on process death. Bulk selection and
+writes remain open.
 All loaded rows currently cross the view boundary on render; serialization and
 large-list/history performance have not been measured.
+
+## Vocabulary Compose browser
+
+The Vocabulary destination renders literal written-prefix input, five independent
+status FilterChips, the four specified sorts, exact unsigned matching count and
+a LazyColumn of surface/status/completed-encounter rows. Controls live inside the
+scrolling list so they remain reachable in small windows. Search and filter/sort
+changes dispatch the complete retained query; the shell holds no second query or
+page cache. Controls allow native-owned read coalescing but disable during unrelated
+storage work.
+
+A visible-screen effect submits LoadVocabulary only for an unattempted, error-free
+query when idle. A snapshotFlow observes the last loaded row's visibility and
+submits LoadMoreVocabulary only with a next offset and no busy/loading/error state.
+Appending preserves rows and position. First-page and append failures expose the
+same explicit Retry action without a timer, automatic retry or error-triggered
+load. Empty matches are distinct from an unattempted query.
+
+YomokuApp owns a session/query-keyed saveable LazyListState outside the Settings
+branch, retaining scroll through Settings and Activity recreation and resetting
+on changed queries. Rust retains query/pages/error through the existing native
+session; process death does not restore these into a fresh handle. No schema,
+dependency, native protocol or dictionary lookup is added by the browser UI.

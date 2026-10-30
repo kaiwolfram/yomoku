@@ -470,7 +470,7 @@ internal fun ReaderWordLookupState(
     }
 }
 
-private fun VocabularyStatus.labelResource(): Int =
+internal fun VocabularyStatus.labelResource(): Int =
     when (this) {
         VocabularyStatus.NEW -> R.string.status_new
         VocabularyStatus.LEARNING -> R.string.status_learning

@@ -6853,3 +6853,56 @@ No device instrumentation, separate Full-loader matrix, release/process-death,
 performance or physical arm64 execution rerun. Logs:
 `/tmp/yomoku-vocabulary-transport-{core,worker,workspace,clippy,jni,codegen,android}.log`.
 Native/BoltFFI generation remained sequential to host JNI execution.
+
+
+## Vocabulary Compose browser and infinite scroll
+
+Verified 2026-10-30 from the repository root:
+
+```sh
+export PATH=/home/kai/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin:$PATH
+export JAVA_HOME="$PWD/.local/jdk-17/jdk-17.0.21+9"
+export GRADLE_USER_HOME="$PWD/.local/gradle"
+export ANDROID_HOME=/home/kai/Android/Sdk
+./android/gradlew -p android :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug --offline --console=plain
+"$ANDROID_HOME/platform-tools/adb" -s emulator-5554 install -r -t android/app/build/outputs/apk/debug/app-debug.apk
+"$ANDROID_HOME/platform-tools/adb" -s emulator-5554 install -r -t android/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+vocabulary_cases=app.yomoku.VocabularyScreenTest,app.yomoku.VocabularyProductionTest,app.yomoku.NavigationTest,app.yomoku.EffectiveReaderNavigationTest
+"$ANDROID_HOME/platform-tools/adb" -s emulator-5554 shell am instrument -w -r -e class "$vocabulary_cases" app.yomoku.test/androidx.test.runner.AndroidJUnitRunner
+"$ANDROID_HOME/platform-tools/adb" -s emulator-5554 shell wm size 2560x1600
+"$ANDROID_HOME/platform-tools/adb" -s emulator-5554 shell wm density 240
+"$ANDROID_HOME/platform-tools/adb" -s emulator-5554 shell cmd uimode night yes
+"$ANDROID_HOME/platform-tools/adb" -s emulator-5554 shell am instrument -w -r -e class "$vocabulary_cases" app.yomoku.test/androidx.test.runner.AndroidJUnitRunner
+"$ANDROID_HOME/platform-tools/adb" -s emulator-5554 shell wm size reset
+"$ANDROID_HOME/platform-tools/adb" -s emulator-5554 shell wm density reset
+"$ANDROID_HOME/platform-tools/adb" -s emulator-5554 shell cmd uimode night no
+"$JAVA_HOME/bin/java" -jar .local/ktfmt-0.64.jar --kotlinlang-style --dry-run --set-exit-if-changed android/app/src/main/java/app/yomoku/{VocabularyScreen,YomokuApp,ReaderWords}.kt android/app/src/androidTest/java/app/yomoku/{VocabularyScreen,VocabularyProduction}Test.kt
+git diff --check
+```
+
+PASS: debug/test APKs, strict Android lint, all changed Kotlin formatting and diff.
+Native generation was up-to-date; existing both-ABI libraries packaged. Eleven
+cases pass on API-36 x86_64 phone/light (1080x2400, 420 dpi; 114.611 s) and
+landscape tablet/dark (2560x1600, 240 dpi; 82.566 s), 22 executions without
+failures or skips. Five new cases cover literal prefix/clear, five status toggles
+including none, all sorts, exact ULong.MAX_VALUE labels, idle/input gating,
+initial/append explicit Retry, retained rows and scroll/query reset. Native SQLite
+fixture verifies 205 rows across three pages, an unloaded prefix match, table
+read failure/repair without automatic retry, Settings and native session/query/
+pages/scroll recreation. Real Full import, effective-reader manual changes and
+completion refresh browser statuses, completed counts and last-seen dates.
+Six existing main/reader navigation cases pass on both layouts.
+
+Initial phone run found two test assumptions: Retry can be offscreen on return
+from Settings, and reopening a reader requires its new effective selection
+identity. Corrected the assertions/selection and reran the complete focused suite
+on both layouts. Initial sandbox Gradle and redirected ADB commands failed socket
+startup; escalated reruns pass. Early APK installs were retried after boot.
+Used the ignored isolated .local/statistics-ui-avd image with the 8 GiB partition
+and startup command recorded in the Statistics Compose section. Visual checks
+pass; screenshots /tmp/yomoku-vocabulary-ui-{phone,tablet}.png. Display/density/
+light settings restored and task-started emulator stopped. No unresolved failure
+or blocker. No Rust/native source, dependency, migration or protocol change;
+Rust tests/Clippy, host JNI/codegen, separate Full-loader matrix, release/process-
+death/performance and physical arm64 were not rerun. Logs:
+/tmp/yomoku-vocabulary-ui-{android,phone,phone-initial,tablet,emulator}.log.

@@ -3170,3 +3170,26 @@ recovered with escalated offline run. No unresolved failure or blocker. Device,
 separate Full-loader matrix, release/process-death/performance and physical arm64
 not rerun. Next: Compose prefix/filter/sort/count/Retry/infinite scroll and
 phone/tablet recreation, followed by global matching bulk operations.
+
+## 2026-10-30 — Vocabulary Compose browser and infinite scroll
+
+Connected retained native Vocabulary state to literal prefix input, five status
+toggles, four sorts, exact matching count and lazy 100-row infinite scroll.
+Added visible/idle loading, unrelated-work input gating and explicit initial/
+append Retry without automatic error retries. Shared existing status labels;
+hoisted session/query-keyed saveable scroll through Settings and recreation.
+Updated progress, architecture, decisions and development/handoff docs. Bulk
+selection/status/deletion remains unchecked; no schema/dependency/native change.
+
+PASS: debug/test APKs, strict Android lint, changed Kotlin formatting and diff;
+five new UI/native plus six navigation cases on phone/light (114.611 s) and
+tablet/dark (82.566 s), 22 executions without failures/skips. Verified 205 rows/
+three pages, unloaded search, filters/sorts, unsigned labels, errors/repair/Retry,
+busy gates, actual Full import/manual-status/completion refresh, Settings/Back and
+session/query/pages/scroll recreation. Visual checks pass; display restored and
+isolated emulator stopped. Corrected initial test assumptions about offscreen
+Retry and stale selection after reopening. Gradle/ADB socket sandbox failures
+recovered with escalation; early install retried after boot. No open blocker.
+Rust/JNI/codegen/Full-loader matrix/release/process-death/performance/physical arm64
+not rerun; existing both-ABI native outputs were up-to-date. Next: global matching
+bulk repositories and confirmed retained bulk UI.

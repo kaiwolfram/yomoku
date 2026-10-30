@@ -3953,3 +3953,21 @@ reentry refresh remains necessary. Keep native requests/results/callbacks out of
 the shell codec. Generate query/state/row values with exact u64/ULong counts and
 i64/Long dates/IDs. No migration, dependency, clock, SQL in core or dictionary
 rescan. Compose browser/infinite scroll and bulk commands are separate slices.
+
+## 2026-10-30 — Vocabulary Compose controls and demand paging
+
+Use existing Compose Material controls and a LazyColumn, with no new library.
+Render written surface, current status and exact completed encounter count per
+row; keep ULong for count labels. Send literal prefix edits without trimming or
+normalization, toggle statuses independently (including none), and dispatch all
+four sorts through the retained core query. Keep controls in the scrolling list
+for small-window accessibility. Preserve query/page ownership in Rust.
+
+Lazy-load only an unattempted error-free query while visible and idle. Observe
+the last loaded row with snapshotFlow to request the next native 100-row page;
+pause while any storage read runs and resume if that row is still visible.
+Never page or retry automatically from error state; retain successful rows and
+offer explicit Retry for both initial and append errors. Permit query coalescing
+during Vocabulary reads, disable input during unrelated work. Keep list position
+in session/query-keyed saveable shell state hoisted across Settings; reset on
+query changes. Do not add row actions or bulk mutation behavior in this slice.
