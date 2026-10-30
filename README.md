@@ -84,8 +84,9 @@ Known distinct dictionary-form counts from durable analyzer links.
 Repetitions/rereads count, imports create registration jumps, and deletion semantics
 recalculate from saved event rows. UTC daily/weekly/monthly timeframe buckets carry
 lifetime cumulative origins and fill empty intervals from one read snapshot.
-Statistics transport and charts
-remain planned.
+Typed native worker/core/FFI transport now retains timeframe/as-of queries,
+loading/error/Retry state and stale-callback protection. Compose overview/drilldown
+charts remain planned.
 
 The pure [EPUB parser](crates/yomoku-import/src/epub.rs) extracts spine-ordered
 chapters, title, headings/emphasis, source ruby, positioned images/covers and

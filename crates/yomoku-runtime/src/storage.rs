@@ -213,6 +213,10 @@ fn execute(
     }
     let storage = storage.as_mut().expect("opened storage");
     match operation {
+        StorageOperation::LoadStatistics(query) => storage
+            .statistics_buckets(query.timeframe, query.as_of_unix_ms)
+            .map(|data| StorageResult::StatisticsLoaded(Box::new(data)))
+            .map_err(map_error),
         StorageOperation::Effective(operation) => {
             effective::execute(storage, imports, dictionary, word_loader, operation)
                 .map(StorageResult::Effective)

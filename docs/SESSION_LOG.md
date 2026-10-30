@@ -3093,3 +3093,21 @@ unresolved-form fixture expectations corrected; no unresolved failures/blockers.
 Updated plan, handoff, README and architecture/data/decisions/development docs.
 Android/JNI/codegen/Full-loader/release/process-death/physical-arm64 not rerun.
 Next: typed statistics transport with retained loading/error/Retry, then charts.
+
+
+## 2026-10-30 — Retained statistics transport
+
+Added native FIFO statistics requests and typed core/FFI timeframe/as-of/state
+payloads, default year, exact Retry and request-ID stale callback protection.
+Rapid selections coalesce, Settings retains state/resumes unattempted queries,
+and imports/status/completions/effective edits plus tab reentry invalidate values.
+Only compact bucket values and explicit shell intents cross FFI; no schema,
+dependency, history semantics or Compose chart change.
+
+PASS: 780 Rust tests (17 opt-in ignored), nine new core/three worker/one protocol
+cases, real-Full full Kotlin/JNI suite and Rust/Kotlin/Rust exact-u64 fixtures,
+repeat generation, build, strict Clippy/Rustfmt/Kotlin-format/diff. Initial corrupt
+fixture/error expectations and Kotlin safe-call warning corrected; Settings edge
+case fixed/tested. No unresolved blockers. Updated plan, README, architecture/data/
+decisions/development and handoff. Android/device/release/performance/Full-loader
+matrix not rerun. Next: Compose overview/drilldowns using retained statistics.

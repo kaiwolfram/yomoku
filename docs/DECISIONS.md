@@ -3852,3 +3852,24 @@ date groups; pure core additionally checks unsigned accumulation. No frozen JSON
 replay, inferred legacy counts, content rescans or cache writes. Errors release
 the transaction without partial output. Add only native projection values/API;
 worker, Crux/FFI state and Compose chart rendering stay in the next slice.
+
+
+## 2026-10-30 — Native statistics transport and retained queries
+
+Use the existing FIFO worker and its typed storage errors for calendar statistics,
+with no new library, schema or I/O in core. Keep the storage request, boxed result
+and request-attempt callback native. Generate only explicit timeframe/as-of shell
+events and retained presentation values. Default to LastYear. Retry uses the exact
+failed cutoff; identical lazy loads are idempotent, including after failure, to
+avoid a render-driven retry loop. A new cutoff is an explicit fresh read.
+
+Capture an incrementing attempt ID per accepted read so late callbacks cannot
+release a newer owner, even for an identical query. Coalesce timeframe/as-of
+changes behind the current read, clear mismatched data, discard stale successes
+and errors, and dispatch the latest query only when visible. Reject requests
+behind unrelated busy work without changing presentation; the UI retries its lazy
+load when idle. Keep Settings/recreation state, invalidate on reentry and relevant
+mutations, and preserve unrelated document errors. Compose will capture wall time
+once per entry/selection rather than each render. Do not add chart or drilldown
+behavior in this transport slice. Generated schemas are a same-build boundary;
+regenerate Kotlin/native together, with generation sequential to JNI execution.

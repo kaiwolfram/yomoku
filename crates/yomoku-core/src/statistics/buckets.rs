@@ -2,13 +2,16 @@
 
 use super::{LifetimeReadingTotals, StatusTimelinePoint};
 use crate::library::WordStatusCounts;
+use serde::{Deserialize, Serialize};
 
 const DAY_MS: i64 = 86_400_000;
 // Last millisecond of Gregorian year 9999. Restrict calendar conversion and
 // allocation independently of the wider durable timestamp representation.
 const MAX_DATE_MS: i64 = 253_402_300_799_999;
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, Deserialize, Serialize, PartialEq, Eq)]
+#[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
+#[repr(C)]
 pub enum StatisticsTimeframe {
     LastMonth,
     LastSixMonths,
@@ -24,7 +27,8 @@ pub struct ReadingTimelinePoint {
     pub totals: LifetimeReadingTotals,
 }
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, Deserialize, Serialize, PartialEq, Eq)]
+#[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
 pub struct StatisticsValues {
     pub reading: LifetimeReadingTotals,
     pub statuses: WordStatusCounts,
@@ -33,14 +37,16 @@ pub struct StatisticsValues {
 
 /// Absolute values just before `end_exclusive_unix_ms`. Empty intervals carry
 /// their preceding values. The first/last calendar intervals may be clipped.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
 pub struct StatisticsBucket {
     pub start_unix_ms: i64,
     pub end_exclusive_unix_ms: i64,
     pub values: StatisticsValues,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
 pub struct StatisticsBuckets {
     pub timeframe: StatisticsTimeframe,
     pub start_unix_ms: i64,

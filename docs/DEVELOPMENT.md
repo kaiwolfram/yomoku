@@ -6656,3 +6656,46 @@ No dependency/migration/wire/Kotlin change; Android/JNI/generated bindings,
 Full-loader matrix, release/process-death and physical arm64 were not rerun.
 Transport, retained loading/Retry state and charts remain open.
 Logs: `/tmp/yomoku-statistics-buckets-{storage,workspace,clippy,build}.log`.
+
+
+## Retained statistics worker/core/FFI transport
+
+Verified 2026-10-30 from the repository root:
+
+```sh
+export PATH=/home/kai/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin:$PATH
+cargo test -p yomoku-core --test statistics_transport --all-features --locked --offline
+cargo test -p yomoku-runtime --test imports statistics --all-features --locked --offline
+cargo test --workspace --all-features --locked --offline --quiet
+cargo clippy --workspace --all-targets --all-features --locked --offline -- -D warnings
+export JAVA_HOME="$PWD/.local/jdk-17/jdk-17.0.21+9"
+export JAVA_BIN="$JAVA_HOME/bin/java"
+tools/test-kotlin-bridge.sh
+cargo run -p yomoku-ffi --bin generate-kotlin --features facet_typegen --locked --offline -- target/generated/kotlin-repeat
+diff -r target/generated/kotlin target/generated/kotlin-repeat
+cargo build --workspace --locked --offline
+cargo fmt --all -- --check
+"$JAVA_BIN" -jar .local/ktfmt-0.64.jar --kotlinlang-style --dry-run --set-exit-if-changed tests/kotlin/StatisticsBridgeTest.kt tests/kotlin/StatisticsCodecTest.kt
+git diff --check
+```
+
+PASS: 780 workspace Rust tests, 17 opt-in ignored; nine new core/three worker/one
+native-protocol cases. Real-Full production Kotlin/JNI plus all existing bridge
+fixtures pass with strict Kotlin compilation, Rust/Kotlin/Rust byte exchanges and
+100 handle lifecycles. Generated output repeats identically; workspace build,
+strict Clippy/Rustfmt/new-Kotlin-format/diff pass. Generation and JNI execution
+remain sequential; Clippy's metadata-only checks can run during JNI execution.
+
+Coverage: default year, all four exact repository projections and absolute lines,
+completed time, lifetime opening values, no analyzer/dictionary loads or writes,
+reopen/document-deleted history, manual status/reread/import and external mutation
+refresh, exact Retry cutoff, error isolation, coalesced selections, stale request
+IDs/equal-query callbacks and Settings-hidden follow-ups. Codec fixtures preserve
+u64::MAX and values above 2^53 for counts/time/forms and absent/loading/error state.
+Initial corruption fixtures were corrected for CHECK constraints/existing typed
+error mapping; a Kotlin unnecessary-safe-call warning was fixed. Review added a
+regression/fix for resuming an unattempted query after Settings closes. No unresolved
+failure/blocker. Expected Crux close-during-I/O diagnostics remain documented above.
+No dependency/migration/Compose change. Android APK/lint/device, separate Full-loader
+matrix, release/process-death/performance and physical-arm64 checks were not rerun.
+Logs: `/tmp/yomoku-statistics-transport-{workspace,jni,clippy,codegen,build}.log`.

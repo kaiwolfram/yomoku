@@ -1,5 +1,6 @@
 //! Read-only projections of reading and vocabulary history. No clocks or I/O.
 
+use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::{document::VocabularyId, library::WordStatusCounts, vocabulary::VocabularyStatus};
@@ -11,10 +12,31 @@ pub use buckets::*;
 /// Occurrences retain repetitions and exclude erased vocabulary history. Time
 /// belongs to each completed page once, including pages with no Japanese words.
 /// Registration, partial time and unused completion reservations contribute zero.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, Deserialize, Serialize, PartialEq, Eq)]
+#[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
 pub struct LifetimeReadingTotals {
     pub japanese_occurrences: u64,
     pub active_time_ms: u64,
+}
+
+/// Explicit UTC clock input; neither the core nor the repository invents now.
+#[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
+pub struct StatisticsQuery {
+    pub timeframe: StatisticsTimeframe,
+    pub as_of_unix_ms: i64,
+}
+
+/// Session-retained presentation. Failed queries retry with the same cutoff;
+/// a changed query clears its previous lines rather than mislabelling them.
+#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, Eq)]
+#[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
+pub struct StatisticsState {
+    pub timeframe: StatisticsTimeframe,
+    pub query: Option<StatisticsQuery>,
+    pub loading: bool,
+    pub error: Option<crate::storage::DocumentError>,
+    pub data: Option<StatisticsBuckets>,
 }
 
 /// One validated v1 registration or actual status transition. Storage validates

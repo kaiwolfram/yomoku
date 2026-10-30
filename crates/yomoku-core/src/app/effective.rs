@@ -58,6 +58,7 @@ impl Model {
         document: ReaderDocument,
         outcome: AnalyzedCompletionOutcome,
     ) {
+        self.invalidate_statistics();
         self.invalidate_library_words();
         // The departing page determines Finish Book, including deliberate rereads.
         let final_page = document.chapters.last().is_some_and(|chapter| {
@@ -414,11 +415,13 @@ impl Yomoku {
                 // Word reads/status writes can observe changes made by another session,
                 // including deleted entries. Never retain a stale Library distribution.
                 model.invalidate_library_words();
+                model.invalidate_statistics();
             }
             Some(EffectiveReaderProgress::Override(_)) => {
                 // A successful write or stale/lost response may have changed
                 // membership. A read can also observe another session's edits.
                 model.invalidate_library_words();
+                model.invalidate_statistics();
             }
             Some(EffectiveReaderProgress::Completion(EffectiveCompletionProgress::Prepared)) => {
                 return self.update(Event::RetryReaderCompletion, model);

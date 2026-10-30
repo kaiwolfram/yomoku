@@ -1494,7 +1494,7 @@ boundary retirement continues to require explicit Reload.
 ## Read-only lifetime statistics
 
 `yomoku-core::statistics::LifetimeReadingTotals` is a pure occurrence/time value,
-without shell serialization or storage effects. The separate SQLite repository
+with generated shell serialization for chart values. The separate SQLite repository
 exposes `Storage::lifetime_reading_totals(&self)`: one statement reads a consistent
 snapshot of completed analyzed commands and their surviving occurrence rows.
 Time is summed independently per command, preserving zero-word pages without
@@ -1503,8 +1503,8 @@ or effective JSON and writes no caches or history. Legacy events without analysi
 markers, pending checkpoints and unused reservations are excluded. Document
 deletion preserves totals; vocabulary-history cascades reduce occurrences while
 retaining completed time. Header-version/duration checks and exact-integer overflow
-errors fail without repair. Runtime/FFI/Compose statistics integration remains
-future work; the Statistics tab is a placeholder.
+errors fail without repair. Runtime/FFI transport is described below; Compose
+charts remain future work and the Statistics tab is a placeholder.
 
 `StatusTimelineBuilder` in the pure core streams surviving registration and
 status changes in durable event-ID order, validates each entry's causal chain and
@@ -1525,8 +1525,8 @@ or shifting unrelated entries. Shared-form reference counts replay in projected
 date order, counting a spelling while any linked surface is Known; simultaneous
 handoffs coalesce. Exact spelling identifies forms, unresolved surfaces add none
 and readings do not affect identity. Links have no observation date and apply
-throughout their vocabulary generation's history. Statistics transport and UI
-transport remain separate tasks.
+throughout their vocabulary generation's history. Statistics transport is
+described below; chart rendering remains separate.
 
 Migration 0020 retains resolved analyzer dictionary-form spellings in a global
 vocabulary-owned junction table, independent of live documents. New snapshots
@@ -1560,5 +1560,33 @@ its surviving occurrence rows and time once, including zero-word pages; pending,
 unused and unanalyzed legacy work is excluded. Historical document/vocabulary
 retention rules, exact integer validation and failure rollback remain unchanged.
 The projection loads no content, dictionary or reservation JSON and writes no
-cache or other data. Runtime only recognizes the new native error variant;
-worker/effect/FFI/Compose statistics transport and charts remain unimplemented.
+cache or other data. The worker transports these values as described below;
+Compose charts remain unimplemented.
+
+
+## Retained statistics transport
+
+`LoadStatistics` supplies one explicit UTC as-of instant for the retained timeframe
+(default last year); `SetStatisticsTimeframe` supplies a timeframe and cutoff.
+`RetryStatistics` resubmits the exact failed query. The pure model projects
+`StatisticsState` with selected timeframe, desired query, loading/error and optional
+bucket values. An identical lazy load never starts a duplicate read or retries an
+error. A changed query clears the previous lines. Settings/recreation retain state;
+returning from another destination invalidates it for a fresh entry-time query.
+The eventual Compose caller must capture its clock once per entry/selection,
+then request when visible and idle, rather than invent a new cutoff on each render.
+
+A skipped native `LoadStatistics` storage operation runs on the existing FIFO,
+without dictionary/analyzer access. Only generated Event/ViewModel values and
+Render cross FFI; the boxed native result and request-ID callback have no shell
+codec. The callback releases only its own request. Rapid changes coalesce behind
+that read, discard both stale successes and failures, and dispatch only the latest
+visible query. Hidden follow-ups wait for another explicit load. Unrelated busy
+work rejects new statistics requests without replacing the worker's owner.
+
+Imports, reader status/completion changes and effective edits invalidate retained
+values; return-to-tab invalidation also observes changes from another session.
+Document deletion preserves history. No schema, persistent counter, dependency or
+history semantics change. Existing typed storage error mapping is retained and
+statistics errors do not overwrite document/import errors. Kotlin/JNI serialization
+preserves exact unsigned occurrence/time/status/form values, including above 2^53.

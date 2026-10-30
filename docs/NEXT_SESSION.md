@@ -1,60 +1,60 @@
 # Resume here
-Updated: 2026-10-30. Phase-5 timeframe buckets verified.
+Updated: 2026-10-30. Phase-5 statistics transport verified.
 
 ## Current slice
-- History audit, lifetime totals, status/Known-form timelines and timeframe
-  buckets complete. Storage schema remains 0020. DATA_MODEL.md documents contracts.
-- Pure statistics::statistics_buckets and Storage::statistics_buckets return
-  absolute occurrence/time, five-status and Known-form values plus explicit
-  opening lifetime state. Last month daily; six months/year weekly (year default);
-  all time monthly. UTC rolling calendar months clamp month-end days, weeks start
-  Monday, first/last intervals clip to the range, gaps carry values. Include the
-  supplied as-of instant; exclude future events. Never reset cumulative y-values.
-  All time starts at the earliest visible event month (current month when empty).
-  Calendar dates support epoch through year 9999; storage timestamps unchanged.
-- One deferred read transaction gives all lines one snapshot. Reading aggregates
-  actual surviving analyzed occurrences and time once per command, including
-  zero-word pages. No cache, dictionary, live text or frozen JSON loads/writes.
-  Original/effective rereads count; duplicates/pending/unused/legacy work do not.
-  Query-only works; corrupt versions/dates/durations/overflow fail without repair.
-- Document deletion preserves history/links; vocabulary erasure recalculates
-  occurrences/statuses/forms, retaining completed time. New IDs start New without
-  rescanning. Undated exact-spelling dictionary links apply throughout their
-  generation's history. Schema-5–20 upgrade/history audits remain covered.
-- Production reader/Library/completion use native effective A/B/C/manual partitions;
-  original B stays immutable. Edits expose Reload; exact Retry/Cancel survives
-  dismissal. Partial time saves every 15s with five-minute idle/background cap,
-  draining before movement/exit/close. Process death can lose in-memory work.
-- Atomic/deduplicated imports return Library without opening. Reimport starts fresh.
-  Android primitive-backed FileImportBytes fixes the real 17.9 MB EPUB heap issue.
-  Debug JNI measurements/CSV: EFFECTIVE_READER_PERFORMANCE.md. Long-page regressions
-  pass; optimized/frame-time/peak-memory/physical-arm64 remain unverified.
-- Statistics transport/charts remain unimplemented; tab is still a placeholder.
+- History audit, lifetime totals, five-status/Known-form timelines, UTC timeframe
+  buckets and typed worker/core/FFI transport complete. Schema remains 0020.
+- ViewModel.statistics retains selected timeframe (LastYear default), desired
+  StatisticsQuery, loading/error and optional StatisticsBuckets. LoadStatistics
+  takes explicit UTC as-of; SetStatisticsTimeframe takes both; RetryStatistics
+  repeats the exact failed cutoff. Identical lazy loads never replay failures.
+- Native skipped request/result and captured attempt IDs share the existing FIFO.
+  Rapid selections coalesce; stale successes/errors cannot replace current lines
+  or release another owner. Settings retains state; hidden unattempted selections
+  resume on a visible lazy load. Unrelated busy work rejects requests unchanged.
+- Committed imports/status/completions/effective edits invalidate values. Returning
+  from another destination invalidates for external mutations. Retain timeframe.
+  Capture wall time once per entry/selection and request when visible/idle, rather
+  than supplying a new cutoff on every render. Errors stay separate from documents.
+- All four projections preserve absolute lifetime occurrence/time, five-status and
+  Known-form values plus opening lifetime state. Daily/monthly/Monday-week bins,
+  UTC rolling calendar months, clipped edges, gaps, inclusive as-of/future exclusion
+  and epoch–9999 validation remain as documented in DATA_MODEL.md.
+- One read transaction, no content/dictionary/frozen JSON/cache reads or writes.
+  Original/effective rereads count, zero-word time survives, pending/legacy do not.
+  Document deletion preserves history; vocabulary erasure recalculates without
+  rescans. Exact unsigned values survive generated Kotlin ULong codecs.
+- Production reader/Library/completion use effective partitions. Exact Retry/Cancel
+  and final time drain remain verified; original B stays immutable. Imports return
+  Library atomically. Performance limits: EFFECTIVE_READER_PERFORMANCE.md.
+- Statistics tab is still a Compose placeholder. New Event/ViewModel wire requires
+  same-build regeneration; native/BoltFFI generation must not overlap host JNI.
 
 ## Next tasks (ordered)
-1. Add typed statistics transport through worker/core/FFI: native bucket request,
-   timeframe/as-of input and retained loading/error/Retry state. Test exact results,
-   default year, stale callbacks and mutation refresh before Compose wiring.
-2. Render overview/drilldown charts for lifetime cumulative occurrences, five
-   statuses and Known surface/dictionary-form lines in all four timeframes.
-3. Profile optimized Android repository/encoding/callback costs before changes;
-   extend diverse many-book/peak-memory/actual Compose measurements.
+1. Render Statistics overview/drilldowns for lifetime cumulative occurrences, five
+   statuses and Known surface/dictionary-form lines using retained transport.
+   Connect all four timeframes, visible/idle loading and explicit error Retry.
+2. Verify chart datasets/lifetime origins and updates after reading/status/import,
+   navigation/recreation and all timeframes through phone/tablet Compose tests.
+3. Profile optimized repository/encoding/callback costs before changes; extend
+   diverse many-book/peak-memory/actual Compose measurements.
 Nostr configuration stays empty; ask Q188 before forwarding.
 
 ## Verification / blockers
-- PASS: eight new core/seven SQLite tests; 767 workspace Rust tests, 17 opt-in
-  ignored; workspace build, strict Clippy/Rustfmt/diff. No unresolved failures or
-  implementation blockers. Initial exhaustive-error match and resolved-form test
-  fixture errors were corrected before final verification.
-- Commands (Rust PATH workaround from DEVELOPMENT.md):
-  cargo test -p yomoku-core --test statistics_buckets --all-features --locked --offline
-  cargo test -p yomoku-storage statistics --locked --offline
+- PASS: 780 workspace Rust tests, 17 opt-in ignored; nine new core/three worker/one
+  protocol cases; full real-Full Kotlin/JNI suite, exact-u64 fixture exchanges,
+  repeat codegen, workspace build, strict Clippy/Rustfmt/new-Kotlin-format/diff.
+- Corrected corrupt-fixture CHECK/error expectations and Kotlin safe-call warning;
+  fixed/tested Settings-hidden query resumption. No unresolved failures/blockers.
+- Commands (Rust PATH/JDK setup in DEVELOPMENT.md):
   cargo test --workspace --all-features --locked --offline --quiet
   cargo clippy --workspace --all-targets --all-features --locked --offline -- -D warnings
+  tools/test-kotlin-bridge.sh
+  cargo run -p yomoku-ffi --bin generate-kotlin --features facet_typegen --locked --offline -- target/generated/kotlin-repeat
+  diff -r target/generated/kotlin target/generated/kotlin-repeat
   cargo build --workspace --locked --offline
   cargo fmt --all -- --check
   git diff --check
-- Logs: /tmp/yomoku-statistics-buckets-{storage,workspace,clippy,build}.log.
-  No dependency/migration/wire/Kotlin change. Android/JNI/codegen/Full-loader/
-  release/process-death/physical-arm64 were not rerun. Native/BoltFFI generation
-  must remain sequential with host JNI execution.
+- Logs: /tmp/yomoku-statistics-transport-{workspace,jni,clippy,codegen,build}.log.
+  Android APK/lint/device, separate Full-loader matrix, release/process-death,
+  performance and physical-arm64 checks were not rerun. No migration/dependency.

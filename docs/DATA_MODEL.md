@@ -1477,7 +1477,8 @@ returns a storage error, never floating-point approximation, wrapping or truncat
 The query performs no writes and works with `PRAGMA query_only = true`.
 Seven dedicated tests plus every schema-5–19 upgrade verify these contracts,
 including duplicate/concurrent success, failure rollback, reopen and deletion.
-Worker/FFI/UI transport remains separate work; calendar buckets are described below.
+Calendar buckets and worker/FFI transport are described below; chart UI remains
+separate work.
 
 ## Read-only statistics calendar buckets (phase 5, no migration)
 
@@ -1518,7 +1519,8 @@ calendar arithmetic and all-time bucket allocation without narrowing stored even
 timestamps. The core checks unsigned cumulative overflow. Storage preserves the
 existing lifetime projection's signed 64-bit total limit across date groups;
 unknown event versions, corrupt durations and overflow fail without repairing or
-returning partial data. Transport, loading/retry state and charts remain separate.
+returning partial data. Retained worker/FFI transport is described below; charts
+remain separate.
 
 ## Read-only vocabulary status and Known-form timeline (phase 5)
 
@@ -1813,3 +1815,24 @@ edit provenance. It clears on normal page invalidation and explicit token loads;
 accepted override outcomes mark their retired before-image again. Pending writes
 and exact native retry payloads remain independent. A close/reopen must not carry
 an earlier edit's reload requirement onto the new reader page. No data change.
+
+
+## Statistics application payloads (no migration)
+
+`StatisticsQuery` contains the selected `StatisticsTimeframe` and caller-supplied
+`as_of_unix_ms`. `ViewModel.statistics` is a session-retained `StatisticsState`:
+selected timeframe (LastYear initially), optional desired query, loading flag,
+optional existing `DocumentError` and optional `StatisticsBuckets`. Chart values
+include the explicit opening lifetime state and each interval's absolute reading,
+five-status and Known dictionary-form values. Unsigned counts/time remain u64
+through generated Kotlin ULong; timestamps remain signed i64/Long.
+
+The three shell events are LoadStatistics(as-of), SetStatisticsTimeframe(timeframe,
+as-of) and RetryStatistics. Retry carries no replacement cutoff. Native worker
+operations/results and the monotonic request-attempt callback ID have no shell
+representation. Queued newer selections replace presentation intent while the old
+read retains the shared FIFO slot. They cannot display a prior query's lines or
+errors. State is ephemeral, retained by the Activity's existing native session,
+not restored across process death. Reentry refreshes after external mutations;
+accepted imports/status/completions/effective edits invalidate cached values.
+No storage schema, history rewrite, dictionary rescan or persistent cache is added.

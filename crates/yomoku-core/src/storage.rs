@@ -61,6 +61,10 @@ pub enum StorageOperation {
     ImportTxt(TxtImport),
     ImportSrt(SrtImport),
     ImportEpub(EpubImport),
+    /// Native FIFO read. Only the compact chart values in ViewModel cross FFI.
+    #[serde(skip)]
+    #[cfg_attr(feature = "facet_typegen", facet(skip))]
+    LoadStatistics(crate::statistics::StatisticsQuery),
     /// Native staging read, using the same compact result and app cache gates
     /// as original B. Activate production with the effective reader consumers.
     #[serde(skip)]
@@ -139,6 +143,9 @@ pub enum StorageResult {
     ReaderStatusChanged(ReaderStatusChange, Option<ReaderVocabulary>),
     /// Cooperative file cancellation rolled back the current file, without error.
     ImportCancelled,
+    #[serde(skip)]
+    #[cfg_attr(feature = "facet_typegen", facet(skip))]
+    StatisticsLoaded(Box<crate::statistics::StatisticsBuckets>),
     #[serde(skip)]
     #[cfg_attr(feature = "facet_typegen", facet(skip))]
     Effective(#[cfg_attr(feature = "facet_typegen", facet(opaque))] EffectiveStorageResult),

@@ -9,6 +9,7 @@ use crux_core::{
 use serde::{Deserialize, Serialize};
 
 mod effective;
+mod statistics;
 
 use crate::{
     active_time::{
@@ -77,6 +78,9 @@ pub struct ImportSummary {
 
 #[derive(Default)]
 pub struct Model {
+    statistics: crate::statistics::StatisticsState,
+    statistics_request: Option<(u64, crate::statistics::StatisticsQuery)>,
+    statistics_request_sequence: u64,
     destination: Destination,
     settings_open: bool,
     documents: Vec<LibraryDocument>,
@@ -133,6 +137,16 @@ pub struct Model {
 #[repr(C)]
 pub enum Event {
     SelectDestination(Destination),
+    /// Lazy read for the retained timeframe. Repeated identical loads coalesce.
+    LoadStatistics {
+        as_of_unix_ms: i64,
+    },
+    SetStatisticsTimeframe {
+        timeframe: crate::statistics::StatisticsTimeframe,
+        as_of_unix_ms: i64,
+    },
+    /// Retry the exact failed query, retaining its original as-of instant.
+    RetryStatistics,
     OpenSettings,
     CloseSettings,
     RefreshLibrary,
@@ -252,11 +266,15 @@ pub enum Event {
     #[serde(skip)]
     #[cfg_attr(feature = "facet_typegen", facet(skip))]
     StorageFinished(StorageResult),
+    #[serde(skip)]
+    #[cfg_attr(feature = "facet_typegen", facet(skip))]
+    StatisticsFinished(u64, StorageResult),
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
 pub struct ViewModel {
+    pub statistics: crate::statistics::StatisticsState,
     pub destination: Destination,
     pub settings_open: bool,
     /// Matching titles in the selected Library order; an empty query shows all.
@@ -327,6 +345,12 @@ impl App for Yomoku {
     type Effect = Effect;
 
     fn update(&self, event: Event, model: &mut Model) -> Command<Effect, Event> {
+        if let Event::StatisticsFinished(request_id, result) = event {
+            return self.finish_statistics(request_id, result, model);
+        }
+        if let Some(command) = self.update_statistics(&event, model) {
+            return command;
+        }
         if let Event::EffectiveStorageFinished(request, result) = event {
             return self.finish_effective(&request, result, model);
         }
@@ -1021,6 +1045,11 @@ impl App for Yomoku {
                 model.library_sort = sort;
             }
             Event::SelectDestination(destination) => {
+                if destination == Destination::Statistics
+                    && model.destination != Destination::Statistics
+                {
+                    model.invalidate_statistics();
+                }
                 model.library_selection = None;
                 model.library_rename = None;
                 model.clear_library_delete();
@@ -1082,7 +1111,7 @@ impl App for Yomoku {
                 }
             }
             Event::StorageFinished(result) => {
-                if model.effective_request.is_some() {
+                if model.effective_request.is_some() || model.statistics_request.is_some() {
                     return Command::done();
                 }
                 let failed = matches!(result, StorageResult::Failed(_));
@@ -1103,6 +1132,12 @@ impl App for Yomoku {
                     StorageResult::Existing(_) => Some(ImportOutcome::Existing),
                     _ => None,
                 };
+                if matches!(
+                    result,
+                    StorageResult::Created(_) | StorageResult::ReaderStatusChanged(..)
+                ) {
+                    model.invalidate_statistics();
+                }
                 match result {
                     StorageResult::DocumentRenamed { document_id, title } => {
                         if document_rename
@@ -1146,7 +1181,7 @@ impl App for Yomoku {
                     }
                     // Effective results must arrive through their captured request,
                     // never through this uncaptured legacy callback envelope.
-                    StorageResult::Effective(_) => {
+                    StorageResult::Effective(_) | StorageResult::StatisticsLoaded(_) => {
                         model.document_error = Some(DocumentError::InvalidDocument);
                     }
                     StorageResult::ImportCancelled => {}
@@ -1457,12 +1492,17 @@ impl App for Yomoku {
             | Event::CancelEffectiveReaderStatus
             | Event::EffectiveReaderOverride(_)
             | Event::EffectiveStorageFinished(..) => unreachable!(),
+            Event::LoadStatistics { .. }
+            | Event::SetStatisticsTimeframe { .. }
+            | Event::RetryStatistics
+            | Event::StatisticsFinished(..) => unreachable!(),
         }
         render::render()
     }
 
     fn view(&self, model: &Model) -> ViewModel {
         ViewModel {
+            statistics: model.statistics.clone(),
             destination: model.destination,
             settings_open: model.settings_open,
             documents: model
