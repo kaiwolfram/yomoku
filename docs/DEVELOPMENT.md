@@ -6941,3 +6941,64 @@ dependency, core/shell protocol or Android source changes. Android/JNI/codegen,
 separate Full-loader matrix, release/process-death/performance and physical arm64
 were not rerun. Retained confirmation/FIFO/FFI/Compose integration remains open.
 Logs: /tmp/yomoku-vocabulary-bulk-{storage,workspace,clippy,build}.log.
+
+
+## Retained native Vocabulary bulk transport
+
+Verified 2026-10-30 from the repository root with the pinned environment:
+
+```sh
+export PATH=/home/kai/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin:$PATH
+cargo test -p yomoku-core --test vocabulary_transport --all-features --locked --offline
+cargo test -p yomoku-runtime --test imports vocabulary_bulk --all-features --locked --offline
+cargo test --workspace --all-features --locked --offline --quiet
+cargo clippy --workspace --all-targets --all-features --locked --offline -- -D warnings
+export JAVA_HOME="$PWD/.local/jdk-17/jdk-17.0.21+9"
+export JAVA_BIN="$JAVA_HOME/bin/java"
+tools/test-kotlin-bridge.sh
+cargo run -p yomoku-ffi --bin generate-kotlin --features facet_typegen --locked --offline -- target/generated/kotlin-repeat
+diff -r target/generated/kotlin target/generated/kotlin-repeat
+cargo fmt --all -- --check
+"$JAVA_BIN" -jar .local/ktfmt-0.64.jar --kotlinlang-style --dry-run --set-exit-if-changed tests/kotlin/VocabularyBridgeTest.kt tests/kotlin/VocabularyCodecTest.kt android/app/src/main/java/app/yomoku/YomokuApp.kt android/app/src/androidTest/java/app/yomoku/{VocabularyScreen,StatisticsScreen,EffectiveReaderBoundaries,EffectiveReaderNavigation,EffectiveReaderWords}Test.kt
+git diff --check
+```
+
+PASS: four new core/three worker/one native-protocol cases; 816 workspace Rust
+tests (17 opt-in ignored), strict Clippy/Rustfmt/diff and workspace build through
+the host bridge script. Both core configurations cover loaded-only toggles,
+1,205 unloaded matches, hidden selections/query changes/Settings, exact prompts,
+all five status choices/nonnegative frozen date, explicit capture/write Retry,
+Cancel, pending/unrelated-work gates, malformed/late/foreign/generic callbacks
+and isolated errors. Native callbacks/operations/results have no shell codec.
+
+SQLite FIFO cases cover read-only capture/confirmation/Cancel, later-row update
+and delete rollback, exact Retry excluding later matches and replacement IDs,
+immutable manual events at the frozen date, reopen and analyzer-free execution.
+The dependent-view case refreshes browser, all-time status/occurrence/time charts,
+Library distributions and original reader tokens without re-registering erased
+words; retained page time survives deletion.
+
+PASS: complete real-Full host Kotlin/JNI and codec regression suite. Production
+effective-reader bulk status/deletion refreshes actual browser/statistics/Library/
+tokens without analyzer reload. Generated public events preserve all actions,
+all statuses, optional/empty selection, capture loading/errors, and exact IDs and
+dates above 2^53 through Rust-Kotlin-Rust exchanges. Generation repeats identically;
+all changed Kotlin formatting passes. Existing nonfatal native close-during-I/O
+teardown diagnostics remain; the complete host command exits zero. Native/BoltFFI
+generation and Android builds remain sequential to host JNI execution.
+
+PASS: regenerated native bridge for x86_64/arm64-v8a, debug and instrumentation
+APKs, and strict Android lint. Existing preview/instrumentation fixtures initialize
+the new capture-loading flag; Compose bulk controls remain unconnected. Command:
+
+```sh
+PATH=/home/kai/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin:$PATH JAVA_HOME=/home/kai/repos/yomoku/.local/jdk-17/jdk-17.0.21+9 GRADLE_USER_HOME=/home/kai/repos/yomoku/.local/gradle ANDROID_HOME=/home/kai/Android/Sdk ./android/gradlew -p android :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug --offline --console=plain
+```
+
+Initial worker-refresh test compilation used incorrect field names; corrected
+before focused/full passes. Initial sandbox Gradle startup could not determine a
+wildcard IP; reran with approved local-socket access. No schema/dependency change.
+Compose bulk controls/Back and phone/tablet recreation acceptance remain open.
+Device execution, separate Full-loader matrix, release/process-death/performance
+and physical arm64 were not rerun. Logs:
+/tmp/yomoku-vocabulary-bulk-transport-{workspace,clippy,host,android}.log.

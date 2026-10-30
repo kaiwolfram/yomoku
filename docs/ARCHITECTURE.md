@@ -1653,8 +1653,9 @@ matching counts restart at zero; pages otherwise assume an unchanged dataset.
 Settings retains state and postpones new coalesced reads while hidden. Reentry
 refreshes pages with retained query choices. Imports, original/effective statuses,
 completions and effective edits/observations invalidate pages. Native state lives
-in the existing retained session and is lost on process death. Bulk selection and
-writes remain open.
+in the existing retained session and is lost on process death. Bulk selection
+and writes now use the native retained protocol described below; Compose
+mutation controls remain open.
 All loaded rows currently cross the view boundary on render; serialization and
 large-list/history performance have not been measured.
 
@@ -1686,7 +1687,7 @@ dependency, native protocol or dictionary lookup is added by the browser UI.
 The storage repository now exposes `vocabulary_matching_ids(query)` to capture
 all matching IDs in one read statement, using the same indexed literal prefix
 and status predicate as browser pages. It returns ascending IDs without the page
-limit or history/analysis reads. Future retained Select All must freeze this set
+limit or history/analysis reads. Retained Select All freezes this set
 before confirmation; confirmed operations and Retry must not rerun matching.
 
 `set_vocabulary_statuses(ids, status, date)` and `delete_vocabulary_entries(ids)`
@@ -1696,6 +1697,35 @@ manual events. Deletion uses existing foreign-key history cascades, preserving
 completed page time/provenance and live content/analysis. Both skip absent IDs;
 duplicate IDs are harmless, and erased IDs cannot affect fresh generations.
 Derived statistics recompute without repair writes or rescanning live books.
-No SQL/platform I/O enters core, and no schema/dependency/protocol changes are
-required. Core selection/confirmation, native FIFO operations and shell controls
-are the next slice; the application does not yet invoke these bulk commands.
+No SQL/platform I/O enters core, and no schema/dependency changes are required.
+The native application protocol below invokes these repositories; Compose
+selection/confirmation controls remain the next slice.
+
+## Retained Vocabulary bulk application protocol
+
+VocabularyState now retains a sorted optional selection, selecting-all flag,
+frozen confirmation command and separate bulk error. Toggle accepts loaded row
+IDs only; Select All captures every match through the existing native FIFO and
+unions it with the selection, including hidden selections retained across query
+changes. Settings retains ordinary selection; leaving the destination clears it.
+No selection or prompt survives process death.
+
+RequestVocabularyBulkAction freezes selected IDs and Delete or SetStatus with its
+nonnegative date before presenting confirmation. Confirm must echo that exact
+command. The private request owns a fresh attempt ID and the single storage slot;
+late/foreign callbacks cannot release another attempt. Confirmation/capture errors
+and pending writes gate unrelated navigation, queries, imports and reader work.
+In-flight work cannot be cancelled. Cancel before/after failure dismisses the
+prompt without a write and keeps selection; CancelVocabularySelection exits
+selection (and abandons a failed capture). RetryVocabularySelection retries the
+frozen failed capture query; RetryVocabularyBulkAction retries the exact frozen
+IDs/action/date, never matching again. There is no automatic retry.
+
+Native-only VocabularyMatchingIds/ApplyVocabularyBulk operations and their
+results/captured callbacks have no shell codec. Generated Kotlin carries only
+public intent events and retained presentation values. Worker writes reuse the
+atomic repository APIs and echo the applied command. Successful mutations clear
+selection/prompt and invalidate browser pages, statistics, Library distributions,
+reader words/tokens and effective-page identity; the usual lazy reads refresh
+those views. No analyzer or word dictionary is loaded by these bulk operations.
+Compose controls/Back handling and actual phone/tablet recreation remain open.

@@ -75,7 +75,12 @@ progress. Explicitly reopening a finished book persists page 1; active-reader
 recreation and completion reloads keep their current position. Finish Book (or a
 final-page left swipe) completes the save and returns to Library with brief confetti
 on each newly recorded completion, including rereads with zero new words.
-Nostr and Vocabulary tabs currently show placeholders.
+Nostr currently shows a placeholder. Vocabulary supports literal surface-prefix
+search, five-status filters, four sorts, matching counts and 100-row infinite
+scroll with explicit Retry. Retained global Select All, confirmed bulk status and
+permanent deletion now work through native core/FIFO/FFI; their Compose controls
+remain to be added. Confirmations and retries freeze IDs/status/date, and deletion
+recalculates history without recreating words from existing books.
 
 The Rust statistics repository derives read-only lifetime Japanese-occurrence
 and completed-time totals plus an absolute five-status vocabulary timeline with

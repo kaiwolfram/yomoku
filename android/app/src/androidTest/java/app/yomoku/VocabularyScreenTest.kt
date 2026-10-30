@@ -210,6 +210,7 @@ private fun vocabularyView() =
             VocabularyState(
                 VocabularyQuery("", VocabularyStatus.entries.toList(), VocabularySort.NEWEST),
                 rows = emptyList(),
+                selectingAll = false,
                 loading = false,
             ),
         statistics = StatisticsState(StatisticsTimeframe.LASTYEAR, loading = false),

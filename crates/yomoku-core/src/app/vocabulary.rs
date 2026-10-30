@@ -11,7 +11,7 @@ pub(super) struct VocabularyRequest {
 }
 
 impl Model {
-    fn vocabulary_visible(&self) -> bool {
+    pub(super) fn vocabulary_visible(&self) -> bool {
         self.destination == Destination::Vocabulary
             && self.content_route == ContentRoute::Main
             && !self.settings_open

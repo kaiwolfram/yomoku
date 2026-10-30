@@ -11,6 +11,7 @@ use serde::{Deserialize, Serialize};
 mod effective;
 mod statistics;
 mod vocabulary;
+mod vocabulary_bulk;
 
 use crate::{
     active_time::{
@@ -83,6 +84,8 @@ pub struct Model {
     vocabulary_request: Option<vocabulary::VocabularyRequest>,
     vocabulary_request_sequence: u64,
     vocabulary_failed_offset: Option<u64>,
+    vocabulary_bulk_request: Option<(u64, vocabulary_bulk::VocabularyBulkRequest)>,
+    vocabulary_select_all_query: Option<crate::vocabulary::VocabularyQuery>,
     statistics: crate::statistics::StatisticsState,
     statistics_request: Option<(u64, crate::statistics::StatisticsQuery)>,
     statistics_request_sequence: u64,
@@ -157,6 +160,14 @@ pub enum Event {
     SetVocabularyQuery(crate::vocabulary::VocabularyQuery),
     LoadMoreVocabulary,
     RetryVocabulary,
+    ToggleVocabularySelection(crate::document::VocabularyId),
+    SelectAllVocabulary,
+    RetryVocabularySelection,
+    CancelVocabularySelection,
+    RequestVocabularyBulkAction(crate::vocabulary::VocabularyBulkAction),
+    ConfirmVocabularyBulkAction(crate::vocabulary::VocabularyBulkCommand),
+    RetryVocabularyBulkAction,
+    CancelVocabularyBulkAction,
     OpenSettings,
     CloseSettings,
     RefreshLibrary,
@@ -282,6 +293,9 @@ pub enum Event {
     #[serde(skip)]
     #[cfg_attr(feature = "facet_typegen", facet(skip))]
     VocabularyFinished(u64, StorageResult),
+    #[serde(skip)]
+    #[cfg_attr(feature = "facet_typegen", facet(skip))]
+    VocabularyBulkFinished(u64, StorageResult),
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -359,6 +373,12 @@ impl App for Yomoku {
     type Effect = Effect;
 
     fn update(&self, event: Event, model: &mut Model) -> Command<Effect, Event> {
+        if let Event::VocabularyBulkFinished(request_id, result) = event {
+            return self.finish_vocabulary_bulk(request_id, result, model);
+        }
+        if let Some(command) = self.update_vocabulary_bulk(&event, model) {
+            return command;
+        }
         if let Event::VocabularyFinished(request_id, result) = event {
             return self.finish_vocabulary(request_id, result, model);
         }
@@ -1139,6 +1159,7 @@ impl App for Yomoku {
                 if model.effective_request.is_some()
                     || model.statistics_request.is_some()
                     || model.vocabulary_request.is_some()
+                    || model.vocabulary_bulk_request.is_some()
                 {
                     return Command::done();
                 }
@@ -1212,7 +1233,9 @@ impl App for Yomoku {
                     // never through this uncaptured legacy callback envelope.
                     StorageResult::Effective(_)
                     | StorageResult::StatisticsLoaded(_)
-                    | StorageResult::VocabularyLoaded(_) => {
+                    | StorageResult::VocabularyLoaded(_)
+                    | StorageResult::VocabularyMatchingIds(_)
+                    | StorageResult::VocabularyBulkApplied(_) => {
                         model.document_error = Some(DocumentError::InvalidDocument);
                     }
                     StorageResult::ImportCancelled => {}
@@ -1528,6 +1551,15 @@ impl App for Yomoku {
             | Event::LoadMoreVocabulary
             | Event::RetryVocabulary
             | Event::VocabularyFinished(..)
+            | Event::VocabularyBulkFinished(..)
+            | Event::ToggleVocabularySelection(_)
+            | Event::SelectAllVocabulary
+            | Event::RetryVocabularySelection
+            | Event::CancelVocabularySelection
+            | Event::RequestVocabularyBulkAction(_)
+            | Event::ConfirmVocabularyBulkAction(_)
+            | Event::RetryVocabularyBulkAction
+            | Event::CancelVocabularyBulkAction
             | Event::LoadStatistics { .. }
             | Event::SetStatisticsTimeframe { .. }
             | Event::RetryStatistics

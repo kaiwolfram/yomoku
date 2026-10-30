@@ -3218,3 +3218,24 @@ recalculation, no live-book recreation and later fresh New registrations. Correc
 initial test API assumptions and one test-only Clippy warning. No open blocker.
 No Android/JNI/codegen/Full-loader matrix/release/process-death/performance/physical
 arm64 checks rerun. Next: retained selection and confirmed native bulk operations.
+
+
+## 2026-10-30 — Retained native Vocabulary bulk transport
+
+Implemented retained selection/global matching Select All and frozen confirmed
+status/deletion through core/FIFO/generated FFI. Exact explicit retries preserve
+IDs/status/date; prompts/capture failures gate unrelated work. Successful mutations
+invalidate browser/statistics/Library/reader state. Updated Kotlin preview/test
+fixtures and architecture/data/decisions/plan/handoff; Compose controls/Back and
+phone/tablet recreation remain unchecked.
+
+PASS: four new core/three worker/one protocol cases; 816 Rust tests (17 opt-in
+ignored), strict Clippy/Rustfmt/diff, workspace build, complete real-Full host
+Kotlin/JNI and exact large-ID/date codecs, repeatable generation/Kotlin formatting,
+both-ABI debug/test APKs and Android lint. Verified 1,205 unloaded matches, hidden
+selection, frozen Retry/Cancel/stale callbacks, later-row rollback/new generations,
+immutable events/reopen and refreshed original/effective reader/Library/charts
+without rescans. Corrected initial test field names; sandbox Gradle wildcard-IP
+failure passed with approved socket access. No unresolved blocker or schema/library
+change. Device/Full-loader matrix/release/process-death/performance/physical arm64
+not rerun. Next: Compose selection/confirmation/Retry/Cancel/Back and device tests.

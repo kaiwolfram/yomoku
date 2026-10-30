@@ -71,6 +71,12 @@ pub enum StorageOperation {
         query: crate::vocabulary::VocabularyQuery,
         offset: u64,
     },
+    #[serde(skip)]
+    #[cfg_attr(feature = "facet_typegen", facet(skip))]
+    VocabularyMatchingIds(crate::vocabulary::VocabularyQuery),
+    #[serde(skip)]
+    #[cfg_attr(feature = "facet_typegen", facet(skip))]
+    ApplyVocabularyBulk(crate::vocabulary::VocabularyBulkCommand),
     /// Native staging read, using the same compact result and app cache gates
     /// as original B. Activate production with the effective reader consumers.
     #[serde(skip)]
@@ -155,6 +161,12 @@ pub enum StorageResult {
     #[serde(skip)]
     #[cfg_attr(feature = "facet_typegen", facet(skip))]
     VocabularyLoaded(crate::vocabulary::VocabularyPage),
+    #[serde(skip)]
+    #[cfg_attr(feature = "facet_typegen", facet(skip))]
+    VocabularyMatchingIds(Vec<crate::document::VocabularyId>),
+    #[serde(skip)]
+    #[cfg_attr(feature = "facet_typegen", facet(skip))]
+    VocabularyBulkApplied(crate::vocabulary::VocabularyBulkCommand),
     #[serde(skip)]
     #[cfg_attr(feature = "facet_typegen", facet(skip))]
     Effective(#[cfg_attr(feature = "facet_typegen", facet(opaque))] EffectiveStorageResult),

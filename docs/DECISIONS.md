@@ -3993,3 +3993,26 @@ limits. Empty/absent/repeated IDs are harmless; all statement/cascade/commit fai
 roll back the whole selection. Existing AUTOINCREMENT allocation prevents stale
 IDs from touching replacements. No migration, library, rescan, counter repair,
 automatic registration or shell action is added by this repository slice.
+
+
+## 2026-10-30 — Retained native Vocabulary bulk commands
+
+Mirror Library selection conventions: keep selected IDs sorted/unique, accept
+row toggles only for loaded rows, union global matching Select All into selection,
+preserve hidden selected IDs across filters/sorts and retain ordinary selection
+through Settings. Leaving Vocabulary clears selection. Some(empty) keeps selection
+mode active. Do not infer new membership from later query changes.
+
+Freeze exact IDs and action (including nonnegative manual date) when requesting
+confirmation. Confirm must echo that command. Gate unrelated events while a
+prompt, failed capture or mutation is retained; do not permit cancellation of
+in-flight work. Cancelling a prompt preserves selection; cancelling selection
+abandons a failed capture. Capture Retry retains the query because no successful
+ID snapshot exists yet; mutation Retry always reuses IDs/status/date and never
+matches again. Callback attempts share the browser's checked monotonic sequence.
+
+Use the existing native-only FIFO protocol, generated public event/view codecs
+and atomic repository commands. Clear all affected caches on success. Keep
+errors separate from read-page/document errors. No schema/library/architectural
+change or durable retry receipt. Compose controls, Back handling and device
+recreation acceptance are deliberately the next independently testable slice.

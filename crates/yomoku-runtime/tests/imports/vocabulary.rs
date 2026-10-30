@@ -148,3 +148,177 @@ fn vocabulary_external_count_changes_restart_pages_and_reopen_reads_literal_filt
     assert!(trace.try_recv().is_err() && reopened_trace.try_recv().is_err());
     drop((reopened, lifecycle));
 }
+
+#[test]
+fn vocabulary_bulk_fifo_frozen_status_retry_rolls_back_all_rows_and_excludes_later_matches() {
+    use yomoku_core::vocabulary::VocabularyBulkAction;
+    let database = Database::new();
+    let mut observer = seed(&database);
+    let Factory { loader, trace, .. } = Factory::new(false, None);
+    let (router, lifecycle) = effect_router_with_analyzed_imports(database.path(), loader).unwrap();
+    router.update(Event::SelectDestination(Destination::Vocabulary), |_| {});
+    let first = dispatch(&router, Event::LoadVocabulary);
+    assert_eq!(first.vocabulary.rows.len(), 100);
+    let before = std::fs::read(database.path()).unwrap();
+    let captured = dispatch(&router, Event::SelectAllVocabulary);
+    let ids = captured.vocabulary.selection.unwrap();
+    assert_eq!(ids.len(), 205);
+    router.update(
+        Event::RequestVocabularyBulkAction(VocabularyBulkAction::SetStatus {
+            status: VocabularyStatus::Known,
+            occurred_at_unix_ms: 999,
+        }),
+        |_| {},
+    );
+    let command = router.view().vocabulary.confirmation.unwrap();
+    assert_eq!(command.ids, ids);
+    assert_eq!(std::fs::read(database.path()).unwrap(), before);
+    let connection = Connection::open(database.path()).unwrap();
+    connection.execute_batch("CREATE TRIGGER bulk_fail BEFORE UPDATE ON vocabulary WHEN OLD.surface='猫150' BEGIN SELECT RAISE(ABORT, 'fixture'); END;").unwrap();
+    let failed = dispatch(&router, Event::ConfirmVocabularyBulkAction(command.clone()));
+    assert_eq!(failed.vocabulary.confirmation, Some(command.clone()));
+    assert!(failed.vocabulary.bulk_error.is_some() && failed.document_error.is_none());
+    assert_eq!(
+        observer
+            .vocabulary_page(&VocabularyQuery::default(), 0)
+            .unwrap()
+            .rows,
+        first.vocabulary.rows
+    );
+    assert_eq!(
+        connection
+            .query_row("SELECT COUNT(*) FROM vocabulary_status_events", [], |row| {
+                row.get::<_, i64>(0)
+            })
+            .unwrap(),
+        205
+    );
+    // Even if matching changes between failure and Retry, the original payload owns the operation.
+    connection.execute_batch("DROP TRIGGER bulk_fail").unwrap();
+    observer.delete_vocabulary_entries(&[ids[0]]).unwrap();
+    observer
+        .register_vocabulary(
+            &[
+                Surface::new("猫000").unwrap(),
+                Surface::new("猫later").unwrap(),
+            ],
+            1000,
+        )
+        .unwrap();
+    let retried = dispatch(&router, Event::RetryVocabularyBulkAction);
+    assert!(retried.vocabulary.confirmation.is_none() && retried.vocabulary.bulk_error.is_none());
+    assert!(retried.vocabulary.rows.is_empty() && retried.vocabulary.matching_count.is_none());
+    assert_eq!(connection.query_row("SELECT COUNT(*) FROM vocabulary_status_events WHERE new_status='known' AND occurred_at_unix_ms=999", [], |row| row.get::<_, i64>(0)).unwrap(), 204);
+    assert_eq!(
+        observer
+            .vocabulary_entry(&Surface::new("猫000").unwrap())
+            .unwrap()
+            .unwrap()
+            .status,
+        VocabularyStatus::New
+    );
+    assert_eq!(
+        observer
+            .vocabulary_entry(&Surface::new("猫later").unwrap())
+            .unwrap()
+            .unwrap()
+            .status,
+        VocabularyStatus::New
+    );
+    let refreshed = dispatch(&router, Event::LoadVocabulary);
+    assert_eq!(refreshed.vocabulary.matching_count, Some(206));
+    assert_eq!(
+        refreshed.vocabulary.rows,
+        observer
+            .vocabulary_page(&VocabularyQuery::default(), 0)
+            .unwrap()
+            .rows
+    );
+    assert!(trace.try_recv().is_err());
+    drop((router, lifecycle));
+}
+
+#[test]
+fn vocabulary_bulk_fifo_delete_cancel_rollback_retry_and_reopen_keep_new_generations() {
+    use yomoku_core::vocabulary::VocabularyBulkAction;
+    let database = Database::new();
+    let mut observer = seed(&database);
+    let Factory { loader, trace, .. } = Factory::new(false, None);
+    let (router, lifecycle) = effect_router_with_analyzed_imports(database.path(), loader).unwrap();
+    router.update(Event::SelectDestination(Destination::Vocabulary), |_| {});
+    dispatch(&router, Event::LoadVocabulary);
+    dispatch(&router, Event::SelectAllVocabulary);
+    router.update(
+        Event::RequestVocabularyBulkAction(VocabularyBulkAction::Delete),
+        |_| {},
+    );
+    let command = router.view().vocabulary.confirmation.unwrap();
+    router.update(Event::CancelVocabularyBulkAction, |_| {});
+    assert!(router.view().vocabulary.confirmation.is_none());
+    assert_eq!(
+        observer
+            .vocabulary_matching_ids(&VocabularyQuery::default())
+            .unwrap(),
+        command.ids
+    );
+    router.update(
+        Event::RequestVocabularyBulkAction(VocabularyBulkAction::Delete),
+        |_| {},
+    );
+    let connection = Connection::open(database.path()).unwrap();
+    connection.execute_batch("CREATE TRIGGER bulk_fail BEFORE DELETE ON vocabulary WHEN OLD.surface='猫150' BEGIN SELECT RAISE(ABORT, 'fixture'); END;").unwrap();
+    let failed = dispatch(&router, Event::ConfirmVocabularyBulkAction(command.clone()));
+    assert!(failed.vocabulary.bulk_error.is_some());
+    assert_eq!(
+        observer
+            .vocabulary_matching_ids(&VocabularyQuery::default())
+            .unwrap(),
+        command.ids
+    );
+    connection.execute_batch("DROP TRIGGER bulk_fail").unwrap();
+    observer
+        .register_vocabulary(&[Surface::new("猫later").unwrap()], 1000)
+        .unwrap();
+    dispatch(&router, Event::RetryVocabularyBulkAction);
+    assert_eq!(
+        observer
+            .vocabulary_page(&VocabularyQuery::default(), 0)
+            .unwrap()
+            .matching_count,
+        1
+    );
+    assert_eq!(
+        connection
+            .query_row("SELECT COUNT(*) FROM vocabulary_status_events", [], |row| {
+                row.get::<_, i64>(0)
+            })
+            .unwrap(),
+        1
+    );
+    observer
+        .register_vocabulary(&[Surface::new("猫000").unwrap()], 1001)
+        .unwrap();
+    let replacement = observer
+        .vocabulary_entry(&Surface::new("猫000").unwrap())
+        .unwrap()
+        .unwrap();
+    assert!(!command.ids.contains(&replacement.id));
+    drop((router, lifecycle));
+    let Factory {
+        loader,
+        trace: reopened_trace,
+        ..
+    } = Factory::new(false, None);
+    let (reopened, lifecycle) =
+        effect_router_with_analyzed_imports(database.path(), loader).unwrap();
+    reopened.update(Event::SelectDestination(Destination::Vocabulary), |_| {});
+    let view = dispatch(&reopened, Event::LoadVocabulary);
+    assert_eq!(view.vocabulary.matching_count, Some(2));
+    assert!(view
+        .vocabulary
+        .rows
+        .iter()
+        .all(|row| row.status == VocabularyStatus::New && row.encountered_count == 0));
+    assert!(trace.try_recv().is_err() && reopened_trace.try_recv().is_err());
+    drop((reopened, lifecycle));
+}

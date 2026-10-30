@@ -136,6 +136,119 @@ internal fun verifyVocabularyBridge() {
             check(dispatch(bridge, Event.SetVocabularyQuery(prior.query), 1).vocabulary == prior)
             check(dictionary.calls.get() == calls)
         }
+        NativeBridge(directory.resolve("bulk.sqlite3").path, listener, dictionary).use { bridge ->
+            val id =
+                checkNotNull(dispatch(bridge, Event.CreatePaste("猫 猫 犬"), 1).importSummary)
+                    .documentId
+            val calls = dictionary.calls.get()
+            val now = System.currentTimeMillis()
+            fun navigate(destination: Destination) {
+                dispatch(bridge, Event.SelectDestination(destination))
+            }
+            fun loadTokens(): List<EffectivePageToken> {
+                navigate(Destination.LIBRARY)
+                val opened = dispatch(bridge, Event.OpenReader(id), 1)
+                val page = checkNotNull(opened.reader)
+                return checkNotNull(
+                        dispatch(
+                                bridge,
+                                Event.LoadReaderTokens(
+                                    ReaderTokenKey(
+                                        id,
+                                        page.anchor,
+                                        checkNotNull(opened.readerAnalysis),
+                                    )
+                                ),
+                                1,
+                            )
+                            .effectiveReaderTokens
+                    )
+                    .tokens
+            }
+            navigate(Destination.STATISTICS)
+            dispatch(bridge, Event.LoadStatistics(now), 1)
+            navigate(Destination.LIBRARY)
+            dispatch(bridge, Event.LoadLibraryWordDistributions, 1)
+            navigate(Destination.VOCABULARY)
+            val initial = dispatch(bridge, Event.LoadVocabulary, 1)
+            val cat = initial.vocabulary.rows.single { it.surface == "猫" }
+            dispatch(bridge, Event.ToggleVocabularySelection(cat.id))
+            val selection = ViewModel.bincodeDeserialize(bridge.view()).vocabulary.selection
+            dispatch(bridge, Event.OpenSettings)
+            check(dispatch(bridge, Event.CloseSettings).vocabulary.selection == selection)
+            val action = VocabularyBulkAction.SetStatus(VocabularyStatus.LEARNING, now)
+            var command =
+                checkNotNull(
+                    dispatch(bridge, Event.RequestVocabularyBulkAction(action))
+                        .vocabulary
+                        .confirmation
+                )
+            check(command.ids == selection)
+            val frozen = dispatch(bridge, Event.OpenSettings)
+            check(!frozen.settingsOpen && frozen.vocabulary.confirmation == command)
+            dispatch(bridge, Event.CancelVocabularyBulkAction)
+            check(
+                dispatch(bridge, Event.ConfirmVocabularyBulkAction(command))
+                    .vocabulary
+                    .confirmation == null
+            )
+            command =
+                checkNotNull(
+                    dispatch(bridge, Event.RequestVocabularyBulkAction(action))
+                        .vocabulary
+                        .confirmation
+                )
+            val changed = dispatch(bridge, Event.ConfirmVocabularyBulkAction(command), 1)
+            check(changed.vocabulary.selection == null && changed.vocabulary.confirmation == null)
+            check(
+                changed.vocabulary.matchingCount == null &&
+                    changed.statistics.data == null &&
+                    changed.libraryWordDistributions == null
+            )
+            val rows = dispatch(bridge, Event.LoadVocabulary, 1).vocabulary.rows
+            check(rows.single { it.id == cat.id }.status == VocabularyStatus.LEARNING)
+            navigate(Destination.STATISTICS)
+            val stats = checkNotNull(dispatch(bridge, Event.LoadStatistics(now), 1).statistics.data)
+            check(stats.buckets.last().values.statuses.learning == 1UL)
+            check(
+                loadTokens()
+                    .filter { it.surface == "猫" }
+                    .all { it.vocabulary?.status == VocabularyStatus.LEARNING }
+            )
+            navigate(Destination.VOCABULARY)
+            dispatch(bridge, Event.SetVocabularyQuery(query("猫")), 1)
+            check(
+                dispatch(bridge, Event.SelectAllVocabulary, 1).vocabulary.selection ==
+                    listOf(cat.id)
+            )
+            val deletion =
+                checkNotNull(
+                    dispatch(bridge, Event.RequestVocabularyBulkAction(VocabularyBulkAction.Delete))
+                        .vocabulary
+                        .confirmation
+                )
+            dispatch(bridge, Event.ConfirmVocabularyBulkAction(deletion), 1)
+            check(dispatch(bridge, Event.LoadVocabulary, 1).vocabulary.matchingCount == 0UL)
+            check(loadTokens().filter { it.surface == "猫" }.all { it.vocabulary == null })
+            navigate(Destination.LIBRARY)
+            val counts =
+                checkNotNull(
+                        dispatch(bridge, Event.LoadLibraryWordDistributions, 1)
+                            .libraryWordDistributions
+                    )
+                    .single()
+                    .counts
+            check(counts?.new == 1UL && counts.learning == 0UL)
+            navigate(Destination.STATISTICS)
+            val erased =
+                checkNotNull(dispatch(bridge, Event.LoadStatistics(now), 1).statistics.data)
+                    .buckets
+                    .last()
+                    .values
+                    .statuses
+            check(erased.new == 1UL && erased.learning == 0UL)
+            check(dictionary.calls.get() == calls)
+        }
         check(effects.isEmpty())
     } finally {
         directory.deleteRecursively()

@@ -1,4 +1,4 @@
-//! Read-only vocabulary browser values. Storage owns matching and pagination.
+//! Vocabulary browser and retained bulk values. Storage owns matching and I/O.
 
 use serde::{Deserialize, Serialize};
 
@@ -79,6 +79,30 @@ pub struct VocabularyState {
     pub next_offset: Option<u64>,
     pub loading: bool,
     pub error: Option<crate::storage::DocumentError>,
+    /// Sorted session selection, including matches outside the loaded prefix.
+    pub selection: Option<Vec<VocabularyId>>,
+    pub selecting_all: bool,
+    pub confirmation: Option<VocabularyBulkCommand>,
+    pub bulk_error: Option<crate::storage::DocumentError>,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
+#[repr(C)]
+pub enum VocabularyBulkAction {
+    SetStatus {
+        status: VocabularyStatus,
+        occurred_at_unix_ms: i64,
+    },
+    Delete,
+}
+
+/// Confirmation and Retry always use these exact IDs/action/date, never a query.
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
+pub struct VocabularyBulkCommand {
+    pub ids: Vec<VocabularyId>,
+    pub action: VocabularyBulkAction,
 }
 
 impl VocabularyQuery {

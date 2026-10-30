@@ -1895,8 +1895,9 @@ Reentry and relevant mutations clear pages while retaining query choices. Count
 changes across pages trigger a fresh page zero. Pages are separate read snapshots;
 external mutations that preserve the count are not automatically detected. No
 persistent browser cache, schema migration, history mutation, analyzer load or
-rescan is added. The shell browser is implemented; retained bulk mutation wiring
-remains open. Repository commands are described below.
+rescan is added. The shell browser and retained native bulk mutation protocol
+are implemented; Compose bulk controls remain open. Repository commands are
+described below.
 
 ## Frozen Vocabulary bulk operations (schema 0020 unchanged)
 
@@ -1904,8 +1905,8 @@ remains open. Repository commands are described below.
 one SQLite statement/snapshot, independent of the 100-row page limit. It shares
 the browser's indexed literal prefix/status predicate. Presentation sort does not
 affect membership; IDs return in ascending order. No history, content, analyzer
-or dictionary is loaded. The future retained caller must freeze these IDs before
-confirmation and reuse them for Retry instead of rerunning the query.
+or dictionary is loaded. The retained caller freezes these IDs before
+confirmation and reuses them for Retry instead of rerunning the query.
 
 `set_vocabulary_statuses(ids, status, occurred_at_unix_ms)` uses one immediate
 transaction and the single-entry validated status/event helper. Every actual
@@ -1928,5 +1929,26 @@ AUTOINCREMENT keeps old IDs from targeting later generations of the same surface
 Reopening readers, loading tokens and refreshing Library distributions leave erased
 entries absent. A later new analyzed import registers a fresh New ID with no old
 history; later completions contribute only new occurrences. Replaying a successful
-original/effective completion does not restore erased history. Confirmation,
-selection lifecycle, FIFO routing and application cache invalidation remain open.
+original/effective completion does not restore erased history. Retained
+confirmation/selection, FIFO routing and application cache invalidation now use
+the native protocol below; Compose bulk controls remain open.
+
+## Retained Vocabulary selection payloads (no migration)
+
+VocabularyState adds Option<Vec<VocabularyId>> selection (None outside selection,
+Some(empty) for an empty active selection), selecting_all, optional
+VocabularyBulkCommand confirmation and optional DocumentError bulk_error.
+Selection IDs are unique and sorted, independent of browser presentation order.
+Select All unions all query-matching IDs in one FIFO read; unloaded and hidden
+selected IDs are preserved. Query changes do not reinterpret previous selections.
+A failed capture retains its query privately until explicit Retry or Cancel.
+
+VocabularyBulkCommand stores the exact selected IDs plus VocabularyBulkAction:
+Delete or SetStatus { status, occurred_at_unix_ms }. Request freezes this command;
+Confirm accepts only exact equality with the retained prompt. Failed writes retain
+that same command for explicit Retry, including the original date. Each attempt
+uses a fresh native callback ID. Matching is never rerun by confirmed writes.
+Success invalidates the dependent application caches. Session state is volatile;
+no migration, persisted selection/command receipt, restore queue or automatic
+retry is introduced. Public events/state have typed generated FFI codecs; native
+storage operations/results/callbacks are skipped by those codecs.

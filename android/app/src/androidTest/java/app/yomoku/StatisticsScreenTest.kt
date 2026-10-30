@@ -165,6 +165,7 @@ private fun statisticsView(): ViewModel {
             VocabularyState(
                 VocabularyQuery("", VocabularyStatus.entries.toList(), VocabularySort.NEWEST),
                 rows = emptyList(),
+                selectingAll = false,
                 loading = false,
             ),
         statistics =
