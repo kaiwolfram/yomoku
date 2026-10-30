@@ -1,8 +1,9 @@
 # Resume here
-Updated: 2026-10-30. Phase-5 durable vocabulary dictionary-form links verified.
+Updated: 2026-10-30. Phase-5 Known dictionary-form timeline verified.
 
 ## Current slice
-- History audit, lifetime totals and five-status timeline complete. Schema 0020 retains v1 completion/status/analysis
+- History audit, lifetime totals and status/Known-form timeline complete.
+  Schema 0020 retains v1 completion/status/analysis
   headers and independent v1 effective reservations. Occurrences inherit the analyzed
   contract; reservation presence selects effective indices. No history-edit API.
 - Every history-bearing schema (5–20) upgrades with exact history/ID high-water marks
@@ -23,6 +24,12 @@ Updated: 2026-10-30. Phase-5 durable vocabulary dictionary-form links verified.
   get fresh IDs/New. Per-entry projected dates never precede their prior change
   (clock regressions/frozen completion); raw event dates remain unchanged. V1
   cause/provenance and causal chains validate before returning any points.
+- Each timeline point now includes known_dictionary_forms: exact spellings with
+  any Known linked surface. Shared forms use chronological reference counts;
+  same-date handoffs coalesce. Unresolved forms add none; readings never identify
+  forms. All retained context resolutions participate. Undated links apply across
+  their vocabulary generation's history; new evidence can refine earlier counts.
+  One statement reads links then events without multiplying history rows.
 - Migration 0020 stores exact analyzer dictionary-form spellings under vocabulary
   IDs, independently of documents. Imports/new snapshots/registered edits/actual
   original and effective completions retain evidence atomically. Unresolved/manual
@@ -40,28 +47,27 @@ Updated: 2026-10-30. Phase-5 durable vocabulary dictionary-form links verified.
   regressions pass; optimized/frame-time/peak-memory/physical-arm64 remain unverified.
 
 ## Next tasks (ordered)
-1. Extend timeline with Known dictionary-form counts (any Known linked surface,
-   spelling identity, unresolved excluded), using vocabulary_dictionary_forms.
-   Test shared forms, transitions/demotion and vocabulary-erasure recalculation.
-   Link persistence is complete; timeline projection is still unchecked.
-2. Add timeframe buckets (month daily, six months/year weekly, all time monthly),
-   date-boundary coverage and lifetime cumulative origin; then typed UI transport.
+1. Add timeframe buckets (month daily, six months/year weekly, all time monthly),
+   date-boundary coverage and lifetime cumulative origin. No bucket API exists yet.
+2. Add typed statistics transport and overview/drilldown charts for occurrences,
+   five statuses and Known surface/dictionary-form lines in all timeframes.
 3. Profile optimized Android repository/encoding/callback costs before changes;
    extend diverse many-book/peak-memory/actual Compose measurements.
 Nostr configuration stays empty; ask Q188 before forwarding.
 
 ## Verification / blockers
-- PASS: seven new link tests and schema-5–20 history upgrade coverage; 741
-  workspace Rust tests, 17 opt-in ignored; build, strict Clippy/Rustfmt/diff.
-  No unresolved failures or implementation blockers.
+- PASS: five new core/six SQLite tests and schema-5–20 Known-form upgrade coverage;
+  752 workspace Rust tests, 17 opt-in ignored; build, strict Clippy/Rustfmt/diff.
+  No failures or implementation blockers.
 - Commands (Rust PATH workaround from DEVELOPMENT.md):
-  cargo test -p yomoku-storage vocabulary_links --locked --offline
+  cargo test -p yomoku-core --test statistics --all-features --locked --offline
+  cargo test -p yomoku-storage --locked --offline --quiet
   cargo test --workspace --all-features --locked --offline --quiet
   cargo clippy --workspace --all-targets --all-features --locked --offline -- -D warnings
   cargo build --workspace --locked --offline
   cargo fmt --all -- --check
   git diff --check
-- Logs: /tmp/yomoku-dictionary-links-{tests,workspace,clippy,build}.log.
-  Migration 0020 added; no dependency/FFI/Kotlin change. Android/JNI/codegen/
+- Logs: /tmp/yomoku-known-forms-{storage,workspace,clippy,build}.log.
+  No dependency/migration/FFI/Kotlin change. Android/JNI/codegen/
   Full-loader/release/process-death/physical-arm64 were not rerun. Native/BoltFFI
   generation must remain sequential with host JNI execution.

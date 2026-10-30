@@ -72,6 +72,260 @@ fn intent(storage: &mut Storage, imported: &AnalyzedPaste) -> PageCompletionInte
     }
 }
 
+fn known_counts(storage: &Storage) -> Vec<(i64, u64, u64)> {
+    storage
+        .vocabulary_status_timeline()
+        .unwrap()
+        .into_iter()
+        .map(|point| {
+            (
+                point.occurred_at_unix_ms,
+                point.counts.known,
+                point.known_dictionary_forms,
+            )
+        })
+        .collect()
+}
+
+fn set_status(storage: &mut Storage, surface: &str, status: VocabularyStatus, timestamp: i64) {
+    storage
+        .set_vocabulary_status(entry(storage, surface).id, status, timestamp)
+        .unwrap();
+}
+
+#[test]
+fn known_forms_share_exact_spellings_exclude_unresolved_and_retain_context_evidence() {
+    let database = TestDatabase::new();
+    let mut storage = Storage::open(database.path()).unwrap();
+    let imported = import(
+        &mut storage,
+        "食べた 食べた 食べます 未解決 が か\u{3099} 𠮷 English",
+    );
+    let mut analysis = analyze(&imported.document.chapter).unwrap();
+    analysis.mode = SplitMode::A;
+    for token in &mut analysis.tokens {
+        token.reading = Some(format!("reading:{}", token.surface));
+    }
+    storage
+        .store_chapter_analysis(imported.document.chapter.chapter_id, &analysis)
+        .unwrap();
+    for surface in ["食べた", "食べます", "未解決", "が", "か\u{3099}", "𠮷"] {
+        set_status(&mut storage, surface, VocabularyStatus::Known, 200);
+    }
+    assert_eq!(known_counts(&storage), [(100, 0, 0), (200, 6, 4)]);
+    // Another automatic context adds a distinct spelling to this generation.
+    // Links have no evidence dates: every projection uses all retained links.
+    analysis.mode = SplitMode::C;
+    analysis.tokens[0].dictionary_form = Some(Surface::new("喰べる").unwrap());
+    storage
+        .store_chapter_analysis(imported.document.chapter.chapter_id, &analysis)
+        .unwrap();
+    assert_eq!(known_counts(&storage), [(100, 0, 0), (200, 6, 5)]);
+    set_status(&mut storage, "食べた", VocabularyStatus::Learning, 300);
+    set_status(&mut storage, "食べます", VocabularyStatus::Familiar, 400);
+    assert_eq!(
+        known_counts(&storage),
+        [(100, 0, 0), (200, 6, 5), (300, 5, 4), (400, 4, 3)]
+    );
+    assert_eq!(
+        storage
+            .lifetime_reading_totals()
+            .unwrap()
+            .japanese_occurrences,
+        0
+    );
+}
+
+#[test]
+fn known_forms_replay_shared_transitions_by_date_and_coalesce_handoffs() {
+    use VocabularyStatus::*;
+    let database = TestDatabase::new();
+    let mut storage = Storage::open(database.path()).unwrap();
+    import(&mut storage, "食べた 食べます");
+    set_status(&mut storage, "食べた", Known, 300);
+    set_status(&mut storage, "食べます", Known, 200);
+    set_status(&mut storage, "食べた", Learning, 400);
+    set_status(&mut storage, "食べます", Ignored, 500);
+    set_status(&mut storage, "食べた", Known, 500);
+    set_status(&mut storage, "食べた", Familiar, 450); // Clamped to 500.
+    assert_eq!(
+        known_counts(&storage),
+        [
+            (100, 0, 0),
+            (200, 1, 1),
+            (300, 2, 1),
+            (400, 1, 1),
+            (500, 0, 0)
+        ]
+    );
+}
+
+#[test]
+fn known_forms_unread_document_deletion_and_vocabulary_erasure_recalculate_history() {
+    let database = TestDatabase::new();
+    let mut storage = Storage::open(database.path()).unwrap();
+    let first = import(&mut storage, "食べた");
+    let live = import(&mut storage, "食べます");
+    set_status(&mut storage, "食べた", VocabularyStatus::Known, 200);
+    set_status(&mut storage, "食べます", VocabularyStatus::Known, 300);
+    let expected = [(100, 0, 0), (200, 1, 1), (300, 2, 1)];
+    storage.delete_document(first.document.document_id).unwrap();
+    assert_eq!(known_counts(&storage), expected);
+    drop(storage);
+    let mut storage = Storage::open(database.path()).unwrap();
+    assert_eq!(known_counts(&storage), expected);
+    let old = entry(&storage, "食べた");
+    storage
+        .connection
+        .execute("DELETE FROM vocabulary WHERE id = ?1", [i64::from(old.id)])
+        .unwrap();
+    assert_eq!(known_counts(&storage), [(100, 0, 0), (300, 1, 1)]);
+    storage
+        .connection
+        .execute("DELETE FROM vocabulary", [])
+        .unwrap();
+    assert!(known_counts(&storage).is_empty());
+    storage
+        .load_document_reader_snapshot(live.document.document_id)
+        .unwrap();
+    let page = intent(&mut storage, &live).page;
+    storage
+        .load_effective_reader_tokens(live.document.document_id, page)
+        .unwrap();
+    assert!(known_counts(&storage).is_empty());
+    // A fresh raw registration has no automatic links, even with live snapshots.
+    storage
+        .register_vocabulary(&[Surface::new("食べます").unwrap()], 600)
+        .unwrap();
+    assert_ne!(entry(&storage, "食べます").id, old.id);
+    set_status(&mut storage, "食べます", VocabularyStatus::Known, 700);
+    storage
+        .store_chapter_analysis(
+            live.document.chapter.chapter_id,
+            &analyze(&live.document.chapter).unwrap(),
+        )
+        .unwrap();
+    assert_eq!(known_counts(&storage), [(600, 0, 0), (700, 1, 0)]);
+    // New actual evidence can link this generation; old erased dates stay absent.
+    storage
+        .create_analyzed_paste(
+            &PasteText::new("食べます 食べます".into()).unwrap(),
+            800,
+            analyze,
+        )
+        .unwrap();
+    assert_eq!(known_counts(&storage), [(600, 0, 0), (700, 1, 1)]);
+}
+
+#[test]
+fn known_forms_original_effective_completions_duplicate_retry_and_failure_are_exact() {
+    for effective in [false, true] {
+        let database = TestDatabase::new();
+        let mut storage = Storage::open(database.path()).unwrap();
+        let imported = import(&mut storage, "食べた 食べます 未解決");
+        let intent = intent(&mut storage, &imported);
+        let original = storage.prepare_page_completion(intent).unwrap();
+        let key = storage
+            .load_effective_reader_tokens(intent.document_id, intent.page)
+            .unwrap()
+            .unwrap()
+            .key()
+            .unwrap();
+        let frozen = storage
+            .prepare_effective_page_completion(intent, &key)
+            .unwrap();
+        storage.connection.execute_batch("CREATE TEMP TRIGGER fail BEFORE INSERT ON reading_occurrences BEGIN SELECT RAISE(ABORT, 'fixture'); END;").unwrap();
+        let complete = |storage: &mut Storage| {
+            if effective {
+                storage.record_effective_page_completion(&frozen)
+            } else {
+                storage.record_analyzed_page_completion(original.completion, original.analysis_id)
+            }
+        };
+        assert!(complete(&mut storage).is_err());
+        assert_eq!(known_counts(&storage), [(100, 0, 0)]);
+        storage
+            .connection
+            .execute_batch("DROP TRIGGER fail")
+            .unwrap();
+        complete(&mut storage).unwrap();
+        let expected = [(100, 0, 0), (500, 3, 1)];
+        assert_eq!(known_counts(&storage), expected);
+        complete(&mut storage).unwrap();
+        assert_eq!(known_counts(&storage), expected);
+        storage
+            .delete_document(imported.document.document_id)
+            .unwrap();
+        assert_eq!(known_counts(&storage), expected);
+        storage
+            .connection
+            .execute("DELETE FROM vocabulary WHERE surface = '食べた'", [])
+            .unwrap();
+        assert_eq!(known_counts(&storage), [(100, 0, 0), (500, 2, 1)]);
+        complete(&mut storage).unwrap();
+        assert_eq!(known_counts(&storage), [(100, 0, 0), (500, 2, 1)]);
+    }
+}
+
+#[test]
+fn known_forms_reads_are_query_only_and_ignore_uncommitted_links_and_statuses() {
+    let database = TestDatabase::new();
+    let mut storage = Storage::open(database.path()).unwrap();
+    import(&mut storage, "食べた 食べます");
+    set_status(&mut storage, "食べた", VocabularyStatus::Known, 200);
+    let other = Storage::open(database.path()).unwrap();
+    other.connection.execute_batch("BEGIN IMMEDIATE").unwrap();
+    crate::vocabulary::set_vocabulary_status_in(
+        &other.connection,
+        entry(&storage, "食べます").id,
+        VocabularyStatus::Known,
+        300,
+    )
+    .unwrap();
+    other.connection.execute("INSERT INTO vocabulary_dictionary_forms SELECT id, '喰べる' FROM vocabulary WHERE surface = '食べた'", []).unwrap();
+    storage
+        .connection
+        .pragma_update(None, "query_only", true)
+        .unwrap();
+    let before = fs::read(database.path()).unwrap();
+    for _ in 0..3 {
+        assert_eq!(known_counts(&storage), [(100, 0, 0), (200, 1, 1)]);
+    }
+    assert_eq!(fs::read(database.path()).unwrap(), before);
+    other.connection.execute_batch("COMMIT").unwrap();
+    let before = fs::read(database.path()).unwrap();
+    assert_eq!(
+        known_counts(&storage),
+        [(100, 0, 0), (200, 1, 2), (300, 2, 2)]
+    );
+    assert_eq!(fs::read(database.path()).unwrap(), before);
+}
+
+#[test]
+fn known_forms_corrupt_empty_evidence_fails_without_repair() {
+    let database = TestDatabase::new();
+    let mut storage = Storage::open(database.path()).unwrap();
+    import(&mut storage, "猫");
+    set_status(&mut storage, "猫", VocabularyStatus::Known, 200);
+    storage
+        .connection
+        .pragma_update(None, "ignore_check_constraints", true)
+        .unwrap();
+    storage
+        .connection
+        .execute(
+            "UPDATE vocabulary_dictionary_forms SET dictionary_form = ''",
+            [],
+        )
+        .unwrap();
+    let before = fs::read(database.path()).unwrap();
+    assert!(matches!(
+        storage.vocabulary_status_timeline(),
+        Err(StorageError::InvalidVocabulary)
+    ));
+    assert_eq!(fs::read(database.path()).unwrap(), before);
+}
+
 #[test]
 fn vocabulary_links_keep_unread_exact_spelling_evidence_after_document_deletion() {
     let database = TestDatabase::new();

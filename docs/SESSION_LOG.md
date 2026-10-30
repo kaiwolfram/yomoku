@@ -3057,3 +3057,21 @@ Updated progress/data/architecture/decisions/development and the brief handoff.
 No dependency/FFI/Kotlin change; Android/JNI/Full-loader/release/arm64 not rerun.
 Next: Known dictionary-form timeline counts from durable links, then timeframe bins
 and typed UI transport. The count task remains unchecked.
+
+## 2026-10-30 — Known dictionary-form history timeline
+
+Extended pure timeline points and the read-only SQLite projection with distinct
+Known dictionary-form counts from durable vocabulary links. Shared forms use
+chronological reference counts, including simultaneous handoffs and regressing
+wall dates. Exact spelling identifies forms; unresolved metadata adds none.
+Retained undated context evidence applies throughout its vocabulary generation.
+Document deletion preserves the projection; vocabulary erasure recalculates it
+without rescans and fresh raw registration supplies no invented links.
+
+PASS: five new core/six SQLite tests; schema-5–20 Known-form upgrade coverage;
+752 workspace Rust tests (17 opt-in ignored), build, strict Clippy/Rustfmt/diff.
+No failures or blockers, dependency/migration/wire/Kotlin change. Android/JNI,
+Full-loader/release/process-death/physical-arm64 checks were not rerun.
+Checked only the completed count task and updated README, architecture/data/
+decisions/development and handoff. Next: timeframe buckets with lifetime cumulative
+origin, then typed statistics transport and charts.

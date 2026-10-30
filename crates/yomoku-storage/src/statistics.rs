@@ -35,21 +35,39 @@ impl Storage {
     /// Replay surviving registration/manual/completion history in a single read
     /// snapshot. Counts are absolute, coalesced per timestamp, without date bins.
     /// Document deletion preserves points; vocabulary deletion recalculates them.
-    /// No content, analyzer, dictionary links, cached counts or JSON is loaded.
+    /// Durable dictionary-form links share the same snapshot. No content,
+    /// analyzer, dictionary data, cached counts or JSON is loaded.
     pub fn vocabulary_status_timeline(&self) -> Result<Vec<StatusTimelinePoint>, StorageError> {
+        // Read each link once before replay, without multiplying events by their
+        // surface's link count. UNION keeps both inputs in one read snapshot.
         let mut statement = self.connection.prepare(
             "SELECT e.id, e.vocabulary_id, e.semantics_version, e.old_status,
                     e.new_status, e.cause, e.occurred_at_unix_ms, e.completion_command_id,
-                    c.semantics_version, a.semantics_version, r.semantics_version
+                    c.semantics_version, a.semantics_version, r.semantics_version,
+                    NULL AS dictionary_form, 1 AS row_kind
              FROM vocabulary_status_events e
              LEFT JOIN reading_completions c ON c.command_id = e.completion_command_id
              LEFT JOIN completion_analyses a ON a.command_id = e.completion_command_id
              LEFT JOIN effective_completion_commands r ON r.command_id = e.completion_command_id
-             ORDER BY e.id",
+             UNION ALL
+             SELECT NULL, vocabulary_id, NULL, NULL, NULL, NULL, NULL, NULL,
+                    NULL, NULL, NULL, dictionary_form, 0
+             FROM vocabulary_dictionary_forms
+             ORDER BY row_kind, id",
         )?;
         let mut rows = statement.query([])?;
         let mut timeline = StatusTimelineBuilder::default();
         while let Some(row) = rows.next()? {
+            if row.get::<_, i64>(12)? == 0 {
+                timeline
+                    .link_dictionary_form(
+                        VocabularyId::try_from(row.get::<_, i64>(1)?)
+                            .map_err(|_| StorageError::InvalidVocabulary)?,
+                        row.get(11)?,
+                    )
+                    .map_err(|_| StorageError::InvalidVocabulary)?;
+                continue;
+            }
             let version: i64 = row.get(2)?;
             let old: Option<String> = row.get(3)?;
             let old = old.as_deref().map(decode_status).transpose()?;

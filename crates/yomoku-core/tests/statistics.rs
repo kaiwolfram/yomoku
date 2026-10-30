@@ -27,6 +27,7 @@ fn point(
 ) -> StatusTimelinePoint {
     StatusTimelinePoint {
         occurred_at_unix_ms: timestamp,
+        known_dictionary_forms: 0,
         counts: WordStatusCounts {
             new,
             learning,
@@ -147,5 +148,153 @@ fn sparse_ids_and_maximum_timestamps_remain_exact() {
     assert_eq!(
         timeline.finish().unwrap(),
         [point(i64::MAX, [0, 0, 0, 1, 0])]
+    );
+}
+
+fn linked_timeline(links: &[(i64, &str)]) -> StatusTimelineBuilder {
+    let mut timeline = StatusTimelineBuilder::default();
+    for &(id, form) in links {
+        timeline
+            .link_dictionary_form(VocabularyId::try_from(id).unwrap(), form.into())
+            .unwrap();
+    }
+    timeline
+}
+
+fn known_point(timestamp: i64, counts: [u64; 5], forms: u64) -> StatusTimelinePoint {
+    StatusTimelinePoint {
+        known_dictionary_forms: forms,
+        ..point(timestamp, counts)
+    }
+}
+
+#[test]
+fn shared_forms_count_once_until_the_last_known_surface_is_demoted() {
+    let mut timeline = linked_timeline(&[(1, "食べる"), (1, "食べる"), (2, "食べる")]);
+    for change in [
+        event(1, 1, 100, None, New),
+        event(2, 2, 100, None, New),
+        event(3, 3, 100, None, New), // Unresolved: no invented surface link.
+        event(4, 1, 200, Some(New), Known),
+        event(5, 2, 300, Some(New), Known),
+        event(6, 3, 300, Some(New), Known),
+        event(7, 1, 400, Some(Known), Learning),
+        event(8, 2, 500, Some(Known), Familiar),
+        event(9, 1, 600, Some(Learning), Known),
+        event(10, 1, 700, Some(Known), Ignored),
+        event(11, 2, 800, Some(Familiar), Known),
+        event(12, 2, 900, Some(Known), New),
+    ] {
+        timeline.push(change).unwrap();
+    }
+    assert_eq!(
+        timeline.finish().unwrap(),
+        [
+            known_point(100, [3, 0, 0, 0, 0], 0),
+            known_point(200, [2, 0, 0, 1, 0], 1),
+            known_point(300, [0, 0, 0, 3, 0], 1),
+            known_point(400, [0, 1, 0, 2, 0], 1),
+            known_point(500, [0, 1, 1, 1, 0], 0),
+            known_point(600, [0, 0, 1, 2, 0], 1),
+            known_point(700, [0, 0, 1, 1, 1], 0),
+            known_point(800, [0, 0, 0, 2, 1], 1),
+            known_point(900, [1, 0, 0, 1, 1], 0),
+        ]
+    );
+}
+
+#[test]
+fn exact_spellings_deduplicate_without_unicode_normalization_or_context_selection() {
+    // Multiple resolutions for one vocabulary generation all retain evidence.
+    let mut timeline = linked_timeline(&[
+        (1, "が"),
+        (1, "か\u{3099}"),
+        (1, "𠮷"),
+        (2, "が"),
+        (3, "食べる"),
+    ]);
+    for change in [
+        event(1, 1, 0, None, New),
+        event(2, 2, 0, None, New),
+        event(3, 3, 0, None, New),
+        event(4, 1, 10, Some(New), Known),
+        event(5, 2, 10, Some(New), Known),
+        event(6, 1, 20, Some(Known), New),
+    ] {
+        timeline.push(change).unwrap();
+    }
+    assert_eq!(
+        timeline.finish().unwrap(),
+        [
+            known_point(0, [3, 0, 0, 0, 0], 0),
+            known_point(10, [1, 0, 0, 2, 0], 3),
+            known_point(20, [2, 0, 0, 1, 0], 1),
+        ]
+    );
+}
+
+#[test]
+fn shared_form_union_uses_dates_instead_of_global_event_order() {
+    let mut timeline = linked_timeline(&[(1, "食べる"), (2, "食べる")]);
+    for change in [
+        event(1, 1, 100, None, New),
+        event(2, 2, 100, None, New),
+        event(3, 1, 300, Some(New), Known),
+        event(4, 2, 200, Some(New), Known),
+        event(5, 1, 400, Some(Known), New),
+        event(6, 2, 500, Some(Known), New),
+    ] {
+        timeline.push(change).unwrap();
+    }
+    assert_eq!(
+        timeline.finish().unwrap(),
+        [
+            known_point(100, [2, 0, 0, 0, 0], 0),
+            known_point(200, [1, 0, 0, 1, 0], 1),
+            known_point(300, [0, 0, 0, 2, 0], 1),
+            known_point(400, [1, 0, 0, 1, 0], 1),
+            known_point(500, [2, 0, 0, 0, 0], 0),
+        ]
+    );
+}
+
+#[test]
+fn simultaneous_handoffs_and_regressing_dates_have_no_transient_form_counts() {
+    let mut timeline = linked_timeline(&[(1, "食べる"), (2, "食べる")]);
+    for change in [
+        event(1, 1, 100, None, New),
+        event(2, 1, 50, Some(New), Known), // Clamped to registration.
+        event(3, 2, 100, None, New),
+        event(4, 1, 200, Some(Known), Ignored),
+        event(5, 2, 200, Some(New), Known), // Same-time handoff.
+        event(6, 2, 150, Some(Known), Learning), // Clamped to 200.
+        event(7, 2, 200, Some(Learning), Known),
+    ] {
+        timeline.push(change).unwrap();
+    }
+    assert_eq!(
+        timeline.finish().unwrap(),
+        [
+            known_point(100, [1, 0, 0, 1, 0], 1),
+            known_point(200, [0, 0, 0, 1, 1], 1),
+        ]
+    );
+}
+
+#[test]
+fn links_must_be_nonempty_and_supplied_before_events() {
+    let id = VocabularyId::try_from(1).unwrap();
+    let mut timeline = StatusTimelineBuilder::default();
+    assert!(timeline.link_dictionary_form(id, String::new()).is_err());
+    timeline.link_dictionary_form(id, "猫".into()).unwrap();
+    timeline.push(event(1, 1, 100, None, New)).unwrap();
+    assert!(timeline.link_dictionary_form(id, "犬".into()).is_err());
+    timeline.push(event(2, 1, 200, Some(New), Known)).unwrap();
+    assert_eq!(
+        timeline.finish().unwrap(),
+        [
+            known_point(100, [1, 0, 0, 0, 0], 0),
+            known_point(200, [0, 0, 0, 1, 0], 1)
+        ]
     );
 }

@@ -1248,7 +1248,7 @@ Explicit reopening persists page 1, while completion reloads and retained Activi
 recreation preserve the active position. Final-page Finish Book/swipe completion
 returns to Library and celebrates each newly Recorded command, including rereads.
 Effective segmentation edits are connected as described below. Read-only lifetime
-aggregation is implemented; statistics timelines, buckets, transport and UI remain
+aggregation and vocabulary timelines are implemented; buckets, transport and UI remain
 separate tasks. Add analysis/import crates only with
 actual behavior; Sudachi Full defaults to B, JMdict/JMnedict remain offline data, and future Nostr I/O stays in Rust. Configuration is empty.
 ## Guarded effective boundary repositories
@@ -1509,19 +1509,24 @@ future work; the Statistics tab is a placeholder.
 `StatusTimelineBuilder` in the pure core streams surviving registration and
 status changes in durable event-ID order, validates each entry's causal chain and
 accumulates date deltas. `Storage::vocabulary_status_timeline(&self)` supplies the
-events from one SQLite read statement, validating v1 semantics, causes and any
+links and events from one SQLite read statement, validating v1 semantics, causes and any
 completion provenance headers. It reads neither live content/analysis nor JSON,
 dictionary data or cached counts. The result has absolute five-status counts after
-all changes at each timestamp, without timeframe filtering or date bins. Memory
-holds one state per surviving entry and one delta per distinct projected date,
-rather than a copy of every event. Document deletion preserves the input;
+all changes at each timestamp, plus distinct Known dictionary-form counts, without
+timeframe filtering or date bins. Memory holds entry/link state, status deltas per
+date and Known reference-count deltas per affected form/date, rather than a copy
+of every event. Document deletion preserves the input;
 vocabulary history cascades recalculate it without rescans.
 
 For a regressing wall clock or delayed frozen completion, clamp only that entry's
 projected date to its preceding event's projected date. This retains causal state,
 nonnegative counts and the final committed status without changing durable dates
-or shifting unrelated entries. Known dictionary-form counts, timeframe buckets
-and UI transport remain separate tasks.
+or shifting unrelated entries. Shared-form reference counts replay in projected
+date order, counting a spelling while any linked surface is Known; simultaneous
+handoffs coalesce. Exact spelling identifies forms, unresolved surfaces add none
+and readings do not affect identity. Links have no observation date and apply
+throughout their vocabulary generation's history. Timeframe buckets and UI
+transport remain separate tasks.
 
 Migration 0020 retains resolved analyzer dictionary-form spellings in a global
 vocabulary-owned junction table, independent of live documents. New snapshots

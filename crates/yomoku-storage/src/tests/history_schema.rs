@@ -54,6 +54,14 @@ fn seed_history(connection: &Connection, version: usize) {
             )
             .unwrap();
     }
+    if version >= 20 {
+        connection
+            .execute(
+                "INSERT INTO vocabulary_dictionary_forms VALUES (81, '猫')",
+                [],
+            )
+            .unwrap();
+    }
     // Keep allocation high-water marks beyond all remaining rows through rebuilds.
     connection
         .execute(
@@ -151,6 +159,7 @@ fn expected_status_timeline(version: usize) -> Vec<yomoku_core::statistics::Stat
             }
             points.push(StatusTimelinePoint {
                 occurred_at_unix_ms: date,
+                known_dictionary_forms: known,
                 counts: WordStatusCounts {
                     new,
                     learning,

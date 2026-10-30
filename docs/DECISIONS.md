@@ -3799,3 +3799,25 @@ vocabulary-generation identity, so one-time recovery can only use their exact
 surface join to currently registered entries. Schema-20 reopen performs no such
 rescan. Keep the count/timeline projection as the next independently testable
 slice; no dependency, wire, core I/O or destructive semantic change.
+
+## 2026-10-30 — Known dictionary-form timeline from vocabulary links
+
+Extend each pure status-timeline point with distinct Known dictionary-form counts,
+using the existing migration-0020 links and the same validated status history.
+Supply all links before replay, deduplicate exact spellings and exclude unresolved
+surfaces. Any Known linked surface keeps the form Known; all retained automatic
+context resolutions participate, with no reading identity or Unicode normalization.
+Links have no acquisition timestamp: apply the current generation's retained
+evidence throughout its replay. New evidence can refine earlier projected counts;
+do not fabricate dated link events or rescan content to recover erased evidence.
+
+Accumulate signed reference-count changes per form and projected date, then replay
+them chronologically. Computing the distinct total in global event-ID order would
+misdate a shared form when unrelated entries have different wall dates. Preserve
+existing per-entry causal clamping and coalesce simultaneous handoffs before
+returning absolute counts. Keep entry/link state and per-date deltas, without a
+complete event copy. One SQL UNION streams links before events in one snapshot,
+avoiding an event-by-link expansion or separate potentially inconsistent reads.
+Document deletion retains links/history; vocabulary cascades recalculate both
+lines and fresh raw registration has no inferred links. No dependency, migration,
+wire or data-destructive semantic change; timeframe buckets and UI remain next.

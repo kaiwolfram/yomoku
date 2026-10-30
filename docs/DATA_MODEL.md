@@ -488,7 +488,8 @@ entry ID. No reading or dictionary form participates in surface identity.
 inflections and composed/decomposed spellings remain distinct, while the same
 written spelling across documents/readings shares an entry. Persist statuses as
 `new`, `learning`, `familiar`, `known`, `ignored`, with constrained nonnegative
-registration timestamps. Analyzer dictionary-form links remain future work.
+registration timestamps. Migration 0020 retains analyzer dictionary-form links
+under vocabulary IDs independently of documents (see below).
 
 `vocabulary_status_events` stores an allocated ID, semantics version 1, vocabulary
 ID, nullable old status, new status, cause and nonnegative Unix milliseconds.
@@ -1478,11 +1479,12 @@ Seven dedicated tests plus every schema-5–19 upgrade verify these contracts,
 including duplicate/concurrent success, failure rollback, reopen and deletion.
 Core/worker/FFI/UI transport and date buckets remain separate work.
 
-## Read-only five-status vocabulary timeline (phase 5, no migration)
+## Read-only vocabulary status and Known-form timeline (phase 5)
 
 `Storage::vocabulary_status_timeline(&self)` streams `vocabulary_status_events`
 in primary-key order through the pure `statistics::StatusTimelineBuilder`.
-One statement supplies a consistent read snapshot, including v1 completion,
+One statement supplies a consistent read snapshot of durable dictionary-form
+links and events, including v1 completion,
 analysis and optional effective-reservation headers for completion-caused changes.
 Registration/manual events must have no completion reference; completions must be
 New→Known with valid analyzed provenance. Unknown versions/causes/statuses,
@@ -1504,19 +1506,33 @@ the maximum of its recorded date and preceding projected date. A later committed
 change never precedes that entry's earlier state; unrelated entries keep their
 own dates. Raw stored timestamps/history remain exact and immutable. Deltas at
 projected dates use exact integers and produce nonnegative unsigned counts.
-Replay retains state per surviving entry and deltas per distinct projected date,
-not every historical row. Timeframe/date-bucket policy is still unimplemented.
+Replay retains entry/link state, status deltas per projected date and form deltas
+per affected spelling/date, rather than every historical row. Timeframe/date-bucket
+policy is still unimplemented.
 
 Deleting a document leaves the entire timeline, including unread manual Known
 entries. Vocabulary deletion erases all that ID's registration/transitions and
 therefore recalculates its full history; no existing content is rescanned.
 A later explicit import or actual completion registers a fresh ID as New.
-Known surface counts are present in each point; Known dictionary-form counts
-remain unimplemented. Migration 0020 supplies their durable automatic links for
-unread surfaces, independently of live documents. The combined feature is open.
+Known surface counts are present in each point's `counts.known`;
+`known_dictionary_forms` counts distinct exact spellings with any Known linked
+surface. Shared links count once until the last linked Known surface is demoted.
+Unresolved surfaces contribute no form; readings never participate in identity.
+Multiple automatic context resolutions all participate, without Unicode
+normalization or selecting an arbitrary context. Migration-0020 links describe
+the surviving vocabulary generation without an evidence timestamp: newly retained
+links apply throughout that generation's replay, including earlier Known dates.
+No acquisition date is inferred from snapshots, source dates or completion time.
 
-Six pure tests and eight SQLite tests cover these semantics; the existing
-schema-5–19 matrix verifies timelines after upgrade, document deletion and reopen.
+The SQL statement streams links first, then events once in ID order, avoiding an
+event-by-link Cartesian expansion. The core collects signed Known reference-count
+deltas per form/projected date and applies them chronologically. A form enters or
+leaves the distinct total only when its number of Known linked surfaces crosses
+zero. Equal-date handoffs coalesce. Using shared-form state in global event-ID
+order would be incorrect when unrelated entries have different wall dates.
+
+Core/SQLite tests cover these semantics; the existing schema-5–20 matrix verifies
+timelines and Known-form counts after upgrade, document deletion and reopen.
 The read API works with `PRAGMA query_only = true` and leaves DB bytes unchanged.
 
 ## Durable vocabulary dictionary-form evidence (migration 0020)
@@ -1550,8 +1566,8 @@ occurrences joined by vocabulary ID. It creates no entries/events, loads no
 analyzer and rewrites no history. Unread metadata already deleted before upgrade
 is unavailable and cannot be reconstructed. The one-time recovery uses available
 snapshots; older schemas did not associate snapshot tokens with vocabulary
-generations. Reopening schema 20 never repeats that recovery. Known-form timeline
-replay/counting and typed transport remain future work.
+generations. Reopening schema 20 never repeats that recovery. The read-only
+timeline uses these links as described above; typed transport remains future work.
 
 ## Required future schema constraints
 - Future import repositories must extend the identity/immutable-text and durable

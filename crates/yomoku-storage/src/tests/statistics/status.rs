@@ -8,6 +8,7 @@ fn point(
 ) -> StatusTimelinePoint {
     StatusTimelinePoint {
         occurred_at_unix_ms: timestamp,
+        known_dictionary_forms: 0,
         counts: WordStatusCounts {
             new,
             learning,

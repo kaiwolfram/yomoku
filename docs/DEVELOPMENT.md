@@ -6589,3 +6589,34 @@ Android/JNI/codegen/Full-loader matrix, release/process-death and physical arm64
 were not rerun. Known dictionary-form timeline counts and UI remain unimplemented.
 Logs: `/tmp/yomoku-dictionary-links-{tests,workspace,clippy,build}.log`;
 initial corrected compile/fixture failures: `dictionary-links-initial.log`.
+
+## Known dictionary-form timeline counts
+
+Verified 2026-10-30 from the repository root:
+
+```sh
+export PATH=/home/kai/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin:$PATH
+cargo test -p yomoku-core --test statistics --all-features --locked --offline
+cargo test -p yomoku-storage --locked --offline --quiet
+cargo test --workspace --all-features --locked --offline --quiet
+cargo clippy --workspace --all-targets --all-features --locked --offline -- -D warnings
+cargo build --workspace --locked --offline
+cargo fmt --all -- --check
+git diff --check
+```
+
+PASS: five new core/six SQLite cases; 11 focused core tests, 332 storage tests
+(one ignored), 752 workspace tests (17 opt-in ignored), build, strict Clippy,
+Rustfmt and diff checks. Schema-5–20 upgrade/deletion/reopen fixtures now verify
+Known-form counts. Coverage includes shared forms and all status demotions,
+unresolved exclusion, exact Unicode/reading/context identity, chronological replay
+across unrelated regressing dates, simultaneous handoffs, unread document deletion,
+vocabulary erasure/fresh generations without rescans, original/effective duplicate
+and failing completions, read-only byte preservation, uncommitted link/status
+isolation and corrupt empty evidence. Retained undated links apply throughout
+their vocabulary generation's replay; new evidence can refine earlier counts.
+
+No failed check or blocker. No dependency/migration/FFI/Kotlin change; Android,
+JNI/codegen, Full-loader matrix, release/process-death and physical arm64 were not
+rerun. Date buckets, typed statistics transport and charts remain unimplemented.
+Logs: `/tmp/yomoku-known-forms-{storage,workspace,clippy,build}.log`.
