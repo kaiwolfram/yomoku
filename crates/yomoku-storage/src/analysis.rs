@@ -18,7 +18,10 @@ use yomoku_core::{
     vocabulary::Surface,
 };
 
-use crate::{vocabulary::register_vocabulary_in, Storage, StorageError};
+use crate::{
+    vocabulary::{link_dictionary_forms_in, register_vocabulary_in},
+    Storage, StorageError,
+};
 
 /// Shared read transaction for segmentation and effective page/status projections.
 pub(crate) fn read_effective_reader_chapter_in<'a>(
@@ -153,7 +156,8 @@ impl Storage {
 
     /// Persist a validated immutable base snapshot. Identical retries reuse its ID;
     /// different output under the same engine/dictionary/mode identity is an error.
-    /// This prerequisite does not register vocabulary or record reading encounters.
+    /// New snapshots retain resolved dictionary-form evidence for existing entries;
+    /// this does not register vocabulary or record reading encounters.
     pub fn store_chapter_analysis(
         &mut self,
         chapter_id: ChapterId,
@@ -268,7 +272,7 @@ pub(crate) fn save_registered_override_in(
     let registered = if changed {
         let effective = read_effective_reader_chapter_in(connection, &chapter)?
             .ok_or(StorageError::InvalidAnalysis)?;
-        let surfaces = effective
+        let tokens = effective
             .tokens_on_page(edit.anchor)
             .map_err(|_| StorageError::InvalidAnalysis)?
             .into_iter()
@@ -278,9 +282,25 @@ pub(crate) fn save_registered_override_in(
                     .override_id
                     == Some(id)
             })
-            .map(|token| Surface::new(token.surface).map_err(|_| StorageError::InvalidAnalysis))
+            .collect::<Vec<_>>();
+        let surfaces = tokens
+            .iter()
+            .map(|token| Surface::new(&token.surface).map_err(|_| StorageError::InvalidAnalysis))
             .collect::<Result<std::collections::BTreeSet<_>, _>>()?;
-        register_vocabulary_in(connection, &surfaces, registered_at_unix_ms)?
+        let registered = register_vocabulary_in(connection, &surfaces, registered_at_unix_ms)?;
+        link_dictionary_forms_in(
+            connection,
+            tokens.iter().map(|token| {
+                (
+                    token.surface.as_str(),
+                    token
+                        .metadata
+                        .as_ref()
+                        .and_then(|metadata| metadata.dictionary_form.as_ref()),
+                )
+            }),
+        )?;
+        registered
     } else {
         0
     };
@@ -543,6 +563,14 @@ pub(crate) fn store_chapter_analysis_in(
              token.dictionary_form.as_ref().map(Surface::as_str)),
         )?;
     }
+    link_dictionary_forms_in(
+        connection,
+        analysis
+            .tokens
+            .iter()
+            .filter(|token| token.is_japanese)
+            .map(|token| (token.surface.as_str(), token.dictionary_form.as_ref())),
+    )?;
     Ok(id)
 }
 

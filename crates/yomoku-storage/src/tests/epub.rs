@@ -751,7 +751,7 @@ fn epub_migration_preserves_existing_files_history_foreign_keys_and_sequence_aft
         .unwrap();
     drop(storage);
     let mut storage = Storage::open(database.path()).unwrap();
-    assert_eq!(storage.schema_version().unwrap(), 19);
+    assert_eq!(storage.schema_version().unwrap(), 20);
     assert_eq!(
         storage.load_txt_source(txt.document.document_id).unwrap(),
         source

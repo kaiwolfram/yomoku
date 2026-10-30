@@ -3038,3 +3038,22 @@ portion. Known dictionary-form counts remain unchecked, requiring durable links
 for registered-but-unread entries after document deletion. Date buckets and UI
 remain open; next session starts with that link/count prerequisite. Updated
 README, architecture/data/decisions/development and the brief handoff.
+
+
+## 2026-10-30 — Durable vocabulary dictionary-form links
+
+Added migration 0020 and transactional analyzer links in vocabulary/analysis,
+all analyzed imports, selected registered edits and original/effective completions.
+Exact spellings survive document deletion, including unread registrations;
+vocabulary erasure cascades them and later evidence belongs to a fresh ID.
+Unresolved/manual metadata stays absent. Upgrade recovers available snapshot and
+retained encounter evidence without rewriting history; already deleted unread
+metadata is unavailable. No read/retry rescan recreates erased associations.
+
+PASS: seven new storage tests, schema-5–20 history coverage, 741 workspace Rust
+tests (17 opt-in ignored), build, strict Clippy/Rustfmt/diff. Initial API/fixture/
+Clippy issues corrected; interrupted workspace test rerun completed. No blocker.
+Updated progress/data/architecture/decisions/development and the brief handoff.
+No dependency/FFI/Kotlin change; Android/JNI/Full-loader/release/arm64 not rerun.
+Next: Known dictionary-form timeline counts from durable links, then timeframe bins
+and typed UI transport. The count task remains unchecked.

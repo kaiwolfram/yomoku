@@ -142,6 +142,11 @@ const MIGRATIONS: &[Migration] = &[
         name: "0019_library_read_order",
         sql: include_str!("../migrations/0019_library_read_order.sql"),
     },
+    Migration {
+        version: 20,
+        name: "0020_vocabulary_dictionary_forms",
+        sql: include_str!("../migrations/0020_vocabulary_dictionary_forms.sql"),
+    },
 ];
 
 /// Failures are returned to the runtime; opening never resets a database.

@@ -1520,5 +1520,18 @@ vocabulary history cascades recalculate it without rescans.
 For a regressing wall clock or delayed frozen completion, clamp only that entry's
 projected date to its preceding event's projected date. This retains causal state,
 nonnegative counts and the final committed status without changing durable dates
-or shifting unrelated entries. Known dictionary-form links/counts, timeframe
-buckets and UI transport remain separate tasks.
+or shifting unrelated entries. Known dictionary-form counts, timeframe buckets
+and UI transport remain separate tasks.
+
+Migration 0020 retains resolved analyzer dictionary-form spellings in a global
+vocabulary-owned junction table, independent of live documents. New snapshots
+link existing entries; analyzed imports, selected registered edits and actual
+original/effective completions retain their own token metadata in the same write
+transaction. Missing/manual metadata stays absent; raw registration and identical
+snapshot retries never rescan existing content. Exact spelling deduplicates links
+across readings/contexts; distinct resolved forms remain separate associations.
+Document deletion retains unread links, while vocabulary deletion cascades them
+with that generation's history. Upgrade recovers available live-snapshot and
+completed-occurrence evidence without creating entries or altering events; unread
+metadata deleted before upgrade cannot be recovered. No core I/O, dependency,
+FFI or Kotlin change is required for this storage prerequisite.

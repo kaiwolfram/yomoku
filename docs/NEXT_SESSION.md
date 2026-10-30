@@ -1,11 +1,11 @@
 # Resume here
-Updated: 2026-10-29. Phase-5 five-status timeline verified.
+Updated: 2026-10-30. Phase-5 durable vocabulary dictionary-form links verified.
 
 ## Current slice
-- History audit, lifetime totals and five-status timeline complete. Schema 0019 retains v1 completion/status/analysis
+- History audit, lifetime totals and five-status timeline complete. Schema 0020 retains v1 completion/status/analysis
   headers and independent v1 effective reservations. Occurrences inherit the analyzed
   contract; reservation presence selects effective indices. No history-edit API.
-- Every history-bearing schema (5–19) upgrades with exact history/ID high-water marks
+- Every history-bearing schema (5–20) upgrades with exact history/ID high-water marks
   and joinable deleted source metadata. Late failures from 9/10/13/17/18 roll back
   byte-identically. Real completed/unused effective payloads survive upgrade/deletion;
   unused reservations never replay. DATA_MODEL.md documents the audited contract.
@@ -23,6 +23,13 @@ Updated: 2026-10-29. Phase-5 five-status timeline verified.
   get fresh IDs/New. Per-entry projected dates never precede their prior change
   (clock regressions/frozen completion); raw event dates remain unchanged. V1
   cause/provenance and causal chains validate before returning any points.
+- Migration 0020 stores exact analyzer dictionary-form spellings under vocabulary
+  IDs, independently of documents. Imports/new snapshots/registered edits/actual
+  original and effective completions retain evidence atomically. Unresolved/manual
+  metadata adds no links. Document deletion retains unread links; vocabulary erasure
+  cascades them. Raw registration, reads and identical snapshot/rule retries never
+  rescan to restore links. Upgrade recovers live snapshots/retained occurrences;
+  unread metadata deleted before upgrade is unrecoverable. See DATA_MODEL.md.
 - Production reader/Library/completion use native effective A/B/C/manual partitions;
   original B stays immutable. Edits expose Reload; exact Retry/Cancel survives dismissal.
   Partial time saves every 15s with a five-minute idle/background cap and drains
@@ -34,9 +41,9 @@ Updated: 2026-10-29. Phase-5 five-status timeline verified.
 
 ## Next tasks (ordered)
 1. Extend timeline with Known dictionary-form counts (any Known linked surface,
-   spelling identity, unresolved excluded). First add durable global analyzer links
-   in storage vocabulary/analysis/imports/completions. Preserve registered-but-unread
-   links after document deletion; test migration, erasure and fresh registration.
+   spelling identity, unresolved excluded), using vocabulary_dictionary_forms.
+   Test shared forms, transitions/demotion and vocabulary-erasure recalculation.
+   Link persistence is complete; timeline projection is still unchecked.
 2. Add timeframe buckets (month daily, six months/year weekly, all time monthly),
    date-boundary coverage and lifetime cumulative origin; then typed UI transport.
 3. Profile optimized Android repository/encoding/callback costs before changes;
@@ -44,18 +51,17 @@ Updated: 2026-10-29. Phase-5 five-status timeline verified.
 Nostr configuration stays empty; ask Q188 before forwarding.
 
 ## Verification / blockers
-- PASS: six new core/eight new SQLite timeline tests and schema-5–19 projections;
-  734 workspace Rust tests, 17 opt-in ignored; workspace build, strict Clippy/
-  Rustfmt/diff. No failures or implementation blocker.
+- PASS: seven new link tests and schema-5–20 history upgrade coverage; 741
+  workspace Rust tests, 17 opt-in ignored; build, strict Clippy/Rustfmt/diff.
+  No unresolved failures or implementation blockers.
 - Commands (Rust PATH workaround from DEVELOPMENT.md):
-  cargo test -p yomoku-storage statistics --locked --offline
-  cargo test -p yomoku-core --test statistics --locked --offline
+  cargo test -p yomoku-storage vocabulary_links --locked --offline
   cargo test --workspace --all-features --locked --offline --quiet
   cargo clippy --workspace --all-targets --all-features --locked --offline -- -D warnings
   cargo build --workspace --locked --offline
   cargo fmt --all -- --check
   git diff --check
-- Logs: /tmp/yomoku-status-statistics-{tests,workspace,clippy,build}.log.
-  No migration/dependency/FFI/Kotlin change; Android/JNI/codegen/Full-loader/release/
-  process-death/physical-arm64 were not rerun. Native/BoltFFI generation must remain
-  sequential with host JNI execution.
+- Logs: /tmp/yomoku-dictionary-links-{tests,workspace,clippy,build}.log.
+  Migration 0020 added; no dependency/FFI/Kotlin change. Android/JNI/codegen/
+  Full-loader/release/process-death/physical-arm64 were not rerun. Native/BoltFFI
+  generation must remain sequential with host JNI execution.

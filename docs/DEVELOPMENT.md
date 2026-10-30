@@ -6552,3 +6552,40 @@ No dependency/migration/FFI/Kotlin change; Android, JNI, generated bindings,
 Full-loader matrix, release/process-death and physical arm64 were not rerun.
 Known dictionary-form links/counts, timeframe buckets and statistics transport/UI
 remain open. Logs: `/tmp/yomoku-status-statistics-{tests,workspace,clippy,build}.log`.
+
+
+## Durable vocabulary dictionary-form links
+
+Verified 2026-10-30 from the repository root:
+
+```sh
+export PATH=/home/kai/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin:$PATH
+cargo test -p yomoku-storage vocabulary_links --locked --offline
+cargo test --workspace --all-features --locked --offline --quiet
+cargo clippy --workspace --all-targets --all-features --locked --offline -- -D warnings
+cargo build --workspace --locked --offline
+cargo fmt --all -- --check
+git diff --check
+```
+
+PASS: seven new storage tests; 741 workspace Rust tests, 17 opt-in ignored;
+workspace build, strict Clippy/Rustfmt/diff. Migration 0020 retains exact analyzer
+spellings independently of documents. Fixtures cover unread document deletion,
+Unicode/inflections, repetitions, unresolved/non-Japanese/manual metadata, distinct
+context resolutions, raw registration/read/snapshot retry without rescan, fresh
+vocabulary generations, selected edit metadata, original/effective completion,
+unused reservations, exact duplicate delivery, statement/deferred-COMMIT rollback
+and exact retry. Upgrade recovers surviving unread snapshots plus completed
+occurrences from deleted documents; late failure rolls back byte-identically and
+preserves totals/timeline. Existing history matrix now exercises schemas 5–20.
+Unread metadata deleted before upgrade cannot be recovered; no inferred mappings.
+
+Initial corrections: use enabled rusqlite `prepare` rather than the unavailable
+cached-statement API; explicitly reconstruct pre-20 fixture tables before historical
+upgrade tests; replace a cloned singleton slice after strict Clippy. Final focused
+and workspace runs pass. The interrupted workspace run was rerun to completion.
+No unresolved failure or implementation blocker. No dependency/FFI/Kotlin change;
+Android/JNI/codegen/Full-loader matrix, release/process-death and physical arm64
+were not rerun. Known dictionary-form timeline counts and UI remain unimplemented.
+Logs: `/tmp/yomoku-dictionary-links-{tests,workspace,clippy,build}.log`;
+initial corrected compile/fixture failures: `dictionary-links-initial.log`.

@@ -3775,3 +3775,27 @@ entry or apply an obsolete transition last. Core validates before mutation and
 storage returns no partial points on invalid history. Retain only entry state and
 per-date deltas; do not copy the complete event stream or introduce a cache.
 No dependency/version/schema/wire or data-destructive semantic change.
+
+## 2026-10-30 — Vocabulary-owned durable analyzer links
+
+Append migration 0020 rather than deriving Known dictionary-form statistics from
+live documents or completed reading alone. Retain distinct analyzer-resolved
+written forms under the current vocabulary ID, with cascade on vocabulary deletion
+and no document FK. Exact spelling, including Unicode distinctions, deduplicates
+observations across readings; preserve distinct resolved forms across contexts
+instead of silently picking an arbitrary analysis. Null/unresolved and manual
+metadata add no association and never remove prior evidence.
+
+New snapshots link existing entries only. Imports, selected registered boundary
+edits and actual original/effective completions link their own validated metadata
+after registration, atomically. Raw surface registration, read projections,
+reservations and identical snapshot/rule retries do not restore erased evidence
+by scanning old content. New evidence may link a newly registered generation.
+
+Upgrade backfills surviving live Japanese snapshots and historical occurrences
+for existing vocabulary; it never analyzes text or manufactures missing forms.
+Unread metadata deleted before upgrade cannot be recovered. Older snapshots lack
+vocabulary-generation identity, so one-time recovery can only use their exact
+surface join to currently registered entries. Schema-20 reopen performs no such
+rescan. Keep the count/timeline projection as the next independently testable
+slice; no dependency, wire, core I/O or destructive semantic change.

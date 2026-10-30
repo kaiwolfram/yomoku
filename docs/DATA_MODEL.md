@@ -1512,19 +1512,52 @@ entries. Vocabulary deletion erases all that ID's registration/transitions and
 therefore recalculates its full history; no existing content is rescanned.
 A later explicit import or actual completion registers a fresh ID as New.
 Known surface counts are present in each point; Known dictionary-form counts
-remain unimplemented pending durable automatic links for unread surfaces that
-survive document deletion. The phase-5 combined feature is not yet complete.
+remain unimplemented. Migration 0020 supplies their durable automatic links for
+unread surfaces, independently of live documents. The combined feature is open.
 
 Six pure tests and eight SQLite tests cover these semantics; the existing
 schema-5–19 matrix verifies timelines after upgrade, document deletion and reopen.
 The read API works with `PRAGMA query_only = true` and leaves DB bytes unchanged.
 
+## Durable vocabulary dictionary-form evidence (migration 0020)
+
+`vocabulary_dictionary_forms` has primary key `(vocabulary_id, dictionary_form)`
+and a vocabulary FK with `ON DELETE CASCADE`. A form is a nonempty, exact written
+spelling; readings, source IDs and live analysis IDs do not participate in its
+identity. Multiple analyzer-resolved spellings for one surface are retained as
+separate associations rather than selecting an arbitrary reading/context. Missing
+metadata contributes no row and never erases previous resolved evidence. Manual
+splits and custom dictionary entries do not invent analyzer links.
+
+New validated A/B/C snapshots retain evidence for already registered surfaces;
+an identical snapshot retry remains write-free. Analyzed imports (all formats),
+new registered boundary edits and actual original/effective completions retain
+their own token evidence after registration, in the same transaction. A snapshot
+alone never creates vocabulary. Effective registration uses only the selected
+rule's eligible tokens and their exact metadata; completion uses only the frozen
+completed page. Reservations and read projections add no links. Raw surface-only
+registration does not search saved analyses, so an erased vocabulary generation
+cannot recover its associations from a snapshot retry or reader reopen.
+
+Document deletion retains links even for unread words, while vocabulary deletion
+erases its links alongside status/encounter history. Later actual registration
+gets a fresh ID; new analyzer evidence can link that generation. Link insertion
+failure or deferred COMMIT failure rolls back the enclosing operation completely.
+
+Migration 0020 backfills distinct resolved Japanese metadata from surviving live
+snapshots joined to currently registered exact surfaces, plus retained reading
+occurrences joined by vocabulary ID. It creates no entries/events, loads no
+analyzer and rewrites no history. Unread metadata already deleted before upgrade
+is unavailable and cannot be reconstructed. The one-time recovery uses available
+snapshots; older schemas did not associate snapshot tokens with vocabulary
+generations. Reopening schema 20 never repeats that recovery. Known-form timeline
+replay/counting and typed transport remain future work.
+
 ## Required future schema constraints
 - Future import repositories must extend the identity/immutable-text and durable
   chapter/byte-offset contract above to multiple chapters.
-- Add analyzer dictionary-form links (nullable) to global vocabulary and wire
-  registration/status repositories into typed application/import effects.
-  Reading never participates in identity.
+- Use migration-0020 analyzer links for Known dictionary-form aggregates.
+  Reading never participates in dictionary-form identity.
 - Document deletion removes content/progress but preserves historical provenance,
   encounters and global vocabulary. Reimport creates fresh document progress.
 - Vocabulary deletion removes its encounter/status history, recalculates statistics
