@@ -529,6 +529,58 @@ fn prefix_query_plans_search_existing_surface_and_occurrence_indexes_for_all_sor
 }
 
 #[test]
+fn newest_page_work_does_not_grow_with_offscreen_encounters() {
+    let database = TestDatabase::new();
+    let mut storage = Storage::open(database.path()).unwrap();
+    let imported = import(&mut storage, "猫 猫");
+    for index in 0..205 {
+        register(&mut storage, &format!("新{index:03}"), 600);
+    }
+    let query = VocabularyQuery::default();
+    let expected = storage.vocabulary_page(&query, 0).unwrap();
+    let steps = |storage: &Storage| {
+        let (predicate, mut values) = crate::vocabulary_browser::matching(&query);
+        values.push(Value::Integer(0));
+        let mut statement = storage
+            .connection
+            .prepare(&crate::vocabulary_browser::page_sql(query.sort, &predicate))
+            .unwrap();
+        let count = statement
+            .query_map(params_from_iter(&values), |_| Ok(()))
+            .unwrap()
+            .collect::<Result<Vec<_>, _>>()
+            .unwrap()
+            .len();
+        assert_eq!(count, 100);
+        statement.get_status(rusqlite::StatementStatus::VmStep)
+    };
+    let before = steps(&storage);
+    for index in 0..100 {
+        complete(&mut storage, &imported, 1_000 + index, index % 2 == 0);
+    }
+    assert_eq!(storage.vocabulary_page(&query, 0).unwrap(), expected);
+    // A deterministic work counter, independent of host speed or timing noise.
+    // None of these 200 offscreen occurrences belongs to the displayed page.
+    assert_eq!(steps(&storage), before);
+    let last = storage.vocabulary_page(&query, 200).unwrap();
+    assert_eq!(last.matching_count, 206);
+    let cat = last.rows.iter().find(|row| row.surface == "猫").unwrap();
+    assert_eq!(cat.encountered_count, 200);
+    assert_eq!(cat.last_seen_unix_ms, Some(1_099));
+    // History validation still applies when the affected row is on the page.
+    storage
+        .connection
+        .pragma_update(None, "ignore_check_constraints", true)
+        .unwrap();
+    storage
+        .connection
+        .execute("UPDATE completion_analyses SET semantics_version = 2", [])
+        .unwrap();
+    assert_eq!(storage.vocabulary_page(&query, 0).unwrap(), expected);
+    assert!(storage.vocabulary_page(&query, 200).is_err());
+}
+
+#[test]
 fn corrupt_values_or_query_failures_release_snapshot_and_never_repair_data() {
     let database = TestDatabase::new();
     let mut storage = Storage::open(database.path()).unwrap();

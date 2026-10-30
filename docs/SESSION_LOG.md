@@ -3263,3 +3263,28 @@ Phone selection visual check passes; emulator display restored and emulator
 stopped. Rust/Clippy/host JNI/codegen/Full-loader matrix/release/process-death/
 performance/physical arm64 not rerun; no native/schema/dependency changes.
 Next: profiling, AnkiDroid API feasibility and remaining lifecycle/accessibility.
+
+## 2026-10-30 — Vocabulary history profiling and bounded Newest projections
+
+Added a disposable, production-seeded host benchmark for all Vocabulary sorts,
+selection, statistics, native FIFO callbacks and view/confirmation Bincode costs.
+Measured 1k/10k/100k entries, 50k encounters and up to 1.08m status events in
+release builds. Newest now selects registration-ordered candidates before history
+probes; its 100k first-page median falls 108.177→30.456 ms and native callback
+111.877→30.455 ms. No schema, dependency, protocol or product-behavior change.
+
+PASS: 817 workspace tests (17 opt-in ignored), two harness cases, workspace build,
+strict all-target/all-feature Clippy, Rustfmt/diff, 132 raw before/after metric rows
+with seven samples each, zero-round/reread even-sample smoke and exact read-only
+guards/cleanup. The new SQLite VM regression verifies unchanged first-page work
+after offscreen original/effective encounters, correct last-page counts/date and
+retained corruption rejection. Initial example enum spelling was corrected to
+LastYear before verification; no remaining blocker. No Android/JNI/Kotlin/codegen,
+Full-loader matrix, process-death or physical-arm64 rerun/claim.
+
+Results/commands are in VOCABULARY_PERFORMANCE.md and DEVELOPMENT.md; raw CSV is
+under docs/measurements. Statistics replay still takes ~1.04 s at 1.08m events;
+100k selected IDs plus frozen prompt create a ~1.6 MB view. These remain measured
+follow-ups, alongside diverse-book/peak-memory/Compose work. Updated architecture,
+data/decisions/plan/handoff. Logs: /tmp/yomoku-vocabulary-performance-{tests,
+example,build,clippy}.log and /tmp/yomoku-vocabulary-measure-{after-,}*.{csv,log}.

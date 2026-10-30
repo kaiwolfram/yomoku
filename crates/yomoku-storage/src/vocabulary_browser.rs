@@ -152,24 +152,44 @@ pub(super) fn page_sql(sort: VocabularySort, predicate: &str) -> String {
         }
         VocabularySort::Alphabetical => "v.surface COLLATE BINARY ASC",
     };
+    // Newest sorts registration fields, not history. Limit that candidate set
+    // before probing occurrences; otherwise SQLite evaluates correlated history
+    // expressions for entries considered by the sort, including offscreen rows.
+    // OFFSET and explicit inner/outer order prevent subquery flattening.
+    let (source, alias, suffix) = if sort == VocabularySort::Newest {
+        (
+            format!(
+                "(SELECT v.id, v.surface, v.status, v.registered_at_unix_ms
+                  FROM vocabulary v WHERE {predicate}
+                  ORDER BY {order} LIMIT {VOCABULARY_PAGE_SIZE} OFFSET ?) page_v"
+            ),
+            "page_v",
+            "ORDER BY page_v.registered_at_unix_ms DESC, page_v.id DESC".to_owned(),
+        )
+    } else {
+        (
+            "vocabulary v".to_owned(),
+            "v",
+            format!("WHERE {predicate} ORDER BY {order} LIMIT {VOCABULARY_PAGE_SIZE} OFFSET ?"),
+        )
+    };
     // Scalar indexed probes avoid grouping the entire occurrence table or
     // multiplying one entry by its readings/forms/events. No reservation JSON.
     format!(
-        "SELECT v.id, v.surface, v.status, v.registered_at_unix_ms,
+        "SELECT {alias}.id, {alias}.surface, {alias}.status, {alias}.registered_at_unix_ms,
             (SELECT COUNT(*) FROM reading_occurrences o
-             WHERE o.vocabulary_id = v.id) AS encountered_count,
+             WHERE o.vocabulary_id = {alias}.id) AS encountered_count,
             (SELECT MAX(c.completed_at_unix_ms) FROM reading_occurrences o
              JOIN reading_completions c USING (command_id)
-             WHERE o.vocabulary_id = v.id) AS last_seen_unix_ms,
+             WHERE o.vocabulary_id = {alias}.id) AS last_seen_unix_ms,
             NOT EXISTS (SELECT 1 FROM reading_occurrences o
              LEFT JOIN reading_completions c USING (command_id)
              LEFT JOIN completion_analyses a USING (command_id)
              LEFT JOIN effective_completion_commands e USING (command_id)
-             WHERE o.vocabulary_id = v.id AND
+             WHERE o.vocabulary_id = {alias}.id AND
                 (c.semantics_version IS NOT 1 OR a.semantics_version IS NOT 1
                  OR (e.semantics_version IS NOT NULL AND e.semantics_version <> 1)
                  OR c.completed_at_unix_ms < 0)) AS valid_history
-         FROM vocabulary v WHERE {predicate}
-         ORDER BY {order} LIMIT {VOCABULARY_PAGE_SIZE} OFFSET ?"
+         FROM {source} {suffix}"
     )
 }

@@ -1868,6 +1868,10 @@ without partial output or repairs. Document deletion preserves row history.
 
 Newest orders by registration date descending then ID descending. Frequency and
 LastSeen order descending by their metric, then Newest; unread dates sort last.
+Newest first captures its 100 ordered candidates with LIMIT/OFFSET in a subquery,
+then reads/validates only those rows' encounter summaries in the same transaction.
+The outer query repeats the order explicitly. This changes execution work only;
+the exact matching count, filters, page membership and history checks are unchanged.
 Alphabetical is exact BINARY surface order. Offset pages are stable for an
 unchanged query/dataset; retained integration must invalidate and restart after
 relevant mutations. Count/page read the same snapshot, but separate pages do not

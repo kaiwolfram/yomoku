@@ -208,7 +208,8 @@ position/encounter history. Keep incremental builds green.
 - [ ] Implement encrypted export of documents/history/settings/custom entries/identity; test complete round trip.
 - [ ] Validate/authenticate before confirmed replace restore and device key re-encryption; test wrong password, tampering, interrupted replacement and preserved original state.
 - [ ] Test supported schema/version upgrades and restored identity usability; never merge backups.
-- [ ] Benchmark large EPUBs, Full dictionary, many books and heavy history; record measurements and fix demonstrated bottlenecks.
+- [x] Profile host Vocabulary repository/FIFO/view encoding with production-seeded history and fix the demonstrated Newest-page bottleneck. Repeatable 1k/10k/100k-entry release fixtures contain 50k occurrences and up to 1.08m status events; limiting registration candidates before history probes lowers the 100k first-page median 108→30 ms. Exact SQLite work-counter regression, unchanged-file guards, 817 workspace tests (17 opt-in ignored), two harness tests, build/Clippy/fmt pass. Raw samples and remaining history/wire/device limits are in VOCABULARY_PERFORMANCE.md; no schema/dependency/protocol change.
+- [ ] Benchmark large EPUBs, Full dictionary, many books and heavy history; record measurements and fix demonstrated bottlenecks. Focused host Vocabulary/history baseline above is complete; diverse many-book, peak-memory and actual Compose/device measurements remain.
 - [ ] Run phone/tablet portrait/landscape, dark/light, airplane mode, accessibility and process-death/lifecycle matrix.
 - [ ] Review privacy, secrets, third-party redistribution/attribution, errors and asset/APK size.
 

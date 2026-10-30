@@ -7059,3 +7059,48 @@ and task-started emulator stopped. No native/schema/dependency change. Rust test
 Clippy, host JNI/codegen reproducibility, separate Full-loader matrix, release/
 process-death/performance and physical arm64 were not rerun. Logs:
 /tmp/yomoku-vocabulary-bulk-ui-{android,phone-initial,phone,phone-light,tablet,emulator}.log.
+
+## Vocabulary host history profiling and bounded Newest reads
+
+2026-10-30: the opt-in host example creates/migrates a disposable database,
+seeds it exclusively through production APIs, then measures repository calls,
+effective-factory FIFO callbacks, full ViewModel projection/Bincode encoding and
+Rust decoding. No input database/dictionary files, new dependency or migration.
+See VOCABULARY_PERFORMANCE.md for fixture definitions, raw samples, executable
+hashes, measured before/after results and host-only limitations.
+
+```sh
+export PATH=/home/kai/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin:$PATH
+cargo test --workspace --all-features --locked --offline --quiet
+cargo test -p yomoku-ffi --example measure_vocabulary --all-features --locked --offline
+cargo build --workspace --all-features --locked --offline
+cargo clippy --workspace --all-targets --all-features --locked --offline -- -D warnings
+cargo fmt --all -- --check
+git diff --check
+cargo build -p yomoku-ffi --example measure_vocabulary --release --locked --offline
+# Run timings only after all builds/tests have finished.
+target/release/examples/measure_vocabulary 1000 10 1000 7
+target/release/examples/measure_vocabulary 10000 10 1000 7
+target/release/examples/measure_vocabulary 100000 10 1000 7
+target/release/examples/measure_vocabulary 100 0 0 2
+```
+
+PASS: 817 workspace tests (17 opt-in ignored), two example cases, build, strict
+Clippy/formatting/diff; 132 before/after metric rows validate seven raw samples
+and rounded extrema/median, plus zero-round/reread even-sample smoke. Newest now
+projects histories only after selecting its ordered page; the VM-step regression
+adds 200 offscreen original/effective occurrences without adding query work, then
+verifies exact counts/dates and corrupt-history rejection on the final page.
+Existing ten browser cases retain Unicode/filter/tie/paging/index/read-only and
+rollback/error coverage. Main/example guards verify exact unchanged database bytes
+and scratch cleanup. The initial example used a nonexistent Year enum spelling;
+corrected to LastYear. No remaining blocker.
+
+100k entries: Newest first-page median 108.177→30.456 ms, native FIFO callback
+111.877→30.455 ms. Year statistics remains ~1.04 s with 1.08m status events;
+selected IDs and frozen confirmation yield a ~1.6 MB view. No Android/JNI/Kotlin,
+codegen/Full-loader matrix, Compose/frame/peak-memory, diverse-book, process-death
+or physical-arm64 check/claim is made for this host slice. Timed runs use isolated
+sequential release executables and RAM-backed /tmp with uncontrolled OS caches.
+Logs: /tmp/yomoku-vocabulary-performance-{tests,example,build,clippy}.log;
+/tmp/yomoku-vocabulary-measure-{after-,}*.{csv,log}. No emulator was started.

@@ -4040,3 +4040,22 @@ keeping selection; ordinary Back exits selection and failed-capture Back abandon
 capture/selection, following the existing native gates. All retained state is
 projected again after Activity recreation; only the status dropdown is local UI
 state. Process death continues to start a fresh native selection session.
+
+## 2026-10-30 — Measure Vocabulary history before optimizing reads
+
+Use an opt-in host example with exclusively disposable databases, synthetic
+analysis and production persistence APIs. Keep repository timings separate from
+native FIFO callback delivery and full-view/event Bincode encoding. Report Rust
+view decoding explicitly; it cannot establish Kotlin/JNI/Compose performance.
+Retain raw samples and exact read-only byte guards, and reject invalid fixture
+arguments before creating storage. Keep ordinary product paths free of profiling.
+
+The measured Newest query was computing encounter summaries while sorting
+registration candidates. Select the ordered LIMIT/OFFSET candidates in a subquery
+before the unchanged history projections, repeating the outer order explicitly.
+Keep one snapshot/count, literal filters, date/ID ties and visible provenance
+validation. Add no index, cached counter, migration, dependency or wire change.
+Use SQLite VM steps to verify that offscreen encounters add no history work to
+this page, rather than a host-speed assertion. Leave metric-dependent sorts and
+history replay for separately measured improvements. See VOCABULARY_PERFORMANCE.md
+for primary SQLite references, results and measurement limits.

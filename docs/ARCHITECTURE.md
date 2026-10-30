@@ -1627,9 +1627,12 @@ history survives; erased vocabulary stays absent without rescanning live texts.
 
 Newest uses registration date then ID descending; metric ties share this order,
 and alphabetical uses exact BINARY spelling. Each page returns an optional next
-offset; separate pages require an unchanged dataset/query. Frequency/date sorts
-can examine all matching histories and require a temporary sort; large-history
-performance is not measured. Retained worker/core/FFI state must invalidate pages
+offset; separate pages require an unchanged dataset/query. Newest limits the
+registration-ordered candidates before projecting/validating their encounter
+histories; offscreen encounters do not add VM work to that page's history probes.
+Frequency/LastSeen still examine matching histories and require a temporary sort.
+Host history/FIFO/encoding measurements and limits are in
+VOCABULARY_PERFORMANCE.md. Retained worker/core/FFI state must invalidate pages
 on relevant mutations and protect stale callbacks before Compose integration.
 The retained native transport and Compose browser are implemented below.
 
