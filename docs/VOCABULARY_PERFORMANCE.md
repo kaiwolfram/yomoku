@@ -1,5 +1,9 @@
 # Vocabulary host measurements
 
+Android JNI/Compose frames and sampled heap/RSS follow-up:
+[Vocabulary Android measurements](VOCABULARY_ANDROID_PERFORMANCE.md). Its synthetic
+debug-emulator results are separate from the host heavy-history timings below.
+
 Measured 2026-10-30 with the opt-in `yomoku-ffi` example `measure_vocabulary`.
 It creates a uniquely named scratch directory/database and accepts only fixture
 sizes, never a user database or input file. All fixture writes use production

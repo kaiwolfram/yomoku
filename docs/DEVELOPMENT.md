@@ -7243,3 +7243,52 @@ zero smoke: `/tmp/yomoku-status-decode-zero.{csv,log}`. No Android/JNI/Kotlin/
 codegen, Full-loader matrix, device/lifecycle/process-death/physical-arm64 or
 Compose/peak-memory/diverse-book measurements were rerun or claimed. No emulator
 started. Required decoding/replay, deep offsets and device measurements remain.
+
+## Vocabulary Compose and sampled-memory measurements
+
+Use the existing isolated API-36 x86_64 medium_phone AVD and pinned CLI tools.
+The opt-in test uses its own disposable database and native session; it does not
+open the app's normal database. Full method, parameters and results:
+[VOCABULARY_ANDROID_PERFORMANCE.md](VOCABULARY_ANDROID_PERFORMANCE.md).
+
+```sh
+export PATH=/home/kai/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin:$PATH
+export JAVA_HOME="$PWD/.local/jdk-17/jdk-17.0.21+9"
+export GRADLE_USER_HOME="$PWD/.local/gradle"
+export ANDROID_HOME=/home/kai/Android/Sdk
+./android/gradlew -p android :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug --offline --console=plain
+tools/format-kotlin.sh --check
+git diff --check
+"$ANDROID_HOME/platform-tools/adb" -s emulator-5554 install -r -t android/app/build/outputs/apk/debug/app-debug.apk
+"$ANDROID_HOME/platform-tools/adb" -s emulator-5554 install -r -t android/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+"$ANDROID_HOME/platform-tools/adb" -s emulator-5554 shell wm size reset
+"$ANDROID_HOME/platform-tools/adb" -s emulator-5554 shell wm density reset
+"$ANDROID_HOME/platform-tools/adb" -s emulator-5554 shell cmd uimode night no
+vocabulary_cases=app.yomoku.VocabularyScreenTest,app.yomoku.VocabularyProductionTest,app.yomoku.NavigationTest,app.yomoku.EffectiveReaderNavigationTest,app.yomoku.VocabularyPerformanceTest
+"$ANDROID_HOME/platform-tools/adb" -s emulator-5554 shell am instrument -w -r -e class "$vocabulary_cases" app.yomoku.test/androidx.test.runner.AndroidJUnitRunner
+# Wait until builds and ordinary regressions finish before measuring.
+"$ANDROID_HOME/platform-tools/adb" -s emulator-5554 shell am instrument -w -r -e class app.yomoku.VocabularyPerformanceTest -e yomokuMeasure true -e yomokuVocabularyEntries 10000 -e yomokuVocabularyLoaded 1000 -e yomokuMeasureIterations 5 app.yomoku.test/androidx.test.runner.AndroidJUnitRunner
+"$ANDROID_HOME/platform-tools/adb" -s emulator-5554 shell am instrument -w -r -e class app.yomoku.VocabularyPerformanceTest -e yomokuMeasure true -e yomokuVocabularyEntries 100000 -e yomokuVocabularyLoaded 1000 -e yomokuMeasureIterations 5 app.yomoku.test/androidx.test.runner.AndroidJUnitRunner
+```
+
+2026-10-30 PASS: both-ABI native rebuild/generated bindings, debug/test APKs,
+strict Android lint, repository Kotlin formatting and diff. Sixteen existing
+Vocabulary/navigation cases pass plus the harness's default assumption skip
+(17 reported; 205.770 s). Separate opt-in 10k/100k processes pass in
+32.330/49.535 s with one scenario warmup and five measured scenarios each.
+All 50 action samples and 110 frame durations validate: exact counts/medians/max,
+reference-frame counts, positive memory observations, payload sizes and zero
+reported drops. Unchanged database bytes, no analyzer, exact IDs/frozen prompts,
+no reading effects, integrity/FK/native closure/scratch cleanup pass. Post-run
+ADB confirms scratch directories absent. Results/hashes/limits/raw CSV are in
+VOCABULARY_ANDROID_PERFORMANCE.md. At 100k, Select All median idle time is
+865.486 ms, confirmation view ~1.65 MB; callback/composition profiling remains.
+
+Initial sandbox Gradle lock-socket failure required an approved rerun; no source
+or instrumentation failure. Used the existing isolated .local/statistics-ui-avd
+(8 GiB partition), reset to phone/light, and stopped the task-started emulator.
+Logs: /tmp/yomoku-vocabulary-compose-{android,format,regressions,10000,100000}.log.
+No production code/schema/dependency/wire changes. Rust host tests/Clippy, separate
+host JNI/codegen reproducibility, Full-loader matrix, optimized build, diverse
+books/heavy-history device data, continuous-fling/tablet/dark performance,
+process-death and physical arm64 were not rerun or claimed.

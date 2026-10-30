@@ -3369,3 +3369,33 @@ and /tmp/yomoku-browser-profile-*. No emulator started.
   in session/progress docs and user-facing reports. Updated the handoff reminder.
 - Reviewed the documentation diff and passed `git diff --check`. No code changes
   or runtime tests needed; implementation priorities and blockers are unchanged.
+
+
+## 2026-10-30 — Vocabulary Compose and sampled process memory
+- Started clean; continued the ordered Android performance follow-up. Added an
+  opt-in instrumentation harness using production YomokuApp/CoreSession/JNI/FIFO
+  with a disposable migrated/seeded SQLite file and forbidden analyzer access.
+  Measures first/append paging, retained-row scrolling, global Select All and
+  frozen confirmation; cancels without writes. No production/schema/wire change.
+- Capture main-window FrameMetrics on a separate handler and sample used Java
+  heap/native allocations/RSS about every 25 ms. Record observer/idle/debug,
+  separate Dialog-window and sampled-high-water limits; no exact peak/PSS claim.
+- PASS: both-ABI native rebuild/generated bindings, debug/test APKs, strict lint,
+  repository Kotlin formatting/diff; 16 existing regressions plus default skip
+  (17 reported; 205.770 s). Two isolated opt-in processes pass in 32.330/49.535 s:
+  10k/100k entries, 1,000 loaded rows, five scenarios after a full warmup each.
+- Validate all 50 action samples/110 raw frames, exact selected/frozen IDs,
+  unchanged DB hashes, zero analyzer/reading effects, integrity/FK/closure and
+  cleanup. No reported frame drops; all observed frames exceed fixed 16.667 ms.
+  Raw CSV, hashes and methodology: VOCABULARY_ANDROID_PERFORMANCE.md.
+- At 100k, Select All median action-to-idle is 865.486 ms; confirmation view
+  ~1.65 MB. Largest measured-action samples: Java 43.619/native 28.574/RSS
+  278.637 MiB at different times, not additive. Profile main callbacks and
+  selection composition next; measurements do not attribute a single cause.
+- Initial sandbox Gradle lock socket needed approved rerun; no source/test
+  failure remains. Reset existing isolated AVD to phone/light; stopped the
+  task-started emulator. Scratch files absent; existing dictionary caches kept.
+  Logs: /tmp/yomoku-vocabulary-compose-{android,format,regressions,10000,100000}.log.
+- No Rust host/Clippy, separate host JNI/codegen reproducibility/Full-loader,
+  optimized/tablet/dark/continuous-fling/heavy-history/diverse-book performance,
+  process-death or physical-arm64 rerun/claim. Broader hardening tasks stay open.

@@ -4123,3 +4123,20 @@ statistics reads with unchanged-byte, snapshot cleanup and successful fixture
 repair checks. Retain existing causal replay, concurrent generation/snapshot,
 read-only and completion provenance regressions. Primary API references and
 host-only results are in VOCABULARY_PERFORMANCE.md.
+
+## 2026-10-30 — Disposable Vocabulary Compose measurement fixture
+
+Measure the production screen and native session inside the existing debug-only,
+non-exported ComponentActivity, with a separate scratch SQLite file. Seed a valid
+deterministic New-registration fixture after production migrations and reopen it
+through CoreSession. Do not add a public seeding API, change the wire format or
+use the normal app database. Fail on analyzer dictionary access; verify exact
+rows/IDs/selection, unchanged bytes, integrity and cleanup. Cancel confirmation
+rather than performing a bulk mutation during read measurements.
+
+Use platform FrameMetrics and sampled Java/native heap/RSS without adopting new
+libraries. Keep raw per-action samples and observed frame durations. Describe
+instrumentation/observer overhead, separate dialog-window exclusion and sampled
+high-water limits explicitly; fixed 16.667 ms counts are not Android jank labels.
+Debug-emulator results do not establish optimized-build/arm64 or diverse-book
+performance. Method and primary API evidence: VOCABULARY_ANDROID_PERFORMANCE.md.
