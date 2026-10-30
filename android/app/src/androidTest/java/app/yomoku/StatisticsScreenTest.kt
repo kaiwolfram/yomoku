@@ -161,6 +161,12 @@ class StatisticsScreenTest {
 private fun statisticsView(): ViewModel {
     val data = statisticsFixture()
     return ViewModel(
+        vocabulary =
+            VocabularyState(
+                VocabularyQuery("", VocabularyStatus.entries.toList(), VocabularySort.NEWEST),
+                rows = emptyList(),
+                loading = false,
+            ),
         statistics =
             StatisticsState(
                 StatisticsTimeframe.LASTYEAR,

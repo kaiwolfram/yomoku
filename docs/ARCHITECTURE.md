@@ -1631,4 +1631,29 @@ offset; separate pages require an unchanged dataset/query. Frequency/date sorts
 can examine all matching histories and require a temporary sort; large-history
 performance is not measured. Retained worker/core/FFI state must invalidate pages
 on relevant mutations and protect stale callbacks before Compose integration.
-That transport and the Vocabulary UI remain unimplemented in this slice.
+The retained native transport is implemented below; the Vocabulary UI remains open.
+
+
+## Retained Vocabulary transport
+
+`ViewModel.vocabulary` contains the canonical status-set/literal-prefix/sort query,
+optional matching count, all loaded rows, next offset, loading and isolated error.
+Core handles LoadVocabulary, SetVocabularyQuery, LoadMoreVocabulary and explicit
+RetryVocabulary; the existing runtime storage worker executes skipped native
+LoadVocabulary(query, offset) reads through `Storage::vocabulary_page` without
+analyzer/word dictionary access. Only presentation/events use generated FFI.
+
+One captured attempt owns the shared FIFO until its callback. Query changes mark
+it obsolete even if the final query compares equal, and coalesce to the latest
+query. Attempts reject stale callbacks without releasing a newer request. Changed
+queries clear pages; failed appends retain them and retry the exact offset. Page
+validation rejects malformed or duplicate rows without partial append. Changed
+matching counts restart at zero; pages otherwise assume an unchanged dataset.
+
+Settings retains state and postpones new coalesced reads while hidden. Reentry
+refreshes pages with retained query choices. Imports, original/effective statuses,
+completions and effective edits/observations invalidate pages. Native state lives
+in the existing retained session and is lost on process death. Compose infinite
+scroll, phone/tablet recreation verification and bulk selection/writes remain open.
+All loaded rows currently cross the view boundary on render; serialization and
+large-list/history performance have not been measured.

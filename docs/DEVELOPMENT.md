@@ -6797,3 +6797,59 @@ rerun. Frequency/date sorts may evaluate every matching history; no large-histor
 performance claim. Vocabulary retained worker/core/FFI/Compose integration remains
 open. Logs: /tmp/yomoku-vocabulary-browser-{storage,workspace,clippy,build}.log;
 corrected initial compile log: /tmp/yomoku-vocabulary-browser-initial.log.
+
+
+## Retained Vocabulary worker/core/FFI transport
+
+Verified 2026-10-30 from the repository root:
+
+```sh
+export PATH=/home/kai/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin:$PATH
+cargo test -p yomoku-core --test vocabulary_transport --all-features --locked --offline
+cargo test -p yomoku-runtime --test imports vocabulary --all-features --locked --offline
+cargo test --workspace --all-features --locked --offline --quiet
+cargo clippy --workspace --all-targets --all-features --locked --offline -- -D warnings
+export JAVA_HOME="$PWD/.local/jdk-17/jdk-17.0.21+9"
+export JAVA_BIN="$JAVA_HOME/bin/java"
+tools/test-kotlin-bridge.sh
+cargo run -p yomoku-ffi --bin generate-kotlin --features facet_typegen --locked --offline -- target/generated/kotlin-repeat
+diff -r target/generated/kotlin target/generated/kotlin-repeat
+cargo fmt --all -- --check
+git diff --check
+```
+
+PASS: eight new core/three worker/one native-protocol cases, 801 workspace Rust
+tests (17 opt-in ignored), strict Clippy, workspace build through the bridge
+script, Kotlin strict compilation and full real-Full production JNI regressions,
+including 100 handle lifecycles. Generated output repeats identically; Rust/Kotlin/
+Rust fixtures preserve literal Unicode/NUL prefixes, nullable/error/loading state,
+u64::MAX counts and values above 2^53 for offsets/dates. Native read requests,
+results and captured callbacks remain unavailable to the shell codec.
+
+Tests cover three-page append, empty results/all sorts/status sets, failed first
+and append exact Retry, coalescing including A -> B -> A, stale/duplicate/generic
+callbacks, unrelated busy work/error isolation, hidden Settings followups, reentry,
+import/status/original/effective completion invalidation, external count restart,
+read-only bytes, no analyzer/dictionary loads, deleted-document history and reopen.
+Initial corrections: use the actual vocabulary table name in corruption fixtures,
+remove unused mut, and add the new field to the existing Rust/Android view fixtures.
+Final full/focused checks pass. Expected Crux close-during-I/O diagnostics remain
+as documented above. No new dependency or migration. Compose browser, bulk actions,
+large-history/serialization measurements and phone/tablet recreation remain open.
+
+Android PASS: native regeneration for both ABIs, debug/test APKs, strict lint,
+and changed Kotlin formatting. Commands (after host JNI finishes):
+
+```sh
+export GRADLE_USER_HOME="$PWD/.local/gradle"
+export ANDROID_HOME=/home/kai/Android/Sdk
+./android/gradlew -p android :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug --offline --console=plain
+"$JAVA_BIN" -jar .local/ktfmt-0.64.jar --kotlinlang-style --dry-run --set-exit-if-changed tests/kotlin/VocabularyBridgeTest.kt tests/kotlin/VocabularyCodecTest.kt android/app/src/main/java/app/yomoku/YomokuApp.kt android/app/src/androidTest/java/app/yomoku/{StatisticsScreen,EffectiveReaderNavigation,EffectiveReaderWords,EffectiveReaderBoundaries}Test.kt
+```
+
+Gradle's sandbox startup failed before building because local socket access was
+unavailable; escalated offline rerun passes. No unresolved failure or blocker.
+No device instrumentation, separate Full-loader matrix, release/process-death,
+performance or physical arm64 execution rerun. Logs:
+`/tmp/yomoku-vocabulary-transport-{core,worker,workspace,clippy,jni,codegen,android}.log`.
+Native/BoltFFI generation remained sequential to host JNI execution.

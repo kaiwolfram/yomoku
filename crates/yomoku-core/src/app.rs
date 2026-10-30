@@ -10,6 +10,7 @@ use serde::{Deserialize, Serialize};
 
 mod effective;
 mod statistics;
+mod vocabulary;
 
 use crate::{
     active_time::{
@@ -78,6 +79,10 @@ pub struct ImportSummary {
 
 #[derive(Default)]
 pub struct Model {
+    vocabulary: crate::vocabulary::VocabularyState,
+    vocabulary_request: Option<vocabulary::VocabularyRequest>,
+    vocabulary_request_sequence: u64,
+    vocabulary_failed_offset: Option<u64>,
     statistics: crate::statistics::StatisticsState,
     statistics_request: Option<(u64, crate::statistics::StatisticsQuery)>,
     statistics_request_sequence: u64,
@@ -147,6 +152,11 @@ pub enum Event {
     },
     /// Retry the exact failed query, retaining its original as-of instant.
     RetryStatistics,
+    /// Lazy first page for the retained literal query; failures require Retry.
+    LoadVocabulary,
+    SetVocabularyQuery(crate::vocabulary::VocabularyQuery),
+    LoadMoreVocabulary,
+    RetryVocabulary,
     OpenSettings,
     CloseSettings,
     RefreshLibrary,
@@ -269,11 +279,15 @@ pub enum Event {
     #[serde(skip)]
     #[cfg_attr(feature = "facet_typegen", facet(skip))]
     StatisticsFinished(u64, StorageResult),
+    #[serde(skip)]
+    #[cfg_attr(feature = "facet_typegen", facet(skip))]
+    VocabularyFinished(u64, StorageResult),
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
 pub struct ViewModel {
+    pub vocabulary: crate::vocabulary::VocabularyState,
     pub statistics: crate::statistics::StatisticsState,
     pub destination: Destination,
     pub settings_open: bool,
@@ -345,6 +359,12 @@ impl App for Yomoku {
     type Effect = Effect;
 
     fn update(&self, event: Event, model: &mut Model) -> Command<Effect, Event> {
+        if let Event::VocabularyFinished(request_id, result) = event {
+            return self.finish_vocabulary(request_id, result, model);
+        }
+        if let Some(command) = self.update_vocabulary(&event, model) {
+            return command;
+        }
         if let Event::StatisticsFinished(request_id, result) = event {
             return self.finish_statistics(request_id, result, model);
         }
@@ -1050,6 +1070,11 @@ impl App for Yomoku {
                 {
                     model.invalidate_statistics();
                 }
+                if destination == Destination::Vocabulary
+                    && model.destination != Destination::Vocabulary
+                {
+                    model.invalidate_vocabulary();
+                }
                 model.library_selection = None;
                 model.library_rename = None;
                 model.clear_library_delete();
@@ -1111,7 +1136,10 @@ impl App for Yomoku {
                 }
             }
             Event::StorageFinished(result) => {
-                if model.effective_request.is_some() || model.statistics_request.is_some() {
+                if model.effective_request.is_some()
+                    || model.statistics_request.is_some()
+                    || model.vocabulary_request.is_some()
+                {
                     return Command::done();
                 }
                 let failed = matches!(result, StorageResult::Failed(_));
@@ -1137,6 +1165,7 @@ impl App for Yomoku {
                     StorageResult::Created(_) | StorageResult::ReaderStatusChanged(..)
                 ) {
                     model.invalidate_statistics();
+                    model.invalidate_vocabulary();
                 }
                 match result {
                     StorageResult::DocumentRenamed { document_id, title } => {
@@ -1181,7 +1210,9 @@ impl App for Yomoku {
                     }
                     // Effective results must arrive through their captured request,
                     // never through this uncaptured legacy callback envelope.
-                    StorageResult::Effective(_) | StorageResult::StatisticsLoaded(_) => {
+                    StorageResult::Effective(_)
+                    | StorageResult::StatisticsLoaded(_)
+                    | StorageResult::VocabularyLoaded(_) => {
                         model.document_error = Some(DocumentError::InvalidDocument);
                     }
                     StorageResult::ImportCancelled => {}
@@ -1492,7 +1523,12 @@ impl App for Yomoku {
             | Event::CancelEffectiveReaderStatus
             | Event::EffectiveReaderOverride(_)
             | Event::EffectiveStorageFinished(..) => unreachable!(),
-            Event::LoadStatistics { .. }
+            Event::LoadVocabulary
+            | Event::SetVocabularyQuery(_)
+            | Event::LoadMoreVocabulary
+            | Event::RetryVocabulary
+            | Event::VocabularyFinished(..)
+            | Event::LoadStatistics { .. }
             | Event::SetStatisticsTimeframe { .. }
             | Event::RetryStatistics
             | Event::StatisticsFinished(..) => unreachable!(),
@@ -1502,6 +1538,7 @@ impl App for Yomoku {
 
     fn view(&self, model: &Model) -> ViewModel {
         ViewModel {
+            vocabulary: model.vocabulary.clone(),
             statistics: model.statistics.clone(),
             destination: model.destination,
             settings_open: model.settings_open,

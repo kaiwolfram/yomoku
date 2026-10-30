@@ -3923,3 +3923,33 @@ all matching histories and require a temporary sort. No performance claim for
 large histories, new counter cache or index migration. Reads never load content,
 analysis, dictionaries or reservation JSON, register erased entries, or write.
 Worker/core/FFI/Compose integration remains the next independently verified slice.
+
+
+## 2026-10-30 — Retained Vocabulary paging transport
+
+Use the existing native FIFO and one storage slot for read-only Vocabulary pages.
+Expose LoadVocabulary, SetVocabularyQuery, LoadMoreVocabulary and RetryVocabulary,
+plus session-retained query/count/rows/next-offset/loading/error presentation.
+The default query has an empty literal prefix, all statuses and Newest sort.
+Canonicalize only the status set to fixed enum order; preserve prefix bytes.
+None count means unattempted/invalidated, Some(0) means successfully empty.
+
+Load the first 100 rows lazily and append only on an explicit load-more event.
+Keep successful rows/count during an append or failed append. Retry replays the
+failed query/offset exactly; automatic load and load-more never retry errors.
+Clear old rows on a changed query and coalesce selections behind the current read.
+Capture monotonic attempt IDs, reject late/duplicate callbacks, and mark an active
+read obsolete on every query change/reentry, including A -> B -> A. An obsolete
+callback releases only its own slot and starts the latest page zero only if visible.
+Settings preserves query/pages/error and defers coalesced follow-ups until the lazy
+load resumes. Unrelated busy work rejects browser input without replacing state.
+
+Retain query choices across navigation; restart pages on reentry (external writes)
+and imports, status changes, completions and effective edits/observations. Validate
+page offset/size/next-offset, membership and duplicate IDs before appending. A
+changed matching count between pages restarts at zero. No cross-page snapshot or
+protection against unseen external changes with unchanged counts is claimed; a
+reentry refresh remains necessary. Keep native requests/results/callbacks out of
+the shell codec. Generate query/state/row values with exact u64/ULong counts and
+i64/Long dates/IDs. No migration, dependency, clock, SQL in core or dictionary
+rescan. Compose browser/infinite scroll and bulk commands are separate slices.

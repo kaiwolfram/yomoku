@@ -34,6 +34,8 @@ mod document_deletion;
 mod document_rename;
 #[path = "imports/statistics.rs"]
 mod statistics;
+#[path = "imports/vocabulary.rs"]
+mod vocabulary;
 
 struct Database(PathBuf);
 impl Database {

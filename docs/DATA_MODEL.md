@@ -475,8 +475,9 @@ selection-scoped drafts are discarded with the reader word panel.
   otherwise. New registration never implies a completed-reading encounter.
 - Completion status policy: only New changes to Known.
 
-Vocabulary has no application/FFI command yet. Persisted status strings are
-defined explicitly below, independently of Rust enum ordinals.
+Reader status commands and the read-only Vocabulary browser use typed application/
+FFI payloads described below; browser bulk commands remain open. Persisted status
+strings are defined explicitly below, independently of Rust enum ordinals.
 
 ## Global vocabulary and status history (migration 0006)
 `VocabularyId` is a distinct positive i64 newtype. `VocabularyEntry` carries ID,
@@ -932,7 +933,7 @@ enables foreign keys per connection and waits up to five seconds for lock
 contention. Newer versions, inconsistent history, nonempty databases without a
 journal, invalid files and SQLite I/O failures return errors without resetting or
 repairing data. Runtime opens/migrates on its FIFO worker using Android's private
-files path. Vocabulary/history tables await their domain commands.
+files path. Vocabulary/history tables and their domain commands are described below.
 
 ## Paste repository (migration 0002)
 `PasteText` validates non-whitespace content without changing the text. Its initial
@@ -1848,8 +1849,8 @@ timeframe, query, loading/error and exact Retry cutoff.
 
 `Storage::vocabulary_page(&VocabularyQuery, offset)` returns a full matching count,
 up to 100 `VocabularyRow` values and an optional next offset in one deferred read
-transaction. Pure core owns only query/sort/row/page values; the repository owns
-SQL. Prefix matching uses the existing BINARY unique surface index with literal
+transaction. Pure core owns query/sort/row/page/presentation values; the repository
+owns SQL. Prefix matching uses the existing BINARY unique surface index with literal
 lower/exclusive upper bounds. No case folding, normalization, wildcard expansion,
 reading/lemma match or trimming. Status subsets intersect the prefix; all five is
 the default, empty matches none, duplicates have no effect.
@@ -1871,4 +1872,27 @@ Alphabetical is exact BINARY surface order. Offset pages are stable for an
 unchanged query/dataset; retained integration must invalidate and restart after
 relevant mutations. Count/page read the same snapshot, but separate pages do not
 retain a database transaction. No new migration, counter table, analyzer access,
-content rescan, FFI wire change or product deletion API is introduced.
+content rescan or product deletion API is introduced by the repository.
+
+
+## Vocabulary application payloads (no migration)
+
+`VocabularyState` contains a retained `VocabularyQuery` (literal prefix, canonical
+five-status subset, sort), optional u64 matching count, loaded `VocabularyRow`
+vector, optional u64 next offset, loading and optional `DocumentError`. None count
+means the first page has not succeeded for this dataset/query; Some(0) is empty.
+Generated Kotlin preserves ULong counts/offsets and Long dates/positive IDs.
+
+LoadVocabulary lazily requests page zero, SetVocabularyQuery changes the query,
+LoadMoreVocabulary requests the next 100-row offset, and RetryVocabulary replays
+the exact failed offset/query. Successful rows survive append failures. Query
+changes clear rows/count/error, retain one active read's FIFO ownership and
+coalesce the desired query. Native attempt IDs/obsolete markers reject old results,
+even across A -> B -> A and equal-query reentry; requests/results/callbacks have
+no generated shell codec. Settings retains data/errors and defers hidden followups.
+
+Reentry and relevant mutations clear pages while retaining query choices. Count
+changes across pages trigger a fresh page zero. Pages are separate read snapshots;
+external mutations that preserve the count are not automatically detected. No
+persistent browser cache, schema migration, history mutation, analyzer load or
+rescan is added. The shell browser and bulk mutation commands remain unimplemented.

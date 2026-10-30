@@ -25,6 +25,8 @@ use yomoku_core::{pagination::ReadingPosition, reader::ReaderAnalysis};
 mod effective_overrides;
 #[path = "unicode-fixtures/statistics.rs"]
 mod statistics;
+#[path = "unicode-fixtures/vocabulary.rs"]
+mod vocabulary;
 
 const CASES: &[(&str, &str)] = &[
     ("", ""),
@@ -50,6 +52,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let dir = Path::new(&args[1]);
     let writing = args[0] == "write";
     statistics::exchange(dir, writing)?;
+    vocabulary::exchange(dir, writing)?;
     if writing {
         fs::create_dir_all(dir)?;
         fs::write(

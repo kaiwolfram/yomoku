@@ -205,6 +205,13 @@ fn statistics_refreshes_after_reader_status_and_reread_completion() {
     let (_observer, id) = seed(&database);
     let Factory { loader, trace, .. } = Factory::new(false, None);
     let (router, lifecycle) = effect_router_with_analyzed_imports(database.path(), loader).unwrap();
+    router.update(Event::SelectDestination(Destination::Vocabulary), |_| {});
+    assert_eq!(
+        dispatch(&router, Event::LoadVocabulary)
+            .vocabulary
+            .matching_count,
+        Some(5)
+    );
     router.update(Event::SelectDestination(Destination::Statistics), |_| {});
     read(&router, Timeframe::AllTime);
     router.update(Event::SelectDestination(Destination::Library), |_| {});
@@ -236,6 +243,7 @@ fn statistics_refreshes_after_reader_status_and_reread_completion() {
         }),
     );
     assert!(changed.statistics.data.is_none());
+    assert_eq!(changed.vocabulary.matching_count, None);
     router.update(Event::SelectDestination(Destination::Statistics), |_| {});
     assert_eq!(
         read(&router, Timeframe::AllTime)
@@ -247,6 +255,8 @@ fn statistics_refreshes_after_reader_status_and_reread_completion() {
             .known,
         2
     );
+    router.update(Event::SelectDestination(Destination::Vocabulary), |_| {});
+    dispatch(&router, Event::LoadVocabulary);
     router.update(Event::SelectDestination(Destination::Library), |_| {});
     let page = dispatch(&router, Event::OpenReader(id)).reader.unwrap();
     let (sender, receiver) = mpsc::channel();
@@ -266,6 +276,7 @@ fn statistics_refreshes_after_reader_status_and_reread_completion() {
         let view = router.view();
         if !view.storage_busy {
             assert!(view.statistics.data.is_none() && view.statistics.query.is_none());
+            assert_eq!(view.vocabulary.matching_count, None);
             assert_eq!(view.document_error, None);
             break;
         }

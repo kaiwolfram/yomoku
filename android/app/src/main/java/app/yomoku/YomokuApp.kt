@@ -41,6 +41,10 @@ import app.yomoku.shared.LibrarySort
 import app.yomoku.shared.StatisticsState
 import app.yomoku.shared.StatisticsTimeframe
 import app.yomoku.shared.ViewModel
+import app.yomoku.shared.VocabularyQuery
+import app.yomoku.shared.VocabularySort
+import app.yomoku.shared.VocabularyState
+import app.yomoku.shared.VocabularyStatus
 import app.yomoku.theme.YomokuTheme
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -237,6 +241,16 @@ private fun YomokuPreview() {
     YomokuTheme {
         YomokuApp(
             ViewModel(
+                vocabulary =
+                    VocabularyState(
+                        VocabularyQuery(
+                            "",
+                            VocabularyStatus.entries.toList(),
+                            VocabularySort.NEWEST,
+                        ),
+                        rows = emptyList(),
+                        loading = false,
+                    ),
                 statistics = StatisticsState(StatisticsTimeframe.LASTYEAR, loading = false),
                 destination = Destination.LIBRARY,
                 settingsOpen = false,

@@ -67,3 +67,29 @@ pub struct VocabularyPage {
     pub rows: Vec<VocabularyRow>,
     pub next_offset: Option<u64>,
 }
+
+/// Session-retained query and loaded prefix of its results. None count means
+/// the first page has not succeeded; Some(0) is a successfully empty result.
+#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, Eq)]
+#[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
+pub struct VocabularyState {
+    pub query: VocabularyQuery,
+    pub matching_count: Option<u64>,
+    pub rows: Vec<VocabularyRow>,
+    pub next_offset: Option<u64>,
+    pub loading: bool,
+    pub error: Option<crate::storage::DocumentError>,
+}
+
+impl VocabularyQuery {
+    /// A status filter is a set. Preserve literal spelling while making equal
+    /// subsets independent of checkbox order or duplicate shell values.
+    pub fn canonicalized(mut self) -> Self {
+        self.statuses = VocabularyQuery::default()
+            .statuses
+            .into_iter()
+            .filter(|status| self.statuses.contains(status))
+            .collect();
+        self
+    }
+}

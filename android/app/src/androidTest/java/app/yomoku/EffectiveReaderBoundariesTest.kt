@@ -50,6 +50,12 @@ class EffectiveReaderBoundariesTest {
                 ReaderTokenKey(page.documentId, page.anchor, analysis),
             )
         return ViewModel(
+            vocabulary =
+                VocabularyState(
+                    VocabularyQuery("", VocabularyStatus.entries.toList(), VocabularySort.NEWEST),
+                    rows = emptyList(),
+                    loading = false,
+                ),
             statistics = StatisticsState(StatisticsTimeframe.LASTYEAR, loading = false),
             destination = Destination.LIBRARY,
             settingsOpen = false,

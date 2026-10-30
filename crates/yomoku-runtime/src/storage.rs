@@ -213,6 +213,10 @@ fn execute(
     }
     let storage = storage.as_mut().expect("opened storage");
     match operation {
+        StorageOperation::LoadVocabulary { query, offset } => storage
+            .vocabulary_page(&query, offset)
+            .map(StorageResult::VocabularyLoaded)
+            .map_err(map_error),
         StorageOperation::LoadStatistics(query) => storage
             .statistics_buckets(query.timeframe, query.as_of_unix_ms)
             .map(|data| StorageResult::StatisticsLoaded(Box::new(data)))

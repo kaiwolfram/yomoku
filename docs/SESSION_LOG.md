@@ -3148,3 +3148,25 @@ rereads, deletion/reopen/read-only behavior, failure isolation and cleanup.
 Corrected an initial missing test import; no remaining blocker. Android/JNI/
 codegen/Full-loader matrix/release/performance/physical arm64 not rerun.
 Next: retained Vocabulary worker/core/FFI paging, then Compose integration.
+
+
+## 2026-10-30 — Retained native Vocabulary browser transport
+
+Added retained literal query/status-set/sort, optional matching count, loaded rows,
+next offset and loading/error state through native FIFO/core/generated FFI.
+Implemented lazy 100-row append, frozen failed-page Retry, coalesced query changes,
+stale attempt rejection including A -> B -> A, Settings deferral, reentry/mutation
+invalidation and count-change restart. Preserved read-only storage and no analyzer/
+dictionary loads. Updated Android view fixtures, architecture/data/decision docs,
+plan and handoff; Compose browser and bulk actions remain unchecked.
+
+PASS: eight core/three worker/one native-protocol cases; 801 workspace Rust tests
+(17 opt-in ignored), strict Clippy, Rustfmt/diff, bridge workspace build, real-Full
+Kotlin/JNI regressions and 100 handle lifecycles, exact unsigned/literal codecs,
+identical repeated generation, both-ABI native regeneration, debug/test APKs,
+strict Android lint and changed Kotlin formatting. Corrected initial fixture
+schema name/unused mut/missing view initializer; sandbox Gradle socket failure
+recovered with escalated offline run. No unresolved failure or blocker. Device,
+separate Full-loader matrix, release/process-death/performance and physical arm64
+not rerun. Next: Compose prefix/filter/sort/count/Retry/infinite scroll and
+phone/tablet recreation, followed by global matching bulk operations.
