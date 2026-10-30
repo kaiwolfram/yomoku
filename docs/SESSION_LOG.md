@@ -3131,3 +3131,20 @@ preserving Library data; original temporary reserve setting restored. Sandbox
 Gradle and /tmp image allocation failures recovered. Display settings restored,
 task emulators stopped; no remaining blocker. Rust/host-JNI/release/performance/
 physical-arm64 checks not rerun. Next: Vocabulary indexed query/paging transport.
+
+
+## 2026-10-30 — Read-only indexed Vocabulary browser repository
+
+Added pure query/sort/row/page values and one-snapshot native prefix/status/count/
+100-row paging repository with four sorts. Reused existing indexes and exact
+completed-reading history without content/analyzer access, writes or migrations.
+Recorded prefix, ordering and page-invalidation choices; updated plan, handoff,
+architecture/data/development docs. Vocabulary UI/transport remain unchecked.
+
+PASS: nine new SQLite cases; 789 workspace Rust tests, 17 opt-in ignored;
+workspace build, strict Clippy/Rustfmt/diff. Verified query plans, all status
+subsets, Unicode/literal prefixes, stable filtered paging, original/effective
+rereads, deletion/reopen/read-only behavior, failure isolation and cleanup.
+Corrected an initial missing test import; no remaining blocker. Android/JNI/
+codegen/Full-loader matrix/release/performance/physical arm64 not rerun.
+Next: retained Vocabulary worker/core/FFI paging, then Compose integration.

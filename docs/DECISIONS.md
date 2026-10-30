@@ -3895,3 +3895,31 @@ recreation transitions, and capture again on an explicit timeframe selection.
 The screen exists only while visible and resubmits its lazy load when storage is
 idle. Explicit Retry carries no newly sampled time. No periodic background refresh,
 time totals UI, migration, dependency or new durable behavior is added.
+
+## 2026-10-30 — Read-only Vocabulary browser repository
+
+Start the browser with pure query/page/row values and one native read transaction
+per page. Reuse the BINARY unique surface index: match a literal lower prefix
+bound and its exclusive Unicode-scalar successor, skipping surrogates and handling
+trailing U+10FFFF. Empty prefix matches all. Preserve case, normalization,
+whitespace, embedded NUL and wildcard characters exactly; do not use LIKE or
+search analyzer readings/forms. Status choices form a union intersected with the
+prefix; default all five, explicit empty set none, duplicates ignored.
+
+Use registration timestamp descending then stable ID descending for Newest.
+Frequency is lifetime completed-reading occurrence count descending, including
+repetitions and rereads. LastSeen is the maximum recorded completion timestamp,
+not registration, manual status change, dictionary lookup or commit order; unseen
+entries follow seen ones. Frequency/date ties use the Newest order. Alphabetical
+uses exact BINARY surface ascending without locale or reading-based collation.
+These are routine ordering choices within the specified four sorts.
+
+Return matching count and at most 100 rows from the same deferred read snapshot,
+with an optional next offset. Reject offsets above SQLite's signed integer range.
+Offsets require an unchanged query/dataset: future retained state must restart
+from zero after mutations and reject stale responses. Existing occurrence indexes
+supply counts/dates with correlated probes; frequency/last-seen sorts may evaluate
+all matching histories and require a temporary sort. No performance claim for
+large histories, new counter cache or index migration. Reads never load content,
+analysis, dictionaries or reservation JSON, register erased entries, or write.
+Worker/core/FFI/Compose integration remains the next independently verified slice.

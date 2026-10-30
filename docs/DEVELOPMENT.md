@@ -6759,3 +6759,41 @@ source change. Rust tests/Clippy, host JNI, codegen reproducibility, separate
 Full-loader matrix, release/process-death, performance and physical arm64 were
 not rerun. Logs: /tmp/yomoku-statistics-ui-{android,android-final,phone,tablet,
 emulator,isolated-emulator}.log. Generation remained sequential to host JNI.
+
+
+## Read-only indexed Vocabulary browser
+
+Verified 2026-10-30 from the repository root with the pinned Rust PATH workaround:
+
+```sh
+export PATH=/home/kai/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin:$PATH
+cargo test -p yomoku-storage vocabulary_browser --locked --offline
+cargo test --workspace --all-features --locked --offline --quiet
+cargo clippy --workspace --all-targets --all-features --locked --offline -- -D warnings
+cargo build --workspace --locked --offline
+cargo fmt --all -- --check
+git diff --check
+```
+
+PASS: nine new SQLite cases; 789 workspace Rust tests, 17 opt-in ignored;
+workspace build, strict Clippy/Rustfmt/diff checks. Query plans use the existing
+BINARY surface range index and per-entry occurrence index for all four sorts.
+Coverage includes all 32 status subsets, duplicate/empty filters, literal wildcard/
+quote/whitespace/NUL/case prefixes, supplementary/decomposed Unicode and scalar
+successor edge bounds, reading/lemma exclusion, 100-row pages with filtered/unloaded
+results and stable ties, huge offsets, original/effective repeated/reread history,
+regressing dates, manual status/lookup exclusion, read-only unchanged bytes/reopen,
+document-deleted history, vocabulary erasure with surviving live documents/fresh
+New generations, pending/unused/legacy/failed/uncommitted isolation, corrupt
+versions/dates/statuses, missing provenance and query failure cleanup without repairs.
+
+Initial test compilation lacked a VocabularyId import; corrected and rerun.
+Focused tests were rerun after strengthening surviving-document and missing-
+provenance assertions; the full suite was rerun after the final SQL change.
+No unresolved failure/blocker. No dependency, migration, shell wire or Android
+source change. Android APK/lint/device, host JNI/codegen reproducibility, separate
+Full-loader matrix, release/process-death/performance and physical arm64 were not
+rerun. Frequency/date sorts may evaluate every matching history; no large-history
+performance claim. Vocabulary retained worker/core/FFI/Compose integration remains
+open. Logs: /tmp/yomoku-vocabulary-browser-{storage,workspace,clippy,build}.log;
+corrected initial compile log: /tmp/yomoku-vocabulary-browser-initial.log.

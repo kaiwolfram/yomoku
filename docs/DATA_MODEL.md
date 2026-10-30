@@ -1843,3 +1843,32 @@ relative drawing distances use floating point, after unsigned subtraction of the
 visible minimum. UTC dates and actual elapsed x spacing match the native bucket
 ranges. The shell saves only the selected drilldown; native state still owns the
 timeframe, query, loading/error and exact Retry cutoff.
+
+## Read-only Vocabulary browser (schema 0020 unchanged)
+
+`Storage::vocabulary_page(&VocabularyQuery, offset)` returns a full matching count,
+up to 100 `VocabularyRow` values and an optional next offset in one deferred read
+transaction. Pure core owns only query/sort/row/page values; the repository owns
+SQL. Prefix matching uses the existing BINARY unique surface index with literal
+lower/exclusive upper bounds. No case folding, normalization, wildcard expansion,
+reading/lemma match or trimming. Status subsets intersect the prefix; all five is
+the default, empty matches none, duplicates have no effect.
+
+Each row retains durable VocabularyId, exact surface/status/registration date,
+unsigned lifetime completed-reading occurrence count and optional last-seen date.
+Counts query `reading_occurrences_by_entry`, so repetitions and original/effective
+rereads contribute separately; erased vocabulary generations stay absent.
+Last seen is the maximum associated `reading_completions.completed_at_unix_ms`,
+including clock regressions, with None for unread entries. Imports, manual status
+changes, partial time, unused reservations, legacy unanalyzed completions and
+lookup alone add no encounter or last-seen value. Validate returned entry/history
+values and v1 completion/analysis/effective provenance; errors release the snapshot
+without partial output or repairs. Document deletion preserves row history.
+
+Newest orders by registration date descending then ID descending. Frequency and
+LastSeen order descending by their metric, then Newest; unread dates sort last.
+Alphabetical is exact BINARY surface order. Offset pages are stable for an
+unchanged query/dataset; retained integration must invalidate and restart after
+relevant mutations. Count/page read the same snapshot, but separate pages do not
+retain a database transaction. No new migration, counter table, analyzer access,
+content rescan, FFI wire change or product deletion API is introduced.

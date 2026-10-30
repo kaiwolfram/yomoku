@@ -40,6 +40,7 @@ mod srt;
 mod statistics;
 mod txt;
 mod vocabulary;
+mod vocabulary_browser;
 mod vocabulary_links;
 
 static NEXT_DATABASE: AtomicU64 = AtomicU64::new(0);

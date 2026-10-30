@@ -1612,3 +1612,23 @@ Status strokes reuse the reader/Library palette, including graph-only Known gree
 Known dictionary forms use a contrasting dashed line. Exact, labeled interval rows
 and chart summaries complement the Canvas. No chart dependency, platform query,
 schema, stored counter or change to completion/history semantics is introduced.
+
+## Vocabulary browser repository
+
+The pure vocabulary module defines query/sort/row/page values. The separate SQLite
+repository supplies literal written-prefix matches, status-subset filters, full
+matching count and 100-row offset pages. One deferred transaction keeps count and
+rows consistent. It reuses the unique BINARY surface index and per-vocabulary
+occurrence index; no schema, dependency, platform SQL or core I/O is added.
+Frequency is lifetime completed-reading occurrences; last seen is the maximum
+completion timestamp. Original/effective repetitions and rereads count, while
+registration, partial time, lookup and unused reservations do not. Document-deleted
+history survives; erased vocabulary stays absent without rescanning live texts.
+
+Newest uses registration date then ID descending; metric ties share this order,
+and alphabetical uses exact BINARY spelling. Each page returns an optional next
+offset; separate pages require an unchanged dataset/query. Frequency/date sorts
+can examine all matching histories and require a temporary sort; large-history
+performance is not measured. Retained worker/core/FFI state must invalidate pages
+on relevant mutations and protect stale callbacks before Compose integration.
+That transport and the Vocabulary UI remain unimplemented in this slice.

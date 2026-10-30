@@ -4,6 +4,9 @@ use serde::{Deserialize, Serialize};
 
 use crate::document::VocabularyId;
 
+mod browser;
+pub use browser::*;
+
 /// Persisted global entry. Registration time is distinct from reading encounters.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct VocabularyEntry {

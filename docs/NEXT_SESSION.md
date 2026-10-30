@@ -1,54 +1,54 @@
 # Resume here
-Updated: 2026-10-30. Phase-5 Statistics Compose overview/drilldowns implemented.
+Updated: 2026-10-30. Native read-only Vocabulary browser repository implemented.
 
 ## Current slice
-- Statistics now renders cumulative lifetime Japanese occurrences, five absolute
-  status lines and Known surface/dictionary-form lines. Tappable overview cards
-  open charts plus exact lifetime opening/interval-end rows. Android Back returns
-  to overview; session-keyed drilldown survives Settings/navigation/recreation.
-- All four timeframe chips use retained core state (LastYear default), explicit
-  UTC grouping/ranges and visible/idle lazy loading. Capture now once for first/
-  invalidated queries or explicit selections; reuse retained cutoff on renders,
-  Settings/recreation and errors. Only RetryStatistics retries a failed query.
-- StatisticsDataset retains exact ULongs, actual elapsed x spacing and opening
-  lifetime values. Step lines map interval-end samples. Subtract unsigned minimum
-  before floating-point drawing conversion; constant/empty lines stay finite.
-  Reuse status palette/Known green; dictionary-form line is dashed. Accessible
-  summaries/legends/rows retain exact counts. No new library or migration.
-- Native FIFO/core/FFI transport and read-only SQLite projections remain unchanged:
-  rapid selections coalesce, stale callbacks cannot replace new lines, imports/
-  status/completions/effective edits/tab reentry invalidate values, document
-  deletion retains history and vocabulary erasure recalculates without rescans.
-- Updated preview/three existing reader fixtures for the Statistics wire field
-  added in the previous slice. Current Android builds regenerate both native ABIs
-  and Kotlin together. Keep native/BoltFFI generation sequential to host JNI.
-- Production reader/Library/completion use effective partitions. Exact Retry/Cancel
-  and final-time drain remain verified; original B stays immutable. Performance
-  limits: EFFECTIVE_READER_PERFORMANCE.md. Schema remains 0020.
+- Pure VocabularyQuery/Sort/Row/Page values plus Storage::vocabulary_page(query,
+  offset): literal indexed surface prefix, five-status subsets, matching count,
+  100-row offset pages and newest/frequency/last-seen/alphabetical sorting.
+- Count and rows share one deferred read snapshot. Existing BINARY surface and
+  occurrence indexes suffice; no migration/dependency. Schema remains 0020.
+- Frequency counts actual completed-reading occurrences, including repeats and
+  original/effective rereads; last seen is maximum recorded completion date.
+  Newest uses registration date then ID descending; metric ties share that order.
+  Alphabetical uses exact BINARY spelling; unread dates sort last.
+- Empty prefix matches all; default all statuses, explicit empty set none.
+  Preserve Unicode/case/whitespace/NUL/wildcards literally, no reading/lemma match.
+  Document deletion retains history; erased entries stay absent without rescans.
+- Pages are stable only for an unchanged query/dataset. Future transport must
+  restart after relevant mutations and protect stale callbacks. Frequency/date
+  sorts can examine all matching histories; large-history costs are unmeasured.
+- Vocabulary worker/core/FFI state and Compose browser remain unimplemented.
+  Statistics UI/transport and effective reader remain as previously verified.
+  Native/BoltFFI generation must stay sequential to host JNI execution.
 
 ## Next tasks (ordered)
-1. Vocabulary browser: indexed surface-prefix query, five-status filters, matching
-   count, 100-row paging and newest/frequency/last-seen/alphabetical sorting;
-   implement/test typed worker/core/FFI transport before Compose integration.
+1. Vocabulary typed FIFO worker/core/FFI transport: retained prefix/status/sort,
+   lazy 100-row append, matching count, explicit exact Retry, query coalescing,
+   stale-request rejection, mutation invalidation and Settings/navigation retention.
+   Then connect Compose infinite scroll and verify phone/tablet recreation.
 2. Global matching Select All and confirmed bulk status/deletion; verify unloaded
-   rows, immutable status events, history erasure/chart refresh and fresh New
-   generations without rescanning existing documents.
-3. Profile optimized repository/encoding/callback costs before changes; extend
-   diverse many-book/peak-memory/actual Compose measurements.
+   rows, immutable status events, chart recalculation and fresh New generations
+   without rescanning existing documents.
+3. Profile repository/encoding/callback costs before optimizations; extend diverse
+   many-book/peak-memory/actual Compose measurements. Reader limits remain in
+   EFFECTIVE_READER_PERFORMANCE.md.
 Nostr configuration stays empty; ask Q188 before forwarding.
 
 ## Verification / blockers
-- PASS: both-ABI debug/test APK build, strict Android lint, all changed Kotlin
-  formatting and git diff check. Thirteen dataset/Compose/production/navigation
-  cases pass on both phone/light and tablet/dark (26 executions), no skips.
-- Final build: /tmp/yomoku-statistics-ui-android-final.log; phone/tablet logs:
-  /tmp/yomoku-statistics-ui-{phone,tablet}.log. No source verification failures.
-- Commands (environment setup in DEVELOPMENT.md):
-  ./android/gradlew -p android :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug --offline --console=plain
-  adb -s emulator-5554 shell am instrument -w -r -e class app.yomoku.StatisticsDatasetTest,app.yomoku.StatisticsScreenTest,app.yomoku.StatisticsProductionTest,app.yomoku.NavigationTest,app.yomoku.EffectiveReaderNavigationTest app.yomoku.test/androidx.test.runner.AndroidJUnitRunner
+- PASS: nine new SQLite browser cases; full workspace Rust tests, strict Clippy,
+  workspace build, Rustfmt and git diff check (see DEVELOPMENT.md for details).
+- Tests cover exact prefixes/query plans, all 32 filter subsets, stable pages,
+  all sorts/ties, original/effective repeats/rereads, read-only/reopen/deletion,
+  pending/failed/uncommitted isolation and error cleanup without repairs.
+- Commands (use Rust PATH workaround from DEVELOPMENT.md):
+  cargo test -p yomoku-storage vocabulary_browser --locked --offline
+  cargo test --workspace --all-features --locked --offline --quiet
+  cargo clippy --workspace --all-targets --all-features --locked --offline -- -D warnings
+  cargo build --workspace --locked --offline
+  cargo fmt --all -- --check
   git diff --check
-- Existing emulator lacked install space. Restored its temporary storage reserve
-  adjustment, preserved Library data and used .local/statistics-ui-avd instead.
-  A /tmp data-image attempt lacked host space; workspace image boots successfully. No unresolved blocker.
-- Rust/host JNI/codegen reproducibility/Full-loader matrix, release/process-death,
-  performance and physical arm64 were not rerun for this Kotlin-only slice.
+- Logs: /tmp/yomoku-vocabulary-browser-{storage,workspace,clippy,build}.log.
+  Initial test compile lacked a VocabularyId import; corrected and rerun.
+  No unresolved failure or blocker. Android/APK/lint/device, host JNI/codegen,
+  separate Full-loader matrix, release/process-death/performance and physical
+  arm64 were not rerun; no existing wire/Android source changed.

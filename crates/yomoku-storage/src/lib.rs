@@ -25,6 +25,7 @@ mod srt;
 mod statistics;
 mod txt;
 mod vocabulary;
+mod vocabulary_browser;
 
 pub use epub::{
     AnalyzedEpub, EpubImportError, EpubImportOutcome, StoredEpubChapter, StoredEpubDocument,
