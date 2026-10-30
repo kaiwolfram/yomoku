@@ -27,6 +27,9 @@ requirements governing the slice. It is the product source of truth.
   authorized these local commits; do not wait for a separate commit request.
   Include only changes belonging to the step, preserve unrelated work, and
   report the commit hash. If verification or committing is blocked, report why.
+- Give every commit a concise subject and a body explaining the changes and
+  their purpose. Merge commit bodies must also identify the source branch and
+  include relevant issue/PR references when available.
 - Report implemented tasks, changed files, test results, next steps and blockers.
 - Never commit credentials/signing keys. Publishing signed releases requires approval.
 

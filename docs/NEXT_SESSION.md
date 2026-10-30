@@ -1,5 +1,6 @@
 # Resume here
 Updated: 2026-10-30. Vocabulary Compose browser implemented and verified.
+Commit guidance updated: all commits need explanatory bodies; merges include provenance.
 
 ## Current slice
 - Vocabulary has literal surface-prefix input, five independent status filters,

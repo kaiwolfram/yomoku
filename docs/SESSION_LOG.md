@@ -3193,3 +3193,10 @@ recovered with escalation; early install retried after boot. No open blocker.
 Rust/JNI/codegen/Full-loader matrix/release/process-death/performance/physical arm64
 not rerun; existing both-ABI native outputs were up-to-date. Next: global matching
 bulk repositories and confirmed retained bulk UI.
+
+## 2026-10-30 — Commit message guidance
+
+Updated AGENTS.md to require commit bodies explaining changes and purpose, with
+source branch and available issue/PR references for merges. Verified the wording
+and `git diff --check`; documentation only, no application tests run. Next tasks
+remain unchanged; no blockers.
