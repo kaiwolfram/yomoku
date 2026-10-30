@@ -3314,3 +3314,28 @@ Full-loader matrix/process-death/physical-arm64 rerun or performance claim.
 See VOCABULARY_PERFORMANCE.md, DEVELOPMENT.md and measurements/statistics-host-
 2026-10-30.csv. Logs: /tmp/yomoku-status-stream-*.log and
 /tmp/yomoku-status-profile-{before,after}-*.{csv,log}.
+
+## 2026-10-30 — Bound Frequency/LastSeen history projections
+
+Shared the private production page SQL builder with opt-in diagnostics. Profiled
+SQL stepping/VM work separately from complete repository reads, then selected
+metric-sort candidates with only their required aggregate and deferred the other
+summary/provenance probes. Reuse the selected metric and repeat outer ordering.
+No schema/dependency/wire or product-behavior change. Updated architecture/data,
+decisions/plan/handoff, performance results/raw CSV and CLI commands.
+
+PASS: 12 browser cases, 821 workspace tests (17 ignored), two harness cases,
+all-feature build, strict all-target/all-feature Clippy, Rustfmt/diff. New exact
+257-row mixed-history paging/filter/tie coverage and offscreen VM-growth bound
+pass; the latter fails the former SQL as expected (7,500 versus 600 Frequency
+steps). All-sort corruption/query-failure cleanup passes. Initial diagnostics u64
+SQL binding compile failure corrected to checked i64; no unresolved blocker.
+
+Four sequential release runs (10k/100k before/after) pass exact replay/bytes/
+integrity/FK/cleanup guards; all 120 seven-sample metric rows validate extrema and
+median. Zero-history/two-sample smoke passes. At 100k, Frequency first-page median
+108.717→64.419 ms and LastSeen 109.834→65.600 ms; last pages 155.940→103.059 ms and
+155.573→107.287 ms. Deep offsets, status decoding/replay and device/Compose/memory
+work remain. No Android/JNI/Kotlin/codegen/Full-loader/process-death/arm64 rerun.
+See VOCABULARY_PERFORMANCE.md and DEVELOPMENT.md. Logs: /tmp/yomoku-browser-page-*
+and /tmp/yomoku-browser-profile-*. No emulator started.

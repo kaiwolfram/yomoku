@@ -186,3 +186,90 @@ Use the existing reproduction commands and arguments; diagnostics run before
 the other repository/FIFO/view metrics. Neither host timings nor synthetic
 fixtures establish cold-storage, diverse-book, peak-memory, Compose/frame,
 process-death or physical-arm64 performance.
+
+## Follow-up: Frequency/LastSeen candidate history work
+
+The profiler now compiles the private production page-query builder directly.
+For Frequency/LastSeen it prepares/steps/destroys the exact page SQL without
+decoding columns, and separately reports statement VM steps and sort operations.
+Before timing, every raw SQL field/order equals the validated repository page.
+These diagnostics exclude the matching-count query and Rust row validation;
+the existing repository measurements include both. They are independent timings,
+not values to subtract for an exact cost decomposition.
+
+The former queries projected both encounter summaries and checked provenance for
+candidates later discarded by LIMIT/OFFSET. Select candidates using only the
+necessary sorting metric, retain that value for output, then project the other
+summary and check provenance for the selected page. Count/page remain in one
+snapshot. Prefix/status filters, registration/ID ties, unread ordering, original/
+effective encounters and maximum wall-clock dates are unchanged. Alphabetical
+and the earlier Newest optimization retain their execution paths. No stored
+counter, index, migration, dependency, public API or wire change is introduced.
+
+This uses SQLite's documented
+[deferred-work optimization](https://www.sqlite.org/optoverview.html#using_co_routines_to_defer_work_until_after_the_sorting)
+and [statement work counters](https://www.sqlite.org/c3ref/c_stmtstatus_counter.html).
+A deterministic regression adds 200 offscreen original/effective occurrences and
+compares page-work growth against the isolated required sorting aggregate, allowing
+at most one extra VM step per occurrence. The former Frequency query fails with
+7,500 added VM steps versus 600 for the aggregate; both changed sorts pass.
+The selected page stays exact, offscreen invalid provenance does not fail that
+page, and selecting the affected entry still rejects it and releases the snapshot.
+A separate 257-entry test compares all row fields/page boundaries against a pure
+expected ordering across mixed histories, equal metrics/dates, regressing clocks,
+unread entries, prefix/status subsets and deleted documents. All-sort corruption
+and SQL-failure tests retain read-only bytes and transaction cleanup.
+
+Measured 2026-10-30 on the same host/toolchain/SQLite and synthetic fixtures as
+above: 10k/100k entries, 10 status rounds, 1,000 rereads and 50,000 occurrences
+concentrated on 25 entries. One excluded warmup, seven samples, isolated sequential
+release executables without concurrent builds/tests; RAM-backed `/tmp` and
+uncontrolled OS caches/CPU scheduling. Full repository medians in milliseconds:
+
+| Entries | Frequency first before → after | Frequency last before → after | LastSeen first before → after | LastSeen last before → after |
+| ---: | ---: | ---: | ---: | ---: |
+| 10,000 | 20.755 → 16.798 | 23.079 → 9.320 | 20.601 → 17.410 | 23.064 → 11.566 |
+| 100,000 | 108.717 → 64.419 | 155.940 → 103.059 | 109.834 → 65.600 | 155.573 → 107.287 |
+
+At 100k entries, statement VM steps change as follows. All return 100 rows and
+retain one statement sort; computing each candidate's metric remains necessary.
+
+| Sort / offset | Before VM steps | After VM steps |
+| --- | ---: | ---: |
+| Frequency / 0 | 6,800,815 | 4,404,220 |
+| Frequency / 99,900 | 6,700,915 | 2,554,322 |
+| LastSeen / 0 | 6,800,815 | 4,504,120 |
+| LastSeen / 99,900 | 6,700,915 | 2,854,222 |
+
+First pages still include all 25 heavily encountered entries and pay their full
+selected-row history/provenance cost. Last pages exclude those entries but still
+scan their sorting metric and sort/skip 99,900 candidates. This is a bounded
+projection improvement, not constant-time metric paging. SQL stepping medians
+after the change at 100k are 60.339/95.597 ms (Frequency first/last) and
+62.677/100.874 ms (LastSeen first/last). No improvement is claimed for other paths.
+
+All 120 metric rows from four before/after runs, including unchanged statistics/
+FIFO/encoding paths, are retained in
+[the metric-sort CSV](measurements/vocabulary-metric-sorts-host-2026-10-30.csv).
+Every row's seven raw samples validate its min/median/max. Exact unchanged database
+bytes, FK/integrity, replay and scratch cleanup guards pass. The 100-entry,
+zero-round/zero-reread/two-sample smoke passes all 21 metrics, including null dates
+and even-sample medians; those smoke samples are outside the comparison CSV.
+
+Baseline production is `e1a5aba` plus the profiler and query-builder extraction,
+before changing execution. Baseline executable SHA-256:
+`d5fc72ab776fce59c20b975178cb9f900b7c99e22a30acb30f513a5066217ae1`.
+After executable SHA-256:
+`92d663feaa1261b54843bc9051e17dc017902b6419c385a715fe92d6d6a50369`.
+Use the existing reproduction commands and arguments; diagnostics run after
+status profiling. Preserved executables: `/tmp/yomoku-browser-profile-before`
+and `-after`. Logs/CSV: `/tmp/yomoku-browser-profile-{before,after}-{10000,100000}`
+with `.log`/`.csv`; zero smoke uses `/tmp/yomoku-browser-profile-zero`.
+
+PASS: 12 focused browser cases, 821 workspace tests (17 opt-in ignored), two
+harness cases, all-feature workspace build, strict all-target/all-feature Clippy,
+Rustfmt/diff. Initial diagnostics used unsupported rusqlite u64 bindings; corrected
+to checked i64 conversions before verification. No open blocker. Status decoding/
+replay, deep offsets, large views, diverse books, peak-memory and Compose/device
+measurements remain follow-ups. Android/JNI/Kotlin/codegen, separate Full-loader
+matrix, lifecycle/process-death and physical-arm64 checks were not rerun.

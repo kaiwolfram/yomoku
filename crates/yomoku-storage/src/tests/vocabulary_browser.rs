@@ -581,6 +581,192 @@ fn newest_page_work_does_not_grow_with_offscreen_encounters() {
 }
 
 #[test]
+fn metric_pages_keep_exact_histories_ties_filters_and_unread_rows_across_boundaries() {
+    let database = TestDatabase::new();
+    let mut storage = Storage::open(database.path()).unwrap();
+    let mut expected = Vec::new();
+    for index in 0..257 {
+        let surface = format!("語{index:03}");
+        let date = index % 3;
+        expected.push(VocabularyRow {
+            id: register(&mut storage, &surface, date),
+            surface,
+            status: VocabularyStatus::New,
+            registered_at_unix_ms: date,
+            encountered_count: 0,
+            last_seen_unix_ms: None,
+        });
+    }
+    for (group, (count, date)) in [(1, 900), (1, 900), (2, 100), (2, 100), (3, 500)]
+        .into_iter()
+        .enumerate()
+    {
+        let text = expected
+            .iter()
+            .skip(group)
+            .step_by(7)
+            .map(|row| row.surface.as_str())
+            .collect::<Vec<_>>()
+            .join(" ");
+        let imported = import(&mut storage, &text);
+        for reread in 0..count {
+            // Regressing dates must still sort by the maximum completion date.
+            complete(&mut storage, &imported, date - reread, reread % 2 == 0);
+        }
+        storage
+            .delete_document(imported.document.document_id)
+            .unwrap();
+        for row in expected.iter_mut().skip(group).step_by(7) {
+            row.encountered_count = count as u64;
+            row.last_seen_unix_ms = Some(date);
+        }
+    }
+    for (index, row) in expected.iter_mut().enumerate() {
+        row.status = VocabularyQuery::default().statuses[index % 5];
+        storage
+            .set_vocabulary_status(row.id, row.status, 1_000)
+            .unwrap();
+    }
+    storage
+        .connection
+        .pragma_update(None, "query_only", true)
+        .unwrap();
+    let before = fs::read(database.path()).unwrap();
+    for sort in [VocabularySort::Frequency, VocabularySort::LastSeen] {
+        for prefix in ["", "語0", "語1", "不存在"] {
+            for statuses in [
+                VocabularyQuery::default().statuses,
+                vec![VocabularyStatus::New, VocabularyStatus::Known],
+                vec![],
+            ] {
+                let query = VocabularyQuery {
+                    prefix: prefix.into(),
+                    statuses,
+                    sort,
+                };
+                let mut matching: Vec<_> = expected
+                    .iter()
+                    .filter(|row| {
+                        row.surface.starts_with(prefix) && query.statuses.contains(&row.status)
+                    })
+                    .cloned()
+                    .collect();
+                matching.sort_by(|a, b| {
+                    let metric = match sort {
+                        VocabularySort::Frequency => b.encountered_count.cmp(&a.encountered_count),
+                        _ => b.last_seen_unix_ms.cmp(&a.last_seen_unix_ms),
+                    };
+                    metric
+                        .then_with(|| b.registered_at_unix_ms.cmp(&a.registered_at_unix_ms))
+                        .then_with(|| b.id.cmp(&a.id))
+                });
+                for offset in [0, 100, 200, 300] {
+                    let page = storage.vocabulary_page(&query, offset).unwrap();
+                    let slice: Vec<_> = matching
+                        .iter()
+                        .skip(offset as usize)
+                        .take(100)
+                        .cloned()
+                        .collect();
+                    assert_eq!(page.rows, slice, "{query:?} offset {offset}");
+                    assert_eq!(page.matching_count, matching.len() as u64);
+                    let next = offset + slice.len() as u64;
+                    assert_eq!(
+                        page.next_offset,
+                        (next < matching.len() as u64).then_some(next)
+                    );
+                    assert!(storage.connection.is_autocommit());
+                }
+            }
+        }
+    }
+    assert_eq!(fs::read(database.path()).unwrap(), before);
+}
+
+#[test]
+fn metric_page_offscreen_work_is_bounded_to_the_sorting_metric() {
+    let database = TestDatabase::new();
+    let mut storage = Storage::open(database.path()).unwrap();
+    let imported = import(&mut storage, "猫 猫");
+    complete(&mut storage, &imported, 1_000, false);
+    for index in 0..205 {
+        register(&mut storage, &format!("未読{index:03}"), 600);
+    }
+    let steps = |storage: &Storage, sql: &str, values: &[Value]| {
+        let mut statement = storage.connection.prepare(sql).unwrap();
+        let mut rows = statement.query(params_from_iter(values)).unwrap();
+        while rows.next().unwrap().is_some() {}
+        drop(rows);
+        statement.get_status(rusqlite::StatementStatus::VmStep)
+    };
+    let metric_sql = [
+        "SELECT COUNT(*) FROM reading_occurrences WHERE vocabulary_id = ?",
+        "SELECT MAX(c.completed_at_unix_ms) FROM reading_occurrences o JOIN reading_completions c USING (command_id) WHERE o.vocabulary_id = ?",
+    ];
+    let cat = storage
+        .vocabulary_entry(&Surface::new("猫").unwrap())
+        .unwrap()
+        .unwrap()
+        .id;
+    let mut measurements = Vec::new();
+    for (sort, metric) in [VocabularySort::Frequency, VocabularySort::LastSeen]
+        .into_iter()
+        .zip(metric_sql)
+    {
+        let query = query("", sort);
+        let (predicate, mut values) = crate::vocabulary_browser::matching(&query);
+        values.push(Value::Integer(200));
+        let sql = crate::vocabulary_browser::page_sql(sort, &predicate);
+        let page = storage.vocabulary_page(&query, 200).unwrap();
+        assert!(page.rows.iter().all(|row| row.encountered_count == 0));
+        measurements.push((
+            query,
+            steps(&storage, &sql, &values),
+            steps(&storage, metric, &[Value::Integer(cat.into())]),
+            sql,
+            values,
+            metric,
+            page,
+        ));
+    }
+    for index in 0..100 {
+        complete(&mut storage, &imported, 1_001 + index, index % 2 == 0);
+    }
+    for (query, page_before, metric_before, sql, values, metric, expected) in measurements {
+        assert_eq!(storage.vocabulary_page(&query, 200).unwrap(), expected);
+        let growth = steps(&storage, &sql, &values) - page_before;
+        let metric_growth = steps(&storage, metric, &[Value::Integer(cat.into())]) - metric_before;
+        // Each of the 200 added offscreen occurrences must pay only for the
+        // necessary sorting aggregate, with at most one extra VM step per row.
+        // This deterministic work bound rejects probing other summaries or
+        // completion/analysis/effective provenance for discarded candidates.
+        assert!(
+            growth > 0 && growth <= metric_growth + 200,
+            "{:?}: page growth {growth}, isolated metric growth {metric_growth}",
+            query.sort
+        );
+        storage
+            .connection
+            .pragma_update(None, "ignore_check_constraints", true)
+            .unwrap();
+        storage
+            .connection
+            .execute("UPDATE completion_analyses SET semantics_version = 2", [])
+            .unwrap();
+        assert_eq!(storage.vocabulary_page(&query, 200).unwrap(), expected);
+        assert!(matches!(
+            storage.vocabulary_page(&query, 0),
+            Err(StorageError::InvalidCompletion)
+        ));
+        assert!(storage.connection.is_autocommit());
+        storage
+            .connection
+            .execute("UPDATE completion_analyses SET semantics_version = 1", [])
+            .unwrap();
+    }
+}
+
+#[test]
 fn corrupt_values_or_query_failures_release_snapshot_and_never_repair_data() {
     let database = TestDatabase::new();
     let mut storage = Storage::open(database.path()).unwrap();
@@ -602,9 +788,11 @@ fn corrupt_values_or_query_failures_release_snapshot_and_never_repair_data() {
     ] {
         storage.connection.execute_batch(sql).unwrap();
         let before = fs::read(database.path()).unwrap();
-        assert!(storage.vocabulary_page(&VocabularyQuery::default(), 0).is_err());
-        assert!(storage.connection.is_autocommit());
-        assert_eq!(fs::read(database.path()).unwrap(), before);
+        for sort in [VocabularySort::Newest, VocabularySort::Frequency, VocabularySort::LastSeen, VocabularySort::Alphabetical] {
+            assert!(storage.vocabulary_page(&query("", sort), 0).is_err());
+            assert!(storage.connection.is_autocommit());
+            assert_eq!(fs::read(database.path()).unwrap(), before);
+        }
     }
     storage.connection.execute_batch("UPDATE completion_analyses SET command_id = command_id - 1000; PRAGMA foreign_keys = ON").unwrap();
     assert_eq!(
@@ -617,11 +805,18 @@ fn corrupt_values_or_query_failures_release_snapshot_and_never_repair_data() {
         .connection
         .execute_batch("ALTER TABLE reading_occurrences RENAME TO unavailable_occurrences")
         .unwrap();
-    assert!(matches!(
-        storage.vocabulary_page(&VocabularyQuery::default(), 0),
-        Err(StorageError::Sqlite(_))
-    ));
-    assert!(storage.connection.is_autocommit());
+    for sort in [
+        VocabularySort::Newest,
+        VocabularySort::Frequency,
+        VocabularySort::LastSeen,
+        VocabularySort::Alphabetical,
+    ] {
+        assert!(matches!(
+            storage.vocabulary_page(&query("", sort), 0),
+            Err(StorageError::Sqlite(_))
+        ));
+        assert!(storage.connection.is_autocommit());
+    }
     storage
         .connection
         .execute_batch("ALTER TABLE unavailable_occurrences RENAME TO reading_occurrences")

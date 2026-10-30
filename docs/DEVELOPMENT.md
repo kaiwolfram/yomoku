@@ -7152,3 +7152,47 @@ started. Logs: `/tmp/yomoku-status-stream-{tests,workspace,example,build,clippy,
 `/tmp/yomoku-status-profile-{before,after}-{10000,100000}.{csv,log}`;
 `/tmp/yomoku-status-profile-zero.{csv,log}`. Raw comparison:
 `docs/measurements/statistics-host-2026-10-30.csv`.
+
+## Vocabulary Frequency/LastSeen candidate profiling
+
+2026-10-30: the existing opt-in example additionally compiles the production page
+SQL builder and reports metric-sort stepping, VM steps and sort counts. Each raw
+row is checked against the validated repository page before timing. Fixtures,
+limits, samples and executable hashes: VOCABULARY_PERFORMANCE.md, final section.
+
+```sh
+export PATH=/home/kai/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin:$PATH
+cargo test -p yomoku-storage vocabulary_browser --locked --offline
+cargo test --workspace --all-features --locked --offline --quiet
+cargo test -p yomoku-ffi --example measure_vocabulary --all-features --locked --offline
+cargo build --workspace --all-features --locked --offline
+cargo clippy --workspace --all-targets --all-features --locked --offline -- -D warnings
+cargo fmt --all -- --check
+git diff --check
+cargo build -p yomoku-ffi --example measure_vocabulary --release --locked --offline
+# No concurrent builds/tests during timings; retain separate executables for comparisons.
+target/release/examples/measure_vocabulary 10000 10 1000 7
+target/release/examples/measure_vocabulary 100000 10 1000 7
+target/release/examples/measure_vocabulary 100 0 0 2
+```
+
+PASS: 12 browser cases, 821 workspace tests (17 opt-in ignored), two example cases,
+build, strict Clippy, Rustfmt/diff. The VM-growth regression fails against former
+production SQL (7,500 additional Frequency steps versus 600 for its required
+aggregate), then passes both changed sorts. Multi-page expected values cover
+mixed original/effective histories, ties, regressing dates, filters, unread rows
+and deleted documents. All-sort invalid-data/SQL failures release snapshots and
+preserve bytes. Initial profiler compile used unsupported u64 SQL bindings;
+corrected to checked i64 conversions. No open blocker.
+
+Four sequential release runs pass replay/byte/FK/integrity/cleanup guards; all 120
+seven-sample metric rows validate min/median/max. Zero-history/two-sample smoke
+passes all 21 metrics. At 100k entries first-page medians improve 108.717→64.419 ms
+(Frequency) and 109.834→65.600 ms (LastSeen); deep offsets still cost ~103–107 ms.
+Raw results: measurements/vocabulary-metric-sorts-host-2026-10-30.csv. Logs:
+/tmp/yomoku-browser-page-{tests,workspace,example,build,clippy,release}.log;
+expected baseline failure: /tmp/yomoku-browser-page-regression-baseline.log;
+measurements: /tmp/yomoku-browser-profile-{before,after}-{10000,100000}.{csv,log};
+zero smoke: /tmp/yomoku-browser-profile-zero.{csv,log}. No Android/JNI/Kotlin/codegen,
+separate Full-loader matrix, lifecycle/process-death, physical-arm64 or device/
+Compose/peak-memory check or claim. No emulator started; schema remains 0020.

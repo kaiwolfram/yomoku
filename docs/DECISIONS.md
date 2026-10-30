@@ -4077,3 +4077,25 @@ and the standalone timeline opens its own. Preserve all version/cause/provenance
 chain/date and dictionary-form checks. WAL is enabled only in a regression fixture
 to commit a deletion/new generation between the two reads and prove isolation;
 application journal configuration is unchanged.
+
+## 2026-10-30 — Limit metric-sort history projections to the selected page
+
+Profile Frequency/LastSeen with the exact production query builder compiled into
+the existing disposable host example. Keep the builder private to storage; sharing
+its source with diagnostics adds no public repository or FFI API. Verify every raw
+SQL field against validated repository rows before timing column-free stepping;
+report VM steps/sorts separately from full count/page repository timings.
+
+The original metric sorts evaluated both encounter summaries and provenance for
+candidates discarded by LIMIT/OFFSET. Select candidates using only the required
+ordering metric, reuse that value in output and defer other probes to selected
+rows. Preserve indexed literal filters, count/page snapshot, registration/ID ties,
+unread ordering and visible-row corruption checks. Repeat the outer order
+explicitly. This follows SQLite's documented deferred-work optimization linked in
+VOCABULARY_PERFORMANCE.md; no cache, index, migration, dependency or wire change.
+
+Use a deterministic regression comparing offscreen VM-work growth with the
+isolated necessary aggregate, allowing at most one extra VM step per occurrence.
+The baseline fails that bound; the changed queries pass. Keep exact multi-page
+mixed-history tests and all-sort corruption/query-failure cleanup coverage.
+These host measurements do not establish device/Compose/peak-memory performance.

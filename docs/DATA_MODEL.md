@@ -1874,9 +1874,13 @@ Newest orders by registration date descending then ID descending. Frequency and
 LastSeen order descending by their metric, then Newest; unread dates sort last.
 Newest first captures its 100 ordered candidates with LIMIT/OFFSET in a subquery,
 then reads/validates only those rows' encounter summaries in the same transaction.
-The outer query repeats the order explicitly. This changes execution work only;
-the exact matching count, filters, page membership and history checks are unchanged.
-Alphabetical is exact BINARY surface order. Offset pages are stable for an
+Frequency/LastSeen select candidates with only their ordering metric, retain that
+metric for output and defer the other summary and provenance checks to the selected
+page. Computing that metric still visits matching histories; no cached value is
+introduced. The outer query repeats the order explicitly for all three sorts.
+This changes execution work only; the exact matching count, filters, page membership
+and visible-row history checks are unchanged. Alphabetical is exact BINARY surface
+order. Offset pages are stable for an
 unchanged query/dataset; retained integration must invalidate and restart after
 relevant mutations. Count/page read the same snapshot, but separate pages do not
 retain a database transaction. No new migration, counter table, analyzer access,
