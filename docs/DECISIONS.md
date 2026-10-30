@@ -4016,3 +4016,27 @@ and atomic repository commands. Clear all affected caches on success. Keep
 errors separate from read-page/document errors. No schema/library/architectural
 change or durable retry receipt. Compose controls, Back handling and device
 recreation acceptance are deliberately the next independently testable slice.
+
+## 2026-10-30 — Compose Vocabulary selection and frozen bulk prompts
+
+Use tap or long-press on a Vocabulary row to enter/toggle retained selection;
+there is no browser row drilldown in the current product slice. Selected rows
+expose checkbox/selected semantics. Keep prefix/filter/sort controls in the list,
+but put active selection count and actions above it so hidden/offscreen matches
+can always be acted on. Show Select All even before selection and dispatch the
+native global capture intent; do not select from just the loaded rows.
+
+Use a five-status menu to request a prompt with a single current manual date.
+Confirmation echoes the core-owned command; failed writes dispatch only Retry,
+preserving exact IDs/status/date. Capture failures have their own explicit native
+Retry/Cancel. Explain permanent history erasure, chart recalculation and absence
+of document rescans in the deletion prompt. No Undo, new dependency, schema,
+shell cache or persistent retry queue is introduced.
+
+Show modal capture progress/failure and mutation confirmation/failure, pause
+browser load/paging and disable main navigation/Settings while frozen. Consume
+Back without cancelling in-flight work. Back or Cancel dismisses a prompt while
+keeping selection; ordinary Back exits selection and failed-capture Back abandons
+capture/selection, following the existing native gates. All retained state is
+projected again after Activity recreation; only the status dropdown is local UI
+state. Process death continues to start a fresh native selection session.

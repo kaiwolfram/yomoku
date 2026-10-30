@@ -74,6 +74,11 @@ internal fun YomokuApp(
         if (view.contentRoute != ContentRoute.PASTE) pasteText = ""
     }
     val mainContent = view.contentRoute == ContentRoute.MAIN
+    val vocabularyLocked =
+        view.destination == app.yomoku.shared.Destination.VOCABULARY &&
+            (view.vocabulary.selectingAll ||
+                view.vocabulary.confirmation != null ||
+                view.vocabulary.bulkError != null)
     val showNavigation = !view.settingsOpen && mainContent
     BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
         val useRail = maxWidth >= 600.dp
@@ -109,7 +114,10 @@ internal fun YomokuApp(
                     },
                     actions = {
                         if (!view.settingsOpen) {
-                            TextButton(onClick = { dispatch(Event.OpenSettings) }) {
+                            TextButton(
+                                onClick = { dispatch(Event.OpenSettings) },
+                                enabled = !vocabularyLocked,
+                            ) {
                                 Text(stringResource(R.string.settings_title))
                             }
                         }
@@ -121,6 +129,7 @@ internal fun YomokuApp(
                     NavigationBar(modifier = Modifier.testTag("bottom_navigation")) {
                         for (destination in Destination.entries) {
                             NavigationBarItem(
+                                enabled = !vocabularyLocked,
                                 selected = view.destination == destination,
                                 onClick = { dispatch(Event.SelectDestination(destination)) },
                                 icon = { DestinationIcon(destination) },
@@ -141,6 +150,7 @@ internal fun YomokuApp(
                     ) {
                         for (destination in Destination.entries) {
                             NavigationRailItem(
+                                enabled = !vocabularyLocked,
                                 selected = view.destination == destination,
                                 onClick = { dispatch(Event.SelectDestination(destination)) },
                                 icon = { DestinationIcon(destination) },

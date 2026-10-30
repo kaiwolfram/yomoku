@@ -7002,3 +7002,60 @@ Compose bulk controls/Back and phone/tablet recreation acceptance remain open.
 Device execution, separate Full-loader matrix, release/process-death/performance
 and physical arm64 were not rerun. Logs:
 /tmp/yomoku-vocabulary-bulk-transport-{workspace,clippy,host,android}.log.
+
+## Compose Vocabulary selection and confirmed bulk actions
+
+Verification commands (2026-10-30, repository root):
+
+```sh
+export PATH=/home/kai/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin:$PATH
+export JAVA_HOME="$PWD/.local/jdk-17/jdk-17.0.21+9"
+export GRADLE_USER_HOME="$PWD/.local/gradle"
+export ANDROID_HOME=/home/kai/Android/Sdk
+"$ANDROID_HOME/platform-tools/adb" -s emulator-5554 shell wm size reset
+"$ANDROID_HOME/platform-tools/adb" -s emulator-5554 shell wm density reset
+"$ANDROID_HOME/platform-tools/adb" -s emulator-5554 shell cmd uimode night no
+./android/gradlew -p android :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug --offline --console=plain
+"$ANDROID_HOME/platform-tools/adb" -s emulator-5554 install -r -t android/app/build/outputs/apk/debug/app-debug.apk
+"$ANDROID_HOME/platform-tools/adb" -s emulator-5554 install -r -t android/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+vocabulary_cases=app.yomoku.VocabularyScreenTest,app.yomoku.VocabularyProductionTest,app.yomoku.NavigationTest,app.yomoku.EffectiveReaderNavigationTest
+"$ANDROID_HOME/platform-tools/adb" -s emulator-5554 shell am instrument -w -r -e class "$vocabulary_cases" app.yomoku.test/androidx.test.runner.AndroidJUnitRunner
+"$ANDROID_HOME/platform-tools/adb" -s emulator-5554 shell wm size 2560x1600
+"$ANDROID_HOME/platform-tools/adb" -s emulator-5554 shell wm density 240
+"$ANDROID_HOME/platform-tools/adb" -s emulator-5554 shell cmd uimode night yes
+"$ANDROID_HOME/platform-tools/adb" -s emulator-5554 shell am instrument -w -r -e class "$vocabulary_cases" app.yomoku.test/androidx.test.runner.AndroidJUnitRunner
+"$ANDROID_HOME/platform-tools/adb" -s emulator-5554 shell wm size reset
+"$ANDROID_HOME/platform-tools/adb" -s emulator-5554 shell wm density reset
+"$ANDROID_HOME/platform-tools/adb" -s emulator-5554 shell cmd uimode night no
+"$JAVA_HOME/bin/java" -jar .local/ktfmt-0.64.jar --kotlinlang-style --dry-run --set-exit-if-changed android/app/src/main/java/app/yomoku/{VocabularyScreen,VocabularySelection,YomokuApp}.kt android/app/src/androidTest/java/app/yomoku/{VocabularyScreen,VocabularyProduction}Test.kt
+git diff --check
+```
+
+PASS: debug/test APKs with the existing x86_64/arm64-v8a native libraries, strict
+Android lint, changed Kotlin formatting and diff checks. Sixteen cases pass on
+explicit API-36 x86_64 phone/light (1080x2400, 420 dpi; 238.314 s) and landscape
+tablet/dark (2560x1600, 240 dpi; 152.128 s), 32 final executions with no failures
+or skips. Five new cases verify tap/long-press selection, all five status choices,
+exact retained confirmations/large dates/Retry events, pending gates, 205 unloaded
+matches plus hidden selection, Settings/Cancel/Back/recreation, capture/update/
+delete failures, later-row rollback, frozen manual dates and exclusion of later
+matches from write Retry. Real Full import/completion then bulk status/deletion
+refresh browser/statistics/Library/effective tokens, preserve completed time,
+erase occurrences, avoid old-document rescans and register a fresh New ID on
+later import. Eleven existing browser/navigation cases pass on both layouts.
+
+Initial Back assertion ran before selection recomposition; synchronize on the
+visible selected count, then the full corrected suite passes. An earlier corrected
+16-case pass used inherited 240-dpi/dark overrides at the physical phone resolution;
+the explicit phone/light and tablet/dark runs above establish the final matrix.
+Always reset display, density and night mode before the first run. Tablet ADB's
+host wrapper returned 143 after complete OK output; device TestRunner confirms
+16 tests/0 failed/0 ignored and AndroidRuntime exits 0. No unresolved source/test
+failure or blocker. Initial sandbox Gradle/ADB socket startup required approved
+access. Phone selection visual check passes; screenshot:
+/tmp/yomoku-vocabulary-bulk-ui-phone.png. Used the existing ignored isolated
+.local/statistics-ui-avd image (8 GiB partition); display/density/light restored
+and task-started emulator stopped. No native/schema/dependency change. Rust tests/
+Clippy, host JNI/codegen reproducibility, separate Full-loader matrix, release/
+process-death/performance and physical arm64 were not rerun. Logs:
+/tmp/yomoku-vocabulary-bulk-ui-{android,phone-initial,phone,phone-light,tablet,emulator}.log.

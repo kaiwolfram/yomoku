@@ -3239,3 +3239,27 @@ without rescans. Corrected initial test field names; sandbox Gradle wildcard-IP
 failure passed with approved socket access. No unresolved blocker or schema/library
 change. Device/Full-loader matrix/release/process-death/performance/physical arm64
 not rerun. Next: Compose selection/confirmation/Retry/Cancel/Back and device tests.
+
+## 2026-10-30 — Compose Vocabulary selection and confirmed bulk actions
+
+Connected tap/long-press row selection, global matching Select All, five-status
+confirmation and permanent deletion to retained native commands. Kept exact
+IDs/status/date on confirmation/Retry, exposed separate capture/write errors and
+Retry/Cancel, gated unrelated controls/paging/navigation and consumed pending Back.
+Selection actions stay above scrolling rows; ordinary Settings and Activity
+recreation retain native selection/prompts/errors. Updated README, architecture/
+data/decisions, verified plan, development commands and handoff.
+
+PASS: debug/test APKs using existing both-ABI native libraries, strict Android
+lint, Kotlin formatting/diff, and 16 focused cases on phone/light and landscape
+tablet/dark (32 final executions). Five new cases verify all statuses/exact
+commands, 205 unloaded matches/hidden selection, capture/update/delete failures,
+atomic rollback/frozen-date Retry/later-match exclusion, Cancel/Back/recreation
+and browser/chart/Library/effective-reader refresh without rescans; fresh import
+gets a New ID. Corrected a test recomposition race and reset inherited display
+overrides before the explicit matrix. Tablet host ADB wrapper returned 143 after
+OK output; device logs confirm all 16 pass and runner exit 0. No open blocker.
+Phone selection visual check passes; emulator display restored and emulator
+stopped. Rust/Clippy/host JNI/codegen/Full-loader matrix/release/process-death/
+performance/physical arm64 not rerun; no native/schema/dependency changes.
+Next: profiling, AnkiDroid API feasibility and remaining lifecycle/accessibility.

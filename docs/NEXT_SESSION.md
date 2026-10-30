@@ -1,5 +1,5 @@
 # Resume here
-Updated: 2026-10-30. Native Vocabulary selection/bulk transport implemented.
+Updated: 2026-10-30. Compose Vocabulary selection/bulk actions implemented.
 Commit guidance: all commits need explanatory bodies; merges include provenance.
 
 ## Current slice
@@ -19,8 +19,14 @@ Commit guidance: all commits need explanatory bodies; merges include provenance.
 - Native-only operations/results/captured callbacks bypass shell codecs. Worker
   uses the existing atomic repository APIs. Success invalidates browser,
   statistics, Library distributions, reader words/tokens/effective identity.
-- Public events/view use generated Kotlin codecs. Compose bulk controls are NOT
-  connected yet; existing preview/instrumentation fixtures set selectingAll=false.
+- Compose row tap/long-press toggles selection with checkbox/selected semantics.
+  Active selection count/actions stay above the scrolling browser; global Select
+  All also works before selection. All five status choices request confirmation.
+  Shell confirmation echoes the retained command; Retry creates no new date/IDs.
+- Modal capture/write progress/errors pause paging and gate query/navigation/
+  Settings. Back/Cancel preserves selection for prompts, exits ordinary selection
+  or abandons a failed capture. Pending work cannot be cancelled. Native selection,
+  prompts/errors and ordinary Settings selection survive Activity recreation.
 - Repository deletion preserves page time/provenance/live analysis, recalculates
   charts, never rescans old books, and old IDs cannot touch fresh generations.
 - Pages assume unchanged data between reads: changed counts restart at zero;
@@ -28,29 +34,31 @@ Commit guidance: all commits need explanatory bodies; merges include provenance.
   cross view serialization; large-list/history costs remain unmeasured.
 
 ## Next tasks (ordered)
-1. Add Compose row selection, global Select All, status/delete confirmation,
-   explicit capture/write Retry and Cancel/Back using retained native commands.
-   Keep exact command/date on Retry; do not recompute matching in the shell.
-2. Verify unloaded matches, hidden selections, failed capture/write gates,
-   Cancel/Back, phone/tablet recreation and browser/statistics/Library/reader
-   refresh with production JNI/SQLite. Core retains state only within a session.
-3. Profile repository/encoding/callback costs before optimizations; extend diverse
+1. Profile repository/encoding/callback costs before optimizations; extend diverse
    many-book/peak-memory/actual Compose measurements. Reader limits remain in
-   EFFECTIVE_READER_PERFORMANCE.md.
+   EFFECTIVE_READER_PERFORMANCE.md; Vocabulary selection/history costs are open.
+2. Verify supported AnkiDroid provider/deck/model/duplicate APIs against primary
+   documentation; record feasible exact-surface duplicate behavior before wiring.
+3. Extend the remaining accessibility/process-death/lifecycle matrix. Physical
+   arm64 remains user-deferred; emulator measurements do not establish viability.
 Nostr configuration stays empty; ask Q188 before forwarding.
 
 ## Verification / blockers
-- PASS: 816 workspace Rust tests (17 opt-in ignored), strict Clippy, Rustfmt/diff.
-  Eight new Rust cases cover selection/confirmation/capture and write Retry,
-  1,205 unloaded matches, canonical/frozen IDs, stale callbacks, all statuses,
-  SQLite later-row rollback/fresh generations/reopen and dependent view refresh.
-- PASS: complete real-Full host Kotlin/JNI and generated codec exchanges;
-  repeatable Kotlin generation; both-ABI debug/test APKs and Android lint.
-- Commands/environment: docs/DEVELOPMENT.md, native bulk transport section.
-  Keep native/BoltFFI generation sequential to host JNI execution.
-- Logs: /tmp/yomoku-vocabulary-bulk-transport-{workspace,clippy,host,android}.log.
-- New worker-refresh fixture initially used incorrect test field names; corrected
-  before focused/full passes. Initial sandbox Gradle startup failed wildcard-IP
-  discovery; approved retry passed. No unresolved failure/blocker.
-- Device/Full-loader matrix/release/process-death/performance/physical arm64 not
-  rerun. Ignored .local/statistics-ui-avd image (8 GiB) remains; emulator stopped.
+- PASS: debug/test APKs (existing both-ABI native libraries), strict Android lint,
+  changed Kotlin formatting and diff checks. No Rust/native/schema/dependency change.
+- PASS: 16 focused API-36 x86_64 cases on phone/light (1080x2400, 420 dpi) and
+  landscape tablet/dark (2560x1600, 240 dpi), 32 final executions.
+  Five new cases cover all statuses, exact prompt/date/Retry, 205 unloaded matches,
+  hidden selections, capture/update/delete failures and rollback, later-match
+  exclusion, Settings/Back/recreation and refreshed charts/Library/effective reader.
+- Commands/environment: docs/DEVELOPMENT.md, Compose Vocabulary selection section.
+  Explicitly reset display/density/night overrides before the phone run.
+- Logs: /tmp/yomoku-vocabulary-bulk-ui-{android,phone-light,tablet}.log.
+- Initial Back assertion raced selection recomposition; visible-count assertion
+  fixes synchronization. Earlier 16-case pass used inherited 240-dpi/dark settings;
+  explicit phone/light rerun passes. Sandbox Gradle needed approved socket access.
+- Tablet ADB wrapper returned 143 after complete OK output; device TestRunner
+  confirms 16 tests/0 failed/0 ignored and AndroidRuntime exit 0. No open blocker.
+- Rust/Clippy/host JNI/codegen/Full-loader matrix/release/process-death/performance/
+  physical arm64 not rerun. Keep generation sequential to host JNI execution.
+  Ignored .local/statistics-ui-avd image (8 GiB) remains; display restored/emulator stopped.

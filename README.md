@@ -77,10 +77,12 @@ final-page left swipe) completes the save and returns to Library with brief conf
 on each newly recorded completion, including rereads with zero new words.
 Nostr currently shows a placeholder. Vocabulary supports literal surface-prefix
 search, five-status filters, four sorts, matching counts and 100-row infinite
-scroll with explicit Retry. Retained global Select All, confirmed bulk status and
-permanent deletion now work through native core/FIFO/FFI; their Compose controls
-remain to be added. Confirmations and retries freeze IDs/status/date, and deletion
-recalculates history without recreating words from existing books.
+scroll with explicit Retry. Tap or long press selects words; global Select All
+includes unloaded matches and preserves hidden selections. Confirmed bulk status
+changes and permanent deletion expose explicit Retry/Cancel and retain selection
+and prompts across Activity recreation. Confirmations and retries freeze
+IDs/status/date, and deletion recalculates history without recreating words from
+existing books.
 
 The Rust statistics repository derives read-only lifetime Japanese-occurrence
 and completed-time totals plus an absolute five-status vocabulary timeline with

@@ -475,8 +475,8 @@ selection-scoped drafts are discarded with the reader word panel.
   otherwise. New registration never implies a completed-reading encounter.
 - Completion status policy: only New changes to Known.
 
-Reader status commands and the read-only Vocabulary browser use typed application/
-FFI payloads described below; browser bulk commands remain open. Persisted status
+Reader status commands, the read-only Vocabulary browser and confirmed bulk
+commands use typed application/FFI payloads described below. Persisted status
 strings are defined explicitly below, independently of Rust enum ordinals.
 
 ## Global vocabulary and status history (migration 0006)
@@ -1895,8 +1895,8 @@ Reentry and relevant mutations clear pages while retaining query choices. Count
 changes across pages trigger a fresh page zero. Pages are separate read snapshots;
 external mutations that preserve the count are not automatically detected. No
 persistent browser cache, schema migration, history mutation, analyzer load or
-rescan is added. The shell browser and retained native bulk mutation protocol
-are implemented; Compose bulk controls remain open. Repository commands are
+rescan is added. The shell browser, retained native bulk mutation protocol and
+Compose bulk controls are implemented. Repository commands are
 described below.
 
 ## Frozen Vocabulary bulk operations (schema 0020 unchanged)
@@ -1931,7 +1931,7 @@ entries absent. A later new analyzed import registers a fresh New ID with no old
 history; later completions contribute only new occurrences. Replaying a successful
 original/effective completion does not restore erased history. Retained
 confirmation/selection, FIFO routing and application cache invalidation now use
-the native protocol below; Compose bulk controls remain open.
+the native protocol below, including Compose selection/confirmation/Retry/Cancel.
 
 ## Retained Vocabulary selection payloads (no migration)
 

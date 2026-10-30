@@ -1699,7 +1699,7 @@ duplicate IDs are harmless, and erased IDs cannot affect fresh generations.
 Derived statistics recompute without repair writes or rescanning live books.
 No SQL/platform I/O enters core, and no schema/dependency changes are required.
 The native application protocol below invokes these repositories; Compose
-selection/confirmation controls remain the next slice.
+selection/confirmation controls use only its public intent events.
 
 ## Retained Vocabulary bulk application protocol
 
@@ -1728,4 +1728,19 @@ atomic repository APIs and echo the applied command. Successful mutations clear
 selection/prompt and invalidate browser pages, statistics, Library distributions,
 reader words/tokens and effective-page identity; the usual lazy reads refresh
 those views. No analyzer or word dictionary is loaded by these bulk operations.
-Compose controls/Back handling and actual phone/tablet recreation remain open.
+
+Compose rows expose tap/long-press selection with checkbox/selected semantics.
+An active selection shows its total (including hidden/unloaded IDs) and Select
+All, all five status choices, Delete and Cancel above the scrolling browser.
+Select All is also available before selection. The shell creates a manual date
+only when requesting a status prompt; confirmation echoes the retained command
+and Retry sends only the native retry intent. Delete explains permanent history
+erasure, recalculation and absence of automatic document rescans.
+
+Modal capture progress/failure and mutation confirmation/failure share the
+retained native gates. Pending operations disable Cancel and consume Back;
+ordinary Back exits selection, prompt Back dismisses just the prompt, and failed
+capture Back abandons capture/selection. Query/paging effects and toolbar/main
+navigation pause while frozen. Settings still retains ordinary selection.
+Activity recreation projects the same native selection/prompt/error; shell menus
+hold no command payload. No persistence/FFI/dependency change is needed.
