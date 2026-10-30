@@ -4140,3 +4140,16 @@ instrumentation/observer overhead, separate dialog-window exclusion and sampled
 high-water limits explicitly; fixed 16.667 ms counts are not Android jank labels.
 Debug-emulator results do not establish optimized-build/arm64 or diverse-book
 performance. Method and primary API evidence: VOCABULARY_ANDROID_PERFORMANCE.md.
+
+## 2026-10-30 — Bound Vocabulary row membership work
+
+Use the existing core selection invariant (sorted unique positive-i64 IDs) for
+binary-search membership at each composed Vocabulary row. Browser row order is
+independent of selection order. Avoid building a shell hash set containing all
+matching IDs and using the full list as a structural remember key. Keep complete
+IDs in the native selection and frozen confirmation; do not reduce Select All to
+loaded rows or change confirmation, Retry, date or history semantics. Exact-ID
+and logarithmic-read regressions cover gaps, the signed identity range and
+100,000 selected IDs; Compose checks equal-size selection replacement and row
+sort independence. No schema, dependency or wire change is needed. Full callback
+decoding and remaining composition costs require separate profiling.

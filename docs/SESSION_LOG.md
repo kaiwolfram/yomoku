@@ -3399,3 +3399,30 @@ and /tmp/yomoku-browser-profile-*. No emulator started.
 - No Rust host/Clippy, separate host JNI/codegen reproducibility/Full-loader,
   optimized/tablet/dark/continuous-fling/heavy-history/diverse-book performance,
   process-death or physical-arm64 rerun/claim. Broader hardening tasks stay open.
+
+## 2026-10-30 — Bound Vocabulary Compose selection membership
+
+- Replace the selection-sized hash set/structural remember key with binary search
+  of core-sorted positive-i64 IDs per composed row. Full hidden/unloaded IDs,
+  selected counts, frozen commands/dates and Retry/history semantics remain intact.
+- Add exact/gapped/empty/single/large-ID and 100k logarithmic-read cases, plus
+  Compose row-order/equal-size replacement coverage. PASS: 19 regression cases and
+  one default assumption skip (20 reported, 228.889 s), debug/test APKs, strict
+  lint, repository Kotlin formatting/diff. Native/binding/assets are up-to-date.
+- Sequential 100k baseline/changed debug phone/light runs pass (51.327/50.541 s).
+  Select All median idle 881.920→765.376 ms with overlapping ranges; confirmation
+  and frame durations do not consistently improve. Avoid general speed/frame-rate
+  or exact memory-savings claims; callback decoding/view equality remain targets.
+- Validate 50 action rows/116 raw frames, positive sampled memory, payload sizes,
+  zero drops, exact selected/frozen IDs, unchanged bytes, no analyzer/reading
+  effects, integrity/FK/native closure and cleanup. Raw samples/hashes/limits:
+  VOCABULARY_ANDROID_PERFORMANCE.md and vocabulary-selection-android CSVs.
+- Initial sandbox Gradle local lock-socket failure required approved rerun; no
+  open failure/blocker. Existing isolated AVD restored phone/light and stopped;
+  ADB confirms no measurement scratch directories. Existing caches preserved.
+  Logs: /tmp/yomoku-selection-{android,format-check,regressions,before-100000,
+  after-100000}.log. No Rust/schema/dependency/wire/destructive change.
+- No Rust host/Clippy, independent JNI/codegen/Full-loader, optimized/tablet/dark/
+  continuous-fling/heavy-history/diverse-book/fully loaded device performance,
+  exact peaks/PSS, process-death or physical-arm64 rerun/claim. Broader tasks stay
+  open; next callback profiling, Anki API verification and lifecycle coverage.

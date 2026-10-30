@@ -171,3 +171,85 @@ diverse many-book/image-heavy, exact peak/PSS, tablet/dark measurement, process-
 or physical-arm64 claim. Rust host tests/Clippy, independent host JNI/codegen
 reproducibility and the separate Full-loader matrix were not rerun. The broader
 performance/lifecycle tasks remain open.
+
+## Selection membership change, 2026-10-30
+
+`VocabularyScreen` previously materialized the entire retained selection as a
+hash set under `remember(state.selection)`. This adds a selection-sized collection
+on the main composition path and structurally compares the full remember key on
+equal subsequent snapshots. Core already retains sorted unique positive-i64 IDs,
+so rows now binary-search that list directly, independently of browser row sort.
+Only composed rows perform membership checks; no auxiliary selection collection
+is built. Full IDs, selected counts and frozen confirmation commands remain
+unchanged. Snapshot encoding/decoding, native reads and confirmation are unchanged.
+
+Two new instrumentation cases check exact membership at gaps, empty/single lists,
+values above 2^53 and Long.MAX_VALUE, plus a counting list that requires at most
+17 indexed reads for each tested present/absent ID in a 100,000-entry selection.
+A new Compose case checks a descending row order and an equal-size replacement
+selection, including Long.MAX_VALUE, without stale checkbox/selected semantics.
+The production bulk/history/recreation/navigation regressions also pass.
+
+Compare the original APK from `37b70ce` with the changed APK using the same method,
+API-36 x86_64 isolated phone/light AVD and 100,000-entry fixture above. Each runs
+in a fresh instrumentation process, one complete scenario warmup followed by five
+samples, with 1,000 retained rows. Builds and regressions finish before measuring;
+no competing build/test/profiler runs during either measurement. These are two
+sequential debug runs with uncontrolled scheduling/JIT/GC/caches, not a randomized
+benchmark or attribution of total action cost to selection membership. The
+counting-list regression establishes the bounded lookup work separately.
+
+Median action-to-idle / synchronous dispatch, milliseconds:
+
+| Action | Before | Binary-search membership |
+| --- | ---: | ---: |
+| First 100 rows | 265.597 / 2.267 | 264.898 / 2.962 |
+| Append 100→200 | 298.958 / — | 315.197 / — |
+| Jump between retained rows | 264.593 / — | 249.014 / — |
+| Select every matching ID | 881.920 / 25.188 | 765.376 / 20.684 |
+| Freeze/render delete confirmation | 350.962 / 98.772 | 371.830 / 79.947 |
+
+Select All action ranges are 865.192–985.128 ms before and 665.854–933.088 ms
+after. Observed Select All main-window frames have median/max durations of
+142.993/484.738 ms before and 147.276/472.613 ms after (13 frames in each run).
+The ranges overlap, confirmation median increases, and frame durations do not
+show consistent improvement. This comparison does not establish a general
+latency/frame-rate improvement or assign the remaining delay to one layer.
+Main callback decoding, complete view comparison and other composition work
+remain profiling targets.
+
+Maximum sampled values across measured actions, MiB:
+
+| Run | Used Java heap | Native allocated heap | RSS |
+| --- | ---: | ---: | ---: |
+| Before | 42.366 | 29.622 | 278.309 |
+| Binary-search membership | 30.077 | 29.628 | 270.617 |
+
+As above, these are independently sampled process high-water values at different
+times; never sum them or interpret the difference as exact allocation savings
+caused by this change. Confirmation payloads remain 1,650,216–1,650,217 bytes.
+All 50 action rows and 116 observed frame durations validate against the
+[comparison CSV](measurements/vocabulary-selection-android-2026-10-30.csv) and
+[frame CSV](measurements/vocabulary-selection-android-2026-10-30-frames.csv):
+five iterations per action/run, expected loaded counts, medians/extrema/reference
+counts, positive memory observations, payload sizes and zero reported drops.
+
+PASS: debug/test APKs, strict Android lint, repository Kotlin formatting/diff,
+19 regression cases plus one default opt-in skip (20 reported, 228.889 s), and
+both opt-in comparison runs (51.327/50.541 s). Both retain exact selected/frozen
+IDs, unchanged bytes, zero analyzer calls/reading effects, integrity/FK, native
+closure and scratch removal. Post-run ADB shows only the existing `sudachi`
+directory in `no_backup`. Fixture size is 11,890,688 bytes and SHA-256 remains
+`61a530e680d3d1ce1e6c6cecd7aae9b1d6441c0e2383bab825baf01b9a5d156c`.
+
+Changed debug APK SHA-256:
+`42c92850cad3f9481617afdccd565f0a2247ec34c42382f9b3135a987bc8bd50`;
+test APK: `78570e15ec8d68a196ea211e40aaa43d6a2aaeee8a4ac4f5cf5366818b2e6df9`.
+Baseline APK and packaged-source x86_64 JNI hashes match the earlier section;
+native/binding/asset Gradle tasks are up-to-date, not rebuilt in this slice.
+No Rust/schema/dependency/wire change. Logs:
+`/tmp/yomoku-selection-{android,format-check,regressions,before-100000,after-100000}.log`.
+Initial sandbox Gradle lock-socket access needed an approved rerun; no open
+failure. Rust host/Clippy, separate JNI/codegen/Full-loader, optimized/tablet/dark/
+continuous-fling/heavy-history/diverse-book/fully loaded lists, exact peak/PSS,
+process-death and physical arm64 were not rerun or claimed.

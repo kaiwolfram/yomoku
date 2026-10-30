@@ -7292,3 +7292,31 @@ No production code/schema/dependency/wire changes. Rust host tests/Clippy, separ
 host JNI/codegen reproducibility, Full-loader matrix, optimized build, diverse
 books/heavy-history device data, continuous-fling/tablet/dark performance,
 process-death and physical arm64 were not rerun or claimed.
+
+## Vocabulary selection membership
+
+Use the pinned tool environment and APK build/install commands in the preceding
+Vocabulary Compose section. The focused regression set now also includes
+`app.yomoku.VocabularySelectionLookupTest` (exact signed identity membership and
+bounded ID reads at 100k). Run it with the existing production/Compose/navigation
+cases, followed by a separate opt-in measurement process without concurrent
+builds/tests/profilers:
+
+```sh
+vocabulary_cases=app.yomoku.VocabularyScreenTest,app.yomoku.VocabularyProductionTest,app.yomoku.VocabularySelectionLookupTest,app.yomoku.NavigationTest,app.yomoku.EffectiveReaderNavigationTest,app.yomoku.VocabularyPerformanceTest
+"$ANDROID_HOME/platform-tools/adb" -s emulator-5554 shell am instrument -w -r -e class "$vocabulary_cases" app.yomoku.test/androidx.test.runner.AndroidJUnitRunner
+"$ANDROID_HOME/platform-tools/adb" -s emulator-5554 shell am instrument -w -r -e class app.yomoku.VocabularyPerformanceTest -e yomokuMeasure true -e yomokuVocabularyEntries 100000 -e yomokuVocabularyLoaded 1000 -e yomokuMeasureIterations 5 app.yomoku.test/androidx.test.runner.AndroidJUnitRunner
+```
+
+2026-10-30 PASS: debug/test APKs, strict lint, repository Kotlin formatting/diff;
+19 regressions plus one assumption skip (20 reported, 228.889 s). Native/binding/
+asset tasks reused existing outputs. Sequential baseline/changed 100k processes
+pass (51.327/50.541 s); 50 action rows/116 raw frames validate alongside exact
+IDs, unchanged bytes, no analyzer/reading effects, integrity/FK/closure/cleanup.
+Select All median idle is 881.920→765.376 ms with overlapping ranges; no consistent
+frame/confirmation improvement. Raw data, hashes, sampled-memory limits and
+remaining checks: VOCABULARY_ANDROID_PERFORMANCE.md, final section. Logs:
+`/tmp/yomoku-selection-{android,format-check,regressions,before-100000,after-100000}.log`.
+Initial sandbox Gradle local lock-socket failure required approved rerun; no open
+failure. Existing isolated AVD used; no Rust/schema/dependency/wire change or
+host/optimized/Full-loader/arm64/lifecycle/peak-memory claim.

@@ -1751,6 +1751,11 @@ reader words/tokens and effective-page identity; the usual lazy reads refresh
 those views. No analyzer or word dictionary is loaded by these bulk operations.
 
 Compose rows expose tap/long-press selection with checkbox/selected semantics.
+Each composed row binary-searches the core's ascending positive-i64 ID selection,
+independently of browser sort. Compose retains no selection-sized hash set and
+does not compare the full selection as a remember key. Membership needs logarithmic
+ID reads per composed row; counts and confirmation still use the complete native
+selection, including hidden/unloaded IDs. Full snapshot decoding remains unchanged.
 An active selection shows its total (including hidden/unloaded IDs) and Select
 All, all five status choices, Delete and Cancel above the scrolling browser.
 Select All is also available before selection. The shell creates a manual date

@@ -201,6 +201,38 @@ class VocabularyScreenTest {
     }
 
     @Test
+    fun selectionMembershipFollowsIdsAcrossRowSortAndEqualSizeReplacement() {
+        frame.value =
+            frame.value.copy(
+                vocabulary =
+                    frame.value.vocabulary.copy(
+                        matchingCount = 3UL,
+                        rows = listOf(Long.MAX_VALUE, 7L, 1L).map(::vocabularyRow),
+                        selection = listOf(VocabularyId(1), VocabularyId(Long.MAX_VALUE)),
+                    )
+            )
+        render()
+        compose.onNodeWithTag("vocabulary_scroll").performScrollToKey(Long.MAX_VALUE)
+        compose.onNodeWithTag("vocabulary_row_${Long.MAX_VALUE}").assertIsSelected()
+        compose.onNodeWithTag("vocabulary_row_7").assertIsNotSelected()
+        compose.onNodeWithTag("vocabulary_row_1").assertIsSelected()
+        compose.runOnUiThread {
+            frame.value =
+                frame.value.copy(
+                    vocabulary =
+                        frame.value.vocabulary.copy(
+                            selection = listOf(VocabularyId(7), VocabularyId(Long.MAX_VALUE))
+                        )
+                )
+        }
+        compose.onNodeWithTag("vocabulary_selected_count").assertTextEquals("Selected words: 2")
+        compose.onNodeWithTag("vocabulary_row_${Long.MAX_VALUE}").assertIsSelected()
+        compose.onNodeWithTag("vocabulary_row_7").assertIsSelected()
+        compose.onNodeWithTag("vocabulary_row_1").assertIsNotSelected().performClick()
+        assertEquals(Event.ToggleVocabularySelection(VocabularyId(1)), events.last())
+    }
+
+    @Test
     fun rowSelectionAllStatusesAndConfirmationEchoTheRetainedCommand() {
         frame.value =
             frame.value.copy(

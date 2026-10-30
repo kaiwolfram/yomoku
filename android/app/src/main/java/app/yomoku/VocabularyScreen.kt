@@ -32,7 +32,7 @@ internal fun VocabularyScreen(
     val frozen = state.selectingAll || state.confirmation != null || state.bulkError != null
     val enabled = (!view.storageBusy || state.loading) && !frozen
     val canSelect = !view.storageBusy && !frozen
-    val selection = remember(state.selection) { state.selection?.toHashSet() }
+    val selection = state.selection
     BackHandler(enabled = selection != null || frozen) {
         if (!view.storageBusy)
             dispatch(
@@ -130,7 +130,7 @@ internal fun VocabularyScreen(
                 if (selection == null) VocabularySelectAll(view, dispatch, canSelect)
             }
             items(state.rows, key = { it.id.value }) { row ->
-                val isSelected = selection?.contains(row.id) == true
+                val isSelected = selection?.containsSortedVocabularyId(row.id) == true
                 val selectLabel = stringResource(R.string.vocabulary_select_word)
                 Row(
                     Modifier.fillMaxWidth()
