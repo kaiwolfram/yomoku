@@ -30,6 +30,9 @@ requirements governing the slice. It is the product source of truth.
 - Give every commit a concise subject and a body explaining the changes and
   their purpose. Merge commit bodies must also identify the source branch and
   include relevant issue/PR references when available.
+- Keep test counts, verification summaries, and build/lint/formatting results out
+  of commit message bodies. Record them in session/progress docs and user-facing
+  reports instead.
 - Report implemented tasks, changed files, test results, next steps and blockers.
 - Never commit credentials/signing keys. Publishing signed releases requires approval.
 

@@ -3362,3 +3362,10 @@ and /tmp/yomoku-browser-profile-*. No emulator started.
 - No unresolved blocker. Android/JNI/Kotlin/codegen, Full-loader matrix, device/
   Compose/peak-memory/diverse-book/lifecycle/process-death/physical-arm64 not
   rerun or claimed. No emulator started. Broader hardening tasks stay unchecked.
+
+## 2026-10-30 — Commit message verification guidance
+- Added an AGENTS.md rule excluding test counts, verification summaries and
+  build/lint/formatting results from commit message bodies; keep those details
+  in session/progress docs and user-facing reports. Updated the handoff reminder.
+- Reviewed the documentation diff and passed `git diff --check`. No code changes
+  or runtime tests needed; implementation priorities and blockers are unchanged.

@@ -1,6 +1,7 @@
 # Resume here
 Updated: 2026-10-30. Status row decoding/allocation profiling complete.
-Commit guidance: all commits need explanatory bodies; merges include provenance.
+Commit guidance: explanatory bodies; merges include provenance. Keep verification
+results in session/progress docs and reports, out of commit message bodies.
 
 ## Current slice
 - Vocabulary browser/selection/bulk Compose integration remains complete. Frozen
