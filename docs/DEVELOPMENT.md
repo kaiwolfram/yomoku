@@ -6620,3 +6620,39 @@ No failed check or blocker. No dependency/migration/FFI/Kotlin change; Android,
 JNI/codegen, Full-loader matrix, release/process-death and physical arm64 were not
 rerun. Date buckets, typed statistics transport and charts remain unimplemented.
 Logs: `/tmp/yomoku-known-forms-{storage,workspace,clippy,build}.log`.
+
+
+## Read-only statistics calendar buckets
+
+Verified 2026-10-30 from the repository root with the pinned Rust PATH workaround:
+
+```sh
+export PATH=/home/kai/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin:$PATH
+cargo test -p yomoku-core --test statistics_buckets --all-features --locked --offline
+cargo test -p yomoku-storage statistics --locked --offline
+cargo test --workspace --all-features --locked --offline --quiet
+cargo clippy --workspace --all-targets --all-features --locked --offline -- -D warnings
+cargo build --workspace --locked --offline
+cargo fmt --all -- --check
+git diff --check
+```
+
+PASS: eight new core/seven SQLite cases; 22 focused storage statistics tests;
+767 workspace Rust tests, 17 opt-in ignored; build, strict Clippy/Rustfmt/diff.
+The focused core run passed its initial seven cases; the final workspace run also
+executes the added eighth Monday-boundary case. Coverage includes month-end,
+leap/century/year/Monday transitions, exact range/as-of ownership, daily/weekly/
+monthly gaps, lifetime origin, absolute status/Known lines, epoch/year-9999 bounds,
+future-only history, original/effective rereads/duplicates, zero-word page time,
+query-only/unchanged DB bytes/reopen, document/vocabulary deletion and fresh IDs,
+failed/uncommitted isolation, invalid versions/dates/durations and same-/cross-date
+integer overflow. Read errors release transactions and do not repair data.
+
+Initial corrections: add the new native error to runtime's exhaustive mapping;
+use explicitly resolved dictionary metadata for Known-form fixture expectations
+(the existing general import fixture is deliberately unresolved). Final focused
+and full checks pass. No unresolved failure or implementation blocker.
+No dependency/migration/wire/Kotlin change; Android/JNI/generated bindings,
+Full-loader matrix, release/process-death and physical arm64 were not rerun.
+Transport, retained loading/Retry state and charts remain open.
+Logs: `/tmp/yomoku-statistics-buckets-{storage,workspace,clippy,build}.log`.

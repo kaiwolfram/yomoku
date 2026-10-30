@@ -3821,3 +3821,34 @@ avoiding an event-by-link expansion or separate potentially inconsistent reads.
 Document deletion retains links/history; vocabulary cascades recalculate both
 lines and fresh raw registration has no inferred links. No dependency, migration,
 wire or data-destructive semantic change; timeframe buckets and UI remain next.
+
+
+## 2026-10-30 — Statistics calendar ranges and lifetime bucket values
+
+Keep calendar projection pure and caller-clock driven, with no new dependencies,
+SQL/platform I/O in core, schema change or persisted counters. The initial policy
+is UTC calendar dates: subtract one/six/twelve calendar months from the supplied
+as-of date, clamp the day to the target month's end and begin at midnight. Use
+Monday-start weeks for six-month/year views, calendar months for all time and
+days for the last month. Clip partial edge intervals and include the supplied
+instant using an end-exclusive cutoff one millisecond later. This records the
+routine boundary choices left unspecified by PRODUCT_SPEC.md; device timezone/
+DST behavior is not introduced. Last year is the default.
+
+Carry the lifetime state strictly before the visible range as an explicit opening
+value, then emit absolute end-of-interval values, including empty intervals.
+Occurrence/time origins never reset under filtering; five statuses and Known
+surface/dictionary-form counts remain absolute. All time starts at the earliest
+visible reading or registration/change month, including unread registrations;
+empty/future-only history uses the current month. Ranges never precede epoch.
+Reject calendar dates outside 1970–9999 without changing durable timestamps.
+This bounds all-time allocation and calendar arithmetic independently of storage.
+
+One deferred SQLite read transaction supplies both validated status/link replay
+and date-grouped analyzed completions. Count actual surviving occurrence rows per
+command independently of time, so repetitions/rereads count and zero-word page
+time survives. Preserve the lifetime SQL's signed-integer total limit even across
+date groups; pure core additionally checks unsigned accumulation. No frozen JSON
+replay, inferred legacy counts, content rescans or cache writes. Errors release
+the transaction without partial output. Add only native projection values/API;
+worker, Crux/FFI state and Compose chart rendering stay in the next slice.

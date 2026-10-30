@@ -1,73 +1,60 @@
 # Resume here
-Updated: 2026-10-30. Phase-5 Known dictionary-form timeline verified.
+Updated: 2026-10-30. Phase-5 timeframe buckets verified.
 
 ## Current slice
-- History audit, lifetime totals and status/Known-form timeline complete.
-  Schema 0020 retains v1 completion/status/analysis
-  headers and independent v1 effective reservations. Occurrences inherit the analyzed
-  contract; reservation presence selects effective indices. No history-edit API.
-- Every history-bearing schema (5–20) upgrades with exact history/ID high-water marks
-  and joinable deleted source metadata. Late failures from 9/10/13/17/18 roll back
-  byte-identically. Real completed/unused effective payloads survive upgrade/deletion;
-  unused reservations never replay. DATA_MODEL.md documents the audited contract.
-- Pure core statistics::LifetimeReadingTotals and Storage::lifetime_reading_totals
-  derive both totals in one read-only SQLite statement. Count surviving analyzed
-  occurrences; sum time once per analyzed command, including zero-Japanese pages.
-  Repetitions/rereads count. Pending/import/reservation/legacy work contributes zero.
-  Document deletion keeps both; vocabulary cascades reduce occurrences, retain time.
-  Versions/corrupt durations/overflow fail without repair. No cache/dictionary load.
-  Statistics transport/charts remain unimplemented; tab is a placeholder.
-- Pure StatusTimelineBuilder and Storage::vocabulary_status_timeline replay
-  surviving registrations/transitions in event-ID order, coalescing each date into
-  absolute five-status counts. Document deletion retains unread/manual history;
-  vocabulary cascades erase its full contribution, never rescan. Recreated entries
-  get fresh IDs/New. Per-entry projected dates never precede their prior change
-  (clock regressions/frozen completion); raw event dates remain unchanged. V1
-  cause/provenance and causal chains validate before returning any points.
-- Each timeline point now includes known_dictionary_forms: exact spellings with
-  any Known linked surface. Shared forms use chronological reference counts;
-  same-date handoffs coalesce. Unresolved forms add none; readings never identify
-  forms. All retained context resolutions participate. Undated links apply across
-  their vocabulary generation's history; new evidence can refine earlier counts.
-  One statement reads links then events without multiplying history rows.
-- Migration 0020 stores exact analyzer dictionary-form spellings under vocabulary
-  IDs, independently of documents. Imports/new snapshots/registered edits/actual
-  original and effective completions retain evidence atomically. Unresolved/manual
-  metadata adds no links. Document deletion retains unread links; vocabulary erasure
-  cascades them. Raw registration, reads and identical snapshot/rule retries never
-  rescan to restore links. Upgrade recovers live snapshots/retained occurrences;
-  unread metadata deleted before upgrade is unrecoverable. See DATA_MODEL.md.
+- History audit, lifetime totals, status/Known-form timelines and timeframe
+  buckets complete. Storage schema remains 0020. DATA_MODEL.md documents contracts.
+- Pure statistics::statistics_buckets and Storage::statistics_buckets return
+  absolute occurrence/time, five-status and Known-form values plus explicit
+  opening lifetime state. Last month daily; six months/year weekly (year default);
+  all time monthly. UTC rolling calendar months clamp month-end days, weeks start
+  Monday, first/last intervals clip to the range, gaps carry values. Include the
+  supplied as-of instant; exclude future events. Never reset cumulative y-values.
+  All time starts at the earliest visible event month (current month when empty).
+  Calendar dates support epoch through year 9999; storage timestamps unchanged.
+- One deferred read transaction gives all lines one snapshot. Reading aggregates
+  actual surviving analyzed occurrences and time once per command, including
+  zero-word pages. No cache, dictionary, live text or frozen JSON loads/writes.
+  Original/effective rereads count; duplicates/pending/unused/legacy work do not.
+  Query-only works; corrupt versions/dates/durations/overflow fail without repair.
+- Document deletion preserves history/links; vocabulary erasure recalculates
+  occurrences/statuses/forms, retaining completed time. New IDs start New without
+  rescanning. Undated exact-spelling dictionary links apply throughout their
+  generation's history. Schema-5–20 upgrade/history audits remain covered.
 - Production reader/Library/completion use native effective A/B/C/manual partitions;
-  original B stays immutable. Edits expose Reload; exact Retry/Cancel survives dismissal.
-  Partial time saves every 15s with a five-minute idle/background cap and drains
-  before movement/exit/close. Process death can lose pending in-memory work.
+  original B stays immutable. Edits expose Reload; exact Retry/Cancel survives
+  dismissal. Partial time saves every 15s with five-minute idle/background cap,
+  draining before movement/exit/close. Process death can lose in-memory work.
 - Atomic/deduplicated imports return Library without opening. Reimport starts fresh.
-  Android primitive-backed FileImportBytes fixes the real 17.9 MB EPUB boxed-list heap
-  exhaustion. Debug JNI measurements/CSV: EFFECTIVE_READER_PERFORMANCE.md. Long-page
-  regressions pass; optimized/frame-time/peak-memory/physical-arm64 remain unverified.
+  Android primitive-backed FileImportBytes fixes the real 17.9 MB EPUB heap issue.
+  Debug JNI measurements/CSV: EFFECTIVE_READER_PERFORMANCE.md. Long-page regressions
+  pass; optimized/frame-time/peak-memory/physical-arm64 remain unverified.
+- Statistics transport/charts remain unimplemented; tab is still a placeholder.
 
 ## Next tasks (ordered)
-1. Add timeframe buckets (month daily, six months/year weekly, all time monthly),
-   date-boundary coverage and lifetime cumulative origin. No bucket API exists yet.
-2. Add typed statistics transport and overview/drilldown charts for occurrences,
-   five statuses and Known surface/dictionary-form lines in all timeframes.
+1. Add typed statistics transport through worker/core/FFI: native bucket request,
+   timeframe/as-of input and retained loading/error/Retry state. Test exact results,
+   default year, stale callbacks and mutation refresh before Compose wiring.
+2. Render overview/drilldown charts for lifetime cumulative occurrences, five
+   statuses and Known surface/dictionary-form lines in all four timeframes.
 3. Profile optimized Android repository/encoding/callback costs before changes;
    extend diverse many-book/peak-memory/actual Compose measurements.
 Nostr configuration stays empty; ask Q188 before forwarding.
 
 ## Verification / blockers
-- PASS: five new core/six SQLite tests and schema-5–20 Known-form upgrade coverage;
-  752 workspace Rust tests, 17 opt-in ignored; build, strict Clippy/Rustfmt/diff.
-  No failures or implementation blockers.
+- PASS: eight new core/seven SQLite tests; 767 workspace Rust tests, 17 opt-in
+  ignored; workspace build, strict Clippy/Rustfmt/diff. No unresolved failures or
+  implementation blockers. Initial exhaustive-error match and resolved-form test
+  fixture errors were corrected before final verification.
 - Commands (Rust PATH workaround from DEVELOPMENT.md):
-  cargo test -p yomoku-core --test statistics --all-features --locked --offline
-  cargo test -p yomoku-storage --locked --offline --quiet
+  cargo test -p yomoku-core --test statistics_buckets --all-features --locked --offline
+  cargo test -p yomoku-storage statistics --locked --offline
   cargo test --workspace --all-features --locked --offline --quiet
   cargo clippy --workspace --all-targets --all-features --locked --offline -- -D warnings
   cargo build --workspace --locked --offline
   cargo fmt --all -- --check
   git diff --check
-- Logs: /tmp/yomoku-known-forms-{storage,workspace,clippy,build}.log.
-  No dependency/migration/FFI/Kotlin change. Android/JNI/codegen/
-  Full-loader/release/process-death/physical-arm64 were not rerun. Native/BoltFFI
-  generation must remain sequential with host JNI execution.
+- Logs: /tmp/yomoku-statistics-buckets-{storage,workspace,clippy,build}.log.
+  No dependency/migration/wire/Kotlin change. Android/JNI/codegen/Full-loader/
+  release/process-death/physical-arm64 were not rerun. Native/BoltFFI generation
+  must remain sequential with host JNI execution.

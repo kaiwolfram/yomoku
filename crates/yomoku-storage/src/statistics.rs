@@ -1,7 +1,8 @@
 use yomoku_core::{
     document::VocabularyId,
     statistics::{
-        LifetimeReadingTotals, StatusTimelineBuilder, StatusTimelinePoint, VocabularyStatusChange,
+        statistics_buckets, LifetimeReadingTotals, ReadingTimelinePoint, StatisticsBuckets,
+        StatisticsTimeframe, StatusTimelineBuilder, StatusTimelinePoint, VocabularyStatusChange,
     },
     vocabulary::VocabularyStatus,
 };
@@ -32,84 +33,30 @@ const LIFETIME_SQL: &str = "
         )";
 
 impl Storage {
+    /// Calendar projections from one deferred read transaction: all chart lines
+    /// see the same committed history. The caller supplies the UTC clock. No
+    /// analyzer, live content, JSON, caches, registrations or database writes.
+    pub fn statistics_buckets(
+        &mut self,
+        timeframe: StatisticsTimeframe,
+        as_of_unix_ms: i64,
+    ) -> Result<StatisticsBuckets, StorageError> {
+        let transaction = self.connection.transaction()?;
+        let statuses = status_timeline(&transaction)?;
+        let reading = reading_timeline(&transaction)?;
+        let buckets = statistics_buckets(timeframe, as_of_unix_ms, &reading, &statuses)
+            .map_err(|_| StorageError::InvalidStatistics)?;
+        transaction.commit()?;
+        Ok(buckets)
+    }
+
     /// Replay surviving registration/manual/completion history in a single read
     /// snapshot. Counts are absolute, coalesced per timestamp, without date bins.
     /// Document deletion preserves points; vocabulary deletion recalculates them.
     /// Durable dictionary-form links share the same snapshot. No content,
     /// analyzer, dictionary data, cached counts or JSON is loaded.
     pub fn vocabulary_status_timeline(&self) -> Result<Vec<StatusTimelinePoint>, StorageError> {
-        // Read each link once before replay, without multiplying events by their
-        // surface's link count. UNION keeps both inputs in one read snapshot.
-        let mut statement = self.connection.prepare(
-            "SELECT e.id, e.vocabulary_id, e.semantics_version, e.old_status,
-                    e.new_status, e.cause, e.occurred_at_unix_ms, e.completion_command_id,
-                    c.semantics_version, a.semantics_version, r.semantics_version,
-                    NULL AS dictionary_form, 1 AS row_kind
-             FROM vocabulary_status_events e
-             LEFT JOIN reading_completions c ON c.command_id = e.completion_command_id
-             LEFT JOIN completion_analyses a ON a.command_id = e.completion_command_id
-             LEFT JOIN effective_completion_commands r ON r.command_id = e.completion_command_id
-             UNION ALL
-             SELECT NULL, vocabulary_id, NULL, NULL, NULL, NULL, NULL, NULL,
-                    NULL, NULL, NULL, dictionary_form, 0
-             FROM vocabulary_dictionary_forms
-             ORDER BY row_kind, id",
-        )?;
-        let mut rows = statement.query([])?;
-        let mut timeline = StatusTimelineBuilder::default();
-        while let Some(row) = rows.next()? {
-            if row.get::<_, i64>(12)? == 0 {
-                timeline
-                    .link_dictionary_form(
-                        VocabularyId::try_from(row.get::<_, i64>(1)?)
-                            .map_err(|_| StorageError::InvalidVocabulary)?,
-                        row.get(11)?,
-                    )
-                    .map_err(|_| StorageError::InvalidVocabulary)?;
-                continue;
-            }
-            let version: i64 = row.get(2)?;
-            let old: Option<String> = row.get(3)?;
-            let old = old.as_deref().map(decode_status).transpose()?;
-            let new = decode_status(&row.get::<_, String>(4)?)?;
-            let cause: String = row.get(5)?;
-            let command: Option<i64> = row.get(7)?;
-            let completion_version: Option<i64> = row.get(8)?;
-            let analysis_version: Option<i64> = row.get(9)?;
-            let effective_version: Option<i64> = row.get(10)?;
-            let valid_cause = match cause.as_str() {
-                "registration" => {
-                    old.is_none() && new == VocabularyStatus::New && command.is_none()
-                }
-                "manual" => old.is_some() && old != Some(new) && command.is_none(),
-                "completion" => {
-                    old == Some(VocabularyStatus::New)
-                        && new == VocabularyStatus::Known
-                        && command.is_some()
-                        && completion_version == Some(1)
-                        && analysis_version == Some(1)
-                        && effective_version.is_none_or(|version| version == 1)
-                }
-                _ => false,
-            };
-            if version != 1 || !valid_cause {
-                return Err(StorageError::InvalidVocabulary);
-            }
-            timeline
-                .push(VocabularyStatusChange {
-                    event_id: u64::try_from(row.get::<_, i64>(0)?)
-                        .map_err(|_| StorageError::InvalidVocabulary)?,
-                    vocabulary_id: VocabularyId::try_from(row.get::<_, i64>(1)?)
-                        .map_err(|_| StorageError::InvalidVocabulary)?,
-                    occurred_at_unix_ms: row.get(6)?,
-                    old_status: old,
-                    new_status: new,
-                })
-                .map_err(|_| StorageError::InvalidVocabulary)?;
-        }
-        timeline
-            .finish()
-            .map_err(|_| StorageError::InvalidVocabulary)
+        status_timeline(&self.connection)
     }
 
     /// Derive exact lifetime totals from committed analyzed history, including
@@ -136,4 +83,129 @@ impl Storage {
                 .map_err(|_| StorageError::InvalidCompletion)?,
         })
     }
+}
+
+fn reading_timeline(
+    connection: &rusqlite::Connection,
+) -> Result<Vec<ReadingTimelinePoint>, StorageError> {
+    // Aggregate time once per command, including zero-occurrence pages. Count
+    // only surviving actual occurrences, never the frozen reservation payload.
+    let mut statement = connection.prepare(
+        "SELECT c.completed_at_unix_ms,
+                SUM((SELECT COUNT(*) FROM reading_occurrences o
+                     WHERE o.command_id = c.command_id)),
+                SUM(c.active_time_ms),
+                MIN(c.semantics_version = 1 AND a.semantics_version = 1
+                    AND (e.semantics_version IS NULL OR e.semantics_version = 1)
+                    AND c.active_time_ms >= 0)
+         FROM reading_completions c
+         JOIN completion_analyses a USING (command_id)
+         LEFT JOIN effective_completion_commands e USING (command_id)
+         GROUP BY c.completed_at_unix_ms
+         ORDER BY c.completed_at_unix_ms",
+    )?;
+    let mut rows = statement.query([])?;
+    let mut points = Vec::new();
+    let mut lifetime = [0_i64; 2];
+    while let Some(row) = rows.next()? {
+        if !row.get::<_, bool>(3)? {
+            return Err(StorageError::InvalidCompletion);
+        }
+        let increments = [row.get::<_, i64>(1)?, row.get::<_, i64>(2)?];
+        // Match the existing lifetime SQL's exact signed-integer limit even
+        // when individually valid date groups would overflow its total SUM.
+        for (total, increment) in lifetime.iter_mut().zip(increments) {
+            if increment < 0 {
+                return Err(StorageError::InvalidCompletion);
+            }
+            *total = total
+                .checked_add(increment)
+                .ok_or(StorageError::InvalidCompletion)?;
+        }
+        points.push(ReadingTimelinePoint {
+            completed_at_unix_ms: row.get(0)?,
+            totals: LifetimeReadingTotals {
+                japanese_occurrences: u64::try_from(increments[0])
+                    .map_err(|_| StorageError::InvalidCompletion)?,
+                active_time_ms: u64::try_from(increments[1])
+                    .map_err(|_| StorageError::InvalidCompletion)?,
+            },
+        });
+    }
+    Ok(points)
+}
+
+fn status_timeline(
+    connection: &rusqlite::Connection,
+) -> Result<Vec<StatusTimelinePoint>, StorageError> {
+    // Read each link once before replay, without multiplying events by their
+    // surface's link count. UNION keeps both inputs in one read snapshot.
+    let mut statement = connection.prepare(
+        "SELECT e.id, e.vocabulary_id, e.semantics_version, e.old_status,
+                    e.new_status, e.cause, e.occurred_at_unix_ms, e.completion_command_id,
+                    c.semantics_version, a.semantics_version, r.semantics_version,
+                    NULL AS dictionary_form, 1 AS row_kind
+             FROM vocabulary_status_events e
+             LEFT JOIN reading_completions c ON c.command_id = e.completion_command_id
+             LEFT JOIN completion_analyses a ON a.command_id = e.completion_command_id
+             LEFT JOIN effective_completion_commands r ON r.command_id = e.completion_command_id
+             UNION ALL
+             SELECT NULL, vocabulary_id, NULL, NULL, NULL, NULL, NULL, NULL,
+                    NULL, NULL, NULL, dictionary_form, 0
+             FROM vocabulary_dictionary_forms
+             ORDER BY row_kind, id",
+    )?;
+    let mut rows = statement.query([])?;
+    let mut timeline = StatusTimelineBuilder::default();
+    while let Some(row) = rows.next()? {
+        if row.get::<_, i64>(12)? == 0 {
+            timeline
+                .link_dictionary_form(
+                    VocabularyId::try_from(row.get::<_, i64>(1)?)
+                        .map_err(|_| StorageError::InvalidVocabulary)?,
+                    row.get(11)?,
+                )
+                .map_err(|_| StorageError::InvalidVocabulary)?;
+            continue;
+        }
+        let version: i64 = row.get(2)?;
+        let old: Option<String> = row.get(3)?;
+        let old = old.as_deref().map(decode_status).transpose()?;
+        let new = decode_status(&row.get::<_, String>(4)?)?;
+        let cause: String = row.get(5)?;
+        let command: Option<i64> = row.get(7)?;
+        let completion_version: Option<i64> = row.get(8)?;
+        let analysis_version: Option<i64> = row.get(9)?;
+        let effective_version: Option<i64> = row.get(10)?;
+        let valid_cause = match cause.as_str() {
+            "registration" => old.is_none() && new == VocabularyStatus::New && command.is_none(),
+            "manual" => old.is_some() && old != Some(new) && command.is_none(),
+            "completion" => {
+                old == Some(VocabularyStatus::New)
+                    && new == VocabularyStatus::Known
+                    && command.is_some()
+                    && completion_version == Some(1)
+                    && analysis_version == Some(1)
+                    && effective_version.is_none_or(|version| version == 1)
+            }
+            _ => false,
+        };
+        if version != 1 || !valid_cause {
+            return Err(StorageError::InvalidVocabulary);
+        }
+        timeline
+            .push(VocabularyStatusChange {
+                event_id: u64::try_from(row.get::<_, i64>(0)?)
+                    .map_err(|_| StorageError::InvalidVocabulary)?,
+                vocabulary_id: VocabularyId::try_from(row.get::<_, i64>(1)?)
+                    .map_err(|_| StorageError::InvalidVocabulary)?,
+                occurred_at_unix_ms: row.get(6)?,
+                old_status: old,
+                new_status: new,
+            })
+            .map_err(|_| StorageError::InvalidVocabulary)?;
+    }
+    timeline
+        .finish()
+        .map_err(|_| StorageError::InvalidVocabulary)
 }

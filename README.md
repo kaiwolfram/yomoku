@@ -82,7 +82,9 @@ The Rust statistics repository derives read-only lifetime Japanese-occurrence
 and completed-time totals plus an absolute five-status vocabulary timeline with
 Known distinct dictionary-form counts from durable analyzer links.
 Repetitions/rereads count, imports create registration jumps, and deletion semantics
-recalculate from saved event rows. Date buckets, statistics transport and charts
+recalculate from saved event rows. UTC daily/weekly/monthly timeframe buckets carry
+lifetime cumulative origins and fill empty intervals from one read snapshot.
+Statistics transport and charts
 remain planned.
 
 The pure [EPUB parser](crates/yomoku-import/src/epub.rs) extracts spine-ordered

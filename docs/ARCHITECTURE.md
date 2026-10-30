@@ -1248,7 +1248,7 @@ Explicit reopening persists page 1, while completion reloads and retained Activi
 recreation preserve the active position. Final-page Finish Book/swipe completion
 returns to Library and celebrates each newly Recorded command, including rereads.
 Effective segmentation edits are connected as described below. Read-only lifetime
-aggregation and vocabulary timelines are implemented; buckets, transport and UI remain
+aggregation, vocabulary timelines and calendar buckets are implemented; transport and UI remain
 separate tasks. Add analysis/import crates only with
 actual behavior; Sudachi Full defaults to B, JMdict/JMnedict remain offline data, and future Nostr I/O stays in Rust. Configuration is empty.
 ## Guarded effective boundary repositories
@@ -1525,7 +1525,7 @@ or shifting unrelated entries. Shared-form reference counts replay in projected
 date order, counting a spelling while any linked surface is Known; simultaneous
 handoffs coalesce. Exact spelling identifies forms, unresolved surfaces add none
 and readings do not affect identity. Links have no observation date and apply
-throughout their vocabulary generation's history. Timeframe buckets and UI
+throughout their vocabulary generation's history. Statistics transport and UI
 transport remain separate tasks.
 
 Migration 0020 retains resolved analyzer dictionary-form spellings in a global
@@ -1540,3 +1540,25 @@ with that generation's history. Upgrade recovers available live-snapshot and
 completed-occurrence evidence without creating entries or altering events; unread
 metadata deleted before upgrade cannot be recovered. No core I/O, dependency,
 FFI or Kotlin change is required for this storage prerequisite.
+
+
+## Read-only statistics timeframe buckets
+
+Pure `statistics::statistics_buckets` takes an explicit UTC as-of clock and
+chronological analyzed-reading increments plus validated absolute status/form
+points. The default year view uses Monday-start weekly intervals, as does six
+months; last month uses days and all time uses calendar months. Finite ranges
+subtract calendar months with day clamping; partial first/last intervals are
+clipped. All time starts at the earliest visible history month, or the current
+month when empty. Epoch/year-9999 bounds keep conversion/allocation bounded.
+An explicit opening lifetime state and absolute end-of-interval values preserve
+the cumulative y-origin and carry all lines through empty intervals.
+
+`Storage::statistics_buckets` wraps both status/link replay and date-grouped
+analyzed completions in one deferred read transaction. Each command contributes
+its surviving occurrence rows and time once, including zero-word pages; pending,
+unused and unanalyzed legacy work is excluded. Historical document/vocabulary
+retention rules, exact integer validation and failure rollback remain unchanged.
+The projection loads no content, dictionary or reservation JSON and writes no
+cache or other data. Runtime only recognizes the new native error variant;
+worker/effect/FFI/Compose statistics transport and charts remain unimplemented.

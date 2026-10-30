@@ -11,6 +11,7 @@ use yomoku_core::{
 
 use super::{imports::fixture, *};
 
+mod buckets;
 mod status;
 
 fn import(storage: &mut Storage, text: &str) -> AnalyzedPaste {

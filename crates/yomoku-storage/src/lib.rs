@@ -161,6 +161,7 @@ pub enum StorageError {
     InvalidCompletion,
     InvalidReadingTime,
     InvalidVocabulary,
+    InvalidStatistics,
     InvalidAnalysis,
 }
 
@@ -183,6 +184,7 @@ impl fmt::Display for StorageError {
             Self::InvalidCompletion => f.write_str("invalid or conflicting page completion"),
             Self::InvalidReadingTime => f.write_str("invalid or stale pending reading time"),
             Self::InvalidVocabulary => f.write_str("invalid vocabulary value or stored entry"),
+            Self::InvalidStatistics => f.write_str("invalid statistics history or calendar date"),
             Self::InvalidAnalysis => f.write_str("invalid analysis or segmentation override"),
         }
     }

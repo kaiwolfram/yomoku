@@ -428,6 +428,7 @@ pub(crate) fn map_error(error: StorageError) -> DocumentError {
         StorageError::UnsupportedSchemaVersion { .. }
         | StorageError::InvalidMigrationHistory
         | StorageError::InvalidVocabulary
+        | StorageError::InvalidStatistics
         | StorageError::InvalidAnalysis
         | StorageError::UnrecognizedDatabase => DocumentError::IncompatibleDatabase,
     }

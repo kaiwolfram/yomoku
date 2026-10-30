@@ -1477,7 +1477,48 @@ returns a storage error, never floating-point approximation, wrapping or truncat
 The query performs no writes and works with `PRAGMA query_only = true`.
 Seven dedicated tests plus every schema-5–19 upgrade verify these contracts,
 including duplicate/concurrent success, failure rollback, reopen and deletion.
-Core/worker/FFI/UI transport and date buckets remain separate work.
+Worker/FFI/UI transport remains separate work; calendar buckets are described below.
+
+## Read-only statistics calendar buckets (phase 5, no migration)
+
+Pure `statistics::statistics_buckets` accepts an explicit UTC `as_of_unix_ms`,
+chronological per-date analyzed reading increments and the validated absolute
+status/Known-form timeline. `StatisticsTimeframe` defaults to `LastYear`.
+`LastMonth` uses daily bins; `LastSixMonths` and `LastYear` use Monday-start weeks;
+`AllTime` uses calendar months. Finite ranges begin at midnight one/six/twelve
+calendar months before the supplied UTC date, clamping the day to that month's
+last day. Clip the first interval to this range start and the last interval to
+`as_of + 1ms`, so the supplied instant is included and future events are excluded.
+All time begins at the first visible reading/status event's month; an empty or
+future-only history shows the current month. Clamp ranges at the Unix epoch.
+UTC is the initial calendar policy; no device timezone or DST conversion occurs.
+
+Each `StatisticsBucket` contains explicit start/end-exclusive timestamps and
+absolute `StatisticsValues`: cumulative lifetime occurrences/time, five status
+counts and Known dictionary forms. The separate `opening` value is the lifetime
+state strictly before the visible range. Events exactly on a boundary belong to
+the following interval; all equal-time reading events are combined before input.
+Empty intervals carry prior values. Changing timeframe never resets cumulative
+y-values or converts statuses/forms to per-bucket deltas. Demotions can reduce
+status/form lines; occurrence totals retain repetitions and rereads.
+
+`Storage::statistics_buckets(&mut self, timeframe, as_of)` opens one deferred read
+transaction for the existing validated status/link replay and a chronological
+reading query. Thus all lines share one SQLite snapshot, with no live text,
+dictionary, analyzer, JSON or cached-count loading. Group analyzed completions by
+completion date, count surviving occurrences per command and sum time once per
+command, including zero-word pages. Unused reservations, partial time and legacy
+unanalyzed events contribute no reading increments. Existing document/vocabulary
+retention and deletion semantics apply unchanged. The projection writes no data
+and works with `query_only`; errors roll back its read transaction.
+
+The core calendar accepts dates from epoch through the last millisecond of year
+9999; out-of-range, negative, duplicate or unsorted input dates fail. This bounds
+calendar arithmetic and all-time bucket allocation without narrowing stored event
+timestamps. The core checks unsigned cumulative overflow. Storage preserves the
+existing lifetime projection's signed 64-bit total limit across date groups;
+unknown event versions, corrupt durations and overflow fail without repairing or
+returning partial data. Transport, loading/retry state and charts remain separate.
 
 ## Read-only vocabulary status and Known-form timeline (phase 5)
 
@@ -1507,8 +1548,8 @@ change never precedes that entry's earlier state; unrelated entries keep their
 own dates. Raw stored timestamps/history remain exact and immutable. Deltas at
 projected dates use exact integers and produce nonnegative unsigned counts.
 Replay retains entry/link state, status deltas per projected date and form deltas
-per affected spelling/date, rather than every historical row. Timeframe/date-bucket
-policy is still unimplemented.
+per affected spelling/date, rather than every historical row. Calendar buckets
+apply to this validated timeline as described below.
 
 Deleting a document leaves the entire timeline, including unread manual Known
 entries. Vocabulary deletion erases all that ID's registration/transitions and

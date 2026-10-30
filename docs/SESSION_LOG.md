@@ -3075,3 +3075,21 @@ Full-loader/release/process-death/physical-arm64 checks were not rerun.
 Checked only the completed count task and updated README, architecture/data/
 decisions/development and handoff. Next: timeframe buckets with lifetime cumulative
 origin, then typed statistics transport and charts.
+
+
+## 2026-10-30 — Statistics timeframe buckets
+
+Implemented pure UTC daily/weekly/monthly buckets and one-snapshot read-only
+SQLite aggregation for all four timeframes, defaulting to last year. Explicit
+opening lifetime values preserve cumulative origins; empty intervals carry all
+absolute status/Known-form lines. Calendar-month clamping, Monday weeks and
+partial edge intervals have documented policy. Actual analyzed rereads count,
+zero-word time survives, and deletion/duplicate/pending/legacy semantics remain.
+No dependencies, migrations, wire or Kotlin changes; runtime maps the new error.
+
+PASS: eight new core/seven SQLite cases; 767 workspace Rust tests (17 opt-in
+ignored), build, strict Clippy/Rustfmt/diff. Initial exhaustive-error mapping and
+unresolved-form fixture expectations corrected; no unresolved failures/blockers.
+Updated plan, handoff, README and architecture/data/decisions/development docs.
+Android/JNI/codegen/Full-loader/release/process-death/physical-arm64 not rerun.
+Next: typed statistics transport with retained loading/error/Retry, then charts.

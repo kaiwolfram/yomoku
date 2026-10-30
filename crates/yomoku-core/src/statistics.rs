@@ -4,6 +4,9 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use crate::{document::VocabularyId, library::WordStatusCounts, vocabulary::VocabularyStatus};
 
+mod buckets;
+pub use buckets::*;
+
 /// Lifetime totals from complete analyzed events, including deliberate rereads.
 /// Occurrences retain repetitions and exclude erased vocabulary history. Time
 /// belongs to each completed page once, including pages with no Japanese words.
