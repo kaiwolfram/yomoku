@@ -1204,7 +1204,7 @@ An app-level keyed Compose effect consumes positive CompletionNotice and display
 a short Android Toast once; zero stays silent and recreation does not replay it.
 Settings exposes five radio choices, disabled while unknown/busy, and offline
 Sudachi licenses/notices and JMdict/JMnedict credits. Dialog visibility survives Activity recreation.
-Nostr/Statistics/Vocabulary remain placeholders. Busy/error/retry state comes from
+Nostr/Vocabulary remain placeholders. Busy/error/retry state comes from
 Rust; the unsaved form draft and notice dialog visibility use rememberSaveable.
 The draft is retained through Settings/recreation.
 Navigation uses a bottom bar below 600dp and a scrollable rail above; Settings,
@@ -1503,8 +1503,8 @@ or effective JSON and writes no caches or history. Legacy events without analysi
 markers, pending checkpoints and unused reservations are excluded. Document
 deletion preserves totals; vocabulary-history cascades reduce occurrences while
 retaining completed time. Header-version/duration checks and exact-integer overflow
-errors fail without repair. Runtime/FFI transport is described below; Compose
-charts remain future work and the Statistics tab is a placeholder.
+errors fail without repair. Runtime/FFI transport and Compose charts are described
+below.
 
 `StatusTimelineBuilder` in the pure core streams surviving registration and
 status changes in durable event-ID order, validates each entry's causal chain and
@@ -1561,7 +1561,7 @@ unused and unanalyzed legacy work is excluded. Historical document/vocabulary
 retention rules, exact integer validation and failure rollback remain unchanged.
 The projection loads no content, dictionary or reservation JSON and writes no
 cache or other data. The worker transports these values as described below;
-Compose charts remain unimplemented.
+Compose charts consume these values as described below.
 
 
 ## Retained statistics transport
@@ -1573,8 +1573,8 @@ Compose charts remain unimplemented.
 bucket values. An identical lazy load never starts a duplicate read or retries an
 error. A changed query clears the previous lines. Settings/recreation retain state;
 returning from another destination invalidates it for a fresh entry-time query.
-The eventual Compose caller must capture its clock once per entry/selection,
-then request when visible and idle, rather than invent a new cutoff on each render.
+The Compose caller captures its clock once per entry/selection, then requests when
+visible and idle, rather than inventing a new cutoff on each render.
 
 A skipped native `LoadStatistics` storage operation runs on the existing FIFO,
 without dictionary/analyzer access. Only generated Event/ViewModel values and
@@ -1590,3 +1590,25 @@ Document deletion preserves history. No schema, persistent counter, dependency o
 history semantics change. Existing typed storage error mapping is retained and
 statistics errors do not overwrite document/import errors. Kotlin/JNI serialization
 preserves exact unsigned occurrence/time/status/form values, including above 2^53.
+
+## Statistics Compose overview and drilldowns
+
+The Statistics destination renders three tappable charts: cumulative lifetime
+Japanese occurrences, five absolute status lines and Known surface/dictionary-form
+lines. Four timeframe chips retain the core selection; Settings, navigation and
+Activity recreation keep the selected drilldown for the current session. Back
+returns from a drilldown to the overview. Error Retry dispatches only the typed
+Retry event; recomposition/lazy loads reuse the existing query's cutoff and never
+automatically retry a failed query. Invisible screens do not request data.
+
+`StatisticsDataset` maps the explicit opening state to the visible start and each
+bucket's absolute values to its end boundary. Time spacing uses actual elapsed
+UTC milliseconds; step lines show interval-end samples without inventing events
+inside a bucket. The y-range includes all opening and bucket values. Keep exact
+ULong values for labels, accessibility summaries and drilldown rows; subtract the
+unsigned minimum before converting relative drawing distances, so large lifetime
+counts with small changes remain distinct. Empty/constant datasets remain finite.
+Status strokes reuse the reader/Library palette, including graph-only Known green;
+Known dictionary forms use a contrasting dashed line. Exact, labeled interval rows
+and chart summaries complement the Canvas. No chart dependency, platform query,
+schema, stored counter or change to completion/history semantics is introduced.

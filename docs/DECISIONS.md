@@ -3873,3 +3873,25 @@ mutations, and preserve unrelated document errors. Compose will capture wall tim
 once per entry/selection rather than each render. Do not add chart or drilldown
 behavior in this transport slice. Generated schemas are a same-build boundary;
 regenerate Kotlin/native together, with generation sequential to JNI execution.
+
+## 2026-10-30 — Statistics charts use exact retained bucket values
+
+Use Compose Canvas and existing Material controls, without adopting a chart
+library. Render the three specified graphs as an overview with tappable drilldowns
+and a lazy list of exact interval-end values, including the lifetime opening row.
+Show UTC range/grouping explicitly. Keep lifetime origins and absolute statuses;
+step segments represent bucket closing samples rather than interpolated event
+dates. Use elapsed timestamps for x spacing and the full visible series extrema
+for y bounds. Constant lines sit at the plot midpoint; labels retain their exact
+value. Keep ULong through projection/labels and subtract before converting drawing
+distances to floating point. Reuse status colors and distinguish the Known
+dictionary-form series with a dashed tertiary stroke. Provide textual legends,
+accessibility summaries and exact rows for interpreting coincident lines.
+
+Keep drilldown choice in session-keyed saveable shell state; all statistics data,
+timeframe, error and Retry ownership remain in Rust. Capture now for the first or
+invalidated query, reuse a retained query's cutoff through busy/render/Settings/
+recreation transitions, and capture again on an explicit timeframe selection.
+The screen exists only while visible and resubmits its lazy load when storage is
+idle. Explicit Retry carries no newly sampled time. No periodic background refresh,
+time totals UI, migration, dependency or new durable behavior is added.

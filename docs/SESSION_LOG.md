@@ -3111,3 +3111,23 @@ fixture/error expectations and Kotlin safe-call warning corrected; Settings edge
 case fixed/tested. No unresolved blockers. Updated plan, README, architecture/data/
 decisions/development and handoff. Android/device/release/performance/Full-loader
 matrix not rerun. Next: Compose overview/drilldowns using retained statistics.
+
+
+## 2026-10-30 — Statistics Compose overview and drilldowns
+
+Rendered the three specified charts, all four timeframe controls, explicit Retry
+and exact opening/interval drilldown rows from retained native values. Preserved
+lifetime origins, unsigned counts, status colors, UTC ranges and actual x spacing;
+added accessible legends/summaries and Settings/Back/recreation retention. No
+new dependency, schema or Rust source change. Updated preview/reader fixtures for
+the previous Statistics wire field and refreshed plan/handoff/architecture/data/
+decisions/development/README docs.
+
+PASS: both-ABI native regeneration, debug/test APKs, strict lint, changed Kotlin
+format/diff; seven new plus six existing cases on phone/light and tablet/dark,
+26 executions without failures/skips. Visual checks pass. Existing emulator's
+insufficient installation space resolved with an isolated workspace image while
+preserving Library data; original temporary reserve setting restored. Sandbox
+Gradle and /tmp image allocation failures recovered. Display settings restored,
+task emulators stopped; no remaining blocker. Rust/host-JNI/release/performance/
+physical-arm64 checks not rerun. Next: Vocabulary indexed query/paging transport.

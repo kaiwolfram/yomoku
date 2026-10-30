@@ -1,60 +1,54 @@
 # Resume here
-Updated: 2026-10-30. Phase-5 statistics transport verified.
+Updated: 2026-10-30. Phase-5 Statistics Compose overview/drilldowns implemented.
 
 ## Current slice
-- History audit, lifetime totals, five-status/Known-form timelines, UTC timeframe
-  buckets and typed worker/core/FFI transport complete. Schema remains 0020.
-- ViewModel.statistics retains selected timeframe (LastYear default), desired
-  StatisticsQuery, loading/error and optional StatisticsBuckets. LoadStatistics
-  takes explicit UTC as-of; SetStatisticsTimeframe takes both; RetryStatistics
-  repeats the exact failed cutoff. Identical lazy loads never replay failures.
-- Native skipped request/result and captured attempt IDs share the existing FIFO.
-  Rapid selections coalesce; stale successes/errors cannot replace current lines
-  or release another owner. Settings retains state; hidden unattempted selections
-  resume on a visible lazy load. Unrelated busy work rejects requests unchanged.
-- Committed imports/status/completions/effective edits invalidate values. Returning
-  from another destination invalidates for external mutations. Retain timeframe.
-  Capture wall time once per entry/selection and request when visible/idle, rather
-  than supplying a new cutoff on every render. Errors stay separate from documents.
-- All four projections preserve absolute lifetime occurrence/time, five-status and
-  Known-form values plus opening lifetime state. Daily/monthly/Monday-week bins,
-  UTC rolling calendar months, clipped edges, gaps, inclusive as-of/future exclusion
-  and epoch–9999 validation remain as documented in DATA_MODEL.md.
-- One read transaction, no content/dictionary/frozen JSON/cache reads or writes.
-  Original/effective rereads count, zero-word time survives, pending/legacy do not.
-  Document deletion preserves history; vocabulary erasure recalculates without
-  rescans. Exact unsigned values survive generated Kotlin ULong codecs.
+- Statistics now renders cumulative lifetime Japanese occurrences, five absolute
+  status lines and Known surface/dictionary-form lines. Tappable overview cards
+  open charts plus exact lifetime opening/interval-end rows. Android Back returns
+  to overview; session-keyed drilldown survives Settings/navigation/recreation.
+- All four timeframe chips use retained core state (LastYear default), explicit
+  UTC grouping/ranges and visible/idle lazy loading. Capture now once for first/
+  invalidated queries or explicit selections; reuse retained cutoff on renders,
+  Settings/recreation and errors. Only RetryStatistics retries a failed query.
+- StatisticsDataset retains exact ULongs, actual elapsed x spacing and opening
+  lifetime values. Step lines map interval-end samples. Subtract unsigned minimum
+  before floating-point drawing conversion; constant/empty lines stay finite.
+  Reuse status palette/Known green; dictionary-form line is dashed. Accessible
+  summaries/legends/rows retain exact counts. No new library or migration.
+- Native FIFO/core/FFI transport and read-only SQLite projections remain unchanged:
+  rapid selections coalesce, stale callbacks cannot replace new lines, imports/
+  status/completions/effective edits/tab reentry invalidate values, document
+  deletion retains history and vocabulary erasure recalculates without rescans.
+- Updated preview/three existing reader fixtures for the Statistics wire field
+  added in the previous slice. Current Android builds regenerate both native ABIs
+  and Kotlin together. Keep native/BoltFFI generation sequential to host JNI.
 - Production reader/Library/completion use effective partitions. Exact Retry/Cancel
-  and final time drain remain verified; original B stays immutable. Imports return
-  Library atomically. Performance limits: EFFECTIVE_READER_PERFORMANCE.md.
-- Statistics tab is still a Compose placeholder. New Event/ViewModel wire requires
-  same-build regeneration; native/BoltFFI generation must not overlap host JNI.
+  and final-time drain remain verified; original B stays immutable. Performance
+  limits: EFFECTIVE_READER_PERFORMANCE.md. Schema remains 0020.
 
 ## Next tasks (ordered)
-1. Render Statistics overview/drilldowns for lifetime cumulative occurrences, five
-   statuses and Known surface/dictionary-form lines using retained transport.
-   Connect all four timeframes, visible/idle loading and explicit error Retry.
-2. Verify chart datasets/lifetime origins and updates after reading/status/import,
-   navigation/recreation and all timeframes through phone/tablet Compose tests.
+1. Vocabulary browser: indexed surface-prefix query, five-status filters, matching
+   count, 100-row paging and newest/frequency/last-seen/alphabetical sorting;
+   implement/test typed worker/core/FFI transport before Compose integration.
+2. Global matching Select All and confirmed bulk status/deletion; verify unloaded
+   rows, immutable status events, history erasure/chart refresh and fresh New
+   generations without rescanning existing documents.
 3. Profile optimized repository/encoding/callback costs before changes; extend
    diverse many-book/peak-memory/actual Compose measurements.
 Nostr configuration stays empty; ask Q188 before forwarding.
 
 ## Verification / blockers
-- PASS: 780 workspace Rust tests, 17 opt-in ignored; nine new core/three worker/one
-  protocol cases; full real-Full Kotlin/JNI suite, exact-u64 fixture exchanges,
-  repeat codegen, workspace build, strict Clippy/Rustfmt/new-Kotlin-format/diff.
-- Corrected corrupt-fixture CHECK/error expectations and Kotlin safe-call warning;
-  fixed/tested Settings-hidden query resumption. No unresolved failures/blockers.
-- Commands (Rust PATH/JDK setup in DEVELOPMENT.md):
-  cargo test --workspace --all-features --locked --offline --quiet
-  cargo clippy --workspace --all-targets --all-features --locked --offline -- -D warnings
-  tools/test-kotlin-bridge.sh
-  cargo run -p yomoku-ffi --bin generate-kotlin --features facet_typegen --locked --offline -- target/generated/kotlin-repeat
-  diff -r target/generated/kotlin target/generated/kotlin-repeat
-  cargo build --workspace --locked --offline
-  cargo fmt --all -- --check
+- PASS: both-ABI debug/test APK build, strict Android lint, all changed Kotlin
+  formatting and git diff check. Thirteen dataset/Compose/production/navigation
+  cases pass on both phone/light and tablet/dark (26 executions), no skips.
+- Final build: /tmp/yomoku-statistics-ui-android-final.log; phone/tablet logs:
+  /tmp/yomoku-statistics-ui-{phone,tablet}.log. No source verification failures.
+- Commands (environment setup in DEVELOPMENT.md):
+  ./android/gradlew -p android :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug --offline --console=plain
+  adb -s emulator-5554 shell am instrument -w -r -e class app.yomoku.StatisticsDatasetTest,app.yomoku.StatisticsScreenTest,app.yomoku.StatisticsProductionTest,app.yomoku.NavigationTest,app.yomoku.EffectiveReaderNavigationTest app.yomoku.test/androidx.test.runner.AndroidJUnitRunner
   git diff --check
-- Logs: /tmp/yomoku-statistics-transport-{workspace,jni,clippy,codegen,build}.log.
-  Android APK/lint/device, separate Full-loader matrix, release/process-death,
-  performance and physical-arm64 checks were not rerun. No migration/dependency.
+- Existing emulator lacked install space. Restored its temporary storage reserve
+  adjustment, preserved Library data and used .local/statistics-ui-avd instead.
+  A /tmp data-image attempt lacked host space; workspace image boots successfully. No unresolved blocker.
+- Rust/host JNI/codegen reproducibility/Full-loader matrix, release/process-death,
+  performance and physical arm64 were not rerun for this Kotlin-only slice.

@@ -75,8 +75,7 @@ progress. Explicitly reopening a finished book persists page 1; active-reader
 recreation and completion reloads keep their current position. Finish Book (or a
 final-page left swipe) completes the save and returns to Library with brief confetti
 on each newly recorded completion, including rereads with zero new words.
-Nostr, Statistics and Vocabulary tabs currently
-show placeholders.
+Nostr and Vocabulary tabs currently show placeholders.
 
 The Rust statistics repository derives read-only lifetime Japanese-occurrence
 and completed-time totals plus an absolute five-status vocabulary timeline with
@@ -85,8 +84,9 @@ Repetitions/rereads count, imports create registration jumps, and deletion seman
 recalculate from saved event rows. UTC daily/weekly/monthly timeframe buckets carry
 lifetime cumulative origins and fill empty intervals from one read snapshot.
 Typed native worker/core/FFI transport now retains timeframe/as-of queries,
-loading/error/Retry state and stale-callback protection. Compose overview/drilldown
-charts remain planned.
+loading/error/Retry state and stale-callback protection. The Statistics screen
+renders all three overview/drilldown charts, four timeframes, exact interval rows
+and explicit error Retry, preserving lifetime origins through navigation/recreation.
 
 The pure [EPUB parser](crates/yomoku-import/src/epub.rs) extracts spine-ordered
 chapters, title, headings/emphasis, source ruby, positioned images/covers and

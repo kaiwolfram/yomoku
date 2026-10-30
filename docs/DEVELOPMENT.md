@@ -6699,3 +6699,63 @@ failure/blocker. Expected Crux close-during-I/O diagnostics remain documented ab
 No dependency/migration/Compose change. Android APK/lint/device, separate Full-loader
 matrix, release/process-death/performance and physical-arm64 checks were not rerun.
 Logs: `/tmp/yomoku-statistics-transport-{workspace,jni,clippy,codegen,build}.log`.
+
+
+## Statistics Compose overview and drilldowns
+
+Verified 2026-10-30 from the repository root:
+
+```sh
+export PATH=/home/kai/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin:$PATH
+export JAVA_HOME="$PWD/.local/jdk-17/jdk-17.0.21+9"
+export GRADLE_USER_HOME="$PWD/.local/gradle"
+export ANDROID_HOME=/home/kai/Android/Sdk
+./android/gradlew -p android :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug --offline --console=plain
+"$ANDROID_HOME/platform-tools/adb" -s emulator-5554 install -r -t android/app/build/outputs/apk/debug/app-debug.apk
+"$ANDROID_HOME/platform-tools/adb" -s emulator-5554 install -r -t android/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+statistics_cases=app.yomoku.StatisticsDatasetTest,app.yomoku.StatisticsScreenTest,app.yomoku.StatisticsProductionTest,app.yomoku.NavigationTest,app.yomoku.EffectiveReaderNavigationTest
+"$ANDROID_HOME/platform-tools/adb" -s emulator-5554 shell am instrument -w -r -e class "$statistics_cases" app.yomoku.test/androidx.test.runner.AndroidJUnitRunner
+"$ANDROID_HOME/platform-tools/adb" -s emulator-5554 shell wm size 2560x1600
+"$ANDROID_HOME/platform-tools/adb" -s emulator-5554 shell wm density 240
+"$ANDROID_HOME/platform-tools/adb" -s emulator-5554 shell cmd uimode night yes
+"$ANDROID_HOME/platform-tools/adb" -s emulator-5554 shell am instrument -w -r -e class "$statistics_cases" app.yomoku.test/androidx.test.runner.AndroidJUnitRunner
+"$ANDROID_HOME/platform-tools/adb" -s emulator-5554 shell wm size reset
+"$ANDROID_HOME/platform-tools/adb" -s emulator-5554 shell wm density reset
+"$ANDROID_HOME/platform-tools/adb" -s emulator-5554 shell cmd uimode night no
+"$JAVA_HOME/bin/java" -jar .local/ktfmt-0.64.jar --kotlinlang-style --dry-run --set-exit-if-changed android/app/src/main/java/app/yomoku/{StatisticsChart,StatisticsScreen,YomokuApp}.kt android/app/src/androidTest/java/app/yomoku/{StatisticsDataset,StatisticsScreen,StatisticsProduction,EffectiveReaderBoundaries,EffectiveReaderWords,EffectiveReaderNavigation}Test.kt
+git diff --check
+```
+
+PASS: both-ABI native/Kotlin regeneration, debug/test APKs, strict Android lint,
+all changed Kotlin formatting and diff checks. Thirteen cases pass without failures
+or skips on phone/light (1080×2400, 420 dpi; 98.594 s) and tablet/dark (2560×1600,
+240 dpi; 59.513 s), 26 executions. Seven new cases cover lifetime opening/closing
+values, all eight lines, four timeframes, actual timestamp spacing, status demotion,
+constant/empty data, UTC dates and exact u64::MAX drawing distances. Compose verifies
+exact chart summaries/opening/interval rows, Settings/Back, stable visible/idle
+cutoffs and explicit error Retry. Real-Full production verifies import registration
+without reading increments, manual status changes, completed occurrences, every
+timeframe and native session/drilldown/query retention across recreation/Settings.
+Six existing main/reader navigation regressions pass on both layouts. Updated
+preview/three reader fixtures for the previous slice's required Statistics field.
+
+The original emulator had only 496 MiB free and could not stage the APK. Cache
+trimming did not help; a temporary storage-reserve reduction was restored to its
+original absent setting after installation still failed. Existing Library data
+was preserved. A /tmp isolated-image attempt failed its host free-space preflight;
+use the ignored workspace data directory instead, with ample host space:
+
+```sh
+mkdir -p "$PWD/.local/statistics-ui-avd"
+"$ANDROID_HOME/emulator/emulator" -avd medium_phone -datadir "$PWD/.local/statistics-ui-avd" -data "$PWD/.local/statistics-ui-avd/userdata-qemu.img" -cache "$PWD/.local/statistics-ui-avd/cache.img" -partition-size 8192 -no-window -no-audio -no-snapshot -gpu swangle -feature -Vulkan -camera-back none -camera-front none -accel on -cores 2
+```
+
+Gradle required local-socket escalation; initial sandbox startup failed before
+building. The isolated emulator boots and installs successfully. Visual phone and
+tablet checks pass; screenshots: /tmp/yomoku-statistics-ui-{phone,tablet}.png.
+Display size/density/light mode restored; task-started emulators stopped. No
+unresolved source/test failure or blocker. No new dependency, migration or Rust
+source change. Rust tests/Clippy, host JNI, codegen reproducibility, separate
+Full-loader matrix, release/process-death, performance and physical arm64 were
+not rerun. Logs: /tmp/yomoku-statistics-ui-{android,android-final,phone,tablet,
+emulator,isolated-emulator}.log. Generation remained sequential to host JNI.

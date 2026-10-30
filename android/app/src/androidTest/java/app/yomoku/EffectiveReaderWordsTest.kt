@@ -78,6 +78,7 @@ class EffectiveReaderWordsTest {
                 )
             }
         return ViewModel(
+            statistics = StatisticsState(StatisticsTimeframe.LASTYEAR, loading = false),
             destination = Destination.LIBRARY,
             settingsOpen = false,
             documents = emptyList(),

@@ -38,6 +38,8 @@ import app.yomoku.shared.ContentRoute
 import app.yomoku.shared.Destination
 import app.yomoku.shared.Event
 import app.yomoku.shared.LibrarySort
+import app.yomoku.shared.StatisticsState
+import app.yomoku.shared.StatisticsTimeframe
 import app.yomoku.shared.ViewModel
 import app.yomoku.theme.YomokuTheme
 
@@ -58,6 +60,7 @@ internal fun YomokuApp(
         Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
     }
     var pasteText by rememberSaveable { mutableStateOf("") }
+    var statisticsDetail by rememberSaveable(sessionKey) { mutableStateOf<String?>(null) }
     LaunchedEffect(view.contentRoute) {
         if (view.contentRoute != ContentRoute.PASTE) pasteText = ""
     }
@@ -161,6 +164,14 @@ internal fun YomokuApp(
                                 coverLoader,
                                 libraryActionsEnabled,
                             )
+                        view.destination == Destination.STATISTICS ->
+                            StatisticsScreen(
+                                view,
+                                sessionKey,
+                                statisticsDetail,
+                                { statisticsDetail = it },
+                                dispatch,
+                            )
                         else ->
                             Text(
                                 stringResource(view.destination.emptyResource()),
@@ -226,6 +237,7 @@ private fun YomokuPreview() {
     YomokuTheme {
         YomokuApp(
             ViewModel(
+                statistics = StatisticsState(StatisticsTimeframe.LASTYEAR, loading = false),
                 destination = Destination.LIBRARY,
                 settingsOpen = false,
                 documents = emptyList(),

@@ -1236,7 +1236,7 @@ range, exact surface and optional reading/dictionary form. Command provenance
 retains source/chapter/date through reading_completions. It has no live text/token
 FK; document deletion preserves encounters. Its vocabulary FK cascades deletion,
 erasing only that entry's encounters. The entry/command index supports selected-word
-counts and lifetime aggregation below; Statistics UI remains future work.
+counts and lifetime aggregation below; Statistics UI consumes the read-only buckets.
 
 Unique departing-page surfaces register only if absent (e.g. actual reading after
 vocabulary deletion); untouched pages are not rescanned. The pure New-only policy
@@ -1477,8 +1477,7 @@ returns a storage error, never floating-point approximation, wrapping or truncat
 The query performs no writes and works with `PRAGMA query_only = true`.
 Seven dedicated tests plus every schema-5–19 upgrade verify these contracts,
 including duplicate/concurrent success, failure rollback, reopen and deletion.
-Calendar buckets and worker/FFI transport are described below; chart UI remains
-separate work.
+Calendar buckets, worker/FFI transport and Compose consumption are described below.
 
 ## Read-only statistics calendar buckets (phase 5, no migration)
 
@@ -1519,8 +1518,8 @@ calendar arithmetic and all-time bucket allocation without narrowing stored even
 timestamps. The core checks unsigned cumulative overflow. Storage preserves the
 existing lifetime projection's signed 64-bit total limit across date groups;
 unknown event versions, corrupt durations and overflow fail without repairing or
-returning partial data. Retained worker/FFI transport is described below; charts
-remain separate.
+returning partial data. Retained worker/FFI transport is described below; Compose
+renders these values without additional queries or persisted chart caches.
 
 ## Read-only vocabulary status and Known-form timeline (phase 5)
 
@@ -1836,3 +1835,11 @@ errors. State is ephemeral, retained by the Activity's existing native session,
 not restored across process death. Reentry refreshes after external mutations;
 accepted imports/status/completions/effective edits invalidate cached values.
 No storage schema, history rewrite, dictionary rescan or persistent cache is added.
+
+Compose consumes the opening state and each bucket's absolute values directly;
+the overview/drilldowns neither aggregate deltas nor perform platform SQL. Chart
+labels, accessibility summaries and interval rows keep exact ULong values. Only
+relative drawing distances use floating point, after unsigned subtraction of the
+visible minimum. UTC dates and actual elapsed x spacing match the native bucket
+ranges. The shell saves only the selected drilldown; native state still owns the
+timeframe, query, loading/error and exact Retry cutoff.
