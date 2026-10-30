@@ -3200,3 +3200,21 @@ Updated AGENTS.md to require commit bodies explaining changes and purpose, with
 source branch and available issue/PR references for merges. Verified the wording
 and `git diff --check`; documentation only, no application tests run. Next tasks
 remain unchanged; no blockers.
+
+## 2026-10-30 — Frozen Vocabulary bulk repositories
+
+Added all-matching ID capture sharing browser prefix/status SQL, atomic frozen-ID
+bulk status changes using existing immutable manual events, and permanent bulk
+vocabulary deletion using existing history cascades. Retained page time/provenance/
+live content and prevented stale IDs from targeting replacement generations.
+Updated plan, architecture/data model, decisions, development commands and handoff.
+Retained Select All/confirmation/FIFO/FFI/Compose wiring remains unchecked.
+
+PASS: seven new SQLite cases; 808 workspace tests (17 opt-in ignored), strict
+Clippy, workspace build, Rustfmt/diff. Verified 1,205 matches, all filters/sorts/
+literal prefixes, read-only capture, immutable events/all statuses, concurrent and
+frozen-ID retries, later-row/cascade/commit rollback, original/effective chart
+recalculation, no live-book recreation and later fresh New registrations. Corrected
+initial test API assumptions and one test-only Clippy warning. No open blocker.
+No Android/JNI/codegen/Full-loader matrix/release/process-death/performance/physical
+arm64 checks rerun. Next: retained selection and confirmed native bulk operations.

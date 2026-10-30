@@ -3971,3 +3971,25 @@ offer explicit Retry for both initial and append errors. Permit query coalescing
 during Vocabulary reads, disable input during unrelated work. Keep list position
 in session/query-keyed saveable shell state hoisted across Settings; reset on
 query changes. Do not add row actions or bulk mutation behavior in this slice.
+
+## 2026-10-30 — Frozen Vocabulary repository selections
+
+Capture all matching IDs with the browser's existing indexed literal prefix/status
+predicate in one SELECT. Return ascending IDs independently of presentation sort
+and loaded pages. Keep query capture separate from mutation so the forthcoming
+retained confirmation and Retry can use exact IDs, including unloaded matches,
+without admitting later matching imports or new generations of erased spellings.
+
+Apply bulk status changes with the existing validated per-entry helper inside one
+immediate transaction. Preserve registration dates and old events; append a manual
+event only for an actual transition, at the supplied frozen date. Missing/repeated
+IDs and same-status retries are no-ops. This follows existing single-status retry
+semantics and does not introduce a persistent command receipt.
+
+Delete only frozen IDs in one immediate transaction, relying on established
+cascades for events/occurrences/dictionary-form links. Preserve completion/time/
+provenance and live content/analysis. Use bound per-ID statements to avoid parameter
+limits. Empty/absent/repeated IDs are harmless; all statement/cascade/commit failures
+roll back the whole selection. Existing AUTOINCREMENT allocation prevents stale
+IDs from touching replacements. No migration, library, rescan, counter repair,
+automatic registration or shell action is added by this repository slice.

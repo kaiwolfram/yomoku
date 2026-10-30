@@ -1680,3 +1680,22 @@ branch, retaining scroll through Settings and Activity recreation and resetting
 on changed queries. Rust retains query/pages/error through the existing native
 session; process death does not restore these into a fresh handle. No schema,
 dependency, native protocol or dictionary lookup is added by the browser UI.
+
+## Vocabulary bulk repository boundary
+
+The storage repository now exposes `vocabulary_matching_ids(query)` to capture
+all matching IDs in one read statement, using the same indexed literal prefix
+and status predicate as browser pages. It returns ascending IDs without the page
+limit or history/analysis reads. Future retained Select All must freeze this set
+before confirmation; confirmed operations and Retry must not rerun matching.
+
+`set_vocabulary_statuses(ids, status, date)` and `delete_vocabulary_entries(ids)`
+accept that frozen selection and commit it in one immediate transaction. Status
+writes reuse the single-entry validated helper and append only actual-transition
+manual events. Deletion uses existing foreign-key history cascades, preserving
+completed page time/provenance and live content/analysis. Both skip absent IDs;
+duplicate IDs are harmless, and erased IDs cannot affect fresh generations.
+Derived statistics recompute without repair writes or rescanning live books.
+No SQL/platform I/O enters core, and no schema/dependency/protocol changes are
+required. Core selection/confirmation, native FIFO operations and shell controls
+are the next slice; the application does not yet invoke these bulk commands.

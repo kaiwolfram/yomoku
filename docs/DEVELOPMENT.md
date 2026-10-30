@@ -6906,3 +6906,38 @@ or blocker. No Rust/native source, dependency, migration or protocol change;
 Rust tests/Clippy, host JNI/codegen, separate Full-loader matrix, release/process-
 death/performance and physical arm64 were not rerun. Logs:
 /tmp/yomoku-vocabulary-ui-{android,phone,phone-initial,tablet,emulator}.log.
+
+## Frozen Vocabulary bulk repositories
+
+Verified 2026-10-30 from the repository root:
+
+```sh
+export PATH=/home/kai/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin:$PATH
+cargo test -p yomoku-storage vocabulary_bulk --locked --offline
+cargo test --workspace --all-features --locked --offline --quiet
+cargo clippy --workspace --all-targets --all-features --locked --offline -- -D warnings
+cargo build --workspace --locked --offline
+cargo fmt --all -- --check
+git diff --check
+```
+
+PASS: seven new SQLite cases; 808 workspace tests pass, 17 opt-in ignored;
+strict Clippy, workspace build, Rustfmt and diff checks. Coverage includes 1,205
+matching/unloaded rows, all 32 filter subsets and four sorts, literal Unicode/NUL/
+wildcard/case/whitespace prefixes, read-only unchanged bytes/reopen, all five
+statuses and immutable actual-transition events, duplicate/absent/empty selections,
+negative dates, concurrent retries, frozen IDs across later imports/status changes/
+replacement generations, later-row/event/cascade/deferred-COMMIT rollback and exact
+retry after reopen. Original/effective history cases verify occurrence/status/
+Known-form chart recalculation in all four timeframes, retained completed time/
+provenance/live analysis, absent words after reader/token/Library reload, fresh New
+generations on later import and no resurrection on lost-success completion replay.
+
+Initial test compile assumptions corrected: mutable document snapshot reads,
+WordStatusCounts has no total method, and Recorded carries newly_known. Initial
+Clippy found an unnecessary clone for a single-element slice; fixed with from_ref
+and reran focused tests/Clippy. No unresolved failure/blocker. No migration,
+dependency, core/shell protocol or Android source changes. Android/JNI/codegen,
+separate Full-loader matrix, release/process-death/performance and physical arm64
+were not rerun. Retained confirmation/FIFO/FFI/Compose integration remains open.
+Logs: /tmp/yomoku-vocabulary-bulk-{storage,workspace,clippy,build}.log.

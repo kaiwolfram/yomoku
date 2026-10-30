@@ -15,6 +15,24 @@ use crate::{
 };
 
 impl Storage {
+    /// Capture every matching ID in one read snapshot, including unloaded rows.
+    /// Sort affects presentation only; IDs are returned in ascending order.
+    /// Freeze this selection before confirmation and reuse it for explicit Retry.
+    /// Never rerun the query when applying a confirmed operation.
+    pub fn vocabulary_matching_ids(
+        &self,
+        query: &VocabularyQuery,
+    ) -> Result<Vec<VocabularyId>, StorageError> {
+        let (predicate, parameters) = matching(query);
+        let mut statement = self.connection.prepare(&format!(
+            "SELECT v.id FROM vocabulary v WHERE {predicate} ORDER BY v.id"
+        ))?;
+        let rows =
+            statement.query_map(params_from_iter(&parameters), |row| row.get::<_, i64>(0))?;
+        rows.map(|id| VocabularyId::try_from(id?).map_err(|_| StorageError::InvalidVocabulary))
+            .collect()
+    }
+
     /// Read 100 matching entries and the full matching count in one snapshot.
     /// The existing BINARY unique surface index bounds prefix searches; existing
     /// occurrence indexes supply lifetime counts and last-completion dates.

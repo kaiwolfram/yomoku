@@ -47,6 +47,53 @@ impl Storage {
         transaction.commit()?;
         Ok(entry)
     }
+
+    /// Apply one confirmed, frozen selection atomically. Append an immutable
+    /// manual event only for an actual transition, using the supplied date.
+    /// Absent/repeated IDs and unchanged statuses are harmless. A deleted ID
+    /// never targets a later registration of the same spelling.
+    pub fn set_vocabulary_statuses(
+        &mut self,
+        ids: &[VocabularyId],
+        status: VocabularyStatus,
+        occurred_at_unix_ms: i64,
+    ) -> Result<(), StorageError> {
+        validate_timestamp(occurred_at_unix_ms)?;
+        if ids.is_empty() {
+            return Ok(());
+        }
+        let transaction = self
+            .connection
+            .transaction_with_behavior(TransactionBehavior::Immediate)?;
+        for &id in ids {
+            set_vocabulary_status_in(&transaction, id, status, occurred_at_unix_ms)?;
+        }
+        transaction.commit()?;
+        Ok(())
+    }
+
+    /// Permanently erase one confirmed, frozen selection and its status events,
+    /// occurrences and dictionary-form links in a single transaction. Retain
+    /// page completions/time/provenance and all live content/analysis. No rescan
+    /// or re-registration occurs. Absent/repeated IDs are idempotent no-ops.
+    pub fn delete_vocabulary_entries(&mut self, ids: &[VocabularyId]) -> Result<(), StorageError> {
+        if ids.is_empty() {
+            return Ok(());
+        }
+        let transaction = self
+            .connection
+            .transaction_with_behavior(TransactionBehavior::Immediate)?;
+        {
+            // Bind one ID at a time to avoid SQLite's parameter limit. Existing
+            // foreign keys cascade only this vocabulary generation's history.
+            let mut delete = transaction.prepare("DELETE FROM vocabulary WHERE id = ?1")?;
+            for &id in ids {
+                delete.execute([i64::from(id)])?;
+            }
+        }
+        transaction.commit()?;
+        Ok(())
+    }
 }
 
 fn validate_timestamp(timestamp: i64) -> Result<(), StorageError> {

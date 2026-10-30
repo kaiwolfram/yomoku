@@ -1895,4 +1895,38 @@ Reentry and relevant mutations clear pages while retaining query choices. Count
 changes across pages trigger a fresh page zero. Pages are separate read snapshots;
 external mutations that preserve the count are not automatically detected. No
 persistent browser cache, schema migration, history mutation, analyzer load or
-rescan is added. The shell browser and bulk mutation commands remain unimplemented.
+rescan is added. The shell browser is implemented; retained bulk mutation wiring
+remains open. Repository commands are described below.
+
+## Frozen Vocabulary bulk operations (schema 0020 unchanged)
+
+`Storage::vocabulary_matching_ids(&VocabularyQuery)` reads every matching ID in
+one SQLite statement/snapshot, independent of the 100-row page limit. It shares
+the browser's indexed literal prefix/status predicate. Presentation sort does not
+affect membership; IDs return in ascending order. No history, content, analyzer
+or dictionary is loaded. The future retained caller must freeze these IDs before
+confirmation and reuse them for Retry instead of rerunning the query.
+
+`set_vocabulary_statuses(ids, status, occurred_at_unix_ms)` uses one immediate
+transaction and the single-entry validated status/event helper. Every actual
+transition appends a v1 manual event at the supplied nonnegative date; registration
+dates and earlier events stay unchanged. Duplicate/absent IDs and same-status
+selections produce no events. The payload retains IDs/status/date across retries;
+there is no new persistent command receipt or cross-command deduplication scheme.
+
+`delete_vocabulary_entries(ids)` uses one immediate transaction and existing
+foreign-key cascades to erase those generations' status events, occurrences and
+durable dictionary-form links. It retains completion/time/analysis provenance,
+live documents/positions/token snapshots and unrelated vocabulary. Derived
+occurrence/status/Known-form charts recalculate from surviving rows; completed
+page time remains. Statement/cascade/deferred-COMMIT failures roll back the whole
+selection. Empty/repeated/absent IDs are harmless, and bound per-ID statements
+avoid SQLite parameter limits.
+
+Neither command reruns matching or recreates vocabulary from live documents.
+AUTOINCREMENT keeps old IDs from targeting later generations of the same surface.
+Reopening readers, loading tokens and refreshing Library distributions leave erased
+entries absent. A later new analyzed import registers a fresh New ID with no old
+history; later completions contribute only new occurrences. Replaying a successful
+original/effective completion does not restore erased history. Confirmation,
+selection lifecycle, FIFO routing and application cache invalidation remain open.
