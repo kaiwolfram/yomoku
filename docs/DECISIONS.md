@@ -4153,3 +4153,23 @@ and logarithmic-read regressions cover gaps, the signed identity range and
 100,000 selected IDs; Compose checks equal-size selection replacement and row
 sort independence. No schema, dependency or wire change is needed. Full callback
 decoding and remaining composition costs require separate profiling.
+
+## 2026-10-30 — Opt-in Android snapshot phase diagnostics
+
+Keep the production CoreSession render sequence and structural state policy.
+An internal, main-thread-only observer optionally times native view retrieval,
+generated Kotlin decoding and state assignment using System.nanoTime. With no
+observer, take the original direct render path without clocks or sample objects.
+Distinguish synchronous dispatch renders from posted native callback renders.
+Record only phase durations, payload length, row/selection/confirmation counts
+and whether the decoded instance became the state value; retain no view or IDs.
+
+State assignment includes structural equality and snapshot notification; it is
+not an isolated equality benchmark or recomposition/layout measurement. Native
+view retrieval includes Rust snapshot creation/encoding and JNI transfer, not
+SQLite request latency. Do not subtract these measurements from idle time to
+claim a composition cost. Exclude request decoding, native update, handler queue
+delay and observer bookkeeping from phase timings, and document that limitation.
+Install the observer only around opt-in disposable-fixture actions and emit
+samples after timing ends. Preserve full IDs and all read-only/replay guards.
+No wire, dependency, schema, threading or render-coalescing change is needed.

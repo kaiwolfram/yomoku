@@ -35,6 +35,7 @@ class VocabularyPerformanceTest {
     @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
     private val instrumentation = InstrumentationRegistry.getInstrumentation()
     private lateinit var core: CoreSession
+    private var measureRender = false
 
     private fun emit(line: String) {
         instrumentation.sendStatus(0, Bundle().apply { putString("stream", "$line\n") })
@@ -196,6 +197,8 @@ class VocabularyPerformanceTest {
         metric: String,
         action: () -> Double,
     ) {
+        val renders = mutableListOf<CoreRenderMeasurement>()
+        if (measureRender) compose.runOnUiThread { core.onRenderMeasured = { renders.add(it) } }
         val sampler = MemorySampler()
         // FrameMetrics uses the System.nanoTime timebase, unlike elapsedRealtime after suspend.
         val start = System.nanoTime()
@@ -207,6 +210,7 @@ class VocabularyPerformanceTest {
             end = System.nanoTime()
         } finally {
             sampler.close()
+            if (measureRender) compose.runOnUiThread { core.onRenderMeasured = null }
         }
         val measured = frames.between(start, end)
         if (iteration < 0) return // Full scenario warmup, excluded from output.
@@ -219,6 +223,20 @@ class VocabularyPerformanceTest {
             "MEASURE,$entries,$iteration,$metric,${core.view.vocabulary.rows.size},${(end - start) / 1e6},$dispatchMs,${durations.size},$median,${durations.lastOrNull() ?: 0.0},${durations.count { it > 1000.0 / 60 }},${measured.sumOf { it.droppedReports }},${memory.maxOf { it.javaBytes }},${memory.maxOf { it.nativeBytes }},${memory.maxOf { it.rssKib }},${memory.size}"
         )
         emit("FRAMES,$entries,$iteration,$metric," + durations.joinToString(","))
+        if (measureRender) {
+            if (metric != "scroll_loaded_rows") assertTrue(renders.isNotEmpty())
+            if (metric == "select_all") assertTrue(renders.any { it.selectedIds == entries })
+            if (metric == "confirmation") assertTrue(renders.any { it.confirmationIds == entries })
+            renders.forEachIndexed { index, render ->
+                assertTrue(render.nativeViewNanos >= 0)
+                assertTrue(render.decodeNanos >= 0)
+                assertTrue(render.publishNanos >= 0)
+                assertTrue(render.payloadBytes > 0)
+                emit(
+                    "RENDER,$entries,$iteration,$metric,$index,${if (render.fromCallback) "callback" else "dispatch"},${render.nativeViewNanos / 1e6},${render.decodeNanos / 1e6},${render.publishNanos / 1e6},${render.payloadBytes},${render.loadedRows},${render.selectedIds},${render.confirmationIds},${render.published}"
+                )
+            }
+        }
     }
 
     private fun scrollTo(id: Long) {
@@ -230,6 +248,7 @@ class VocabularyPerformanceTest {
     fun measureDisposableVocabulary() {
         val args = InstrumentationRegistry.getArguments()
         assumeTrue("Opt in with -e yomokuMeasure true", args.getString("yomokuMeasure") == "true")
+        measureRender = args.getString("yomokuMeasureRender") == "true"
         val entries = (args.getString("yomokuVocabularyEntries") ?: "10000").toInt()
         val loaded = (args.getString("yomokuVocabularyLoaded") ?: "1000").toInt()
         val iterations = (args.getString("yomokuMeasureIterations") ?: "5").toInt()
@@ -271,6 +290,10 @@ class VocabularyPerformanceTest {
             emit(
                 "COLUMNS,entries,iteration,metric,loaded_rows,idle_ms,dispatch_ms,frames,frame_median_ms,frame_max_ms,frames_over_16_667_ms,dropped_reports,java_peak_bytes,native_peak_bytes,rss_peak_kib,memory_samples"
             )
+            if (measureRender)
+                emit(
+                    "RENDER_COLUMNS,entries,iteration,metric,index,source,native_view_ms,decode_ms,publish_ms,payload_bytes,loaded_rows,selected_ids,confirmation_ids,published"
+                )
             Frames().use { frames ->
                 for (iteration in -1 until iterations) {
                     // Change the literal prefix each time; both match the complete fixture.

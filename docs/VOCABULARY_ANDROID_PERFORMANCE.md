@@ -253,3 +253,97 @@ Initial sandbox Gradle lock-socket access needed an approved rerun; no open
 failure. Rust host/Clippy, separate JNI/codegen/Full-loader, optimized/tablet/dark/
 continuous-fling/heavy-history/diverse-book/fully loaded lists, exact peak/PSS,
 process-death and physical arm64 were not rerun or claimed.
+
+## Snapshot phase profiling, 2026-10-30
+
+Add `-e yomokuMeasureRender true` to the existing opt-in instrumentation command.
+The default harness and normal app leave this observer disabled. During each
+measured action, CoreSession records one `RENDER` row per actual Render effect,
+distinguishing synchronous dispatch from posted native callbacks:
+
+- `native_view_ms`: `NativeBridge.view()`, including Rust snapshot creation,
+  encoding and JNI transfer. It excludes the earlier native update/request work
+  and SQLite/FIFO request latency.
+- `decode_ms`: generated `ViewModel.bincodeDeserialize`, including allocations.
+- `publish_ms`: the existing Compose state assignment, including structural
+  equality and state notification. Subsequent recomposition/layout is outside
+  this interval; this does not isolate equality alone.
+- Payload bytes, decoded loaded-row/selected-ID/frozen-confirmation counts and
+  `published`: whether the new decoded instance became the state value. An equal
+  snapshot retains the earlier state instance under the unchanged default policy.
+
+Primary policy reference: Android's [mutableStateOf and structuralEqualityPolicy
+API documentation](https://developer.android.com/reference/kotlin/androidx/compose/runtime/package-summary#mutableStateOf(kotlin.Any,androidx.compose.runtime.SnapshotMutationPolicy)).
+No new dependency/API version is adopted. The observer setter requires the main
+thread, records no snapshots/IDs and is installed only around timed actions.
+Without it, renders take the original direct path with no clock reads or sample
+objects. Sample bookkeeping and output lie outside the phase intervals; output
+is deferred until after action timing. All phase clocks use System.nanoTime.
+
+Phase intervals omit request decoding, native update, handler queue delay,
+reader-clock/import observers and instrumentation synchronization. Scheduling,
+JIT, GC and observer overhead still affect these debug-emulator wall times.
+Do not subtract phase totals from action-to-idle to label the residual as
+composition or add medians from different samples. These are profiling results,
+not a before/after optimization or optimized-build/physical-device claim.
+
+Separate API-36 x86_64 debug phone/light processes retain 1,000 rows with
+10k/100k entries, one full scenario warmup and five measured scenarios each.
+No competing builds/tests/profilers run during either profile. Median per-render
+phase wall times, milliseconds (five samples in each row):
+
+| Entries | Render | Native view | Kotlin decode | State publication |
+| ---: | --- | ---: | ---: | ---: |
+| 10,000 | Select All callback | 2.153 | 15.339 | 0.418 |
+| 100,000 | Select All callback | 22.046 | 82.612 | 0.785 |
+| 10,000 | Confirmation dispatch | 2.139 | 12.671 | 0.410 |
+| 100,000 | Confirmation dispatch | 29.789 | 65.726 | 1.009 |
+
+At 100k, Select All callback decode ranges 81.131–165.457 ms, native view
+12.171–23.138 ms and publication 0.563–4.018 ms. Confirmation decode ranges
+60.073–83.084 ms, native view 21.064–81.308 ms and publication 0.962–1.214 ms.
+Publication is below 4.615 ms across all 70 retained renders. Every observed
+render publishes a changed instance; these scenarios do not measure a large
+structurally equal snapshot. Equality may short-circuit on differing fields.
+Keep the existing equality policy; the results do not justify replacing it.
+
+Select All median action-to-idle is 182.239 ms at 10k and 915.957 ms at 100k;
+confirmation is 289.264/367.161 ms. Select All ranges are 163.428–748.114 and
+715.929–1,282.920 ms. These are new instrumented samples, not evidence of a
+regression or improvement against earlier runs. Decode and native view retrieval
+are measurable targets; the remaining idle duration is unattributed. Profile
+native update/request work and composition separately before choosing a change.
+The Select All callback payload is 130,204–130,205 bytes at 10k and
+850,204–850,205 bytes at 100k; confirmations remain 210,216–210,217 and
+1,650,216–1,650,217 bytes. Complete selected/frozen IDs are preserved.
+
+All [70 render rows](measurements/vocabulary-render-android-2026-10-30.csv),
+[50 action rows](measurements/vocabulary-render-android-2026-10-30-actions.csv)
+and [107 raw frame durations](measurements/vocabulary-render-android-2026-10-30-frames.csv)
+validate: five iterations per action/size, source/index/count/payload constraints,
+finite nonnegative phases, exact frame medians/extrema/reference counts, positive
+memory observations and zero reported frame drops. The sampled process-memory
+and separate-dialog-window limits above still apply; no exact peak claim.
+
+PASS: 20 ordinary regressions plus default assumption skip (21 reported,
+219.050 s), debug/test APKs, strict Android lint, repository Kotlin formatting
+and diff. CoreSessionTest also exercises installing/removing the observer while
+independent native handles and rendered destinations remain correct. Both opt-in
+profiles pass (36.355/53.160 s), including exact rows/selected/frozen IDs,
+unchanged database bytes, zero analyzer/reading effects, integrity/FK/native
+closure and scratch removal. Database sizes/hashes and JNI hash match the
+original fixture section. ADB confirms only the existing sudachi cache remains
+in no_backup. The task-started isolated emulator was stopped afterward.
+
+Debug APK SHA-256:
+`758dcd1a51967f778504ec8c3fd131d1bc55fc18f66dce37d21adba781cf93ed`;
+test APK:
+`137515d96f4c39f61c899d50b96bc0dc7c6740a4016871a56a1556702a5a0bef`.
+Production baseline: `3a59964`. Native/binding/assets reuse existing Gradle
+outputs. Logs: `/tmp/yomoku-render-{android,format-check,regressions,10000,100000,validation}.log`.
+Initial sandbox Gradle lock-socket failure required approved rerun; an initial
+compile caught nullable selection counting and was corrected. No open failure.
+No Rust/schema/dependency/wire change. Host Rust/Clippy, independent JNI/codegen/
+Full-loader, optimized/tablet/dark/continuous-fling/heavy-history/diverse-book/
+fully loaded lists, exact peak/PSS, process-death and physical arm64 were not
+rerun or claimed; broader tasks remain open.

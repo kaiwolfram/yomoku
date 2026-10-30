@@ -1,31 +1,33 @@
 # Resume here
-Updated: 2026-10-30. Vocabulary Compose selection membership bounded and verified.
+Updated: 2026-10-30. Vocabulary snapshot render phases profiled and verified.
 Commit guidance: explanatory bodies; merges include provenance. Keep verification
 results in session/progress docs and reports, out of commit message bodies.
 
 ## Current slice
-- VocabularyScreen binary-searches the core's sorted unique positive-i64 IDs
-  per composed row. Removed the selection-sized hash set and structural remember
-  key; complete hidden/unloaded IDs, counts and frozen confirmations are retained.
-- Two exact-ID/resource-bound instrumentation cases and one Compose case cover
-  gaps, empty/single lists, >2^53/Long.MAX_VALUE, at most 17 indexed reads at 100k,
-  arbitrary row sort and equal-size selection replacement without stale semantics.
-- Existing native bulk/history/recreation/navigation guards pass. Full callback
-  decoding, view equality, encoding and native storage remain unchanged.
-- Sequential baseline/changed debug API-36 x86_64 phone/light processes: 100k
-  entries, 1,000 retained rows, one warmup and five samples. Select All median
-  action-to-idle 881.920→765.376 ms; ranges overlap. Confirmation/frame durations
-  do not consistently improve. No general latency/frame-rate claim.
-- Fifty action rows/116 observed frames retained and validated. Sampled Java/
-  native/RSS maxima are separate process high-water observations, not exact peaks
-  or allocations attributable to this change. Confirmation views remain ~1.65 MB.
-- No Rust/schema/dependency/wire/architecture/destructive change. Schema 0020.
+- CoreSession has an opt-in main-thread render observer separating native view
+  retrieval, generated Kotlin decoding and Compose state publication. Distinguish
+  synchronous dispatch/post-native callbacks; record payload and loaded/selected/
+  frozen counts without retaining snapshots or IDs. Normal path reads no clocks.
+- Production sequence, structural state equality, full hidden/unloaded IDs and
+  frozen confirmations remain intact. Publication includes equality/notification,
+  excluding later composition. Request decoding/update/queue delay are not timed.
+- Separate debug API-36 x86_64 phone/light 10k/100k processes: 1,000 retained rows,
+  one full warmup and five samples. At 100k Select All callback native/decode/
+  publication medians: 22.046/82.612/0.785 ms; confirmation 29.789/65.726/1.009 ms.
+  All 70 renders publish changed instances; equal-snapshot cost remains unmeasured.
+- 100k Select All median idle 915.957 ms; do not assign residual time to composition
+  or compare these observer runs as an optimization. Decoding/native work remain
+  measurable targets. Retain equality policy; do not infer latency/frame gains.
+- Raw 70 phase rows/50 actions/107 frames retained and validated. Existing sampled
+  process-memory/dialog-window/debug limits apply; no exact peak/PSS claim.
+- No Rust/schema/dependency/wire/threading/destructive change. Schema 0020.
   No Nostr starter data; configuration empty. Ask Q188 before forwarding.
 
 ## Next tasks (ordered)
-1. Profile large Vocabulary main callback decoding/view equality and remaining
-   composition. Preserve exact frozen IDs/read-only/replay guards. Extend optimized
-   Android, fully loaded lists, heavy-history/diverse-book and exact peak-memory work.
+1. Profile remaining Vocabulary native update/request and composition work;
+   investigate large-ID decoding with exact frozen/read-only/replay guards.
+   Include equal snapshots, optimized/fully loaded/heavy-history/diverse-book
+   cases and exact peak memory before making broader performance claims.
 2. Verify supported AnkiDroid provider/deck/model/duplicate APIs against primary
    documentation; record feasible exact-surface duplicate behavior before wiring.
 3. Extend remaining accessibility/process-death/lifecycle matrix. Physical arm64
@@ -33,33 +35,31 @@ results in session/progress docs and reports, out of commit message bodies.
 
 ## Verification / blockers
 - PASS: debug/test APKs, strict Android lint, repository Kotlin formatting/diff;
-  native/bindings/assets reused existing Gradle outputs, not rebuilt. Nineteen
-  passing cases plus harness default assumption skip (20 reported, 228.889 s).
-- PASS: separate baseline/changed opt-in 100k runs (51.327/50.541 s). All exact
-  rows/selection/confirmation, no analyzer/reading effects, unchanged bytes,
-  integrity/FK/native closure/scratch cleanup guards pass. ADB confirms no scratch
-  directories. Fifty action rows/116 raw frame durations validate metrics, payload
-  sizes, positive memory observations and zero reported drops.
-- Results/hashes/limits: VOCABULARY_ANDROID_PERFORMANCE.md, final section, and
-  measurements/vocabulary-selection-android-2026-10-30{,-frames}.csv.
-  Exact commands/pinned Rust/JDK/SDK/Gradle environment: DEVELOPMENT.md, final sections.
+  native/bindings/assets reused Gradle outputs. Twenty passing regressions plus
+  harness default assumption skip (21 reported, 219.050 s), including observer
+  installation/removal and independent-handle coverage in CoreSessionTest.
+- PASS: separate opt-in 10k/100k processes (36.355/53.160 s). Exact rows/selected/
+  frozen IDs, unchanged bytes, zero analyzer/reading effects, integrity/FK/native
+  closure/scratch cleanup and all raw metrics validate. ADB shows no scratch dirs.
+- Results/hashes/limits: VOCABULARY_ANDROID_PERFORMANCE.md, snapshot phase section,
+  and measurements/vocabulary-render-android-2026-10-30{,-actions,-frames}.csv.
+  Exact pinned environment/build/install/regression/profile commands:
+  DEVELOPMENT.md, final Vocabulary sections; add CoreSessionTest to class list.
 - Build: ./android/gradlew -p android :app:assembleDebug
   :app:assembleDebugAndroidTest :app:lintDebug --offline --console=plain
 - Format: JAVA_HOME="$PWD/.local/jdk-17/jdk-17.0.21+9"
   tools/format-kotlin.sh --check; git diff --check.
-- Regression classes now include app.yomoku.VocabularySelectionLookupTest alongside
-  VocabularyScreenTest/VocabularyProductionTest/NavigationTest/
-  EffectiveReaderNavigationTest/VocabularyPerformanceTest.
-- Measure: adb shell am instrument -w -r -e class
+- Profile: adb shell am instrument -w -r -e class
   app.yomoku.VocabularyPerformanceTest -e yomokuMeasure true
-  -e yomokuVocabularyEntries 100000 -e yomokuVocabularyLoaded 1000
-  -e yomokuMeasureIterations 5 app.yomoku.test/androidx.test.runner.AndroidJUnitRunner
+  -e yomokuMeasureRender true -e yomokuVocabularyEntries 100000
+  -e yomokuVocabularyLoaded 1000 -e yomokuMeasureIterations 5
+  app.yomoku.test/androidx.test.runner.AndroidJUnitRunner
   No competing builds/tests/profilers; no input corpus needed.
-- Logs: /tmp/yomoku-selection-{android,format-check,regressions,before-100000,
-  after-100000}.log. Initial sandbox Gradle lock-socket failure required approved
-  rerun; no open failure. Task-started isolated .local/statistics-ui-avd stopped;
-  phone/light settings retained; existing ignored caches preserved.
-- Rust host/Clippy, independent host JNI/codegen, separate Full-loader matrix,
-  optimized/tablet/dark/continuous-fling/heavy-history/diverse-book/fully loaded
-  device measurements, process-death, exact peaks/PSS and physical arm64 not rerun.
-  Broader tasks remain unchecked.
+- Logs: /tmp/yomoku-render-{android,format-check,regressions,10000,100000,
+  validation}.log. Initial sandbox Gradle lock-socket failure needed approved
+  rerun; initial nullable-selection compile error corrected; no open failure.
+  Task-started isolated .local/statistics-ui-avd stopped; phone/light retained;
+  existing ignored caches preserved.
+- Host Rust/Clippy, independent JNI/codegen/Full-loader, optimized/tablet/dark/
+  continuous-fling/heavy-history/diverse-book/fully loaded, equal-snapshot,
+  process-death, exact peaks/PSS and physical arm64 not rerun. Broader tasks open.

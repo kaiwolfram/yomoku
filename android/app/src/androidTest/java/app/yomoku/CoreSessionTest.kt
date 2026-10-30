@@ -7,6 +7,7 @@ import app.yomoku.shared.Event
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertThrows
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 
@@ -30,6 +31,8 @@ class CoreSessionTest {
                             ),
                         )
                         .use { independent ->
+                            val renders = mutableListOf<CoreRenderMeasurement>()
+                            core.onRenderMeasured = { renders.add(it) }
                             assertNotEquals(core.sessionKey, independent.sessionKey)
                             assertEquals(Destination.LIBRARY, core.view.destination)
                             for (destination in Destination.entries + Destination.LIBRARY) {
@@ -37,6 +40,20 @@ class CoreSessionTest {
                                 assertEquals(destination, core.view.destination)
                                 assertEquals(Destination.LIBRARY, independent.view.destination)
                             }
+                            assertTrue(renders.isNotEmpty())
+                            assertTrue(renders.all { !it.fromCallback && it.payloadBytes > 0 })
+                            assertTrue(
+                                renders.all {
+                                    it.nativeViewNanos >= 0 &&
+                                        it.decodeNanos >= 0 &&
+                                        it.publishNanos >= 0
+                                }
+                            )
+                            val measured = renders.size
+                            core.onRenderMeasured = null
+                            core.dispatch(Event.SelectDestination(Destination.NOSTR))
+                            assertEquals(Destination.NOSTR, core.view.destination)
+                            assertEquals(measured, renders.size)
                         }
                     core.dispatch(Event.SelectDestination(Destination.VOCABULARY))
                     assertEquals(Destination.VOCABULARY, core.view.destination)

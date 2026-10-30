@@ -20,6 +20,19 @@ import java.util.UUID
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 
+/** Main-thread render phases; publication includes structural equality and state notification. */
+internal data class CoreRenderMeasurement(
+    val fromCallback: Boolean,
+    val nativeViewNanos: Long,
+    val decodeNanos: Long,
+    val publishNanos: Long,
+    val payloadBytes: Int,
+    val loadedRows: Int,
+    val selectedIds: Int,
+    val confirmationIds: Int,
+    val published: Boolean,
+)
+
 /** Owns a native handle and a render snapshot; application state stays in Rust. */
 internal class CoreSession(
     databasePath: String,
@@ -66,7 +79,7 @@ internal class CoreSession(
                 override fun onEffects(requests: ByteArray) {
                     mainHandler.post {
                         if (!isClosed) {
-                            render(requests)
+                            render(requests, fromCallback = true)
                             driveReaderClock()
                         }
                     }
@@ -84,6 +97,13 @@ internal class CoreSession(
 
     // Platform import sequencing observes committed core outcomes, on the main thread.
     var onViewChanged: (() -> Unit)? = null
+
+    // Opt-in diagnostics only. Normal renders read no clocks and retain no samples.
+    var onRenderMeasured: ((CoreRenderMeasurement) -> Unit)? = null
+        set(value) {
+            requireMainThread()
+            field = value
+        }
 
     val images =
         EpubImageLoader(
@@ -239,13 +259,41 @@ internal class CoreSession(
         tickScheduled = false
     }
 
-    private fun render(requests: ByteArray) {
+    private fun render(requests: ByteArray, fromCallback: Boolean = false) {
         for (request in Requests.bincodeDeserialize(requests).value) {
             when (request.effect) {
-                is ShellEffect.Render -> view = ViewModel.bincodeDeserialize(bridge.view())
+                is ShellEffect.Render -> renderView(fromCallback)
             }
         }
         onViewChanged?.invoke()
+    }
+
+    private fun renderView(fromCallback: Boolean) {
+        val observer = onRenderMeasured
+        if (observer == null) {
+            view = ViewModel.bincodeDeserialize(bridge.view())
+            return
+        }
+        val start = System.nanoTime()
+        val bytes = bridge.view()
+        val retrieved = System.nanoTime()
+        val decoded = ViewModel.bincodeDeserialize(bytes)
+        val deserialized = System.nanoTime()
+        view = decoded
+        val published = System.nanoTime()
+        observer(
+            CoreRenderMeasurement(
+                fromCallback,
+                retrieved - start,
+                deserialized - retrieved,
+                published - deserialized,
+                bytes.size,
+                decoded.vocabulary.rows.size,
+                decoded.vocabulary.selection?.size ?: 0,
+                decoded.vocabulary.confirmation?.ids?.size ?: 0,
+                view === decoded,
+            )
+        )
     }
 
     override fun close() {

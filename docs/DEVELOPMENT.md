@@ -7320,3 +7320,36 @@ remaining checks: VOCABULARY_ANDROID_PERFORMANCE.md, final section. Logs:
 Initial sandbox Gradle local lock-socket failure required approved rerun; no open
 failure. Existing isolated AVD used; no Rust/schema/dependency/wire change or
 host/optimized/Full-loader/arm64/lifecycle/peak-memory claim.
+
+## Vocabulary snapshot phase profiling
+
+Use the pinned Rust/JDK/SDK/Gradle environment and build/install/phone-light
+commands from the Vocabulary Compose section. Include `app.yomoku.CoreSessionTest`
+in the selection-membership regression class list. After all builds and ordinary
+regressions finish, run separate opt-in processes with the additional observer:
+
+```sh
+"$ANDROID_HOME/platform-tools/adb" -s emulator-5554 shell am instrument -w -r -e class app.yomoku.VocabularyPerformanceTest -e yomokuMeasure true -e yomokuMeasureRender true -e yomokuVocabularyEntries 10000 -e yomokuVocabularyLoaded 1000 -e yomokuMeasureIterations 5 app.yomoku.test/androidx.test.runner.AndroidJUnitRunner
+"$ANDROID_HOME/platform-tools/adb" -s emulator-5554 shell am instrument -w -r -e class app.yomoku.VocabularyPerformanceTest -e yomokuMeasure true -e yomokuMeasureRender true -e yomokuVocabularyEntries 100000 -e yomokuVocabularyLoaded 1000 -e yomokuMeasureIterations 5 app.yomoku.test/androidx.test.runner.AndroidJUnitRunner
+```
+
+`RENDER_COLUMNS` describes each per-render phase/count row. See
+VOCABULARY_ANDROID_PERFORMANCE.md, snapshot phase section, for phase boundaries,
+raw samples and limits. `publish_ms` includes equality plus state notification;
+do not label it as isolated equality or subsequent composition time. The normal
+app and default harness leave this diagnostic observer disabled.
+
+2026-10-30 PASS: debug/test APKs, strict Android lint, Kotlin formatting/diff,
+20 regressions plus default assumption skip (21 reported, 219.050 s). Separate
+10k/100k profiles pass (36.355/53.160 s); 70 render rows/50 actions/107 raw frames
+validate with exact selected/frozen IDs, unchanged bytes, no analyzer/reading
+effects, integrity/FK/closure/cleanup. ADB confirms scratch directories absent;
+the task-started isolated AVD was stopped with phone/light settings retained.
+Native/binding/asset tasks reused outputs. Initial sandbox Gradle lock sockets
+needed approved rerun; initial nullable-selection compile error was corrected.
+No unresolved failure. Raw CSV/results/hashes/limits:
+VOCABULARY_ANDROID_PERFORMANCE.md, snapshot phase section. Logs:
+`/tmp/yomoku-render-{android,format-check,regressions,10000,100000,validation}.log`.
+No Rust/schema/dependency/wire change or host Rust/Clippy, independent JNI/codegen/
+Full-loader, optimized/tablet/dark/fully-loaded/heavy-history/diverse-book,
+equal-snapshot, exact peak/PSS, process-death or physical-arm64 claim.

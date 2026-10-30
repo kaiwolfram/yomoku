@@ -3426,3 +3426,36 @@ and /tmp/yomoku-browser-profile-*. No emulator started.
   continuous-fling/heavy-history/diverse-book/fully loaded device performance,
   exact peaks/PSS, process-death or physical-arm64 rerun/claim. Broader tasks stay
   open; next callback profiling, Anki API verification and lifecycle coverage.
+
+## 2026-10-30 — Vocabulary Android snapshot phase profiling
+
+- Started clean; continued the ordered callback profiling slice. Added an opt-in
+  main-thread CoreSession render observer distinguishing native view retrieval,
+  generated Kotlin decoding and state assignment, plus dispatch/callback source,
+  payload and row/selected/frozen counts. Normal renders retain the original
+  direct path without clocks/samples. No view/ID retention, equality-policy,
+  sequence, threading, schema, dependency or wire change.
+- Extend the disposable Vocabulary harness with deferred per-render output and
+  full selected/frozen count guards. CoreSessionTest verifies observer install/
+  removal alongside independent native handles and correct destinations.
+- PASS: debug/test APKs, strict Android lint, Kotlin formatting/diff; 20 ordinary
+  regressions plus default assumption skip (21 reported; 219.050 s). Native/
+  bindings/assets reused outputs. Separate 10k/100k debug phone/light profiles
+  pass (36.355/53.160 s), one warmup/five scenarios each, 1,000 retained rows.
+- Validate 70 render rows/50 action rows/107 raw frames, exact selected/frozen
+  IDs, unchanged hashes, zero analyzer/reading effects, integrity/FK/native
+  closure and scratch cleanup. ADB confirms only the existing sudachi cache in
+  no_backup. Task-started isolated emulator stopped; phone/light retained.
+- At 100k Select All callback native/decode/publication medians are
+  22.046/82.612/0.785 ms; confirmation 29.789/65.726/1.009 ms. Retain equality
+  policy; all observed renders changed, so equal-snapshot cost stays unmeasured.
+  Total idle residual is unattributed, not composition time. No before/after,
+  generalized speed/frame or exact peak-memory claim. Raw CSV/hashes/limits:
+  VOCABULARY_ANDROID_PERFORMANCE.md, snapshot phase section.
+- Initial sandbox Gradle lock sockets needed approved rerun; initial nullable
+  selection count compile error corrected. No unresolved failure/blocker. Logs:
+  /tmp/yomoku-render-{android,format-check,regressions,10000,100000,validation}.log.
+- Host Rust/Clippy, independent JNI/codegen/Full-loader, optimized/tablet/dark/
+  continuous-fling/heavy-history/diverse-book/fully loaded, equal-snapshot,
+  exact peak/PSS, process-death and physical arm64 not rerun or claimed. Continue
+  native update/composition/decoding investigation, then Anki APIs/lifecycle.
