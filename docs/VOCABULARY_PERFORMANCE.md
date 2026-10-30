@@ -86,7 +86,7 @@ Unchanged metrics vary between runs; no general improvement is claimed for them.
 All 132 before/after metric rows, including min/max and raw samples, are retained
 in [the CSV](measurements/vocabulary-host-2026-10-30.csv). Setup is excluded;
 the final 100,000-entry setup took 35.2 seconds. One million status events still
-make year-statistics replay costly and deserve separate profiling.
+make year-statistics replay costly and motivated the follow-up below.
 
 ## Reproduce
 
@@ -118,3 +118,71 @@ Peak allocations/RSS, fully loaded 100,000-row views, dispersed encounter dates,
 diverse many-book/image-heavy Libraries, cold storage, Android callbacks/decoding,
 actual Compose frames, process death and physical arm64 remain unmeasured here.
 The broader benchmark and device-matrix tasks remain unchecked.
+
+## Follow-up: statistics SQL versus pure replay
+
+The same host/fixture harness now reports four additional metrics. Production
+continues streaming events; only the diagnostic harness retains a predecoded
+event vector. Memory usage of that vector is not a production-memory measurement.
+
+- `status_sql_legacy_step_only`: prepare, step every row and destroy the frozen
+  former ordered-UNION query, without decoding column values in Rust.
+- `status_sql_split_step_only`: the same row stepping over the exact shared
+  production link/event SQL files, in one explicit read transaction.
+- `status_rust_replay_predecoded`: construct the pure builder, clone its links,
+  push predecoded events, finish and destroy the output. Extraction is excluded.
+- `repository_status_timeline`: the complete validated public repository call,
+  including SQL, column decoding, cause/version/provenance checks and pure replay.
+  The existing `repository_statistics_year` adds reading/date bucket projection.
+
+Each timed operation has an excluded warmup and seven samples. The layers are
+independent measurements: they have different allocations and cache behavior,
+and must not be summed/subtracted as an exact CPU decomposition. Both the old
+and new public timeline outputs equal the isolated replay on these fixtures.
+Existing byte/FK/integrity/cleanup guards cover the new diagnostics. Timings use
+sequential release executables with no overlapping builds/tests, RAM-backed
+`/tmp`, warm and uncontrolled OS caches and host scheduling.
+
+The ordered UNION performed two sorts to deliver links before events. Load
+links first, then stream events in primary-key order in a single deferred read
+transaction. Both internal helpers require a transaction; calendar statistics
+reuse their existing snapshot and the standalone timeline opens its own.
+All column/version/cause/provenance/chain/date validation remains. No cached
+counter, index, migration, core/FFI/Android change or product behavior is added.
+
+SQLite's [query-plan documentation](https://www.sqlite.org/eqp.html#temporary_sorting_b_trees)
+describes temporary sorting; its [transaction documentation](https://www.sqlite.org/lang_transaction.html#read_transactions_versus_write_transactions)
+establishes the snapshot guarantee across statements. A new WAL-only regression
+commits vocabulary erasure/recreation between link and event reads and requires
+the original generation's exact result. Another requires zero statement sort
+operations and read-transaction cleanup after failures in either query. Existing
+corrupt-history tests now also require the standalone transaction to be closed.
+
+At 100k entries / 1,080,025 events / 25 links, the frozen query executes
+65,882,372 VM steps and two sorts; split reads execute 39,960,891 steps and zero
+sorts over the same 1,080,050 rows. Full year-statistics median falls from
+944.157 to 542.853 ms (42.5%); the standalone timeline falls from 943.659 to
+538.206 ms. After-run layered medians are 589.119 ms for legacy stepping,
+182.040 ms for split stepping and 96.999 ms for predecoded replay. These SQL
+measurements identified the optimization; the remaining decoding/validation and
+replay costs remain material. Frequency/LastSeen queries are unchanged.
+
+The 10k fixture has 108,025 events and 25 links. Its public timeline median falls
+85.287→51.816 ms and full year statistics 86.947→53.254 ms. After-run layered
+medians are 49.640 ms legacy stepping, 17.351 ms split stepping and 9.291 ms
+predecoded replay. All 104 metric rows from the four before/after runs (including
+unchanged Vocabulary/FIFO/view metrics) are retained in
+[the follow-up CSV](measurements/statistics-host-2026-10-30.csv). Seven raw samples
+per row validate against their reported min/median/max. The no-status-round,
+no-reread 100-entry/even-two-sample smoke also passes; these extra smoke samples
+are not included in the comparison CSV.
+
+Baseline production is `e04c85cc49f22ced0b1d2d3b56df93af184689c1` plus the new
+diagnostics, before the storage refactor. Executable SHA-256:
+`fd03fb4965c94ccc780493fd0819cbc4c96cb80c3523136f1eab21f2d55edf6a`.
+After executable SHA-256:
+`7bb2fb5bd919e2f4228011fe5bc19426f57ea29639a8ae937e5e90fba73fb9a2`.
+Use the existing reproduction commands and arguments; diagnostics run before
+the other repository/FIFO/view metrics. Neither host timings nor synthetic
+fixtures establish cold-storage, diverse-book, peak-memory, Compose/frame,
+process-death or physical-arm64 performance.

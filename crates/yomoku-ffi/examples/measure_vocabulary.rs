@@ -28,6 +28,9 @@ use yomoku_storage::Storage;
 
 const DATE: i64 = 1_700_000_000_000;
 
+#[path = "measure_vocabulary/history_profile.rs"]
+mod history_profile;
+
 struct Scratch(PathBuf);
 
 impl Scratch {
@@ -439,6 +442,7 @@ fn main() {
         std::env::consts::OS
     );
     println!("metric,min_ms,median_ms,max_ms,samples_ms");
+    history_profile::measure(&storage, &path, config.iterations);
     for sort in [
         VocabularySort::Newest,
         VocabularySort::Frequency,
@@ -525,6 +529,7 @@ mod tests {
         seed(&mut storage, &config);
         let baseline = scratch.0.join("baseline.sqlite");
         std::fs::copy(&path, &baseline).unwrap();
+        history_profile::measure(&storage, &path, config.iterations);
         bridge_measurements(&path, &config);
         assert_same_bytes(&path, &baseline);
         drop(storage);

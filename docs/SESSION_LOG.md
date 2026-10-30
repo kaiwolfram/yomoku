@@ -3288,3 +3288,29 @@ under docs/measurements. Statistics replay still takes ~1.04 s at 1.08m events;
 follow-ups, alongside diverse-book/peak-memory/Compose work. Updated architecture,
 data/decisions/plan/handoff. Logs: /tmp/yomoku-vocabulary-performance-{tests,
 example,build,clippy}.log and /tmp/yomoku-vocabulary-measure-{after-,}*.{csv,log}.
+
+## 2026-10-30 — Profile and remove statistics history sorting
+
+Separated SQL stepping, predecoded pure builder replay and complete repository
+costs in the disposable host harness. The former ordered UNION sorts the full
+status history twice; production now reads links then primary-key-ordered events
+inside one deferred read transaction, retaining all validation and snapshot
+semantics. No schema, dependency, core/wire or Android code change. Updated
+architecture/data/decisions/plan, performance CSV/results, commands and handoff.
+
+PASS: 24 focused statistics cases, 819 workspace tests (17 opt-in ignored), two
+harness cases, workspace build, strict all-target/all-feature Clippy, Rustfmt/diff.
+New cases verify zero sorts, concurrent erasure/new-generation isolation between
+link/event reads and failure cleanup. Initial test compilation required internal
+helper/SQL visibility; corrected, no open blocker. Four sequential release runs
+at 10k/100k entries pass exact replay/bytes/cleanup; 104 seven-sample CSV rows
+validate extrema/medians. Zero-round/reread even-sample smoke passes.
+
+At 1.08m events, SQL steps fall 65.88m→39.96m and sorts 2→0; full year-statistics
+median falls 944.157→542.853 ms (42.5%). At 108k events: 86.947→53.254 ms.
+Residual decoding/replay and Frequency/LastSeen profiling remain, alongside
+diverse-book/peak-memory/Compose work. No emulator/device/JNI/Kotlin/codegen,
+Full-loader matrix/process-death/physical-arm64 rerun or performance claim.
+See VOCABULARY_PERFORMANCE.md, DEVELOPMENT.md and measurements/statistics-host-
+2026-10-30.csv. Logs: /tmp/yomoku-status-stream-*.log and
+/tmp/yomoku-status-profile-{before,after}-*.{csv,log}.

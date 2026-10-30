@@ -7104,3 +7104,51 @@ or physical-arm64 check/claim is made for this host slice. Timed runs use isolat
 sequential release executables and RAM-backed /tmp with uncontrolled OS caches.
 Logs: /tmp/yomoku-vocabulary-performance-{tests,example,build,clippy}.log;
 /tmp/yomoku-vocabulary-measure-{after-,}*.{csv,log}. No emulator was started.
+
+## Statistics SQL stepping, pure replay and streaming event reads
+
+2026-10-30: extended `measure_vocabulary` with four diagnostic layers: the frozen
+former production UNION's SQL stepping, shared split-query SQL stepping, pure
+builder replay over predecoded fixture events and the full validated repository
+timeline. Exact replay equality and existing byte/integrity/FK/cleanup guards
+cover diagnostics. Only the opt-in harness retains the decoded events; production
+still streams them. Measurements/limits/hashes: VOCABULARY_PERFORMANCE.md.
+
+```sh
+export PATH=/home/kai/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin:$PATH
+cargo test -p yomoku-storage statistics --locked --offline
+cargo test --workspace --all-features --locked --offline --quiet
+cargo test -p yomoku-ffi --example measure_vocabulary --all-features --locked --offline
+cargo build --workspace --all-features --locked --offline
+cargo clippy --workspace --all-targets --all-features --locked --offline -- -D warnings
+cargo fmt --all -- --check
+git diff --check
+cargo build -p yomoku-ffi --example measure_vocabulary --release --locked --offline
+# No overlapping builds/tests during timings; preserve separate executables for comparison.
+target/release/examples/measure_vocabulary 10000 10 1000 7
+target/release/examples/measure_vocabulary 100000 10 1000 7
+target/release/examples/measure_vocabulary 100 0 0 2
+```
+
+PASS: 24 focused statistics cases, 819 workspace tests (17 opt-in ignored), two
+example cases, workspace build, strict all-target/all-feature Clippy, Rustfmt/diff.
+Two new storage cases require zero statement sorts, old-generation link/event
+consistency despite a committed intervening WAL deletion/reimport, read-only use,
+and transaction cleanup after either query fails. Existing corrupt-history cases
+also require cleanup; version/cause/provenance/chain/date checks are unchanged.
+The initial focused compile needed crate-scoped helper/SQL visibility for the
+regressions; corrected before successful verification. No remaining blocker.
+
+Four sequential release runs (before/after, 10k/100k entries) pass exact byte
+guards/cleanup, with seven samples after warmup. All 104 CSV rows were checked
+against raw sample counts/extrema/medians; zero-round/reread even-sample smoke
+passes. 100k year statistics median: 944.157→542.853 ms; 10k:
+86.947→53.254 ms. SQL steps at 100k fall 65,882,372→39,960,891 and sorts 2→0.
+New SQL files are shared by production and diagnostics; schema remains 0020.
+No dependency, core/wire or Android code change. Android/JNI/Kotlin/codegen,
+Full-loader matrix, device/process-death/physical-arm64 and Compose/frame/
+peak-memory/diverse-book measurements were not rerun or claimed. No emulator
+started. Logs: `/tmp/yomoku-status-stream-{tests,workspace,example,build,clippy,release}.log`;
+`/tmp/yomoku-status-profile-{before,after}-{10000,100000}.{csv,log}`;
+`/tmp/yomoku-status-profile-zero.{csv,log}`. Raw comparison:
+`docs/measurements/statistics-host-2026-10-30.csv`.

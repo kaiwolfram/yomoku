@@ -9,6 +9,9 @@ use yomoku_core::{
 
 use crate::{vocabulary::decode_status, Storage, StorageError};
 
+pub(super) const STATUS_EVENTS_SQL: &str = include_str!("statistics/status_events.sql");
+pub(super) const STATUS_LINKS_SQL: &str = include_str!("statistics/status_links.sql");
+
 // One statement gives both totals the same SQLite snapshot. Sum time separately
 // from occurrences: joining before SUM would multiply repeated words' time and
 // drop zero-word pages. No live document, analysis, vocabulary or JSON is loaded.
@@ -56,7 +59,10 @@ impl Storage {
     /// Durable dictionary-form links share the same snapshot. No content,
     /// analyzer, dictionary data, cached counts or JSON is loaded.
     pub fn vocabulary_status_timeline(&self) -> Result<Vec<StatusTimelinePoint>, StorageError> {
-        status_timeline(&self.connection)
+        let transaction = self.connection.unchecked_transaction()?;
+        let points = status_timeline(&transaction)?;
+        transaction.commit()?;
+        Ok(points)
     }
 
     /// Derive exact lifetime totals from committed analyzed history, including
@@ -136,38 +142,40 @@ fn reading_timeline(
 }
 
 fn status_timeline(
-    connection: &rusqlite::Connection,
+    transaction: &rusqlite::Transaction<'_>,
 ) -> Result<Vec<StatusTimelinePoint>, StorageError> {
-    // Read each link once before replay, without multiplying events by their
-    // surface's link count. UNION keeps both inputs in one read snapshot.
-    let mut statement = connection.prepare(
-        "SELECT e.id, e.vocabulary_id, e.semantics_version, e.old_status,
-                    e.new_status, e.cause, e.occurred_at_unix_ms, e.completion_command_id,
-                    c.semantics_version, a.semantics_version, r.semantics_version,
-                    NULL AS dictionary_form, 1 AS row_kind
-             FROM vocabulary_status_events e
-             LEFT JOIN reading_completions c ON c.command_id = e.completion_command_id
-             LEFT JOIN completion_analyses a ON a.command_id = e.completion_command_id
-             LEFT JOIN effective_completion_commands r ON r.command_id = e.completion_command_id
-             UNION ALL
-             SELECT NULL, vocabulary_id, NULL, NULL, NULL, NULL, NULL, NULL,
-                    NULL, NULL, NULL, dictionary_form, 0
-             FROM vocabulary_dictionary_forms
-             ORDER BY row_kind, id",
-    )?;
-    let mut rows = statement.query([])?;
+    // Read links before replay, without multiplying events by link count. The
+    // explicit transaction keeps both reads in one snapshot. Separate statements
+    // let events stream in primary-key order without UNION's temporary sort.
+    let timeline = status_links(transaction)?;
+    status_events(transaction, timeline)
+}
+
+pub(super) fn status_links(
+    transaction: &rusqlite::Transaction<'_>,
+) -> Result<StatusTimelineBuilder, StorageError> {
     let mut timeline = StatusTimelineBuilder::default();
+    let mut statement = transaction.prepare(STATUS_LINKS_SQL)?;
+    let mut rows = statement.query([])?;
     while let Some(row) = rows.next()? {
-        if row.get::<_, i64>(12)? == 0 {
-            timeline
-                .link_dictionary_form(
-                    VocabularyId::try_from(row.get::<_, i64>(1)?)
-                        .map_err(|_| StorageError::InvalidVocabulary)?,
-                    row.get(11)?,
-                )
-                .map_err(|_| StorageError::InvalidVocabulary)?;
-            continue;
-        }
+        timeline
+            .link_dictionary_form(
+                VocabularyId::try_from(row.get::<_, i64>(0)?)
+                    .map_err(|_| StorageError::InvalidVocabulary)?,
+                row.get(1)?,
+            )
+            .map_err(|_| StorageError::InvalidVocabulary)?;
+    }
+    Ok(timeline)
+}
+
+pub(super) fn status_events(
+    transaction: &rusqlite::Transaction<'_>,
+    mut timeline: StatusTimelineBuilder,
+) -> Result<Vec<StatusTimelinePoint>, StorageError> {
+    let mut statement = transaction.prepare(STATUS_EVENTS_SQL)?;
+    let mut rows = statement.query([])?;
+    while let Some(row) = rows.next()? {
         let version: i64 = row.get(2)?;
         let old: Option<String> = row.get(3)?;
         let old = old.as_deref().map(decode_status).transpose()?;

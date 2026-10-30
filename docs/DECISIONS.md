@@ -4059,3 +4059,21 @@ Use SQLite VM steps to verify that offscreen encounters add no history work to
 this page, rather than a host-speed assertion. Leave metric-dependent sorts and
 history replay for separately measured improvements. See VOCABULARY_PERFORMANCE.md
 for primary SQLite references, results and measurement limits.
+
+## 2026-10-30 — Stream statistics events without the ordered UNION
+
+Extend the disposable host benchmark with separate SQL stepping and pure replay
+measurements before changing status reads. Keep the frozen former production SQL
+only in the opt-in harness; share the new SQL files with production to avoid a
+second profiling implementation. Predecoded events are held only by diagnostics;
+production continues streaming and retains its existing validation and pure core.
+Layer timings are independent measurements, not an additive cost decomposition.
+
+The former ordered UNION sorts the full history to put links before events.
+Load links and primary-key-ordered events separately inside one deferred read
+transaction, eliminating that sort without a new index, cache or schema change.
+Require a transaction in both internal helpers; calendar statistics reuse theirs,
+and the standalone timeline opens its own. Preserve all version/cause/provenance,
+chain/date and dictionary-form checks. WAL is enabled only in a regression fixture
+to commit a deletion/new generation between the two reads and prove isolation;
+application journal configuration is unchanged.

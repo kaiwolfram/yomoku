@@ -1509,7 +1509,8 @@ below.
 `StatusTimelineBuilder` in the pure core streams surviving registration and
 status changes in durable event-ID order, validates each entry's causal chain and
 accumulates date deltas. `Storage::vocabulary_status_timeline(&self)` supplies the
-links and events from one SQLite read statement, validating v1 semantics, causes and any
+links and events from two statements in one deferred SQLite read transaction,
+validating v1 semantics, causes and any
 completion provenance headers. It reads neither live content/analysis nor JSON,
 dictionary data or cached counts. The result has absolute five-status counts after
 all changes at each timestamp, plus distinct Known dictionary-form counts, without
@@ -1517,6 +1518,14 @@ timeframe filtering or date bins. Memory holds entry/link state, status deltas p
 date and Known reference-count deltas per affected form/date, rather than a copy
 of every event. Document deletion preserves the input;
 vocabulary history cascades recalculate it without rescans.
+
+Load all links before streaming events in primary-key order. Splitting the former
+ordered UNION avoids temporary sorting of the full event history; both internal
+read helpers require a transaction. The standalone timeline opens its own read
+transaction, while calendar statistics reuse their existing transaction. Errors
+release the snapshot without writes. The opt-in host profiler separates SQL
+stepping, predecoded pure replay and complete repository costs; see
+VOCABULARY_PERFORMANCE.md for measurements and limits.
 
 For a regressing wall clock or delayed frozen completion, clamp only that entry's
 projected date to its preceding event's projected date. This retains causal state,

@@ -29,6 +29,20 @@ fn status(storage: &mut Storage, surface: &str, status: VocabularyStatus, timest
         .unwrap();
 }
 
+fn import_linked(storage: &mut Storage, text: &str) -> AnalyzedPaste {
+    storage
+        .create_analyzed_paste(&PasteText::new(text.into()).unwrap(), 100, |chapter| {
+            let mut analysis = fixture(chapter).unwrap();
+            for token in &mut analysis.tokens {
+                if token.is_japanese {
+                    token.dictionary_form = Some(Surface::new(&token.surface).unwrap());
+                }
+            }
+            Ok::<_, std::convert::Infallible>(analysis)
+        })
+        .unwrap()
+}
+
 #[test]
 fn import_registration_jumps_preserve_unique_unicode_surfaces_and_all_five_statuses() {
     use VocabularyStatus::*;
@@ -351,6 +365,105 @@ fn invalid_versions_causes_dates_status_chains_and_completion_provenance_fail_wi
         storage.connection.execute(sql, []).unwrap();
         let before = fs::read(database.path()).unwrap();
         assert!(matches!(storage.vocabulary_status_timeline(), Err(StorageError::InvalidVocabulary)), "{sql}");
+        assert!(storage.connection.is_autocommit(), "{sql}");
         assert_eq!(fs::read(database.path()).unwrap(), before);
+    }
+}
+
+#[test]
+fn status_links_and_events_keep_one_snapshot_across_concurrent_erasure_and_new_generations() {
+    let database = TestDatabase::new();
+    let mut storage = Storage::open(database.path()).unwrap();
+    // WAL permits the writer to commit between the two reader statements. It is
+    // a test-only journal choice; normal application configuration is unchanged.
+    storage
+        .connection
+        .pragma_update(None, "journal_mode", "WAL")
+        .unwrap();
+    import_linked(&mut storage, "猫");
+    status(&mut storage, "猫", VocabularyStatus::Known, 200);
+    let cat = storage
+        .vocabulary_entry(&Surface::new("猫").unwrap())
+        .unwrap()
+        .unwrap();
+    let expected = storage.vocabulary_status_timeline().unwrap();
+    assert_eq!(expected.last().unwrap().known_dictionary_forms, 1);
+    let mut writer = Storage::open(database.path()).unwrap();
+    storage
+        .connection
+        .pragma_update(None, "query_only", true)
+        .unwrap();
+    let transaction = storage.connection.unchecked_transaction().unwrap();
+    let links = crate::statistics::status_links(&transaction).unwrap();
+    writer.delete_vocabulary_entries(&[cat.id]).unwrap();
+    writer
+        .create_analyzed_paste(&PasteText::new("猫".into()).unwrap(), 300, |chapter| {
+            let mut analysis = fixture(chapter).unwrap();
+            analysis.tokens[0].dictionary_form = Some(Surface::new("別の形").unwrap());
+            Ok::<_, std::convert::Infallible>(analysis)
+        })
+        .unwrap();
+    assert_ne!(
+        writer
+            .vocabulary_entry(&Surface::new("猫").unwrap())
+            .unwrap()
+            .unwrap()
+            .id,
+        cat.id
+    );
+    status(&mut writer, "猫", VocabularyStatus::Learning, 400);
+    // Loaded links belong to the erased generation. Its events must remain
+    // visible to this snapshot, with no replacement registration mixed in.
+    assert_eq!(
+        crate::statistics::status_events(&transaction, links).unwrap(),
+        expected
+    );
+    transaction.commit().unwrap();
+    assert!(storage.connection.is_autocommit());
+    let current = storage.vocabulary_status_timeline().unwrap();
+    assert_eq!(
+        current,
+        [point(300, [1, 0, 0, 0, 0]), point(400, [0, 1, 0, 0, 0])]
+    );
+    assert!(storage.connection.is_autocommit());
+}
+
+#[test]
+fn status_queries_stream_without_sorting_and_query_failures_release_the_snapshot() {
+    let database = TestDatabase::new();
+    let mut storage = Storage::open(database.path()).unwrap();
+    let imported = import_linked(&mut storage, "猫 犬");
+    let completion = prepare(&mut storage, &imported);
+    storage
+        .record_effective_page_completion(&completion)
+        .unwrap();
+    let expected = storage.vocabulary_status_timeline().unwrap();
+    for sql in [
+        crate::statistics::STATUS_LINKS_SQL,
+        crate::statistics::STATUS_EVENTS_SQL,
+    ] {
+        let mut statement = storage.connection.prepare(sql).unwrap();
+        let mut rows = statement.query([]).unwrap();
+        while rows.next().unwrap().is_some() {}
+        drop(rows);
+        assert_eq!(statement.get_status(rusqlite::StatementStatus::Sort), 0);
+    }
+    for table in ["vocabulary_dictionary_forms", "vocabulary_status_events"] {
+        storage
+            .connection
+            .execute_batch(&format!("ALTER TABLE {table} RENAME TO unavailable"))
+            .unwrap();
+        let before = fs::read(database.path()).unwrap();
+        assert!(matches!(
+            storage.vocabulary_status_timeline(),
+            Err(StorageError::Sqlite(_))
+        ));
+        assert!(storage.connection.is_autocommit());
+        assert_eq!(fs::read(database.path()).unwrap(), before);
+        storage
+            .connection
+            .execute_batch(&format!("ALTER TABLE unavailable RENAME TO {table}"))
+            .unwrap();
+        assert_eq!(storage.vocabulary_status_timeline().unwrap(), expected);
     }
 }

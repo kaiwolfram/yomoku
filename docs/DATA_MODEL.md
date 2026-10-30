@@ -1526,13 +1526,17 @@ renders these values without additional queries or persisted chart caches.
 
 `Storage::vocabulary_status_timeline(&self)` streams `vocabulary_status_events`
 in primary-key order through the pure `statistics::StatusTimelineBuilder`.
-One statement supplies a consistent read snapshot of durable dictionary-form
-links and events, including v1 completion,
+One deferred read transaction supplies a consistent snapshot across separate
+durable dictionary-form link and ordered event statements, including v1 completion,
 analysis and optional effective-reservation headers for completion-caused changes.
 Registration/manual events must have no completion reference; completions must be
 New→Known with valid analyzed provenance. Unknown versions/causes/statuses,
 negative dates, nonincreasing IDs, missing/duplicate registrations, no-op changes
 and broken old→new chains fail without returning partial points or repairing data.
+Links load before events; events stream in primary-key order without sorting an
+ordered UNION. Calendar statistics share their existing transaction; the
+standalone timeline opens and closes its own. Concurrent vocabulary erasure/new
+generations cannot mix their links/events; failures release the read transaction.
 
 Each retained vocabulary ID contributes exactly one count after its New
 registration. Actual changes move that count between the five statuses. Same-time
