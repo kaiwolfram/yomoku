@@ -1,13 +1,14 @@
-//! Layered diagnostics: SQL stepping without column decoding, pure replay over
-//! predecoded fixture input, then the complete production repository projection.
+//! Layered diagnostics: SQL stepping, production row/provenance decoding, pure
+//! replay over predecoded input, then the complete repository projection.
 //! This module is only compiled into the opt-in example, never the library.
 
 use super::*;
 use rusqlite::{Connection, StatementStatus};
 use yomoku_core::{
     document::VocabularyId,
-    statistics::{StatusTimelineBuilder, StatusTimelinePoint, VocabularyStatusChange},
+    statistics::{StatusTimelineBuilder, StatusTimelinePoint},
 };
+use yomoku_storage::StorageError;
 
 // Share the production SQL rather than maintaining a profiling copy.
 const EVENTS: &str = include_str!("../../../yomoku-storage/src/statistics/status_events.sql");
@@ -29,15 +30,22 @@ fn scan(connection: &Connection, sql: &str) -> (usize, i32, i32) {
     )
 }
 
-fn status(value: &str) -> VocabularyStatus {
-    match value {
-        "new" => VocabularyStatus::New,
-        "learning" => VocabularyStatus::Learning,
-        "familiar" => VocabularyStatus::Familiar,
-        "known" => VocabularyStatus::Known,
-        "ignored" => VocabularyStatus::Ignored,
-        _ => panic!("invalid fixture status"),
+// Compile the production decoder and enum parser, including provenance checks.
+#[path = "../../../yomoku-storage/src/vocabulary/status.rs"]
+mod status;
+#[path = "../../../yomoku-storage/src/statistics/status_row.rs"]
+mod status_row;
+use status::decode_status;
+
+fn decode_events(connection: &Connection) -> usize {
+    let mut statement = connection.prepare(EVENTS).unwrap();
+    let mut rows = statement.query([]).unwrap();
+    let mut count = 0;
+    while let Some(row) = rows.next().unwrap() {
+        black_box(status_row::decode(row).unwrap());
+        count += 1;
     }
+    count
 }
 
 pub(super) fn measure(storage: &Storage, path: &Path, iterations: usize) {
@@ -58,19 +66,11 @@ pub(super) fn measure(storage: &Storage, path: &Path, iterations: usize) {
         .collect::<Result<Vec<_>, _>>()
         .unwrap();
     let mut statement = transaction.prepare(EVENTS).unwrap();
-    let events = statement
-        .query_map([], |row| {
-            Ok(VocabularyStatusChange {
-                event_id: u64::try_from(row.get::<_, i64>(0)?).unwrap(),
-                vocabulary_id: VocabularyId::try_from(row.get::<_, i64>(1)?).unwrap(),
-                occurred_at_unix_ms: row.get(6)?,
-                old_status: row.get::<_, Option<String>>(3)?.as_deref().map(status),
-                new_status: status(&row.get::<_, String>(4)?),
-            })
-        })
-        .unwrap()
-        .collect::<Result<Vec<_>, _>>()
-        .unwrap();
+    let mut rows = statement.query([]).unwrap();
+    let mut events = Vec::new();
+    while let Some(row) = rows.next().unwrap() {
+        events.push(status_row::decode(row).unwrap());
+    }
     let replay = || -> Vec<StatusTimelinePoint> {
         let mut builder = StatusTimelineBuilder::default();
         for (id, form) in &links {
@@ -90,6 +90,7 @@ pub(super) fn measure(storage: &Storage, path: &Path, iterations: usize) {
     assert_eq!(legacy.0, events.len() + links.len());
     assert_eq!(event_scan.0, events.len());
     assert_eq!(link_scan.0, links.len());
+    assert_eq!(decode_events(&transaction), events.len());
     eprintln!("status_sql_legacy_rows={} vm_steps={} sorts={} split_rows={} vm_steps={} sorts={} replay_input_events={} links={}",
         legacy.0, legacy.1, legacy.2, event_scan.0 + link_scan.0,
         event_scan.1 + link_scan.1, event_scan.2 + link_scan.2, events.len(), links.len());
@@ -98,6 +99,9 @@ pub(super) fn measure(storage: &Storage, path: &Path, iterations: usize) {
     });
     super::measure("status_sql_split_step_only", iterations, || {
         (scan(&transaction, LINKS), scan(&transaction, EVENTS))
+    });
+    super::measure("status_sql_decode_validate", iterations, || {
+        decode_events(&transaction)
     });
     super::measure("status_rust_replay_predecoded", iterations, replay);
     super::measure("repository_status_timeline", iterations, || {

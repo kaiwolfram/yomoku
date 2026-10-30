@@ -273,3 +273,79 @@ to checked i64 conversions before verification. No open blocker. Status decoding
 replay, deep offsets, large views, diverse books, peak-memory and Compose/device
 measurements remain follow-ups. Android/JNI/Kotlin/codegen, separate Full-loader
 matrix, lifecycle/process-death and physical-arm64 checks were not rerun.
+
+## Follow-up: status row decoding and temporary text allocations
+
+The profiler now measures SQL stepping plus the exact production event decoder
+and provenance validation, without replay or retaining events. It compiles the
+private decoder and existing status parser directly; no public storage/FFI API is
+added. Predecoded replay extraction also uses that decoder. Exact equality with
+the public timeline, byte preservation, FK/integrity and scratch cleanup guards
+still apply. Link reads remain outside this new metric. Like the other layers,
+these independent timings are not an additive decomposition.
+
+Status events formerly allocated temporary Strings for old status (when present),
+new status and cause. Those enum spellings are only used while validating one
+row. Borrow them with the pinned rusqlite 0.40.2
+[Row::get_ref](https://docs.rs/rusqlite/0.40.2/rusqlite/struct.Row.html#method.get_ref)
+and [ValueRef text accessors](https://docs.rs/rusqlite/0.40.2/rusqlite/types/enum.ValueRef.html#method.as_str_or_null),
+removing up to three allocations per event. The documented lifetime prevents
+references escaping the row; replay still receives the same owned numeric/enum
+event. Dictionary-form strings remain owned because replay retains them. SQL,
+VM work, snapshot ownership, provenance checks, core replay, schema and wire
+formats are unchanged. No dependency or cache is added.
+
+The decoder rejects non-TEXT values, invalid UTF-8, whitespace/case changes,
+embedded NUL and unknown spellings. NULL is accepted only for absent old status.
+Normal STRICT tables forbid BLOB values, so raw SQLite rows exercise type/NULL
+gates separately. Public timeline/calendar read tests inject malformed UTF-8 and
+nonliteral spellings, require unchanged bytes and released snapshots on failure,
+then verify exact successful reads after fixture repair. Existing v1 provenance,
+causal-chain, clock regression, Known-form, deletion/replay, concurrent generation
+snapshot and read-only regressions remain in place.
+
+Measured 2026-10-30 on the host/toolchain and synthetic fixtures above: 10k/100k
+entries, ten status rounds, 1,000 rereads, one excluded warmup and seven samples.
+Preserved release executables ran sequentially without overlapping builds/tests;
+RAM-backed `/tmp`, OS caches, CPU frequency and scheduling remain uncontrolled.
+Median milliseconds:
+
+| Entries | SQL + decode/validate before → after | Public timeline before → after | Year statistics before → after |
+| ---: | ---: | ---: | ---: |
+| 10,000 | 54.325 → 52.808 | 54.619 → 52.007 | 56.841 → 54.123 |
+| 100,000 | 596.927 → 532.782 | 584.478 → 545.795 | 633.523 → 545.436 |
+
+At 100k, split SQL stepping medians are 198.389→193.717 ms; predecoded pure replay
+100.719→103.093 ms. Query work stays 39,960,891 VM steps and zero sorts. Borrowing
+removes temporary text allocation without addressing the SQL/provenance or pure
+replay work. The complete timeline sample ranges overlap (571.979–589.955 ms
+before, 534.714–587.051 ms after); the measured timing improvements must not be
+read as portable guarantees. No performance change is claimed for unrelated
+Vocabulary, FIFO or encoding metrics.
+
+All 124 metric rows from four runs are retained in
+[the decoding CSV](measurements/statistics-decoding-host-2026-10-30.csv). Every
+row's seven raw samples validate its extrema/median. Exact replay/row counts,
+unchanged database bytes, FK/integrity and scratch cleanup pass. The 100-entry,
+zero-round/zero-reread/two-sample smoke passes all 22 metrics and even-sample
+median checks; smoke samples are outside the comparison CSV.
+
+Baseline production is `b51d650c7d7a359894ef5553268de562a5dcb8cb` plus extraction
+of the unchanged private decoder/parser and the new diagnostic, before borrowing.
+Baseline executable SHA-256:
+`fcc43655ee8fb7f800564b9b8187db7e37811a05abef6c94471d2bf23a02eb77`.
+After executable SHA-256:
+`f9539774d34a1f941a8618544ae663ded4a293072b63bad93635450ab3089ac4`.
+Preserved executables: `/tmp/yomoku-status-decode-{before,after}`. Run logs/CSV:
+`/tmp/yomoku-status-decode-{before,after}-{10000,100000}.{log,csv}`; zero smoke:
+`/tmp/yomoku-status-decode-zero.{log,csv}`.
+
+PASS: 26 focused statistics cases, 823 workspace tests (17 opt-in ignored), three
+harness cases, all-feature build, strict all-target/all-feature Clippy, Rustfmt/
+diff. The initial integration corruption fixture attempted a BLOB write into a
+STRICT TEXT column; SQLite correctly rejected it. Raw rows now test those type
+and NULL gates; public reads cover malformed TEXT and cleanup. No open blocker.
+Remaining work includes required row decoding/replay, deep metric offsets, large
+views, diverse books, peak-memory and Compose/device measurements. Android/JNI/
+Kotlin/codegen, separate Full-loader matrix, lifecycle/process-death and physical-
+arm64 were not rerun; no emulator started and no device performance claim is made.

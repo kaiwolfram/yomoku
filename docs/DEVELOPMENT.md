@@ -7196,3 +7196,50 @@ measurements: /tmp/yomoku-browser-profile-{before,after}-{10000,100000}.{csv,log
 zero smoke: /tmp/yomoku-browser-profile-zero.{csv,log}. No Android/JNI/Kotlin/codegen,
 separate Full-loader matrix, lifecycle/process-death, physical-arm64 or device/
 Compose/peak-memory check or claim. No emulator started; schema remains 0020.
+
+## Statistics row decoding and borrowed enum text
+
+Verification commands (2026-10-30, repository root):
+
+```sh
+export PATH=/home/kai/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin:$PATH
+cargo test -p yomoku-storage statistics --locked --offline
+cargo test --workspace --all-features --locked --offline --quiet
+cargo test -p yomoku-ffi --example measure_vocabulary --all-features --locked --offline
+cargo build --workspace --all-features --locked --offline
+cargo clippy --workspace --all-targets --all-features --locked --offline -- -D warnings
+cargo fmt --all -- --check
+git diff --check
+cargo build -p yomoku-ffi --example measure_vocabulary --release --locked --offline
+# Run preserved before/after executables sequentially, with no builds/tests overlapping.
+target/release/examples/measure_vocabulary 10000 10 1000 7
+target/release/examples/measure_vocabulary 100000 10 1000 7
+target/release/examples/measure_vocabulary 100 0 0 2
+```
+
+PASS: 26 focused statistics cases, 823 workspace tests (17 opt-in ignored), three
+harness cases (including the shared decoder's type/NULL test), all-feature build,
+strict all-target/all-feature Clippy, Rustfmt/diff. Two new regressions require
+strict borrowed TEXT/NULL decoding plus invalid UTF-8/literal spelling rejection
+through public timeline/calendar reads, unchanged bytes, snapshot cleanup and
+exact recovery after fixture repair. Existing provenance, causal replay, Known-
+form, read-only and concurrent generation/snapshot guards pass. The initial
+corruption fixture attempted BLOB writes into a STRICT table; SQLite correctly
+rejected them. Raw SELECT rows now cover type/NULL gates without altering schema.
+No unresolved failure/blocker. Shared decoder diagnostics retain the exact
+production parser/provenance validation; no SQL/schema/dependency/wire change.
+
+Four sequential release runs (before/after at 10k/100k) and the 100-entry,
+zero-round/zero-reread/two-sample smoke pass. All 124 comparison rows and 22 smoke
+rows validate raw sample counts/extrema/medians; byte/replay/FK/integrity/cleanup
+guards pass. At 100k, median SQL plus decode/validation is 596.927→532.782 ms;
+complete status timeline 584.478→545.795 ms. Raw samples/hashes/limits:
+VOCABULARY_PERFORMANCE.md, final section, and
+measurements/statistics-decoding-host-2026-10-30.csv. Logs:
+`/tmp/yomoku-status-decode-{tests,workspace,example,build,clippy,release}.log`;
+baseline extraction verification uses `-baseline-{tests,example,release}.log`.
+Measurements: `/tmp/yomoku-status-decode-{before,after}-{10000,100000}.{csv,log}`;
+zero smoke: `/tmp/yomoku-status-decode-zero.{csv,log}`. No Android/JNI/Kotlin/
+codegen, Full-loader matrix, device/lifecycle/process-death/physical-arm64 or
+Compose/peak-memory/diverse-book measurements were rerun or claimed. No emulator
+started. Required decoding/replay, deep offsets and device measurements remain.

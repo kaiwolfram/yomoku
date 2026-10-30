@@ -4099,3 +4099,27 @@ isolated necessary aggregate, allowing at most one extra VM step per occurrence.
 The baseline fails that bound; the changed queries pass. Keep exact multi-page
 mixed-history tests and all-sort corruption/query-failure cleanup coverage.
 These host measurements do not establish device/Compose/peak-memory performance.
+
+## 2026-10-30 — Borrow status enum text during history decoding
+
+Extend the opt-in host profiler with SQL stepping plus the exact production row
+and provenance decoder, excluding replay. Extract the private row decoder and
+existing status parser into source modules shared with diagnostics; add no public
+repository or FFI API. Keep predecoded replay, SQL-only and complete repository
+measurements separate rather than treating their timings as additive.
+
+Use rusqlite 0.40.2 Row::get_ref and ValueRef::as_str/as_str_or_null to borrow
+old/new status and cause spellings only while validating that SQLite row. This
+removes up to three temporary String allocations per event without changing SQL,
+streaming replay, snapshot ownership, provenance checks or schema. Require exact
+UTF-8 TEXT, permitting NULL only for the absent old status; reject malformed text
+and nonliteral spellings instead of coercion. Such text failures return
+InvalidVocabulary; SQLite query/index errors retain their existing error path.
+Dictionary-form links still own their strings because replay retains them.
+
+Normal STRICT tables reject BLOB values. Test the decoder's type/NULL gates with
+raw SQLite rows, and test malformed UTF-8/literal spellings through both public
+statistics reads with unchanged-byte, snapshot cleanup and successful fixture
+repair checks. Retain existing causal replay, concurrent generation/snapshot,
+read-only and completion provenance regressions. Primary API references and
+host-only results are in VOCABULARY_PERFORMANCE.md.

@@ -1537,6 +1537,10 @@ Links load before events; events stream in primary-key order without sorting an
 ordered UNION. Calendar statistics share their existing transaction; the
 standalone timeline opens and closes its own. Concurrent vocabulary erasure/new
 generations cannot mix their links/events; failures release the read transaction.
+Old/new statuses and causes decode from borrowed row-local SQLite TEXT, with
+NULL permitted only for the absent old status. BLOBs, malformed UTF-8 and
+nonliteral spellings fail without coercion or writes. No borrowed text escapes
+the decoder; pure replay receives the existing owned numeric/enum event value.
 
 Each retained vocabulary ID contributes exactly one count after its New
 registration. Actual changes move that count between the five statuses. Same-time

@@ -1524,7 +1524,11 @@ ordered UNION avoids temporary sorting of the full event history; both internal
 read helpers require a transaction. The standalone timeline opens its own read
 transaction, while calendar statistics reuse their existing transaction. Errors
 release the snapshot without writes. The opt-in host profiler separates SQL
-stepping, predecoded pure replay and complete repository costs; see
+stepping, row decoding/provenance validation, predecoded pure replay and complete
+repository costs. The private production row decoder borrows SQLite TEXT only
+within each row to validate exact old/new status and cause spellings; it retains
+no text references or per-event String copies. The profiler compiles that same
+decoder and enum parser. Invalid types/UTF-8 fail without coercion. See
 VOCABULARY_PERFORMANCE.md for measurements and limits.
 
 For a regressing wall clock or delayed frozen completion, clamp only that entry's

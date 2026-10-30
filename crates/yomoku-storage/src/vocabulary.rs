@@ -6,6 +6,9 @@ use yomoku_core::{
 
 use crate::{Storage, StorageError};
 
+mod status;
+pub(crate) use status::decode_status;
+
 impl Storage {
     /// Register analyzer-supplied Japanese surfaces, preserving existing entries.
     /// Returns the number created, not token frequency or reading encounters.
@@ -130,17 +133,6 @@ fn validate_entry(
         status,
         registered_at_unix_ms: timestamp,
     })
-}
-
-pub(crate) fn decode_status(status: &str) -> Result<VocabularyStatus, StorageError> {
-    match status {
-        "new" => Ok(VocabularyStatus::New),
-        "learning" => Ok(VocabularyStatus::Learning),
-        "familiar" => Ok(VocabularyStatus::Familiar),
-        "known" => Ok(VocabularyStatus::Known),
-        "ignored" => Ok(VocabularyStatus::Ignored),
-        _ => Err(StorageError::InvalidVocabulary),
-    }
 }
 
 pub(crate) fn read_entry_by_surface(

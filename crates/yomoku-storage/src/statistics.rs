@@ -2,12 +2,13 @@ use yomoku_core::{
     document::VocabularyId,
     statistics::{
         statistics_buckets, LifetimeReadingTotals, ReadingTimelinePoint, StatisticsBuckets,
-        StatisticsTimeframe, StatusTimelineBuilder, StatusTimelinePoint, VocabularyStatusChange,
+        StatisticsTimeframe, StatusTimelineBuilder, StatusTimelinePoint,
     },
-    vocabulary::VocabularyStatus,
 };
 
 use crate::{vocabulary::decode_status, Storage, StorageError};
+
+mod status_row;
 
 pub(super) const STATUS_EVENTS_SQL: &str = include_str!("statistics/status_events.sql");
 pub(super) const STATUS_LINKS_SQL: &str = include_str!("statistics/status_links.sql");
@@ -176,41 +177,8 @@ pub(super) fn status_events(
     let mut statement = transaction.prepare(STATUS_EVENTS_SQL)?;
     let mut rows = statement.query([])?;
     while let Some(row) = rows.next()? {
-        let version: i64 = row.get(2)?;
-        let old: Option<String> = row.get(3)?;
-        let old = old.as_deref().map(decode_status).transpose()?;
-        let new = decode_status(&row.get::<_, String>(4)?)?;
-        let cause: String = row.get(5)?;
-        let command: Option<i64> = row.get(7)?;
-        let completion_version: Option<i64> = row.get(8)?;
-        let analysis_version: Option<i64> = row.get(9)?;
-        let effective_version: Option<i64> = row.get(10)?;
-        let valid_cause = match cause.as_str() {
-            "registration" => old.is_none() && new == VocabularyStatus::New && command.is_none(),
-            "manual" => old.is_some() && old != Some(new) && command.is_none(),
-            "completion" => {
-                old == Some(VocabularyStatus::New)
-                    && new == VocabularyStatus::Known
-                    && command.is_some()
-                    && completion_version == Some(1)
-                    && analysis_version == Some(1)
-                    && effective_version.is_none_or(|version| version == 1)
-            }
-            _ => false,
-        };
-        if version != 1 || !valid_cause {
-            return Err(StorageError::InvalidVocabulary);
-        }
         timeline
-            .push(VocabularyStatusChange {
-                event_id: u64::try_from(row.get::<_, i64>(0)?)
-                    .map_err(|_| StorageError::InvalidVocabulary)?,
-                vocabulary_id: VocabularyId::try_from(row.get::<_, i64>(1)?)
-                    .map_err(|_| StorageError::InvalidVocabulary)?,
-                occurred_at_unix_ms: row.get(6)?,
-                old_status: old,
-                new_status: new,
-            })
+            .push(status_row::decode(row)?)
             .map_err(|_| StorageError::InvalidVocabulary)?;
     }
     timeline

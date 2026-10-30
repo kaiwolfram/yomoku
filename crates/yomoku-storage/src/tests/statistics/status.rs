@@ -1,4 +1,7 @@
-use yomoku_core::{library::WordStatusCounts, statistics::StatusTimelinePoint};
+use yomoku_core::{
+    library::WordStatusCounts,
+    statistics::{StatisticsTimeframe, StatusTimelinePoint},
+};
 
 use super::*;
 
@@ -367,6 +370,65 @@ fn invalid_versions_causes_dates_status_chains_and_completion_provenance_fail_wi
         assert!(matches!(storage.vocabulary_status_timeline(), Err(StorageError::InvalidVocabulary)), "{sql}");
         assert!(storage.connection.is_autocommit(), "{sql}");
         assert_eq!(fs::read(database.path()).unwrap(), before);
+    }
+}
+
+#[test]
+fn status_text_rejects_invalid_utf8_and_nonliteral_spellings_without_leaking_a_snapshot() {
+    for (column, value) in [
+        ("old_status", "CAST(X'FF' AS TEXT)"),
+        ("new_status", "CAST(X'FF' AS TEXT)"),
+        ("cause", "CAST(X'FF' AS TEXT)"),
+        ("old_status", "'New'"),
+        ("new_status", "'known '"),
+        ("cause", "' completion'"),
+        ("new_status", "'known' || char(0)"),
+        ("cause", "'completion' || char(0)"),
+        ("old_status", "''"),
+        ("new_status", "'既知'"),
+        ("cause", "7"),
+    ] {
+        let database = TestDatabase::new();
+        let mut storage = Storage::open(database.path()).unwrap();
+        let imported = import_linked(&mut storage, "猫");
+        let completion = prepare(&mut storage, &imported);
+        storage
+            .record_effective_page_completion(&completion)
+            .unwrap();
+        let expected = storage.vocabulary_status_timeline().unwrap();
+        storage
+            .connection
+            .pragma_update(None, "ignore_check_constraints", true)
+            .unwrap();
+        let sql = format!(
+            "UPDATE vocabulary_status_events SET {column} = {value} WHERE cause = 'completion'"
+        );
+        storage.connection.execute(&sql, []).unwrap();
+        storage
+            .connection
+            .pragma_update(None, "query_only", true)
+            .unwrap();
+        let before = fs::read(database.path()).unwrap();
+        assert!(storage.vocabulary_status_timeline().is_err(), "{sql}");
+        assert!(storage.connection.is_autocommit(), "{sql}");
+        assert!(
+            storage
+                .statistics_buckets(StatisticsTimeframe::AllTime, 1000)
+                .is_err(),
+            "{sql}"
+        );
+        assert!(storage.connection.is_autocommit(), "{sql}");
+        assert_eq!(fs::read(database.path()).unwrap(), before, "{sql}");
+        storage
+            .connection
+            .pragma_update(None, "query_only", false)
+            .unwrap();
+        // Repair only in the fixture and require the next read to succeed.
+        storage.connection.execute(
+            "UPDATE vocabulary_status_events SET old_status = 'new', new_status = 'known', cause = 'completion' WHERE completion_command_id IS NOT NULL",
+            [],
+        ).unwrap();
+        assert_eq!(storage.vocabulary_status_timeline().unwrap(), expected);
     }
 }
 

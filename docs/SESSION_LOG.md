@@ -3339,3 +3339,26 @@ median. Zero-history/two-sample smoke passes. At 100k, Frequency first-page medi
 work remain. No Android/JNI/Kotlin/codegen/Full-loader/process-death/arm64 rerun.
 See VOCABULARY_PERFORMANCE.md and DEVELOPMENT.md. Logs: /tmp/yomoku-browser-page-*
 and /tmp/yomoku-browser-profile-*. No emulator started.
+
+## 2026-10-30 — Statistics row decoding and temporary enum text
+- Started clean; continued the ordered host-history performance follow-up. Added
+  SQL-plus-decoding/provenance diagnostics using the exact private production
+  decoder and enum parser, without new public API, dependency or schema changes.
+- Borrow SQLite TEXT for old/new status and cause within each row, removing up
+  to three temporary String allocations per event. Keep SQL, snapshots, required
+  provenance checks, pure streaming replay and dictionary-form ownership intact.
+- Two new regressions verify raw SQLite type/NULL gates and malformed UTF-8/
+  nonliteral spellings through public timeline/calendar reads, unchanged bytes,
+  snapshot cleanup and exact recovery after fixture repair. Initial BLOB writes
+  were correctly rejected by STRICT tables; moved those cases to raw rows.
+- PASS: 26 focused statistics cases, 823 workspace tests (17 opt-in ignored),
+  three harness cases, all-feature build, strict Clippy, fmt/diff. Four release
+  runs retain 124 checked raw metric rows plus a passing 22-metric zero-history/
+  even-sample smoke. Replay/byte/FK/integrity/scratch-cleanup guards pass.
+- At 100k entries/1.08m events, median SQL plus decode/validation falls
+  596.927→532.782 ms; complete timeline 584.478→545.795 ms. Samples/hashes and
+  host limits are in VOCABULARY_PERFORMANCE.md and measurements/statistics-
+  decoding-host-2026-10-30.csv. No cached counters or core/wire behavior changes.
+- No unresolved blocker. Android/JNI/Kotlin/codegen, Full-loader matrix, device/
+  Compose/peak-memory/diverse-book/lifecycle/process-death/physical-arm64 not
+  rerun or claimed. No emulator started. Broader hardening tasks stay unchecked.
