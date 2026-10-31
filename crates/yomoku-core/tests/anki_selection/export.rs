@@ -44,6 +44,8 @@ fn original_and_effective_commands_freeze_identical_content_and_distinct_selecti
         )
         .unwrap();
     assert_eq!(first.export().note(), second.export().note());
+    assert_eq!(first.export().layout(), &AnkiModelLayout::yomoku());
+    assert_eq!(first.export().layout(), second.export().layout());
     assert_eq!(first.export().note(), &f.original().unwrap());
     assert_eq!(i64::from(first.export().deck()), i64::MAX);
     assert_eq!(first.operation(), AnkiExportOperation::CheckAndAdd);

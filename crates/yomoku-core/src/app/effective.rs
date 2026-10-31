@@ -27,7 +27,10 @@ impl Model {
             .is_some_and(|session| session.mutation_pending())
     }
 
-    fn can_start_effective_selection(&self, selection: EffectiveReaderSelection) -> bool {
+    pub(super) fn can_start_effective_selection(
+        &self,
+        selection: EffectiveReaderSelection,
+    ) -> bool {
         self.can_start_effective_page(selection.page)
     }
 

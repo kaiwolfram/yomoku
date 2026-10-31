@@ -81,6 +81,7 @@ pub struct ImportSummary {
 
 #[derive(Default)]
 pub struct Model {
+    prepared_anki_export: Option<crate::anki::AnkiExport>,
     anki_recovery: crate::anki::AnkiRecoveryState,
     anki_recovery_sequence: u64,
     anki_recovery_request: Option<u64>,
@@ -302,6 +303,18 @@ pub enum Event {
     #[serde(skip)]
     #[cfg_attr(feature = "facet_typegen", facet(skip))]
     VocabularyBulkFinished(u64, StorageResult),
+    /// Native preparation only. No provider dispatch or live callback token.
+    #[serde(skip)]
+    #[cfg_attr(feature = "facet_typegen", facet(skip))]
+    PrepareAnkiExport {
+        #[cfg_attr(feature = "facet_typegen", facet(opaque))]
+        selection: crate::anki::AnkiSelection,
+        #[cfg_attr(feature = "facet_typegen", facet(opaque))]
+        deck: crate::anki::AnkiDeckId,
+    },
+    #[serde(skip)]
+    #[cfg_attr(feature = "facet_typegen", facet(skip))]
+    ClearPreparedAnkiExport,
     /// Runtime startup only; no shell codec and no provider mutation.
     #[serde(skip)]
     #[cfg_attr(feature = "facet_typegen", facet(skip))]
@@ -1594,6 +1607,8 @@ impl App for Yomoku {
             | Event::RetryStatistics
             | Event::StatisticsFinished(..)
             | Event::RestoreAnkiRecovery
+            | Event::PrepareAnkiExport { .. }
+            | Event::ClearPreparedAnkiExport
             | Event::RetryAnkiRecovery
             | Event::AnkiRecoveryFinished(..)
             | Event::CommitAnkiRecovery(_)

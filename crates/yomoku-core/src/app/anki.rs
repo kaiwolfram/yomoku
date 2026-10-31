@@ -4,6 +4,7 @@
 use super::*;
 use crate::anki::AnkiRecoveryState;
 
+mod preparation;
 mod reconciliation;
 
 impl Model {
@@ -18,6 +19,9 @@ impl Yomoku {
         event: &Event,
         model: &mut Model,
     ) -> Option<Command<Effect, Event>> {
+        if let Some(command) = self.update_anki_preparation(event, model) {
+            return Some(command);
+        }
         if let Some(command) = self.update_anki_reconciliation(event, model) {
             return Some(command);
         }

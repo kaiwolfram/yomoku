@@ -4592,3 +4592,27 @@ must capture the frozen pair when issuing its read, provide validated supported
 provider observations and reject obsolete shell selections. No provider read or
 write, live export/session ownership, begin/outcome dispatch, visible recovery
 Retry or Settings/Add to Anki call site is enabled by this slice.
+
+## 2026-10-31 — App-owned frozen Anki export preparation
+
+Pull forward current-selection ownership before connecting provider dispatch.
+The app accepts native preparation only for its visible, loaded dictionary
+selection on the actual current original/effective page and canonical document.
+Original events cannot fall back through an effective owner. Apply the existing
+reader busy/checkpoint/completion/departure gates and require successful empty
+startup recovery without an outstanding/failed recovery commit. Stale shell
+selections never supply text, dictionary content or an alternative current page.
+
+Retain one immutable `AnkiExport` containing selection, exact note fields/surface,
+deck and full v1 layout. Share its pure construction with the existing isolated
+export session, which now freezes that layout too. Later dictionary/deck changes,
+popup dismissal, navigation and duplicate preparation cannot replace it. Explicit
+native Clear discards only this unsubmitted data; it cannot clear either journal
+or a recovery commit. A fresh process restores obligations, never prepared intent.
+
+Preparation emits no effects, grants no provider authority and creates no live
+callback token. Keep both new events and retained data out of shell codecs and
+ViewModel until typed preflight, durable begin/outcome commits and one-invocation
+dispatch are connected. Do not reuse the isolated session's CheckAndAdd request
+as an app command before those gates exist. No schema, dependency or product UI
+change is needed for this bounded prerequisite.

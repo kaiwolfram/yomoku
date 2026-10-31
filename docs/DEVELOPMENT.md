@@ -7955,3 +7955,38 @@ No Android APK/lint/emulator, host Kotlin/JNI JVM, real collection/browser,
 independent Full-loader, physical arm64, broader lifecycle or performance check.
 Next: live export ownership, typed provider reads/preflight/callback provenance,
 durable begin/outcome routing, then visible recovery Retry/settings/actions.
+
+## App-owned frozen Anki export preparation
+
+Verified 2026-10-31 with the Rust PATH workaround above. Native host-only slice;
+no platform/provider or dependency change.
+
+```sh
+cargo test -p yomoku-core -p yomoku-ffi anki --all-features --locked --offline
+cargo test --workspace --all-features --locked --offline --quiet
+cargo build --workspace --locked --offline
+cargo clippy --workspace --all-targets --all-features --locked --offline -- -D warnings
+cargo fmt --all -- --check
+cargo run -p yomoku-ffi --bin generate-kotlin --features facet_typegen --locked --offline -- /tmp/yomoku-anki-preparation-kotlin
+diff -r target/generated/kotlin /tmp/yomoku-anki-preparation-kotlin
+git diff --check
+```
+
+PASS: 10 new cases (9 app, 1 FFI codec); 29 focused core/FFI Anki cases; 919
+workspace tests, 17 opt-in fixtures ignored; workspace build, strict Clippy,
+Rustfmt/diff and byte-for-byte unchanged generated Kotlin output. Coverage:
+current original/effective dictionary ownership; exact Unicode sentence occurrence;
+frozen fields/deck/full layout; no reader/status/encounter projection changes;
+unrestored/failed/note/model recovery gates; pending/failed custom mutation;
+obsolete indices/analysis/effective revisions; navigation/dismissal/duplicate
+preparation; explicit Clear preserving obligations/commits; and fresh models
+without prepared intent. Preparation emits no effect and creates no live token.
+
+Initial focused checks found an incomplete synthetic analyzer fixture; supplied
+complete canonical text coverage before final verification. No open blocker.
+Logs: `/tmp/yomoku-anki-preparation-{core,focused,workspace,build,clippy,format,typegen,codec-diff}.log`.
+No schema, dependency, public codec, Kotlin/provider/UI change. No Android APK/
+lint/emulator, host Kotlin/JNI JVM, real provider/collection/browser, independent
+Full-loader, physical arm64, broader lifecycle or performance checks were run.
+Next: typed provider read/preflight callback provenance plus durable begin/outcome
+routing before one live invocation; visible recovery/deck/actions follow.

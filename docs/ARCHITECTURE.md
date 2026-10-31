@@ -2010,3 +2010,25 @@ placement. Model evidence requires frozen full layout and known returned ID.
 The typed commit, result and callback have no shell codec. Provider observations
 and dispatch remain unconnected, as do live export ownership and durable begin/
 outcome routing. Existing terminal payload/ID retention and schema 0022 remain.
+
+### App-owned frozen Anki preparation
+
+Native `PrepareAnkiExport` authenticates its selection against the app's current
+reader route, document, page/analysis, original/effective owner and loaded visible
+dictionary result. Busy/checkpoint/completion/departure and effective mutation
+gates apply; unresolved startup journals or recovery commits block preparation.
+The shell cannot submit substitute snapshots, note fields or dictionary results.
+
+`Model::prepared_anki_export` exposes immutable native data only: selection,
+exact note fields/surface, deck and complete frozen v1 layout. One accepted intent
+survives dictionary changes, popup dismissal and navigation; repeated preparation
+cannot replace it. `ClearPreparedAnkiExport` clears only unsubmitted intent and
+leaves recovery obligations/commits intact. A new model starts without intent.
+Both original/effective preparation and the isolated export session use the same
+pure export constructors; the latter now freezes the complete layout as well.
+
+Preparation emits no effect, journal write or provider request and creates no
+live callback token. Neither event has a public shell codec; the ViewModel stays
+unchanged. App-owned preflight/callback provenance, durable begin/outcome dispatch
+and visible Settings/Add to Anki/recovery actions remain unfinished. The standalone
+`AnkiExportSession` is still isolated and must not bypass those durable gates.

@@ -2,7 +2,7 @@
 
 use std::sync::Arc;
 
-use super::AnkiNote;
+use super::{AnkiModelLayout, AnkiNote};
 use crate::{
     document::{ChapterText, InvalidTextValue},
     effective_session::{EffectiveReaderPage, EffectiveReaderSelection, EffectiveWordDetails},
@@ -57,6 +57,7 @@ pub struct AnkiExport {
     selection: AnkiSelection,
     deck: AnkiDeckId,
     note: AnkiNote,
+    layout: AnkiModelLayout,
 }
 
 impl AnkiExport {
@@ -70,6 +71,40 @@ impl AnkiExport {
 
     pub fn note(&self) -> &AnkiNote {
         &self.note
+    }
+
+    pub fn layout(&self) -> &AnkiModelLayout {
+        &self.layout
+    }
+
+    pub(crate) fn from_original_selection(
+        deck: AnkiDeckId,
+        chapter: &ChapterText,
+        current: &ReaderTokenSnapshot,
+        selection: ReaderWordSelection,
+        details: &ReaderWordDetails,
+    ) -> Result<Self, InvalidTextValue> {
+        Ok(Self {
+            selection: AnkiSelection::Original(selection),
+            deck,
+            note: AnkiNote::from_original_selection(chapter, current, selection, details)?,
+            layout: AnkiModelLayout::yomoku(),
+        })
+    }
+
+    pub(crate) fn from_effective_selection(
+        deck: AnkiDeckId,
+        chapter: &ChapterText,
+        current: &EffectiveReaderPage,
+        selection: EffectiveReaderSelection,
+        details: &EffectiveWordDetails,
+    ) -> Result<Self, InvalidTextValue> {
+        Ok(Self {
+            selection: AnkiSelection::Effective(selection),
+            deck,
+            note: AnkiNote::from_effective_selection(chapter, current, selection, details)?,
+            layout: AnkiModelLayout::yomoku(),
+        })
     }
 }
 
@@ -232,9 +267,10 @@ impl AnkiExportSession {
         details: &ReaderWordDetails,
     ) -> Result<AnkiExportRequest, AnkiBeginError> {
         self.can_begin()?;
-        let note = AnkiNote::from_original_selection(chapter, current, selection, details)
-            .map_err(|_| AnkiBeginError::InvalidSelection)?;
-        self.begin(deck, AnkiSelection::Original(selection), note)
+        let export =
+            AnkiExport::from_original_selection(deck, chapter, current, selection, details)
+                .map_err(|_| AnkiBeginError::InvalidSelection)?;
+        self.dispatch(Arc::new(export), AnkiExportOperation::CheckAndAdd)
     }
 
     /// Same current-owner requirement as begin_original; effective revisions and
@@ -248,9 +284,10 @@ impl AnkiExportSession {
         details: &EffectiveWordDetails,
     ) -> Result<AnkiExportRequest, AnkiBeginError> {
         self.can_begin()?;
-        let note = AnkiNote::from_effective_selection(chapter, current, selection, details)
-            .map_err(|_| AnkiBeginError::InvalidSelection)?;
-        self.begin(deck, AnkiSelection::Effective(selection), note)
+        let export =
+            AnkiExport::from_effective_selection(deck, chapter, current, selection, details)
+                .map_err(|_| AnkiBeginError::InvalidSelection)?;
+        self.dispatch(Arc::new(export), AnkiExportOperation::CheckAndAdd)
     }
 
     /// Only explicit Retry dispatches again. A safe failure repeats CheckAndAdd
@@ -314,22 +351,6 @@ impl AnkiExportSession {
             return Err(AnkiBeginError::UnresolvedInsertion);
         }
         Ok(())
-    }
-
-    fn begin(
-        &mut self,
-        deck: AnkiDeckId,
-        selection: AnkiSelection,
-        note: AnkiNote,
-    ) -> Result<AnkiExportRequest, AnkiBeginError> {
-        self.dispatch(
-            Arc::new(AnkiExport {
-                selection,
-                deck,
-                note,
-            }),
-            AnkiExportOperation::CheckAndAdd,
-        )
     }
 
     fn dispatch(

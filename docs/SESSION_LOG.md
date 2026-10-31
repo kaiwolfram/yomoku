@@ -3914,3 +3914,21 @@ and /tmp/yomoku-browser-profile-*. No emulator started.
   browser, separate Full-loader, physical device, broader lifecycle or performance
   verification. Next: live export ownership, typed provider read/preflight dispatch
   and durable begin/outcome gates, then recovery Retry/settings/actions.
+
+## 2026-10-31 — App-owned frozen Anki export preparation
+
+- Started clean. Added native current-owner preparation for original/effective
+  dictionary selections, guarded by startup/recovery-commit and existing reader/
+  checkpoint/completion/departure/mutation gates. Retain exact fields/surface,
+  deck, selection and full layout across duplicate events/dictionary changes/
+  navigation. Shared pure constructors now freeze layout in isolated sessions too.
+- Explicit Clear drops only unsubmitted data and preserves journal obligations/
+  recovery commits. Preparation has no effects, live tokens, shell codecs or
+  ViewModel projection; provider/preflight/begin/outcome/UI remain unfinished.
+- PASS: 10 new cases, 29 focused core/FFI cases, 919 workspace tests/17 ignored;
+  build, strict Clippy, Rustfmt/diff and unchanged Kotlin generation. Fixed initial
+  incomplete analyzer fixture; final checks clean. No open blocker. Logs:
+  /tmp/yomoku-anki-preparation-*.log. No Android, host JNI JVM, real provider,
+  separate Full-loader, physical arm64, broad lifecycle or performance checks.
+- Updated plan, architecture/data model, decisions, verification and handoff.
+  Next: typed preflight/recovery reads and durable begin/outcome dispatch gates.

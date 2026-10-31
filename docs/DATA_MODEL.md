@@ -1982,6 +1982,22 @@ blocks further evidence commits until explicit native Retry restores both journa
 read-only. No automatic observation/provider replay or cleanup is added.
 Provider read/dispatch, live begin/outcome routing and UI projection remain next.
 
+## App-owned prepared Anki export (no migration)
+
+`Model` retains at most one native `AnkiExport`: current authenticated original/
+effective selection, immutable exact note fields/surface, configured deck ID and
+full v1 model layout. It owns no model ID until future provider preflight. Shared
+pure construction also freezes the layout in the isolated export session.
+Reader/dictionary/deck changes and repeated preparation cannot rewrite accepted
+data. Explicit Clear drops only unsubmitted data; journals and pending recovery
+commits remain intact. A new process starts without prepared intent.
+
+Preparation requires both recovery journals successfully restored empty, no
+pending/failed recovery commit and current reader/dictionary ownership. It emits
+no effect and creates no journal row or live token. Neither native preparation/
+clear event nor this data has a generated shell codec or ViewModel projection.
+Durable begin/outcome dispatch and provider/UI activation remain unfinished.
+
 ## Read-only Vocabulary browser (schema 0020 unchanged)
 
 `Storage::vocabulary_page(&VocabularyQuery, offset)` returns a full matching count,
