@@ -16,6 +16,10 @@ import android.os.Looper
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import app.yomoku.shared.AnkiExportError
+import app.yomoku.shared.AnkiPreflightDeck
+import app.yomoku.shared.AnkiPreflightModel
+import app.yomoku.shared.AnkiPreflightOperation
+import app.yomoku.shared.AnkiPreflightResult
 import app.yomoku.shared.AnkiReadModelLayout
 import app.yomoku.shared.AnkiRecoveryReadOperation
 import app.yomoku.shared.AnkiRecoveryReadResult
@@ -351,6 +355,146 @@ class AnkiProviderReaderTest {
                 layout.answerFormat,
             ),
         )
+
+    private fun Fixture.preflight() =
+        AnkiPreflightOperation("𠮷猫", Long.MAX_VALUE, recoveryModel().layout)
+
+    @Test
+    fun typedPreflightKeepsDecksExactDuplicatesAndAllNamedModelsWithoutWrites() {
+        Fixture().use { f ->
+            f.provider.database.execSQL(
+                "INSERT INTO decks VALUES(?, 'Frozen', 0)",
+                arrayOf<Any?>(Long.MAX_VALUE),
+            )
+            f.provider.database.execSQL("INSERT INTO decks VALUES(1, 'Filtered', 1)")
+            f.provider.database.execSQL(
+                "INSERT INTO notes VALUES(?, 7, ?, 1)",
+                arrayOf<Any?>(Long.MAX_VALUE, "𠮷猫\u001fmeaning"),
+            )
+            f.model(9007199254740993L)
+            f.model(Long.MAX_VALUE)
+            f.provider.templates[Long.MAX_VALUE] = emptyList()
+            f.model(1, "User model")
+            val before = f.provider.rows()
+            val result = AnkiPreflightReader(f.reader).read(f.preflight())
+            val observed = (result as AnkiPreflightResult.Complete).value
+            assertEquals(
+                listOf(AnkiPreflightDeck(Long.MAX_VALUE, false), AnkiPreflightDeck(1, true)),
+                observed.decks,
+            )
+            assertEquals(listOf(Long.MAX_VALUE), observed.duplicateNoteIds)
+            assertEquals(
+                listOf(
+                    AnkiPreflightModel(9007199254740993L, f.layout.name, true),
+                    AnkiPreflightModel(Long.MAX_VALUE, f.layout.name, false),
+                    AnkiPreflightModel(1, "User model", false),
+                ),
+                observed.models,
+            )
+            assertEquals(result, AnkiPreflightResult.bincodeDeserialize(result.bincodeSerialize()))
+            assertEquals(before, f.provider.rows())
+            assertFalse(f.provider.operations.contains("query:/models/1"))
+            assertTrue(f.provider.inserts.isEmpty())
+            assertTrue(f.provider.updates.isEmpty())
+        }
+    }
+
+    @Test
+    fun typedPreflightEmptyCompleteReadsRemainEvidenceForCoreEvaluation() {
+        Fixture().use { f ->
+            val result =
+                AnkiPreflightReader(f.reader).read(f.preflight()) as AnkiPreflightResult.Complete
+            assertTrue(result.value.decks.isEmpty())
+            assertTrue(result.value.models.isEmpty())
+            assertTrue(result.value.duplicateNoteIds.isEmpty())
+        }
+    }
+
+    @Test
+    fun typedPreflightDiscardsAllEvidenceOnEachLaterQueryFailure() {
+        for (path in
+            listOf(
+                "/decks",
+                "/notes_v2",
+                "/models",
+                "/models/7",
+                "/models/7/templates",
+                "/models/${Long.MAX_VALUE}",
+            )) {
+            Fixture().use { f ->
+                f.model(7)
+                f.model(Long.MAX_VALUE)
+                f.provider.database.execSQL(
+                    "INSERT INTO notes VALUES(1, 7, ?, 1)",
+                    arrayOf<Any?>("𠮷猫"),
+                )
+                f.provider.beforeQuery = { uri ->
+                    if (uri.path == path) throw IllegalStateException("lost collection")
+                }
+                assertEquals(
+                    AnkiPreflightResult.Failed(
+                        if (path == "/notes_v2") AnkiExportError.DUPLICATELOOKUPFAILED
+                        else AnkiExportError.COLLECTIONUNAVAILABLE
+                    ),
+                    AnkiPreflightReader(f.reader).read(f.preflight()),
+                )
+                assertTrue(f.provider.inserts.isEmpty())
+                assertTrue(f.provider.updates.isEmpty())
+            }
+        }
+    }
+
+    @Test
+    fun typedPreflightPermissionRevocationAndMalformedLaterCursorDiscardEarlierMatches() {
+        for (permission in listOf(false, true)) {
+            Fixture().use { f ->
+                f.model(7)
+                f.model(Long.MAX_VALUE)
+                f.provider.beforeQuery = { uri ->
+                    if (uri.path == "/models/${Long.MAX_VALUE}") {
+                        if (permission) f.environment.permitted = false
+                        else throw IllegalArgumentException("bad cursor")
+                    }
+                }
+                assertEquals(
+                    AnkiPreflightResult.Failed(
+                        if (permission) AnkiExportError.PERMISSIONDENIED
+                        else AnkiExportError.INVALIDRESPONSE
+                    ),
+                    AnkiPreflightReader(f.reader).read(f.preflight()),
+                )
+            }
+        }
+    }
+
+    @Test
+    fun typedPreflightMissingUnsupportedOrUnpermittedProviderAndInvalidInputFailClosed() {
+        Fixture().use { f ->
+            val reader = AnkiPreflightReader(f.reader)
+            assertEquals(
+                AnkiPreflightResult.Failed(AnkiExportError.INVALIDRESPONSE),
+                reader.read(f.preflight().copy(deckId = 0)),
+            )
+            assertEquals(0, f.provider.queries)
+            f.environment.permitted = false
+            assertEquals(
+                AnkiPreflightResult.Failed(AnkiExportError.PERMISSIONDENIED),
+                reader.read(f.preflight()),
+            )
+            f.environment.permitted = true
+            f.environment.info!!.metaData.putInt(AnkiProviderReader.SPEC_KEY, 1)
+            assertEquals(
+                AnkiPreflightResult.Failed(AnkiExportError.UNSUPPORTEDPROVIDER),
+                reader.read(f.preflight()),
+            )
+            f.environment.info = null
+            assertEquals(
+                AnkiPreflightResult.Failed(AnkiExportError.PROVIDERUNAVAILABLE),
+                reader.read(f.preflight()),
+            )
+            assertEquals(0, f.provider.queries)
+        }
+    }
 
     @Test
     fun typedRecoveryNotesPreserveUnicodeAndLongIdsWithoutProviderWrites() {

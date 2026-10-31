@@ -288,6 +288,15 @@ pub enum Event {
     RetryEffectiveReaderStatus,
     CancelEffectiveReaderStatus,
     EffectiveReaderOverride(EffectiveOverrideAction),
+    // Keep shell variants before skipped native callbacks: Serde's serializer
+    // counts skipped variants while its deserializer/typegen omit them.
+    /// Read-only dispatch for the native frozen export; no mutation authorization.
+    BeginAnkiExportPreflight,
+    /// Explicitly abandon a lost read or old observation and capture a fresh handle.
+    RetryAnkiExportPreflight,
+    RetryAnkiRecovery,
+    /// Explicit read-only recovery; native handles stay in the response closure.
+    BeginAnkiRecoveryRead(crate::anki::AnkiRecoveryReadTarget),
     #[serde(skip)]
     #[cfg_attr(feature = "facet_typegen", facet(skip))]
     EffectiveStorageFinished(
@@ -318,14 +327,13 @@ pub enum Event {
     #[serde(skip)]
     #[cfg_attr(feature = "facet_typegen", facet(skip))]
     ClearPreparedAnkiExport,
-    /// Native read ownership only, pending typed provider dispatch/durable begin.
     #[serde(skip)]
     #[cfg_attr(feature = "facet_typegen", facet(skip))]
-    BeginAnkiExportPreflight,
-    /// Explicitly abandon a lost read or old observation and capture a fresh handle.
-    #[serde(skip)]
-    #[cfg_attr(feature = "facet_typegen", facet(skip))]
-    RetryAnkiExportPreflight,
+    AnkiExportPreflightProviderFinished(
+        #[cfg_attr(feature = "facet_typegen", facet(opaque))]
+        Box<crate::anki::AnkiPreflightRequest>,
+        crate::anki::AnkiPreflightResult,
+    ),
     #[serde(skip)]
     #[cfg_attr(feature = "facet_typegen", facet(skip))]
     AnkiExportPreflightFinished(
@@ -338,7 +346,6 @@ pub enum Event {
     #[serde(skip)]
     #[cfg_attr(feature = "facet_typegen", facet(skip))]
     RestoreAnkiRecovery,
-    RetryAnkiRecovery,
     #[serde(skip)]
     #[cfg_attr(feature = "facet_typegen", facet(skip))]
     AnkiRecoveryFinished(u64, StorageResult),
@@ -350,8 +357,7 @@ pub enum Event {
     #[serde(skip)]
     #[cfg_attr(feature = "facet_typegen", facet(skip))]
     AnkiRecoveryCommitFinished(u64, StorageResult),
-    /// Explicit read-only dispatch; the native callback retains its own handle.
-    BeginAnkiRecoveryRead(crate::anki::AnkiRecoveryReadTarget),
+    /// Native response; the callback retains its own read handle.
     #[serde(skip)]
     #[cfg_attr(feature = "facet_typegen", facet(skip))]
     AnkiRecoveryProviderFinished(
@@ -433,6 +439,7 @@ pub enum Effect {
     Render(RenderOperation),
     Storage(StorageOperation),
     AnkiRecoveryRead(crate::anki::AnkiRecoveryReadOperation),
+    AnkiExportPreflight(crate::anki::AnkiPreflightOperation),
 }
 
 #[derive(Default)]
@@ -1647,6 +1654,7 @@ impl App for Yomoku {
             | Event::BeginAnkiExportPreflight
             | Event::RetryAnkiExportPreflight
             | Event::AnkiExportPreflightFinished(..)
+            | Event::AnkiExportPreflightProviderFinished(..)
             | Event::RetryAnkiRecovery
             | Event::AnkiRecoveryFinished(..)
             | Event::CommitAnkiRecovery(_)

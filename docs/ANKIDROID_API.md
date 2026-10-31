@@ -200,6 +200,8 @@ no new provider API, dependency/minimum-version or real-provider claim is adopte
 
 The native app now owns frozen-export preflight handles and validates complete
 typed deck/model/duplicate observations before selecting an existing-note result,
-model reuse or model creation. This is read-only native lifecycle ownership;
-provider dispatch, durable live begin/outcome gates and visible export remain
-unfinished. No additional API, dependency or compatibility claim is adopted.
+model reuse or model creation. Typed preflight now dispatches through
+`AnkiPreflightReader` using only the already reviewed queries. Every exact-name
+candidate receives full layout validation; any failed read discards all earlier
+evidence. Durable live begin/outcome gates and visible export remain unfinished.
+No additional API, dependency or compatibility claim is adopted.

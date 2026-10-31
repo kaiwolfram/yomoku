@@ -3,15 +3,20 @@
 
 use std::{collections::BTreeSet, sync::Arc};
 
-use super::{AnkiExistingNotes, AnkiExport, AnkiExportError, AnkiModelId};
+use crux_core::capability::Operation;
+use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+use super::{AnkiExistingNotes, AnkiExport, AnkiExportError, AnkiModelId, AnkiReadModelLayout};
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
 pub struct AnkiPreflightDeck {
     pub id: i64,
     pub filtered: bool,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
 pub struct AnkiPreflightModel {
     pub id: i64,
     pub name: String,
@@ -25,11 +30,34 @@ pub struct AnkiPreflightModel {
 /// and model reads succeed. Lists must be complete; discard all partial results
 /// on any read failure. Duplicate IDs must have verified exact first fields,
 /// across all models/decks. No inferred absence from failed queries is allowed.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
 pub struct AnkiPreflightObservation {
     pub decks: Vec<AnkiPreflightDeck>,
     pub duplicate_note_ids: Vec<i64>,
     pub models: Vec<AnkiPreflightModel>,
+}
+
+/// Read-only transport. The native request/selection and prepared note fields
+/// stay in core; this data cannot grant provider write permission.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
+pub struct AnkiPreflightOperation {
+    pub surface: String,
+    pub deck_id: i64,
+    pub layout: Box<AnkiReadModelLayout>,
+}
+
+impl Operation for AnkiPreflightOperation {
+    type Output = AnkiPreflightResult;
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
+#[repr(C)]
+pub enum AnkiPreflightResult {
+    Complete(AnkiPreflightObservation),
+    Failed(AnkiExportError),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -60,6 +88,14 @@ impl AnkiPreflightRequest {
 
     pub fn export(&self) -> &AnkiExport {
         &self.0
+    }
+
+    pub fn operation(&self) -> AnkiPreflightOperation {
+        AnkiPreflightOperation {
+            surface: self.export().note().surface().as_str().to_owned(),
+            deck_id: self.export().deck().into(),
+            layout: Box::new(self.export().layout().into()),
+        }
     }
 
     pub(crate) fn evaluate(

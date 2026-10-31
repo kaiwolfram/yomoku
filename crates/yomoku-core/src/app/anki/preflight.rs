@@ -1,7 +1,9 @@
 //! App-owned preflight lifecycle, independent of the local reader's I/O slot.
 
 use super::*;
-use crate::anki::{AnkiExportError, AnkiPreflight, AnkiPreflightPlan, AnkiPreflightRequest};
+use crate::anki::{
+    AnkiExportError, AnkiPreflight, AnkiPreflightPlan, AnkiPreflightRequest, AnkiPreflightResult,
+};
 
 impl Model {
     pub fn pending_anki_export_preflight(&self) -> Option<&AnkiPreflightRequest> {
@@ -43,11 +45,27 @@ impl Yomoku {
                     return Some(Command::done());
                 }
                 if let Some(export) = &model.prepared_anki_export {
+                    let request = AnkiPreflightRequest::new(export.clone());
                     model.anki_export_preflight = Some(AnkiPreflight {
-                        request: AnkiPreflightRequest::new(export.clone()),
+                        request: request.clone(),
                         result: None,
                     });
+                    return Some(Command::request_from_shell(request.operation()).then_send(
+                        move |result| {
+                            Event::AnkiExportPreflightProviderFinished(Box::new(request), result)
+                        },
+                    ));
                 }
+            }
+            Event::AnkiExportPreflightProviderFinished(request, result) => {
+                let observation = match result {
+                    AnkiPreflightResult::Complete(value) => Ok(value.clone()),
+                    AnkiPreflightResult::Failed(error) => Err(*error),
+                };
+                return self.update_anki_preflight(
+                    &Event::AnkiExportPreflightFinished(request.clone(), observation),
+                    model,
+                );
             }
             Event::AnkiExportPreflightFinished(request, observation) => {
                 if model.pending_anki_export_preflight() != Some(request.as_ref()) {
@@ -70,8 +88,7 @@ impl Yomoku {
             }
             _ => return None,
         }
-        // This bounded lifecycle grants no live token and emits no provider or
-        // storage effect. Typed dispatch and durable begin follow separately.
+        // Read completion grants no live token and emits no storage/write effect.
         Some(Command::done())
     }
 }

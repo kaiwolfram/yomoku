@@ -12,6 +12,27 @@ internal fun verifyAnkiRecoveryBridge(fixtures: String) {
     val root = File(fixtures)
     val frozen = AnkiReadModelLayout.bincodeDeserialize(root.resolve("anki-layout.bin").readBytes())
     root.resolve("anki-layout-return.bin").writeBytes(frozen.bincodeSerialize())
+    val preflight =
+        AnkiPreflightOperation.bincodeDeserialize(
+            root.resolve("anki-preflight-operation.bin").readBytes()
+        )
+    check(preflight == AnkiPreflightOperation("𠮷猫", Long.MAX_VALUE, frozen))
+    root.resolve("anki-preflight-operation-return.bin").writeBytes(preflight.bincodeSerialize())
+    for (i in 0..1) {
+        val result =
+            AnkiPreflightResult.bincodeDeserialize(
+                root.resolve("anki-preflight-result-$i.bin").readBytes()
+            )
+        if (i == 0) {
+            val observed = (result as AnkiPreflightResult.Complete).value
+            check(observed.decks == listOf(AnkiPreflightDeck(Long.MAX_VALUE, false)))
+            check(observed.duplicateNoteIds == listOf(Long.MAX_VALUE, 9007199254740993L))
+            check(
+                observed.models == listOf(AnkiPreflightModel(9007199254740993L, frozen.name, true))
+            )
+        } else check(result == AnkiPreflightResult.Failed(AnkiExportError.PERMISSIONDENIED))
+        root.resolve("anki-preflight-result-$i-return.bin").writeBytes(result.bincodeSerialize())
+    }
     for (model in listOf(false, true)) {
         val name = if (model) "model" else "note"
         val database = root.resolve("anki-$name-jni.sqlite3")
@@ -59,6 +80,14 @@ internal fun verifyAnkiRecoveryBridge(fixtures: String) {
                 Requests.bincodeDeserialize(bridge.update(event.bincodeSerialize())).value.isEmpty()
             )
             barrier(bridge)
+            for (preflightEvent in
+                listOf(Event.BeginAnkiExportPreflight, Event.RetryAnkiExportPreflight)) {
+                check(
+                    Requests.bincodeDeserialize(bridge.update(preflightEvent.bincodeSerialize()))
+                        .value
+                        .isEmpty()
+                )
+            }
             val lost = begin(bridge)
             check(
                 Requests.bincodeDeserialize(bridge.update(event.bincodeSerialize())).value.isEmpty()

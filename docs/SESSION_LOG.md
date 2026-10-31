@@ -4078,3 +4078,24 @@ and /tmp/yomoku-browser-profile-*. No emulator started.
 - A phone schema-23 upgrade trial with the existing Library/history remains more
   valuable now than enabling live integration without that checkpoint. No release
   build requested; real Anki validation still requires a disposable collection.
+
+
+## 2026-10-31 — Typed frozen-export Anki preflight dispatch
+
+- Continued the clean handoff with typed Crux/FFI preflight reads and the Android
+  provider worker. Rust retains frozen selection/note fields/callback ownership;
+  complete deck/duplicate/model evidence or one failure returns to core.
+- Later query failures discard all earlier evidence. Both journal gates and
+  stale/foreign/retry/clear ownership remain enforced; recovery/preflight share
+  worker/main/close delivery. Fixed public-event Serde index ordering exposed by
+  a serialized Crux regression, preserving the generated compact order.
+- PASS: 6 new host and 5 new provider cases; 937 workspace tests/17 ignored,
+  build/strict Clippy/Rustfmt/Kotlin formatting, full JNI/Unicode, repeatable
+  generation, both-ABI debug/test APKs/lint and all 65 selected emulator cases.
+  Initial helper/index failures are resolved; commands/logs: DEVELOPMENT.md.
+- No open blocker or remaining implementation/verification work for this slice.
+  Durable begin/outcome routing remains next; native preparation remains unexposed,
+  and there is no visible Anki action, live mutation or compatibility claim.
+- Recommend a phone schema-23 upgrade trial with existing Library/history before
+  enabling live integration. Real Anki validation needs a disposable collection;
+  neither physical trial nor optimized release was requested/performed here.

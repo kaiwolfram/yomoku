@@ -2008,8 +2008,9 @@ pure export constructors; the latter now freezes the complete layout as well.
 
 Preparation emits no effect, journal write or provider request and creates no
 live callback token. Neither event has a public shell codec; the ViewModel stays
-unchanged. App-owned preflight/callback provenance, durable begin/outcome dispatch
-and visible Settings/Add to Anki/recovery actions remain unfinished. The standalone
+unchanged. Typed read-only preflight/callback ownership is described below;
+durable begin/outcome dispatch and visible Settings/Add to Anki/recovery actions
+remain unfinished. The standalone
 `AnkiExportSession` is still isolated and must not bypass those durable gates.
 
 
@@ -2050,13 +2051,14 @@ It cannot abandon a pending commit; failed/lost commit results require restore
 and a fresh observation. Only Begin/Retry are new public Events; native handles,
 callbacks, commits and journal snapshots still reject shell serialization. No
 mutation/replay, schema/dependency change or visible recovery/deck/Add action is
-introduced. Preflight and durable live begin/outcome dispatch remain unfinished.
+introduced. Typed preflight is described below; durable live begin/outcome
+dispatch remains unfinished.
 
 
 ### Native Anki export preflight ownership
 
 `BeginAnkiExportPreflight` captures the prepared export in a fresh native shared
-handle. `Model::pending_anki_export_preflight` exposes it to the future dispatcher;
+handle. `Model::pending_anki_export_preflight` exposes native diagnostics;
 `AnkiExportPreflightFinished` accepts only that active handle, unchanged intent
 and empty restored journals with no pending/failed recovery work. No reader I/O
 slot is acquired. Navigation/dictionary changes cannot substitute note fields,
@@ -2070,7 +2072,24 @@ observations. `anki_export_preflight_result` retains only a read observation,
 never a live mutation token or authority to bypass later journal/provider checks.
 Explicit Retry invalidates any previous read/result and captures a fresh handle.
 Clear drops only this unsubmitted work; durable recovery obligations remain.
-New owners retain neither preparation nor preflight. These native Events have no
-shell codec/effect or UI; typed platform dispatch and durable live begin/outcome
-commits remain the next implementation boundaries. Persistent data/schema and
-existing recovery-read transport are unchanged.
+New owners retain neither preparation nor preflight. Begin/Retry now dispatch a
+typed read-only `AnkiPreflightOperation` through EffectRouter/FFI; the response
+closure retains the native handle. Native callbacks/preparation/clear remain
+unserializable. Persistent data/schema are unchanged.
+
+`AnkiPreflightReader` reads complete decks, exact-surface duplicates, model
+discovery and every exact-name candidate's full layout through the existing
+provider adapter. Unrelated models retain a false comparison without a layout
+query. A later query/cursor/permission failure discards all earlier evidence,
+including duplicates and compatible candidates; a complete mismatch remains false.
+Core owns frozen-deck validation and the Existing/ReuseModel/CreateModel decision.
+
+CoreSession routes preflight and recovery through the same separate provider
+executor, main-thread response handling and close gate. Reads never hold the
+reader SQLite FIFO, keep a closing bridge alive or cross into a new session.
+Begin coalesces; Retry issues a fresh captured attempt. Shared-allocation ownership
+and both restored-empty journal gates are checked again on accepted callbacks.
+Public read events precede skipped callbacks in Rust declaration order so Serde
+serialization, deserialization and generated Kotlin use identical compact indices.
+No visible preflight action, permission flow or live mutation is enabled. Durable
+live begin/outcome commits remain the next implementation boundary.

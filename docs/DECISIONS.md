@@ -4729,3 +4729,25 @@ future durable begin must recheck gates, and mutating adapters must repeat fresh
 provider/deck/model/duplicate checks. This bounded step adds no effect, shell
 codec, provider call, persistence, dependency or UI. Typed dispatch and durable
 live begin/outcome routing remain unfinished.
+
+
+## 2026-10-31 — Typed frozen-export Anki preflight dispatch
+
+Use the existing Crux resolve registry and provider executor for preflight.
+Expose Begin/Retry and a compact comparison operation, retaining the request,
+selection and note fields in Rust. Transport complete deck/model/duplicate
+observations or one error; never salvage earlier evidence after a later query
+failure. Query layouts for all exact-name candidates, preserving conflicts and
+ambiguity for core evaluation; unrelated model layouts cannot be reused.
+
+Share CoreSession's worker/main/close delivery between recovery and preflight.
+Keep native-only preparation/clear/callbacks and both durable journal gates.
+Preflight observations grant no writes; durable begin and immediate provider
+revalidation still precede any future model/note invocation. No provider API,
+permission prompt, visible action, dependency or persistence change is introduced.
+
+A serialized Crux regression exposed Serde's differing enum index handling when
+public events follow skipped native variants. Declare public read events before
+skipped callbacks in the same generated order; Rust round trips then agree with
+Kotlin without changing the new protocol's compact indices. Keep this boundary
+covered by real serialized requests/responses and explicit public-event cases.

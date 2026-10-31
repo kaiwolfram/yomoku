@@ -51,15 +51,16 @@ internal class AnkiRecoveryReader(private val provider: AnkiProviderReader) {
     }
 
     private fun failure(error: AnkiReadError): AnkiRecoveryReadResult =
-        AnkiRecoveryReadResult.Failed(
-            when (error) {
-                AnkiReadError.ProviderUnavailable -> AnkiExportError.PROVIDERUNAVAILABLE
-                AnkiReadError.UnsupportedProvider -> AnkiExportError.UNSUPPORTEDPROVIDER
-                AnkiReadError.PermissionDenied -> AnkiExportError.PERMISSIONDENIED
-                AnkiReadError.CollectionUnavailable -> AnkiExportError.COLLECTIONUNAVAILABLE
-                AnkiReadError.DuplicateLookupFailed -> AnkiExportError.DUPLICATELOOKUPFAILED
-                AnkiReadError.InvalidResponse -> AnkiExportError.INVALIDRESPONSE
-                AnkiReadError.ProviderFailure -> AnkiExportError.PROVIDERFAILURE
-            }
-        )
+        AnkiRecoveryReadResult.Failed(error.exportError())
 }
+
+internal fun AnkiReadError.exportError(): AnkiExportError =
+    when (this) {
+        AnkiReadError.ProviderUnavailable -> AnkiExportError.PROVIDERUNAVAILABLE
+        AnkiReadError.UnsupportedProvider -> AnkiExportError.UNSUPPORTEDPROVIDER
+        AnkiReadError.PermissionDenied -> AnkiExportError.PERMISSIONDENIED
+        AnkiReadError.CollectionUnavailable -> AnkiExportError.COLLECTIONUNAVAILABLE
+        AnkiReadError.DuplicateLookupFailed -> AnkiExportError.DUPLICATELOOKUPFAILED
+        AnkiReadError.InvalidResponse -> AnkiExportError.INVALIDRESPONSE
+        AnkiReadError.ProviderFailure -> AnkiExportError.PROVIDERFAILURE
+    }

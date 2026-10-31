@@ -1953,8 +1953,9 @@ Provider read/dispatch, live begin/outcome routing and UI projection remain next
 
 `Model` retains at most one native `AnkiExport`: current authenticated original/
 effective selection, immutable exact note fields/surface, configured deck ID and
-full v1 model layout. It owns no model ID until future provider preflight. Shared
-pure construction also freezes the layout in the isolated export session.
+full v1 model layout. It owns no model ID; a separate volatile preflight plan may
+observe a reusable model. Shared pure construction also freezes the layout in
+the isolated export session.
 Reader/dictionary/deck changes and repeated preparation cannot rewrite accepted
 data. Explicit Clear drops only unsubmitted data; journals and pending recovery
 commits remain intact. A new process starts without prepared intent.
@@ -2103,3 +2104,17 @@ Success invalidates the dependent application caches. Session state is volatile;
 no migration, persisted selection/command receipt, restore queue or automatic
 retry is introduced. Public events/state have typed generated FFI codecs; native
 storage operations/results/callbacks are skipped by those codecs.
+
+
+## Typed frozen-export preflight transport (no migration)
+
+`AnkiPreflightOperation` contains only exact surface, positive signed-64 frozen
+deck ID and the existing list-based full-layout comparison DTO. The prepared
+note fields, selection and allocation-identified request stay native in the Crux
+response closure. `AnkiPreflightResult` is Complete(decks, duplicate note IDs,
+models with full-layout comparison flags) or Failed(typed export error).
+Every provider read must succeed before Complete; partial evidence is discarded.
+Core validates IDs/deck/model ambiguity and retains only a volatile read plan or
+error. Neither result supplies a live token or journal row. Clear/retry/restart
+semantics and both durable journals are unchanged. Preparation/clear/callbacks
+remain absent from shell codecs; Begin/Retry are typed shell events.

@@ -1,7 +1,11 @@
 use std::{error::Error, fs, path::Path};
 
 use yomoku_core::{
-    anki::{AnkiModelCreation, AnkiModelLayout, AnkiNote, AnkiReadModelLayout, AnkiSubmission},
+    anki::{
+        AnkiExportError, AnkiModelCreation, AnkiModelLayout, AnkiNote, AnkiPreflightDeck,
+        AnkiPreflightModel, AnkiPreflightObservation, AnkiPreflightOperation, AnkiPreflightResult,
+        AnkiReadModelLayout, AnkiSubmission,
+    },
     document::{TextOffset, TextRange},
     vocabulary::Surface,
 };
@@ -11,6 +15,43 @@ pub fn exchange(dir: &Path, writing: bool) -> Result<(), Box<dyn Error>> {
     fs::create_dir_all(dir)?;
     let mut layout = AnkiModelLayout::yomoku();
     layout.css.push_str("/* frozen 𠮷 */");
+    // Exercise both directions of the shell protocol with Rust-owned comparison
+    // data, Unicode and signed-64 IDs. Native preparation remains unexposed.
+    let operation = AnkiPreflightOperation {
+        surface: "𠮷猫".into(),
+        deck_id: i64::MAX,
+        layout: Box::new((&layout).into()),
+    };
+    let results = [
+        AnkiPreflightResult::Complete(AnkiPreflightObservation {
+            decks: vec![AnkiPreflightDeck {
+                id: i64::MAX,
+                filtered: false,
+            }],
+            duplicate_note_ids: vec![i64::MAX, 9007199254740993],
+            models: vec![AnkiPreflightModel {
+                id: 9007199254740993,
+                name: layout.name.clone(),
+                matches_layout: true,
+            }],
+        }),
+        AnkiPreflightResult::Failed(AnkiExportError::PermissionDenied),
+    ];
+    for (name, bytes) in std::iter::once(("operation".to_owned(), super::encode(&operation))).chain(
+        results
+            .iter()
+            .enumerate()
+            .map(|(i, result)| (format!("result-{i}"), super::encode(result))),
+    ) {
+        if writing {
+            fs::write(dir.join(format!("anki-preflight-{name}.bin")), bytes)?;
+        } else {
+            assert_eq!(
+                fs::read(dir.join(format!("anki-preflight-{name}-return.bin")))?,
+                bytes
+            );
+        }
+    }
     if writing {
         fs::write(
             dir.join("anki-layout.bin"),

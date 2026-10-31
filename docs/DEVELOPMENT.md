@@ -8245,3 +8245,64 @@ No failed verification or open blocker. Logs:
 Android APK/lint/emulator, JNI, physical schema-23 upgrade and real AnkiDroid trials
 were not rerun for this native-only step. Preflight emits no provider/storage
 effect or write token; platform dispatch and durable begin/outcome commits remain.
+
+## Typed frozen-export Anki preflight dispatch
+
+2026-10-31: use the pinned Rust/JDK/Gradle/SDK environment above. Keep host JNI
+execution sequential with Android native builds; use the existing isolated
+8 GiB statistics-ui-avd image without wiping data.
+
+```sh
+cargo test --workspace --all-features --locked --offline --quiet
+cargo build --workspace --all-features --locked --offline
+cargo clippy --workspace --all-targets --all-features --locked --offline -- -D warnings
+cargo fmt --all -- --check
+tools/test-kotlin-bridge.sh
+tools/format-kotlin.sh --check
+"$JAVA_BIN" -jar .local/ktfmt-0.64.jar --kotlinlang-style --dry-run --set-exit-if-changed tests/kotlin/AnkiRecoveryBridgeTest.kt
+./android/gradlew -p android :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug --offline --console=plain
+./android/gradlew -p android :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=app.yomoku.AnkiProviderReaderTest,app.yomoku.AnkiRecoverySessionTest,app.yomoku.CoreSessionTest,app.yomoku.NavigationTest --offline --console=plain
+cargo run -p yomoku-ffi --bin generate-kotlin --features facet_typegen --locked --offline -- /tmp/yomoku-preflight-dispatch-kotlin
+diff -r target/generated/kotlin /tmp/yomoku-preflight-dispatch-kotlin
+git diff --check
+```
+
+PASS: 937 workspace tests/17 ignored opt-in fixtures, workspace build, strict
+Clippy, Rustfmt, Kotlin formatting and identical Kotlin regeneration. Six new
+host cases include original/effective read effects, owner/retry/clear/restart,
+journal gate rechecks, invalid evidence, absent native callback codecs and actual
+serialized Crux requests/responses. Explicit read-event Rust round trips caught
+Serde's mismatched indices after skipped variants; public read events now precede
+native callbacks in the same generated order. The new generated codecs match
+before/after this declaration-only correction.
+
+PASS: full host Kotlin/JNI/Unicode exchange, including Rust-owned preflight
+surface/deck/full layout, complete/failed results, exact long IDs and no dispatch
+without native preparation. Both-ABI native packaging, debug/test APK builds and
+strict lintDebug pass. All 65 selected API-36 x86_64 emulator tests pass with zero
+failures/skips: 58 provider cases (5 new preflight cases), 2 retained recovery
+session cases, 3 CoreSession cases and 2 navigation cases. Shared recovery/
+preflight worker delivery retains off-main reads, responsive navigation and close/
+restart isolation. New adapter cases cover Unicode/long IDs, complete empty reads,
+all named candidates/unrelated models, duplicates, discarded partial evidence at
+each query stage, malformed responses, lost permission and unavailable/unsupported
+providers without writes. Android regeneration matches the independent output.
+
+Initial test-helper compilation attempts exposed a temporary iterator lifetime,
+then the pure core's deliberate lack of generated EffectFFI. The bounded bridge
+regression uses a local test-only read mapping without adding core typegen/I/O.
+The serialized test then exposed and fixed the public-event index mismatch.
+One premature diff ran before generation completed; the final comparison passes.
+No new provider API, schema, dependency, permission flow, visible Anki action or
+live mutation is introduced. Native preparation remains intentionally unavailable
+to the shell; preflight codecs/provider reads and native callback ownership are
+verified separately. A disposable real collection/browser and physical schema-23
+upgrade trial remain unrun. Durable live begin/outcome gates are the next slice.
+
+Logs: `/tmp/yomoku-preflight-dispatch-{core,workspace,build,clippy,rustfmt,jni,format,format-check,typegen,codegen-diff}.log`;
+Android build/emulator/independent-generation logs add `-android.log`,
+`-emulator.log`, `-emulator-boot.log`, `-android-codegen-diff.log` and
+`-host-format.log`. XML is in
+`android/app/build/outputs/androidTest-results/connected/debug/`.
+Local ADB/Gradle/emulator sockets/KVM required the usual sandbox escalation; no
+open blocker. No implementation/verification steps remain for this slice.

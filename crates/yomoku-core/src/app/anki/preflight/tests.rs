@@ -10,7 +10,18 @@ use crate::{
 };
 
 fn update(model: &mut Model, event: Event) {
-    assert!(Yomoku.update(event, model).effects().next().is_none());
+    let dispatch = matches!(
+        event,
+        Event::BeginAnkiExportPreflight | Event::RetryAnkiExportPreflight
+    );
+    let mut command = Yomoku.update(event, model);
+    let effects: Vec<_> = command.effects().collect();
+    assert!(
+        effects.is_empty()
+            || (dispatch
+                && effects.len() == 1
+                && matches!(effects[0], Effect::AnkiExportPreflight(_)))
+    );
 }
 
 fn prepared(effective: bool) -> Model {
@@ -417,4 +428,240 @@ fn anki_preflight_provider_errors_never_become_empty_success_or_reader_errors() 
         assert_eq!(Yomoku.view(&model), before);
         assert!(model.anki_recovery.allows_preparation());
     }
+}
+
+fn provider_callback(model: &mut Model, event: Event, result: AnkiPreflightResult) -> Event {
+    let mut command = Yomoku.update(event, model);
+    let Some(Effect::AnkiExportPreflight(mut effect)) = command.effects().next() else {
+        panic!("one typed read-only preflight")
+    };
+    assert!(command.effects().next().is_none());
+    let request = model.pending_anki_export_preflight().unwrap();
+    assert_eq!(effect.operation, request.operation());
+    assert_eq!(effect.operation.surface, "猫");
+    assert_eq!(effect.operation.deck_id, i64::MAX);
+    assert_eq!(*effect.operation.layout, request.export().layout().into());
+    effect.resolve(result).unwrap();
+    let callback = command.events().next().unwrap();
+    callback
+}
+
+#[test]
+fn anki_preflight_typed_dispatch_returns_only_read_evidence_for_each_selection_kind() {
+    for effective in [false, true] {
+        let mut model = prepared(effective);
+        let before = Yomoku.view(&model);
+        let callback = provider_callback(
+            &mut model,
+            Event::BeginAnkiExportPreflight,
+            AnkiPreflightResult::Complete(observation()),
+        );
+        update(&mut model, callback.clone());
+        assert_eq!(
+            model.anki_export_preflight_result(),
+            Some(&Ok(AnkiPreflightPlan::CreateModel))
+        );
+        update(&mut model, callback);
+        assert_eq!(Yomoku.view(&model), before);
+        assert!(model.anki_recovery.allows_preparation());
+        assert!(!model.anki_recovery_saving());
+    }
+}
+
+#[test]
+fn anki_preflight_typed_callback_keeps_its_owner_through_retry_clear_and_restart() {
+    let mut model = prepared(false);
+    let old = provider_callback(
+        &mut model,
+        Event::BeginAnkiExportPreflight,
+        AnkiPreflightResult::Complete(observation()),
+    );
+    let mut foreign = prepared(false);
+    let _foreign = begin(&mut foreign);
+    update(&mut foreign, old.clone());
+    assert!(foreign.pending_anki_export_preflight().is_some());
+    let fresh = provider_callback(
+        &mut model,
+        Event::RetryAnkiExportPreflight,
+        AnkiPreflightResult::Failed(AnkiExportError::PermissionDenied),
+    );
+    update(&mut model, old.clone());
+    assert!(model.pending_anki_export_preflight().is_some());
+    update(&mut model, fresh);
+    assert_eq!(
+        model.anki_export_preflight_result(),
+        Some(&Err(AnkiExportError::PermissionDenied))
+    );
+    let late = provider_callback(
+        &mut model,
+        Event::RetryAnkiExportPreflight,
+        AnkiPreflightResult::Complete(observation()),
+    );
+    update(&mut model, Event::ClearPreparedAnkiExport);
+    update(&mut model, late);
+    assert!(model.anki_export_preflight_result().is_none());
+    let mut restarted = Model::default();
+    update(&mut restarted, old);
+    assert!(restarted.anki_export_preflight_result().is_none());
+}
+
+#[test]
+fn anki_preflight_typed_response_rechecks_journals_and_discards_invalid_evidence() {
+    for gate in 0..8 {
+        let mut model = prepared(false);
+        let callback = provider_callback(
+            &mut model,
+            Event::BeginAnkiExportPreflight,
+            AnkiPreflightResult::Complete(observation()),
+        );
+        close_gate(&mut model, gate);
+        let before = model.anki_recovery.clone();
+        update(&mut model, callback);
+        assert_eq!(
+            model.anki_export_preflight_result(),
+            Some(&Err(AnkiExportError::InvalidResponse))
+        );
+        assert_eq!(model.anki_recovery, before);
+    }
+    let mut model = prepared(false);
+    let mut malformed = observation();
+    malformed.duplicate_note_ids = vec![i64::MAX, 0];
+    let callback = provider_callback(
+        &mut model,
+        Event::BeginAnkiExportPreflight,
+        AnkiPreflightResult::Complete(malformed),
+    );
+    update(&mut model, callback);
+    assert_eq!(
+        model.anki_export_preflight_result(),
+        Some(&Err(AnkiExportError::InvalidResponse))
+    );
+}
+
+#[test]
+fn anki_preflight_native_handles_and_callbacks_have_no_shell_codec() {
+    use crux_core::bridge::{BincodeFfiFormat, FfiFormat};
+    let mut model = prepared(false);
+    let callback = provider_callback(
+        &mut model,
+        Event::BeginAnkiExportPreflight,
+        AnkiPreflightResult::Complete(observation()),
+    );
+    assert!(BincodeFfiFormat::serialize(&mut vec![], &callback).is_err());
+    let request = model.pending_anki_export_preflight().unwrap();
+    let native = Event::AnkiExportPreflightFinished(Box::new(request.clone()), Ok(observation()));
+    assert!(BincodeFfiFormat::serialize(&mut vec![], &native).is_err());
+    for event in [
+        Event::BeginAnkiExportPreflight,
+        Event::RetryAnkiExportPreflight,
+    ] {
+        assert!(BincodeFfiFormat::serialize(&mut vec![], &event).is_ok());
+    }
+}
+
+#[test]
+fn anki_preflight_bincode_bridge_resolves_only_the_captured_attempt() {
+    #[crux_core::macros::effect]
+    enum PreflightWire {
+        Read(crate::anki::AnkiPreflightOperation),
+    }
+    #[derive(serde::Serialize, serde::Deserialize)]
+    pub enum PreflightWireFfi {
+        Read(crate::anki::AnkiPreflightOperation),
+    }
+    impl crux_core::EffectFFI for PreflightWire {
+        type Ffi = PreflightWireFfi;
+        fn serialize<T: FfiFormat>(self) -> (Self::Ffi, crux_core::bridge::ResolveSerialized<T>) {
+            let Self::Read(request) = self;
+            request.serialize(PreflightWireFfi::Read)
+        }
+    }
+    impl From<Effect> for PreflightWire {
+        fn from(effect: Effect) -> Self {
+            match effect {
+                Effect::AnkiExportPreflight(request) => Self::Read(request),
+                _ => panic!("preflight must emit only a read"),
+            }
+        }
+    }
+    use crux_core::{
+        bridge::{BincodeFfiFormat, FfiFormat, Requests},
+        middleware::{Bridge, Layer},
+        Core,
+    };
+
+    #[derive(Default)]
+    struct Probe;
+    impl App for Probe {
+        type Event = Event;
+        type Model = Model;
+        type Effect = Effect;
+        type ViewModel = (bool, bool);
+        fn update(&self, event: Event, model: &mut Model) -> Command<Effect, Event> {
+            Yomoku.update(event, model)
+        }
+        fn view(&self, model: &Model) -> Self::ViewModel {
+            (
+                model.pending_anki_export_preflight().is_some(),
+                matches!(
+                    model.anki_export_preflight_result(),
+                    Some(Ok(AnkiPreflightPlan::CreateModel))
+                ),
+            )
+        }
+    }
+    fn encode(value: &impl serde::Serialize) -> Vec<u8> {
+        let mut bytes = vec![];
+        BincodeFfiFormat::serialize(&mut bytes, value).unwrap();
+        bytes
+    }
+    let bridge = Bridge::<_, BincodeFfiFormat>::new(
+        Core::new_with(Probe, prepared(false)).map_effect::<PreflightWire>(),
+        |_| panic!("no async native effects"),
+    );
+    let mut bytes = vec![];
+    bridge
+        .update(&encode(&Event::BeginAnkiExportPreflight), &mut bytes)
+        .unwrap();
+    let first: Requests<PreflightWireFfi> = BincodeFfiFormat::deserialize(&bytes).unwrap();
+    assert_eq!(first.0.len(), 1);
+    let PreflightWireFfi::Read(operation) = &first.0[0].effect;
+    assert_eq!(operation.deck_id, i64::MAX);
+    assert_eq!(operation.surface, "猫");
+    bytes.clear();
+    bridge
+        .update(&encode(&Event::RetryAnkiExportPreflight), &mut bytes)
+        .unwrap();
+    let fresh: Requests<PreflightWireFfi> = BincodeFfiFormat::deserialize(&bytes).unwrap();
+    let result = encode(&AnkiPreflightResult::Complete(observation()));
+    bytes.clear();
+    bridge.resolve(first.0[0].id, &result, &mut bytes).unwrap();
+    assert!(
+        BincodeFfiFormat::deserialize::<Requests<PreflightWireFfi>>(&bytes)
+            .unwrap()
+            .0
+            .is_empty()
+    );
+    let mut view = vec![];
+    bridge.view(&mut view).unwrap();
+    assert_eq!(
+        BincodeFfiFormat::deserialize::<(bool, bool)>(&view).unwrap(),
+        (true, false)
+    );
+    bytes.clear();
+    bridge.resolve(fresh.0[0].id, &result, &mut bytes).unwrap();
+    assert!(
+        BincodeFfiFormat::deserialize::<Requests<PreflightWireFfi>>(&bytes)
+            .unwrap()
+            .0
+            .is_empty()
+    );
+    view.clear();
+    bridge.view(&mut view).unwrap();
+    assert_eq!(
+        BincodeFfiFormat::deserialize::<(bool, bool)>(&view).unwrap(),
+        (false, true)
+    );
+    // Crux also rejects resolving a consumed response ID at the wire boundary.
+    assert!(bridge.resolve(fresh.0[0].id, &result, &mut vec![]).is_err());
 }

@@ -68,8 +68,6 @@ fn anki_export_preparation_and_clear_have_no_shell_codec() {
             deck: i64::MAX.try_into().unwrap(),
         },
         Event::ClearPreparedAnkiExport,
-        Event::BeginAnkiExportPreflight,
-        Event::RetryAnkiExportPreflight,
     ] {
         assert!(BincodeFfiFormat::serialize(&mut vec![], &event).is_err());
     }
@@ -124,4 +122,23 @@ fn anki_recovery_read_dispatch_is_public_but_captured_callback_has_no_shell_code
         AnkiRecoveryReadResult::Model(Some(i64::MAX)),
     );
     assert!(BincodeFfiFormat::serialize(&mut vec![], &event).is_err());
+}
+
+#[test]
+fn anki_public_read_events_round_trip_after_skipped_native_callbacks() {
+    use yomoku_core::anki::AnkiRecoveryReadTarget;
+    for event in [
+        Event::BeginAnkiExportPreflight,
+        Event::RetryAnkiExportPreflight,
+        Event::RetryAnkiRecovery,
+        Event::BeginAnkiRecoveryRead(AnkiRecoveryReadTarget::Note),
+        Event::BeginAnkiRecoveryRead(AnkiRecoveryReadTarget::Model),
+    ] {
+        let mut bytes = vec![];
+        BincodeFfiFormat::serialize(&mut bytes, &event).unwrap();
+        assert_eq!(
+            BincodeFfiFormat::deserialize::<Event>(&bytes).unwrap(),
+            event
+        );
+    }
 }

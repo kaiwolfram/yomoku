@@ -10,6 +10,7 @@ internal class CoreSessionOwner(application: Application) : AndroidViewModel(app
             java.io.File(application.filesDir, "yomoku.sqlite3").absolutePath,
             sudachiDictionaryProvider(application),
             readAnkiRecovery = AnkiRecoveryReader(AnkiProviderReader(application))::read,
+            readAnkiPreflight = AnkiPreflightReader(AnkiProviderReader(application))::read,
         )
     val fileImports: FileImports =
         FileImports(

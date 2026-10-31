@@ -24,6 +24,7 @@ pub use imports::{AnalyzerLifecycle, AnalyzerLoader, PasteAnalyzer};
 pub enum ShellEffect {
     Render(RenderOperation),
     AnkiRecoveryRead(yomoku_core::anki::AnkiRecoveryReadOperation),
+    AnkiExportPreflight(yomoku_core::anki::AnkiPreflightOperation),
 }
 
 impl From<Effect> for ShellEffect {
@@ -33,6 +34,7 @@ impl From<Effect> for ShellEffect {
         match effect {
             Effect::Render(request) => Self::Render(request),
             Effect::AnkiRecoveryRead(request) => Self::AnkiRecoveryRead(request),
+            Effect::AnkiExportPreflight(request) => Self::AnkiExportPreflight(request),
             Effect::Storage(_) => unreachable!("storage effects are consumed by Rust middleware"),
         }
     }

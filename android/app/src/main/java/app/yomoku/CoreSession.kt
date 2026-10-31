@@ -11,6 +11,8 @@ import app.yomoku.nativebridge.EffectsListener
 import app.yomoku.nativebridge.FfiError
 import app.yomoku.nativebridge.NativeBridge
 import app.yomoku.shared.AnkiExportError
+import app.yomoku.shared.AnkiPreflightOperation
+import app.yomoku.shared.AnkiPreflightResult
 import app.yomoku.shared.AnkiRecoveryReadOperation
 import app.yomoku.shared.AnkiRecoveryReadResult
 import app.yomoku.shared.Event
@@ -71,6 +73,9 @@ internal class CoreSession(
         AnkiRecoveryReadResult.Failed(AnkiExportError.PROVIDERUNAVAILABLE)
     },
     private val ankiExecutor: ExecutorService = Executors.newSingleThreadExecutor(),
+    private val readAnkiPreflight: (AnkiPreflightOperation) -> AnkiPreflightResult = {
+        AnkiPreflightResult.Failed(AnkiExportError.PROVIDERUNAVAILABLE)
+    },
 ) : AutoCloseable {
     // Retained with this handle across Activity recreation; never restored into a new handle.
     val sessionKey: String = UUID.randomUUID().toString()
@@ -353,24 +358,17 @@ internal class CoreSession(
             when (request.effect) {
                 is ShellEffect.Render -> renderView(source)
                 is ShellEffect.AnkiRecoveryRead -> {
-                    if (!closing) {
-                        val operation = request.effect.value
-                        ankiExecutor.execute {
-                            val result =
-                                try {
-                                    readAnkiRecovery(operation)
-                                } catch (_: Exception) {
-                                    AnkiRecoveryReadResult.Failed(AnkiExportError.PROVIDERFAILURE)
-                                }
-                            mainHandler.post {
-                                // Closing may abandon a read, never the durable journal. A fresh
-                                // process restores it; this callback cannot reach another bridge.
-                                if (!closing && !isClosed) {
-                                    render(bridge.resolve(request.id, result.bincodeSerialize()))
-                                    driveReaderClock()
-                                }
-                            }
-                        }
+                    val operation = request.effect.value
+                    readAnki(request.id, { readAnkiRecovery(operation).bincodeSerialize() }) {
+                        AnkiRecoveryReadResult.Failed(AnkiExportError.PROVIDERFAILURE)
+                            .bincodeSerialize()
+                    }
+                }
+                is ShellEffect.AnkiExportPreflight -> {
+                    val operation = request.effect.value
+                    readAnki(request.id, { readAnkiPreflight(operation).bincodeSerialize() }) {
+                        AnkiPreflightResult.Failed(AnkiExportError.PROVIDERFAILURE)
+                            .bincodeSerialize()
                     }
                 }
             }
@@ -386,6 +384,26 @@ internal class CoreSession(
                 decoded.size,
             )
         )
+    }
+
+    /** Both read protocols share worker/main delivery and the retained handle's close gate. */
+    private fun readAnki(id: UInt, read: () -> ByteArray, failed: () -> ByteArray) {
+        if (closing) return
+        ankiExecutor.execute {
+            val result =
+                try {
+                    read()
+                } catch (_: Exception) {
+                    failed()
+                }
+            mainHandler.post {
+                // Read callbacks never keep a closing handle alive or reach a restarted bridge.
+                if (!closing && !isClosed) {
+                    render(bridge.resolve(id, result))
+                    driveReaderClock()
+                }
+            }
+        }
     }
 
     private fun renderView(source: CoreRenderSource) {
