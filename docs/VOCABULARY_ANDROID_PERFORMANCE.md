@@ -666,3 +666,114 @@ Rust/Clippy, independent Full-loader matrix, full native callback/Compose
 profiles, optimized/arm64, diverse/heavy histories, full-load lists, lifecycle/
 process-death and exact peak-memory work were not rerun or claimed. Broad tasks
 remain open; next measure the actual callback/composition path with this decoder.
+
+## Actual callback queue and Compose passes — 2026-10-31
+
+The disposable production JNI/SQLite/Compose harness now measures the integrated
+scalar decoder with 1,000 loaded rows and every selected/frozen ID. Kotlin listener
+arrival is timestamped on the native worker after generated JNI argument conversion.
+The main-thread sample records arrival-to-handler queue delay and handler elapsed
+time. Handler time includes request decoding, native-view retrieval, Kotlin view
+decoding, publication, their observers, onViewChanged and clock driving; its own
+observer invocation is excluded. Arrival relative to action start includes setup,
+UI scheduling, FIFO/SQL/core work and transfer; it does not isolate native work.
+The observer is volatile, delivered only on the main thread, and removed-observer
+delivery is suppressed even for previously posted callbacks. Disabled diagnostics
+read no clocks and create no measurement records.
+
+An instrumentation-only observer uses the already pinned Compose runtime 1.10.6
+[CompositionObserver](https://developer.android.com/reference/kotlin/androidx/compose/runtime/tooling/CompositionObserver)
+and [setObserver](https://developer.android.com/reference/kotlin/androidx/compose/runtime/tooling/package-summary)
+APIs, verified against primary documentation and compiled local signatures. It
+attaches to the harness's root composition and inherited subcompositions, then
+detaches with DisposableEffect. It records begin/end timestamps and active nesting
+depth, retaining no scope/composition in completed samples. Per-scope callbacks
+are no-ops but still add observer overhead. The samples include animation-driven
+passes and lazy/dialog subcompositions, not just VocabularyScreen's function body.
+Subcomposition can occur during layout, so these intervals are not additive with
+frame layout metrics. Apply, drawing and scheduler waiting outside these boundaries
+are not measured composition. Use interval union rather than summing nested spans;
+all observed spans in these runs have depth zero and do not overlap. The action
+end includes a main-thread barrier that stops collection before its timestamp.
+Do not subtract callback/composition timings from idle time to infer missing costs.
+
+Two fresh processes ran sequentially, 10k then 100k, after all builds/regressions,
+with one full scenario warmup and five measured scenarios per size. Same isolated
+API-36 x86_64 medium_phone AVD, debug build, 1080×2400/420 dpi/light, KVM/two cores/
+swangle/Vulkan disabled. Fingerprint:
+`google/sdk_gphone64_x86_64/emu64xa:16/BE2A.250530.026.D1/13818094:user/release-keys`.
+No concurrent build, test or profiler; no forced GC. Source baseline `7d908bb`;
+debug APK SHA-256 `cea94fb528e9fe8e6e2adab84b0cb50a37221bde709ca54f409bf08f688a152a`;
+test APK `57d93393999a06964d92a0a6b735bbf50b7c164d080512856dcd4fb8c7d8dade`.
+
+Median Select All callback milliseconds (five samples per size):
+
+| Entries | Arrival offset | Handler queue | Handler elapsed | Native view | Kotlin decode | Publication |
+| ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 10,000 | 22.981 | 4.757 | 20.559 | 2.504 | 17.718 | 0.281 |
+| 100,000 | 136.447 | 54.153 | 71.460 | 21.460 | 49.866 | 0.738 |
+
+At 100k, queue delay ranges 22.549–65.335 ms and handler elapsed 64.293–75.043 ms;
+callback decode ranges 41.816–56.248 ms. At 10k, queue delay ranges
+0.095–146.058 ms; preserve that long sample. Confirmation is a synchronous
+dispatch render, with no async callback in either fixture. Its median native-view/
+decode/publication phases are 2.209/12.880/0.444 ms at 10k and
+33.490/78.567/2.390 ms at 100k. Confirmed views contain 210,216–210,217 and
+1,650,216–1,650,217 bytes respectively; changing literal prefixes explain the byte.
+
+Observed composition interval union and action-to-idle medians (milliseconds):
+
+| Entries | Action | Composition union median | Union range | Idle median |
+| ---: | --- | ---: | ---: | ---: |
+| 10,000 | Select All | 15.489 | 11.140–185.686 | 178.262 |
+| 100,000 | Select All | 192.414 | 138.407–269.125 | 936.683 |
+| 10,000 | Confirmation | 47.554 | 36.382–53.848 | 299.177 |
+| 100,000 | Confirmation | 45.065 | 34.853–75.562 | 395.569 |
+| 10,000 | Equal confirmation replay | 0 | 0–0 | 74.181 |
+| 100,000 | Equal confirmation replay | 0 | 0–0 | 208.740 |
+
+Every equal replay keeps the existing state instance, emits no request/callback,
+and records zero composition passes. Its publication median is 1.384 ms at 10k
+(0.580–16.355) and 2.435 ms at 100k (1.739–4.552). The 100k replay decode median
+is 121.579 ms with a 51.265–231.847 range. These heterogeneous production-path
+samples differ from the controlled 100-row frozen-snapshot experiment; JIT,
+heap/GC history, scheduling, debug build and observers affect results. They do
+not establish a before/after speed improvement or attribute all costs to ID
+decoding. Keep equality, full IDs and event guards; native response/FIFO/SQL/
+serialization profiling and optimized builds remain needed.
+
+All raw data validate: [60 actions](measurements/vocabulary-callback-compose-android-2026-10-31-actions.csv),
+[80 renders](measurements/vocabulary-callback-compose-android-2026-10-31-renders.csv),
+[70 request phases](measurements/vocabulary-callback-compose-android-2026-10-31-requests.csv),
+[30 callbacks](measurements/vocabulary-callback-compose-android-2026-10-31-callbacks.csv),
+[1,982 composition passes](measurements/vocabulary-callback-compose-android-2026-10-31-compositions.csv)
+and [108 raw frames](measurements/vocabulary-callback-compose-android-2026-10-31-frames.csv).
+Validation checks exact scenario counts, contiguous indices, finite nonnegative
+values, interval bounds/depth/union, no handler/composition overlap, callback/request
+correspondence, exact frame counts/medians/max/budget counts, selected/frozen counts
+and equal-replay guards. No dropped FrameMetrics reports; all observed frames
+exceed 16.667 ms. Frame counts depend on observer delivery and test idle windows;
+this is not a complete frame trace or physical-device smoothness claim. Existing
+25 ms sampled Java/native heap/RSS maxima remain observations, not exact peaks.
+
+Unchanged database SHA-256: 10k
+`dbaa96d39b8b3d425c2a6604332aff6f81e2554ce1cc1d6016172abc2ce61f68`
+(1,359,872 bytes); 100k
+`61a530e680d3d1ce1e6c6cecd7aae9b1d6441c0e2383bab825baf01b9a5d156c`
+(11,890,688 bytes). All exact full-ID/rows/status/count/read-only guards, zero
+analyzer calls/reading effects, integrity/FK, native close and scratch deletion
+pass; a subsequent ADB listing confirms no scratch directories remain.
+
+PASS: debug/test APKs, strict lint, repository Kotlin formatting/diff; ten focused
+cases plus three default opt-in skips (13 reported, 11.216 s), and 17 Vocabulary
+UI/production/navigation regressions (221.766 s). New cases cover callback delivery,
+removal/thread guards and composition change/equality/detachment. Two profiles pass
+in 37.639/54.632 s. Native/bindings/assets reused existing build outputs. Initial
+sandbox Gradle local-socket startup needed approved rerun; no source/test failure.
+Commands: DEVELOPMENT.md, Vocabulary callback queue and Compose passes. Logs:
+`/tmp/yomoku-callback-{android,format,focused,regressions,10000,100000,validation}.log`;
+validator `/tmp/yomoku-validate-callback-profile.py`. Task-started AVD stopped;
+existing ignored image/caches retained. No schema/dependency/wire/product behavior
+change. Host Rust/Clippy/JNI/codegen, independent Full-loader matrix, native worker
+breakdown, optimized/tablet/dark/fling/heavy-history/diverse-book/full-load/peak/
+lifecycle/process-death and physical arm64 checks were not rerun or claimed.

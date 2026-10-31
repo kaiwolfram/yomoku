@@ -49,6 +49,14 @@ internal data class CoreRequestsMeasurement(
     val requestCount: Int,
 )
 
+/** Arrival at Kotlin excludes preceding native work; handling includes render/observer work. */
+internal data class CoreCallbackMeasurement(
+    val arrivedNanos: Long,
+    val queueNanos: Long,
+    val handleNanos: Long,
+    val payloadBytes: Int,
+)
+
 /** Owns a native handle and a render snapshot; application state stays in Rust. */
 internal class CoreSession(
     databasePath: String,
@@ -93,10 +101,24 @@ internal class CoreSession(
             databasePath,
             object : EffectsListener {
                 override fun onEffects(requests: ByteArray) {
+                    val observer = onCallbackMeasured
+                    val arrived = if (observer != null) System.nanoTime() else 0L
                     mainHandler.post {
                         if (!isClosed) {
+                            val start = if (observer != null) System.nanoTime() else 0L
                             render(requests, fromCallback = true)
                             driveReaderClock()
+                            if (observer != null && onCallbackMeasured === observer) {
+                                val end = System.nanoTime()
+                                observer(
+                                    CoreCallbackMeasurement(
+                                        arrived,
+                                        start - arrived,
+                                        end - start,
+                                        requests.size,
+                                    )
+                                )
+                            }
                         }
                     }
                 }
@@ -122,6 +144,14 @@ internal class CoreSession(
         }
 
     var onRequestsMeasured: ((CoreRequestsMeasurement) -> Unit)? = null
+        set(value) {
+            requireMainThread()
+            field = value
+        }
+
+    // Read on the native worker at arrival; install/remove and delivery stay on the main thread.
+    @Volatile
+    var onCallbackMeasured: ((CoreCallbackMeasurement) -> Unit)? = null
         set(value) {
             requireMainThread()
             field = value

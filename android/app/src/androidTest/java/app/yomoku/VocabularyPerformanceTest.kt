@@ -36,6 +36,8 @@ class VocabularyPerformanceTest {
     private val instrumentation = InstrumentationRegistry.getInstrumentation()
     private lateinit var core: CoreSession
     private var measureRender = false
+    private var measureComposition = false
+    private val compositions = CompositionMeasurements()
 
     private fun emit(line: String) {
         instrumentation.sendStatus(0, Bundle().apply { putString("stream", "$line\n") })
@@ -199,27 +201,40 @@ class VocabularyPerformanceTest {
     ) {
         val renders = mutableListOf<CoreRenderMeasurement>()
         val requests = mutableListOf<CoreRequestsMeasurement>()
+        val callbacks = mutableListOf<CoreCallbackMeasurement>()
         if (measureRender)
             compose.runOnUiThread {
                 core.onRenderMeasured = { renders.add(it) }
                 core.onRequestsMeasured = { requests.add(it) }
+                core.onCallbackMeasured = { callbacks.add(it) }
             }
         val sampler = MemorySampler()
         // FrameMetrics uses the System.nanoTime timebase, unlike elapsedRealtime after suspend.
         val start = System.nanoTime()
+        if (measureComposition) compose.runOnUiThread { compositions.start() }
+        var recordingComposition = measureComposition
         val dispatchMs: Double
-        val end: Long
+        var end = 0L
+        var passes = emptyList<CompositionMeasurement>()
         try {
             dispatchMs = action()
             idle()
-            end = System.nanoTime()
+            compose.runOnUiThread {
+                if (recordingComposition) {
+                    passes = compositions.stop()
+                    recordingComposition = false
+                }
+                end = System.nanoTime()
+            }
         } finally {
             sampler.close()
             if (measureRender)
                 compose.runOnUiThread {
                     core.onRenderMeasured = null
                     core.onRequestsMeasured = null
+                    core.onCallbackMeasured = null
                 }
+            if (recordingComposition) compose.runOnUiThread { compositions.stop() }
         }
         val measured = frames.between(start, end)
         if (iteration < 0) return // Full scenario warmup, excluded from output.
@@ -232,6 +247,17 @@ class VocabularyPerformanceTest {
             "MEASURE,$entries,$iteration,$metric,${core.view.vocabulary.rows.size},${(end - start) / 1e6},$dispatchMs,${durations.size},$median,${durations.lastOrNull() ?: 0.0},${durations.count { it > 1000.0 / 60 }},${measured.sumOf { it.droppedReports }},${memory.maxOf { it.javaBytes }},${memory.maxOf { it.nativeBytes }},${memory.maxOf { it.rssKib }},${memory.size}"
         )
         emit("FRAMES,$entries,$iteration,$metric," + durations.joinToString(","))
+        if (measureComposition) {
+            passes
+                .sortedBy { it.startNanos }
+                .forEachIndexed { index, pass ->
+                    assertTrue(pass.startNanos >= start && pass.endNanos <= end)
+                    assertTrue(pass.endNanos >= pass.startNanos && pass.depth >= 0)
+                    emit(
+                        "COMPOSITION,$entries,$iteration,$metric,$index,${(pass.startNanos - start) / 1e6},${(pass.endNanos - start) / 1e6},${(pass.endNanos - pass.startNanos) / 1e6},${pass.depth}"
+                    )
+                }
+        }
         if (measureRender) {
             if (metric != "scroll_loaded_rows") assertTrue(renders.isNotEmpty())
             if (metric == "select_all") assertTrue(renders.any { it.selectedIds == entries })
@@ -272,6 +298,15 @@ class VocabularyPerformanceTest {
                     "REQUEST,$entries,$iteration,$metric,$index,${request.source.name.lowercase()},${request.eventEncodeNanos?.let { it / 1e6 } ?: ""},${request.nativeUpdateNanos?.let { it / 1e6 } ?: ""},${request.requestDecodeNanos / 1e6},${request.payloadBytes},${request.requestCount}"
                 )
             }
+            assertEquals(requests.count { it.source == CoreRenderSource.CALLBACK }, callbacks.size)
+            callbacks.forEachIndexed { index, callback ->
+                assertTrue(callback.arrivedNanos >= start)
+                assertTrue(callback.queueNanos >= 0 && callback.handleNanos >= 0)
+                assertTrue(callback.payloadBytes > 0)
+                emit(
+                    "CALLBACK,$entries,$iteration,$metric,$index,${(callback.arrivedNanos - start) / 1e6},${callback.queueNanos / 1e6},${callback.handleNanos / 1e6},${callback.payloadBytes}"
+                )
+            }
         }
     }
 
@@ -285,6 +320,7 @@ class VocabularyPerformanceTest {
         val args = InstrumentationRegistry.getArguments()
         assumeTrue("Opt in with -e yomokuMeasure true", args.getString("yomokuMeasure") == "true")
         measureRender = args.getString("yomokuMeasureRender") == "true"
+        measureComposition = args.getString("yomokuMeasureComposition") == "true"
         val entries = (args.getString("yomokuVocabularyEntries") ?: "10000").toInt()
         val loaded = (args.getString("yomokuVocabularyLoaded") ?: "1000").toInt()
         val iterations = (args.getString("yomokuMeasureIterations") ?: "5").toInt()
@@ -315,6 +351,7 @@ class VocabularyPerformanceTest {
             compose.runOnUiThread { core = CoreSession(database.path, provider) }
             idle()
             compose.setContent {
+                if (measureComposition) compositions.Observe()
                 YomokuTheme { YomokuApp(core.view, core.sessionKey, core::dispatch) }
             }
             dispatch(Event.SelectDestination(Destination.VOCABULARY))
@@ -333,7 +370,14 @@ class VocabularyPerformanceTest {
                 emit(
                     "REQUEST_COLUMNS,entries,iteration,metric,index,source,event_encode_ms,native_update_ms,request_decode_ms,payload_bytes,request_count"
                 )
+                emit(
+                    "CALLBACK_COLUMNS,entries,iteration,metric,index,arrival_offset_ms,queue_ms,handle_ms,payload_bytes"
+                )
             }
+            if (measureComposition)
+                emit(
+                    "COMPOSITION_COLUMNS,entries,iteration,metric,index,start_offset_ms,end_offset_ms,duration_ms,depth"
+                )
             Frames().use { frames ->
                 for (iteration in -1 until iterations) {
                     // Change the literal prefix each time; both match the complete fixture.

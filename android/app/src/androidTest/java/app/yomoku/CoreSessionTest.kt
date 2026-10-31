@@ -114,6 +114,7 @@ class CoreSessionTest {
         try {
             assertTrue(loaded.await(30, TimeUnit.SECONDS))
             assertThrows(IllegalStateException::class.java) { core.onRequestsMeasured = {} }
+            assertThrows(IllegalStateException::class.java) { core.onCallbackMeasured = {} }
             assertThrows(IllegalStateException::class.java) { core.measureCurrentView() }
             instrumentation.runOnMainSync {
                 assertThrows(IllegalStateException::class.java) { core.measureCurrentView() }
@@ -136,6 +137,60 @@ class CoreSessionTest {
                 core.onRenderMeasured = null
                 assertThrows(IllegalStateException::class.java) { core.measureCurrentView() }
             }
+        } finally {
+            instrumentation.runOnMainSync { core.close() }
+            assertTrue(core.isClosed)
+        }
+    }
+
+    @Test
+    fun callbackObserverMeasuresPostedWorkAndRemovalSuppressesQueuedDelivery() {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        lateinit var core: CoreSession
+        fun awaitIdle(action: () -> Unit) {
+            val idle = CountDownLatch(1)
+            instrumentation.runOnMainSync {
+                core.onViewChanged = { if (!core.view.storageBusy) idle.countDown() }
+                action()
+                if (!core.view.storageBusy) idle.countDown()
+            }
+            assertTrue(idle.await(30, TimeUnit.SECONDS))
+            instrumentation.runOnMainSync { assertFalse(core.view.storageBusy) }
+        }
+        instrumentation.runOnMainSync {
+            core = CoreSession(":memory:", sudachiDictionaryProvider(instrumentation.targetContext))
+        }
+        try {
+            awaitIdle {}
+            val samples = mutableListOf<CoreCallbackMeasurement>()
+            val delivered = CountDownLatch(1)
+            awaitIdle {
+                core.onCallbackMeasured = {
+                    assertSame(android.os.Looper.getMainLooper(), android.os.Looper.myLooper())
+                    samples.add(it)
+                    delivered.countDown()
+                }
+                core.dispatch(Event.RefreshLibrary)
+            }
+            assertTrue(delivered.await(30, TimeUnit.SECONDS))
+            instrumentation.runOnMainSync {
+                assertTrue(samples.isNotEmpty())
+                assertTrue(
+                    samples.all {
+                        it.arrivedNanos > 0 &&
+                            it.queueNanos >= 0 &&
+                            it.handleNanos >= 0 &&
+                            it.payloadBytes > 0
+                    }
+                )
+            }
+            val before = samples.size
+            awaitIdle {
+                // Any arrival during this dispatch is posted behind this main-thread removal.
+                core.dispatch(Event.RefreshLibrary)
+                core.onCallbackMeasured = null
+            }
+            instrumentation.runOnMainSync { assertEquals(before, samples.size) }
         } finally {
             instrumentation.runOnMainSync { core.close() }
             assertTrue(core.isClosed)

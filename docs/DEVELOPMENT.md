@@ -7487,3 +7487,55 @@ validation}.log; -bytecode.txt and -legacy-bytecode.txt. Task-started isolated A
 stopped; ignored caches/image retained. No schema/dependency/wire change. Full
 workspace Rust/Clippy, broader history/Compose/optimized/arm64/peak/lifecycle
 checks remain outside this slice; see the handoff.
+
+## Vocabulary callback queue and Compose passes
+
+Use the pinned Rust/JDK/SDK/Gradle environment, build/install commands and isolated
+phone/light API-36 AVD from the preceding sections. Native/assets/bindings need
+no source change. The new composition observer is instrumentation-only and opts
+into the already pinned Compose runtime APIs; no dependency is added.
+
+```sh
+./android/gradlew -p android :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug --offline --console=plain
+tools/format-kotlin.sh --check
+git diff --check
+"$ANDROID_HOME/platform-tools/adb" -s emulator-5554 install -r -t android/app/build/outputs/apk/debug/app-debug.apk
+"$ANDROID_HOME/platform-tools/adb" -s emulator-5554 install -r -t android/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+callback_cases=app.yomoku.CoreSessionTest,app.yomoku.CompositionMeasurementsTest,app.yomoku.VocabularySelectionLookupTest,app.yomoku.VocabularyDecodingTest,app.yomoku.ScalarDecodingTest,app.yomoku.VocabularyPerformanceTest
+"$ANDROID_HOME/platform-tools/adb" -s emulator-5554 shell am instrument -w -r -e class "$callback_cases" app.yomoku.test/androidx.test.runner.AndroidJUnitRunner
+vocabulary_cases=app.yomoku.VocabularyScreenTest,app.yomoku.VocabularyProductionTest,app.yomoku.NavigationTest,app.yomoku.EffectiveReaderNavigationTest
+"$ANDROID_HOME/platform-tools/adb" -s emulator-5554 shell am instrument -w -r -e class "$vocabulary_cases" app.yomoku.test/androidx.test.runner.AndroidJUnitRunner
+# Separate fresh processes, 10000 then 100000; no concurrent builds/tests/profilers.
+"$ANDROID_HOME/platform-tools/adb" -s emulator-5554 shell am instrument -w -r -e class app.yomoku.VocabularyPerformanceTest -e yomokuMeasure true -e yomokuMeasureRender true -e yomokuMeasureComposition true -e yomokuVocabularyEntries 10000 -e yomokuVocabularyLoaded 1000 -e yomokuMeasureIterations 5 app.yomoku.test/androidx.test.runner.AndroidJUnitRunner
+"$ANDROID_HOME/platform-tools/adb" -s emulator-5554 shell am instrument -w -r -e class app.yomoku.VocabularyPerformanceTest -e yomokuMeasure true -e yomokuMeasureRender true -e yomokuMeasureComposition true -e yomokuVocabularyEntries 100000 -e yomokuVocabularyLoaded 1000 -e yomokuMeasureIterations 5 app.yomoku.test/androidx.test.runner.AndroidJUnitRunner
+```
+
+`CALLBACK_COLUMNS` records Kotlin listener arrival relative to the action start,
+posted main-handler queue delay and handler elapsed time. Arrival includes action
+scheduling/setup and is not a native worker duration. Handler time includes the
+existing render/request observers and excludes its own observer invocation.
+`COMPOSITION_COLUMNS` records start/end offsets, duration and nesting depth for
+each pass. Use interval union, never the sum of overlapping nested passes; apply,
+layout/draw and scheduler waiting remain separate. Observer hooks add work even
+when scope callbacks are no-ops. End-of-action now includes a main-thread barrier
+that stops pass collection before taking the end timestamp. See
+VOCABULARY_ANDROID_PERFORMANCE.md for results, raw CSVs and remaining work.
+
+2026-10-31 PASS: debug/test APKs, strict Android lint, repository Kotlin
+formatting/diff. Native/bindings/assets reused build outputs. Ten focused cases
+plus three default opt-in skips pass (13 reported, 11.216 s), followed by all 17
+Vocabulary UI/production/navigation regressions (221.766 s). Separate 10k/100k
+profiles pass (37.639/54.632 s); 60 actions/80 renders/70 requests/30 callbacks/
+1,982 composition intervals/108 raw frames validate, including full exact IDs,
+unchanged-file/no-analyzer/no-reading-effect/integrity/FK/closure/cleanup guards.
+Every equal replay retains the existing state with no request/callback/pass.
+100k Select All median queue/handler/composition union is 54.153/71.460/192.414 ms;
+these observer/debug timings establish no before/after speed improvement. Results,
+hashes and six raw CSVs: VOCABULARY_ANDROID_PERFORMANCE.md, final section.
+Logs: /tmp/yomoku-callback-{android,format,focused,regressions,10000,100000,
+validation}.log; validator /tmp/yomoku-validate-callback-profile.py. Initial
+sandbox Gradle local-socket failure needed approved rerun; no source/test failure
+or open blocker. Task-started AVD stopped; existing ignored image/caches retained.
+No dependency/schema/wire change. Host Rust/Clippy/JNI/codegen, independent Full
+loader, native worker breakdown, optimized/tablet/dark/fling/heavy-history/diverse
+books/full-load/exact peaks/lifecycle/process-death/physical arm64 not rerun.

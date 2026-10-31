@@ -4240,3 +4240,31 @@ thread comparison alternates decoder order across four warmup/eight measured
 rounds, retaining both results until validation outside timing. Approximate ART
 allocated-byte deltas are process-wide and may lag; no exact allocation, peak,
 composition, real interaction or hardware performance claim follows.
+
+## 2026-10-31 — Callback queue and Compose pass diagnostics
+
+Extend opt-in CoreSession diagnostics with Kotlin listener arrival, arrival-to-main
+queue delay and posted-handler elapsed time. Publish the observer through a
+volatile field because arrival runs on the native worker; invoke it only on the
+main thread and only if the same observer is still installed. Removal suppresses
+already queued diagnostic delivery. Disabled diagnostics read no clocks and
+create no measurement records. Keep the existing callback/render/clock sequence.
+Arrival excludes Rust work and the generated JNI callback's argument conversion;
+handler time includes request/render observers, onViewChanged and clock driving,
+but excludes the callback observer itself. An action-relative arrival offset
+includes scheduling and setup; it cannot isolate SQL, FIFO wait, core response
+processing or native serialization.
+
+Use the already pinned Compose runtime's experimental
+[CompositionObserver](https://developer.android.com/reference/kotlin/androidx/compose/runtime/tooling/CompositionObserver)
+and [setObserver](https://developer.android.com/reference/kotlin/androidx/compose/runtime/tooling/package-summary)
+only in instrumentation code. Attach to the harness's composition via the
+explicitly opted-in internal currentComposer API; detach with DisposableEffect.
+Record begin/end intervals and nesting depth, retaining no composition or scope
+in completed samples. Nested intervals overlap: use their union for elapsed
+composition time, never their sum. These boundaries exclude subsequent apply,
+layout/draw and scheduler waiting; no-op scope callbacks still add observer cost.
+The tests require the current main-thread harness and fail on other threading.
+Do not subtract these intervals from idle/frame time to manufacture a native or
+composition decomposition. Full selected/frozen IDs, structural equality,
+replay/event guards and the production wire remain unchanged; add no dependency.

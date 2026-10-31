@@ -3565,3 +3565,37 @@ and /tmp/yomoku-browser-profile-*. No emulator started.
   process-death/physical arm64 not rerun. Broad tasks remain unchecked. Next:
   measure actual callbacks/composition with the scalar decoder, then Anki API
   verification and remaining lifecycle/accessibility matrix.
+
+## 2026-10-31 — Actual Vocabulary callbacks and Compose intervals
+
+- Started clean; continued the ordered actual-path profiling task. Added opt-in
+  volatile Kotlin callback arrival/handler queue/handler elapsed observation and
+  test-only pinned Compose runtime pass observation with lifecycle detachment.
+  Preserve callback order, structural equality, full selected/frozen IDs, event/
+  replay guards and schema/dependency/wire. Record interval union, not nested sums;
+  observed passes include inherited subcomposition and animations.
+- PASS: debug/test APKs, strict Android lint, repository Kotlin formatting/diff;
+  ten focused cases plus three default opt-in skips (13 reported, 11.216 s),
+  17 Vocabulary UI/native persistence/Retry/recreation/navigation regressions
+  (221.766 s). New cases verify callback main-thread delivery/removal/thread guard
+  and composition change/equality/detachment.
+- PASS: separate opt-in 10k/100k processes (37.639/54.632 s), one full warmup/five
+  measured scenarios each. Validate 60 actions/80 renders/70 requests/30 callbacks/
+  1,982 passes/108 frames, exact interval/count/frame/replay/full-ID guards,
+  unchanged database bytes, zero analyzer/reading effects, integrity/FK/native
+  close/scratch cleanup. ADB confirms scratch directories absent.
+- 100k Select All median queue/handler/composition union: 54.153/71.460/192.414 ms.
+  Equal replay retains the state instance and produces no requests/callbacks/
+  composition passes. Debug/emulator/observer/heap/JIT effects and long samples
+  prevent before/after speed or native-worker attribution; sampled memory is not
+  exact peaks. Results/hashes/raw CSVs: VOCABULARY_ANDROID_PERFORMANCE.md; commands:
+  DEVELOPMENT.md, Vocabulary callback queue and Compose passes.
+- Logs: /tmp/yomoku-callback-{android,format,focused,regressions,10000,100000,
+  validation}.log; validator /tmp/yomoku-validate-callback-profile.py. Initial
+  sandbox Gradle local-socket startup needed approved rerun; no source/test
+  failure or open blocker. Stopped task-started AVD; kept ignored image/caches.
+- Native/bindings/assets reused build outputs. Host Rust/Clippy/JNI/codegen,
+  independent Full-loader, native worker breakdown, optimized/tablet/dark/fling/
+  heavy-history/diverse-book/full-load/exact peak/lifecycle/process-death/physical
+  arm64 work not rerun. Broad tasks stay open. Next: native request/response and
+  observer-free optimized profiling, Anki API verification, lifecycle matrix.
