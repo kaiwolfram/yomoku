@@ -347,3 +347,126 @@ No Rust/schema/dependency/wire change. Host Rust/Clippy, independent JNI/codegen
 Full-loader, optimized/tablet/dark/continuous-fling/heavy-history/diverse-book/
 fully loaded lists, exact peak/PSS, process-death and physical arm64 were not
 rerun or claimed; broader tasks remain open.
+
+## Request phases and equal confirmation replay, 2026-10-31
+
+The same `yomokuMeasureRender=true` opt-in now records `REQUEST` rows as well
+as render rows. Synchronous dispatch records generated event encoding,
+`NativeBridge.update()` and generated `Requests.bincodeDeserialize` separately.
+The JNI update interval includes native event processing, routing and returning
+request bytes; it does not isolate Rust CPU time or measure the full asynchronous
+SQLite/FIFO operation. Posted callbacks record only main-thread request decoding;
+event-encoding/native-update cells are empty because callback native processing
+and handler queue delay are outside these intervals. Request records contain only
+source, timings, byte count and request count, with no event/snapshot/ID retention.
+The normal path reads no clocks and creates no measurement records. Observers
+remain main-thread-only and output stays outside action timings.
+
+Each scenario also re-reads the settled confirmation through the production
+native-view/decode/publication path, labelled `equal_confirmation` / `replay`.
+An installed render observer and open session are required. It sends no event,
+handles no requests and does not invoke onViewChanged. This diagnostic exists
+because frozen prompts deliberately ignore unrelated product events; their
+event guards remain unchanged. All decoded selected and frozen IDs must match
+the fixture count, the original state instance must remain installed and the
+render must report `published=false`. This deliberately constructed equal
+snapshot is not a user action or a measured composition. The action CSV's
+`dispatch_ms` column times the replay call for this metric. `publish_ms` still
+includes the state setter/equality machinery rather than isolating equality.
+
+Use the commands in DEVELOPMENT.md, final Vocabulary section. Separate debug
+API-36 x86_64 phone/light processes retain 1,000 rows, one full scenario warmup
+and five measured scenarios at each size. Environment and synthetic fixture
+limitations match the earlier sections. No competing builds/tests/profilers run
+during profiles. These samples include both observers and an extra replay;
+they are not a controlled optimization comparison with earlier runs. Keep the
+structural state policy. Do not add medians or assign the residual idle time to
+composition; asynchronous native callback work, queue delay, instrumentation,
+scheduling/JIT/GC and composition remain mixed outside these measured intervals.
+
+Median synchronous request phases, milliseconds (five samples per row):
+
+| Entries | Dispatch | Event encoding | Native update | Request decoding |
+| ---: | --- | ---: | ---: | ---: |
+| 10,000 | Select All | 0.022 | 4.604 | 0.041 |
+| 100,000 | Select All | 0.022 | 0.298 | 0.034 |
+| 10,000 | Confirmation | 0.019 | 0.210 | 0.024 |
+| 100,000 | Confirmation | 0.026 | 0.335 | 0.038 |
+
+Native update at 100k ranges 0.267–0.340 ms for Select All and 0.297–0.385 ms
+for confirmation. The 10k Select All range is 0.293–9.598 ms; these wall-time
+samples do not establish scaling or isolate lock/scheduling costs. Every measured
+request contains one Render effect in 16 bytes. Across all 70 request samples,
+main-thread request decoding is at most 0.090 ms. Async storage and native
+callback application remain unmeasured; the small synchronous update intervals
+do not establish that all native work is small.
+
+Median render phases, milliseconds (five samples per row):
+
+| Entries | Render | Native view | Kotlin decode | State publication |
+| ---: | --- | ---: | ---: | ---: |
+| 10,000 | Select All callback | 1.981 | 13.796 | 0.287 |
+| 100,000 | Select All callback | 25.915 | 134.515 | 0.587 |
+| 10,000 | Confirmation dispatch | 2.262 | 15.273 | 0.498 |
+| 100,000 | Confirmation dispatch | 39.207 | 69.925 | 1.115 |
+| 10,000 | Equal confirmation replay | 7.832 | 70.227 | 1.389 |
+| 100,000 | Equal confirmation replay | 61.037 | 192.500 | 5.594 |
+
+At 100k equal publication ranges 3.936–35.825 ms and decoding
+129.063–339.958 ms. All ten equal snapshots retain the original state instance;
+all other 70 render samples publish changed instances. This observes the
+previously missing equal case without supporting a different equality policy.
+Replay follows confirmation assertions and diagnostic serialization, shares the
+same process/GC history and does not trigger composition. It is not a paired
+decode microbenchmark against confirmation dispatch. Large-ID decoding remains
+a measurable target; investigate its allocations and use controlled comparisons
+before changing the generated codec/transport.
+
+Median action-to-idle / synchronous call, milliseconds:
+
+| Action | 10,000 entries | 100,000 entries |
+| --- | ---: | ---: |
+| First 100 rows | 182.868 / 1.082 | 281.412 / 1.127 |
+| Append 100→200 | 214.358 / — | 346.951 / — |
+| Jump between retained rows | 280.822 / — | 282.236 / — |
+| Select every matching ID | 181.112 / 30.145 | 1,132.142 / 25.667 |
+| Freeze/render confirmation | 314.909 / 18.276 | 405.611 / 119.095 |
+| Diagnostic equal replay | 98.511 / 79.078 | 323.533 / 292.832 |
+
+No equal replay produces an observed main-window frame. Across all actions,
+111 observed frames exceed the fixed 16.667 ms reference, with zero reported
+drops; separate dialog-window limits still apply. Maximum sampled Java/native
+allocated heap/RSS is 19.303/22.658/246.016 MiB at 10k and
+52.873/28.394/285.488 MiB at 100k. These are independent process high-water
+observations, not additive components, exact peaks or per-action allocations.
+The replay retains the existing state and allocates a fresh decoded view that
+is then rejected by the unchanged state policy; no retained-byte saving is claimed.
+
+All [80 render rows](measurements/vocabulary-request-android-2026-10-31.csv),
+[70 request rows](measurements/vocabulary-request-android-2026-10-31-requests.csv),
+[60 action rows](measurements/vocabulary-request-android-2026-10-31-actions.csv)
+and [111 raw frame durations](measurements/vocabulary-request-android-2026-10-31-frames.csv)
+validate: exact source/count/index/payload and published-instance expectations,
+five iterations per action/size, finite nonnegative timings, absent callback
+native intervals, exact frame summaries, positive memory observations and zero
+drops. Payloads, fixture sizes and unchanged database hashes match the original
+section. No analyzer/reading effects, integrity/FK, exact IDs, handle closure
+and scratch-directory cleanup pass in both processes. ADB confirms only the
+existing sudachi cache remains in no_backup; the task-started AVD was stopped.
+
+PASS: debug/test APKs, strict Android lint, repository Kotlin formatting/diff;
+21 ordinary regressions plus default assumption skip (22 reported, 240.384 s).
+CoreSessionTest covers observer removal/thread guards and equal replay identity,
+no requests and no onViewChanged notification. Separate 10k/100k profiles pass
+in 38.092/60.011 s. Production source baseline: `cf63d10`; native/binding/assets
+reuse Gradle outputs and the x86_64 JNI hash matches the earlier sections.
+Debug APK SHA-256:
+`f75c30ead000f74f40e0b011edf56f8cbc25fab8f47fda7c686c8df664a656d4`;
+test APK:
+`43c05d5bdd113d62622d84d5e9c80f54a770fa7ffb0a84b6d36251e9e6bf0221`.
+Logs: `/tmp/yomoku-request-{android,format-check,regressions,10000,100000,validation}.log`.
+Initial sandbox Gradle lock-socket access required approved rerun; no source/test
+failure remains. No Rust/schema/dependency/wire or product event-policy change.
+Host Rust/Clippy, independent JNI/codegen/Full-loader, optimized/tablet/dark/
+continuous-fling/heavy-history/diverse-book/fully loaded lists, exact peak/PSS,
+process-death and physical arm64 were not rerun or claimed. Broader tasks remain.

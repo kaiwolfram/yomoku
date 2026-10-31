@@ -3459,3 +3459,35 @@ and /tmp/yomoku-browser-profile-*. No emulator started.
   continuous-fling/heavy-history/diverse-book/fully loaded, equal-snapshot,
   exact peak/PSS, process-death and physical arm64 not rerun or claimed. Continue
   native update/composition/decoding investigation, then Anki APIs/lifecycle.
+
+## 2026-10-31 — Vocabulary request phases and equal snapshot replay
+
+- Started clean; continued the ordered profiling task. Added opt-in event
+  encoding/synchronous JNI update/request decoding measurements; callbacks leave
+  unmeasured native intervals absent. Disabled diagnostics read no clocks or
+  allocate records. No Rust/schema/dependency/wire/product-policy change.
+- Added observer-gated main-thread native snapshot replay through production
+  decode/publication. CoreSessionTest checks identity, no requests/notification,
+  observer removal and thread guards. The disposable fixture replays exact full
+  frozen confirmations; equality and product event guards remain unchanged.
+- PASS: debug/test APKs, strict Android lint, Kotlin formatting/diff; 21 passing
+  regressions plus default assumption skip (22 reported, 240.384 s). Native/
+  bindings/assets reused Gradle outputs. Separate 10k/100k debug phone/light
+  processes pass (38.092/60.011 s), 1,000 retained rows, warmup/five scenarios.
+- Validate 80 render/70 request/60 action rows and 111 frames, exact IDs, unchanged
+  bytes, zero analyzer/reading effects, integrity/FK/native closure/scratch cleanup.
+  ADB confirms only sudachi cache remains; task-started isolated AVD stopped.
+- At 100k Select All/confirmation synchronous native updates have medians
+  0.298/0.335 ms; equal replay native/decode/publication 61.037/192.500/5.594 ms.
+  Equal publication range 3.936–35.825 ms; all ten equal samples retain state,
+  all 70 changed renders publish. Keep equality policy; async native callback
+  work/composition remain unmeasured. No optimization/composition/peak claim.
+- Raw CSV/hashes/method/limits: VOCABULARY_ANDROID_PERFORMANCE.md, final section.
+  Logs: /tmp/yomoku-request-{android,format-check,regressions,10000,100000,
+  validation}.log. Initial sandbox Gradle lock-socket access needed approved
+  rerun; no source/test failure remains. Existing ignored caches preserved.
+- Host Rust/Clippy, independent JNI/codegen/Full-loader, optimized/tablet/dark/
+  continuous-fling/heavy-history/diverse-book/fully loaded, exact peaks/PSS,
+  process-death and physical arm64 not rerun. Broader tasks stay unchecked.
+  Continue controlled large-ID decoding/allocation and async callback/composition
+  profiling, then Anki API verification and lifecycle matrix.

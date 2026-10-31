@@ -7353,3 +7353,41 @@ VOCABULARY_ANDROID_PERFORMANCE.md, snapshot phase section. Logs:
 No Rust/schema/dependency/wire change or host Rust/Clippy, independent JNI/codegen/
 Full-loader, optimized/tablet/dark/fully-loaded/heavy-history/diverse-book,
 equal-snapshot, exact peak/PSS, process-death or physical-arm64 claim.
+
+## Vocabulary request phases and equal confirmation replay
+
+Use the same pinned environment, build/install commands and phone/light isolated
+AVD as above. Add `app.yomoku.CoreSessionTest` to the selection-membership class
+list; it now covers observer removal, thread guards and equal replay identity.
+After builds/regressions finish, the existing `yomokuMeasureRender=true` commands
+also emit `REQUEST` rows and measure one `equal_confirmation` replay per scenario:
+
+```sh
+"$ANDROID_HOME/platform-tools/adb" -s emulator-5554 shell am instrument -w -r -e class app.yomoku.VocabularyPerformanceTest -e yomokuMeasure true -e yomokuMeasureRender true -e yomokuVocabularyEntries 10000 -e yomokuVocabularyLoaded 1000 -e yomokuMeasureIterations 5 app.yomoku.test/androidx.test.runner.AndroidJUnitRunner
+"$ANDROID_HOME/platform-tools/adb" -s emulator-5554 shell am instrument -w -r -e class app.yomoku.VocabularyPerformanceTest -e yomokuMeasure true -e yomokuMeasureRender true -e yomokuVocabularyEntries 100000 -e yomokuVocabularyLoaded 1000 -e yomokuMeasureIterations 5 app.yomoku.test/androidx.test.runner.AndroidJUnitRunner
+```
+
+`REQUEST_COLUMNS` describes event encoding, synchronous native update and request
+decoding. Callback encoding/update cells are empty, not zero-duration estimates.
+Render `source` can now be `replay`; this diagnostic reads the settled native view
+and executes normal decode/publication without dispatching an event or requests.
+For `equal_confirmation`, the action CSV's `dispatch_ms` column times that replay
+call instead of dispatch. It is not an actual UI action. Exact state identity,
+all selected/frozen IDs and no requests are asserted. State-publication timings
+include equality and are not isolated equality or composition benchmarks.
+
+2026-10-31 PASS: debug/test APKs, strict Android lint, Kotlin formatting/diff;
+21 regressions plus default assumption skip (22 reported, 240.384 s). Separate
+10k/100k processes pass in 38.092/60.011 s, preserving all exact-ID/read-only/
+integrity/FK/no-analyzer/no-reading-effects/closure/cleanup guards. Validated
+80 render/70 request/60 action rows and 111 raw frames. All ten equal renders
+retain the original state instance; 70 changed renders publish. At 100k native
+Select All/confirmation updates have medians 0.298/0.335 ms; equal publication
+median is 5.594 ms (3.936–35.825 ms range). Full raw CSV/results/hashes/limits:
+VOCABULARY_ANDROID_PERFORMANCE.md, final request/replay section. No timing
+improvement, composition, exact peak or physical-device claim. Native/bindings/
+assets reused Gradle outputs; host Rust/Clippy and independent JNI/codegen/Full-
+loader/optimized/lifecycle/broader device matrices were not rerun. Initial
+sandbox Gradle lock-socket access required approved rerun; no open failure.
+ADB confirms scratch directories absent; task-started isolated AVD stopped.
+Logs: `/tmp/yomoku-request-{android,format-check,regressions,10000,100000,validation}.log`.

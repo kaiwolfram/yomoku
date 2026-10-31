@@ -198,7 +198,12 @@ class VocabularyPerformanceTest {
         action: () -> Double,
     ) {
         val renders = mutableListOf<CoreRenderMeasurement>()
-        if (measureRender) compose.runOnUiThread { core.onRenderMeasured = { renders.add(it) } }
+        val requests = mutableListOf<CoreRequestsMeasurement>()
+        if (measureRender)
+            compose.runOnUiThread {
+                core.onRenderMeasured = { renders.add(it) }
+                core.onRequestsMeasured = { requests.add(it) }
+            }
         val sampler = MemorySampler()
         // FrameMetrics uses the System.nanoTime timebase, unlike elapsedRealtime after suspend.
         val start = System.nanoTime()
@@ -210,7 +215,11 @@ class VocabularyPerformanceTest {
             end = System.nanoTime()
         } finally {
             sampler.close()
-            if (measureRender) compose.runOnUiThread { core.onRenderMeasured = null }
+            if (measureRender)
+                compose.runOnUiThread {
+                    core.onRenderMeasured = null
+                    core.onRequestsMeasured = null
+                }
         }
         val measured = frames.between(start, end)
         if (iteration < 0) return // Full scenario warmup, excluded from output.
@@ -227,13 +236,40 @@ class VocabularyPerformanceTest {
             if (metric != "scroll_loaded_rows") assertTrue(renders.isNotEmpty())
             if (metric == "select_all") assertTrue(renders.any { it.selectedIds == entries })
             if (metric == "confirmation") assertTrue(renders.any { it.confirmationIds == entries })
+            if (metric == "equal_confirmation") {
+                assertTrue(requests.isEmpty())
+                assertEquals(1, renders.size)
+                assertEquals(CoreRenderSource.REPLAY, renders.single().source)
+                assertFalse(renders.single().published)
+                assertEquals(entries, renders.single().selectedIds)
+                assertEquals(entries, renders.single().confirmationIds)
+            }
             renders.forEachIndexed { index, render ->
                 assertTrue(render.nativeViewNanos >= 0)
                 assertTrue(render.decodeNanos >= 0)
                 assertTrue(render.publishNanos >= 0)
                 assertTrue(render.payloadBytes > 0)
                 emit(
-                    "RENDER,$entries,$iteration,$metric,$index,${if (render.fromCallback) "callback" else "dispatch"},${render.nativeViewNanos / 1e6},${render.decodeNanos / 1e6},${render.publishNanos / 1e6},${render.payloadBytes},${render.loadedRows},${render.selectedIds},${render.confirmationIds},${render.published}"
+                    "RENDER,$entries,$iteration,$metric,$index,${render.source.name.lowercase()},${render.nativeViewNanos / 1e6},${render.decodeNanos / 1e6},${render.publishNanos / 1e6},${render.payloadBytes},${render.loadedRows},${render.selectedIds},${render.confirmationIds},${render.published}"
+                )
+            }
+            requests.forEachIndexed { index, request ->
+                assertTrue(request.requestDecodeNanos >= 0)
+                assertTrue(request.payloadBytes > 0)
+                assertTrue(request.requestCount >= 0)
+                when (request.source) {
+                    CoreRenderSource.DISPATCH -> {
+                        assertTrue(request.eventEncodeNanos!! >= 0)
+                        assertTrue(request.nativeUpdateNanos!! >= 0)
+                    }
+                    CoreRenderSource.CALLBACK -> {
+                        assertNull(request.eventEncodeNanos)
+                        assertNull(request.nativeUpdateNanos)
+                    }
+                    CoreRenderSource.REPLAY -> error("Snapshot replay has no requests")
+                }
+                emit(
+                    "REQUEST,$entries,$iteration,$metric,$index,${request.source.name.lowercase()},${request.eventEncodeNanos?.let { it / 1e6 } ?: ""},${request.nativeUpdateNanos?.let { it / 1e6 } ?: ""},${request.requestDecodeNanos / 1e6},${request.payloadBytes},${request.requestCount}"
                 )
             }
         }
@@ -290,10 +326,14 @@ class VocabularyPerformanceTest {
             emit(
                 "COLUMNS,entries,iteration,metric,loaded_rows,idle_ms,dispatch_ms,frames,frame_median_ms,frame_max_ms,frames_over_16_667_ms,dropped_reports,java_peak_bytes,native_peak_bytes,rss_peak_kib,memory_samples"
             )
-            if (measureRender)
+            if (measureRender) {
                 emit(
                     "RENDER_COLUMNS,entries,iteration,metric,index,source,native_view_ms,decode_ms,publish_ms,payload_bytes,loaded_rows,selected_ids,confirmation_ids,published"
                 )
+                emit(
+                    "REQUEST_COLUMNS,entries,iteration,metric,index,source,event_encode_ms,native_update_ms,request_decode_ms,payload_bytes,request_count"
+                )
+            }
             Frames().use { frames ->
                 for (iteration in -1 until iterations) {
                     // Change the literal prefix each time; both match the complete fixture.
@@ -357,6 +397,20 @@ class VocabularyPerformanceTest {
                         emit(
                             "PAYLOAD,$entries,$iteration,${core.view.vocabulary.rows.size},${core.view.bincodeSerialize().size}"
                         )
+                    if (measureRender) {
+                        val frozenView = core.view
+                        measure(frames, entries, iteration, "equal_confirmation") {
+                            var duration = 0L
+                            compose.runOnUiThread {
+                                val start = SystemClock.elapsedRealtimeNanos()
+                                core.measureCurrentView()
+                                duration = SystemClock.elapsedRealtimeNanos() - start
+                            }
+                            duration / 1e6
+                        }
+                        assertSame(frozenView, core.view)
+                        compose.onNodeWithTag("vocabulary_bulk_dialog").assertIsDisplayed()
+                    }
                     dispatch(Event.CancelVocabularyBulkAction)
                     dispatch(Event.CancelVocabularySelection)
                 }

@@ -20,9 +20,15 @@ import java.util.UUID
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 
+internal enum class CoreRenderSource {
+    DISPATCH,
+    CALLBACK,
+    REPLAY,
+}
+
 /** Main-thread render phases; publication includes structural equality and state notification. */
 internal data class CoreRenderMeasurement(
-    val fromCallback: Boolean,
+    val source: CoreRenderSource,
     val nativeViewNanos: Long,
     val decodeNanos: Long,
     val publishNanos: Long,
@@ -31,6 +37,16 @@ internal data class CoreRenderMeasurement(
     val selectedIds: Int,
     val confirmationIds: Int,
     val published: Boolean,
+)
+
+/** Callback native work/queue delay and subsequent renders are outside these intervals. */
+internal data class CoreRequestsMeasurement(
+    val source: CoreRenderSource,
+    val eventEncodeNanos: Long?,
+    val nativeUpdateNanos: Long?,
+    val requestDecodeNanos: Long,
+    val payloadBytes: Int,
+    val requestCount: Int,
 )
 
 /** Owns a native handle and a render snapshot; application state stays in Rust. */
@@ -104,6 +120,22 @@ internal class CoreSession(
             requireMainThread()
             field = value
         }
+
+    var onRequestsMeasured: ((CoreRequestsMeasurement) -> Unit)? = null
+        set(value) {
+            requireMainThread()
+            field = value
+        }
+
+    /**
+     * Re-read the current native snapshot through the production publication path, diagnostics
+     * only.
+     */
+    fun measureCurrentView() {
+        requireMainThread()
+        check(!closing && onRenderMeasured != null)
+        renderView(CoreRenderSource.REPLAY)
+    }
 
     val images =
         EpubImageLoader(
@@ -191,7 +223,16 @@ internal class CoreSession(
     }
 
     private fun send(event: Event) {
-        render(bridge.update(event.bincodeSerialize()))
+        if (onRequestsMeasured == null) {
+            render(bridge.update(event.bincodeSerialize()))
+            return
+        }
+        val start = System.nanoTime()
+        val bytes = event.bincodeSerialize()
+        val encoded = System.nanoTime()
+        val requests = bridge.update(bytes)
+        val updated = System.nanoTime()
+        render(requests, eventEncodeNanos = encoded - start, nativeUpdateNanos = updated - encoded)
     }
 
     private fun observe(action: ReaderClockAction) {
@@ -259,16 +300,36 @@ internal class CoreSession(
         tickScheduled = false
     }
 
-    private fun render(requests: ByteArray, fromCallback: Boolean = false) {
-        for (request in Requests.bincodeDeserialize(requests).value) {
+    private fun render(
+        requests: ByteArray,
+        fromCallback: Boolean = false,
+        eventEncodeNanos: Long? = null,
+        nativeUpdateNanos: Long? = null,
+    ) {
+        val observer = onRequestsMeasured
+        val start = if (observer != null) System.nanoTime() else 0L
+        val decoded = Requests.bincodeDeserialize(requests).value
+        val decodeNanos = if (observer != null) System.nanoTime() - start else 0L
+        val source = if (fromCallback) CoreRenderSource.CALLBACK else CoreRenderSource.DISPATCH
+        for (request in decoded) {
             when (request.effect) {
-                is ShellEffect.Render -> renderView(fromCallback)
+                is ShellEffect.Render -> renderView(source)
             }
         }
         onViewChanged?.invoke()
+        observer?.invoke(
+            CoreRequestsMeasurement(
+                source,
+                eventEncodeNanos,
+                nativeUpdateNanos,
+                decodeNanos,
+                requests.size,
+                decoded.size,
+            )
+        )
     }
 
-    private fun renderView(fromCallback: Boolean) {
+    private fun renderView(source: CoreRenderSource) {
         val observer = onRenderMeasured
         if (observer == null) {
             view = ViewModel.bincodeDeserialize(bridge.view())
@@ -283,7 +344,7 @@ internal class CoreSession(
         val published = System.nanoTime()
         observer(
             CoreRenderMeasurement(
-                fromCallback,
+                source,
                 retrieved - start,
                 deserialized - retrieved,
                 published - deserialized,

@@ -4173,3 +4173,22 @@ delay and observer bookkeeping from phase timings, and document that limitation.
 Install the observer only around opt-in disposable-fixture actions and emit
 samples after timing ends. Preserve full IDs and all read-only/replay guards.
 No wire, dependency, schema, threading or render-coalescing change is needed.
+
+## 2026-10-31 — Request phases and diagnostic snapshot replay
+
+Extend opt-in CoreSession diagnostics with event encoding, synchronous JNI
+update and generated request-decoding intervals. Callback rows leave encoding
+and native-update durations absent: native worker/callback work and handler queue
+delay happen outside the measured main-thread interval. Record only durations,
+source, request bytes and request count. Disabled observers read no clocks or
+allocate measurement records; keep native requests and render ordering intact.
+
+Frozen Vocabulary prompts intentionally ignore unrelated events, so do not alter
+product event handling to manufacture an equal render. A main-thread diagnostic
+method, requiring an installed render observer and an open session, re-reads the
+current native view through the existing decode/state-publication path. Identify
+it as replay, with no event, request handling or onViewChanged notification. The
+disposable harness replays a settled confirmation with all selected/frozen IDs
+and asserts the existing state instance survives structural equality. This is
+an artificial publication measurement, not a user interaction or composition
+benchmark. Preserve the structural state policy and production wire format.
