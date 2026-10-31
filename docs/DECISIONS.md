@@ -4418,3 +4418,26 @@ including close failures. Refresh provider/spec/permission before both queries
 and reject a host package change between them. This is a non-atomic observation;
 repeat validation in the future mutating operation, retain duplicate recheck and
 uncertain-submission rules, and enable no live calls before durable recovery.
+
+## 2026-10-31 — Anki model creation without repair or replay
+
+Keep worker-only model creation separate from read-only discovery/validation and
+unconnected to app/FFI/UI. Follow the reviewed release contract: insert a new normal
+four-field model with one template and sort field zero, then configure only that
+invocation's returned new ID at template ordinal zero. Require a canonical
+provider URI and positive signed-64 ID absent from the preflight model list.
+Refuse exact-name collisions before submission; the future owner can separately
+validate reuse or present a conflict. Do not rename, repair, overwrite or delete
+user models, set a default deck, or select/create a deck. No production HTML/CSS
+constants move from Rust into Kotlin and no new dependency is introduced.
+
+Refresh host/spec/permission between calls and after full readback. The reviewed
+provider returns a count of template properties changed, so positive update count
+alone is insufficient: require exact metadata/template validation for success.
+Any failure after the initial insert is submitted is uncertain, including a null
+or lost response, invalid URI/ID, update failure or readback mismatch/failure.
+Retain a validated returned ID when known; perform no retry or destructive cleanup.
+A partial/orphan model can remain. These non-atomic observations are not ownership
+or compatibility leases. Note insertion must still revalidate layout/deck, recheck
+exact duplicates, explicitly place cards and preserve submission uncertainty.
+Durable export recovery remains required before enabling live app calls.

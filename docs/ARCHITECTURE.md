@@ -1875,4 +1875,18 @@ does not define layout; explicit configured-deck placement remains a mutating
 adapter obligation. Null/malformed/partial/close-failed reads fail; missing or
 incompatible layouts return false without changing provider state. Recheck host
 and permission between reads. This snapshot cannot prevent concurrent user edits;
-future submission must revalidate. No creation/update/delete path is enabled.
+future submission must revalidate. No live creation/update/delete call is enabled.
+
+The separate, unconnected `AnkiProviderModelCreator` implements worker-only model
+creation. It discovers existing IDs/names, refuses an exact name collision and
+submits one new normal four-field model with sort field zero. Only a canonical
+positive ID returned by that invocation, absent from discovery, can receive the
+ordinal-zero template update. It never repairs/renames/deletes an existing model
+or changes a deck. Fresh host/spec/permission checks surround calls; full layout
+readback is required for success. Provider template updates count properties,
+so accept a positive count only alongside successful readback. Pre-submission
+failure is distinct from any uncertain outcome after insertion was submitted;
+retain a validated returned ID when known. No retry, cleanup or restart replay
+is built into this boundary. Creation can leave a partial model and provides no
+atomic ownership/layout lease. Note insertion, explicit deck placement, durable
+export recovery and typed app wiring remain separate prerequisites.

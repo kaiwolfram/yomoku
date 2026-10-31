@@ -1,20 +1,25 @@
 # Resume here
-Updated: 2026-10-31. Read-only Android Anki model validation verified.
+Updated: 2026-10-31. Isolated Android Anki model creation verified.
 Commit guidance: explanatory bodies; merges include provenance. Keep verification
 results in session/progress docs and reports, out of commit message bodies.
 
 ## Current slice
 - Unconnected `AnkiProviderReader`: fresh provider/spec >=2/permission gates,
   worker-only deck/model discovery, exact-surface duplicates and reconciliation.
-- `modelMatches` reads a positive signed-64 ID's metadata and actual template rows:
+  `modelMatches` reads a positive signed-64 ID's metadata and actual template rows:
   exact name/four ordered fields/CSS, normal type, sort field zero, one ordinal-zero
   forward card with exact name/question/answer and empty browser overrides.
   Expected layout comes from future core bridge; no production HTML/CSS copies.
-  Same-name model discovery never implies compatibility or selects/overwrites one.
-- Missing/incompatible layout returns false; malformed/null/partial/close-failed
-  reads fail. Recheck host/permission between queries; observations are non-atomic.
+  Same-name discovery never implies compatibility or selects/overwrites a model.
+- Separate unconnected `AnkiProviderModelCreator` refuses exact-name conflicts,
+  inserts a normal four-field/one-card model, validates a fresh returned URI/ID,
+  updates only its ordinal-zero template and requires full layout readback.
+  Refresh host/spec/permission between calls. Update counts measure properties,
+  not rows. Any failure after submission is Uncertain with a known new ID retained;
+  no retry/repair/delete. A partial/orphan model may remain; observations are
+  non-atomic. Missing/incompatible layout is false; malformed/failed reads fail.
   Default model deck is not a layout constraint: explicit frozen-deck placement
-  remains required. No model creation/update/delete or note insertion exists.
+  remains required. No note insertion or live app/FFI/UI call site exists.
 - Duplicate lookup recognizes core escaping/syntax-free plain first fields across
   models/decks, without arbitrary HTML decoding/normalization. Embedded NUL fails
   closed. Empty reconciliation stays Unresolved; query costs remain unmeasured.
@@ -26,9 +31,9 @@ results in session/progress docs and reports, out of commit message bodies.
   Nostr starter configuration empty; ask Q188 before forwarding.
 
 ## Next tasks (ordered)
-1. Implement mutating provider adapter contract: create models without overwriting
-   user models, revalidate layout/deck and recheck exact duplicates immediately
-   before note insertion; place cards explicitly in the frozen configured deck.
+1. Implement note insertion adapter contract: revalidate layout/deck and recheck
+   exact duplicates immediately before insertion; place cards explicitly in the
+   frozen configured deck.
    Null/exception/transport loss after submission must be Uncertain. Preserve
    payload/deck and read-only reconciliation; extend fake-provider cases. No
    completion fence permits insertion after empty reconciliation.
@@ -43,14 +48,13 @@ results in session/progress docs and reports, out of commit message bodies.
    arm64 is user-deferred; emulator/host results do not establish hardware viability.
 
 ## Verification / blockers
-- PASS: nine new fake-provider cases, 12 prior provider cases and three CoreSession
-  regressions (24 total, 0.162 s), API-36 x86_64 isolated 8 GiB AVD; debug/test APKs,
+- PASS: 11 new fake-provider cases, 21 prior provider cases and three CoreSession
+  regressions (35 total, 0.217 s), API-36 x86_64 isolated 8 GiB AVD; debug/test APKs,
   strict Android lint, repository Kotlin formatting and diff check. Native/bindings/
-  assets reused. Commands: DEVELOPMENT.md final Anki model section. Logs:
-  /tmp/yomoku-anki-model-{android,tests,format,format-check,emulator}.log.
-- Sandbox Gradle/ADB sockets required approved execution. One APK install attempted
-  before boot finished failed; installation after boot succeeded. No app data
-  cleared. Task-owned emulator stopped. No open blocker.
+  assets reused. Commands: DEVELOPMENT.md final Anki creation section. Logs:
+  /tmp/yomoku-anki-create-{android,tests,format,format-check,emulator}.log.
+- Sandbox ADB socket attempt failed; approved Gradle/ADB/emulator execution passed.
+  No app data cleared. Task-owned emulator stopped. No open blocker.
 - No Rust/schema/dependency/protocol change. Host Rust/Clippy/Rustfmt, independent
   Full-loader, real Anki provider, physical device, broader UI/lifecycle and
   performance checks were not run this slice.

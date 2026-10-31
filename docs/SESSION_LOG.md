@@ -3775,3 +3775,27 @@ and /tmp/yomoku-browser-profile-*. No emulator started.
   broader UI/lifecycle/performance run. Next: mutating adapter/model creation/deck
   placement, then durable pending/uncertain recovery and typed app/settings/UI
   wiring. Real collection checks remain required before compatibility claims.
+
+## 2026-10-31 — Isolated Anki model creation
+
+- Started clean; continued model creation as an independently testable part of
+  the mutating adapter. Added worker-only `AnkiProviderModelCreator`, unconnected
+  to app/FFI/UI. Refuse exact-name conflicts, insert a normal four-field/one-card
+  model, validate a new positive signed-64 returned URI/ID, configure only its
+  ordinal-zero template and require full metadata/template readback. Preserve
+  existing models/notes; no default-deck selection or mutation. Rust owns layout.
+- Refresh host/spec/permission between calls and after readback. Positive update
+  counts represent properties rather than rows. All failures after submission
+  are uncertain, retaining a validated new ID when known. No retry/repair/delete;
+  partial models can remain. No atomic ownership/layout lease is claimed.
+- PASS: 11 new fake-provider cases plus 21 prior provider cases and three
+  CoreSession regressions (35 total, 0.217 s), API-36 x86_64 isolated 8 GiB AVD;
+  debug/test APKs, strict lint, Kotlin formatting and diff. Native/bindings/probe/
+  assets reused. Initial sandbox ADB socket attempt failed; approved execution
+  passed. No app data cleared. Task-owned emulator stopped; no open blocker.
+- Updated plan, API evidence, architecture, decisions, commands and handoff.
+  Logs: /tmp/yomoku-anki-create-{android,tests,format,format-check,emulator}.log.
+  No Rust/schema/dependency/protocol/UI change or independent Rust/Full-loader,
+  real-provider/browser/collection, physical-device, broad lifecycle/performance
+  check. Next: note insertion/layout/deck/duplicates/explicit placement, then
+  durable pending/uncertain recovery and typed app/settings/UI wiring.

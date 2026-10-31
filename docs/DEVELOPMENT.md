@@ -7742,3 +7742,37 @@ collection/browser verification or compatibility claim. Host Rust/Clippy/Rustfmt
 independent Full-loader, broader UI/lifecycle, physical device and performance
 checks were not run. Creation/insertion, durable recovery and typed app wiring
 remain the precise continuation point in NEXT_SESSION.md.
+
+## Isolated Android Anki model creation
+
+Use the pinned environment and isolated 8 GiB AVD from the preceding sections.
+`AnkiProviderModelCreator` remains unconnected; opt-in fake mutations configure
+only test models. No AnkiDroid installation or real collection is required.
+
+```sh
+./android/gradlew -p android :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug --offline --console=plain
+"$ANDROID_HOME/platform-tools/adb" -s emulator-5554 install -r -t android/app/build/outputs/apk/debug/app-debug.apk
+"$ANDROID_HOME/platform-tools/adb" -s emulator-5554 install -r -t android/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+"$ANDROID_HOME/platform-tools/adb" -s emulator-5554 shell am instrument -w -r -e class app.yomoku.AnkiProviderReaderTest,app.yomoku.CoreSessionTest app.yomoku.test/androidx.test.runner.AndroidJUnitRunner
+JAVA_HOME="$JAVA_HOME" tools/format-kotlin.sh --check
+git diff --check
+```
+
+2026-10-31 PASS: eleven new creation cases plus 21 prior provider cases and three
+CoreSession regressions (35 total, 0.217 s), API-36 x86_64; debug/test APKs, strict
+Android lint, repository Kotlin formatting and diff. Native/bindings/probe/assets
+were up-to-date and reused. Cases cover full new-model readback, preserved user
+models/notes, same-name conflicts, fresh gates, malformed/old/long returned IDs,
+committed-but-lost insert/update responses, positive property update counts,
+partial model retention, failed/mismatched/close-failed readback, permission/host
+changes between calls and the main-thread guard. No automatic replay/repair/delete.
+
+An initial sandbox ADB socket attempt failed; approved Gradle/ADB/emulator
+execution passed. Both APKs installed after boot, without clearing app data.
+Task-owned emulator stopped; no outstanding failure/blocker. Logs:
+`/tmp/yomoku-anki-create-{android,tests,format,format-check,emulator}.log`.
+No Rust/schema/dependency/protocol/UI change, note insertion/deck mutation, real
+AnkiDroid/browser/collection test or compatibility claim. Host Rust/Clippy/Rustfmt,
+independent Full-loader, physical device, broader UI/lifecycle and performance
+checks were not run. Next: note insertion with fresh layout/deck/duplicate checks
+and explicit placement, then durable export recovery and typed app wiring.

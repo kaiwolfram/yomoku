@@ -147,9 +147,23 @@ queries. Default model deck is deliberately not a layout constraint: the future
 adapter must place cards in the frozen configured deck explicitly. Validation is
 an observation, not an atomic reuse guarantee, and must run again before mutation.
 No production template constants are copied into Kotlin; the future typed bridge
-must supply Rust's layout. No model is created, repaired or overwritten here.
+must supply Rust's layout. The reader never creates, repairs or overwrites models.
 
-Next implement the mutating adapter contract, then
+The separate unconnected `AnkiProviderModelCreator` follows the release wrapper's
+two-stage creation: insert metadata/four fields/one dummy template, then update
+only that new ID's ordinal-zero template. Discovery refuses exact-name conflicts
+without overwriting or renaming user models. Validate the returned content URI,
+positive signed-64 ID and absence from preflight discovery before updating. Send
+normal type/sort field zero and empty browser overrides; do not set a default deck
+or select one. The reviewed provider counts updated template **properties**, so
+a positive count requires full metadata/template readback before success. Refresh
+host/spec/permission between calls and after readback. Null/exception/invalid
+response after submission, failed updates, mismatches and failed readback all
+return uncertainty, preserving a validated new ID when known. No retry, repair or
+delete is attempted: a partial/orphan model may remain. Concurrent collection edits
+are not fenced. Fake-provider coverage does not establish real-provider behavior.
+
+Next implement note insertion and explicit frozen-deck placement, then
 app-owned state/typed transport and durable pending/uncertain insertion
 recovery before enabling live wiring. A process restart must not erase insert
 uncertainty or replay an old mutating request. No supported provider completion

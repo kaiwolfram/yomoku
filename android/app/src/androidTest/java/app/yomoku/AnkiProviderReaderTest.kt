@@ -61,6 +61,10 @@ class AnkiProviderReaderTest {
         var lastArguments: List<String>? = null
         val models = linkedMapOf<Long, Array<Any?>>()
         val templates = linkedMapOf<Long, List<Array<Any?>>>()
+        val inserts = mutableListOf<Pair<Uri, ContentValues>>()
+        val updates = mutableListOf<Pair<Uri, ContentValues>>()
+        var insertReplacement: ((Uri, ContentValues) -> Uri?)? = null
+        var updateReplacement: ((Uri, ContentValues) -> Int)? = null
 
         override fun onCreate() = true
 
@@ -108,14 +112,27 @@ class AnkiProviderReaderTest {
             return database.query(table, columns, selection, args, null, null, order)
         }
 
-        override fun insert(uri: Uri, values: ContentValues?): Uri = error("Unexpected insert")
+        override fun insert(uri: Uri, values: ContentValues?): Uri? {
+            check(Looper.myLooper() != Looper.getMainLooper())
+            val handler = insertReplacement ?: error("Unexpected insert")
+            val snapshot = ContentValues(checkNotNull(values))
+            inserts.add(uri to snapshot)
+            return handler(uri, snapshot)
+        }
 
         override fun update(
             uri: Uri,
             values: ContentValues?,
             selection: String?,
             args: Array<out String>?,
-        ): Int = error("Unexpected update")
+        ): Int {
+            check(Looper.myLooper() != Looper.getMainLooper())
+            check(selection == null && args == null)
+            val handler = updateReplacement ?: error("Unexpected update")
+            val snapshot = ContentValues(checkNotNull(values))
+            updates.add(uri to snapshot)
+            return handler(uri, snapshot)
+        }
 
         override fun delete(uri: Uri, selection: String?, args: Array<out String>?): Int =
             error("Unexpected delete")
@@ -155,6 +172,7 @@ class AnkiProviderReaderTest {
                 )
             }
         val reader = AnkiProviderReader(ContentResolver.wrap(provider), environment)
+        val creator = AnkiProviderModelCreator(ContentResolver.wrap(provider), environment)
         // Comparison inputs stand in for the future Rust-owned layout transport, not production
         // copies of the core's HTML/CSS constants.
         val layout =
@@ -192,6 +210,43 @@ class AnkiProviderReaderTest {
                 )
         }
 
+        fun enableCreation(id: Long = Long.MAX_VALUE) {
+            provider.insertReplacement = { uri, values ->
+                check(uri.pathSegments == listOf("models"))
+                check(id !in provider.models)
+                provider.models[id] =
+                    arrayOf(
+                        id,
+                        values.getAsString("name"),
+                        values.getAsString("field_names"),
+                        values.getAsLong("num_cards"),
+                        values.getAsString("css"),
+                        values.getAsLong("sort_field_index"),
+                        values.getAsLong("type"),
+                    )
+                provider.templates[id] =
+                    listOf(arrayOf(id, 0L, "Dummy", "dummy question", "dummy answer", "", ""))
+                uri.buildUpon().appendPath(id.toString()).build()
+            }
+            provider.updateReplacement = { uri, values ->
+                check(uri.pathSegments == listOf("models", id.toString(), "templates", "0"))
+                provider.templates[id] =
+                    listOf(
+                        arrayOf(
+                            id,
+                            0L,
+                            values.getAsString("card_template_name"),
+                            values.getAsString("question_format"),
+                            values.getAsString("answer_format"),
+                            values.getAsString("browser_question_format"),
+                            values.getAsString("browser_answer_format"),
+                        )
+                    )
+                // The real provider increments once per property, not once per template row.
+                values.size()
+            }
+        }
+
         override fun close() = provider.close()
     }
 
@@ -199,6 +254,288 @@ class AnkiProviderReaderTest {
 
     private fun failed(reason: AnkiReadError, result: AnkiReadResult<*>) {
         assertEquals(AnkiReadResult.Failed(reason), result)
+    }
+
+    @Test
+    fun creationWritesOnlyFreshModelThenValidatesTheEntireLayout() {
+        Fixture().use { f ->
+            f.model(7, "User model")
+            val before = f.provider.models[7]!!.toList()
+            val templateBefore = f.provider.templates[7]!!.map { it.toList() }
+            f.provider.note(1, "猫", model = 7)
+            val notesBefore = f.provider.rows()
+            f.enableCreation()
+            assertEquals(
+                AnkiModelCreationResult.Created(AnkiProviderModelId(Long.MAX_VALUE)),
+                f.creator.create(f.layout),
+            )
+            assertEquals(before, f.provider.models[7]!!.toList())
+            assertEquals(templateBefore, f.provider.templates[7]!!.map { it.toList() })
+            val (uri, values) = f.provider.inserts.single()
+            assertEquals("content://${AnkiProviderReader.AUTHORITY}/models", uri.toString())
+            assertEquals(
+                setOf("name", "field_names", "num_cards", "css", "sort_field_index", "type"),
+                values.keySet(),
+            )
+            assertEquals(f.layout.joinedFieldNames, values.getAsString("field_names"))
+            assertEquals(1, values.getAsInteger("num_cards"))
+            assertEquals(0, values.getAsInteger("type"))
+            assertEquals(0, values.getAsInteger("sort_field_index"))
+            val (templateUri, template) = f.provider.updates.single()
+            assertEquals(
+                "content://${AnkiProviderReader.AUTHORITY}/models/${Long.MAX_VALUE}/templates/0",
+                templateUri.toString(),
+            )
+            assertEquals(5, template.size())
+            assertEquals("", template.getAsString("browser_question_format"))
+            assertEquals("", template.getAsString("browser_answer_format"))
+            assertTrue(value(f.reader.modelMatches(AnkiProviderModelId(Long.MAX_VALUE), f.layout)))
+            assertEquals(notesBefore, f.provider.rows())
+        }
+    }
+
+    @Test
+    fun creationNeverOverwritesOrRenamesSameNameModelsEvenWhenCompatible() {
+        for (compatible in listOf(false, true)) Fixture().use { f ->
+            f.model()
+            if (!compatible) f.provider.models[7]!![2] = "User fields"
+            val before = f.provider.models[7]!!.toList()
+            f.enableCreation()
+            assertEquals(
+                AnkiModelCreationResult.Failed(AnkiModelCreationError.NameConflict),
+                f.creator.create(f.layout),
+            )
+            assertEquals(before, f.provider.models[7]!!.toList())
+            assertTrue(f.provider.inserts.isEmpty())
+            assertTrue(f.provider.updates.isEmpty())
+        }
+    }
+
+    @Test
+    fun creationGatesAndFailedDiscoveryNeverSubmitWrites() {
+        val cases =
+            listOf<(Fixture) -> Unit>(
+                { it.environment.info = null },
+                { it.environment.info!!.metaData!!.putInt(AnkiProviderReader.SPEC_KEY, 1) },
+                { it.environment.permitted = false },
+                { it.provider.replacement = { null } },
+                { it.provider.replacement = { throw android.os.DeadObjectException() } },
+                { it.provider.replacement = { MatrixCursor(arrayOf("_id")) } },
+            )
+        for (configure in cases) Fixture().use { f ->
+            f.enableCreation()
+            configure(f)
+            assertTrue(f.creator.create(f.layout) is AnkiModelCreationResult.Failed)
+            assertTrue(f.provider.inserts.isEmpty())
+            assertTrue(f.provider.updates.isEmpty())
+        }
+    }
+
+    @Test
+    fun creationRechecksHostAndPermissionAfterDiscoveryBeforeSubmission() {
+        for (revoke in listOf(false, true)) Fixture().use { f ->
+            f.enableCreation()
+            f.provider.replacement = {
+                if (revoke) f.environment.permitted = false
+                else f.environment.info!!.packageName = "replacement.host"
+                MatrixCursor(arrayOf("_id", "name"))
+            }
+            assertTrue(f.creator.create(f.layout) is AnkiModelCreationResult.Failed)
+            assertTrue(f.provider.inserts.isEmpty())
+            assertTrue(f.provider.updates.isEmpty())
+        }
+    }
+
+    @Test
+    fun creationRejectsMalformedOrPreviouslyDiscoveredReturnedIdsWithoutUpdatingThem() {
+        val base = "content://${AnkiProviderReader.AUTHORITY}"
+        val responses =
+            listOf(
+                "$base/models/0",
+                "$base/models/-1",
+                "$base/models/07",
+                "$base/models/+8",
+                "$base/models/9223372036854775808",
+                "$base/models/current",
+                "$base/models/7",
+                "$base/notes/8",
+                "$base/models/8/templates/0",
+                "$base/models/8?other=1",
+                "$base/models/8#fragment",
+                "content://other.host/models/8",
+                "https://${AnkiProviderReader.AUTHORITY}/models/8",
+            )
+        for (response in responses) Fixture().use { f ->
+            f.model(7, "User model")
+            f.enableCreation()
+            f.provider.insertReplacement = { _, _ -> Uri.parse(response) }
+            assertEquals(
+                AnkiModelCreationResult.Uncertain(null, AnkiModelCreationError.InvalidResponse),
+                f.creator.create(f.layout),
+            )
+            assertEquals(1, f.provider.inserts.size)
+            assertTrue(f.provider.updates.isEmpty())
+            assertEquals("User model", f.provider.models[7]!![1])
+        }
+    }
+
+    @Test
+    fun creationLostInsertResponseStaysUncertainEvenIfModelWasCommitted() {
+        for (mode in 0..3) Fixture().use { f ->
+            f.enableCreation()
+            val insert = f.provider.insertReplacement!!
+            f.provider.insertReplacement = { uri, values ->
+                insert(uri, values)
+                when (mode) {
+                    0 -> null
+                    1 -> throw android.os.DeadObjectException()
+                    2 -> throw SecurityException("permission lost")
+                    else -> throw IllegalArgumentException("failure after commit")
+                }
+            }
+            val result = f.creator.create(f.layout)
+            assertTrue(result is AnkiModelCreationResult.Uncertain)
+            assertNull((result as AnkiModelCreationResult.Uncertain).id)
+            assertEquals(1, f.provider.models.size)
+            assertEquals(1, f.provider.inserts.size)
+            assertTrue(f.provider.updates.isEmpty())
+            // Read-only discovery cannot cause a replay or repair a dummy model.
+            value(f.reader.models())
+            assertFalse(value(f.reader.modelMatches(AnkiProviderModelId(Long.MAX_VALUE), f.layout)))
+            assertEquals(1, f.provider.inserts.size)
+            assertTrue(f.provider.updates.isEmpty())
+        }
+    }
+
+    @Test
+    fun creationHostChangeOrRevocationAfterInsertStopsTemplateSubmission() {
+        for (revoke in listOf(false, true)) Fixture().use { f ->
+            f.enableCreation()
+            val insert = f.provider.insertReplacement!!
+            f.provider.insertReplacement = { uri, values ->
+                insert(uri, values).also {
+                    if (revoke) f.environment.permitted = false
+                    else f.environment.info!!.packageName = "replacement.host"
+                }
+            }
+            val result = f.creator.create(f.layout) as AnkiModelCreationResult.Uncertain
+            assertEquals(AnkiProviderModelId(Long.MAX_VALUE), result.id)
+            assertTrue(f.provider.updates.isEmpty())
+        }
+    }
+
+    @Test
+    fun creationFailedTemplateUpdateRetainsIdWithoutRetryOrCleanup() {
+        for (mode in 0..3) Fixture().use { f ->
+            f.enableCreation()
+            val update = f.provider.updateReplacement!!
+            f.provider.updateReplacement = { uri, values ->
+                when (mode) {
+                    0 -> 0
+                    1 -> -1
+                    else -> {
+                        update(uri, values)
+                        if (mode == 2) throw android.os.DeadObjectException()
+                        throw SecurityException("permission lost after update")
+                    }
+                }
+            }
+            val result = f.creator.create(f.layout) as AnkiModelCreationResult.Uncertain
+            assertEquals(AnkiProviderModelId(Long.MAX_VALUE), result.id)
+            assertEquals(1, f.provider.inserts.size)
+            assertEquals(1, f.provider.updates.size)
+            assertEquals(1, f.provider.models.size)
+        }
+    }
+
+    @Test
+    fun creationValidatesReadbackInsteadOfTrustingPositiveUpdateCounts() {
+        for (mode in 0..3) Fixture().use { f ->
+            f.enableCreation()
+            val update = f.provider.updateReplacement!!
+            f.provider.updateReplacement = { uri, values ->
+                if (mode != 0) update(uri, values)
+                when (mode) {
+                    1 -> f.provider.models[Long.MAX_VALUE]!![1] = "Provider renamed model"
+                    2 -> f.provider.templates[Long.MAX_VALUE]!![0][5] = "browser override"
+                    3 -> f.provider.replacement = { null }
+                }
+                5
+            }
+            val result = f.creator.create(f.layout) as AnkiModelCreationResult.Uncertain
+            assertEquals(AnkiProviderModelId(Long.MAX_VALUE), result.id)
+            if (mode != 3) assertEquals(AnkiModelCreationError.LayoutMismatch, result.error)
+            else
+                assertEquals(
+                    AnkiModelCreationError.ReadFailed(AnkiReadError.CollectionUnavailable),
+                    result.error,
+                )
+            assertEquals(1, f.provider.inserts.size)
+            assertEquals(1, f.provider.updates.size)
+        }
+    }
+
+    @Test
+    fun creationRejectsRevocationAndHostChangeDuringReadback() {
+        for (duringTemplate in listOf(false, true)) for (revoke in listOf(false, true)) Fixture()
+            .use { f ->
+                f.enableCreation()
+                val update = f.provider.updateReplacement!!
+                f.provider.updateReplacement = { uri, values ->
+                    update(uri, values).also {
+                        f.provider.replacement = {
+                            val template = f.provider.lastUri!!.lastPathSegment == "templates"
+                            if (template == duringTemplate) {
+                                if (revoke) f.environment.permitted = false
+                                else f.environment.info!!.packageName = "replacement.host"
+                            }
+                            val columns = if (template) TEMPLATE_COLUMNS else MODEL_COLUMNS
+                            MatrixCursor(columns).apply {
+                                addRow(
+                                    if (template) f.provider.templates[Long.MAX_VALUE]!!.single()
+                                    else f.provider.models[Long.MAX_VALUE]!!
+                                )
+                            }
+                        }
+                    }
+                }
+                assertTrue(f.creator.create(f.layout) is AnkiModelCreationResult.Uncertain)
+                assertEquals(1, f.provider.updates.size)
+            }
+    }
+
+    @Test
+    fun creationReadbackCloseFailureCannotReportSuccess() {
+        Fixture().use { f ->
+            f.enableCreation()
+            val update = f.provider.updateReplacement!!
+            f.provider.updateReplacement = { uri, values ->
+                update(uri, values).also {
+                    f.provider.replacement = {
+                        object :
+                            CursorWrapper(
+                                MatrixCursor(MODEL_COLUMNS).apply {
+                                    addRow(f.provider.models[Long.MAX_VALUE]!!)
+                                }
+                            ) {
+                            override fun close() {
+                                super.close()
+                                throw IllegalStateException("close failed after model read")
+                            }
+                        }
+                    }
+                }
+            }
+            assertEquals(
+                AnkiModelCreationResult.Uncertain(
+                    AnkiProviderModelId(Long.MAX_VALUE),
+                    AnkiModelCreationError.ReadFailed(AnkiReadError.CollectionUnavailable),
+                ),
+                f.creator.create(f.layout),
+            )
+            assertEquals(1, f.provider.inserts.size)
+            assertEquals(1, f.provider.updates.size)
+        }
     }
 
     @Test
@@ -822,6 +1159,7 @@ class AnkiProviderReaderTest {
                         { f.reader.duplicates("猫") },
                         { f.reader.reconcile("猫") },
                         { f.reader.existingNoteIntent(AnkiProviderNoteId(7)) },
+                        { f.creator.create(f.layout) },
                     )
                 operations.forEach { operation ->
                     assertThrows(IllegalStateException::class.java) { operation() }
