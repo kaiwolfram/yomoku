@@ -10,9 +10,14 @@ fn read(router: &Router, model: bool) -> (AnkiRecoveryReadRequest, AnkiRecoveryO
     } else {
         AnkiRecoveryReadTarget::Note
     };
-    assert!(router
-        .update(Event::BeginAnkiRecoveryRead(target), |_| panic!("no I/O"))
-        .is_empty());
+    assert!(matches!(
+        router
+            .update(Event::BeginAnkiRecoveryRead(target), |_| panic!(
+                "synchronous read dispatch"
+            ))
+            .as_slice(),
+        [Effect::AnkiRecoveryRead(_)]
+    ));
     let request = router.view().4.unwrap();
     let observation = if model {
         let recovery = request.expected().model.as_ref().unwrap();

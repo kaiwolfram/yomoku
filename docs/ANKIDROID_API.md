@@ -109,9 +109,10 @@ and export have no mutable vocabulary/history input or effect.
 The read-only Android prerequisite is now `AnkiProviderReader`. It checks current
 provider metadata/spec >=2, enabled/exported state and permission before every
 operation, enumerates decks without selecting/creating one, queries exact-surface
-duplicates and reconciles read-only. Shell-local result types are not an adopted
-Event/FFI protocol. The manifest declares only the known provider visibility query
-and database permission; no permission prompt or app call site is enabled.
+duplicates and reconciles read-only. Shell-local results translate to the typed core recovery protocol. The manifest
+declares only the known provider visibility query and database permission; no
+permission prompt or automatic provider read is enabled. Explicit recovery reads
+now dispatch through CoreSession; live mutations and visible actions remain gated.
 
 Duplicate candidates are the exact Yomoku escaped first field and, when it has no
 HTML/entity/media/delimiter syntax, the literal plain surface. Bound `flds = ?`
@@ -187,3 +188,12 @@ Cover missing provider, unsupported spec, permission denial, unconfigured/locked
 collection, missing deck/model, duplicate ambiguity, failure after insertion,
 open-link resolution and unchanged Yomoku status. Test a disposable real AnkiDroid
 collection before advertising supported app versions or complete export behavior.
+
+
+Typed recovery dispatch now uses these existing queries through
+`AnkiRecoveryReader`, with the frozen surface/layout supplied by Rust. Unknown
+model IDs require exactly one full match; known IDs cannot be substituted.
+Failures during later validation discard earlier matches. Crux retains callback
+provenance and both journals natively until the SQLite evidence commit. Rechecked
+the pinned contract and Android ContentResolver documentation for this wiring;
+no new provider API, dependency/minimum-version or real-provider claim is adopted.

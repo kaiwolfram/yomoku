@@ -4032,3 +4032,27 @@ and /tmp/yomoku-browser-profile-*. No emulator started.
   /tmp/yomoku-remove-known-*. No open blocker or remaining request work.
 - No release/physical trial or performance claim. Recommend testing an upgrade
   against the user's existing phone Library/history before further Anki work.
+
+
+## 2026-10-31 — Typed read-only Anki recovery dispatch
+
+- Continued the Anki plan with explicit Crux/EffectRouter/FFI read operations and
+  a retained Android worker. Native handles/captured journal pairs stay in the
+  response closure; typed observations pass validation and durable evidence
+  commits. Closing drops late callbacks; startup restores without provider replay.
+- Added the comparison-layout DTO (stored arrays/JSON unchanged), conservative
+  unique full-model matching/known-ID checks and provider-error translation. No
+  provider writes, automatic reads, permission prompt, visible action or migration.
+- PASS: 920 workspace cases/17 ignored, strict Clippy/Rustfmt/Kotlin formatting,
+  full JNI/Unicode and durable journal exchange, identical Kotlin generation,
+  both-ABI debug/test APKs, strict lint and all 60 selected emulator cases. New
+  coverage includes four core and seven Android cases; actual session close/
+  restart/off-main dispatch and navigation while blocked pass.
+- Resolved initial test temporary lifetime, enum size and fixed-array generator
+  failures. Standard Gradle/adb/KVM escalation; no open blocker. No remaining
+  implementation/verification work for this slice. Commands/results/logs:
+  DEVELOPMENT.md “Typed read-only Anki recovery dispatch”, /tmp/yomoku-anki-dispatch-*.
+- Next: prepared-export preflight and durable live begin/outcome dispatch, then
+  recovery/deck/Add actions and a disposable real collection/browser trial. A
+  phone upgrade trial with the existing Library/history is recommended now; no
+  optimized release, physical or real-provider trial was performed this session.

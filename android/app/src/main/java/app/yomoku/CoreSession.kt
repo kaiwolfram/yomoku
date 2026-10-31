@@ -10,6 +10,9 @@ import app.yomoku.nativebridge.DictionaryProvider
 import app.yomoku.nativebridge.EffectsListener
 import app.yomoku.nativebridge.FfiError
 import app.yomoku.nativebridge.NativeBridge
+import app.yomoku.shared.AnkiExportError
+import app.yomoku.shared.AnkiRecoveryReadOperation
+import app.yomoku.shared.AnkiRecoveryReadResult
 import app.yomoku.shared.Event
 import app.yomoku.shared.ReaderClockAction
 import app.yomoku.shared.ReaderClockSample
@@ -64,6 +67,10 @@ internal class CoreSession(
     private val monotonicMs: () -> Long = SystemClock::elapsedRealtime,
     private val checkpointIntervalMs: Long = 15_000L,
     private val cancellationExecutor: ExecutorService = Executors.newSingleThreadExecutor(),
+    private val readAnkiRecovery: (AnkiRecoveryReadOperation) -> AnkiRecoveryReadResult = {
+        AnkiRecoveryReadResult.Failed(AnkiExportError.PROVIDERUNAVAILABLE)
+    },
+    private val ankiExecutor: ExecutorService = Executors.newSingleThreadExecutor(),
 ) : AutoCloseable {
     // Retained with this handle across Activity recreation; never restored into a new handle.
     val sessionKey: String = UUID.randomUUID().toString()
@@ -292,6 +299,7 @@ internal class CoreSession(
                 isClosed = true
                 bridge.close()
                 cancellationExecutor.shutdown()
+                ankiExecutor.shutdown()
             } else if (!view.storageBusy) {
                 // onCleared has no UI left for Retry. Keep the exact core obligation alive.
                 scheduleTick(1_000L)
@@ -344,6 +352,27 @@ internal class CoreSession(
         for (request in decoded) {
             when (request.effect) {
                 is ShellEffect.Render -> renderView(source)
+                is ShellEffect.AnkiRecoveryRead -> {
+                    if (!closing) {
+                        val operation = request.effect.value
+                        ankiExecutor.execute {
+                            val result =
+                                try {
+                                    readAnkiRecovery(operation)
+                                } catch (_: Exception) {
+                                    AnkiRecoveryReadResult.Failed(AnkiExportError.PROVIDERFAILURE)
+                                }
+                            mainHandler.post {
+                                // Closing may abandon a read, never the durable journal. A fresh
+                                // process restores it; this callback cannot reach another bridge.
+                                if (!closing && !isClosed) {
+                                    render(bridge.resolve(request.id, result.bincodeSerialize()))
+                                    driveReaderClock()
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
         onViewChanged?.invoke()

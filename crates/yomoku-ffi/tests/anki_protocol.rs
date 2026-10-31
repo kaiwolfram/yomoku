@@ -11,7 +11,6 @@ fn anki_startup_worker_payloads_and_callbacks_have_no_shell_codec() {
     assert!(BincodeFfiFormat::serialize(&mut vec![], &result).is_err());
     for event in [
         Event::RestoreAnkiRecovery,
-        Event::RetryAnkiRecovery,
         Event::AnkiRecoveryFinished(1, result),
         Event::AnkiRecoveryFinished(2, StorageResult::Failed(DocumentError::Unavailable)),
     ] {
@@ -75,21 +74,22 @@ fn anki_export_preparation_and_clear_have_no_shell_codec() {
 }
 
 #[test]
-fn anki_recovery_read_begin_and_captured_callback_have_no_shell_codec() {
+fn anki_recovery_read_dispatch_is_public_but_captured_callback_has_no_shell_codec() {
     use crux_core::App;
     use yomoku_core::{
         anki::{
             AnkiModelCreation, AnkiModelLayout, AnkiModelReconciliation, AnkiModelRecovery,
-            AnkiRecoveryObservation, AnkiRecoveryReadTarget, AnkiRecoverySnapshot,
+            AnkiRecoveryObservation, AnkiRecoveryReadResult, AnkiRecoveryReadTarget,
+            AnkiRecoverySnapshot,
         },
         app::{Model, Yomoku},
     };
     for target in [AnkiRecoveryReadTarget::Note, AnkiRecoveryReadTarget::Model] {
         assert!(
-            BincodeFfiFormat::serialize(&mut vec![], &Event::BeginAnkiRecoveryRead(target))
-                .is_err()
+            BincodeFfiFormat::serialize(&mut vec![], &Event::BeginAnkiRecoveryRead(target)).is_ok()
         );
     }
+    assert!(BincodeFfiFormat::serialize(&mut vec![], &Event::RetryAnkiRecovery).is_ok());
     let mut model = Model::default();
     let _restore = Yomoku.update(Event::RestoreAnkiRecovery, &mut model);
     let _finished = Yomoku.update(
@@ -115,6 +115,11 @@ fn anki_recovery_read_begin_and_captured_callback_have_no_shell_codec() {
         Box::new(AnkiRecoveryObservation::Model(
             AnkiModelReconciliation::Unresolved,
         )),
+    );
+    assert!(BincodeFfiFormat::serialize(&mut vec![], &event).is_err());
+    let event = Event::AnkiRecoveryProviderFinished(
+        Box::new(model.pending_anki_recovery_read().unwrap().clone()),
+        AnkiRecoveryReadResult::Model(Some(i64::MAX)),
     );
     assert!(BincodeFfiFormat::serialize(&mut vec![], &event).is_err());
 }

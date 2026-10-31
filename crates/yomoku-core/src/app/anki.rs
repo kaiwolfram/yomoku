@@ -35,6 +35,7 @@ impl Yomoku {
                 if model.anki_recovery_commit.is_none()
                     && (model.anki_recovery_read.is_some()
                         || matches!(model.anki_recovery, AnkiRecoveryState::Failed(_))
+                        || model.anki_recovery_read_error.is_some()
                         || model.anki_recovery_commit_error.is_some()) => {}
             Event::RestoreAnkiRecovery | Event::RetryAnkiRecovery => {
                 return Some(Command::done());

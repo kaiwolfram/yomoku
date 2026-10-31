@@ -1918,9 +1918,9 @@ attempt IDs. Only Restored with both slots empty satisfies the startup gate;
 this alone never authorizes a provider write. Errors, unexpected result kinds,
 stale/duplicate callbacks and sequence exhaustion cannot open the gate. Initial
 Library refresh schedules this separate read on the existing FIFO; repeated
-refreshes do not retry failures. Explicit native Retry is available for future
-UI wiring. Reader/import busy/error/checkpoint state is independent. No new
-shell Event/ViewModel payload, settings, provider action or replay is enabled.
+refreshes do not retry failures. Explicit Retry has a shell codec for future
+UI wiring. Reader/import busy/error/checkpoint state is independent. No journal
+snapshot ViewModel, settings, provider write or replay is enabled.
 
 ## App-owned Anki recovery evidence commits (schema 0022 unchanged)
 
@@ -1971,8 +1971,9 @@ Durable begin/outcome dispatch and provider/UI activation remain unfinished.
 `AnkiExportError` for invalid callbacks. The request freezes the complete restored
 pair and a note/model target behind a private shared allocation; equality means
 that exact allocation, not equivalent IDs or contents. A new app/read attempt
-cannot reconstruct it. Native begin/callback events and these values have no
-shell codec or ViewModel projection.
+cannot reconstruct it. Handles/callbacks and these journal values have no shell
+codec or ViewModel projection. Explicit Begin/Retry have generated shell codecs;
+read operations transport only exact surface or full layout/optional model ID.
 
 A callback must match the active handle, target kind and current full pair.
 Accepted evidence consumes the handle and creates the existing durable recovery
@@ -1981,7 +1982,12 @@ An active read blocks direct native evidence commits. Explicit Retry can discard
 a lost read handle before restoring both journals; late callbacks are ignored.
 Pending commits cannot be discarded, and failed/lost commit responses require
 restore and a fresh read. No journal row/state change occurs at read begin; no
-provider dispatch or mutation, replay, migration or dependency is introduced.
+provider mutation, replay, migration or dependency is introduced. Read-only
+provider dispatch retains this native handle in the Crux response closure.
+`AnkiReadModelLayout` is a list-based comparison DTO for Kotlin generation; stored
+`AnkiModelLayout` retains its existing fixed four-field array/JSON representation.
+Positive IDs are validated before evidence enters the existing commit path;
+failed/empty reads retain obligations and never grant live mutation tokens.
 
 ## Read-only Vocabulary browser (schema 0020 unchanged)
 

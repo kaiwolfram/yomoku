@@ -9,7 +9,7 @@ import android.database.Cursor
 import android.net.Uri
 import android.os.Looper
 
-/** Shell-only prerequisites; these values are not yet an Event/FFI protocol. */
+/** Provider-local failures, translated to the typed recovery protocol by AnkiRecoveryReader. */
 internal enum class AnkiReadError {
     ProviderUnavailable,
     UnsupportedProvider,
@@ -56,8 +56,8 @@ internal interface AnkiProviderEnvironment {
 
 /**
  * Read-only ContentResolver boundary. Call on a worker. No provider state is cached and no
- * permission dialog, Activity launch, model creation or note mutation occurs here. Keep unconnected
- * until the app owns durable pending/uncertain export recovery.
+ * permission dialog, Activity launch, model creation or note mutation occurs here. Explicit
+ * recovery dispatch uses the app's captured handle and durable evidence commit gate.
  */
 internal class AnkiProviderReader(
     private val resolver: ContentResolver,

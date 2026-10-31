@@ -23,6 +23,7 @@ pub use imports::{AnalyzerLifecycle, AnalyzerLoader, PasteAnalyzer};
 #[effect(facet_typegen)]
 pub enum ShellEffect {
     Render(RenderOperation),
+    AnkiRecoveryRead(yomoku_core::anki::AnkiRecoveryReadOperation),
 }
 
 impl From<Effect> for ShellEffect {
@@ -31,12 +32,13 @@ impl From<Effect> for ShellEffect {
         // its owner here. Rust I/O must be handled below this mapping layer.
         match effect {
             Effect::Render(request) => Self::Render(request),
+            Effect::AnkiRecoveryRead(request) => Self::AnkiRecoveryRead(request),
             Effect::Storage(_) => unreachable!("storage effects are consumed by Rust middleware"),
         }
     }
 }
 
-/// SQLite effects are consumed before the shell mapping; only Render crosses FFI.
+/// SQLite effects stay native; render and explicit read-only Anki requests cross FFI.
 pub type EffectRouter =
     AnkiStartupLayer<MapEffectLayer<HandleEffectLayer<Core<Yomoku>, StorageEffects>, ShellEffect>>;
 

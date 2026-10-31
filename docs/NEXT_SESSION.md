@@ -7,64 +7,63 @@ results in progress docs/reports, out of commit message bodies.
 - Announce when no plan steps remain; ask about product ambiguities. Recommend
   physical testing when it provides more value than the next implementation step.
 - User's phone trial was acceptable; detailed device/workflow validation remains
-  unchecked. Small polish can wait while the implementation plan continues.
+  unchecked. Recommend an upgrade trial with existing Library/history (schema 23)
+  before further integration; rebuild optimized APK when requested.
 - Feed is only `Coming Soon! 🌱`; Nostr/identity/Q188 are beyond the first MVP.
-- Known forms chart/aggregate removed. Keep Known in the five-status chart.
+- Statistics retains cumulative occurrences and all five statuses including Known.
+  Schema 0023 drops only unused vocabulary_dictionary_forms; all other history,
+  vocabulary, token dictionary metadata and Anki journals are preserved.
 
-## Current slice
-- Schema 0023 drops only vocabulary_dictionary_forms; no current writer/reader
-  uses it. Historical migrations remain intact. Vocabulary, status/occurrence/
-  completion history, token dictionary metadata and Anki journals remain intact.
-- Statistics now has cumulative occurrences and five-status charts. Native bucket
-  payloads/Kotlin codecs and the opt-in profiler no longer carry form aggregates.
-- Migration cases preserve all other tables on a populated schema-22 upgrade;
-  failure after DROP rolls back bytes/history and permits exact retry. Historical
-  schema upgrades, imports, original/effective completions and deletion pass.
-
-## Anki continuation (unchanged)
-- Native BeginAnkiRecoveryRead(Note|Model) captures both restored journals before
-  dispatch. One immutable shared-allocation handle identifies app owner/attempt;
-  equal IDs/payloads cannot recreate it. Callback must return the same handle,
-  matching target and unchanged pair. Foreign/stale/duplicate callbacks cannot
-  consume a newer read; matching invalid evidence records a separate read error.
-- Accepted evidence consumes the handle and enters FIFO CommitAnkiRecovery with
-  the captured pair. No provider effects are emitted yet. Direct evidence commits
-  cannot compete with an active read. Native accessors are for a future coordinator,
-  not polling; no shell codec/ViewModel/Android/FFI read call site is enabled.
-- Explicit Retry invalidates a lost read and restores BOTH journals read-only.
-  Pending commits cannot be abandoned. Failed/lost commit responses require restore
+## Current Anki slice
+- Explicit BeginAnkiRecoveryRead(Note|Model) now emits a typed read-only Crux
+  operation through EffectRouter/FFI. Only frozen surface or full layout/optional
+  known model ID crosses; both journals and shared-allocation read handle remain
+  in the native response closure. Begin and explicit Retry have shell codecs;
+  callbacks/commits/journals still do not. No automatic read or UI action exists.
+- CoreSessionOwner supplies AnkiRecoveryReader/AnkiProviderReader. CoreSession
+  dispatches on a separate single-thread worker, resolves on main and drops late
+  callbacks during/after close. Shutdown does not wait for blocked reads. Restarts
+  restore journals without replay. Low-level sessions default to unavailable.
+- Unknown models require one complete layout match; any later read failure drops
+  earlier matches. Known model ID checks cannot substitute another model. Empty,
+  failed, partial or ambiguous reads retain obligations. Notes prove existence,
+  never deck placement. No model repair/rename/delete or retry mutation occurs.
+- Model transport uses AnkiReadModelLayout with ordered list fields because the
+  pinned generator mishandles fixed string arrays. Native stored four-field arrays
+  and JSON stay unchanged. No schema/dependency/native ABI change.
+- Matching responses validate kind/positive IDs and unchanged captured pair,
+  then enter FIFO CommitAnkiRecovery. Gate stays closed until commit. Foreign,
+  stale and duplicate callbacks cannot consume newer reads. Provider/read errors
+  remain separate from reader and journal-persistence errors.
+- Explicit Retry invalidates lost reads/read errors and restores BOTH journals.
+  Pending commits cannot be abandoned. Failed/lost commit responses need restore
   plus fresh observations; never replay evidence or provider mutations.
+
+## Retained live-export prerequisites
 - Native PrepareAnkiExport authenticates the current visible original/effective
   selection and freezes fields/surface/sentence/deck/full layout. Reader busy,
-  checkpoint/completion/departure/mutation gates apply; both journals must be
-  restored empty without pending/failed commits. Clear drops only unsubmitted
-  intent. Restart retains neither prepared intent nor read handles.
-- Initial Library refresh schedules restore before List on the existing FIFO.
-  Recovery commits compare both journals in one immediate transaction. Both begin
-  methods gate BOTH journals and commit before one live invocation; only a newly
-  committed preparation grants private live tokens. Recovery IDs never grant writes.
-- Note IDs prove existence, not deck placement. Model evidence requires exact full
-  layout and original ID when known. Empty/failed/partial/wrong reads retain doubt.
-  Terminal journals survive deletion. No replay/repair/rename/delete/cleanup or
-  automatic retries. Isolated AnkiExportSession/CheckAndAdd remains unowned.
-- API evidence: ANKIDROID_API.md, pinned 2.25.3. Isolated worker adapters have no
-  app call site or real-provider claim; no Anki dependency/minimum adopted.
+  checkpoint/completion/departure/mutation gates apply; journals must be restored
+  empty without pending/failed commits. Clear drops only unsubmitted intent.
+  Restart retains neither intent nor read handles; CheckAndAdd remains isolated.
+- Both durable begin methods gate both journals and commit before one invocation;
+  only newly committed preparation grants private live tokens. Recovery IDs never
+  grant writes. Terminal journals survive deletion; no pruning or automatic retry.
+- API evidence: ANKIDROID_API.md, pinned 2.25.3. Isolated mutating adapters remain
+  unowned with no app call site/real-provider claim; no dependency/minimum adopted.
 
 ## Next tasks (ordered)
-1. Recommend a physical-phone upgrade trial against the existing Library/history
-   before further integration work; rebuild an optimized APK when requested.
-2. Connect native read handles/prepared intent to typed Android/FFI read-only
-   dispatch/preflight, then durable begin/outcome commits before one invocation.
-   Validate provider/permission/deck/model failures and death/stale/lost callbacks.
-3. Add recovery/error/explicit Retry projection, deck settings, Add to Anki and
+1. App-owned prepared-export preflight with typed provider observations, then
+   durable begin/outcome commits before one live model/note invocation. Validate
+   provider/permission/deck/model failures and death/stale/lost callbacks.
+2. Add recovery/error/explicit Retry projection, deck settings, Add to Anki and
    existing-note actions after gates; validate a disposable real collection/browser.
+3. Encrypted-backup format/library review follows completed Anki integration.
 
 ## Verification / blockers
-- PASS: 916 workspace tests/17 ignored opt-in fixtures, three profiling-harness
-  cases, focused status-query check, strict Clippy, Rustfmt, Kotlin formatting,
-  full host JNI/Unicode suite; Kotlin regeneration identical for host/Android.
-- PASS: debug/test APKs, strict lintDebug; statistics/navigation 9/9 on phone
-  and 9/9 on tablet-sized API-36 x86_64. Display restored; no remaining request work.
-- No open blocker. Release/physical trials and performance/accessibility matrix
-  not rerun. Commands/results: DEVELOPMENT.md “Remove Known forms” section;
-  logs: /tmp/yomoku-remove-known-*. Older phone APK remains source 0374365.
+- PASS: 920 workspace cases/17 ignored; strict Clippy/Rustfmt/Kotlin formatting;
+  full host JNI/Unicode exchange; identical host/Android generation; both-ABI
+  debug/test APKs, strict lint and all 60 selected API-36 x86_64 emulator cases.
+  Commands, resolved initial failures and logs: DEVELOPMENT.md, typed dispatch.
+- No open blocker or remaining work for this slice. Physical upgrade/real AnkiDroid
+  trials and broad performance/accessibility/lifecycle matrix remain unchecked.
+- Older phone APK remains source 0374365; no new optimized release requested.

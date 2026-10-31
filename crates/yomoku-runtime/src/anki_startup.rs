@@ -1,5 +1,5 @@
 //! Schedule native recovery before the initial Library read. Constructors stay
-//! free of database I/O, and no Anki request or recovery payload crosses FFI.
+//! free of database I/O; startup emits no provider reads and keeps journals native.
 
 use crux_core::{middleware::Layer, Resolvable, ResolveError};
 use yomoku_core::app::Event;

@@ -4673,3 +4673,29 @@ Remove obsolete link-only tests and the profiling comparison against link/event
 UNION SQL. Existing status, history, import, completion and bridge checks continue;
 add explicit populated-upgrade/all-other-tables preservation and drop-rollback
 coverage. Historical benchmark results retain their original workload context.
+
+
+## 2026-10-31 — Typed read-only Anki recovery dispatch
+
+Use the existing Crux request/response bridge for explicit recovery reads. Keep
+the shared native handle and both journals in the response closure; export only
+the frozen exact surface or full model layout/optional known model ID. Expose
+Begin/Retry Events, retaining native-only callbacks/commits. Core validates result
+kind and positive signed-64 IDs before committing evidence on the existing FIFO.
+Empty/failed reads cannot authorize insertion; note existence proves no placement.
+
+Translate provider-local errors to the typed core error. Model discovery must
+yield one full match, with every candidate read succeeding; known model IDs are
+validated directly without substitution. Retain full layout strings from the
+old journal, including across upgrades. The Kotlin generator cannot serialize
+the native fixed string array correctly, so use a list-based comparison DTO;
+leave stored four-field arrays/JSON and all migrations unchanged. Box the model
+operation payload to keep the operation enum small. No dependency is introduced.
+
+CoreSession owns a separate single-thread provider executor, resolves on main,
+and discards callbacks during/after close. Shutdown does not wait on a blocked
+provider read; the durable journal survives and startup restores it. The app owner
+supplies the real adapter, while low-level sessions default to unavailable. No
+automatic reads, permission prompt or recovery UI is introduced in this slice.
+Provider writes still require app-owned preflight and durable live begin/outcome
+gates before invoking the existing isolated mutating adapters.

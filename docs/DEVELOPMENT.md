@@ -8157,3 +8157,59 @@ existing Library/history before the next Anki integration slice. Logs:
 `/tmp/yomoku-remove-known-{workspace,clippy,status-query,harness,rustfmt,jni,format,format-check,codegen-diff,android-phone,android-tablet}.log`;
 phone XML: `/tmp/yomoku-remove-known-phone-results`; tablet XML:
 `android/app/build/outputs/androidTest-results/connected/debug/`.
+
+
+## Typed read-only Anki recovery dispatch
+
+2026-10-31: configure PATH/JAVA_HOME/JAVA_BIN/GRADLE_USER_HOME/ANDROID_HOME as
+above. Keep host JNI generation/execution sequential with Android native builds.
+Use the existing isolated 8 GiB statistics-ui-avd image; do not wipe user data.
+
+```sh
+cargo test --workspace --all-features --locked --offline --quiet
+cargo clippy --workspace --all-targets --all-features --locked --offline -- -D warnings
+cargo fmt --all -- --check
+tools/test-kotlin-bridge.sh
+tools/format-kotlin.sh --check
+"$JAVA_BIN" -jar .local/ktfmt-0.64.jar --kotlinlang-style --dry-run --set-exit-if-changed tests/kotlin/AnkiRecoveryBridgeTest.kt
+./android/gradlew -p android :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug --offline --console=plain
+./android/gradlew -p android :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=app.yomoku.AnkiProviderReaderTest,app.yomoku.AnkiRecoverySessionTest,app.yomoku.CoreSessionTest,app.yomoku.NavigationTest --offline --console=plain
+cargo run -p yomoku-ffi --bin generate-kotlin --features facet_typegen --locked --offline -- /tmp/yomoku-anki-dispatch-kotlin
+diff -r target/generated/kotlin /tmp/yomoku-anki-dispatch-kotlin
+git diff --check
+```
+
+PASS: 920 workspace tests/17 ignored opt-in fixtures, strict all-target/all-feature
+Clippy, Rustfmt/diff, Kotlin formatting, full host Kotlin/JNI and Unicode exchange.
+Four new core cases cover the actual captured Crux response, foreign/stale/wrong
+result kinds, invalid/large IDs, empty/failed reads, unchanged reader state and
+commit gates. JNI fixtures exchange Rust-owned layout/Unicode/large IDs, commit
+both journal kinds durably and verify lost/late callbacks, permission/empty reads,
+close/restart without automatic provider dispatch. The verifier reopens the JNI
+SQLite files in Rust and confirms both obligations are terminal. Host and Android
+Kotlin regeneration is byte-for-byte identical.
+
+PASS: both-ABI native packaging, debug/test APKs and strict lintDebug. All 60
+selected API-36 x86_64 tests pass with zero failures/skips at the phone baseline
+(1080×2400, 420 dpi): 53 provider adapter, 2 new retained recovery session, 3 core
+session and 2 navigation cases. Five new provider cases cover exact Unicode/long
+IDs, known-ID restrictions, full/ambiguous model matches, discarded partial reads,
+permission loss, unavailable provider and unchanged provider state. The two new
+real-JNI/SQLite session cases verify off-main dispatch, frozen old layout, blocked
+read with responsive navigation, retained uncertainty after failure, close while
+reading and a late old callback that cannot affect a restarted session.
+
+Initial checks found a test-helper temporary lifetime error, Clippy's large-enum
+warning and a fixed-string-array Kotlin generator failure. Fixed the temporary,
+boxed the operation layout and introduced a list transport DTO without changing
+stored arrays/JSON. Final checks above pass. Gradle/adb/emulator needed the usual
+local-socket/KVM sandbox escalation; no open blocker. No permission prompt, visible
+Anki action, live mutation, dependency/schema/native-export ABI change or real
+AnkiDroid compatibility claim. No optimized release, physical upgrade trial,
+broader lifecycle/accessibility matrix or performance measurement was run. No
+remaining implementation/verification work for this slice; preflight/durable live
+dispatch and recovery/settings/actions remain planned. The existing phone upgrade
+trial recommendation still applies before further integration.
+
+Logs: `/tmp/yomoku-anki-dispatch-{focused,workspace,clippy,rustfmt,protocol,jni,format,format-check,host-format,kotlin-precheck,android,emulator,typegen-check,codegen-diff,android-codegen-diff}.log`;
+Android XML remains in `android/app/build/outputs/androidTest-results/connected/debug/`.

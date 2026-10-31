@@ -49,6 +49,7 @@ fun main(args: Array<String>) {
     verifyVocabularyBridge()
     verifyStatisticsCodecs(args.single())
     verifyStatisticsBridge()
+    verifyAnkiRecoveryBridge(args.single())
     verifyReaderBoundaryDraft()
     verifyEffectiveReaderDisplay()
     verifyTextBoundaries(args.single())

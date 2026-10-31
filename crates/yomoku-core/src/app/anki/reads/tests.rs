@@ -52,7 +52,11 @@ fn no_effect(model: &mut Model, event: Event) {
 }
 
 fn begin(model: &mut Model, target: AnkiRecoveryReadTarget) -> AnkiRecoveryReadRequest {
-    no_effect(model, Event::BeginAnkiRecoveryRead(target));
+    let mut command = Yomoku.update(Event::BeginAnkiRecoveryRead(target), model);
+    assert!(matches!(
+        command.effects().next(),
+        Some(Effect::AnkiRecoveryRead(_))
+    ));
     model.pending_anki_recovery_read().unwrap().clone()
 }
 
@@ -369,4 +373,163 @@ fn anki_reads_commit_attempt_exhaustion_never_releases_frozen_obligation() {
         model.anki_recovery,
         AnkiRecoveryState::Restored(Box::new(request.expected().clone()))
     );
+}
+
+fn provider_callback(
+    model: &mut Model,
+    target: AnkiRecoveryReadTarget,
+    result: AnkiRecoveryReadResult,
+) -> (AnkiRecoveryReadRequest, Event) {
+    let mut command = Yomoku.update(Event::BeginAnkiRecoveryRead(target), model);
+    let Some(Effect::AnkiRecoveryRead(mut effect)) = command.effects().next() else {
+        panic!("read-only provider effect")
+    };
+    let captured = model.pending_anki_recovery_read().unwrap().clone();
+    assert_eq!(effect.operation, captured.operation());
+    effect.resolve(result).unwrap();
+    let callback = command.events().next().unwrap();
+    (captured, callback)
+}
+
+#[test]
+fn anki_provider_response_keeps_native_owner_and_frozen_model_layout_until_commit() {
+    for target in [AnkiRecoveryReadTarget::Note, AnkiRecoveryReadTarget::Model] {
+        let mut model = fixture();
+        let result = match target {
+            AnkiRecoveryReadTarget::Note => AnkiRecoveryReadResult::Notes(vec![i64::MAX, i64::MAX]),
+            AnkiRecoveryReadTarget::Model => AnkiRecoveryReadResult::Model(Some(9007199254740993)),
+        };
+        let before = Yomoku.view(&model);
+        let (captured, callback) = provider_callback(&mut model, target, result);
+        let mut foreign = fixture();
+        let _other = begin(&mut foreign, target);
+        no_effect(&mut foreign, callback.clone());
+        assert!(foreign.pending_anki_recovery_read().is_some());
+        let mut command = Yomoku.update(callback.clone(), &mut model);
+        let Some(Effect::Storage(effect)) = command.effects().next() else {
+            panic!("durable commit")
+        };
+        let StorageOperation::CommitAnkiRecovery(commit) = effect.operation else {
+            panic!("recovery commit")
+        };
+        assert_eq!(commit.expected.as_ref(), captured.expected());
+        assert_eq!(Yomoku.view(&model), before);
+        assert!(model.anki_recovery_saving());
+        assert_eq!(model.anki_recovery_read_error(), None);
+        assert_ne!(
+            commit.expected_result().unwrap().as_ref(),
+            captured.expected()
+        );
+        no_effect(&mut model, callback);
+        assert!(model.anki_recovery_saving());
+    }
+}
+
+#[test]
+fn anki_provider_invalid_ids_and_wrong_result_kind_never_commit_or_release_journals() {
+    for (target, result) in [
+        (
+            AnkiRecoveryReadTarget::Note,
+            AnkiRecoveryReadResult::Notes(vec![i64::MAX, 0]),
+        ),
+        (
+            AnkiRecoveryReadTarget::Note,
+            AnkiRecoveryReadResult::Notes(vec![-1]),
+        ),
+        (
+            AnkiRecoveryReadTarget::Note,
+            AnkiRecoveryReadResult::Model(None),
+        ),
+        (
+            AnkiRecoveryReadTarget::Model,
+            AnkiRecoveryReadResult::Model(Some(0)),
+        ),
+        (
+            AnkiRecoveryReadTarget::Model,
+            AnkiRecoveryReadResult::Notes(vec![i64::MAX]),
+        ),
+    ] {
+        let mut model = fixture();
+        let expected = model.anki_recovery.clone();
+        let (_, callback) = provider_callback(&mut model, target, result);
+        no_effect(&mut model, callback);
+        assert_eq!(model.anki_recovery, expected);
+        assert!(!model.anki_recovery_saving());
+        assert!(model.pending_anki_recovery_read().is_none());
+        assert_eq!(
+            model.anki_recovery_read_error(),
+            Some(AnkiExportError::InvalidResponse)
+        );
+        let mut retry = Yomoku.update(Event::RetryAnkiRecovery, &mut model);
+        assert!(matches!(retry.effects().next(), Some(Effect::Storage(_))));
+    }
+}
+
+#[test]
+fn anki_provider_empty_failed_or_wrong_known_model_evidence_retains_obligations() {
+    for (target, result) in [
+        (
+            AnkiRecoveryReadTarget::Note,
+            AnkiRecoveryReadResult::Notes(vec![]),
+        ),
+        (
+            AnkiRecoveryReadTarget::Model,
+            AnkiRecoveryReadResult::Model(None),
+        ),
+        (
+            AnkiRecoveryReadTarget::Model,
+            AnkiRecoveryReadResult::Model(Some(1)),
+        ),
+        (
+            AnkiRecoveryReadTarget::Note,
+            AnkiRecoveryReadResult::Failed(AnkiExportError::PermissionDenied),
+        ),
+        (
+            AnkiRecoveryReadTarget::Model,
+            AnkiRecoveryReadResult::Failed(AnkiExportError::CollectionUnavailable),
+        ),
+    ] {
+        let mut model = fixture();
+        let error = if let AnkiRecoveryReadResult::Failed(error) = result {
+            Some(error)
+        } else {
+            None
+        };
+        let (captured, callback) = provider_callback(&mut model, target, result);
+        let mut command = Yomoku.update(callback, &mut model);
+        let Some(Effect::Storage(effect)) = command.effects().next() else {
+            panic!("durable unresolved commit")
+        };
+        let StorageOperation::CommitAnkiRecovery(commit) = effect.operation else {
+            panic!("recovery commit")
+        };
+        assert_eq!(
+            commit.expected_result().unwrap().as_ref(),
+            captured.expected()
+        );
+        assert_eq!(model.anki_recovery_read_error(), error);
+        assert!(!model.anki_recovery().allows_preparation());
+    }
+}
+
+#[test]
+fn anki_provider_callback_after_explicit_retry_cannot_consume_new_read() {
+    let mut model = fixture();
+    let (old, late) = provider_callback(
+        &mut model,
+        AnkiRecoveryReadTarget::Note,
+        AnkiRecoveryReadResult::Notes(vec![i64::MAX]),
+    );
+    let mut retry = Yomoku.update(Event::RetryAnkiRecovery, &mut model);
+    assert!(matches!(retry.effects().next(), Some(Effect::Storage(_))));
+    no_effect(
+        &mut model,
+        Event::AnkiRecoveryFinished(
+            1,
+            StorageResult::AnkiRecoveryLoaded(Box::new(old.expected().clone())),
+        ),
+    );
+    let new = begin(&mut model, AnkiRecoveryReadTarget::Note);
+    no_effect(&mut model, late);
+    assert_eq!(model.pending_anki_recovery_read(), Some(&new));
 }

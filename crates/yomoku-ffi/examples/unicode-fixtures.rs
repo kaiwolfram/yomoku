@@ -21,6 +21,8 @@ use yomoku_core::{
 };
 use yomoku_core::{pagination::ReadingPosition, reader::ReaderAnalysis};
 
+#[path = "unicode-fixtures/anki.rs"]
+mod anki;
 #[path = "unicode-fixtures/effective_overrides.rs"]
 mod effective_overrides;
 #[path = "unicode-fixtures/statistics.rs"]
@@ -53,6 +55,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let writing = args[0] == "write";
     statistics::exchange(dir, writing)?;
     vocabulary::exchange(dir, writing)?;
+    anki::exchange(dir, writing)?;
     if writing {
         fs::create_dir_all(dir)?;
         fs::write(

@@ -321,8 +321,6 @@ pub enum Event {
     #[serde(skip)]
     #[cfg_attr(feature = "facet_typegen", facet(skip))]
     RestoreAnkiRecovery,
-    #[serde(skip)]
-    #[cfg_attr(feature = "facet_typegen", facet(skip))]
     RetryAnkiRecovery,
     #[serde(skip)]
     #[cfg_attr(feature = "facet_typegen", facet(skip))]
@@ -335,11 +333,14 @@ pub enum Event {
     #[serde(skip)]
     #[cfg_attr(feature = "facet_typegen", facet(skip))]
     AnkiRecoveryCommitFinished(u64, StorageResult),
-    /// Native read lifecycle only; no provider invocation or shell codec yet.
+    /// Explicit read-only dispatch; the native callback retains its own handle.
+    BeginAnkiRecoveryRead(crate::anki::AnkiRecoveryReadTarget),
     #[serde(skip)]
     #[cfg_attr(feature = "facet_typegen", facet(skip))]
-    BeginAnkiRecoveryRead(
-        #[cfg_attr(feature = "facet_typegen", facet(opaque))] crate::anki::AnkiRecoveryReadTarget,
+    AnkiRecoveryProviderFinished(
+        #[cfg_attr(feature = "facet_typegen", facet(opaque))]
+        Box<crate::anki::AnkiRecoveryReadRequest>,
+        crate::anki::AnkiRecoveryReadResult,
     ),
     #[serde(skip)]
     #[cfg_attr(feature = "facet_typegen", facet(skip))]
@@ -414,6 +415,7 @@ pub struct ViewModel {
 pub enum Effect {
     Render(RenderOperation),
     Storage(StorageOperation),
+    AnkiRecoveryRead(crate::anki::AnkiRecoveryReadOperation),
 }
 
 #[derive(Default)]
@@ -1630,6 +1632,7 @@ impl App for Yomoku {
             | Event::CommitAnkiRecovery(_)
             | Event::AnkiRecoveryCommitFinished(..)
             | Event::BeginAnkiRecoveryRead(_)
+            | Event::AnkiRecoveryProviderFinished(..)
             | Event::AnkiRecoveryReadFinished(..) => unreachable!(),
         }
         render::render()

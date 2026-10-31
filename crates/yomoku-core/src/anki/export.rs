@@ -173,7 +173,9 @@ impl AnkiExistingNotes {
     }
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
+#[repr(C)]
 pub enum AnkiExportError {
     ProviderUnavailable,
     UnsupportedProvider,

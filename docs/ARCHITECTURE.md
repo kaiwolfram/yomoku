@@ -1860,7 +1860,7 @@ See DATA_MODEL.md for the stored shape. This remains an isolated prerequisite:
 app/Event/FFI ownership, restore gating and Android/UI integration are still
 required before any live mutation. Model-creation storage is described below.
 
-Android's unconnected `AnkiProviderReader` implements the read-only prerequisite:
+Android's `AnkiProviderReader` implements the read-only prerequisite:
 fresh availability/spec/permission checks, deck enumeration, bound exact-first-
 field candidate queries across models/decks and read-only reconciliation. It
 accepts exact canonical escaping or syntax-free plain surfaces; arbitrary HTML
@@ -1871,13 +1871,13 @@ verified IDs are retained. Existing-note intents target the current provider's
 package and are returned only after supported browser-link resolution, without
 launching. All entry points reject the main thread; no reader/core/database handle
 is available to this adapter. Manifest visibility/permission declarations do not
-request permission or dispatch I/O. Local Kotlin types are prerequisites for the
-future typed bridge, not a second app state machine or serialized protocol.
+request permission or dispatch I/O. Local Kotlin types are translated by the
+typed recovery bridge, not a second app state machine.
 
 Model discovery returns positive signed-64 IDs and exact names without inferring
 compatibility or selecting a same-name model. `modelMatches` performs fresh
 metadata/template reads by ID against an `AnkiProviderModelLayout` supplied by the
-future core bridge. Rust retains production names/HTML/CSS; Kotlin snapshots field
+core read bridge. Rust retains production names/HTML/CSS; Kotlin snapshots field
 order and verifies normal type, sort field zero, four ordered fields, exact CSS,
 one ordinal-zero card, exact templates and empty browser overrides. Default deck
 does not define layout; explicit configured-deck placement remains a mutating
@@ -1951,8 +1951,8 @@ No app/Event/FFI/Android call site or mutation replay is enabled by this journal
 All EffectRouter factories now use a narrow `AnkiStartupLayer`: before the first
 Library refresh it dispatches native `RestoreAnkiRecovery` on the existing worker
 FIFO. Constructors retain lazy database opening. Repeated refreshes coalesce;
-failed recovery requires native explicit Retry. Normal effects and callbacks
-continue through the same mapping/bridge; no additional shell protocol is added.
+failed recovery requires explicit Retry. Normal effects and callbacks continue
+through the same mapping/bridge; startup itself emits no provider request.
 
 `Model` retains `AnkiRecoveryState` independently of reader/import storage_busy,
 errors and checkpoint/completion retries. Attempt IDs reject stale callbacks.
@@ -1965,7 +1965,7 @@ provider command or recovery mutation. Live tokens remain in storage and cannot
 be constructed from the core's validated recovery IDs.
 
 Startup ownership now feeds the native evidence-commit path below. Live export/
-session ownership, durable begin/outcome routing and provider/FFI/UI activation
+session ownership, durable begin/outcome routing and provider writes/UI activation
 remain unfinished. Earlier journal/provider descriptions imply no enabled actions.
 
 ### App-owned Anki recovery evidence commits
@@ -2013,25 +2013,41 @@ and visible Settings/Add to Anki/recovery actions remain unfinished. The standal
 `AnkiExportSession` is still isolated and must not bypass those durable gates.
 
 
-### Native Anki recovery read lifecycle
+### Typed Anki recovery read dispatch
 
-`BeginAnkiRecoveryRead(Note|Model)` now retains one `AnkiRecoveryReadRequest`
-only for an existing target in the restored pair, with no pending/failed recovery
-commit. Its immutable shared allocation captures both journals and identifies
-this app's read attempt. Native `pending_anki_recovery_read` exposes the handle
-for a future coordinator to capture before invoking the provider; beginning the
-lifecycle currently emits no effect and performs no I/O.
+Explicit `BeginAnkiRecoveryRead(Note|Model)` retains one native read handle only
+for an existing target in the restored pair, without pending/failed recovery
+commits. It emits `AnkiRecoveryReadOperation` through EffectRouter and the generated
+Crux FFI. Only the exact written surface or frozen full layout/optional known model
+ID crosses; journal payloads/IDs and the shared-allocation handle stay native.
+The response closure captures that handle before dispatch. The platform cannot
+supply a replacement pair or recreate callback provenance.
 
-`AnkiRecoveryReadFinished` accepts only that active handle, the matching observation
-kind and an unchanged full pair. Foreign, stale and duplicate callbacks cannot
-consume newer work. A matching invalid callback records a separate read error,
-without changing either journal. Accepted evidence automatically enters the existing
-FIFO evidence-commit path with the captured pair, keeping obligations gated until
-commit. Direct native evidence commits cannot compete with an active read.
+`AnkiRecoveryReader` translates the operation into existing worker-only provider
+reads. Unknown-model discovery requires one complete compatible match; ambiguous,
+missing or incompatible models are unresolved. Known IDs are checked directly,
+without substituting another compatible model. Any failure discards partial
+results. The list transport DTO preserves the native layout's four-field order;
+Rust owns the production strings and stored fixed-array layout.
 
-Explicit Retry can invalidate a lost read and restore both journals read-only.
+`CoreSessionOwner` supplies the real provider adapter. Retained `CoreSession`
+dispatches on a separate single-thread executor, then resolves the owning Crux
+request on main. Closing shuts down that executor without waiting for a blocked
+provider; late results are discarded and a fresh session restores the journal.
+No read or permission prompt occurs automatically on startup/popup entry. Low-level
+sessions default to a typed unavailable result unless supplied a reader.
+
+The core validates result kind/positive IDs and rejects foreign/stale/duplicate
+handles and changed pairs. Matching malformed evidence sets a separate read error;
+valid empty/failed evidence retains obligations through the existing FIFO commit.
+A model match uses the captured layout, never a replacement from Android. Provider
+errors remain separate from reader and persistence errors. Exact-note existence
+does not prove deck placement. Direct native evidence commits remain blocked during
+a read; accepted observations keep the gate closed until the durable commit.
+
+Explicit Retry invalidates a lost read or read error and restores both journals.
 It cannot abandon a pending commit; failed/lost commit results require restore
-before a fresh read. Reader busy/errors and prepared intent remain independent.
-Handles have no shell codec or restart representation and authorize no provider
-mutation. Android/FFI read dispatch, preflight, live begin/outcome routing and
-visible recovery/deck/Add to Anki actions remain unconnected.
+and a fresh observation. Only Begin/Retry are new public Events; native handles,
+callbacks, commits and journal snapshots still reject shell serialization. No
+mutation/replay, schema/dependency change or visible recovery/deck/Add action is
+introduced. Preflight and durable live begin/outcome dispatch remain unfinished.
