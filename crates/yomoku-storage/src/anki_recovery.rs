@@ -68,7 +68,7 @@ impl Storage {
     }
 }
 
-fn read_snapshot(
+pub(crate) fn read_snapshot(
     connection: &rusqlite::Connection,
 ) -> Result<AnkiRecoverySnapshot, AnkiJournalError> {
     Ok(AnkiRecoverySnapshot {

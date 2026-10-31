@@ -4099,3 +4099,24 @@ and /tmp/yomoku-browser-profile-*. No emulator started.
 - Recommend a phone schema-23 upgrade trial with existing Library/history before
   enabling live integration. Real Anki validation needs a disposable collection;
   neither physical trial nor optimized release was requested/performed here.
+
+
+## 2026-10-31 — Atomic live Anki journal transactions
+
+- Continued from a clean tree with the storage prerequisite for durable live
+  begin/outcome routing. Compose both journal gates, writes and exact pair
+  readback under immediate transactions; return only after commit. Share existing
+  SQL helpers and retain private nonserializable live attempts, never recovered
+  mutation authority. Uncertain payloads/known IDs and terminal records persist.
+- PASS: 10 new storage cases; 46 focused Anki cases; 947 workspace cases/17 ignored;
+  build, strict Clippy, Rustfmt and diff. Coverage includes concurrent/stale/wrong-
+  kind/changed-pair outcomes, post-write snapshot checks, statement/deferred-COMMIT
+  rollback and lost begin/outcome response recovery without replay. Commands/logs:
+  DEVELOPMENT.md, Atomic live Anki journal transactions.
+- No open blocker or remaining implementation/verification work for this storage
+  slice. Next: app/FIFO ownership of the live attempt and one-invocation typed
+  provider dispatch, then recovery/deck/Add actions and real collection/browser
+  validation. No app/FFI/schema/dependency or enabled mutation change.
+- Kotlin/JNI/generation, Android/device/real-provider and performance trials were
+  not rerun. The schema-23 upgrade trial with existing phone Library/history is
+  still recommended before enabling live integration; no release was requested.

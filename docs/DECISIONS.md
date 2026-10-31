@@ -4751,3 +4751,20 @@ public events follow skipped native variants. Declare public read events before
 skipped callbacks in the same generated order; Rust round trips then agree with
 Kotlin without changing the new protocol's compact indices. Keep this boundary
 covered by real serialized requests/responses and explicit public-event cases.
+
+## 2026-10-31 — Atomic live Anki journal transaction boundary
+
+Compose the existing note/model begin and outcome SQL with the two-journal
+snapshot in `yomoku-storage::anki_live`, before adding retained dispatch. Returning
+a snapshot from a separate transaction could let another writer change either
+gate between commit and acknowledgement. Keep the insert/update, exact-pair
+readback validation and commit in one immediate transaction. Share internal SQL
+helpers with the existing isolated journal APIs rather than duplicating rules.
+
+Only a successful begin commit returns the private nonserializable live attempt;
+recovery IDs/snapshots cannot recreate it. Outcome acceptance requires the complete
+captured pair and matching journal kind. Preserve uncertain payloads/known IDs,
+roll back failures and recover lost responses through reads. No replay, schema or
+dependency change is introduced. App/worker session ownership, at-most-once
+invocation and fresh provider/deck/layout/duplicate checks remain the next slice;
+the new APIs alone neither authenticate shell selections nor invoke providers.

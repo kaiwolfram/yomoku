@@ -4,6 +4,7 @@
 
 mod analysis;
 pub mod anki;
+pub mod anki_live;
 pub mod anki_model;
 mod anki_recovery;
 mod completions;

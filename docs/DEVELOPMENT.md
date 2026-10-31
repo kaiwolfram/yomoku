@@ -8306,3 +8306,41 @@ Android build/emulator/independent-generation logs add `-android.log`,
 `android/app/build/outputs/androidTest-results/connected/debug/`.
 Local ADB/Gradle/emulator sockets/KVM required the usual sandbox escalation; no
 open blocker. No implementation/verification steps remain for this slice.
+
+
+## Atomic live Anki journal transactions
+
+2026-10-31: storage-only continuation of the live-export prerequisite. Use the
+Rust PATH workaround at the top of this document. No dependency/toolchain change.
+
+```sh
+cargo test -p yomoku-storage anki --all-features --locked --offline
+cargo test --workspace --all-features --locked --offline --quiet
+cargo build --workspace --all-features --locked --offline
+cargo clippy --workspace --all-targets --all-features --locked --offline -- -D warnings
+cargo fmt --all -- --check
+git diff --check
+```
+
+PASS: 10 new storage cases, 46 focused Anki cases, 947 workspace cases/17 ignored
+opt-in fixtures, workspace build, strict Clippy, Rustfmt and diff. Begin returns
+a live attempt and exact pending pair only after commit; outcome checks the
+captured pair and pending kind before returning the committed authoritative pair.
+Cases cover all terminal/uncertain outcomes, exact Unicode/long IDs/frozen layouts,
+concurrent note/model begins and duplicate outcomes, stale/wrong-kind callbacks,
+changed payloads/other obligations, corrupt second journals, statement/deferred-
+COMMIT rollback, post-write snapshot validation and lost-response/restart recovery.
+Trigger injection also proves new other-journal obligations roll back atomically.
+Existing isolated journal cases exercise the shared internal SQL helpers.
+
+No implementation/test failure or open blocker; an initial patch failed to match
+formatted test context and was reapplied without partial changes. The final
+workspace/Clippy checks include the additional post-write other-journal case.
+No remaining implementation/verification work for this storage slice. App/worker
+ownership and one-invocation provider dispatch remain unfinished; no app protocol,
+FFI, schema, dependency or enabled provider mutation changed. Kotlin/JNI/generation,
+Android APK/lint/emulator, real AnkiDroid, physical upgrade and performance trials
+were not rerun. Recommend the retained schema-23 phone upgrade checkpoint before
+enabling live integration; real-provider validation needs a disposable collection.
+
+Logs: `/tmp/yomoku-anki-live-{focused,workspace,build,clippy,rustfmt,diff}.log`.

@@ -2091,5 +2091,26 @@ Begin coalesces; Retry issues a fresh captured attempt. Shared-allocation owners
 and both restored-empty journal gates are checked again on accepted callbacks.
 Public read events precede skipped callbacks in Rust declaration order so Serde
 serialization, deserialization and generated Kotlin use identical compact indices.
-No visible preflight action, permission flow or live mutation is enabled. Durable
-live begin/outcome commits remain the next implementation boundary.
+No visible preflight action, permission flow or live mutation is enabled. App/
+worker ownership of durable live begin/outcome commits remains the next boundary.
+
+### Atomic live Anki journal transactions
+
+`yomoku-storage::anki_live` composes the existing note/model journal operations
+with a coherent two-journal snapshot under one immediate transaction. Begin
+checks both gates, inserts the exact frozen intent, validates the resulting pair
+and commits before returning `AnkiLiveAttempt`. The attempt privately retains the
+original live token and captured pair; it has no clone, codec or recovery
+constructor. Existing single-journal APIs share the same internal SQL helpers.
+
+Outcome acceptance compares the complete captured pair before updating a still
+pending record, rejects the wrong journal kind, validates the resulting pair and
+returns it only after commit. Uncertain outcomes retain exact payloads/known IDs;
+terminal outcomes release only their own obligation. Statement, validation or
+commit errors roll back. Lost begin/outcome responses require read-only restore
+and reconciliation; snapshots never reconstruct live attempts or replay writes.
+
+These APIs do not invoke providers. The future retained app/worker owner must
+authenticate session/callback identity, retain the attempt for one invocation,
+recheck provider/deck/layout/duplicates and handle lost responses conservatively.
+App/FFI dispatch, visible actions and real-provider validation remain unfinished.

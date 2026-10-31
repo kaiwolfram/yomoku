@@ -82,25 +82,9 @@ impl Storage {
         let transaction = self
             .connection
             .transaction_with_behavior(TransactionBehavior::Immediate)?;
-        if read_recovery(&transaction)?.is_some() {
-            return Err(AnkiJournalError::UnresolvedSubmission);
-        }
-        if crate::anki_model::read_recovery(&transaction)?.is_some() {
-            return Err(AnkiJournalError::UnresolvedModelCreation);
-        }
-        let payload =
-            serde_json::to_string(submission).map_err(|_| AnkiJournalError::InvalidRecord)?;
-        let changed = transaction.execute(
-            "INSERT INTO anki_submissions (payload, state) VALUES (?1, 'pending')",
-            [payload],
-        )?;
-        let id = AnkiSubmissionId::try_from(transaction.last_insert_rowid())
-            .map_err(|_| AnkiJournalError::InvalidRecord)?;
-        if changed != 1 {
-            return Err(AnkiJournalError::InvalidRecord);
-        }
+        let live = begin_in(&transaction, submission)?;
         transaction.commit()?;
-        Ok(AnkiLiveSubmission { id })
+        Ok(live)
     }
 
     /// A successful empty result alone permits a fresh user-initiated export.
@@ -118,35 +102,10 @@ impl Storage {
         live: &AnkiLiveSubmission,
         outcome: AnkiSubmissionOutcome,
     ) -> Result<(), AnkiJournalError> {
-        let id = live.id;
         let transaction = self
             .connection
             .transaction_with_behavior(TransactionBehavior::Immediate)?;
-        let recovery = read_recovery(&transaction)?.ok_or(AnkiJournalError::StaleCallback)?;
-        if recovery.id != id {
-            return Err(AnkiJournalError::StaleCallback);
-        }
-        let (state, note, existing) = match outcome {
-            AnkiSubmissionOutcome::NotInserted => ("not_inserted", None, None),
-            AnkiSubmissionOutcome::Added(id) => ("added", Some(id), None),
-            AnkiSubmissionOutcome::Existing(ids) => ("existing", None, Some(ids)),
-            AnkiSubmissionOutcome::Uncertain { known_note_id } => {
-                ("uncertain", known_note_id, None)
-            }
-        };
-        let changed = transaction.execute(
-            "UPDATE anki_submissions SET state = ?2, known_note_id = ?3, existing_ids = ?4
-             WHERE id = ?1 AND state = 'pending'",
-            params![
-                id.value(),
-                state,
-                note.map(i64::from),
-                encode_existing(existing)?
-            ],
-        )?;
-        if changed != 1 {
-            return Err(AnkiJournalError::StaleCallback);
-        }
+        finish_in(&transaction, live, outcome)?;
         transaction.commit()?;
         Ok(())
     }
@@ -230,6 +189,62 @@ pub(crate) fn reconcile_in(
     let changed = connection.execute(
         "UPDATE anki_submissions SET state = ?2, existing_ids = ?3 WHERE id = ?1",
         params![id.value(), state, encode_existing(existing)?],
+    )?;
+    if changed != 1 {
+        return Err(AnkiJournalError::StaleCallback);
+    }
+    Ok(())
+}
+
+/// Internal transaction composition; the caller must commit before exposing the token.
+pub(crate) fn begin_in(
+    connection: &Connection,
+    submission: &AnkiSubmission,
+) -> Result<AnkiLiveSubmission, AnkiJournalError> {
+    if read_recovery(connection)?.is_some() {
+        return Err(AnkiJournalError::UnresolvedSubmission);
+    }
+    if crate::anki_model::read_recovery(connection)?.is_some() {
+        return Err(AnkiJournalError::UnresolvedModelCreation);
+    }
+    let payload = serde_json::to_string(submission).map_err(|_| AnkiJournalError::InvalidRecord)?;
+    let changed = connection.execute(
+        "INSERT INTO anki_submissions (payload, state) VALUES (?1, 'pending')",
+        [payload],
+    )?;
+    let id = AnkiSubmissionId::try_from(connection.last_insert_rowid())
+        .map_err(|_| AnkiJournalError::InvalidRecord)?;
+    if changed != 1 {
+        return Err(AnkiJournalError::InvalidRecord);
+    }
+    Ok(AnkiLiveSubmission { id })
+}
+
+pub(crate) fn finish_in(
+    connection: &Connection,
+    live: &AnkiLiveSubmission,
+    outcome: AnkiSubmissionOutcome,
+) -> Result<(), AnkiJournalError> {
+    let id = live.id;
+    let recovery = read_recovery(connection)?.ok_or(AnkiJournalError::StaleCallback)?;
+    if recovery.id != id {
+        return Err(AnkiJournalError::StaleCallback);
+    }
+    let (state, note, existing) = match outcome {
+        AnkiSubmissionOutcome::NotInserted => ("not_inserted", None, None),
+        AnkiSubmissionOutcome::Added(id) => ("added", Some(id), None),
+        AnkiSubmissionOutcome::Existing(ids) => ("existing", None, Some(ids)),
+        AnkiSubmissionOutcome::Uncertain { known_note_id } => ("uncertain", known_note_id, None),
+    };
+    let changed = connection.execute(
+        "UPDATE anki_submissions SET state = ?2, known_note_id = ?3, existing_ids = ?4
+             WHERE id = ?1 AND state = 'pending'",
+        params![
+            id.value(),
+            state,
+            note.map(i64::from),
+            encode_existing(existing)?
+        ],
     )?;
     if changed != 1 {
         return Err(AnkiJournalError::StaleCallback);

@@ -42,25 +42,9 @@ impl Storage {
         let transaction = self
             .connection
             .transaction_with_behavior(TransactionBehavior::Immediate)?;
-        if read_recovery(&transaction)?.is_some() {
-            return Err(AnkiJournalError::UnresolvedModelCreation);
-        }
-        if crate::anki::read_recovery(&transaction)?.is_some() {
-            return Err(AnkiJournalError::UnresolvedSubmission);
-        }
-        let payload =
-            serde_json::to_string(creation).map_err(|_| AnkiJournalError::InvalidRecord)?;
-        let changed = transaction.execute(
-            "INSERT INTO anki_model_creations (payload, state) VALUES (?1, 'pending')",
-            [payload],
-        )?;
-        let id = AnkiModelCreationId::try_from(transaction.last_insert_rowid())
-            .map_err(|_| AnkiJournalError::InvalidRecord)?;
-        if changed != 1 {
-            return Err(AnkiJournalError::InvalidRecord);
-        }
+        let live = begin_in(&transaction, creation)?;
         transaction.commit()?;
-        Ok(AnkiLiveModelCreation { id })
+        Ok(live)
     }
 
     /// Pending and uncertain restore identically. Errors must gate live work;
@@ -79,23 +63,7 @@ impl Storage {
         let transaction = self
             .connection
             .transaction_with_behavior(TransactionBehavior::Immediate)?;
-        let recovery = read_recovery(&transaction)?.ok_or(AnkiJournalError::StaleCallback)?;
-        if recovery.id != live.id {
-            return Err(AnkiJournalError::StaleCallback);
-        }
-        let (state, model) = match outcome {
-            AnkiModelCreationOutcome::NotCreated => ("not_created", None),
-            AnkiModelCreationOutcome::Created(id) => ("created", Some(id)),
-            AnkiModelCreationOutcome::Uncertain { known_model_id } => ("uncertain", known_model_id),
-        };
-        let changed = transaction.execute(
-            "UPDATE anki_model_creations SET state = ?2, known_model_id = ?3
-             WHERE id = ?1 AND state = 'pending'",
-            params![live.id.value(), state, model.map(i64::from)],
-        )?;
-        if changed != 1 {
-            return Err(AnkiJournalError::StaleCallback);
-        }
+        finish_in(&transaction, live, outcome)?;
         transaction.commit()?;
         Ok(())
     }
@@ -176,6 +144,55 @@ pub(crate) fn reconcile_in(
     let changed = connection.execute(
         "UPDATE anki_model_creations SET state = ?2, existing_model_id = ?3 WHERE id = ?1",
         params![id.value(), state, existing.map(i64::from)],
+    )?;
+    if changed != 1 {
+        return Err(AnkiJournalError::StaleCallback);
+    }
+    Ok(())
+}
+
+/// Internal transaction composition; the caller must commit before exposing the token.
+pub(crate) fn begin_in(
+    connection: &Connection,
+    creation: &AnkiModelCreation,
+) -> Result<AnkiLiveModelCreation, AnkiJournalError> {
+    if read_recovery(connection)?.is_some() {
+        return Err(AnkiJournalError::UnresolvedModelCreation);
+    }
+    if crate::anki::read_recovery(connection)?.is_some() {
+        return Err(AnkiJournalError::UnresolvedSubmission);
+    }
+    let payload = serde_json::to_string(creation).map_err(|_| AnkiJournalError::InvalidRecord)?;
+    let changed = connection.execute(
+        "INSERT INTO anki_model_creations (payload, state) VALUES (?1, 'pending')",
+        [payload],
+    )?;
+    let id = AnkiModelCreationId::try_from(connection.last_insert_rowid())
+        .map_err(|_| AnkiJournalError::InvalidRecord)?;
+    if changed != 1 {
+        return Err(AnkiJournalError::InvalidRecord);
+    }
+    Ok(AnkiLiveModelCreation { id })
+}
+
+pub(crate) fn finish_in(
+    connection: &Connection,
+    live: &AnkiLiveModelCreation,
+    outcome: AnkiModelCreationOutcome,
+) -> Result<(), AnkiJournalError> {
+    let recovery = read_recovery(connection)?.ok_or(AnkiJournalError::StaleCallback)?;
+    if recovery.id != live.id {
+        return Err(AnkiJournalError::StaleCallback);
+    }
+    let (state, model) = match outcome {
+        AnkiModelCreationOutcome::NotCreated => ("not_created", None),
+        AnkiModelCreationOutcome::Created(id) => ("created", Some(id)),
+        AnkiModelCreationOutcome::Uncertain { known_model_id } => ("uncertain", known_model_id),
+    };
+    let changed = connection.execute(
+        "UPDATE anki_model_creations SET state = ?2, known_model_id = ?3
+             WHERE id = ?1 AND state = 'pending'",
+        params![live.id.value(), state, model.map(i64::from)],
     )?;
     if changed != 1 {
         return Err(AnkiJournalError::StaleCallback);

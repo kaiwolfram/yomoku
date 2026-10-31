@@ -7,57 +7,63 @@ results in progress docs/reports, out of commit message bodies.
 - Announce when no plan steps remain; ask about product ambiguities. Recommend
   physical testing when it provides more value than the next implementation step.
 - User's phone trial was acceptable; detailed device/workflow validation remains
-  unchecked. Recommend an upgrade trial with existing Library/history (schema 23)
-  before further integration; rebuild optimized APK when requested.
+  unchecked. Recommend a schema-23 upgrade trial with existing Library/history
+  before enabling live integration; rebuild optimized APK when requested.
 - Feed is only `Coming Soon! 🌱`; Nostr/identity/Q188 are beyond the first MVP.
 - Statistics retains cumulative occurrences and all five statuses including Known.
   Schema 0023 drops only unused vocabulary_dictionary_forms; all other history,
   vocabulary, token dictionary metadata and Anki journals are preserved.
 
-## Current Anki slice
-- Begin/RetryAnkiExportPreflight dispatch typed read-only Crux/FFI operations.
-  Rust retains handle/selection/note fields; shell receives exact surface, deck
-  and full frozen layout. Native preparation/clear/callbacks have no shell codec.
-- Android AnkiPreflightReader uses complete deck/duplicate/model queries and full
-  validation of every exact-name model. Any later failure discards all evidence.
-  Core requires the frozen nonfiltered deck and selects Existing/Reuse/Create;
-  incompatible/ambiguous models fail without overwrite or arbitrary selection.
-- Preflight/recovery share CoreSession's separate single-thread executor, main
-  response handling and close gate. No reader FIFO ownership or automatic reads.
-  Late callbacks are dropped on close; native ownership rejects stale/foreign/
-  duplicate callbacks. Retry recaptures; Clear drops only unsubmitted intent.
-- Recheck both restored-empty journal gates at begin/acceptance. Results are read
-  observations, never write tokens. Restart retains neither intent nor preflight.
-- Public events precede skipped callbacks so Rust Serde round trips match Kotlin's
-  compact indices. Durable recovery commits still run through the SQLite FIFO.
+## Current Anki persistence slice
+- Storage::begin_anki_live checks both gates, inserts the frozen note/model and
+  validates its complete pair under one immediate transaction. Only successful
+  COMMIT returns private nonserializable/noncloneable AnkiLiveAttempt.
+- finish_anki_live compares the captured pair/payloads/known IDs, requires matching
+  journal kind and pending state, validates the result and returns after COMMIT.
+  Uncertain outcomes retain payload/known ID; terminal records remain durable.
+- Existing journal APIs share internal begin/finish SQL. Statement/readback/commit
+  failures roll back; lost begin/outcome responses require read-only restoration
+  and reconciliation. Snapshots/IDs cannot recreate live tokens. No replay queue.
+- These are storage-only APIs, not app-owned authorization. Runtime must retain
+  the live attempt and authenticate callback/session ownership for one invocation.
+  No core/Event/FFI/Kotlin/schema/dependency or enabled provider mutation change.
 
 ## Retained live-export prerequisites
 - Native PrepareAnkiExport authenticates the current visible original/effective
   selection and freezes fields/surface/sentence/deck/full layout. Reader busy,
-  checkpoint/completion/departure/mutation gates apply; journals must be restored
-  empty without pending/failed commits. Clear drops only unsubmitted intent.
-  Restart retains neither intent nor read handles; CheckAndAdd remains isolated.
-- Both durable begin methods gate both journals and commit before one invocation;
-  only newly committed preparation grants private live tokens. Recovery IDs never
-  grant writes. Terminal journals survive deletion; no pruning or automatic retry.
+  checkpoint/completion/departure/mutation gates apply. Preparation stays unexposed.
+- Begin/RetryAnkiExportPreflight dispatch typed read-only Crux/FFI operations;
+  Rust retains handles/fields, Android reads complete deck/duplicate/model evidence.
+  Later failure discards all evidence; exact-name ambiguity/conflicts fail safely.
+- Recovery/preflight share CoreSession's separate worker/main/close gates. They
+  do not hold reader FIFO ownership or run automatically. Retry captures fresh
+  reads; late/stale/foreign/duplicate callbacks cannot cross owners or restart.
+- Recheck both restored-empty journals at begin/acceptance, including pending or
+  failed recovery commits. Clear drops only unsubmitted intent. Restart retains
+  neither intent nor preflight. Recovery IDs never grant writes.
+- Public events precede skipped callbacks to keep Rust/Kotlin compact indices
+  aligned. Durable recovery evidence commits already use the SQLite FIFO.
 - API evidence: ANKIDROID_API.md, pinned 2.25.3. Isolated mutating adapters remain
   unowned with no app call site/real-provider claim; no dependency/minimum adopted.
 
 ## Next tasks (ordered)
-1. Own durable live begin/outcome commits after preflight and before one model/
-   note invocation. Recheck both journals and fresh provider/deck/layout/duplicate
-   observations; validate permission failures, death/stale/lost callbacks and no
-   restart mutation replay. Native authenticated preparation remains unexposed.
-2. Add recovery/error/explicit Retry projection, deck settings, Add to Anki and
-   existing-note actions after gates; validate a disposable real collection/browser.
+1. Own native live begin/outcome lifecycle through app and FIFO using the new
+   storage APIs. Retain AnkiLiveAttempt in the worker; only a matching successful
+   begin response may lead to one invocation. Gate stale/foreign/lost callbacks,
+   errors and close/restart without restoring mutation authority.
+2. Wire typed provider invocation with fresh provider/deck/layout/duplicate checks,
+   then recovery/error/explicit Retry projection, deck settings and Add/existing
+   note actions. Validate a disposable real AnkiDroid collection/browser.
 3. Encrypted-backup format/library review follows completed Anki integration.
 
 ## Verification / blockers
-- PASS: 937 workspace cases/17 ignored; build/strict Clippy/Rustfmt/Kotlin format,
-  full JNI/Unicode exchange, repeatable generation, both-ABI debug/test APKs/lint
-  and 65 API-36 x86_64 emulator cases (zero failures/skips). Commands/logs:
-  DEVELOPMENT.md, typed frozen-export Anki preflight dispatch.
-- No blocker or remaining implementation/verification work for this slice.
-  Durable live begin/outcome routing and the wider release plan remain open.
-- Physical schema-23 upgrade/real AnkiDroid trials and broad performance/device
-  matrix remain unchecked. Older phone APK is source 0374365; no release requested.
+- PASS this slice: 10 new storage cases; 46 focused Anki cases; 947 workspace
+  cases/17 ignored; build, strict Clippy, Rustfmt and diff. Exact commands/logs:
+  DEVELOPMENT.md, Atomic live Anki journal transactions.
+- No blocker or remaining implementation/verification work for this storage slice.
+  App/worker ownership, provider dispatch and the wider release plan remain open.
+- Kotlin/JNI generation, Android APK/lint/emulator, real-provider and physical
+  trials were not rerun for this storage-only slice. Previous typed preflight
+  checks: full JNI/generation, both-ABI debug/test APKs/lint, 65 emulator cases.
+- Physical schema-23 upgrade and broad device/performance matrix remain unchecked.
+  Older phone APK is source 0374365; no release requested.

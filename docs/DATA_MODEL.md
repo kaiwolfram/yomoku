@@ -2118,3 +2118,20 @@ Core validates IDs/deck/model ambiguity and retains only a volatile read plan or
 error. Neither result supplies a live token or journal row. Clear/retry/restart
 semantics and both durable journals are unchanged. Preparation/clear/callbacks
 remain absent from shell codecs; Begin/Retry are typed shell events.
+
+## Atomic live Anki journal transitions (schema 0023 unchanged)
+
+`Storage::begin_anki_live` accepts a frozen note submission or model creation.
+Both unresolved journals must be empty in the same immediate transaction. It
+captures and validates the newly pending pair before commit, returning a private
+nonserializable `AnkiLiveAttempt` only after commit succeeds. Its snapshot is
+recovery data; neither it nor persisted IDs can construct another live attempt.
+
+`finish_anki_live` requires that attempt's complete captured pair, including
+payloads and known IDs, still match. It accepts only the matching note/model
+outcome against a pending row and returns the authoritative pair after commit.
+Uncertain outcomes preserve the payload and any known provider ID. Terminal rows
+remain durable, as in the existing journals. Any write/readback/commit error
+rolls back; lost responses require read-only recovery, never mutation replay.
+The future app/worker dispatcher also owns session/callback authentication and
+one-invocation gating. No provider, core protocol, FFI, settings or schema change.
