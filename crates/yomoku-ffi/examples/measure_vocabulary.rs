@@ -273,21 +273,49 @@ fn encode<T: serde::Serialize>(value: &T) -> Vec<u8> {
 struct Session {
     bridge: YomokuBridge,
     callbacks: Receiver<(Instant, Vec<u8>)>,
+    #[cfg(feature = "storage-measurements")]
+    measurements: Receiver<yomoku_runtime::storage_measurements::StorageMeasurement>,
+}
+
+struct RequestSample {
+    elapsed: Duration,
+    #[cfg(feature = "storage-measurements")]
+    storage: yomoku_runtime::storage_measurements::StorageMeasurement,
 }
 
 impl Session {
     fn new(path: &Path) -> Self {
         let (sender, callbacks) = mpsc::channel();
+        let callback = move |result: Result<Vec<u8>, yomoku_ffi::FfiError>| {
+            sender.send((Instant::now(), result.unwrap())).unwrap();
+        };
+        #[cfg(not(feature = "storage-measurements"))]
         let (bridge, _) = YomokuBridge::with_effective_reader(
             path.into(),
             Box::new(|| panic!("Vocabulary must not load an analyzer")),
             Box::new(|| panic!("Vocabulary must not load a dictionary")),
-            move |result| {
-                sender.send((Instant::now(), result.unwrap())).unwrap();
-            },
+            callback,
         )
         .unwrap();
-        let session = Self { bridge, callbacks };
+        #[cfg(feature = "storage-measurements")]
+        let (bridge, measurements) = {
+            let (sender, measurements) = mpsc::channel();
+            let (bridge, _) = YomokuBridge::with_measured_effective_reader(
+                path.into(),
+                Box::new(|| panic!("Vocabulary must not load an analyzer")),
+                Box::new(|| panic!("Vocabulary must not load a dictionary")),
+                std::sync::Arc::new(move |sample| sender.send(sample).unwrap()),
+                callback,
+            )
+            .unwrap();
+            (bridge, measurements)
+        };
+        let session = Self {
+            bridge,
+            callbacks,
+            #[cfg(feature = "storage-measurements")]
+            measurements,
+        };
         session.dispatch(Event::SelectDestination(Destination::Vocabulary));
         session
     }
@@ -301,11 +329,21 @@ impl Session {
         BincodeFfiFormat::deserialize(&self.bridge.view().unwrap()).unwrap()
     }
 
-    fn request(&self, event: Event) -> Duration {
+    fn request(&self, event: Event) -> RequestSample {
         assert!(
             self.callbacks.try_recv().is_err(),
             "unexpected queued callback"
         );
+        #[cfg(feature = "storage-measurements")]
+        let expected_operation = match &event {
+            Event::SelectAllVocabulary => {
+                yomoku_runtime::storage_measurements::StorageRead::VocabularyMatchingIds
+            }
+            Event::LoadVocabulary | Event::LoadMoreVocabulary => {
+                yomoku_runtime::storage_measurements::StorageRead::VocabularyPage
+            }
+            _ => panic!("unmeasured request"),
+        };
         let event = encode(&event);
         let started = Instant::now();
         let effects = self.bridge.update(&event).unwrap();
@@ -316,14 +354,35 @@ impl Session {
             .unwrap();
         let _: Requests<ShellEffectFfi> = BincodeFfiFormat::deserialize(&effects).unwrap();
         assert!(!self.view().storage_busy);
-        finished.duration_since(started)
+        #[cfg(feature = "storage-measurements")]
+        let storage = {
+            let sample = self
+                .measurements
+                .recv_timeout(Duration::from_secs(30))
+                .unwrap();
+            assert_eq!(sample.operation, expected_operation);
+            assert!(!sample.failed);
+            assert!(self.measurements.try_recv().is_err());
+            sample
+        };
+        RequestSample {
+            elapsed: finished.duration_since(started),
+            #[cfg(feature = "storage-measurements")]
+            storage,
+        }
     }
 }
 
 fn bridge_measurements(path: &Path, config: &Config) {
+    let expected_ids = Storage::open(path)
+        .unwrap()
+        .vocabulary_matching_ids(&VocabularyQuery::default())
+        .unwrap();
     let session = Session::new(path);
     let mut first = Vec::new();
     let mut select_all = Vec::new();
+    #[cfg(feature = "storage-measurements")]
+    let (mut load_phases, mut capture_phases) = (Vec::new(), Vec::new());
     for index in 0..=config.iterations {
         // Navigation invalidates the loaded page and clears session selection.
         session.dispatch(Event::SelectDestination(Destination::Library));
@@ -333,14 +392,34 @@ fn bridge_measurements(path: &Path, config: &Config) {
         let capture = session.request(Event::SelectAllVocabulary);
         let state = session.view().vocabulary;
         assert!(state.error.is_none() && state.bulk_error.is_none());
-        assert_eq!(state.selection.as_ref().unwrap().len(), config.entries);
+        assert_eq!(state.selection.as_ref().unwrap(), &expected_ids);
         if index > 0 {
-            first.push(load);
-            select_all.push(capture);
+            first.push(load.elapsed);
+            select_all.push(capture.elapsed);
+            #[cfg(feature = "storage-measurements")]
+            {
+                load_phases.push(load.storage);
+                capture_phases.push(capture.storage);
+            }
         }
     }
     report("fifo_first_page_callback", first);
     report("fifo_select_all_callback", select_all);
+    #[cfg(feature = "storage-measurements")]
+    for (operation, samples) in [("first_page", load_phases), ("select_all", capture_phases)] {
+        report(
+            &format!("worker_{operation}_queue"),
+            samples.iter().map(|s| s.queue).collect(),
+        );
+        report(
+            &format!("worker_{operation}_execute"),
+            samples.iter().map(|s| s.execute).collect(),
+        );
+        report(
+            &format!("worker_{operation}_resolve"),
+            samples.iter().map(|s| s.resolve).collect(),
+        );
+    }
 
     // Measure the complete production ViewModel projection/encoding, including
     // retained rows and global selection, independently of repository/FIFO work.

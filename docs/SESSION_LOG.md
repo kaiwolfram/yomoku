@@ -3599,3 +3599,36 @@ and /tmp/yomoku-browser-profile-*. No emulator started.
   heavy-history/diverse-book/full-load/exact peak/lifecycle/process-death/physical
   arm64 work not rerun. Broad tasks stay open. Next: native request/response and
   observer-free optimized profiling, Anki API verification, lifecycle matrix.
+
+## 2026-10-31 — Native Vocabulary host worker diagnostics
+
+- Started clean; continued the native profiling task with a default-off Rust
+  storage-measurements feature over the existing effective-reader FIFO. Only
+  Vocabulary page/ID reads allocate metadata/read clocks. No Android diagnostic
+  API, dependency, schema, core, wire, equality or product behavior change.
+- Separate pre-send/worker start, repository execution/cleanup and combined
+  resolver/core/Render serialization/host callback durations. Deliver samples
+  after callback on the worker; observers must not block/reenter. Keep host
+  timings separate from Android callback/Compose intervals and device claims.
+- PASS: workspace build, 826 tests/17 ignored data-dependent fixtures, three
+  harness cases in each feature mode, strict all-feature workspace/feature-off
+  harness Clippy, Rustfmt/diff. Two new FFI tests cover a blocked earlier FIFO
+  callback, callback/sample ordering/thread, exact unloaded/frozen IDs, read-only
+  failure and exact Retry. Corrected initial replay test setup and boxed only
+  diagnostic metadata after enum-size lint; no remaining blocker.
+- Four sequential optimized processes (10k off, 100k observed, 100k off, 10k
+  observed) use ten status rounds, 1k rereads/50k occurrences, warmup/seven samples.
+  All 136 metric rows/952 raw durations validate, with full exact-ID, unchanged
+  bytes, no analyzer/dictionary loads, integrity/FK and scratch cleanup guards.
+  100k Select All queue/repository/combined response medians:
+  0.035759/7.748635/0.186407 ms; feature-off callback median 7.806115 ms. These
+  identify host repository cost, not an Android bottleneck or production speedup.
+- Results/hashes/CSV: VOCABULARY_PERFORMANCE.md, final section; commands:
+  DEVELOPMENT.md, Native Vocabulary worker diagnostics. Logs:
+  /tmp/yomoku-worker-{workspace,harness,harness-base,focused,clippy,clippy-base,
+  build,build-base,build-measured,validation}.log and size/mode CSV/log pairs;
+  validator /tmp/yomoku-validate-worker.py. No emulator started.
+- Android/Kotlin/JNI/codegen, independent Full-loader, physical arm64, lifecycle/
+  accessibility, optimized Android, exact peaks/diverse books not run here. Broad
+  tasks stay unchecked. Next: actual Android native/observer-free optimized
+  comparison, Anki API evidence, remaining lifecycle/accessibility matrix.

@@ -353,3 +353,89 @@ Remaining work includes required row decoding/replay, deep metric offsets, large
 views, diverse books, peak-memory and Compose/device measurements. Android/JNI/
 Kotlin/codegen, separate Full-loader matrix, lifecycle/process-death and physical-
 arm64 were not rerun; no emulator started and no device performance claim is made.
+
+## Native worker boundaries — 2026-10-31
+
+The opt-in `storage-measurements` Rust feature now observes the actual existing
+effective-reader FIFO used by the host bridge. Default builds exclude the hooks;
+ordinary constructors also create no metadata/read no diagnostic clocks when
+the feature is enabled. Only Vocabulary page and matching-ID reads are sampled.
+No JNI API, dependency, schema, SQL, core, event, equality or wire change is made.
+
+The three adjacent boundaries are pre-send to worker start (queue), production
+repository execution through worker cleanup (execute), and resolver entry through
+return (resolve). Queue includes diagnostic metadata allocation, channel send and
+worker scheduling. Execution includes lazy opening/migration when needed, row
+decoding/validation and result/error mapping; it is not SQL stepping alone.
+Resolution includes core response handling, Render request serialization and
+the synchronous host callback; these components remain combined. View projection/
+encoding is separately timed as before. Samples arrive after the callback on the
+worker and retain only operation kind, failure flag and durations. Observer cost
+is excluded from its sample but can delay later jobs. Do not block/reenter the
+bridge from the observer or subtract these host phases from Android idle times.
+
+Four separate release processes ran sequentially after builds/tests, without
+competing builds/tests/profilers: 10k feature-off, 100k observed, 100k feature-off,
+10k observed. Same Fedora/kernel/CPU/Rust/SQLite as the Method above. Every run
+uses ten status rounds, 1,000 completions/50k concentrated occurrences, one
+excluded warmup and seven measured samples. The fixtures contain 108,025/
+1,080,025 status events and occupy 12,828,672/96,768,000 bytes. Selection checks
+now compare every ID with the repository capture, rather than just its length.
+Both variants perform that same additional untimed check. The host callback
+sends to a channel; it does not include JNI/Kotlin dispatch. Source baseline
+`0b5fc45` plus this slice. Executable SHA-256:
+
+- Feature-off: `f44abef6209a4eb9ba7c4971f761aeda6f965c246286ebd956ea765c3383257d`.
+- Observed: `83d30a56d31632beff6a8870b386f02b4e079ab62a2f5b2d49ccbaae1519e8b8`.
+
+Observed median milliseconds (seven samples; phase medians are not additive):
+
+| Entries | Read | Queue | Execute | Resolve | Update to callback |
+| ---: | --- | ---: | ---: | ---: | ---: |
+| 10,000 | First page | 0.030451 | 2.662568 | 0.022000 | 2.721165 |
+| 10,000 | Select All | 0.027099 | 0.636326 | 0.028635 | 0.714478 |
+| 100,000 | First page | 0.033384 | 29.547774 | 0.049308 | 29.645901 |
+| 100,000 | Select All | 0.035759 | 7.748635 | 0.186407 | 8.272097 |
+
+Feature-off/observed callback medians are 2.830187/2.721165 ms (10k first page),
+0.870016/0.714478 ms (10k Select All), 30.354722/29.645901 ms (100k first page),
+and 7.806115/8.272097 ms (100k Select All). Select All ranges are
+7.570539–8.106573 ms feature-off and 7.551333–9.936281 ms observed at 100k.
+There is no production optimization here. Run order, scheduling/caches and
+separate binary layouts prevent attributing the differences solely to observer
+overhead. Repository execution dominates these observed host read paths; the
+combined response phase is smaller. This does not identify Android worker costs
+or explain the earlier debug-emulator Compose/interaction measurements.
+
+With 1,000 loaded rows and all selected/frozen IDs, feature-off/observed view
+projection+encoding medians are 0.082553/0.091283 ms (10k) and
+1.628983/1.762800 ms (100k). Payload sizes remain 206,201/1,646,201 bytes;
+confirmation events remain 80,028/800,028 bytes. These are host Rust codecs,
+not Kotlin decode, JNI copying, memory peaks or device viability measurements.
+
+All [136 metric rows/952 raw durations](measurements/vocabulary-worker-host-2026-10-31.csv)
+validate: seven finite nonnegative samples per row, exact min/median/max, metric
+sets, sample-aligned queue+execute boundaries preceding callback, fixture row/
+payload counts, unchanged database bytes and scratch cleanup. CSV SHA-256:
+`4d99c8f7d39968408f809bf1edef3b8f6e55ec3bcc44f9b7f873c1ed78f2e069`.
+The existing integrity/FK and panic-on-analyzer/dictionary guards pass in all
+four runs. Profiles contain 28 measured observed reads (84 phase durations),
+plus their warmups and appended pages checked outside the reported phase rows.
+
+PASS: 826 workspace tests (17 ignored data-dependent fixtures), three harness
+cases with/without diagnostics, workspace build, strict workspace/all-target/
+all-feature Clippy, feature-off harness Clippy, Rustfmt and diff checks. Two new
+FFI cases verify a deliberately blocked earlier FIFO callback, worker-thread/
+callback-before-sample delivery, complete unloaded IDs/frozen confirmation,
+read-only behavior, errors and explicit exact Retry. Initial test setup wrongly
+repeated Select All before freezing; corrected it to test rejection while frozen.
+Initial Clippy exposed diagnostic job growth; boxing only observed metadata
+resolved it without allocating on the default path. No remaining blocker.
+
+Commands: DEVELOPMENT.md, Native Vocabulary worker diagnostics. Logs:
+`/tmp/yomoku-worker-{workspace,harness,harness-base,focused,clippy,clippy-base,build,
+build-base,build-measured,validation}.log` and size/mode `.csv`/`.log` pairs;
+validator `/tmp/yomoku-validate-worker.py`. No Android/Kotlin/JNI generation,
+independent Full-loader, physical arm64, lifecycle/accessibility, exact peaks,
+diverse-book or observer-free optimized Android profiling was run. Those and
+separating the combined core/request-serialization boundary remain open.

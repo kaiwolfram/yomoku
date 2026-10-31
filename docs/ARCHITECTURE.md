@@ -1662,6 +1662,18 @@ VOCABULARY_PERFORMANCE.md. Retained worker/core/FFI state must invalidate pages
 on relevant mutations and protect stale callbacks before Compose integration.
 The retained native transport and Compose browser are implemented below.
 
+The optional Rust `storage-measurements` feature adds a host-only factory over
+the same effective-reader core and FIFO. It observes Vocabulary page/matching-ID
+reads: pre-send to worker start, repository execution/cleanup, and resolver entry
+through return. Resolution includes core response handling, Render request
+serialization and the synchronous host callback; view projection/serialization
+remains a separate call. Samples contain only operation kind, failure flag and
+durations and arrive after the callback on the worker. The observer must not
+block or reenter the bridge. Only observed reads allocate diagnostic metadata
+or read clocks; default builds compile out these hooks. No JNI diagnostic API,
+worker, persistent data, schema or product behavior is added. Host results and
+observer overhead do not establish Android worker or interaction timings.
+
 
 ## Retained Vocabulary transport
 

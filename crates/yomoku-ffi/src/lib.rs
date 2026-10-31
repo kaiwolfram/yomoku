@@ -45,6 +45,30 @@ pub struct YomokuBridge {
 }
 
 impl YomokuBridge {
+    /// Host-only diagnostic factory; the production Android API is unchanged.
+    #[cfg(feature = "storage-measurements")]
+    pub fn with_measured_effective_reader(
+        database_path: std::path::PathBuf,
+        loader: AnalyzerLoader,
+        word_loader: WordDictionaryLoader,
+        observer: yomoku_runtime::storage_measurements::StorageObserver,
+        on_effects: impl Fn(Result<Vec<u8>, FfiError>) + Send + Sync + 'static,
+    ) -> Result<(Self, AnalyzerLifecycle), FfiError> {
+        let (router, lifecycle) = yomoku_runtime::effect_router_with_measured_effective_reader(
+            database_path,
+            loader,
+            word_loader,
+            observer,
+        )
+        .map_err(|_| FfiError::WorkerUnavailable)?;
+        Ok((
+            Self {
+                bridge: router.bridge(move |result| on_effects(result.map_err(Into::into))),
+            },
+            lifecycle,
+        ))
+    }
+
     /// Production effective reader with retained native provenance, sharing the
     /// import/dictionary worker and lifecycle without a shell toggle.
     pub fn with_effective_reader(

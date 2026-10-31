@@ -10,6 +10,8 @@ use yomoku_core::app::{Effect, Model, Yomoku};
 
 mod epub_assets;
 mod storage;
+#[cfg(feature = "storage-measurements")]
+pub mod storage_measurements;
 use storage::StorageEffects;
 pub use storage::WordDictionaryLoader;
 mod imports;
@@ -85,6 +87,26 @@ pub fn effect_router_with_effective_reader(
 ) -> std::io::Result<(EffectRouter, AnalyzerLifecycle)> {
     let (effects, lifecycle) =
         StorageEffects::with_dictionaries(database_path, loader, word_loader)?;
+    Ok((
+        Core::new_with(Yomoku, Model::with_effective_reader())
+            .handle_effects_using(effects)
+            .map_effect(),
+        lifecycle,
+    ))
+}
+
+/// Opt-in host diagnostics on the same effective-reader worker and core.
+/// Not exported through the Android binding or included in default builds.
+#[cfg(feature = "storage-measurements")]
+pub fn effect_router_with_measured_effective_reader(
+    database_path: std::path::PathBuf,
+    loader: AnalyzerLoader,
+    word_loader: WordDictionaryLoader,
+    observer: storage_measurements::StorageObserver,
+) -> std::io::Result<(EffectRouter, AnalyzerLifecycle)> {
+    let (mut effects, lifecycle) =
+        StorageEffects::with_dictionaries(database_path, loader, word_loader)?;
+    effects.measurements = Some(observer);
     Ok((
         Core::new_with(Yomoku, Model::with_effective_reader())
             .handle_effects_using(effects)

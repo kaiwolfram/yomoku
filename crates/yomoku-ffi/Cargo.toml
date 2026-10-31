@@ -12,6 +12,7 @@ name = "generate-kotlin"
 required-features = ["facet_typegen"]
 
 [features]
+storage-measurements = ["yomoku-runtime/storage-measurements"]
 facet_typegen = ["crux_core/facet_typegen", "yomoku-runtime/facet_typegen", "yomoku-core/facet_typegen"]
 
 [dependencies]

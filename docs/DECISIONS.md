@@ -4268,3 +4268,25 @@ The tests require the current main-thread harness and fail on other threading.
 Do not subtract these intervals from idle/frame time to manufacture a native or
 composition decomposition. Full selected/frozen IDs, structural equality,
 replay/event guards and the production wire remain unchanged; add no dependency.
+
+## 2026-10-31 — Opt-in native Vocabulary worker boundaries
+
+Use a default-off Rust `storage-measurements` feature and a host-only measured
+effective-reader factory to observe the existing FIFO. Restrict samples to
+Vocabulary page and matching-ID reads; retain no IDs, surfaces, query text or
+paths. Measure before send to worker start, the production repository call plus
+cleanup, and resolver entry through return. Resolution includes core response
+processing, Render request serialization and the synchronous host callback;
+it cannot separate those components or measure view serialization/JNI/Compose.
+Lazy open/migration belongs to execution when present. Queue includes send,
+diagnostic metadata allocation and scheduling, not just earlier jobs.
+
+Deliver samples after resolution on the worker. Observers must be nonblocking
+and must not reenter the bridge; callback entry precedes sample delivery. Box
+only observed-read metadata to keep the FIFO job size bounded. Observer work is
+excluded from its sample but can delay later jobs. Default constructors read no
+diagnostic clocks or allocate metadata even when the feature is compiled in;
+default builds exclude the hooks. Preserve the core, full IDs, equality, failure/
+Retry/replay guards, callback codec and Android API. Compare feature-off optimized
+host runs with observed runs, without treating their difference as a speedup or
+an Android native/interaction decomposition. Add no dependency.

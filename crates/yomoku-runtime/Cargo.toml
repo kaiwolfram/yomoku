@@ -5,6 +5,7 @@ edition.workspace = true
 license.workspace = true
 
 [features]
+storage-measurements = []
 facet_typegen = ["crux_core/facet_typegen", "yomoku-core/facet_typegen", "dep:facet"]
 
 [dependencies]

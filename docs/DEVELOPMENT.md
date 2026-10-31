@@ -7539,3 +7539,50 @@ or open blocker. Task-started AVD stopped; existing ignored image/caches retaine
 No dependency/schema/wire change. Host Rust/Clippy/JNI/codegen, independent Full
 loader, native worker breakdown, optimized/tablet/dark/fling/heavy-history/diverse
 books/full-load/exact peaks/lifecycle/process-death/physical arm64 not rerun.
+
+## Native Vocabulary worker diagnostics
+
+Use the pinned Rust PATH from the opening section. This is host-only and adds no
+dependency or Android/JNI diagnostics API. Do all builds/tests before profiles;
+run the four executables sequentially with no competing build/test/profiler.
+
+```sh
+cargo build --workspace --locked --offline
+cargo test --workspace --all-features --locked --offline
+cargo test -p yomoku-ffi --example measure_vocabulary --locked --offline
+cargo test -p yomoku-ffi --example measure_vocabulary --all-features --locked --offline
+cargo clippy --workspace --all-targets --all-features --locked --offline -- -D warnings
+cargo clippy -p yomoku-ffi --example measure_vocabulary --locked --offline -- -D warnings
+cargo fmt --all -- --check
+git diff --check
+cargo build -p yomoku-ffi --example measure_vocabulary --release --locked --offline
+cp target/release/examples/measure_vocabulary /tmp/yomoku-worker-base
+cargo build -p yomoku-ffi --example measure_vocabulary --release --features storage-measurements --locked --offline
+cp target/release/examples/measure_vocabulary /tmp/yomoku-worker-measured
+sha256sum /tmp/yomoku-worker-base /tmp/yomoku-worker-measured
+/tmp/yomoku-worker-base 10000 10 1000 7 > /tmp/yomoku-worker-10000-base.csv 2> /tmp/yomoku-worker-10000-base.log
+/tmp/yomoku-worker-measured 100000 10 1000 7 > /tmp/yomoku-worker-100000-measured.csv 2> /tmp/yomoku-worker-100000-measured.log
+/tmp/yomoku-worker-base 100000 10 1000 7 > /tmp/yomoku-worker-100000-base.csv 2> /tmp/yomoku-worker-100000-base.log
+/tmp/yomoku-worker-measured 10000 10 1000 7 > /tmp/yomoku-worker-10000-measured.csv 2> /tmp/yomoku-worker-10000-measured.log
+```
+
+The feature adds six `worker_{first_page,select_all}_{queue,execute,resolve}` rows.
+Queue starts before send; execute includes the repository/open/cleanup; resolve
+includes core response processing, request serialization and the synchronous host
+callback through return. It excludes view(). The observer runs after the callback
+on the worker. Normal constructors read no diagnostic clocks/allocate no metadata;
+feature-off builds exclude the hooks. Feature-on diagnostics allocate one metadata
+box per observed read and add clocks/observer work; no production speedup is implied.
+
+2026-10-31 PASS: workspace build, 826 tests/17 ignored fixtures, three harness
+cases in each mode, strict all-feature workspace/feature-off harness Clippy,
+Rustfmt/diff. Four profiles retain 136 metric rows/952 raw durations, full exact
+IDs/frozen commands, read-only bytes, no analyzer/dictionary loads, integrity/FK
+and scratch cleanup. Native queue/execute/resolve at 100k Select All has medians
+0.035759/7.748635/0.186407 ms; feature-off callback median is 7.806115 ms.
+Results/hashes/limits: VOCABULARY_PERFORMANCE.md, final section. Logs:
+`/tmp/yomoku-worker-{workspace,harness,harness-base,focused,clippy,clippy-base,build,
+build-base,build-measured,validation}.log`, four size/mode CSV/log pairs;
+validator `/tmp/yomoku-validate-worker.py`. Corrected initial frozen-replay test
+setup and diagnostic enum-size lint; no open blocker. Android/Kotlin/JNI/Full-loader,
+optimized Android/arm64/exact-peak/lifecycle/diverse-book checks were not run.

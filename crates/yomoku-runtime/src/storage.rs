@@ -36,17 +36,21 @@ pub(crate) enum Job {
         ReaderImageAsset,
         crate::epub_assets::AssetCallback,
     ),
-    Storage(
-        StorageOperation,
-        EffectResolver<StorageResult>,
-        Option<Arc<ImportCancellation>>,
-    ),
+    Storage {
+        operation: StorageOperation,
+        resolver: EffectResolver<StorageResult>,
+        cancellation: Option<Arc<ImportCancellation>>,
+        #[cfg(feature = "storage-measurements")]
+        measurement: Option<Box<crate::storage_measurements::QueuedMeasurement>>,
+    },
     Foreground(bool),
 }
 
 pub struct StorageEffects {
     sender: Arc<mpsc::Sender<Job>>,
     file: Arc<FileImportControl>,
+    #[cfg(feature = "storage-measurements")]
+    pub(crate) measurements: Option<crate::storage_measurements::StorageObserver>,
 }
 
 impl StorageEffects {
@@ -125,7 +129,15 @@ impl StorageEffects {
                             })();
                             callback(result);
                         }
-                        Job::Storage(operation, mut resolver, cancellation) => {
+                        Job::Storage {
+                            operation,
+                            mut resolver,
+                            cancellation,
+                            #[cfg(feature = "storage-measurements")]
+                            measurement,
+                        } => {
+                            #[cfg(feature = "storage-measurements")]
+                            let started = measurement.as_ref().map(|_| std::time::Instant::now());
                             let output = if cancellation
                                 .as_ref()
                                 .is_some_and(|value| value.is_cancelled())
@@ -149,7 +161,20 @@ impl StorageEffects {
                             if let Some(imports) = imports.as_mut() {
                                 imports.release_if_hidden();
                             }
+                            #[cfg(feature = "storage-measurements")]
+                            let failed = matches!(&output, StorageResult::Failed(_));
+                            #[cfg(feature = "storage-measurements")]
+                            let executed = measurement.as_ref().map(|_| std::time::Instant::now());
                             resolver.resolve(output);
+                            #[cfg(feature = "storage-measurements")]
+                            if let Some(measurement) = measurement {
+                                measurement.finish(
+                                    started.unwrap(),
+                                    executed.unwrap(),
+                                    std::time::Instant::now(),
+                                    failed,
+                                );
+                            }
                         }
                         Job::Foreground(foreground) => {
                             if let Some(imports) = imports.as_mut() {
@@ -164,6 +189,8 @@ impl StorageEffects {
         Ok(Self {
             sender: Arc::new(sender),
             file,
+            #[cfg(feature = "storage-measurements")]
+            measurements: None,
         })
     }
 }
@@ -183,9 +210,20 @@ impl EffectMiddleware for StorageEffects {
         .then(|| self.file.begin());
         // The worker exits only when all senders are dropped. No detached task
         // or per-operation thread can reorder database commands.
+        #[cfg(feature = "storage-measurements")]
+        let measurement = crate::storage_measurements::QueuedMeasurement::new(
+            self.measurements.as_ref(),
+            &operation,
+        );
         assert!(
             self.sender
-                .send(Job::Storage(operation, resolver, cancellation))
+                .send(Job::Storage {
+                    operation,
+                    resolver,
+                    cancellation,
+                    #[cfg(feature = "storage-measurements")]
+                    measurement,
+                })
                 .is_ok(),
             "storage worker exited unexpectedly"
         );
