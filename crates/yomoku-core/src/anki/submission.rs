@@ -51,6 +51,54 @@ impl AnkiModelLayout {
     }
 }
 
+/// Frozen model-creation intent. Recovery is comparison data only; it must never
+/// authorize another insert or an update to a partially created model.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(try_from = "StoredModelCreation", into = "StoredModelCreation")]
+pub struct AnkiModelCreation {
+    layout: AnkiModelLayout,
+}
+
+impl AnkiModelCreation {
+    pub fn new(layout: AnkiModelLayout) -> Result<Self, InvalidTextValue> {
+        if !layout.valid() {
+            return Err(InvalidTextValue);
+        }
+        Ok(Self { layout })
+    }
+
+    pub fn layout(&self) -> &AnkiModelLayout {
+        &self.layout
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct StoredModelCreation {
+    version: i64,
+    layout: AnkiModelLayout,
+}
+
+impl From<AnkiModelCreation> for StoredModelCreation {
+    fn from(value: AnkiModelCreation) -> Self {
+        Self {
+            version: 1,
+            layout: value.layout,
+        }
+    }
+}
+
+impl TryFrom<StoredModelCreation> for AnkiModelCreation {
+    type Error = InvalidTextValue;
+
+    fn try_from(value: StoredModelCreation) -> Result<Self, Self::Error> {
+        if value.version != 1 {
+            return Err(InvalidTextValue);
+        }
+        Self::new(value.layout)
+    }
+}
+
 /// Validated immutable payload; no selection or live document is needed to
 /// reconcile after restart. The live owner must authenticate selection BEFORE
 /// constructing/recording it. No vocabulary/history mutation occurs here.

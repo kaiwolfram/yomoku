@@ -4,6 +4,7 @@
 
 mod analysis;
 pub mod anki;
+pub mod anki_model;
 mod completions;
 pub mod custom_dictionary;
 pub mod dictionary;
@@ -153,6 +154,11 @@ const MIGRATIONS: &[Migration] = &[
         version: 21,
         name: "0021_anki_submissions",
         sql: include_str!("../migrations/0021_anki_submissions.sql"),
+    },
+    Migration {
+        version: 22,
+        name: "0022_anki_model_creations",
+        sql: include_str!("../migrations/0022_anki_model_creations.sql"),
     },
 ];
 

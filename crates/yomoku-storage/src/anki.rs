@@ -35,6 +35,7 @@ pub enum AnkiJournalError {
     Storage(StorageError),
     InvalidRecord,
     UnresolvedSubmission,
+    UnresolvedModelCreation,
     StaleCallback,
 }
 
@@ -42,8 +43,9 @@ impl fmt::Display for AnkiJournalError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(match self {
             Self::Storage(_) => "Anki journal storage failed",
-            Self::InvalidRecord => "invalid stored Anki submission",
+            Self::InvalidRecord => "invalid stored Anki journal record",
             Self::UnresolvedSubmission => "Anki submission requires reconciliation",
+            Self::UnresolvedModelCreation => "Anki model creation requires reconciliation",
             Self::StaleCallback => "stale Anki submission callback",
         })
     }
@@ -99,6 +101,9 @@ impl Storage {
             .transaction_with_behavior(TransactionBehavior::Immediate)?;
         if read_recovery(&transaction)?.is_some() {
             return Err(AnkiJournalError::UnresolvedSubmission);
+        }
+        if crate::anki_model::read_recovery(&transaction)?.is_some() {
+            return Err(AnkiJournalError::UnresolvedModelCreation);
         }
         let payload =
             serde_json::to_string(submission).map_err(|_| AnkiJournalError::InvalidRecord)?;
@@ -197,7 +202,9 @@ fn encode_existing(ids: Option<AnkiExistingNotes>) -> Result<Option<String>, Ank
     .transpose()
 }
 
-fn read_recovery(connection: &Connection) -> Result<Option<AnkiRecovery>, AnkiJournalError> {
+pub(crate) fn read_recovery(
+    connection: &Connection,
+) -> Result<Option<AnkiRecovery>, AnkiJournalError> {
     let mut statement = connection.prepare(
         "SELECT id, payload, known_note_id, state, existing_ids FROM anki_submissions
          WHERE state NOT IN ('not_inserted', 'added', 'existing')",

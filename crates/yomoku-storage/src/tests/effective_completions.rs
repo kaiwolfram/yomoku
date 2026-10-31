@@ -653,7 +653,7 @@ fn effective_completions_migration_preserves_old_history_and_failed_upgrade_roll
         .record_analyzed_page_completion(old.completion, old.analysis_id)
         .unwrap();
     // Reconstruct the exact v17 schema; new table is still empty.
-    storage.connection.execute_batch("DROP TABLE anki_submissions; DROP TABLE vocabulary_dictionary_forms; DROP TABLE effective_completion_commands; DROP TABLE library_read_clock; ALTER TABLE documents DROP COLUMN last_read_sequence; DELETE FROM schema_migrations WHERE version >= 18;").unwrap();
+    storage.connection.execute_batch("DROP TABLE anki_model_creations; DROP TABLE anki_submissions; DROP TABLE vocabulary_dictionary_forms; DROP TABLE effective_completion_commands; DROP TABLE library_read_clock; ALTER TABLE documents DROP COLUMN last_read_sequence; DELETE FROM schema_migrations WHERE version >= 18;").unwrap();
     let before = rows(&storage, "reading_occurrences");
     storage
         .connection
@@ -668,7 +668,7 @@ fn effective_completions_migration_preserves_old_history_and_failed_upgrade_roll
         .unwrap();
     drop(connection);
     let mut storage = Storage::open(database.path()).unwrap();
-    assert_eq!(storage.schema_version().unwrap(), 21);
+    assert_eq!(storage.schema_version().unwrap(), 22);
     assert_eq!(rows(&storage, "reading_occurrences"), before);
     assert!(rows(&storage, "effective_completion_commands").is_empty());
     assert_eq!(
@@ -738,7 +738,7 @@ fn versioned_effective_history_and_uncommitted_reservations_survive_upgrade_and_
     let before = tables.map(|table| rows(&storage, table));
     // Exact v18 table shape, with real serialized effective commands: one
     // completed and one reserved only. Upgrade must never auto-replay either.
-    storage.connection.execute_batch("DROP TABLE anki_submissions; DROP TABLE vocabulary_dictionary_forms; DROP TABLE library_read_clock; ALTER TABLE documents DROP COLUMN last_read_sequence; DELETE FROM schema_migrations WHERE version >= 19;").unwrap();
+    storage.connection.execute_batch("DROP TABLE anki_model_creations; DROP TABLE anki_submissions; DROP TABLE vocabulary_dictionary_forms; DROP TABLE library_read_clock; ALTER TABLE documents DROP COLUMN last_read_sequence; DELETE FROM schema_migrations WHERE version >= 19;").unwrap();
     drop(storage);
     let mut storage = Storage::open(database.path()).unwrap();
     assert_eq!(tables.map(|table| rows(&storage, table)), before);

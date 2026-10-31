@@ -3848,3 +3848,26 @@ and /tmp/yomoku-browser-profile-*. No emulator started.
   real collection/browser, independent Full-loader, physical-device or broader
   lifecycle/performance run. Next: retained app-owned restore/commit gates and
   typed provider bridge, model-creation recovery, then deck/settings/UI wiring.
+
+
+## 2026-10-31 — Durable Anki model-creation recovery
+
+- Started clean. Added pure validated/versioned `AnkiModelCreation` and migration
+  0022 model journal with exact full layout, nonreused IDs, optional known model
+  ID and retained terminal payload/results. Newly committed preparation alone
+  produces a live callback token; restoration supplies read-only data/IDs.
+- Pending/uncertain models block both creation and note insertion. Both journals
+  share a mutation gate under immediate transactions. Empty/failed/partial reads
+  preserve obligations; full-layout reconciliation requires the known returned
+  ID when available. No restart replay, partial-model repair or cleanup. Stale
+  callbacks cannot release later work; local reader/history deletion is separate.
+- PASS: 11 new host cases, 25 focused Anki cases, 876 workspace tests/17 opt-in
+  fixtures ignored; workspace build, strict Clippy, Rustfmt and diff. Corrected
+  one old schema expectation and boxed an oversized enum variant after initial
+  checks. No open blocker/escalation. Logs:
+  /tmp/yomoku-anki-model-journal-{focused,workspace,build,clippy}.log.
+- Updated architecture/data model, decisions, plan, commands and handoff. No
+  dependencies, public Event/FFI or Kotlin/provider/UI call site changed. No
+  Android, real collection/browser, independent Full-loader, physical device,
+  broad lifecycle or performance verification. Next: retained app startup
+  restore/outcome-commit gates and typed dispatch, then settings/Add to Anki UI.

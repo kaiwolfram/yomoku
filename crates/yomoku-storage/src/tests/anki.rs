@@ -9,7 +9,7 @@ use yomoku_core::{
     vocabulary::Surface,
 };
 
-fn payload(deck: i64) -> AnkiSubmission {
+pub(super) fn payload(deck: i64) -> AnkiSubmission {
     let surface = Surface::new("𠮷<&[猫]e\u{301}\u{1f}").unwrap();
     let sentence = format!("前。{surface}と{surface}。", surface = surface.as_str());
     let start = "前。".len() as i64;
@@ -485,7 +485,7 @@ fn anki_migration_upgrade_is_empty_and_failure_preserves_prior_schema_and_data()
         .unwrap();
     drop(connection);
     let storage = Storage::open(database.path()).unwrap();
-    assert_eq!(storage.schema_version().unwrap(), 21);
+    assert_eq!(storage.schema_version().unwrap(), 22);
     assert_eq!(storage.anki_recovery().unwrap(), None);
     assert_eq!(
         storage

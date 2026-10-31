@@ -570,7 +570,7 @@ fn migration_preserves_v8_data_and_rolls_back_schema_and_history_on_failure() {
         .unwrap();
     drop(connection);
     let mut storage = Storage::open(database.path()).unwrap();
-    assert_eq!(storage.schema_version().unwrap(), 21);
+    assert_eq!(storage.schema_version().unwrap(), 22);
     assert_eq!(storage.load_paste(document.document_id).unwrap(), expected);
     assert_eq!(storage.page_length().unwrap(), PageLength::Characters750);
     assert_eq!(

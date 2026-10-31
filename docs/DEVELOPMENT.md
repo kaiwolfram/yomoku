@@ -7846,3 +7846,38 @@ APK/lint/emulator, real-provider/browser/collection, separate Full-loader, physi
 arm64, broad lifecycle or performance checks were run. Next: retained app-owned
 restore/commit gates and typed provider dispatch, including durable model-creation
 uncertainty, before enabling configured-deck settings or Add to Anki.
+
+
+## Durable Anki model-creation journal
+
+Verified 2026-10-31 with the pinned Rust PATH workaround above. Host-only slice;
+no Android/provider installation is required. Note/model journals remain isolated
+from app/FFI/UI and authorize no provider calls on restore.
+
+```sh
+cargo test -p yomoku-storage anki --locked --offline
+cargo test --workspace --all-features --locked --offline --quiet
+cargo build --workspace --locked --offline
+cargo clippy --workspace --all-targets --all-features --locked --offline -- -D warnings
+cargo fmt --all -- --check
+git diff --check
+```
+
+PASS: 25 focused Anki cases including 11 new model-journal cases; 876 workspace
+tests, 17 opt-in fixtures ignored; workspace build, strict Clippy, Rustfmt and
+diff. Coverage includes frozen old-layout/Unicode recovery, interrupted/partial
+creation, full-layout and known-ID reconciliation, stale/duplicate callbacks,
+concurrent note/model preparation, failed statements/deferred COMMIT, invalid
+payloads/states/IDs, ID exhaustion, migration rollback with a pending note, and
+unchanged reader/vocabulary/statistics plus deletion-independent obligations.
+
+Initial broader checks found one multiline historical schema expectation still
+at 21 and Clippy's large-enum-variant warning. Updated the schema expectation and
+boxed the readback layout; final checks above pass. Historical migration fixtures
+also drop the new table when simulating older schemas. No open blocker/escalation.
+Logs: `/tmp/yomoku-anki-model-journal-{focused,workspace,build,clippy}.log`.
+No dependencies, public Event/ViewModel/FFI protocol or Kotlin sources changed.
+No Android APK/lint/emulator, real AnkiDroid collection/browser, independent
+Full-loader, physical arm64, broad lifecycle or performance checks were run.
+Next: retained app ownership restoring both journals, commit gates and typed
+provider dispatch before configured-deck settings/Add to Anki are enabled.

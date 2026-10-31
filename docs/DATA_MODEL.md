@@ -1891,8 +1891,46 @@ foreign keys, so erasing local reader data cannot erase the external obligation.
 This repository is not wired into app/Event/FFI or Android. The retained owner
 must authenticate current selections, gate on restore, commit before invoking
 once and persist the classified outcome before releasing its live obligation.
-Model-creation uncertainty needs separate durable handling before live creation.
+Migration 0022 below supplies isolated model-creation recovery; app-owned restore
+and dispatch gates remain required before live creation.
 No Anki replay/repair, vocabulary/history mutation or backup behavior is added.
+
+## Durable Anki model creation (migration 0022)
+
+`anki_model_creations` retains an AUTOINCREMENT positive signed-64 ID, immutable
+version-1 JSON expected layout, state, optional positive known returned model ID
+and optional positive existing model ID. Layout stores the actual model name,
+four ordered unique field names, CSS, card name and question/answer templates;
+normal type, sort field zero and one ordinal-zero forward card are fixed v1
+invariants. `AnkiModelCreation` validates NUL/field-separator/empty-name constraints
+and fails closed on unknown versions/fields. Recovery never substitutes current
+layout constants. No deck or word selection is part of model creation.
+
+| State | Meaning | Next permitted journal transition |
+| --- | --- | --- |
+| `pending` | Committed before one live creator call; outcome may be lost | Live callback or read-only reconciliation |
+| `uncertain` | Model may exist, including partial configuration | Read-only reconciliation |
+| `not_created` | Live callback establishes no mutation was submitted | Terminal |
+| `created` | Live callback verifies full creation/readback; known ID required | Terminal |
+| `existing` | Full frozen-layout observation establishes usable model | Terminal; no ownership assertion |
+
+A unique partial index limits unresolved creation to one row. Both note and
+model preparation check both journals within an immediate transaction, providing
+one shared mutation gate across concurrent connections. Each journal's recovery
+read is independent; the retained owner must restore both before enabling work.
+Only newly committed model preparation returns an `AnkiLiveModelCreation` token;
+recovery supplies `AnkiModelRecovery` data/ID and never a mutation command.
+Duplicate/old/post-reconciliation live callbacks are refused. Failed statements
+and COMMIT leave prior state intact. Committed IDs are not reused.
+
+Full-layout readback must match the frozen layout and, when present, the known
+returned ID. Compatible observations of other IDs cannot clear a known partial
+model. Empty/failed/partial/incompatible/ambiguous reads keep uncertainty and
+preserve the known ID. Matching readback records `existing_model_id` and retains
+`known_model_id`, without updating provider state or claiming creation ownership.
+Terminal payloads/results remain stored; no pruning/delete API or document/
+vocabulary cascade can erase the obligation. Both journals remain unconnected
+to app/Event/FFI/provider/UI; no restart replay, repair or cleanup is authorized.
 
 ## Read-only Vocabulary browser (schema 0020 unchanged)
 

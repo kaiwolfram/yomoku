@@ -1878,8 +1878,8 @@ are never reused, repeated/stale callbacks cannot release newer obligations, and
 reader/vocabulary deletion cannot cascade to the journal. Terminal records retain
 their frozen content/results; no pruning API or destructive policy is introduced.
 See DATA_MODEL.md for the stored shape. This remains an isolated prerequisite:
-app/Event/FFI ownership, restore gating, model-creation recovery and Android/UI
-integration are still required before any live mutation.
+app/Event/FFI ownership, restore gating and Android/UI integration are still
+required before any live mutation. Model-creation storage is described below.
 
 Android's unconnected `AnkiProviderReader` implements the read-only prerequisite:
 fresh availability/spec/permission checks, deck enumeration, bound exact-first-
@@ -1946,3 +1946,23 @@ and an empty read never permits insertion. The future durable owner must record
 pending submission before invoking once, preserve uncertainty across process death
 and never replay a mutation on restart. No app/FFI/UI call site is enabled yet;
 fake-provider tests do not establish real Binder/collection compatibility.
+
+
+`yomoku-storage::anki_model` adds the separate migration-0022 model-creation
+journal. Pure `AnkiModelCreation` freezes the full validated versioned layout.
+Pending creation commits before one live creator invocation; only successful
+preparation produces a nonserializable live callback token. Recovery returns
+separate read-only data/IDs, never creation/template-update commands. Both
+preparation methods check both journals under an immediate transaction, blocking
+overlapping note/model mutations even across connections. Restore/commit errors
+must keep the retained owner gated; it must restore both journals on startup.
+
+Known pre-submission failure and verified full creation are live-callback-only
+terminal results. All post-submission failures remain uncertain with any known
+returned ID. Read-only reconciliation compares full layout to the frozen intent
+and requires the original ID when known; a compatible different ID cannot hide
+a known partial model. Missing/failed/partial/incompatible reads preserve the
+obligation. A full match records existing usability, without claiming ownership
+or repairing anything. Stale/duplicate callbacks cannot release later work;
+terminal payloads/results and nonreused IDs survive reader/vocabulary deletion.
+No app/Event/FFI/Android call site or mutation replay is enabled by this journal.

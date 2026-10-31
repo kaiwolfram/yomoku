@@ -4503,3 +4503,33 @@ callbacks cannot release a newer obligation. Never treat failed restore/commit
 as permission to invoke. This isolated repository does not invoke Anki or replay
 mutations; app-owned restore/commit gates, model-creation recovery and live
 provider/Event/FFI/UI integration remain necessary before enabling the action.
+
+
+## 2026-10-31 — Durable Anki model-creation prerequisite
+
+Add a separate creation journal before enabling the existing model creator. The
+pure `AnkiModelCreation` captures the actual full expected layout in validated
+version-1 JSON, independent of future changes to the app's templates. Migration
+0022 retains pending/uncertain/terminal records, nonreused committed IDs and
+optional known returned model IDs, without reader/vocabulary foreign keys.
+No dependency, platform I/O in core, public Event/FFI or UI action is introduced.
+
+Use the same commit-before-one-live-invocation boundary as note submissions.
+Only successful new preparation returns a nonserializable live callback token;
+restoration returns distinct data/IDs for read-only reconciliation. Pending and
+uncertain both block new creation and note insertion. Both preparation methods
+check both journals under an immediate transaction, so concurrent callers cannot
+start an overlapping note/model mutation. Missing/corrupt journal reads fail
+closed. A failed outcome commit never releases the durable obligation.
+
+Only a still-pending live callback can establish that no mutation was submitted
+or that complete creation/readback succeeded. Every post-submission failure is
+uncertain, including a partial model or lost insert/template-update response.
+Reconciliation requires full normal/sort-zero/single-card layout evidence equal
+to the frozen layout; name-only discovery is insufficient. When the returned ID
+is known, a different compatible model cannot resolve its obligation. A full
+match records existing usability, not ownership or proof the original invocation
+finished. Empty, failed, ambiguous, partial and incompatible observations keep
+creation blocked. No replay, repair, rename, deletion or cleanup is introduced.
+The retained app owner must restore both journals and persist outcomes before
+releasing its live gate; typed dispatch and provider/UI activation remain next.
