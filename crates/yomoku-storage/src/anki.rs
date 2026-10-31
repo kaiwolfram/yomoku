@@ -8,14 +8,7 @@ use yomoku_core::anki::{AnkiExistingNotes, AnkiNoteId, AnkiReconciliation, AnkiS
 
 use crate::{Storage, StorageError};
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct AnkiSubmissionId(i64);
-
-impl AnkiSubmissionId {
-    pub fn value(self) -> i64 {
-        self.0
-    }
-}
+pub use yomoku_core::anki::{AnkiRecovery, AnkiSubmissionId};
 
 /// Created only by a newly committed preparation, never by a recovery read.
 /// Keep in the live provider callback; no serialization or reconstruction API.
@@ -77,16 +70,6 @@ pub enum AnkiSubmissionOutcome {
     Uncertain { known_note_id: Option<AnkiNoteId> },
 }
 
-/// Recovery contains only frozen data for read-only reconciliation. Pending and
-/// uncertain records are deliberately indistinguishable here. An empty/failed
-/// observation cannot establish that a prior provider write will never commit.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct AnkiRecovery {
-    pub id: AnkiSubmissionId,
-    pub submission: AnkiSubmission,
-    pub known_note_id: Option<AnkiNoteId>,
-}
-
 impl Storage {
     /// Commit BEFORE calling the note inserter, once, in the same live attempt.
     /// A successful return is for that caller only; never replay it on restart
@@ -111,8 +94,9 @@ impl Storage {
             "INSERT INTO anki_submissions (payload, state) VALUES (?1, 'pending')",
             [payload],
         )?;
-        let id = AnkiSubmissionId(transaction.last_insert_rowid());
-        if id.0 <= 0 || changed != 1 {
+        let id = AnkiSubmissionId::try_from(transaction.last_insert_rowid())
+            .map_err(|_| AnkiJournalError::InvalidRecord)?;
+        if changed != 1 {
             return Err(AnkiJournalError::InvalidRecord);
         }
         transaction.commit()?;
@@ -153,7 +137,12 @@ impl Storage {
         let changed = transaction.execute(
             "UPDATE anki_submissions SET state = ?2, known_note_id = ?3, existing_ids = ?4
              WHERE id = ?1 AND state = 'pending'",
-            params![id.0, state, note.map(i64::from), encode_existing(existing)?],
+            params![
+                id.value(),
+                state,
+                note.map(i64::from),
+                encode_existing(existing)?
+            ],
         )?;
         if changed != 1 {
             return Err(AnkiJournalError::StaleCallback);
@@ -184,7 +173,7 @@ impl Storage {
         };
         let changed = transaction.execute(
             "UPDATE anki_submissions SET state = ?2, existing_ids = ?3 WHERE id = ?1",
-            params![id.0, state, encode_existing(existing)?],
+            params![id.value(), state, encode_existing(existing)?],
         )?;
         if changed != 1 {
             return Err(AnkiJournalError::StaleCallback);
@@ -226,7 +215,7 @@ pub(crate) fn read_recovery(
         return Err(AnkiJournalError::InvalidRecord);
     }
     let recovery = AnkiRecovery {
-        id: AnkiSubmissionId(id),
+        id: AnkiSubmissionId::try_from(id).map_err(|_| AnkiJournalError::InvalidRecord)?,
         submission: serde_json::from_str(&payload).map_err(|_| AnkiJournalError::InvalidRecord)?,
         known_note_id: note
             .map(AnkiNoteId::try_from)

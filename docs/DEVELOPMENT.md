@@ -7881,3 +7881,39 @@ No Android APK/lint/emulator, real AnkiDroid collection/browser, independent
 Full-loader, physical arm64, broad lifecycle or performance checks were run.
 Next: retained app ownership restoring both journals, commit gates and typed
 provider dispatch before configured-deck settings/Add to Anki are enabled.
+
+## App-owned Anki startup recovery
+
+Verified 2026-10-31 with the Rust PATH workaround above; host-only native slice.
+
+```sh
+cargo test -p yomoku-core -p yomoku-storage -p yomoku-runtime anki --all-features --locked --offline
+cargo test --workspace --all-features --locked --offline --quiet
+cargo build --workspace --locked --offline
+cargo clippy --workspace --all-targets --all-features --locked --offline -- -D warnings
+cargo fmt --all -- --check
+cargo run -p yomoku-ffi --bin generate-kotlin --features facet_typegen --locked --offline -- /tmp/yomoku-anki-startup-kotlin
+diff -r target/generated/kotlin /tmp/yomoku-anki-startup-kotlin
+git diff --check
+```
+
+PASS: 15 new host cases (6 app, 4 worker/startup, 4 combined repository, 1 FFI
+codec); 44 focused Anki cases; 891 workspace tests, 17 opt-in fixtures ignored;
+workspace build, strict Clippy, Rustfmt and diff. Generated Kotlin output is
+byte-for-byte equal to the existing generated tree; no public codec changed.
+Coverage includes lazy worker-only startup for original/effective models, retained
+empty/failed/uncertain gates, exact old payloads/layout/deck/large IDs, lost provider
+callbacks/restart, stale/duplicate callbacks, attempt exhaustion, wrong results,
+explicit Retry, missing/corrupt journals, rollback after failed restore, concurrent
+note/model snapshot switches, unchanged reader state and absent shell codecs.
+Restoring pending/uncertain records preserves DB bytes and emits no provider work.
+
+Initial checks found a test issuing RefreshLibrary before an asynchronous invalid
+paste completed; added the missing wait. A native result relocation accidentally
+left a duplicate variant; removed it before final checks. Git staging needed sandbox escalation; no open blocker. Logs: `/tmp/yomoku-anki-startup-{focused,workspace,build,clippy,check,
+typegen,codec-diff,format}.log` (one path per suffix).
+No dependency, migration, Kotlin/provider/UI or public Event/ViewModel change.
+No Android APK/lint/emulator, host Kotlin/JNI JVM, real collection/browser,
+independent Full-loader, physical arm64, broader lifecycle or performance check.
+Next: live export ownership and durable begin/outcome/reconciliation routing,
+typed provider/FFI dispatch and compact visible recovery/settings/action state.

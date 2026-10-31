@@ -1888,11 +1888,11 @@ payload/results remain stored; no delete/pruning API is provided. IDs do not
 reuse committed values, even across reopen. There are no document/vocabulary
 foreign keys, so erasing local reader data cannot erase the external obligation.
 
-This repository is not wired into app/Event/FFI or Android. The retained owner
-must authenticate current selections, gate on restore, commit before invoking
-once and persist the classified outcome before releasing its live obligation.
-Migration 0022 below supplies isolated model-creation recovery; app-owned restore
-and dispatch gates remain required before live creation.
+The retained app now restores both journals through the native startup read
+below. Live dispatch remains unconnected: the owner must authenticate current
+selections, commit before invoking once and persist the classified outcome
+before releasing its live obligation. Migration 0022 below supplies separate
+model-creation recovery; dispatch/commit gates remain required before activation.
 No Anki replay/repair, vocabulary/history mutation or backup behavior is added.
 
 ## Durable Anki model creation (migration 0022)
@@ -1916,8 +1916,8 @@ layout constants. No deck or word selection is part of model creation.
 
 A unique partial index limits unresolved creation to one row. Both note and
 model preparation check both journals within an immediate transaction, providing
-one shared mutation gate across concurrent connections. Each journal's recovery
-read is independent; the retained owner must restore both before enabling work.
+one shared mutation gate across concurrent connections. Individual recovery
+reads remain available; app startup uses one combined read transaction below.
 Only newly committed model preparation returns an `AnkiLiveModelCreation` token;
 recovery supplies `AnkiModelRecovery` data/ID and never a mutation command.
 Duplicate/old/post-reconciliation live callbacks are refused. Failed statements
@@ -1929,8 +1929,31 @@ model. Empty/failed/partial/incompatible/ambiguous reads keep uncertainty and
 preserve the known ID. Matching readback records `existing_model_id` and retains
 `known_model_id`, without updating provider state or claiming creation ownership.
 Terminal payloads/results remain stored; no pruning/delete API or document/
-vocabulary cascade can erase the obligation. Both journals remain unconnected
-to app/Event/FFI/provider/UI; no restart replay, repair or cleanup is authorized.
+vocabulary cascade can erase the obligation. The app restores both journals
+read-only; live provider/FFI/UI dispatch remains unconnected. No restart replay,
+repair or cleanup is authorized.
+
+## Retained Anki startup snapshot (no migration)
+
+Pure core now owns `AnkiSubmissionId`, `AnkiModelCreationId`, `AnkiRecovery` and
+`AnkiModelRecovery`; existing storage paths reexport them. Validated positive
+journal IDs are recovery identifiers only. Nonserializable live callback tokens
+remain private in storage and cannot be reconstructed from these IDs.
+
+`Storage::anki_recovery_snapshot` reads both journals in one deferred read
+transaction, preserving a consistent snapshot during concurrent note/model
+transitions. It returns both complete results or an error, never a partial pair.
+No journal state is changed. Frozen fields/surface/deck/model/layout and known
+returned IDs retain their existing validation and exact values.
+
+The app retains native Unrestored/Loading/Failed/Restored state and monotonic
+attempt IDs. Only Restored with both slots empty satisfies the startup gate;
+this alone never authorizes a provider write. Errors, unexpected result kinds,
+stale/duplicate callbacks and sequence exhaustion cannot open the gate. Initial
+Library refresh schedules this separate read on the existing FIFO; repeated
+refreshes do not retry failures. Explicit native Retry is available for future
+UI wiring. Reader/import busy/error/checkpoint state is independent. No new
+shell Event/ViewModel payload, settings, provider action or replay is enabled.
 
 ## Read-only Vocabulary browser (schema 0020 unchanged)
 

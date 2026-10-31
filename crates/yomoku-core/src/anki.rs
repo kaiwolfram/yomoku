@@ -8,6 +8,8 @@ use crate::{
 
 mod export;
 mod projection;
+mod recovery;
+pub use recovery::*;
 mod submission;
 pub use export::*;
 pub use submission::*;

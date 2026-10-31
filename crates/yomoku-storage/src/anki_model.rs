@@ -6,14 +6,7 @@ use yomoku_core::anki::{AnkiModelCreation, AnkiModelId, AnkiModelLayout};
 
 use crate::{anki::AnkiJournalError, Storage};
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct AnkiModelCreationId(i64);
-
-impl AnkiModelCreationId {
-    pub fn value(self) -> i64 {
-        self.0
-    }
-}
+pub use yomoku_core::anki::{AnkiModelCreationId, AnkiModelRecovery};
 
 /// Only newly committed preparation produces a live callback token. There is
 /// no serialization, cloning or reconstruction from a recovery ID.
@@ -26,13 +19,6 @@ impl AnkiLiveModelCreation {
     pub fn id(&self) -> AnkiModelCreationId {
         self.id
     }
-}
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct AnkiModelRecovery {
-    pub id: AnkiModelCreationId,
-    pub creation: AnkiModelCreation,
-    pub known_model_id: Option<AnkiModelId>,
 }
 
 /// `NotCreated` requires knowledge that no mutating provider call was submitted.
@@ -80,8 +66,9 @@ impl Storage {
             "INSERT INTO anki_model_creations (payload, state) VALUES (?1, 'pending')",
             [payload],
         )?;
-        let id = AnkiModelCreationId(transaction.last_insert_rowid());
-        if id.0 <= 0 || changed != 1 {
+        let id = AnkiModelCreationId::try_from(transaction.last_insert_rowid())
+            .map_err(|_| AnkiJournalError::InvalidRecord)?;
+        if changed != 1 {
             return Err(AnkiJournalError::InvalidRecord);
         }
         transaction.commit()?;
@@ -116,7 +103,7 @@ impl Storage {
         let changed = transaction.execute(
             "UPDATE anki_model_creations SET state = ?2, known_model_id = ?3
              WHERE id = ?1 AND state = 'pending'",
-            params![live.id.0, state, model.map(i64::from)],
+            params![live.id.value(), state, model.map(i64::from)],
         )?;
         if changed != 1 {
             return Err(AnkiJournalError::StaleCallback);
@@ -156,7 +143,7 @@ impl Storage {
         };
         let changed = transaction.execute(
             "UPDATE anki_model_creations SET state = ?2, existing_model_id = ?3 WHERE id = ?1",
-            params![id.0, state, existing.map(i64::from)],
+            params![id.value(), state, existing.map(i64::from)],
         )?;
         if changed != 1 {
             return Err(AnkiJournalError::StaleCallback);
@@ -190,7 +177,7 @@ pub(crate) fn read_recovery(
         return Err(AnkiJournalError::InvalidRecord);
     }
     let recovery = AnkiModelRecovery {
-        id: AnkiModelCreationId(id),
+        id: AnkiModelCreationId::try_from(id).map_err(|_| AnkiJournalError::InvalidRecord)?,
         creation: serde_json::from_str(&payload).map_err(|_| AnkiJournalError::InvalidRecord)?,
         known_model_id: model
             .map(AnkiModelId::try_from)

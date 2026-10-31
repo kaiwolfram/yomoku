@@ -3871,3 +3871,24 @@ and /tmp/yomoku-browser-profile-*. No emulator started.
   Android, real collection/browser, independent Full-loader, physical device,
   broad lifecycle or performance verification. Next: retained app startup
   restore/outcome-commit gates and typed dispatch, then settings/Add to Anki UI.
+
+## 2026-10-31 — App-owned Anki startup recovery
+
+- Started clean. Added one-transaction combined journal restoration and moved
+  validated recovery IDs/data into pure core, preserving storage reexports and
+  private live callback tokens. No migration or dependency change.
+- Retained Model owns closed startup/failed/uncertain gates and attempt IDs.
+  Runtime schedules native restore before initial Library refresh on the existing
+  FIFO; constructors stay lazy and local reader busy/errors/checkpoints remain
+  independent. Explicit native Retry only; no restart provider replay or journal
+  mutation. Live export/commit/reconciliation/provider/FFI/UI dispatch remain next.
+- PASS: 15 new cases, 44 focused Anki cases, 891 workspace tests/17 opt-in fixtures
+  ignored; workspace build, strict Clippy, Rustfmt and diff. Kotlin generation
+  matches existing output byte-for-byte; recovery events/payloads have no shell
+  codec. Fixed a missing asynchronous test wait and duplicate enum relocation
+  during initial checks. Git staging needed sandbox escalation; no open blocker.
+- Updated architecture/data model, decisions, plan, verification and handoff.
+  Logs: /tmp/yomoku-anki-startup-*.log. No Android, host JNI JVM, real provider/
+  collection/browser, separate Full-loader, physical device, broader lifecycle
+  or performance verification. Next: live export ownership, durable dispatch/
+  outcome/reconciliation gates, then visible recovery Retry/settings/actions.

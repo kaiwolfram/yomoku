@@ -5,6 +5,7 @@
 mod analysis;
 pub mod anki;
 pub mod anki_model;
+mod anki_recovery;
 mod completions;
 pub mod custom_dictionary;
 pub mod dictionary;

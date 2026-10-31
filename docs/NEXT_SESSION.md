@@ -1,60 +1,63 @@
 # Resume here
-Updated: 2026-10-31. Durable isolated Anki model-creation recovery verified.
+Updated: 2026-10-31. App-owned Anki startup recovery verified.
 Commit guidance: explanatory bodies; merges include provenance. Keep verification
 results in session/progress docs and reports, out of commit message bodies.
 
 ## Current slice
-- `AnkiExportSession` remains pure/in-memory, unowned by app/Event/FFI/UI. Prepare
-  exact current original/effective context/definitions without changing history.
-  Preserve current-owner stale-shell guards when wiring live actions.
-- `AnkiSubmission` freezes exact surface/four fields/deck/model/full layout.
-  `AnkiModelCreation` freezes full layout independently; both validate version-1
-  JSON and reject unknown/corrupt payloads instead of using current constants.
-- Schemas 0021 note submissions and 0022 model creations are durable journals,
-  not mutation queues. Both begin methods check BOTH journals in one immediate
-  transaction, blocking overlapping note/model writes across connections.
-  Commit BEFORE one live invocation. Only new preparation returns nonserializable
-  live callback tokens; recovery returns distinct data/IDs for read-only reads.
-- Startup must restore BOTH journals; errors are never empty. Pending/uncertain
-  restore identically, with optional known returned IDs. Failed outcome commits
-  keep the obligation. Never replay provider mutations from recovery.
-- Note existing IDs establish existence, not deck placement. Model reconciliation
-  requires exact frozen full layout and the original ID when known; a compatible
-  different ID cannot hide a known partial model. Failed/empty/partial/mismatched
-  reads retain uncertainty. No replay/repair/rename/delete/cleanup. Terminal rows
-  retain payload/results; no reader/vocab FK can erase obligations. Stale callbacks
-  cannot release newer work. No app/runtime/FFI/provider call site is enabled.
-- Android worker-only provider reader/model creator/note inserter remain isolated.
-  Refresh host/spec >=2/permission; validate full layout/nonfiltered deck and exact
-  cross-model/deck duplicates immediately before insert. Explicit ordinal-zero
-  card placement/readback; never change model default deck or existing notes.
-  Every post-submission failure uncertain; model creation may leave partial models.
-- No real-provider compatibility claim. Evidence: ANKIDROID_API.md, pinned 2.25.3;
-  no Anki dependency/minimum version adopted. Observations non-atomic; query cost
-  unmeasured. Nostr config empty; ask Q188 before forwarding.
+- All runtime routers wrap `AnkiStartupLayer`: initial RefreshLibrary schedules
+  native recovery before List on the existing FIFO. Constructors stay lazy;
+  invalid paste still opens no DB. Core-only fixtures must request restore.
+- Model owns Unrestored/Loading/Failed/Restored recovery with native attempt IDs.
+  Only a successful empty pair satisfies startup; neither obligation nor errors
+  enable preparation. Repeated refresh never retries failure. Native-only Retry
+  exists; visible error/Retry projection remains unwired. Reader busy/errors/
+  checkpoints remain independent. Recovery itself emits no shell effects.
+- `anki_recovery_snapshot` reads BOTH journals in one deferred read transaction;
+  errors never return a partial/empty pair. IDs/recovery data now live in core,
+  reexported at old storage paths. No schema or generated codec change.
+- `AnkiExportSession` is still pure/in-memory and unowned by app/Event/FFI/UI.
+  Preserve original/effective current-owner stale-shell selection guards.
+- Note/model payloads freeze actual version-1 fields/surface/deck/model/layout.
+  Both begin methods gate BOTH journals under one immediate transaction. Commit
+  BEFORE one live invocation. Only new preparation returns nonserializable live
+  callback tokens; recovery IDs/data cannot reconstruct them. A startup-empty
+  gate alone never authorizes a write; DB preparation must recheck both journals.
+- Pending/uncertain recover identically with optional known returned IDs. Failed
+  outcome commits retain obligations. No mutation replay/repair/rename/delete/
+  cleanup. Terminal payload/results survive local reader/vocabulary deletion.
+  Note existing IDs prove existence, not deck placement. Model readback requires
+  frozen full layout and original ID when known; empty/partial/mismatched reads
+  retain uncertainty. Stale callbacks cannot release newer work.
+- Android provider reader/model creator/note inserter remain isolated/unconnected.
+  Fresh host/spec>=2/permission, full layout/nonfiltered frozen deck and exact
+  cross-model/deck duplicates gate inserts. Explicit ordinal-zero card placement/
+  readback; no model-default/existing-note changes. Post-submission failure is
+  uncertain; model creation may leave partial models. No real-provider claim.
+- API evidence: ANKIDROID_API.md, pinned 2.25.3; no Anki dependency/minimum adopted.
+  Observations non-atomic; query cost unmeasured. Nostr config empty; Q188 before
+  forwarding. Physical arm64 remains user-deferred.
 
 ## Next tasks (ordered)
-1. Own retained export/recovery in app with typed Event/FFI/provider dispatch.
-   Gate on startup restore of both journals and pending/outcome commits; use the
-   journals before one live note/model invocation and recover read-only without
-   replay. Preserve frozen payload/deck; reject stale shell selections. Test
-   restore/commit failures, process death and duplicate/stale callbacks.
-2. Wire configured-deck settings/Add to Anki/existing-note action after gates.
-   Handle permission, missing/filtered deck, conflicting/incompatible model and
-   uncertain creation. Test a disposable real collection before compatibility
-   claims; verify actual browser/return behavior and duplicate query cost.
+1. Own live export in app and wire typed begin/outcome/reconciliation commits and
+   provider dispatch through FFI. Require startup gate + durable preparation
+   before one live note/model invocation. Restore only read-only reconciliation;
+   preserve frozen fields/deck/layout and current-owner selection checks. Test
+   failed commits, lost responses/process death and stale/duplicate callbacks.
+2. Add compact recovery/error/explicit Retry projection, configured-deck settings,
+   Add to Anki and existing-note action after dispatch gates. Handle permission,
+   absent/filtered deck and incompatible/uncertain model. Test a disposable real
+   collection/browser/return and duplicate cost before compatibility claims.
 3. Resume Android native-phase/100k Select All Compose and observer-free optimized
    profiling plus accessibility/process-death matrix. Preserve full IDs/equality/
-   replay guards. Heavy-history/diverse-book/full-load/exact peaks remain. Physical
-   arm64 is user-deferred; emulator/host results do not establish hardware viability.
+   replay guards. Heavy-history/diverse-book/full-load/exact peaks remain.
 
 ## Verification / blockers
-- PASS: 11 new model cases; 25 focused Anki cases; 876 workspace tests/17 opt-in
-  fixtures ignored; workspace build, strict Clippy, Rustfmt and diff. Exact commands
-  in DEVELOPMENT.md final model-journal section. Logs:
-  /tmp/yomoku-anki-model-journal-{focused,workspace,build,clippy}.log.
-- Corrected one old multiline schema expectation and boxed a large readback enum
-  variant after initial checks. No escalation/open blocker. No dependency,
-  Event/ViewModel/FFI protocol or Kotlin source change.
-- No Android APK/lint/emulator, independent Full-loader, real collection/browser,
-  physical device, broader lifecycle or performance check this slice.
+- PASS: 15 new host cases; 44 focused Anki cases; 891 workspace tests/17 opt-in
+  fixtures ignored; workspace build, strict Clippy, Rustfmt and diff. Generated
+  Kotlin output matches existing output byte-for-byte. Commands: DEVELOPMENT.md
+  final startup-recovery section. Logs: /tmp/yomoku-anki-startup-*.log.
+- Fixed an asynchronous test's missing wait and an accidental duplicate enum
+  variant during relocation; final checks pass. No dependency/schema/public
+  codec/Kotlin/UI change or open blocker. No Android APK/lint/emulator, JNI JVM,
+  real provider/collection/browser, independent Full-loader, physical arm64,
+  broader lifecycle or performance check this slice.

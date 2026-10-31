@@ -4533,3 +4533,31 @@ finished. Empty, failed, ambiguous, partial and incompatible observations keep
 creation blocked. No replay, repair, rename, deletion or cleanup is introduced.
 The retained app owner must restore both journals and persist outcomes before
 releasing its live gate; typed dispatch and provider/UI activation remain next.
+
+## 2026-10-31 — App-owned Anki startup recovery
+
+Pull forward the startup prerequisite as a small native slice before live export
+or provider dispatch. Move only recovery data and validated journal IDs into pure
+core, reexporting the existing storage paths. Live callback tokens remain private
+to newly committed preparation in storage; recovery IDs cannot reconstruct them.
+No dependency, schema or shell Event/ViewModel codec change is required.
+
+Restore both journals in one deferred SQLite read transaction. Independent reads
+could straddle a concurrent note/model transition and falsely report an empty
+pair; any read/commit error must fail the complete snapshot. Preserve frozen
+fields/layout/deck and known returned IDs without consulting current constants.
+
+The retained app model starts Unrestored and owns separate Loading/Failed/Restored
+state and attempt IDs. Only a successful empty pair satisfies the startup
+prerequisite; stale/duplicate callbacks, unexpected results and attempt exhaustion
+cannot open it. A failed restore requires an explicit native Retry, never a render
+or repeated Library refresh. A restored obligation remains read-only data.
+
+Wrap the existing EffectRouter with a narrow startup layer that schedules this
+read before the initial Library refresh on the same FIFO. Keep constructors lazy
+and reader/import storage_busy/errors/checkpoints independent, so absent or broken
+Anki journals cannot block local reading. Forward all normal effects/callbacks;
+recovery itself has no shell projection yet. No analyzer or dictionary loading,
+provider calls, restart replay or journal state changes occur during restore.
+App-owned live export, preparation/outcome commits, read-only reconciliation,
+typed provider/FFI dispatch and visible Retry/settings/actions remain next.

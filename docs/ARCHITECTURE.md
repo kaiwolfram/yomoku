@@ -1966,3 +1966,25 @@ obligation. A full match records existing usability, without claiming ownership
 or repairing anything. Stale/duplicate callbacks cannot release later work;
 terminal payloads/results and nonreused IDs survive reader/vocabulary deletion.
 No app/Event/FFI/Android call site or mutation replay is enabled by this journal.
+
+### App-owned Anki startup read
+
+All EffectRouter factories now use a narrow `AnkiStartupLayer`: before the first
+Library refresh it dispatches native `RestoreAnkiRecovery` on the existing worker
+FIFO. Constructors retain lazy database opening. Repeated refreshes coalesce;
+failed recovery requires native explicit Retry. Normal effects and callbacks
+continue through the same mapping/bridge; no additional shell protocol is added.
+
+`Model` retains `AnkiRecoveryState` independently of reader/import storage_busy,
+errors and checkpoint/completion retries. Attempt IDs reject stale callbacks.
+Only a successfully restored empty pair satisfies the startup prerequisite;
+Unrestored/Loading/Failed and either obligation keep it closed. Both journals
+come from one deferred SQLite read transaction via `anki_recovery_snapshot`.
+Any read/commit error fails the complete result. Frozen payloads and known IDs
+remain pure native data with no generated codec, analyzer/dictionary read,
+provider command or recovery mutation. Live tokens remain in storage and cannot
+be constructed from the core's validated recovery IDs.
+
+This is startup ownership only. Live export/session ownership, durable begin/
+outcome/reconciliation routing and provider/FFI/UI activation remain unfinished.
+The earlier isolated journal/provider descriptions do not imply enabled actions.

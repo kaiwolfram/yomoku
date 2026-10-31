@@ -8,6 +8,7 @@ use crux_core::{
 };
 use serde::{Deserialize, Serialize};
 
+mod anki;
 mod effective;
 mod statistics;
 mod vocabulary;
@@ -80,6 +81,9 @@ pub struct ImportSummary {
 
 #[derive(Default)]
 pub struct Model {
+    anki_recovery: crate::anki::AnkiRecoveryState,
+    anki_recovery_sequence: u64,
+    anki_recovery_request: Option<u64>,
     vocabulary: crate::vocabulary::VocabularyState,
     vocabulary_request: Option<vocabulary::VocabularyRequest>,
     vocabulary_request_sequence: u64,
@@ -296,6 +300,16 @@ pub enum Event {
     #[serde(skip)]
     #[cfg_attr(feature = "facet_typegen", facet(skip))]
     VocabularyBulkFinished(u64, StorageResult),
+    /// Runtime startup only; no shell codec and no provider mutation.
+    #[serde(skip)]
+    #[cfg_attr(feature = "facet_typegen", facet(skip))]
+    RestoreAnkiRecovery,
+    #[serde(skip)]
+    #[cfg_attr(feature = "facet_typegen", facet(skip))]
+    RetryAnkiRecovery,
+    #[serde(skip)]
+    #[cfg_attr(feature = "facet_typegen", facet(skip))]
+    AnkiRecoveryFinished(u64, StorageResult),
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -373,6 +387,9 @@ impl App for Yomoku {
     type Effect = Effect;
 
     fn update(&self, event: Event, model: &mut Model) -> Command<Effect, Event> {
+        if let Some(command) = self.update_anki_recovery(&event, model) {
+            return command;
+        }
         if let Event::VocabularyBulkFinished(request_id, result) = event {
             return self.finish_vocabulary_bulk(request_id, result, model);
         }
@@ -1235,7 +1252,8 @@ impl App for Yomoku {
                     | StorageResult::StatisticsLoaded(_)
                     | StorageResult::VocabularyLoaded(_)
                     | StorageResult::VocabularyMatchingIds(_)
-                    | StorageResult::VocabularyBulkApplied(_) => {
+                    | StorageResult::VocabularyBulkApplied(_)
+                    | StorageResult::AnkiRecoveryLoaded(_) => {
                         model.document_error = Some(DocumentError::InvalidDocument);
                     }
                     StorageResult::ImportCancelled => {}
@@ -1563,7 +1581,10 @@ impl App for Yomoku {
             | Event::LoadStatistics { .. }
             | Event::SetStatisticsTimeframe { .. }
             | Event::RetryStatistics
-            | Event::StatisticsFinished(..) => unreachable!(),
+            | Event::StatisticsFinished(..)
+            | Event::RestoreAnkiRecovery
+            | Event::RetryAnkiRecovery
+            | Event::AnkiRecoveryFinished(..) => unreachable!(),
         }
         render::render()
     }

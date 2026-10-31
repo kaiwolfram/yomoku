@@ -87,6 +87,10 @@ pub enum StorageOperation {
     #[serde(skip)]
     #[cfg_attr(feature = "facet_typegen", facet(skip))]
     Effective(#[cfg_attr(feature = "facet_typegen", facet(opaque))] EffectiveStorageOperation),
+    /// Native startup snapshot of both external mutation journals.
+    #[serde(skip)]
+    #[cfg_attr(feature = "facet_typegen", facet(skip))]
+    LoadAnkiRecovery,
 }
 
 impl StorageOperation {
@@ -170,6 +174,12 @@ pub enum StorageResult {
     #[serde(skip)]
     #[cfg_attr(feature = "facet_typegen", facet(skip))]
     Effective(#[cfg_attr(feature = "facet_typegen", facet(opaque))] EffectiveStorageResult),
+    #[serde(skip)]
+    #[cfg_attr(feature = "facet_typegen", facet(skip))]
+    AnkiRecoveryLoaded(
+        #[cfg_attr(feature = "facet_typegen", facet(opaque))]
+        Box<crate::anki::AnkiRecoverySnapshot>,
+    ),
 }
 
 impl Operation for StorageOperation {

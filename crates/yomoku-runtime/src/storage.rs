@@ -199,8 +199,9 @@ impl EffectMiddleware for StorageEffects {
     type Op = StorageOperation;
 
     fn try_process_effect(&self, operation: Self::Op, resolver: EffectResolver<StorageResult>) {
-        // The core accepts one storage operation at a time. Publish its fresh
-        // attempt before enqueue; a busy/rejected core event never replaces it.
+        // Reader/import commands share one app storage slot; the native Anki
+        // startup read owns a separate slot on this same FIFO. Publish fresh
+        // import attempts only for accepted commands, never for startup reads.
         let cancellation = matches!(
             operation,
             StorageOperation::ImportTxt(_)
@@ -251,6 +252,10 @@ fn execute(
     }
     let storage = storage.as_mut().expect("opened storage");
     match operation {
+        StorageOperation::LoadAnkiRecovery => storage
+            .anki_recovery_snapshot()
+            .map(|snapshot| StorageResult::AnkiRecoveryLoaded(Box::new(snapshot)))
+            .map_err(|_| DocumentError::Unavailable),
         StorageOperation::LoadVocabulary { query, offset } => storage
             .vocabulary_page(&query, offset)
             .map(StorageResult::VocabularyLoaded)
