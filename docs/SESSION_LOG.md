@@ -3661,3 +3661,28 @@ and /tmp/yomoku-browser-profile-*. No emulator started.
   export, Android provider contract/live tests, then pending native/optimized
   Vocabulary profiling and lifecycle/accessibility coverage. Full Add to Anki
   stays unchecked; physical arm64 remains user-deferred and Q188 remains pending.
+
+## 2026-10-31 — Anki selected context and dictionary projection
+
+- Added pure original/effective selection constructors on AnkiNote. Validate the
+  owner's current page/base/revision, full token metadata and canonical ownership,
+  exact surface and clipped display range; vocabulary observations may differ.
+- Extract full chapter-local sentence context with shared pagination punctuation/
+  closing-quote rules and canonical hard lines, retaining full crossing/manual
+  targets, whitespace and a single selected occurrence highlight.
+- Revalidate applicable surface/base dictionary indices; export all licensed
+  source-ordered readings and English senses/name groups without repeating shared
+  form matches. Preserve qualifiers; exact custom fallback requires no built-in
+  match. Selected metadata reading is the final fallback; absent data stays empty.
+- PASS: ten new core cases; 841 workspace tests/17 ignored data-dependent fixtures,
+  workspace build, strict all-target/all-feature Clippy and Rustfmt/diff. Cover
+  original/effective parity, restrictions/name data/inflections/shared forms,
+  cross-page words, hard lines/quotes/decimals, literal custom/manual/absent data,
+  stale/corrupt inputs and unchanged statuses/deleted vocabulary observations.
+- Updated architecture, API continuation, decisions, checklist, commands/handoff.
+  Logs: /tmp/yomoku-anki-selection-{workspace,build,clippy}.log. No blocker/failure.
+  No dependency/schema/protocol/Android change; no Kotlin/JNI/codegen/APK/lint,
+  Full-loader, provider, device or performance run. No emulator started.
+- Next: retained export commands/results, Android provider contract/live tests,
+  then remaining native/optimized Vocabulary profiling and lifecycle/accessibility
+  checks. Full Add to Anki stays unchecked; Q188/physical arm64 remain as before.

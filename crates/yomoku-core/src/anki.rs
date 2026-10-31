@@ -6,6 +6,8 @@ use crate::{
     vocabulary::Surface,
 };
 
+mod projection;
+
 /// One forward card, with the exact written surface as its first field.
 /// These are original templates, not copied Yomitan assets. Android must verify
 /// a stored model's complete layout before reusing it; never overwrite a user's

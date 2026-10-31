@@ -4313,3 +4313,30 @@ data and a current canonical sentence; this step invents no sentence-boundary,
 selection or dictionary-choice policy and adds no export event, status change,
 settings, migration, transport or UI. Rendering control characters cannot be
 assumed lossless even though the raw identity retains them.
+
+## 2026-10-31 — Anki selected context and applicable definitions
+
+Prepare export content from the owning reader's current original/effective page,
+selection and loaded word details. Compare page/base/revision, token identity and
+text metadata; allow vocabulary-only observations to differ because export must
+neither depend on nor change status. Validate canonical ownership, full target
+surface and the exact clipped display range. This pure API is a prerequisite;
+retained export commands/results and Android provider/settings/UI remain open.
+
+For canonical sentence context, reuse pagination's lightweight Japanese/ASCII
+punctuation and trailing-quote rules, with CRLF/CR/LF hard-line boundaries too.
+Keep whitespace and punctuation verbatim; use full chapter text rather than the
+visible logical page. Ignore boundaries inside a selected manual span so its full
+surface survives. No normalization, chapter crossing or linguistic parser.
+
+Use all applicable source-ordered dictionary readings, exact-deduplicated across
+surface/base forms and word/name sections, joined by `、`. Export each licensed
+JMdict sense once and then each JMnedict group, with only `eng` translations,
+joined by `; ` within the sense/group and retaining grammatical qualifiers.
+Recompute pair/sense matches before indexing; reject unrelated forms or corrupt
+indices rather than exporting unfiltered payloads. A valid exact custom entry
+applies only when both built-in sections are absent. With no dictionary/custom
+reading use available metadata for this exact selected token; never borrow old B
+readings for unresolved manual parts. Absent readings/meanings stay empty. These
+are routine content-projection choices within the specified four-field model;
+there is no new provider API, dependency, schema or product UI behavior.

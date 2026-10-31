@@ -7610,3 +7610,31 @@ Logs: `/tmp/yomoku-anki-{workspace,build,clippy}.log`. No failed check or blocke
 Primary API evidence/remaining provider tests: ANKIDROID_API.md. No dependency,
 schema, Event/FFI or Android change. No APK/lint/Kotlin/JNI/codegen/Full-loader,
 live provider, native/Compose profiler or device checks ran in this slice.
+
+## Anki selected context and dictionary projection
+
+Verified 2026-10-31, pure core only, with the pinned Rust PATH above:
+
+```sh
+cargo test -p yomoku-core --test anki_selection --all-features --locked --offline
+cargo test --workspace --all-features --locked --offline
+cargo clippy --workspace --all-targets --all-features --locked --offline -- -D warnings
+cargo build --workspace --locked --offline
+cargo fmt --all -- --check
+git diff --check
+```
+
+PASS: ten new core cases (the first focused run covered the initial eight; the
+workspace run includes all ten), 841 workspace tests/17 ignored data-dependent
+fixtures, strict all-feature/all-target Clippy, workspace build, Rustfmt/diff.
+Tests cover original/effective parity; licensed source-ordered readings/English
+senses/name groups; surface/base union deduplication; inflection identity;
+canonical sentence extraction beyond logical page clips; hard lines/quotes/
+decimals; manual/custom/absent definitions; stale identity/metadata and corrupt
+dictionary indices; unchanged vocabulary statuses and absent/deleted entries.
+No failed check or blocker. Logs:
+`/tmp/yomoku-anki-selection-{workspace,build,clippy}.log`.
+
+No dependency/schema/protocol or Android change. No APK/lint/Kotlin/JNI/codegen/
+Full-loader, provider installation/export, native/Compose profiling or device
+checks ran. Retained export commands/results and provider/settings/UI remain open.

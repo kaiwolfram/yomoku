@@ -1801,8 +1801,25 @@ before escaping and highlighting only the selected occurrence. The raw surface
 remains independent of HTML for future exact-identity checks. Escaping covers
 HTML, bracket media syntax and the provider's U+001F field delimiter.
 
-There is no mutable model/history input or effect. Sentence extraction,
-applicable original/effective dictionary projection, retained export state,
+`AnkiNote::from_original_selection` and `from_effective_selection` accept the
+owner's current selected page and dictionary details. They compare selection,
+page/analysis (including effective revision), whole token metadata and canonical
+source/chapter/range; live vocabulary observations may differ. Display ranges
+must equal the visible intersection, while sentence extraction uses the full
+chapter and whole target, including tokens crossing logical page edges.
+Sentence boundaries share pagination's punctuation/closing-quote heuristic and
+also respect canonical hard lines. Boundaries inside a target cannot truncate it;
+text/whitespace stay literal and no sentence crosses a chapter.
+
+Dictionary projection revalidates surface/base forms and applicable pair/sense
+indices. It retains all licensed readings in source order, deduplicated by exact
+text; each applicable JMdict sense/JMnedict group contributes its ordered English
+translations once, including supplied grammatical qualifiers. Readings join with
+`、`, translations within a sense with `; `. Custom data applies only without
+built-in matches; otherwise available analyzer reading is the final fallback.
+Missing data stays empty. No old B metadata is inferred for manual segments.
+
+There is no mutable model/history input or effect. Retained export state,
 settings, transport and Compose actions remain unimplemented. Android will own
 ContentResolver/permission/deck/model/open-link I/O; no SQL/provider access belongs
 in core. Current primary-source evidence and duplicate/retry limits are in

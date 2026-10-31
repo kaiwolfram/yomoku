@@ -159,11 +159,7 @@ fn paginate_chapter(
             let mut chars = paragraph.char_indices().peekable();
             while let Some((index, scalar)) = chars.next() {
                 count += usize::from(!scalar.is_whitespace());
-                let sentence_end = matches!(scalar, '。' | '！' | '？' | '!' | '?')
-                    || (scalar == '.'
-                        && chars.peek().is_none_or(|(_, next)| {
-                            next.is_whitespace() || is_sentence_tail(*next)
-                        }));
+                let sentence_end = is_sentence_end(scalar, chars.peek().map(|(_, next)| *next));
                 if count >= target && sentence_end {
                     let mut end = line_start + index + scalar.len_utf8();
                     // Keep punctuation runs and closing quotes with the sentence.
@@ -217,7 +213,12 @@ fn push_page(
     Ok(())
 }
 
-fn is_sentence_tail(scalar: char) -> bool {
+pub(crate) fn is_sentence_end(scalar: char, next: Option<char>) -> bool {
+    matches!(scalar, '。' | '！' | '？' | '!' | '?')
+        || (scalar == '.' && next.is_none_or(|next| next.is_whitespace() || is_sentence_tail(next)))
+}
+
+pub(crate) fn is_sentence_tail(scalar: char) -> bool {
     matches!(
         scalar,
         '。' | '！'

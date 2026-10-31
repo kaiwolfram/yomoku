@@ -89,10 +89,15 @@ raw identity do not imply that an HTML renderer can display them losslessly.
 Template field substitution and `FrontSide` follow the
 [Anki template contract](https://docs.ankiweb.net/manual/templates/fields).
 
-This is a pure content boundary: callers still need to resolve the canonical
-sentence, applicable dictionary/custom data and a current original/effective
-selection. No Event, FFI type, settings, schema, dependency or UI action is added.
-Preparing a note has no mutable vocabulary/history input or effect.
+This is a pure content boundary. Original/effective selection constructors now
+validate the owner's current page/selection against dictionary details and
+canonical text, extract a full chapter-local sentence and project licensed
+readings/English senses or the permitted custom fallback. They preserve complete
+cross-page words, exact surface identity and one occurrence highlight. See
+ARCHITECTURE.md and DECISIONS.md for sentence/definition projection rules.
+Callers must supply their actual current selection, then retain the prepared note
+across export callbacks. No Event, FFI type, settings, schema, dependency or UI
+action is added. Preparing a note has no mutable vocabulary/history input or effect.
 
 Next implement typed retained export commands/results and an Android provider
 adapter with a fake-provider contract suite before live wiring. Verify model
