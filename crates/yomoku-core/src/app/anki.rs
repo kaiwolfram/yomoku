@@ -4,6 +4,7 @@
 use super::*;
 use crate::anki::AnkiRecoveryState;
 
+mod live;
 mod preflight;
 mod preparation;
 mod reads;
@@ -23,6 +24,9 @@ impl Yomoku {
         event: &Event,
         model: &mut Model,
     ) -> Option<Command<Effect, Event>> {
+        if let Some(command) = self.update_anki_live(event, model) {
+            return Some(command);
+        }
         if let Some(command) = self.update_anki_preflight(event, model) {
             return Some(command);
         }
@@ -39,7 +43,15 @@ impl Yomoku {
             Event::RestoreAnkiRecovery if model.anki_recovery == AnkiRecoveryState::Unrestored => {}
             Event::RetryAnkiRecovery
                 if model.anki_recovery_commit.is_none()
-                    && (model.anki_recovery_read.is_some()
+                    && (!model.anki_live_blocks_recovery()
+                        || matches!(
+                            model.anki_live_progress(),
+                            Some(crate::anki::AnkiLiveProgress::Failed(_))
+                        ))
+                    && (matches!(
+                        model.anki_live_progress(),
+                        Some(crate::anki::AnkiLiveProgress::Failed(_))
+                    ) || model.anki_recovery_read.is_some()
                         || matches!(model.anki_recovery, AnkiRecoveryState::Failed(_))
                         || model.anki_recovery_read_error.is_some()
                         || model.anki_recovery_commit_error.is_some()) => {}
@@ -66,6 +78,13 @@ impl Yomoku {
         // read-only handle before restoring. It cannot abandon a journal commit.
         model.anki_recovery_read = None;
         model.anki_recovery_read_error = None;
+        // Restoring never recreates live authority. Drop frozen preflight too,
+        // so a later empty restore still requires fresh explicit preparation.
+        if model.anki_live.is_some() {
+            model.anki_live = None;
+            model.prepared_anki_export = None;
+            model.anki_export_preflight = None;
+        }
         let Some(id) = model.anki_recovery_sequence.checked_add(1) else {
             model.anki_recovery = AnkiRecoveryState::Failed(DocumentError::Unavailable);
             return Some(Command::done());

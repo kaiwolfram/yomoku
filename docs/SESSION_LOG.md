@@ -4120,3 +4120,24 @@ and /tmp/yomoku-browser-profile-*. No emulator started.
 - Kotlin/JNI/generation, Android/device/real-provider and performance trials were
   not rerun. The schema-23 upgrade trial with existing phone Library/history is
   still recommended before enabling live integration; no release was requested.
+
+## 2026-10-31 — Native app/FIFO live Anki ownership
+
+- Continue the Anki plan with native frozen-preflight begin/outcome ownership.
+  App stages authenticate fresh handles and committed snapshots; one move-only
+  permit consumes Ready. Worker retains/consumes the private storage attempt,
+  rejects replay/foreign callbacks and drops authority before read-only restore.
+  Failed/lost responses require explicit restoration; uncertain payload/known IDs
+  survive. Reader/navigation gates remain independent. Pure intent/outcome types
+  move to core with storage reexports; no schema/dependency/public codec change.
+- PASS: 20 new cases (12 core/8 runtime), 137 focused Anki cases, 967 workspace
+  cases/17 ignored; build, strict Clippy, Rustfmt, identical Kotlin generation and
+  diff. Initial native test harness completion-fence errors were corrected; all
+  final checks pass. Commands/logs: DEVELOPMENT.md, Native app/FIFO live Anki ownership.
+- No open blocker or remaining implementation/verification work for this native
+  lifecycle slice. Permit has no production consumer yet; typed provider dispatch
+  with Android session/close gates remains next, then recovery/deck/Add UI and a
+  disposable real collection/browser trial. No enabled provider mutation.
+- JNI, APK/lint/emulator, real-provider, physical upgrade and performance checks
+  were not rerun. Recommend the schema-23 phone upgrade with existing Library/
+  history before enabling live integration; no release requested.

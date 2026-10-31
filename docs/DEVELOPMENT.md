@@ -8344,3 +8344,51 @@ were not rerun. Recommend the retained schema-23 phone upgrade checkpoint before
 enabling live integration; real-provider validation needs a disposable collection.
 
 Logs: `/tmp/yomoku-anki-live-{focused,workspace,build,clippy,rustfmt,diff}.log`.
+
+## Native app/FIFO live Anki ownership
+
+2026-10-31: native lifecycle continuation using the pinned Rust PATH above. No
+new schema/dependency/public bridge operation or enabled provider mutation.
+
+```sh
+cargo test -p yomoku-core -p yomoku-runtime -p yomoku-storage -p yomoku-ffi anki --all-features --locked --offline
+cargo test --workspace --all-features --locked --offline --quiet
+cargo build --workspace --all-features --locked --offline
+cargo clippy --workspace --all-targets --all-features --locked --offline -- -D warnings
+cargo fmt --all -- --check
+cargo run -p yomoku-ffi --bin generate-kotlin --features facet_typegen --locked --offline -- /tmp/yomoku-anki-owner-kotlin
+diff -r target/generated/kotlin /tmp/yomoku-anki-owner-kotlin
+git diff --check
+```
+
+PASS: 20 new cases (12 core, 8 runtime/FIFO), 137 focused Anki cases, 967 workspace
+cases/17 opt-in ignored; build, strict Clippy, Rustfmt, identical Kotlin generation
+and diff. Core cases cover both selection kinds, note/model preparation, all
+outcomes/known IDs, single-consumption native permits, captured Crux responses,
+invalid/foreign/duplicate/stale acknowledgements, gate/pair changes, active Clear/
+recovery/preflight rejection and explicit lost-begin/invocation/outcome restoration.
+Native operations/results/callbacks reject shell serialization. Reader state and
+navigation remain independent of Anki persistence.
+
+Real SQLite/FIFO cases cover both readers/kinds, exact frozen payloads, durable
+acknowledgements, uncertain known-ID reopen, lost-success responses, foreign worker
+callbacks, duplicate begins/outcomes, failed restore invalidating live tokens,
+changed/corrupt pairs, statement/deferred-COMMIT rollback and a blocked begin with
+responsive navigation followed by Abandon/Retry and rejection of its late success.
+Worker tests intentionally exercise native operations directly; production app
+request/selection gates remain separately covered. The private committed storage
+attempt stays in the worker; pure classification types move to core with storage
+reexports. Weak request history retains no abandoned frozen payloads.
+
+Initial runtime harness failures assumed a render callback for native
+Command::done. Recheck the completed model when the resolver channel closes;
+these native updates intentionally emit no render. All final checks pass.
+No remaining implementation/verification work or open blocker for this native
+lifecycle slice. The permit still has no production consumer: typed provider
+invocation and Android worker/main/close/session ownership remain next, followed
+by visible recovery/deck/Add actions. No JNI, Android APK/lint/emulator, real
+AnkiDroid collection/browser, physical upgrade or performance trial was rerun.
+A schema-23 physical upgrade trial with existing Library/history remains useful
+before enabling live integration. No compatibility claim or release requested.
+
+Logs: `/tmp/yomoku-anki-owner-{core,runtime,focused,workspace,build,clippy,rustfmt,typegen,codec-diff,diff}.log`.

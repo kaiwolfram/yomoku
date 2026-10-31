@@ -87,12 +87,17 @@ impl Yomoku {
                     model.prepared_anki_export = Some(export);
                 }
             }
-            // Only unsubmitted data exists here. Never extend this to clearing a
-            // live request or recovery obligation when dispatch is connected.
+            // Clear unsubmitted intent or dismiss a finished live presentation.
+            // Active/failed live work requires explicit read-only restoration;
+            // durable recovery obligations always remain in their own state.
             Event::ClearPreparedAnkiExport => {
+                if model.anki_live_blocks_recovery() {
+                    return Some(Command::done());
+                }
+                model.anki_live = None;
                 model.prepared_anki_export = None;
                 // Preflight is read-only; invalidate its handle and observation.
-                // Future submitted mutations must retain their separate journal.
+                // Submitted mutations retain their separate journal.
                 model.anki_export_preflight = None;
             }
             _ => return None,

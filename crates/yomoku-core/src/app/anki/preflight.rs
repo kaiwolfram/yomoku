@@ -21,6 +21,7 @@ impl Model {
 
     pub(super) fn anki_export_gate_open(&self) -> bool {
         self.anki_recovery.allows_preparation()
+            && self.anki_live.is_none()
             && self.anki_recovery_commit.is_none()
             && self.anki_recovery_commit_error.is_none()
             && self.anki_recovery_read.is_none()

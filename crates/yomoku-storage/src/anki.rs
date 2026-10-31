@@ -8,7 +8,7 @@ use yomoku_core::anki::{AnkiExistingNotes, AnkiNoteId, AnkiReconciliation, AnkiS
 
 use crate::{Storage, StorageError};
 
-pub use yomoku_core::anki::{AnkiRecovery, AnkiSubmissionId};
+pub use yomoku_core::anki::{AnkiRecovery, AnkiSubmissionId, AnkiSubmissionOutcome};
 
 /// Created only by a newly committed preparation, never by a recovery read.
 /// Keep in the live provider callback; no serialization or reconstruction API.
@@ -57,17 +57,6 @@ impl From<rusqlite::Error> for AnkiJournalError {
     fn from(value: rusqlite::Error) -> Self {
         Self::Storage(value.into())
     }
-}
-
-/// Callback classification from the isolated provider boundary. `NotInserted`
-/// requires positive knowledge that NO mutation was submitted. Every failure
-/// after submission, including deck placement/readback, must be `Uncertain`.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum AnkiSubmissionOutcome {
-    NotInserted,
-    Added(AnkiNoteId),
-    Existing(AnkiExistingNotes),
-    Uncertain { known_note_id: Option<AnkiNoteId> },
 }
 
 impl Storage {

@@ -1986,9 +1986,9 @@ newer work. Errors and lost responses retain the app gate until fresh restore;
 there is no automatic commit/provider replay. Note existence does not assert deck
 placement. Model evidence requires frozen full layout and known returned ID.
 
-The typed commit, result and callback have no shell codec. Provider observations
-and dispatch remain unconnected, as do live export ownership and durable begin/
-outcome routing. Existing terminal payload/ID retention and schema 0022 remain.
+The typed commit, result and callback have no shell codec. Typed read-only provider
+observations and native live ownership are described below; provider mutation
+dispatch remains unfinished. Terminal payload/ID retention and schema 0022 remain.
 
 ### App-owned frozen Anki preparation
 
@@ -2001,16 +2001,17 @@ The shell cannot submit substitute snapshots, note fields or dictionary results.
 `Model::prepared_anki_export` exposes immutable native data only: selection,
 exact note fields/surface, deck and complete frozen v1 layout. One accepted intent
 survives dictionary changes, popup dismissal and navigation; repeated preparation
-cannot replace it. `ClearPreparedAnkiExport` clears only unsubmitted intent and
-leaves recovery obligations/commits intact. A new model starts without intent.
+cannot replace it. `ClearPreparedAnkiExport` clears unsubmitted intent or a finished
+live presentation and leaves recovery obligations/commits intact. Active/failed
+live work cannot be cleared. A new model starts without intent.
 Both original/effective preparation and the isolated export session use the same
 pure export constructors; the latter now freezes the complete layout as well.
 
 Preparation emits no effect, journal write or provider request and creates no
 live callback token. Neither event has a public shell codec; the ViewModel stays
-unchanged. Typed read-only preflight/callback ownership is described below;
-durable begin/outcome dispatch and visible Settings/Add to Anki/recovery actions
-remain unfinished. The standalone
+unchanged. Typed read-only preflight and native durable begin/outcome ownership
+are described below; provider dispatch and visible Settings/Add to Anki/recovery
+actions remain unfinished. The standalone
 `AnkiExportSession` is still isolated and must not bypass those durable gates.
 
 
@@ -2091,8 +2092,8 @@ Begin coalesces; Retry issues a fresh captured attempt. Shared-allocation owners
 and both restored-empty journal gates are checked again on accepted callbacks.
 Public read events precede skipped callbacks in Rust declaration order so Serde
 serialization, deserialization and generated Kotlin use identical compact indices.
-No visible preflight action, permission flow or live mutation is enabled. App/
-worker ownership of durable live begin/outcome commits remains the next boundary.
+No visible preflight action, permission flow or live mutation is enabled. Native
+app/FIFO ownership of durable live begin/outcome commits is described below.
 
 ### Atomic live Anki journal transactions
 
@@ -2110,7 +2111,41 @@ terminal outcomes release only their own obligation. Statement, validation or
 commit errors roll back. Lost begin/outcome responses require read-only restore
 and reconciliation; snapshots never reconstruct live attempts or replay writes.
 
-These APIs do not invoke providers. The future retained app/worker owner must
-authenticate session/callback identity, retain the attempt for one invocation,
-recheck provider/deck/layout/duplicates and handle lost responses conservatively.
-App/FFI dispatch, visible actions and real-provider validation remain unfinished.
+These APIs do not invoke providers. The retained app/FIFO lifecycle below owns
+session/callback identity, attempts and lost-response handling. Typed provider
+dispatch must still recheck provider/deck/layout/duplicates; visible actions and
+real-provider validation remain unfinished.
+
+### Native app/FIFO live Anki ownership
+
+Native `BeginAnkiLive` requires the app's frozen original/effective export, its
+matching successful preflight plan and both empty restored journals with no
+recovery read/commit/error. Exact duplicates, model conflicts and partial reads
+produce no begin. The request has fresh allocation identity and no shell codec;
+note/model intent and outcome values now live in pure core, with storage reexports
+preserving the repository APIs. SQL and private `AnkiLiveAttempt` stay in storage.
+
+The existing SQLite FIFO retains the attempt against that request after commit.
+Only its matching valid begin acknowledgement changes app state to Ready.
+`Model::take_anki_live_invocation` consumes Ready once and returns a move-only
+native permit for the exact payload. It rechecks the captured pair and recovery
+owners. The permit has no serialization/recovery constructor; consuming it creates
+the callback. App stages reject wrong-kind, foreign, duplicate and late responses;
+accepted outcomes use the FIFO and release obligations only after exact committed
+snapshot acknowledgement. Uncertain results retain payload/known IDs. Local
+reader busy/error ownership and navigation remain independent.
+
+Worker outcome processing consumes the private attempt even on SQL failure.
+A weak identity ledger rejects begin replay while any native callback still owns
+the request, without retaining abandoned payloads. Read-only restoration drops the
+worker attempt before reading, including on read failure. Native Abandon invalidates
+a lost app callback; explicit recovery Retry restores both journals and discards
+live/prepared/preflight state. A late success cannot grant another permit. Fresh
+sessions restore data only. Clear cannot erase active/failed live ownership, and
+clearing a finished presentation preserves every durable recovery obligation.
+
+This is a native lifecycle prerequisite. The permit has no production consumer;
+no FFI/Kotlin provider mutation or visible action is enabled. The next dispatcher
+must capture this permit once, enforce Android worker/main/close ownership, refresh
+provider/spec/permission/deck/layout/duplicate checks and classify every outcome.
+Real collection/browser validation and recovery/deck/Add UI remain unfinished.

@@ -4768,3 +4768,27 @@ roll back failures and recover lost responses through reads. No replay, schema o
 dependency change is introduced. App/worker session ownership, at-most-once
 invocation and fresh provider/deck/layout/duplicate checks remain the next slice;
 the new APIs alone neither authenticate shell selections nor invoke providers.
+
+## 2026-10-31 — Native app/FIFO live Anki ownership
+
+Keep one app-owned live request from frozen preparation/preflight through begin
+and outcome commits, with fresh allocation identity rather than journal IDs.
+Move only pure intent/outcome classifications into core and retain storage API
+reexports. The SQLite FIFO owns the private committed `AnkiLiveAttempt`; the app
+receives only snapshots and can take one move-only native invocation permit after
+a matching successful begin. The permit is consumed into its callback. This stages
+the lifecycle without exposing provider writes or adding a new platform protocol.
+
+Check app stages and exact pairs at every boundary. Consume the worker token on
+outcome processing even on failure. Track consumed request identities with weak
+references so duplicate begins cannot replay after completion/restoration while
+callbacks remain reachable, without retaining frozen payloads indefinitely.
+Restoration drops live tokens even when its read fails; failed/lost responses use
+explicit read-only Retry. Retry discards the old live intent/preflight, and Clear
+cannot cancel active/failed work or erase durable obligations. Reader/navigation
+ownership stays separate. No schema/dependency or data-destructive change.
+
+The native permit has no production consumer yet. Typed provider dispatch must
+still enforce CoreSession worker/main/close ownership and fresh provider/deck/
+layout/duplicate checks. These tests establish native ownership, not Android close
+behavior, a real provider invocation or AnkiDroid compatibility.

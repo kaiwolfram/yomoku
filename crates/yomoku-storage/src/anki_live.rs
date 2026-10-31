@@ -2,9 +2,7 @@
 //! the dispatcher must still authenticate its owner and invoke the provider once.
 
 use rusqlite::TransactionBehavior;
-use yomoku_core::anki::{
-    AnkiModelCreation, AnkiModelRecovery, AnkiRecovery, AnkiRecoverySnapshot, AnkiSubmission,
-};
+use yomoku_core::anki::{AnkiModelRecovery, AnkiRecovery, AnkiRecoverySnapshot};
 
 use crate::{
     anki::{self, AnkiJournalError, AnkiLiveSubmission, AnkiSubmissionOutcome},
@@ -13,18 +11,7 @@ use crate::{
     Storage,
 };
 
-/// Frozen content from native preparation/preflight, never a restored mutation.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum AnkiLiveIntent {
-    Note(Box<AnkiSubmission>),
-    Model(Box<AnkiModelCreation>),
-}
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum AnkiLiveOutcome {
-    Note(AnkiSubmissionOutcome),
-    Model(AnkiModelCreationOutcome),
-}
+pub use yomoku_core::anki::{AnkiLiveIntent, AnkiLiveOutcome};
 
 #[derive(Debug)]
 enum LiveToken {

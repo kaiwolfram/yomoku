@@ -6,7 +6,9 @@ use yomoku_core::anki::{AnkiModelCreation, AnkiModelId};
 
 use crate::{anki::AnkiJournalError, Storage};
 
-pub use yomoku_core::anki::{AnkiModelCreationId, AnkiModelReconciliation, AnkiModelRecovery};
+pub use yomoku_core::anki::{
+    AnkiModelCreationId, AnkiModelCreationOutcome, AnkiModelReconciliation, AnkiModelRecovery,
+};
 
 /// Only newly committed preparation produces a live callback token. There is
 /// no serialization, cloning or reconstruction from a recovery ID.
@@ -19,16 +21,6 @@ impl AnkiLiveModelCreation {
     pub fn id(&self) -> AnkiModelCreationId {
         self.id
     }
-}
-
-/// `NotCreated` requires knowledge that no mutating provider call was submitted.
-/// Everything after the initial submission is uncertain unless full readback
-/// verified creation, including lost insert/update responses and partial models.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum AnkiModelCreationOutcome {
-    NotCreated,
-    Created(AnkiModelId),
-    Uncertain { known_model_id: Option<AnkiModelId> },
 }
 
 impl Storage {

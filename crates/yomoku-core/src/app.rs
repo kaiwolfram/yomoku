@@ -82,6 +82,7 @@ pub struct ImportSummary {
 #[derive(Default)]
 pub struct Model {
     prepared_anki_export: Option<crate::anki::AnkiExport>,
+    anki_live: Option<crate::anki::AnkiLiveState>,
     anki_export_preflight: Option<crate::anki::AnkiPreflight>,
     anki_recovery_read: Option<crate::anki::AnkiRecoveryReadRequest>,
     anki_recovery_read_error: Option<crate::anki::AnkiExportError>,
@@ -342,6 +343,31 @@ pub enum Event {
         #[cfg_attr(feature = "facet_typegen", facet(opaque))]
         Result<crate::anki::AnkiPreflightObservation, crate::anki::AnkiExportError>,
     ),
+    /// Native durable begin; preparation and preflight remain required.
+    #[serde(skip)]
+    #[cfg_attr(feature = "facet_typegen", facet(skip))]
+    BeginAnkiLive,
+    #[serde(skip)]
+    #[cfg_attr(feature = "facet_typegen", facet(skip))]
+    AnkiLiveBeginFinished(
+        #[cfg_attr(feature = "facet_typegen", facet(opaque))] Box<crate::anki::AnkiLiveRequest>,
+        StorageResult,
+    ),
+    #[serde(skip)]
+    #[cfg_attr(feature = "facet_typegen", facet(skip))]
+    FinishAnkiLive(
+        #[cfg_attr(feature = "facet_typegen", facet(opaque))] Box<crate::anki::AnkiLiveCallback>,
+    ),
+    #[serde(skip)]
+    #[cfg_attr(feature = "facet_typegen", facet(skip))]
+    AnkiLiveOutcomeFinished(
+        #[cfg_attr(feature = "facet_typegen", facet(opaque))] Box<crate::anki::AnkiLiveRequest>,
+        StorageResult,
+    ),
+    /// Invalidate a lost native callback; explicit Retry must restore read-only.
+    #[serde(skip)]
+    #[cfg_attr(feature = "facet_typegen", facet(skip))]
+    AbandonAnkiLive,
     /// Runtime startup only; no shell codec and no provider mutation.
     #[serde(skip)]
     #[cfg_attr(feature = "facet_typegen", facet(skip))]
@@ -1319,7 +1345,9 @@ impl App for Yomoku {
                     | StorageResult::VocabularyMatchingIds(_)
                     | StorageResult::VocabularyBulkApplied(_)
                     | StorageResult::AnkiRecoveryLoaded(_)
-                    | StorageResult::AnkiRecoveryCommitted(_) => {
+                    | StorageResult::AnkiRecoveryCommitted(_)
+                    | StorageResult::AnkiLiveBegun(_)
+                    | StorageResult::AnkiLiveFinished(_) => {
                         model.document_error = Some(DocumentError::InvalidDocument);
                     }
                     StorageResult::ImportCancelled => {}
@@ -1649,6 +1677,11 @@ impl App for Yomoku {
             | Event::RetryStatistics
             | Event::StatisticsFinished(..)
             | Event::RestoreAnkiRecovery
+            | Event::BeginAnkiLive
+            | Event::AnkiLiveBeginFinished(..)
+            | Event::FinishAnkiLive(..)
+            | Event::AnkiLiveOutcomeFinished(..)
+            | Event::AbandonAnkiLive
             | Event::PrepareAnkiExport { .. }
             | Event::ClearPreparedAnkiExport
             | Event::BeginAnkiExportPreflight

@@ -96,6 +96,16 @@ pub enum StorageOperation {
     CommitAnkiRecovery(
         #[cfg_attr(feature = "facet_typegen", facet(opaque))] Box<crate::anki::AnkiRecoveryCommit>,
     ),
+    #[serde(skip)]
+    #[cfg_attr(feature = "facet_typegen", facet(skip))]
+    BeginAnkiLive(
+        #[cfg_attr(feature = "facet_typegen", facet(opaque))] Box<crate::anki::AnkiLiveRequest>,
+    ),
+    #[serde(skip)]
+    #[cfg_attr(feature = "facet_typegen", facet(skip))]
+    FinishAnkiLive(
+        #[cfg_attr(feature = "facet_typegen", facet(opaque))] Box<crate::anki::AnkiLiveCallback>,
+    ),
 }
 
 impl StorageOperation {
@@ -188,6 +198,18 @@ pub enum StorageResult {
     #[serde(skip)]
     #[cfg_attr(feature = "facet_typegen", facet(skip))]
     AnkiRecoveryCommitted(
+        #[cfg_attr(feature = "facet_typegen", facet(opaque))]
+        Box<crate::anki::AnkiRecoverySnapshot>,
+    ),
+    #[serde(skip)]
+    #[cfg_attr(feature = "facet_typegen", facet(skip))]
+    AnkiLiveBegun(
+        #[cfg_attr(feature = "facet_typegen", facet(opaque))]
+        Box<crate::anki::AnkiRecoverySnapshot>,
+    ),
+    #[serde(skip)]
+    #[cfg_attr(feature = "facet_typegen", facet(skip))]
+    AnkiLiveFinished(
         #[cfg_attr(feature = "facet_typegen", facet(opaque))]
         Box<crate::anki::AnkiRecoverySnapshot>,
     ),
