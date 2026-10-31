@@ -4656,3 +4656,20 @@ change. The destination already has no network or identity call site. Move Nostr
 plan tasks outside the first-MVP checklist and remove identity work from current
 backup requirements. Keep deferred requirements and Q188 for a future scope
 discussion; they do not block the first release.
+
+
+## 2026-10-31 — Remove Known forms statistics and its dedicated table
+
+The user explicitly removed Known forms statistics and authorized simplifying
+storage dedicated to them. Remove the separate two-line chart, dictionary-form
+aggregate from native/Kotlin payloads and per-form replay state. Keep the Known
+status in the five-status chart. `vocabulary_dictionary_forms` has no remaining
+consumer, so migration 0023 drops it and all current link writes are removed.
+Keep migrations 0001–0022 unchanged for installed databases. No reset, vacuum,
+vocabulary/history erasure or Anki-journal change accompanies this migration.
+Analyzed-token dictionary forms remain for dictionary lookup, effective metadata
+and Anki preparation; completed-occurrence metadata remains immutable provenance.
+Remove obsolete link-only tests and the profiling comparison against link/event
+UNION SQL. Existing status, history, import, completion and bridge checks continue;
+add explicit populated-upgrade/all-other-tables preservation and drop-rollback
+coverage. Historical benchmark results retain their original workload context.

@@ -1,5 +1,12 @@
 # Vocabulary host measurements
 
+Scope update (2026-10-31): Known forms statistics and their dedicated link table
+were removed in migration 0023. The results below remain historical measurements
+of the earlier workload. The current harness retains status SQL/decoding/replay
+and repository checks, exposes `status_sql_step_only`, and no longer measures the
+removed link query or legacy link/event UNION. New timings are not directly
+comparable to those earlier metrics without accounting for the reduced workload.
+
 Android JNI/Compose frames and sampled heap/RSS follow-up:
 [Vocabulary Android measurements](VOCABULARY_ANDROID_PERFORMANCE.md). Its synthetic
 debug-emulator results are separate from the host heavy-history timings below.

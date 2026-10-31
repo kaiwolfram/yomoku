@@ -1,1 +1,0 @@
-SELECT vocabulary_id, dictionary_form FROM vocabulary_dictionary_forms

@@ -37,7 +37,6 @@ fn history(storage: &Storage) -> Vec<Vec<Vec<Value>>> {
     [
         "vocabulary",
         "vocabulary_status_events",
-        "vocabulary_dictionary_forms",
         "reading_occurrences",
         "reading_completions",
         "completion_analyses",
@@ -349,7 +348,6 @@ fn later_delete_cascade_and_commit_failures_preserve_history_charts_and_exact_re
         "CREATE TRIGGER fail BEFORE DELETE ON vocabulary WHEN OLD.surface = '犬' BEGIN SELECT RAISE(ABORT, 'fixture'); END;",
         "CREATE TRIGGER fail BEFORE DELETE ON reading_occurrences WHEN OLD.vocabulary_id = 2 BEGIN SELECT RAISE(ABORT, 'fixture'); END;",
         "CREATE TRIGGER fail BEFORE DELETE ON vocabulary_status_events WHEN OLD.vocabulary_id = 2 BEGIN SELECT RAISE(ABORT, 'fixture'); END;",
-        "CREATE TRIGGER fail BEFORE DELETE ON vocabulary_dictionary_forms WHEN OLD.vocabulary_id = 2 BEGIN SELECT RAISE(ABORT, 'fixture'); END;",
         "CREATE TABLE deferred_failure (id INTEGER REFERENCES vocabulary(id) DEFERRABLE INITIALLY DEFERRED); CREATE TRIGGER fail AFTER DELETE ON vocabulary WHEN OLD.surface = '犬' BEGIN INSERT INTO deferred_failure VALUES (-1); END;",
     ] {
         let database = TestDatabase::new();
@@ -465,7 +463,7 @@ fn deletion_recalculates_original_effective_charts_without_rescan_and_new_appear
         let timeline = storage.vocabulary_status_timeline().unwrap();
         assert_eq!(timeline[0].counts.new, 2);
         assert_eq!(timeline.last().unwrap().counts.known, 1);
-        assert_eq!(timeline.last().unwrap().known_dictionary_forms, 1);
+
         for frame in [
             StatisticsTimeframe::LastMonth,
             StatisticsTimeframe::LastSixMonths,
@@ -476,7 +474,6 @@ fn deletion_recalculates_original_effective_charts_without_rescan_and_new_appear
             let last = chart.buckets.last().unwrap().values;
             assert_eq!(last.reading, totals);
             assert_eq!(last.statuses, timeline.last().unwrap().counts);
-            assert_eq!(last.known_dictionary_forms, 1);
         }
         drop(storage);
         let mut storage = Storage::open(database.path()).unwrap();

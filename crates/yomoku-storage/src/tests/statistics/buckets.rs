@@ -98,7 +98,7 @@ fn buckets_keep_original_effective_rereads_lifetime_origin_and_all_lines_read_on
         assert_eq!(last.reading, lifetime);
         assert_eq!(last.statuses, status.last().unwrap().counts);
         assert_eq!(last.statuses.known, 2);
-        assert_eq!(last.known_dictionary_forms, 2);
+
         if frame == LastMonth {
             assert_eq!(result.start_unix_ms, FEB_29);
             assert_eq!(
@@ -150,10 +150,7 @@ fn imports_pending_time_unused_reservations_and_legacy_history_add_no_reading() 
         .buckets
         .iter()
         .all(|b| b.values.reading == LifetimeReadingTotals::default()));
-    assert!(result
-        .buckets
-        .iter()
-        .all(|b| b.values.statuses.new == 3 && b.values.known_dictionary_forms == 0));
+    assert!(result.buckets.iter().all(|b| b.values.statuses.new == 3));
 }
 
 #[test]
@@ -185,7 +182,7 @@ fn deletions_recalculate_buckets_without_rescanning_and_fresh_generations_start_
         }
     );
     assert_eq!(erased.opening.statuses.known, 1);
-    assert_eq!(erased.opening.known_dictionary_forms, 1);
+
     let reimported = storage
         .create_analyzed_paste(&PasteText::new("猫 猫 犬".into()).unwrap(), MAR_31, fixture)
         .unwrap();
@@ -195,7 +192,7 @@ fn deletions_recalculate_buckets_without_rescanning_and_fresh_generations_start_
     assert_eq!(last.reading, erased.opening.reading);
     assert_eq!(last.statuses.new, 1);
     assert_eq!(last.statuses.known, 1);
-    assert_eq!(last.known_dictionary_forms, 1);
+
     complete_at(&mut storage, &reimported, MAR_31, true);
     assert_eq!(
         buckets(&mut storage, LastMonth)
@@ -247,10 +244,6 @@ fn failed_and_uncommitted_work_is_invisible_and_the_cutoff_excludes_future_compl
     );
     assert_eq!(future.buckets.last().unwrap().values.statuses.new, 2);
     assert_eq!(future.buckets.last().unwrap().values.statuses.known, 0);
-    assert_eq!(
-        future.buckets.last().unwrap().values.known_dictionary_forms,
-        0
-    );
 }
 
 #[test]

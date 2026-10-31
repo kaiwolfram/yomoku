@@ -161,6 +161,11 @@ const MIGRATIONS: &[Migration] = &[
         name: "0022_anki_model_creations",
         sql: include_str!("../migrations/0022_anki_model_creations.sql"),
     },
+    Migration {
+        version: 23,
+        name: "0023_remove_known_forms",
+        sql: include_str!("../migrations/0023_remove_known_forms.sql"),
+    },
 ];
 
 /// Failures are returned to the runtime; opening never resets a database.

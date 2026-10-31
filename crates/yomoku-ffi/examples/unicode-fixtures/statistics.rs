@@ -43,7 +43,6 @@ pub fn exchange(dir: &Path, writing: bool) -> Result<(), Box<dyn Error>> {
                 known: (1 << 53) + 1,
                 ignored: 5,
             },
-            known_dictionary_forms: u64::MAX - 1,
         };
         let mut view = Core::<Yomoku>::new().view();
         view.statistics = StatisticsState {

@@ -54,7 +54,7 @@ fn seed_history(connection: &Connection, version: usize) {
             )
             .unwrap();
     }
-    if version >= 20 {
+    if (20..23).contains(&version) {
         connection
             .execute(
                 "INSERT INTO vocabulary_dictionary_forms VALUES (81, '猫')",
@@ -159,7 +159,7 @@ fn expected_status_timeline(version: usize) -> Vec<yomoku_core::statistics::Stat
             }
             points.push(StatusTimelinePoint {
                 occurred_at_unix_ms: date,
-                known_dictionary_forms: known,
+
                 counts: WordStatusCounts {
                     new,
                     learning,
@@ -318,4 +318,113 @@ fn failed_late_upgrade_preserves_populated_history_and_retries_without_partial_r
         );
         assert_integrity(&storage.connection);
     }
+}
+
+// Snapshot every remaining table so the scope reduction cannot silently discard
+// reader state, vocabulary/status history, dictionaries or Anki obligations.
+fn state_without_known_form_links(connection: &Connection) -> Vec<(String, Vec<Vec<Value>>)> {
+    let mut statement = connection
+        .prepare(
+            "SELECT name FROM sqlite_schema WHERE type = 'table'
+         AND name NOT IN ('schema_migrations', 'vocabulary_dictionary_forms') ORDER BY name",
+        )
+        .unwrap();
+    let names = statement
+        .query_map([], |row| row.get::<_, String>(0))
+        .unwrap()
+        .collect::<Result<Vec<_>, _>>()
+        .unwrap();
+    names
+        .into_iter()
+        .map(|name| {
+            let data = rows(
+                connection,
+                &format!("SELECT * FROM \"{}\"", name.replace('"', "\"\"")),
+            );
+            (name, data)
+        })
+        .collect()
+}
+
+#[test]
+fn removing_known_forms_migrates_populated_database_and_preserves_all_other_state() {
+    let database = TestDatabase::new();
+    let mut connection = Connection::open(database.path()).unwrap();
+    connection
+        .pragma_update(None, "foreign_keys", true)
+        .unwrap();
+    migrate(&mut connection, &MIGRATIONS[..22]).unwrap();
+    seed_history(&connection, 22);
+    assert_eq!(
+        rows(&connection, "SELECT * FROM vocabulary_dictionary_forms").len(),
+        1
+    );
+    let before = state_without_known_form_links(&connection);
+    drop(connection);
+    for _ in 0..2 {
+        let storage = Storage::open(database.path()).unwrap();
+        assert_eq!(storage.schema_version().unwrap(), 23);
+        assert!(!storage
+            .connection
+            .table_exists(None, "vocabulary_dictionary_forms")
+            .unwrap());
+        assert_eq!(state_without_known_form_links(&storage.connection), before);
+        assert_eq!(
+            storage.vocabulary_status_timeline().unwrap(),
+            expected_status_timeline(22)
+        );
+        assert_eq!(
+            storage
+                .lifetime_reading_totals()
+                .unwrap()
+                .japanese_occurrences,
+            2
+        );
+        assert_integrity(&storage.connection);
+    }
+}
+
+#[test]
+fn failed_known_forms_removal_restores_links_and_history_before_retry() {
+    let database = TestDatabase::new();
+    let mut connection = Connection::open(database.path()).unwrap();
+    connection
+        .pragma_update(None, "foreign_keys", true)
+        .unwrap();
+    migrate(&mut connection, &MIGRATIONS[..22]).unwrap();
+    seed_history(&connection, 22);
+    let before = fs::read(database.path()).unwrap();
+    let mut failing = MIGRATIONS[..22]
+        .iter()
+        .map(|migration| Migration { ..*migration })
+        .collect::<Vec<_>>();
+    failing.push(Migration {
+        version: 23,
+        name: MIGRATIONS[22].name,
+        sql: concat!(
+            include_str!("../../migrations/0023_remove_known_forms.sql"),
+            "INSERT INTO nonexistent VALUES (1);"
+        ),
+    });
+    assert!(matches!(
+        migrate(&mut connection, &failing),
+        Err(StorageError::Sqlite(_))
+    ));
+    assert!(connection.is_autocommit());
+    assert_eq!(fs::read(database.path()).unwrap(), before);
+    assert_eq!(
+        rows(&connection, "SELECT * FROM vocabulary_dictionary_forms").len(),
+        1
+    );
+    assert_integrity(&connection);
+    drop(connection);
+    let storage = Storage::open(database.path()).unwrap();
+    assert!(!storage
+        .connection
+        .table_exists(None, "vocabulary_dictionary_forms")
+        .unwrap());
+    assert_eq!(
+        storage.vocabulary_status_timeline().unwrap(),
+        expected_status_timeline(22)
+    );
 }

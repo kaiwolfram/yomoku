@@ -11,9 +11,7 @@ use yomoku_core::{
 
 use crate::{
     analysis::read_analysis,
-    vocabulary::{
-        encode_status, link_dictionary_forms_in, read_entry_by_surface, register_vocabulary_in,
-    },
+    vocabulary::{encode_status, read_entry_by_surface, register_vocabulary_in},
     StorageError,
 };
 
@@ -42,12 +40,6 @@ pub(crate) fn record_occurrences_in(
         .collect::<Result<BTreeSet<_>, _>>()
         .map_err(|_| StorageError::InvalidAnalysis)?;
     let newly_known = register_completed_surfaces_in(connection, &surfaces, completion)?;
-    link_dictionary_forms_in(
-        connection,
-        tokens
-            .iter()
-            .map(|(_, token)| (token.surface.as_str(), token.dictionary_form.as_ref())),
-    )?;
     let mut insert = connection.prepare(
         "INSERT INTO reading_occurrences
          (command_id, token_index, vocabulary_id, start_byte, end_byte, surface, reading, dictionary_form)
@@ -123,18 +115,6 @@ pub(crate) fn record_effective_occurrences_in(
         .collect::<Result<BTreeSet<_>, _>>()
         .map_err(|_| StorageError::InvalidAnalysis)?;
     let newly_known = register_completed_surfaces_in(connection, &surfaces, completion)?;
-    link_dictionary_forms_in(
-        connection,
-        frozen.occurrences().iter().map(|token| {
-            (
-                token.surface.as_str(),
-                token
-                    .metadata
-                    .as_ref()
-                    .and_then(|metadata| metadata.dictionary_form.as_ref()),
-            )
-        }),
-    )?;
     let mut insert = connection.prepare(
         "INSERT INTO reading_occurrences
          (command_id, token_index, vocabulary_id, start_byte, end_byte, surface, reading, dictionary_form)

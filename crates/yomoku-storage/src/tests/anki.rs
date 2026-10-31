@@ -485,7 +485,7 @@ fn anki_migration_upgrade_is_empty_and_failure_preserves_prior_schema_and_data()
         .unwrap();
     drop(connection);
     let storage = Storage::open(database.path()).unwrap();
-    assert_eq!(storage.schema_version().unwrap(), 22);
+    assert_eq!(storage.schema_version().unwrap(), 23);
     assert_eq!(storage.anki_recovery().unwrap(), None);
     assert_eq!(
         storage

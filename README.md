@@ -85,14 +85,14 @@ IDs/status/date, and deletion recalculates history without recreating words from
 existing books.
 
 The Rust statistics repository derives read-only lifetime Japanese-occurrence
-and completed-time totals plus an absolute five-status vocabulary timeline with
-Known distinct dictionary-form counts from durable analyzer links.
+and completed-time totals plus an absolute five-status vocabulary timeline.
+Known forms statistics and their dedicated association table have been removed.
 Repetitions/rereads count, imports create registration jumps, and deletion semantics
 recalculate from saved event rows. UTC daily/weekly/monthly timeframe buckets carry
 lifetime cumulative origins and fill empty intervals from one read snapshot.
 Typed native worker/core/FFI transport now retains timeframe/as-of queries,
 loading/error/Retry state and stale-callback protection. The Statistics screen
-renders all three overview/drilldown charts, four timeframes, exact interval rows
+renders two overview/drilldown charts, four timeframes, exact interval rows
 and explicit error Retry, preserving lifetime origins through navigation/recreation.
 
 The pure [EPUB parser](crates/yomoku-import/src/epub.rs) extracts spine-ordered

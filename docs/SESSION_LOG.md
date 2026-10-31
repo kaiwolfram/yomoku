@@ -4009,3 +4009,26 @@ and /tmp/yomoku-browser-profile-*. No emulator started.
 - Rust/JNI suites, release packaging and physical trials not rerun. Emulator
   checks suffice for this presentation change; next value is typed Anki recovery
   read/preflight/dispatch, followed by real provider and physical validation.
+
+## 2026-10-31 — Remove Known forms statistics and dedicated storage
+
+- User removed Known forms stats and requested storage simplification. Removed the
+  separate chart, dictionary-form aggregate/replay state and native/Kotlin payload
+  field. Cumulative occurrences and five-status charts remain, including Known.
+- Schema 0023 drops only vocabulary_dictionary_forms; removed link writes from
+  imports, snapshots, registered edits and original/effective completions. Kept
+  historical migrations, dictionary/token metadata, reading/vocabulary history
+  and Anki journals. Updated tests, profiling harness and all current product,
+  architecture/data, decisions, performance and continuity documents.
+- PASS: 916 workspace cases/17 ignored opt-in fixtures; three harness cases; focused
+  status-query cleanup; strict Clippy/Rustfmt/Kotlin formatting/diff; host JNI and
+  Unicode/codecs; identical host/Android Kotlin generation; both-ABI debug/test
+  APKs and strict lint; nine statistics/navigation cases on phone and tablet each.
+  New migration cases cover preservation of all other tables, rollback after
+  DROP and exact retry. Historical schema upgrade matrix includes version 23.
+- Initial profiling SQL/schema literal/single-element test-loop failures were
+  resolved. Used the documented isolated 8 GiB emulator image for dictionary space;
+  display restored. Commands/logs: DEVELOPMENT.md “Remove Known forms” section,
+  /tmp/yomoku-remove-known-*. No open blocker or remaining request work.
+- No release/physical trial or performance claim. Recommend testing an upgrade
+  against the user's existing phone Library/history before further Anki work.

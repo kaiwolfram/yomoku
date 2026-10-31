@@ -16,10 +16,6 @@ internal enum class StatisticsChart(val title: Int, val lines: List<Int>) {
             R.string.status_known,
             R.string.status_ignored,
         ),
-    ),
-    KNOWN(
-        R.string.statistics_known,
-        listOf(R.string.statistics_known_surfaces, R.string.statistics_known_forms),
     );
 
     fun values(value: StatisticsValues): List<ULong> =
@@ -29,7 +25,6 @@ internal enum class StatisticsChart(val title: Int, val lines: List<Int>) {
                 value.statuses.let {
                     listOf(it.new, it.learning, it.familiar, it.known, it.ignored)
                 }
-            KNOWN -> listOf(value.statuses.known, value.knownDictionaryForms)
         }
 }
 

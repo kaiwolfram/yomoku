@@ -494,7 +494,7 @@ fn failed_hash_migration_preserves_version_seven_database_and_can_retry() {
         .unwrap();
     drop(connection);
     let mut storage = Storage::open(database.path()).unwrap();
-    assert_eq!(storage.schema_version().unwrap(), 22);
+    assert_eq!(storage.schema_version().unwrap(), 23);
     assert_eq!(storage.load_paste(saved.document_id).unwrap(), Some(saved));
     assert_eq!(count(&storage, "paste_content_hashes"), 0);
 }

@@ -8107,3 +8107,53 @@ No open blocker; further phone testing adds less value here than the next planne
 typed Anki preflight/dispatch slice. Logs: `/tmp/yomoku-feed-{build,format,phone,phone-retry,tablet,emulator}.log`;
 phone results: `/tmp/yomoku-feed-phone-results`; tablet XML remains in
 `android/app/build/outputs/androidTest-results/connected/debug/`.
+
+## Remove Known forms statistics and dedicated storage
+
+Configure JDK/SDK/Gradle/Cargo paths as above. Commands for this scope reduction:
+
+```sh
+cargo test --workspace --all-features --locked --offline --quiet
+cargo clippy --workspace --all-targets --all-features --locked --offline -- -D warnings
+cargo fmt --all -- --check
+cargo test -p yomoku-ffi --example measure_vocabulary --all-features --locked --offline
+tools/test-kotlin-bridge.sh
+tools/format-kotlin.sh --check
+"$JAVA_HOME/bin/java" -jar .local/ktfmt-0.64.jar --kotlinlang-style --dry-run --set-exit-if-changed tests/kotlin/StatisticsBridgeTest.kt tests/kotlin/StatisticsCodecTest.kt
+./android/gradlew -p android :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=app.yomoku.StatisticsDatasetTest,app.yomoku.StatisticsScreenTest,app.yomoku.StatisticsProductionTest,app.yomoku.NavigationTest --offline --console=plain
+# Repeat the same four instrumentation classes at tablet dimensions.
+"$ANDROID_HOME/platform-tools/adb" shell wm size 2560x1600
+"$ANDROID_HOME/platform-tools/adb" shell wm density 240
+./android/gradlew -p android :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=app.yomoku.StatisticsDatasetTest,app.yomoku.StatisticsScreenTest,app.yomoku.StatisticsProductionTest,app.yomoku.NavigationTest --offline --console=plain
+"$ANDROID_HOME/platform-tools/adb" shell wm size reset
+"$ANDROID_HOME/platform-tools/adb" shell wm density reset
+git diff --check
+```
+
+Use the existing isolated 8 GiB `.local/statistics-ui-avd` emulator image documented
+in the Statistics Compose section. The default image has little space for the
+APK and extracted Full dictionary; do not clear an existing user Library.
+
+PASS: 916 workspace tests (17 opt-in fixtures ignored), strict all-target/all-feature
+Clippy, Rustfmt/diff, three profiling-harness cases, the focused status-query
+cleanup check, full host Kotlin/JNI suite and Rust/Kotlin Unicode codec exchange.
+Host and Android Kotlin regeneration are identical. New migration cases preserve
+all other tables on a populated schema-22 upgrade and prove rollback after DROP
+before an exact retry; the historical upgrade matrix now runs through schema 23.
+Initial checks exposed obsolete profiling SQL, an old schema-version expectation
+and a single-element test loop; those references were updated and checks passed.
+
+PASS: both-ABI native packaging, debug/test APKs, strict lintDebug and all nine
+StatisticsDataset/StatisticsScreen/StatisticsProduction/Navigation cases on
+API-36 x86_64 phone (1080×2400, 420 dpi) and tablet (2560×1600, 240 dpi): 18
+executions, no failures/skips. The removed card is absent; both remaining charts,
+all five statuses including Known, four timeframes, exact opening/interval values,
+Retry, production import/status/completion refresh, Settings and recreation pass.
+Display overrides were restored. No open blocker or remaining work for this request.
+
+No optimized release, physical upgrade trial, broader accessibility/lifecycle or
+performance benchmark was rerun. Recommend a phone upgrade trial with the user's
+existing Library/history before the next Anki integration slice. Logs:
+`/tmp/yomoku-remove-known-{workspace,clippy,status-query,harness,rustfmt,jni,format,format-check,codegen-diff,android-phone,android-tablet}.log`;
+phone XML: `/tmp/yomoku-remove-known-phone-results`; tablet XML:
+`android/app/build/outputs/androidTest-results/connected/debug/`.

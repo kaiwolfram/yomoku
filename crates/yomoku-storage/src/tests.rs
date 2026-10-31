@@ -46,7 +46,6 @@ mod txt;
 mod vocabulary;
 mod vocabulary_browser;
 mod vocabulary_bulk;
-mod vocabulary_links;
 
 static NEXT_DATABASE: AtomicU64 = AtomicU64::new(0);
 
@@ -107,8 +106,8 @@ fn history(path: &Path) -> Vec<(i64, String)> {
 
 fn failing_migration() -> Migration {
     Migration {
-        version: 23,
-        name: "0023_failure_fixture",
+        version: 24,
+        name: "0024_failure_fixture",
         sql: "CREATE TABLE partial_fixture (value TEXT); INSERT INTO partial_fixture VALUES ('途中'); INSERT INTO nonexistent VALUES (1);",
     }
 }
@@ -119,7 +118,11 @@ fn creates_empty_database_and_reopens_without_reapplying_migrations() {
     assert!(!database.path().exists());
     for _ in 0..3 {
         let storage = Storage::open(database.path()).unwrap();
-        assert_eq!(storage.schema_version().unwrap(), 22);
+        assert_eq!(storage.schema_version().unwrap(), 23);
+        assert!(!storage
+            .connection
+            .table_exists(None, "vocabulary_dictionary_forms")
+            .unwrap());
     }
     assert_eq!(
         history(&database.path()),
@@ -145,7 +148,8 @@ fn creates_empty_database_and_reopens_without_reapplying_migrations() {
             (19, "0019_library_read_order".into()),
             (20, "0020_vocabulary_dictionary_forms".into()),
             (21, "0021_anki_submissions".into()),
-            (22, "0022_anki_model_creations".into())
+            (22, "0022_anki_model_creations".into()),
+            (23, "0023_remove_known_forms".into())
         ]
     );
     let connection = Connection::open(database.path()).unwrap();
@@ -193,7 +197,7 @@ fn upgrades_existing_database_in_order_and_preserves_data_on_reopen() {
                 .unwrap(),
             "日本語𠮷📖"
         );
-        assert_eq!(history(&database.path()).len(), 22);
+        assert_eq!(history(&database.path()).len(), 23);
     }
 }
 
@@ -230,6 +234,7 @@ fn failed_upgrade_rolls_back_schema_data_and_history() {
                 Migration { ..MIGRATIONS[19] },
                 Migration { ..MIGRATIONS[20] },
                 Migration { ..MIGRATIONS[21] },
+                Migration { ..MIGRATIONS[22] },
                 failing_migration()
             ]
         ),
@@ -282,6 +287,7 @@ fn failed_initialization_rolls_back_all_pending_migrations_and_can_retry() {
                 Migration { ..MIGRATIONS[19] },
                 Migration { ..MIGRATIONS[20] },
                 Migration { ..MIGRATIONS[21] },
+                Migration { ..MIGRATIONS[22] },
                 failing_migration()
             ]
         ),
@@ -296,7 +302,7 @@ fn failed_initialization_rolls_back_all_pending_migrations_and_can_retry() {
             .unwrap()
             .schema_version()
             .unwrap(),
-        22
+        23
     );
 }
 
@@ -307,7 +313,7 @@ fn rejects_newer_schema_without_rewriting_history() {
     Connection::open(database.path())
         .unwrap()
         .execute(
-            "INSERT INTO schema_migrations VALUES (23, '0023_future')",
+            "INSERT INTO schema_migrations VALUES (24, '0024_future')",
             [],
         )
         .unwrap();
@@ -315,8 +321,8 @@ fn rejects_newer_schema_without_rewriting_history() {
     assert!(matches!(
         Storage::open(database.path()),
         Err(StorageError::UnsupportedSchemaVersion {
-            found: 23,
-            supported: 22
+            found: 24,
+            supported: 23
         })
     ));
     assert_eq!(fs::read(database.path()).unwrap(), before);
@@ -425,9 +431,9 @@ fn concurrent_initialization_records_migration_once() {
             let path = database.path();
             scope.spawn(move || {
                 barrier.wait();
-                assert_eq!(Storage::open(path).unwrap().schema_version().unwrap(), 22);
+                assert_eq!(Storage::open(path).unwrap().schema_version().unwrap(), 23);
             });
         }
     });
-    assert_eq!(history(&database.path()).len(), 22);
+    assert_eq!(history(&database.path()).len(), 23);
 }

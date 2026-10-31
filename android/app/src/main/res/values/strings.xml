@@ -38,9 +38,6 @@
     <string name="statistics_empty">No reading history yet.</string>
     <string name="statistics_occurrences">Japanese words read</string>
     <string name="statistics_statuses">Word statuses</string>
-    <string name="statistics_known">Known forms</string>
-    <string name="statistics_known_surfaces">Known surface forms</string>
-    <string name="statistics_known_forms">Known dictionary forms</string>
     <string name="statistics_month">Last month</string>
     <string name="statistics_six_months">Last six months</string>
     <string name="statistics_year">Last year</string>

@@ -11,7 +11,6 @@ fn point(
 ) -> StatusTimelinePoint {
     StatusTimelinePoint {
         occurred_at_unix_ms: timestamp,
-        known_dictionary_forms: 0,
         counts: WordStatusCounts {
             new,
             learning,
@@ -433,7 +432,7 @@ fn status_text_rejects_invalid_utf8_and_nonliteral_spellings_without_leaking_a_s
 }
 
 #[test]
-fn status_links_and_events_keep_one_snapshot_across_concurrent_erasure_and_new_generations() {
+fn status_events_keep_one_snapshot_across_concurrent_erasure_and_new_generations() {
     let database = TestDatabase::new();
     let mut storage = Storage::open(database.path()).unwrap();
     // WAL permits the writer to commit between the two reader statements. It is
@@ -449,14 +448,19 @@ fn status_links_and_events_keep_one_snapshot_across_concurrent_erasure_and_new_g
         .unwrap()
         .unwrap();
     let expected = storage.vocabulary_status_timeline().unwrap();
-    assert_eq!(expected.last().unwrap().known_dictionary_forms, 1);
+
     let mut writer = Storage::open(database.path()).unwrap();
     storage
         .connection
         .pragma_update(None, "query_only", true)
         .unwrap();
     let transaction = storage.connection.unchecked_transaction().unwrap();
-    let links = crate::statistics::status_links(&transaction).unwrap();
+    // Establish the read snapshot before another connection changes history.
+    transaction
+        .query_row("SELECT COUNT(*) FROM vocabulary_status_events", [], |row| {
+            row.get::<_, i64>(0)
+        })
+        .unwrap();
     writer.delete_vocabulary_entries(&[cat.id]).unwrap();
     writer
         .create_analyzed_paste(&PasteText::new("猫".into()).unwrap(), 300, |chapter| {
@@ -474,10 +478,10 @@ fn status_links_and_events_keep_one_snapshot_across_concurrent_erasure_and_new_g
         cat.id
     );
     status(&mut writer, "猫", VocabularyStatus::Learning, 400);
-    // Loaded links belong to the erased generation. Its events must remain
-    // visible to this snapshot, with no replacement registration mixed in.
+    // The erased generation remains visible in this read transaction, with
+    // no replacement registration mixed into the snapshot.
     assert_eq!(
-        crate::statistics::status_events(&transaction, links).unwrap(),
+        crate::statistics::status_timeline(&transaction).unwrap(),
         expected
     );
     transaction.commit().unwrap();
@@ -500,32 +504,29 @@ fn status_queries_stream_without_sorting_and_query_failures_release_the_snapshot
         .record_effective_page_completion(&completion)
         .unwrap();
     let expected = storage.vocabulary_status_timeline().unwrap();
-    for sql in [
-        crate::statistics::STATUS_LINKS_SQL,
-        crate::statistics::STATUS_EVENTS_SQL,
-    ] {
-        let mut statement = storage.connection.prepare(sql).unwrap();
-        let mut rows = statement.query([]).unwrap();
-        while rows.next().unwrap().is_some() {}
-        drop(rows);
-        assert_eq!(statement.get_status(rusqlite::StatementStatus::Sort), 0);
-    }
-    for table in ["vocabulary_dictionary_forms", "vocabulary_status_events"] {
-        storage
-            .connection
-            .execute_batch(&format!("ALTER TABLE {table} RENAME TO unavailable"))
-            .unwrap();
-        let before = fs::read(database.path()).unwrap();
-        assert!(matches!(
-            storage.vocabulary_status_timeline(),
-            Err(StorageError::Sqlite(_))
-        ));
-        assert!(storage.connection.is_autocommit());
-        assert_eq!(fs::read(database.path()).unwrap(), before);
-        storage
-            .connection
-            .execute_batch(&format!("ALTER TABLE unavailable RENAME TO {table}"))
-            .unwrap();
-        assert_eq!(storage.vocabulary_status_timeline().unwrap(), expected);
-    }
+    let mut statement = storage
+        .connection
+        .prepare(crate::statistics::STATUS_EVENTS_SQL)
+        .unwrap();
+    let mut rows = statement.query([]).unwrap();
+    while rows.next().unwrap().is_some() {}
+    drop(rows);
+    assert_eq!(statement.get_status(rusqlite::StatementStatus::Sort), 0);
+    drop(statement);
+    storage
+        .connection
+        .execute_batch("ALTER TABLE vocabulary_status_events RENAME TO unavailable")
+        .unwrap();
+    let before = fs::read(database.path()).unwrap();
+    assert!(matches!(
+        storage.vocabulary_status_timeline(),
+        Err(StorageError::Sqlite(_))
+    ));
+    assert!(storage.connection.is_autocommit());
+    assert_eq!(fs::read(database.path()).unwrap(), before);
+    storage
+        .connection
+        .execute_batch("ALTER TABLE unavailable RENAME TO vocabulary_status_events")
+        .unwrap();
+    assert_eq!(storage.vocabulary_status_timeline().unwrap(), expected);
 }

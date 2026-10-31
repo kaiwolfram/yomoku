@@ -48,7 +48,7 @@ fn reading(timestamp: i64, occurrences: u64, time: u64) -> ReadingTimelinePoint 
     }
 }
 
-fn status(timestamp: i64, counts: [u64; 5], forms: u64) -> StatusTimelinePoint {
+fn status(timestamp: i64, counts: [u64; 5]) -> StatusTimelinePoint {
     let [new, learning, familiar, known, ignored] = counts;
     StatusTimelinePoint {
         occurred_at_unix_ms: timestamp,
@@ -59,7 +59,6 @@ fn status(timestamp: i64, counts: [u64; 5], forms: u64) -> StatusTimelinePoint {
             known,
             ignored,
         },
-        known_dictionary_forms: forms,
     }
 }
 
@@ -130,8 +129,8 @@ fn sunday_and_monday_events_belong_to_different_weekly_end_values() {
         date("2025-01-03"),
         &[reading(monday - 1, 5, 7), reading(monday, 11, 13)],
         &[
-            status(monday - 1, [1, 2, 3, 4, 5], 3),
-            status(monday, [2, 3, 4, 5, 6], 4),
+            status(monday - 1, [1, 2, 3, 4, 5]),
+            status(monday, [2, 3, 4, 5, 6]),
         ],
     )
     .unwrap();
@@ -146,7 +145,7 @@ fn sunday_and_monday_events_belong_to_different_weekly_end_values() {
         }
     );
     assert_eq!(previous.values.statuses.known, 4);
-    assert_eq!(previous.values.known_dictionary_forms, 3);
+
     assert_eq!(
         current.values.reading,
         LifetimeReadingTotals {
@@ -155,7 +154,6 @@ fn sunday_and_monday_events_belong_to_different_weekly_end_values() {
         }
     );
     assert_eq!(current.values.statuses.known, 5);
-    assert_eq!(current.values.known_dictionary_forms, 4);
 }
 
 #[test]
@@ -200,15 +198,15 @@ fn filters_preserve_lifetime_origin_and_absolute_lines_with_exact_endpoint_owner
         reading(now + 1, 999, 999),
     ];
     let statuses = [
-        status(start - 1, [4, 5, 6, 3, 2], 2),
-        status(start, [3, 5, 6, 4, 2], 2),
-        status(now, [1, 2, 3, 10, 4], 7),
-        status(now + 1, [0, 0, 0, 20, 0], 15),
+        status(start - 1, [4, 5, 6, 3, 2]),
+        status(start, [3, 5, 6, 4, 2]),
+        status(now, [1, 2, 3, 10, 4]),
+        status(now + 1, [0, 0, 0, 20, 0]),
     ];
     let result = statistics_buckets(LastMonth, now, &readings, &statuses).unwrap();
     assert_eq!(result.opening.reading.japanese_occurrences, 85_000);
     assert_eq!(result.opening.statuses.known, 3);
-    assert_eq!(result.opening.known_dictionary_forms, 2);
+
     assert_eq!(
         result.buckets[0].values.reading.japanese_occurrences,
         86_000
@@ -224,7 +222,7 @@ fn filters_preserve_lifetime_origin_and_absolute_lines_with_exact_endpoint_owner
         }
     );
     assert_eq!(last.statuses, statuses[2].counts);
-    assert_eq!(last.known_dictionary_forms, 7);
+
     for frame in [LastSixMonths, LastYear, AllTime] {
         assert_eq!(
             statistics_buckets(frame, now, &readings, &statuses)
@@ -245,7 +243,7 @@ fn monthly_gaps_carry_values_and_earliest_status_can_precede_reading() {
         AllTime,
         now,
         &[reading(date("2024-03-01"), 3, 17)],
-        &[status(date("2024-01-01"), [4, 0, 0, 0, 0], 0)],
+        &[status(date("2024-01-01"), [4, 0, 0, 0, 0])],
     )
     .unwrap();
     assert_eq!(result.buckets.len(), 4);
@@ -289,7 +287,7 @@ fn invalid_dates_order_and_overflow_fail_without_partial_values() {
         assert!(statistics_buckets(LastYear, 2, &invalid, &[]).is_err());
     }
     for dates in [[-1, 1], [1, 0], [0, 0], [0, i64::MAX]] {
-        let points = dates.map(|d| status(d, [0; 5], 0));
+        let points = dates.map(|d| status(d, [0; 5]));
         assert!(statistics_buckets(LastYear, 2, &[], &points).is_err());
     }
     for increments in [

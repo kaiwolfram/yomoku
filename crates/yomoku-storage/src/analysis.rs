@@ -18,10 +18,7 @@ use yomoku_core::{
     vocabulary::Surface,
 };
 
-use crate::{
-    vocabulary::{link_dictionary_forms_in, register_vocabulary_in},
-    Storage, StorageError,
-};
+use crate::{vocabulary::register_vocabulary_in, Storage, StorageError};
 
 /// Shared read transaction for segmentation and effective page/status projections.
 pub(crate) fn read_effective_reader_chapter_in<'a>(
@@ -287,20 +284,7 @@ pub(crate) fn save_registered_override_in(
             .iter()
             .map(|token| Surface::new(&token.surface).map_err(|_| StorageError::InvalidAnalysis))
             .collect::<Result<std::collections::BTreeSet<_>, _>>()?;
-        let registered = register_vocabulary_in(connection, &surfaces, registered_at_unix_ms)?;
-        link_dictionary_forms_in(
-            connection,
-            tokens.iter().map(|token| {
-                (
-                    token.surface.as_str(),
-                    token
-                        .metadata
-                        .as_ref()
-                        .and_then(|metadata| metadata.dictionary_form.as_ref()),
-                )
-            }),
-        )?;
-        registered
+        register_vocabulary_in(connection, &surfaces, registered_at_unix_ms)?
     } else {
         0
     };
@@ -563,14 +547,6 @@ pub(crate) fn store_chapter_analysis_in(
              token.dictionary_form.as_ref().map(Surface::as_str)),
         )?;
     }
-    link_dictionary_forms_in(
-        connection,
-        analysis
-            .tokens
-            .iter()
-            .filter(|token| token.is_japanese)
-            .map(|token| (token.surface.as_str(), token.dictionary_form.as_ref())),
-    )?;
     Ok(id)
 }
 

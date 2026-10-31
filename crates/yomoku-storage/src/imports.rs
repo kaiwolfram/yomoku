@@ -11,7 +11,7 @@ use yomoku_core::{
 use crate::{
     analysis::store_chapter_analysis_in,
     documents::{create_paste_in, load_paste_in},
-    vocabulary::{link_dictionary_forms_in, register_vocabulary_in},
+    vocabulary::register_vocabulary_in,
     Storage, StorageError,
 };
 
@@ -196,14 +196,6 @@ pub(crate) fn store_analyzed_chapter_in(
         .collect::<Result<BTreeSet<_>, _>>()
         .map_err(|_| StorageError::InvalidAnalysis)?;
     let registered_surfaces = register_vocabulary_in(connection, &surfaces, registered_at_unix_ms)?;
-    link_dictionary_forms_in(
-        connection,
-        analysis
-            .tokens
-            .iter()
-            .filter(|token| token.is_japanese)
-            .map(|token| (token.surface.as_str(), token.dictionary_form.as_ref())),
-    )?;
     Ok((analysis_id, registered_surfaces))
 }
 

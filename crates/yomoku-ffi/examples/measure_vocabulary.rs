@@ -504,7 +504,6 @@ fn main() {
         "vocabulary_status_events",
         "reading_completions",
         "reading_occurrences",
-        "vocabulary_dictionary_forms",
     ] {
         let count: i64 = audit
             .query_row(&format!("SELECT COUNT(*) FROM {table}"), [], |row| {

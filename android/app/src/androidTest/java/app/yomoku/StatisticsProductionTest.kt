@@ -96,8 +96,6 @@ class StatisticsProductionTest {
             else imported.statuses.known - 1UL,
             changed.statuses.known,
         )
-        if (chosen == VocabularyStatus.KNOWN) assertTrue(changed.knownDictionaryForms > 0UL)
-        else assertTrue(changed.knownDictionaryForms <= imported.knownDictionaryForms)
 
         compose.onNode(hasText("Library") and hasClickAction()).performClick()
         idle()

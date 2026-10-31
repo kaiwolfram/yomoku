@@ -607,7 +607,7 @@ fn custom_dictionary_migration_preserves_v16_reader_state_and_rolls_back_failed_
         .unwrap();
     drop(connection);
     let mut storage = Storage::open(database.path()).unwrap();
-    assert_eq!(storage.schema_version().unwrap(), 22);
+    assert_eq!(storage.schema_version().unwrap(), 23);
     assert_eq!(
         storage
             .load_reader_snapshot(key(&imported).document_id)

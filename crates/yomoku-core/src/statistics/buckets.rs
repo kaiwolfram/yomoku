@@ -32,7 +32,6 @@ pub struct ReadingTimelinePoint {
 pub struct StatisticsValues {
     pub reading: LifetimeReadingTotals,
     pub statuses: WordStatusCounts,
-    pub known_dictionary_forms: u64,
 }
 
 /// Absolute values just before `end_exclusive_unix_ms`. Empty intervals carry
@@ -139,7 +138,6 @@ pub fn statistics_buckets(
         {
             let point = statuses.next().expect("peeked status");
             values.statuses = point.counts;
-            values.known_dictionary_forms = point.known_dictionary_forms;
         }
         Ok(values)
     };

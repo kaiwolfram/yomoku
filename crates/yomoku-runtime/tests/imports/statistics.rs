@@ -105,7 +105,7 @@ fn statistics_fifo_returns_exact_all_timeframes_without_loading_analyzer_or_writ
                 ignored: 1,
             }
         );
-        assert_eq!(last.known_dictionary_forms, 1);
+
         if frame == Timeframe::LastMonth {
             assert_eq!(result.opening.reading.japanese_occurrences, 6);
         }
@@ -137,15 +137,6 @@ fn statistics_fifo_returns_exact_all_timeframes_without_loading_analyzer_or_writ
     assert!(router.view().statistics.data.is_none());
     let refreshed = read(&router, Timeframe::AllTime);
     assert_eq!(refreshed.buckets.last().unwrap().values.statuses.known, 2);
-    assert_eq!(
-        refreshed
-            .buckets
-            .last()
-            .unwrap()
-            .values
-            .known_dictionary_forms,
-        2
-    );
     assert!(trace.try_recv().is_err() && reopened_trace.try_recv().is_err());
     drop((router, lifecycle, reopened, reopened_lifecycle));
 }

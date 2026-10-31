@@ -22,6 +22,7 @@ must not change without user approval.
 
 **Important late scope changes that override earlier brainstorming:**
 
+- **Remove Known forms statistics** (user scope reduction, 2026-10-31): no separate Known surface/dictionary-form chart or dedicated dictionary-form aggregation storage. The five-status vocabulary chart still includes Known.
 - **No Nostr integration in the first MVP** (user phone-trial scope reduction, 2026-10-31). Rename its navigation destination to **Feed**; the view shows only **`Coming Soon! 🌱`**. No relay configuration/networking, post reading, signing identity, reactions or forwarding in this release. The Nostr requirements in section 5 are deferred beyond the first MVP.
 - **No in-app AI features in v1**, including BYOK API keys/provider/model settings, AI-generated definitions or translations, and AI regeneration. Do not scaffold AI merely because older design notes might mention it.
 - **Only EPUB, TXT, SRT, and pasted text**. No WebVTT `.vtt`, no ASS/SSA `.ass`, no PDF, no NHK integration, and no Android Share-intent import in v1.
@@ -66,7 +67,7 @@ If a chosen library does not support a required capability or architecture in cu
 
 - Five globally tracked statuses: **New**, **Learning**, **Familiar**, **Known**, **Ignored**.
 - Status colors: New blue (`#A9CCFF` light / `#28558D` dark), Learning light red (`#FFC5C0` / `#783E44`), Familiar yellow (`#FFE29A` / `#725A2D`), **Known unhighlighted in text** (green in graphs), Ignored pronounced gray (`#BEC5CF` / `#505B6B`). Follow Android light/dark system theme; **no in-app manual theme override**.
-- Vocabulary identity is the **exact written surface form**, NOT a lemma: `食べる`, `食べた`, `食べます` are separate entries with separate statuses and encounter counts. Same spelling with different readings is **one** status entry; show all appropriate dictionary readings/senses. Link each surface form to a dictionary form determined automatically by Sudachi, for aggregate lemma statistics.
+- Vocabulary identity is the **exact written surface form**, NOT a lemma: `食べる`, `食べた`, `食べます` are separate entries with separate statuses and encounter counts. Same spelling with different readings is **one** status entry; show all appropriate dictionary readings/senses. Retain Sudachi dictionary forms where needed for dictionary lookup; no aggregate lemma statistics.
 - **No manual correction of surface→dictionary-form mappings in v1** (complexity reduction). Don't edit built-in JMdict/JMnedict definitions; allow user-created, editable/deletable **English meaning + reading** dictionary entry when no dictionary match exists. No global overriding of built-in definitions.
 - Default every newly encountered/imported written Japanese word to **New**. Upon **book import**, register **all unique word surfaces in its content immediately**, not lazily only when read. Deferred Nostr behavior: register vocabulary when a post is **first displayed**, even if it is later skipped. Registration is different from a **reading encounter**.
 - Word tap opens dictionary UI with original surface form, readings, linked base form, all **JMdict English senses immediately expanded and grouped by sense**, compact human-readable grammatical labels (e.g. noun, Ichidan/Godan verb, adjectives), and **JMnedict name readings/categories in a separate section** when available. Proper names are treated like other vocabulary, not excluded.
@@ -96,7 +97,7 @@ If a chosen library does not support a required capability or architecture in cu
 - Statistics: overview + tap into detailed charts. Timeframes: **last month**, **last six months**, **last year (default)**, **all time**; group **daily / weekly / weekly / monthly** respectively.
 - Graph 1: **cumulative lifetime Japanese word occurrences read**. Time filter changes visible x-range but **not** origin of cumulative y-values (e.g. 85k→100k for last month).
 - Graph 2: **five distinct time-series lines** of absolute number of registered word surfaces in each status, with statuses' graph colors; import-time registration causes jumps in New.
-- Graph 3: **two lines**: number of Known surface forms and Known distinct **dictionary forms**, counted Known if any linked surface is Known. Lemma uniqueness based on written spelling, not reading; if Sudachi cannot resolve dictionary form, **exclude** it from Known-lemma counter.
+- There are **two charts only**: cumulative reading occurrences and the five vocabulary statuses. No separate **Known forms** chart or distinct dictionary-form count. Keep the Known status line in Graph 2 and dictionary-form metadata required by reader/dictionary/history workflows.
 - No calendar heatmaps, goals, streaks, or per-source charts in v1 (keep source identities internally).
 - **Vocabulary deletion semantics differ from document deletion:** permanently deleting a vocabulary entry wipes its encounter/status history and recalculates history-based stats. If the form appears again later, it starts as New; existing documents are not automatically rescanned to recreate it just because a word was deleted.
 

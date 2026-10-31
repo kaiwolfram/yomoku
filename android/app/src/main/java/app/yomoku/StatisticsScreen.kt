@@ -13,7 +13,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -184,11 +183,6 @@ private fun StatisticsPlot(dataset: StatisticsDataset, chart: StatisticsChart) {
                         Color(if (dark) 0xFF438A60 else 0xFF7CCB96)
                     else vocabularyBackground(status, dark)
                 }
-            StatisticsChart.KNOWN ->
-                listOf(
-                    Color(if (dark) 0xFF438A60 else 0xFF7CCB96),
-                    MaterialTheme.colorScheme.tertiary,
-                )
         }
     val title = stringResource(chart.title)
     val labels = chart.lines.map { stringResource(it) }
@@ -229,16 +223,7 @@ private fun StatisticsPlot(dataset: StatisticsDataset, chart: StatisticsChart) {
                 drawPath(
                     path,
                     colors[line],
-                    style =
-                        Stroke(
-                            width = 3.dp.toPx(),
-                            pathEffect =
-                                if (chart == StatisticsChart.KNOWN && line == 1)
-                                    PathEffect.dashPathEffect(
-                                        floatArrayOf(10.dp.toPx(), 5.dp.toPx())
-                                    )
-                                else null,
-                        ),
+                    style = Stroke(width = 3.dp.toPx()),
                 )
             }
         }
@@ -261,10 +246,6 @@ private fun StatisticsPlot(dataset: StatisticsDataset, chart: StatisticsChart) {
                         Offset(0f, size.height / 2),
                         Offset(size.width, size.height / 2),
                         strokeWidth = 3.dp.toPx(),
-                        pathEffect =
-                            if (chart == StatisticsChart.KNOWN && index == 1)
-                                PathEffect.dashPathEffect(floatArrayOf(6.dp.toPx(), 3.dp.toPx()))
-                            else null,
                     )
                 }
                 Text(

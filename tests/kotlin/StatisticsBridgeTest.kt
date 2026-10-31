@@ -97,7 +97,6 @@ internal fun verifyStatisticsBridge() {
                 check(
                     data.buckets.last().values.statuses == WordStatusCounts(0UL, 0UL, 0UL, 2UL, 0UL)
                 )
-                check(data.buckets.last().values.knownDictionaryForms == 2UL)
                 check(data.endExclusiveUnixMs == asOf + 1)
                 check(database.readBytes().contentEquals(before) && dictionary.calls.get() == calls)
                 retained = data

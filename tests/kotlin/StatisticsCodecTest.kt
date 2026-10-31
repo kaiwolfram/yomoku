@@ -18,7 +18,6 @@ internal fun verifyStatisticsCodecs(dir: String) {
         check(
             data.opening.statuses == WordStatusCounts(1UL, 2UL, 3UL, 9_007_199_254_740_993UL, 5UL)
         )
-        check(data.opening.knownDictionaryForms == ULong.MAX_VALUE - 1UL)
         check(view.bincodeSerialize().contentEquals(bytes))
         File(dir, "statistics-view-$index-return.bin").writeBytes(view.bincodeSerialize())
         val eventBytes = File(dir, "statistics-event-$index.bin").readBytes()

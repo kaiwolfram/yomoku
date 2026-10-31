@@ -1520,57 +1520,34 @@ below.
 
 `StatusTimelineBuilder` in the pure core streams surviving registration and
 status changes in durable event-ID order, validates each entry's causal chain and
-accumulates date deltas. `Storage::vocabulary_status_timeline(&self)` supplies the
-links and events from two statements in one deferred SQLite read transaction,
-validating v1 semantics, causes and any
-completion provenance headers. It reads neither live content/analysis nor JSON,
-dictionary data or cached counts. The result has absolute five-status counts after
-all changes at each timestamp, plus distinct Known dictionary-form counts, without
-timeframe filtering or date bins. Memory holds entry/link state, status deltas per
-date and Known reference-count deltas per affected form/date, rather than a copy
-of every event. Document deletion preserves the input;
-vocabulary history cascades recalculate it without rescans.
+accumulates date deltas. `Storage::vocabulary_status_timeline(&self)` supplies one
+ordered event statement in a deferred SQLite read transaction, validating v1
+semantics, causes and completion provenance headers. It reads no live content,
+analysis, JSON, dictionaries or cached counts. The result has absolute five-status
+counts after all changes at each timestamp. Replay retains entry state and date
+deltas rather than every event. Document deletion preserves history; vocabulary
+history cascades recalculate it without rescans. Regressing timestamps clamp only
+the affected entry's projected date; raw event dates remain unchanged.
 
-Load all links before streaming events in primary-key order. Splitting the former
-ordered UNION avoids temporary sorting of the full event history; both internal
-read helpers require a transaction. The standalone timeline opens its own read
-transaction, while calendar statistics reuse their existing transaction. Errors
-release the snapshot without writes. The opt-in host profiler separates SQL
-stepping, row decoding/provenance validation, predecoded pure replay and complete
-repository costs. The private production row decoder borrows SQLite TEXT only
-within each row to validate exact old/new status and cause spellings; it retains
-no text references or per-event String copies. The profiler compiles that same
-decoder and enum parser. Invalid types/UTF-8 fail without coercion. See
-VOCABULARY_PERFORMANCE.md for measurements and limits.
+Events stream in primary-key order without a temporary sort. Calendar statistics
+reuse their existing transaction; standalone replay opens its own. Errors release
+the snapshot without writes. The decoder borrows exact SQLite TEXT per row for
+status/cause validation, retaining no text references or per-event String copies.
+Invalid types/UTF-8 fail without coercion. The opt-in profiler separates SQL
+stepping, production decoding, predecoded pure replay and repository costs.
+Historical measurements in VOCABULARY_PERFORMANCE.md describe the older workload.
 
-For a regressing wall clock or delayed frozen completion, clamp only that entry's
-projected date to its preceding event's projected date. This retains causal state,
-nonnegative counts and the final committed status without changing durable dates
-or shifting unrelated entries. Shared-form reference counts replay in projected
-date order, counting a spelling while any linked surface is Known; simultaneous
-handoffs coalesce. Exact spelling identifies forms, unresolved surfaces add none
-and readings do not affect identity. Links have no observation date and apply
-throughout their vocabulary generation's history. Statistics transport is
-described below; chart rendering remains separate.
-
-Migration 0020 retains resolved analyzer dictionary-form spellings in a global
-vocabulary-owned junction table, independent of live documents. New snapshots
-link existing entries; analyzed imports, selected registered edits and actual
-original/effective completions retain their own token metadata in the same write
-transaction. Missing/manual metadata stays absent; raw registration and identical
-snapshot retries never rescan existing content. Exact spelling deduplicates links
-across readings/contexts; distinct resolved forms remain separate associations.
-Document deletion retains unread links, while vocabulary deletion cascades them
-with that generation's history. Upgrade recovers available live-snapshot and
-completed-occurrence evidence without creating entries or altering events; unread
-metadata deleted before upgrade cannot be recovered. No core I/O, dependency,
-FFI or Kotlin change is required for this storage prerequisite.
-
+The user removed Known forms statistics on 2026-10-31. Migration 0023 drops the
+migration-0020 `vocabulary_dictionary_forms` table, whose only consumer was that
+aggregate. Remove link writes from imports, snapshots, registered edits and both
+completion paths; remove the aggregate from replay, bucket payloads and Kotlin
+codecs. Historical migrations remain unchanged. Vocabulary/status/encounter
+history and dictionary-form metadata used by lookup/reading provenance remain.
 
 ## Read-only statistics timeframe buckets
 
 Pure `statistics::statistics_buckets` takes an explicit UTC as-of clock and
-chronological analyzed-reading increments plus validated absolute status/form
+chronological analyzed-reading increments plus validated absolute status
 points. The default year view uses Monday-start weekly intervals, as does six
 months; last month uses days and all time uses calendar months. Finite ranges
 subtract calendar months with day clamping; partial first/last intervals are
@@ -1579,7 +1556,7 @@ month when empty. Epoch/year-9999 bounds keep conversion/allocation bounded.
 An explicit opening lifetime state and absolute end-of-interval values preserve
 the cumulative y-origin and carry all lines through empty intervals.
 
-`Storage::statistics_buckets` wraps both status/link replay and date-grouped
+`Storage::statistics_buckets` wraps both status replay and date-grouped
 analyzed completions in one deferred read transaction. Each command contributes
 its surviving occurrence rows and time once, including zero-word pages; pending,
 unused and unanalyzed legacy work is excluded. Historical document/vocabulary
@@ -1614,13 +1591,12 @@ values; return-to-tab invalidation also observes changes from another session.
 Document deletion preserves history. No schema, persistent counter, dependency or
 history semantics change. Existing typed storage error mapping is retained and
 statistics errors do not overwrite document/import errors. Kotlin/JNI serialization
-preserves exact unsigned occurrence/time/status/form values, including above 2^53.
+preserves exact unsigned occurrence/time/status values, including above 2^53.
 
 ## Statistics Compose overview and drilldowns
 
-The Statistics destination renders three tappable charts: cumulative lifetime
-Japanese occurrences, five absolute status lines and Known surface/dictionary-form
-lines. Four timeframe chips retain the core selection; Settings, navigation and
+The Statistics destination renders two tappable charts: cumulative lifetime
+Japanese occurrences and five absolute status lines. Four timeframe chips retain the core selection; Settings, navigation and
 Activity recreation keep the selected drilldown for the current session. Back
 returns from a drilldown to the overview. Error Retry dispatches only the typed
 Retry event; recomposition/lazy loads reuse the existing query's cutoff and never
@@ -1633,9 +1609,8 @@ inside a bucket. The y-range includes all opening and bucket values. Keep exact
 ULong values for labels, accessibility summaries and drilldown rows; subtract the
 unsigned minimum before converting relative drawing distances, so large lifetime
 counts with small changes remain distinct. Empty/constant datasets remain finite.
-Status strokes reuse the reader/Library palette, including graph-only Known green;
-Known dictionary forms use a contrasting dashed line. Exact, labeled interval rows
-and chart summaries complement the Canvas. No chart dependency, platform query,
+Status strokes reuse the reader/Library palette, including graph-only Known green.
+Exact, labeled interval rows and chart summaries complement the Canvas. No chart dependency, platform query,
 schema, stored counter or change to completion/history semantics is introduced.
 
 ## Vocabulary browser repository

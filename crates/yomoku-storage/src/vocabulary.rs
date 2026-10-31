@@ -178,31 +178,6 @@ pub(crate) fn register_vocabulary_in<'a>(
     Ok(created)
 }
 
-/// Retain resolved analyzer evidence for existing entries only. The caller owns
-/// the validated analysis/registration/completion transaction. No rescan or
-/// surface fallback: unresolved observations never erase earlier evidence.
-pub(crate) fn link_dictionary_forms_in<'a>(
-    connection: &Connection,
-    tokens: impl IntoIterator<Item = (&'a str, Option<&'a Surface>)>,
-) -> Result<(), StorageError> {
-    let mut resolved = tokens
-        .into_iter()
-        .filter_map(|(surface, form)| form.map(|form| (surface, form)))
-        .peekable();
-    if resolved.peek().is_none() {
-        return Ok(());
-    }
-    let mut insert = connection.prepare(
-        "INSERT INTO vocabulary_dictionary_forms (vocabulary_id, dictionary_form)
-         SELECT id, ?2 FROM vocabulary WHERE surface = ?1
-         ON CONFLICT (vocabulary_id, dictionary_form) DO NOTHING",
-    )?;
-    for (surface, dictionary_form) in resolved {
-        insert.execute((surface, dictionary_form.as_str()))?;
-    }
-    Ok(())
-}
-
 /// Caller owns the transaction, including any selection/provenance validation.
 pub(crate) fn set_vocabulary_status_in(
     connection: &Connection,

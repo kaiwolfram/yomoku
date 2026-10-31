@@ -1,9 +1,6 @@
-use yomoku_core::{
-    document::VocabularyId,
-    statistics::{
-        statistics_buckets, LifetimeReadingTotals, ReadingTimelinePoint, StatisticsBuckets,
-        StatisticsTimeframe, StatusTimelineBuilder, StatusTimelinePoint,
-    },
+use yomoku_core::statistics::{
+    statistics_buckets, LifetimeReadingTotals, ReadingTimelinePoint, StatisticsBuckets,
+    StatisticsTimeframe, StatusTimelineBuilder, StatusTimelinePoint,
 };
 
 use crate::{vocabulary::decode_status, Storage, StorageError};
@@ -11,7 +8,6 @@ use crate::{vocabulary::decode_status, Storage, StorageError};
 mod status_row;
 
 pub(super) const STATUS_EVENTS_SQL: &str = include_str!("statistics/status_events.sql");
-pub(super) const STATUS_LINKS_SQL: &str = include_str!("statistics/status_links.sql");
 
 // One statement gives both totals the same SQLite snapshot. Sum time separately
 // from occurrences: joining before SUM would multiply repeated words' time and
@@ -57,7 +53,7 @@ impl Storage {
     /// Replay surviving registration/manual/completion history in a single read
     /// snapshot. Counts are absolute, coalesced per timestamp, without date bins.
     /// Document deletion preserves points; vocabulary deletion recalculates them.
-    /// Durable dictionary-form links share the same snapshot. No content,
+    /// No content,
     /// analyzer, dictionary data, cached counts or JSON is loaded.
     pub fn vocabulary_status_timeline(&self) -> Result<Vec<StatusTimelinePoint>, StorageError> {
         let transaction = self.connection.unchecked_transaction()?;
@@ -142,38 +138,10 @@ fn reading_timeline(
     Ok(points)
 }
 
-fn status_timeline(
+pub(super) fn status_timeline(
     transaction: &rusqlite::Transaction<'_>,
 ) -> Result<Vec<StatusTimelinePoint>, StorageError> {
-    // Read links before replay, without multiplying events by link count. The
-    // explicit transaction keeps both reads in one snapshot. Separate statements
-    // let events stream in primary-key order without UNION's temporary sort.
-    let timeline = status_links(transaction)?;
-    status_events(transaction, timeline)
-}
-
-pub(super) fn status_links(
-    transaction: &rusqlite::Transaction<'_>,
-) -> Result<StatusTimelineBuilder, StorageError> {
     let mut timeline = StatusTimelineBuilder::default();
-    let mut statement = transaction.prepare(STATUS_LINKS_SQL)?;
-    let mut rows = statement.query([])?;
-    while let Some(row) = rows.next()? {
-        timeline
-            .link_dictionary_form(
-                VocabularyId::try_from(row.get::<_, i64>(0)?)
-                    .map_err(|_| StorageError::InvalidVocabulary)?,
-                row.get(1)?,
-            )
-            .map_err(|_| StorageError::InvalidVocabulary)?;
-    }
-    Ok(timeline)
-}
-
-pub(super) fn status_events(
-    transaction: &rusqlite::Transaction<'_>,
-    mut timeline: StatusTimelineBuilder,
-) -> Result<Vec<StatusTimelinePoint>, StorageError> {
     let mut statement = transaction.prepare(STATUS_EVENTS_SQL)?;
     let mut rows = statement.query([])?;
     while let Some(row) = rows.next()? {

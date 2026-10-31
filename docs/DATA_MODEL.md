@@ -1487,7 +1487,7 @@ Calendar buckets, worker/FFI transport and Compose consumption are described bel
 
 Pure `statistics::statistics_buckets` accepts an explicit UTC `as_of_unix_ms`,
 chronological per-date analyzed reading increments and the validated absolute
-status/Known-form timeline. `StatisticsTimeframe` defaults to `LastYear`.
+five-status timeline. `StatisticsTimeframe` defaults to `LastYear`.
 `LastMonth` uses daily bins; `LastSixMonths` and `LastYear` use Monday-start weeks;
 `AllTime` uses calendar months. Finite ranges begin at midnight one/six/twelve
 calendar months before the supplied UTC date, clamping the day to that month's
@@ -1498,16 +1498,16 @@ future-only history shows the current month. Clamp ranges at the Unix epoch.
 UTC is the initial calendar policy; no device timezone or DST conversion occurs.
 
 Each `StatisticsBucket` contains explicit start/end-exclusive timestamps and
-absolute `StatisticsValues`: cumulative lifetime occurrences/time, five status
-counts and Known dictionary forms. The separate `opening` value is the lifetime
-state strictly before the visible range. Events exactly on a boundary belong to
+absolute `StatisticsValues`: cumulative lifetime occurrences/time and five status
+counts. The separate `opening` value is the lifetime state strictly before the
+visible range. Events exactly on a boundary belong to
 the following interval; all equal-time reading events are combined before input.
 Empty intervals carry prior values. Changing timeframe never resets cumulative
-y-values or converts statuses/forms to per-bucket deltas. Demotions can reduce
-status/form lines; occurrence totals retain repetitions and rereads.
+y-values or converts statuses to per-bucket deltas. Demotions can reduce
+status lines; occurrence totals retain repetitions and rereads.
 
 `Storage::statistics_buckets(&mut self, timeframe, as_of)` opens one deferred read
-transaction for the existing validated status/link replay and a chronological
+transaction for the existing validated status replay and a chronological
 reading query. Thus all lines share one SQLite snapshot, with no live text,
 dictionary, analyzer, JSON or cached-count loading. Group analyzed completions by
 completion date, count surviving occurrences per command and sum time once per
@@ -1525,21 +1525,20 @@ unknown event versions, corrupt durations and overflow fail without repairing or
 returning partial data. Retained worker/FFI transport is described below; Compose
 renders these values without additional queries or persisted chart caches.
 
-## Read-only vocabulary status and Known-form timeline (phase 5)
+## Read-only vocabulary status timeline (phase 5)
 
 `Storage::vocabulary_status_timeline(&self)` streams `vocabulary_status_events`
 in primary-key order through the pure `statistics::StatusTimelineBuilder`.
-One deferred read transaction supplies a consistent snapshot across separate
-durable dictionary-form link and ordered event statements, including v1 completion,
+One deferred read transaction supplies ordered events, including v1 completion,
 analysis and optional effective-reservation headers for completion-caused changes.
 Registration/manual events must have no completion reference; completions must be
 New→Known with valid analyzed provenance. Unknown versions/causes/statuses,
 negative dates, nonincreasing IDs, missing/duplicate registrations, no-op changes
 and broken old→new chains fail without returning partial points or repairing data.
-Links load before events; events stream in primary-key order without sorting an
-ordered UNION. Calendar statistics share their existing transaction; the
-standalone timeline opens and closes its own. Concurrent vocabulary erasure/new
-generations cannot mix their links/events; failures release the read transaction.
+Events stream in primary-key order without sorting an ordered UNION. Calendar
+statistics share their existing transaction; the standalone timeline opens and
+closes its own. Concurrent vocabulary erasure/new
+generations cannot mix their events; failures release the read transaction.
 Old/new statuses and causes decode from borrowed row-local SQLite TEXT, with
 NULL permitted only for the absent old status. BLOBs, malformed UTF-8 and
 nonliteral spellings fail without coercion or writes. No borrowed text escapes
@@ -1560,74 +1559,39 @@ the maximum of its recorded date and preceding projected date. A later committed
 change never precedes that entry's earlier state; unrelated entries keep their
 own dates. Raw stored timestamps/history remain exact and immutable. Deltas at
 projected dates use exact integers and produce nonnegative unsigned counts.
-Replay retains entry/link state, status deltas per projected date and form deltas
-per affected spelling/date, rather than every historical row. Calendar buckets
-apply to this validated timeline as described below.
+Replay retains entry state and status deltas per projected date, rather than
+every historical row. Calendar buckets apply to this validated timeline.
 
 Deleting a document leaves the entire timeline, including unread manual Known
 entries. Vocabulary deletion erases all that ID's registration/transitions and
 therefore recalculates its full history; no existing content is rescanned.
 A later explicit import or actual completion registers a fresh ID as New.
-Known surface counts are present in each point's `counts.known`;
-`known_dictionary_forms` counts distinct exact spellings with any Known linked
-surface. Shared links count once until the last linked Known surface is demoted.
-Unresolved surfaces contribute no form; readings never participate in identity.
-Multiple automatic context resolutions all participate, without Unicode
-normalization or selecting an arbitrary context. Migration-0020 links describe
-the surviving vocabulary generation without an evidence timestamp: newly retained
-links apply throughout that generation's replay, including earlier Known dates.
-No acquisition date is inferred from snapshots, source dates or completion time.
-
-The SQL statement streams links first, then events once in ID order, avoiding an
-event-by-link Cartesian expansion. The core collects signed Known reference-count
-deltas per form/projected date and applies them chronologically. A form enters or
-leaves the distinct total only when its number of Known linked surfaces crosses
-zero. Equal-date handoffs coalesce. Using shared-form state in global event-ID
-order would be incorrect when unrelated entries have different wall dates.
-
-Core/SQLite tests cover these semantics; the existing schema-5–20 matrix verifies
-timelines and Known-form counts after upgrade, document deletion and reopen.
+Known status counts remain in each point's `counts.known` for the five-status chart.
 The read API works with `PRAGMA query_only = true` and leaves DB bytes unchanged.
 
-## Durable vocabulary dictionary-form evidence (migration 0020)
+## Removed Known forms statistics (migration 0023)
 
-`vocabulary_dictionary_forms` has primary key `(vocabulary_id, dictionary_form)`
-and a vocabulary FK with `ON DELETE CASCADE`. A form is a nonempty, exact written
-spelling; readings, source IDs and live analysis IDs do not participate in its
-identity. Multiple analyzer-resolved spellings for one surface are retained as
-separate associations rather than selecting an arbitrary reading/context. Missing
-metadata contributes no row and never erases previous resolved evidence. Manual
-splits and custom dictionary entries do not invent analyzer links.
+The user removed the separate Known surface/dictionary-form chart on 2026-10-31.
+`StatisticsValues` and `StatusTimelinePoint` no longer include a dictionary-form
+aggregate, and replay no longer loads links or maintains per-form reference counts.
+The first MVP has two charts: cumulative occurrences and all five vocabulary statuses.
 
-New validated A/B/C snapshots retain evidence for already registered surfaces;
-an identical snapshot retry remains write-free. Analyzed imports (all formats),
-new registered boundary edits and actual original/effective completions retain
-their own token evidence after registration, in the same transaction. A snapshot
-alone never creates vocabulary. Effective registration uses only the selected
-rule's eligible tokens and their exact metadata; completion uses only the frozen
-completed page. Reservations and read projections add no links. Raw surface-only
-registration does not search saved analyses, so an erased vocabulary generation
-cannot recover its associations from a snapshot retry or reader reopen.
+Migration 0023 drops `vocabulary_dictionary_forms`, the association table introduced
+by migration 0020 solely for that aggregate. Imports, A/B/C snapshot saves, registered
+segmentation edits and original/effective completions no longer populate it. Keep
+historical migrations unchanged so installed databases upgrade transactionally.
+Dropping this derived table does not erase vocabulary, status/encounter/completion
+history, documents, analysis snapshots, custom definitions or Anki obligations.
+No reset, vacuum or history rewrite is required. Existing dictionary-form metadata
+in analyzed tokens and completed occurrences remains for lookup and provenance.
 
-Document deletion retains links even for unread words, while vocabulary deletion
-erases its links alongside status/encounter history. Later actual registration
-gets a fresh ID; new analyzer evidence can link that generation. Link insertion
-failure or deferred COMMIT failure rolls back the enclosing operation completely.
-
-Migration 0020 backfills distinct resolved Japanese metadata from surviving live
-snapshots joined to currently registered exact surfaces, plus retained reading
-occurrences joined by vocabulary ID. It creates no entries/events, loads no
-analyzer and rewrites no history. Unread metadata already deleted before upgrade
-is unavailable and cannot be reconstructed. The one-time recovery uses available
-snapshots; older schemas did not associate snapshot tokens with vocabulary
-generations. Reopening schema 20 never repeats that recovery. The read-only
-timeline uses these links as described above; typed transport remains future work.
+Tests cover fresh databases/reopen, every historical schema upgrade, a populated
+schema-22 upgrade preserving all other table contents, rollback after the drop,
+exact migration retry, integrity and foreign-key checks.
 
 ## Required future schema constraints
 - Future import repositories must extend the identity/immutable-text and durable
   chapter/byte-offset contract above to multiple chapters.
-- Use migration-0020 analyzer links for Known dictionary-form aggregates.
-  Reading never participates in dictionary-form identity.
 - Document deletion removes content/progress but preserves historical provenance,
   encounters and global vocabulary. Reimport creates fresh document progress.
 - Vocabulary deletion removes its encounter/status history, recalculates statistics
@@ -1835,7 +1799,7 @@ an earlier edit's reload requirement onto the new reader page. No data change.
 selected timeframe (LastYear initially), optional desired query, loading flag,
 optional existing `DocumentError` and optional `StatisticsBuckets`. Chart values
 include the explicit opening lifetime state and each interval's absolute reading,
-five-status and Known dictionary-form values. Unsigned counts/time remain u64
+five-status values. Unsigned counts/time remain u64
 through generated Kotlin ULong; timestamps remain signed i64/Long.
 
 The three shell events are LoadStatistics(as-of), SetStatisticsTimeframe(timeframe,
@@ -2098,10 +2062,9 @@ selections produce no events. The payload retains IDs/status/date across retries
 there is no new persistent command receipt or cross-command deduplication scheme.
 
 `delete_vocabulary_entries(ids)` uses one immediate transaction and existing
-foreign-key cascades to erase those generations' status events, occurrences and
-durable dictionary-form links. It retains completion/time/analysis provenance,
+foreign-key cascades to erase those generations' status events and occurrences. It retains completion/time/analysis provenance,
 live documents/positions/token snapshots and unrelated vocabulary. Derived
-occurrence/status/Known-form charts recalculate from surviving rows; completed
+occurrence/status charts recalculate from surviving rows; completed
 page time remains. Statement/cascade/deferred-COMMIT failures roll back the whole
 selection. Empty/repeated/absent IDs are harmless, and bound per-ID statements
 avoid SQLite parameter limits.

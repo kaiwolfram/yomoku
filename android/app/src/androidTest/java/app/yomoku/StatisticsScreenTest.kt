@@ -27,6 +27,7 @@ class StatisticsScreenTest {
     @Test
     fun overviewDrilldownsExactValuesAndAllTimeframeEvents() {
         render()
+        compose.onNodeWithTag("statistics_card_KNOWN").assertDoesNotExist()
         compose.onNodeWithTag("statistics_timeframe_LASTYEAR").assertIsSelected()
         StatisticsTimeframe.entries.forEach { timeframe ->
             compose.onNodeWithTag("statistics_timeframe_${timeframe.name}").performClick()
