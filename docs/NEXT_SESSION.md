@@ -1,20 +1,22 @@
 # Resume here
-Updated: 2026-10-31. Local optimized release APK ready for physical testing.
+Updated: 2026-10-31. User phone trial acceptable; resume implementation next session.
 Commit guidance: explanatory bodies; merges include provenance. Keep verification
 results in session/progress docs and reports, out of commit message bodies.
 
 ## User checkpoints
 - Announce when no plan steps remain; ask when product opinions/clarifications
   are needed. Recommend physical testing when it is more useful than more code.
-- A short physical arm64 reader/import/dictionary trial is now recommended:
-  local workflows are implemented; device usability/performance/lifecycle remain
-  unverified. User chooses timing; existing physical validation stays unchecked.
+- User reports the app works reasonably well on their physical phone. Many small
+  polish issues can wait; continue the implementation plan next session.
+- Device/Android/build and individual workflows/measurements were not reported.
+  Keep detailed physical validation unchecked; do not block implementation on it.
 
 ## Physical test APK
 - `target/releases/yomoku-0.1.0-0374365-release.apk` (~242 MiB), Android 10+,
   arm64/x86_64; optimized Rust + release app, locally development-signed.
 - PASS: assembleRelease/lintRelease, signature, ZIP/ELF alignment, CRC/assets/probe
-  exclusion. No device run. Rebuild commands: DEVELOPMENT.md final section.
+  exclusion. User reports acceptable phone use; no agent-run hardware checks.
+  Rebuild commands: DEVELOPMENT.md final section.
 
 ## Current slice
 - Native BeginAnkiRecoveryRead(Note|Model) retains one immutable handle with the
@@ -52,17 +54,14 @@ results in session/progress docs and reports, out of commit message bodies.
   unowned; do not use CheckAndAdd to bypass durable gates.
 - Isolated Android worker provider adapters have no app call site or real-provider
   claim. API evidence: ANKIDROID_API.md, pinned 2.25.3; no Anki dependency/minimum
-  adopted. Nostr config empty; ask Q188 before forwarding. Physical arm64 deferred.
+  adopted. Nostr config empty; ask Q188 before forwarding.
 
 ## Next tasks (ordered)
-1. User-run physical APK trial: import/paste, dictionary/status, navigation and
-   reopen persistence, background/rotation and performance. Record device/Android/
-   source build and failures; physical validation stays unchecked until observed.
-2. Connect native recovery handles and prepared intent to typed Android/FFI
+1. Connect native recovery handles and prepared intent to typed Android/FFI
    read-only dispatch/preflight. Capture handle before read; validate full
    observations and provider/permission/deck/model failures. Route durable begin/
    outcome commits before one live invocation; test death/stale/lost callbacks.
-3. Add recovery/error/explicit Retry projection, deck settings, Add to Anki and
+2. Add recovery/error/explicit Retry projection, deck settings, Add to Anki and
    existing-note actions after gates. Validate disposable real collection/browser/
    return/query cost. Performance/accessibility matrix remains in the plan.
 

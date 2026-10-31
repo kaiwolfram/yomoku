@@ -3979,3 +3979,15 @@ and /tmp/yomoku-browser-profile-*. No emulator started.
 - No device install/run/instrumentation or host tests rerun. Physical validation
   and all unfinished plan items remain unchecked. Handoff prioritizes user trial
   and retains the next native/UI integration work; documented exact release steps.
+
+## 2026-10-31 — User physical-phone feedback and next-session priority
+
+- User reports the app works reasonably well on their physical phone, with many
+  small polish issues to address later. Resume the implementation plan next
+  session, starting with typed Android/FFI Anki reads/preflight and durable gates.
+- Device/Android/build, specific tested workflows and performance/lifecycle
+  observations were not supplied. Recorded the positive usability report without
+  closing the broader physical-validation task. No immediate clarification is
+  needed to continue implementation; polish is deferred at the user's request.
+- Documentation only: handoff, plan and session log updated; diff/whitespace
+  checks pass. No app tests or builds rerun.
