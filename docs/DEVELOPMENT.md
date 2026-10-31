@@ -7810,3 +7810,39 @@ No Rust/schema/dependency/protocol/UI change or real AnkiDroid/browser/collectio
 compatibility claim. Host Rust/Clippy/Rustfmt, independent Full-loader, physical
 device, broader UI/lifecycle and performance checks were not run. Next: durable
 pending/uncertain recovery, typed retained app/FFI bridge and settings/UI wiring.
+
+
+## Durable Anki note-submission journal
+
+Verified 2026-10-31 with the pinned Rust PATH workaround above; no Android or
+provider installation is needed. The journal remains isolated from app/FFI/UI.
+
+```sh
+cargo test -p yomoku-storage anki --locked --offline
+cargo test --workspace --all-features --locked --offline --quiet
+cargo build --workspace --locked --offline
+cargo clippy --workspace --all-targets --all-features --locked --offline -- -D warnings
+cargo fmt --all -- --check
+git diff --check
+```
+
+PASS: 14 new journal/payload cases; 865 workspace tests, 17 opt-in fixtures ignored;
+workspace build, strict Clippy, Rustfmt and diff. Coverage includes exact Unicode/
+HTML/four-field/large signed-64 ID and old-layout restoration, interrupted insertion
+and placement, failed/empty reconciliation, duplicate/stale callbacks, concurrent
+preparation, ID exhaustion, statement/deferred-COMMIT/migration rollback, invalid/
+unknown payloads and restore errors, reader-data deletion independence and unchanged
+reader/vocabulary/statistics. Reopen/recovery preserves database bytes. Distinct
+nonserializable live callback tokens cannot be reconstructed from recovery IDs.
+No provider mutation or restart replay is performed by this repository.
+
+Initial focused compilation used a nonexistent list helper; corrected to the
+existing repository API. Initial workspace run found four historical migration
+fixtures needing schema-0021 expectations/table teardown; corrected and final
+checks above pass. No open blocker or escalation. Logs:
+`/tmp/yomoku-anki-journal-{focused,workspace,build,clippy}.log`.
+No dependencies, Event/ViewModel/FFI protocol or Kotlin source changed. No Android
+APK/lint/emulator, real-provider/browser/collection, separate Full-loader, physical
+arm64, broad lifecycle or performance checks were run. Next: retained app-owned
+restore/commit gates and typed provider dispatch, including durable model-creation
+uncertainty, before enabling configured-deck settings or Add to Anki.

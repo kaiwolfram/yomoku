@@ -3,6 +3,7 @@
 //! Paste repositories use pure domain values. Runtime effect handling is separate.
 
 mod analysis;
+pub mod anki;
 mod completions;
 pub mod custom_dictionary;
 pub mod dictionary;
@@ -147,6 +148,11 @@ const MIGRATIONS: &[Migration] = &[
         version: 20,
         name: "0020_vocabulary_dictionary_forms",
         sql: include_str!("../migrations/0020_vocabulary_dictionary_forms.sql"),
+    },
+    Migration {
+        version: 21,
+        name: "0021_anki_submissions",
+        sql: include_str!("../migrations/0021_anki_submissions.sql"),
     },
 ];
 

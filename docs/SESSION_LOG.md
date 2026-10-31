@@ -3824,3 +3824,27 @@ and /tmp/yomoku-browser-profile-*. No emulator started.
   independent Full-loader, real collection/browser, physical-device, broader
   UI/lifecycle/performance run. Next: durable pending/uncertain recovery with no
   restart mutation replay, typed app/FFI ownership and deck/settings/UI handling.
+
+
+## 2026-10-31 — Durable Anki note-submission journal
+
+- Started clean; continued the persistence prerequisite as an independent slice.
+  Added pure validated/versioned `AnkiSubmission` data with frozen exact note,
+  model/layout/deck and a migration-0021 SQLite journal. Only committed live
+  preparation creates a nonserializable submission callback token; recovery
+  returns separate read-only reconciliation data/IDs and never replays mutations.
+- Preserve pending/uncertain obligations and known note IDs across interrupted
+  insertion/placement. Empty/failed reads keep insertion blocked. Exact existing
+  IDs resolve existence without claiming placement. Reject duplicate/stale
+  callbacks, serialize concurrent preparation, never reuse committed IDs and keep
+  obligations independent of reader/vocabulary deletion. Reader/vocabulary/
+  statistics remain unchanged. Terminal payloads/results remain stored.
+- PASS: 14 new host cases, 865 workspace tests/17 ignored fixtures, workspace
+  build, strict Clippy, Rustfmt and diff. Initial helper-name compile error and
+  four historical migration fixture failures corrected; final checks pass.
+  No escalation/open blocker. Logs: /tmp/yomoku-anki-journal-{focused,workspace,
+  build,clippy}.log. Updated plan, architecture/data model, decisions and handoff.
+- No app/Event/FFI/provider call site, Kotlin/dependency change, Android checks,
+  real collection/browser, independent Full-loader, physical-device or broader
+  lifecycle/performance run. Next: retained app-owned restore/commit gates and
+  typed provider bridge, model-creation recovery, then deck/settings/UI wiring.

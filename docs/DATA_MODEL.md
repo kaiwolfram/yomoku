@@ -1853,6 +1853,47 @@ visible minimum. UTC dates and actual elapsed x spacing match the native bucket
 ranges. The shell saves only the selected drilldown; native state still owns the
 timeframe, query, loading/error and exact Retry cutoff.
 
+## Durable Anki note submissions (migration 0021)
+
+`anki_submissions` is an external-write journal, never a retry queue. Rows contain
+an `AUTOINCREMENT` positive signed-64 ID, immutable version-1 JSON payload, state,
+optional positive signed-64 known note ID and optional JSON existing-note IDs.
+The payload retains raw surface, all four escaped fields, external deck/model IDs
+and actual model name/ordered fields/CSS/card/front/back strings. Normal model,
+sort field zero and one forward card are fixed layout invariants of this version.
+No current selection, dictionary query, default deck or current layout constants
+are consulted during recovery. Unknown/malformed versions, ambiguous fields,
+nonpositive IDs, NUL and invalid exact-first-field identity fail closed.
+
+| State | Meaning | Next permitted journal transition |
+| --- | --- | --- |
+| `pending` | Committed before a single live provider call; outcome may be lost | Live callback, or read-only reconciliation |
+| `uncertain` | Submission/placement may have happened | Read-only reconciliation |
+| `not_inserted` | Live callback establishes no mutation was submitted | Terminal |
+| `added` | Live callback verifies note and target-deck placement | Terminal |
+| `existing` | Verified exact-surface note IDs establish existence | Terminal; no placement-success assertion |
+
+A unique partial index permits only one pending/uncertain record across the
+database. Preparation, callback acceptance and reconciliation use immediate
+transactions; only a committed preparation returns a nonserializable live token.
+Only that token can submit a provider callback. Recovery reads return data and
+the durable ID, with no live token, mutation command or automatic state change.
+Both pending and uncertain rows recover as reconciliation-only obligations.
+Failed/empty reconciliation sets/keeps uncertainty and preserves any known ID;
+existing-note reconciliation retains all verified matching IDs, including when
+they differ from the known inserted ID. Duplicate/old callbacks are rejected by
+durable ID/state. Failed statement/commit leaves the previous record intact.
+Restore errors never authorize a fresh submission. Terminal records and their
+payload/results remain stored; no delete/pruning API is provided. IDs do not
+reuse committed values, even across reopen. There are no document/vocabulary
+foreign keys, so erasing local reader data cannot erase the external obligation.
+
+This repository is not wired into app/Event/FFI or Android. The retained owner
+must authenticate current selections, gate on restore, commit before invoking
+once and persist the classified outcome before releasing its live obligation.
+Model-creation uncertainty needs separate durable handling before live creation.
+No Anki replay/repair, vocabulary/history mutation or backup behavior is added.
+
 ## Read-only Vocabulary browser (schema 0020 unchanged)
 
 `Storage::vocabulary_page(&VocabularyQuery, offset)` returns a full matching count,

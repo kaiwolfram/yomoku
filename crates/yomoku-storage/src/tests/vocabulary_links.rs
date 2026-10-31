@@ -646,7 +646,7 @@ fn vocabulary_links_upgrade_recovers_unread_snapshots_and_deleted_document_occur
     let expected = links(&storage);
     let totals = storage.lifetime_reading_totals().unwrap();
     let timeline = storage.vocabulary_status_timeline().unwrap();
-    storage.connection.execute_batch("DROP TABLE vocabulary_dictionary_forms; DELETE FROM schema_migrations WHERE version = 20;").unwrap();
+    storage.connection.execute_batch("DROP TABLE anki_submissions; DROP TABLE vocabulary_dictionary_forms; DELETE FROM schema_migrations WHERE version >= 20;").unwrap();
     drop(storage);
     // Inject failure after table creation/backfill, then prove byte-exact rollback.
     let before = fs::read(database.path()).unwrap();

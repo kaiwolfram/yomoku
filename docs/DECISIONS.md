@@ -4474,3 +4474,32 @@ existence rather than completed placement, and never authorizes insertion after
 an empty result. Before wiring app calls, the durable owner must persist pending
 submission, enforce one invocation and restore read-only uncertainty on restart.
 Real-provider/Binder/collection/browser behavior and query cost remain unverified.
+
+## 2026-10-31 — Durable Anki note-submission prerequisite
+
+Continue persistence before app/provider/UI activation. Keep a pure, validated
+`AnkiSubmission` snapshot with raw surface, four exact escaped fields, positive
+external deck/model IDs and the actual full model layout. Persist a versioned
+shape and reject unknown versions/fields rather than substitute new layout
+constants after upgrade. Capture only after current-owner selection validation;
+restoring content cannot validate a stale popup or authorize provider writes.
+No new dependency, FFI payload or platform I/O is added to core.
+
+Migration 0021 adds a retained SQLite submission journal, with one
+app-wide unresolved slot and nonreused committed IDs. Immediate transactions
+commit pending state before a live provider invocation and serialize outcomes.
+Successful preparation alone creates a nonserializable live callback token;
+recovery returns only data/ID for read-only reconciliation. Keep terminal rows
+and payload/results; introduce no cleanup/destructive semantics. No reader or
+vocabulary foreign keys may cascade away an external obligation.
+
+Pending means the provider might have been invoked, including a lost commit or
+callback response. Restore pending/uncertain records identically as read-only
+obligations. Failed/empty reads retain uncertainty; known note IDs survive.
+Exact-surface existing IDs resolve existence without asserting/repairing deck
+placement. Only a still-pending live callback may establish known pre-submission
+failure or verified insertion/placement. Duplicate, old and post-reconciliation
+callbacks cannot release a newer obligation. Never treat failed restore/commit
+as permission to invoke. This isolated repository does not invoke Anki or replay
+mutations; app-owned restore/commit gates, model-creation recovery and live
+provider/Event/FFI/UI integration remain necessary before enabling the action.

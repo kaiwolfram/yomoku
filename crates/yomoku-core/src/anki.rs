@@ -8,7 +8,9 @@ use crate::{
 
 mod export;
 mod projection;
+mod submission;
 pub use export::*;
+pub use submission::*;
 
 /// One forward card, with the exact written surface as its first field.
 /// These are original templates, not copied Yomitan assets. Android must verify

@@ -1845,11 +1845,41 @@ remain existing notes, not permission to insert. No provider completion fence or
 atomic check-and-add guarantee is invented to permit a retry after an empty read.
 
 This session is not yet owned by the app Model or exposed through Event/FFI.
-Settings, mutating provider adapter and Compose wiring remain open. Before enabling the
-action, preserve pending/uncertain insertion obligations durably across process
-death; recreating an empty in-memory session cannot establish safe retry. Do not
+Settings, retained app/provider dispatch and Compose wiring remain open. The
+schema-0021 journal below supplies isolated durable note-submission storage;
+the app must own its restore/commit gates before enabling the action. Recreating
+an empty in-memory session cannot establish safe retry. Do not
 advertise runtime compatibility until fake-provider and disposable-collection
 tests verify the actual adapter and its error classification.
+
+`AnkiSubmission` freezes a prepared note, positive signed-64 external model/deck
+IDs and the complete expected four-field/one-card layout. Versioned persistence
+retains the actual layout strings across app upgrades. Deserialization validates
+surface/first-field identity, field count and provider delimiter/NUL constraints,
+layout shape and IDs; unknown versions/fields fail. It does not authenticate a
+current reader selection; the eventual retained owner must do that before capture.
+
+`yomoku-storage::anki` owns the migration-0021 submission journal. Its immediate
+transactions serialize preparation and callback/reconciliation writes. Commit a
+pending record before the one live provider invocation; an unresolved record
+blocks another preparation even for identical content. Only successful preparation
+returns a nonserializable `AnkiLiveSubmission` token for accepting the submission
+callback. Recovery returns a separate `AnkiRecovery` data value/ID usable only for
+read-only reconciliation; it cannot reconstruct that token. Neither repository
+nor recovery invokes the provider. Host code must never queue/replay a mutation
+from these records or treat a restore/commit error as an empty journal.
+
+Pending/uncertain recovery retains the same exact payload/deck and any durably
+reported note ID after interrupted insertion or placement. Empty/failed reads keep
+the obligation. Verified exact-surface existing notes resolve existence, without
+asserting target-deck placement or repairing it. Known pre-submission failure,
+verified insertion/placement and existing-note outcomes are terminal. Durable IDs
+are never reused, repeated/stale callbacks cannot release newer obligations, and
+reader/vocabulary deletion cannot cascade to the journal. Terminal records retain
+their frozen content/results; no pruning API or destructive policy is introduced.
+See DATA_MODEL.md for the stored shape. This remains an isolated prerequisite:
+app/Event/FFI ownership, restore gating, model-creation recovery and Android/UI
+integration are still required before any live mutation.
 
 Android's unconnected `AnkiProviderReader` implements the read-only prerequisite:
 fresh availability/spec/permission checks, deck enumeration, bound exact-first-

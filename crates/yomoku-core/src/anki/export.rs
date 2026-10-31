@@ -39,6 +39,10 @@ provider_id!(
     AnkiNoteId,
     "An external AnkiDroid note ID, never a Yomoku ID."
 );
+provider_id!(
+    AnkiModelId,
+    "An external AnkiDroid model ID, never a Yomoku ID."
+);
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum AnkiSelection {
