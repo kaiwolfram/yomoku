@@ -1,5 +1,5 @@
 # Resume here
-Updated: 2026-10-31. Native Anki recovery read callback ownership verified.
+Updated: 2026-10-31. Local optimized release APK ready for physical testing.
 Commit guidance: explanatory bodies; merges include provenance. Keep verification
 results in session/progress docs and reports, out of commit message bodies.
 
@@ -9,6 +9,12 @@ results in session/progress docs and reports, out of commit message bodies.
 - A short physical arm64 reader/import/dictionary trial is now recommended:
   local workflows are implemented; device usability/performance/lifecycle remain
   unverified. User chooses timing; existing physical validation stays unchecked.
+
+## Physical test APK
+- `target/releases/yomoku-0.1.0-0374365-release.apk` (~242 MiB), Android 10+,
+  arm64/x86_64; optimized Rust + release app, locally development-signed.
+- PASS: assembleRelease/lintRelease, signature, ZIP/ELF alignment, CRC/assets/probe
+  exclusion. No device run. Rebuild commands: DEVELOPMENT.md final section.
 
 ## Current slice
 - Native BeginAnkiRecoveryRead(Note|Model) retains one immutable handle with the
@@ -49,23 +55,21 @@ results in session/progress docs and reports, out of commit message bodies.
   adopted. Nostr config empty; ask Q188 before forwarding. Physical arm64 deferred.
 
 ## Next tasks (ordered)
-1. Connect native recovery handles and prepared intent to typed Android/FFI
-   read-only dispatch/preflight. Capture handle before read; validate supported
-   full observations, permission/provider/deck/model failures and lost callbacks.
-   Then route durable note/model begin/outcome commits before one live invocation.
-   Test process death, stale callbacks and failed/lost begin/outcome commits.
-2. Add compact recovery/error/explicit Retry projection, configured deck, Add to
-   Anki/existing-note actions after dispatch gates. Handle absent/filtered deck and
-   incompatible/uncertain model. Validate disposable real collection/browser/
-   return/query cost before compatibility claims.
-3. Resume Android native-phase/100k Select All Compose and observer-free optimized
-   profiling plus accessibility/process-death matrix. Preserve full IDs/equality/
-   replay guards. Heavy-history/diverse-book/full-load/exact peaks remain.
+1. User-run physical APK trial: import/paste, dictionary/status, navigation and
+   reopen persistence, background/rotation and performance. Record device/Android/
+   source build and failures; physical validation stays unchecked until observed.
+2. Connect native recovery handles and prepared intent to typed Android/FFI
+   read-only dispatch/preflight. Capture handle before read; validate full
+   observations and provider/permission/deck/model failures. Route durable begin/
+   outcome commits before one live invocation; test death/stale/lost callbacks.
+3. Add recovery/error/explicit Retry projection, deck settings, Add to Anki and
+   existing-note actions after gates. Validate disposable real collection/browser/
+   return/query cost. Performance/accessibility matrix remains in the plan.
 
 ## Verification / blockers
 - PASS: 13 new cases; 50 focused core/runtime/FFI Anki cases; 932 workspace tests/
   17 opt-in fixtures ignored; build, strict Clippy, Rustfmt/diff. Kotlin generation
-  identical. Commands: DEVELOPMENT.md final section. Logs: /tmp/yomoku-anki-read-*.
-- No open blocker. No Android APK/lint/emulator, host Kotlin/JNI JVM, real provider/
+  identical. Native commands: DEVELOPMENT.md native-read section. Logs: /tmp/yomoku-anki-read-*.
+- Native-slice limits: no emulator/host Kotlin/JNI JVM, real provider/
   collection/browser, independent Full-loader, physical arm64, broader lifecycle
-  or performance check this slice. Native read/preparation remain unencodable.
+  or performance check. No open blocker; native read/preparation unencodable.

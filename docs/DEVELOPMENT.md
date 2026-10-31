@@ -201,8 +201,8 @@ and generated outputs. It generates Crux codecs and uses BoltFFI 0.30.1 to build
 and combine Rust static archives with generated JNI C. Outputs stay under
 `target/generated/{kotlin,native,android}`; BoltFFI also places temporary linker
 files under `crates/yomoku-ffi/target/`. All are ignored. Both development ABIs
-(`arm64-v8a`, `x86_64`) are always packaged. The Rust profile is currently debug;
-optimized release tooling remains a later task. `BOLTFFI_BIN` overrides the local
+(`arm64-v8a`, `x86_64`) are always packaged. The default Rust profile is debug;
+for an optimized local release, use the explicit release procedure below. `BOLTFFI_BIN` overrides the local
 CLI path; `ANDROID_NDK_HOME` can select an installation of the exact pinned NDK.
 The script fails early for another NDK or missing targets and uses locked/offline
 Cargo. Do not run native generation/build/test scripts concurrently.
@@ -8025,3 +8025,52 @@ APK/lint/emulator, host Kotlin/JNI JVM, real provider/collection/browser,
 independent Full-loader, physical arm64, broad lifecycle or performance checks.
 Next: actual typed Android/FFI read dispatch and prepared-export preflight,
 then durable begin/outcome gates before live model/note invocation and UI actions.
+
+
+## Local optimized release APK for physical-device testing
+
+The normal Gradle native preBuild task currently selects Rust debug. To build
+an optimized local release, generate codecs and package both native ABIs with
+BoltFFI's verified `pack android --release` option first, then exclude only that
+native task from Gradle. Always rebuild the native outputs before this command;
+otherwise `-x` could package stale libraries. Do not run another native/debug
+build concurrently. No release-signing configuration or publishing is enabled.
+
+With PATH/JAVA_HOME/GRADLE_USER_HOME/ANDROID_HOME set as above:
+
+```sh
+export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/30.0.16248370"
+export CARGO_NET_OFFLINE=true
+python3 tools/verify-sudachi-source.py
+cargo run -p yomoku-ffi --bin generate-kotlin --features facet_typegen --locked --offline -- target/generated/kotlin
+(cd crates/yomoku-ffi && ../../.local/bin/boltffi pack android --release --deny-skipped --cargo-arg=--locked --cargo-arg=--offline)
+./android/gradlew -p android :app:assembleRelease :app:lintRelease -x :app:buildRustBridge --offline --console=plain
+mkdir -p target/releases
+"$ANDROID_HOME/build-tools/36.0.0/zipalign" -f -P 16 4 android/app/build/outputs/apk/release/app-release-unsigned.apk target/releases/yomoku-release-aligned.apk
+"$ANDROID_HOME/build-tools/36.0.0/apksigner" sign --ks "$HOME/.android/debug.keystore" --ks-key-alias androiddebugkey --ks-pass pass:android --key-pass pass:android --out target/releases/yomoku-0.1.0-0374365-release.apk target/releases/yomoku-release-aligned.apk
+"$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose target/releases/yomoku-0.1.0-0374365-release.apk
+"$ANDROID_HOME/build-tools/36.0.0/zipalign" -c -P 16 4 target/releases/yomoku-0.1.0-0374365-release.apk
+```
+
+This local test APK uses the existing workstation Android development certificate.
+The `android` passwords above are the standard development-key defaults, not
+release credentials. Keep all key files and APKs untracked; publishing still
+requires approval. Filename revision `0374365` identifies the compiled source;
+update it when building later source revisions. Android minimum is API 29 (10).
+
+
+Verified 2026-10-31 from source revision `0374365`: both optimized Rust/JNI
+ABIs build; `assembleRelease` and strict `lintRelease` pass. The local signed APK
+is `target/releases/yomoku-0.1.0-0374365-release.apk` (253,482,688 bytes; approximately
+242 MiB). Its SHA-256 is recorded alongside it in `.apk.sha256`. APK signature
+verification, ZIP/ELF 16 KiB alignment, correct native machines/JNI exports,
+complete ZIP CRC scan, dictionary assets, non-debuggable manifest and debug-probe
+library/DEX exclusion pass. Minimum API 29; target API 36; arm64-v8a and x86_64.
+No physical-device installation/runtime, emulator execution or instrumentation
+was performed; physical validation remains unchecked. No Rust/application code
+changed or host suites rerun for this packaging-only checkpoint.
+
+The sandbox initially blocked Gradle's local file-lock socket; the same offline
+build succeeded with sandbox escalation. No open blocker. Logs:
+`/tmp/yomoku-phone-release-{native,gradle,signature,alignment,manifest,package}.log`;
+packaged-library details: `/tmp/yomoku-phone-release-check/`.

@@ -3961,3 +3961,21 @@ and /tmp/yomoku-browser-profile-*. No emulator started.
   those workflows are implemented, while hardware usability/performance/lifecycle
   remain unverified. User chooses timing; no task was checked off.
 - Documentation-only change; diff/whitespace checks pass. No code checks rerun.
+
+
+## 2026-10-31 — Local optimized release APK for physical testing
+
+- Started clean. Compiled both Rust/JNI ABIs with BoltFFI 0.30.1 `--release`,
+  then assembled the release app while excluding the debug-native preBuild task.
+  Signed the local installable copy with the existing development certificate;
+  no release key/configuration, publication, code or dependency change.
+- APK: target/releases/yomoku-0.1.0-0374365-release.apk (~242 MiB), source 0374365;
+  Android 10+, arm64-v8a/x86_64, bundled offline dictionaries. All artifacts and
+  keys remain untracked. SHA-256 sidecar accompanies the APK.
+- PASS: optimized native builds, assembleRelease, strict lintRelease, APK signature,
+  ZIP/ELF 16 KiB alignment, machines/JNI exports, CRC/assets/probe exclusion and
+  non-debuggable manifest; diff checks. Initial sandbox Gradle file-lock socket
+  failure resolved by escalation; no open blocker. Logs: /tmp/yomoku-phone-release-*.
+- No device install/run/instrumentation or host tests rerun. Physical validation
+  and all unfinished plan items remain unchecked. Handoff prioritizes user trial
+  and retains the next native/UI integration work; documented exact release steps.
