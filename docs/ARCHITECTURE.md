@@ -1888,5 +1888,31 @@ so accept a positive count only alongside successful readback. Pre-submission
 failure is distinct from any uncertain outcome after insertion was submitted;
 retain a validated returned ID when known. No retry, cleanup or restart replay
 is built into this boundary. Creation can leave a partial model and provides no
-atomic ownership/layout lease. Note insertion, explicit deck placement, durable
-export recovery and typed app wiring remain separate prerequisites.
+atomic ownership/layout lease. Durable export recovery and typed app wiring
+remain separate prerequisites.
+
+The unconnected `AnkiProviderNoteInserter` accepts a shell-local frozen request:
+raw surface, four prepared fields, model ID/layout and explicit positive deck ID.
+It snapshots the joined fields, rejects embedded NUL/field separators and requires
+first-field equality with the reader's exact Yomoku escaping. Content and layout
+still originate in Rust; no production HTML/CSS constants move into Kotlin.
+On a worker, revalidate full model layout and an existing nonfiltered frozen deck,
+then query cross-model/deck exact duplicates as the final collection read before
+submission. Return all observed matches without mutation. Refresh host/spec/
+permission between calls and after readback; no atomic check-and-add is claimed.
+
+Insert only model/fields into `notes`. Validate the canonical returned URI/positive
+signed-64 ID and exact note ID/model/fields before touching its cards. Require
+one ordinal-zero card and explicitly update only its `deck_id`, since insertion
+uses the model default deck. Require a single-property update count of one plus
+fresh exact note/card/deck readback. Never modify a model default, select/create
+a deck, change discovered duplicates or write Yomoku vocabulary/history.
+Every failure after submitting insertion is uncertain, retaining the frozen
+request and validated returned ID when available; this includes insertion,
+placement and cursor-close failures. No retry, repair, deletion or cleanup occurs.
+An uncertain note may remain in the model default deck. Separate read-only surface
+reconciliation can establish existing-note IDs, not successful deck placement,
+and an empty read never permits insertion. The future durable owner must record
+pending submission before invoking once, preserve uncertainty across process death
+and never replay a mutation on restart. No app/FFI/UI call site is enabled yet;
+fake-provider tests do not establish real Binder/collection compatibility.

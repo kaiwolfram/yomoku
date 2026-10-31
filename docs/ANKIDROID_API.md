@@ -163,8 +163,22 @@ return uncertainty, preserving a validated new ID when known. No retry, repair o
 delete is attempted: a partial/orphan model may remain. Concurrent collection edits
 are not fenced. Fake-provider coverage does not establish real-provider behavior.
 
-Next implement note insertion and explicit frozen-deck placement, then
-app-owned state/typed transport and durable pending/uncertain insertion
+The isolated `AnkiProviderNoteInserter` now revalidates layout, an existing
+nonfiltered frozen deck and exact duplicates before submission. The reviewed
+[`addNoteForContentValues`](https://github.com/ankidroid/Anki-Android/blob/v2.25.3/api/src/main/java/com/ichi2/anki/api/AddContentApi.kt)
+inserts a note, then moves its cards: there is no deck column for single-note
+insertion. Validate the returned canonical URI and exact note ID/model/fields,
+require one ordinal-zero card, update only its `deck_id` and verify note/card/deck
+readback. The
+[provider](https://github.com/ankidroid/Anki-Android/blob/v2.25.3/AnkiDroid/src/main/java/com/ichi2/anki/provider/CardContentProvider.kt)
+initially uses the model default deck; the adapter never changes that default.
+Any failure after insertion submission is uncertain, retaining the payload/deck
+and validated returned ID when available. No retry/repair/delete occurs; a note
+may remain in the default deck. Read-only exact-surface reconciliation establishes
+existence, not placement success. This remains unconnected to app/FFI/UI and does
+not establish installed-provider compatibility or an atomic check-and-add.
+
+Next implement app-owned state/typed transport and durable pending/uncertain insertion
 recovery before enabling live wiring. A process restart must not erase insert
 uncertainty or replay an old mutating request. No supported provider completion
 fence for safe retry after empty reconciliation has been established. Verify model

@@ -3799,3 +3799,28 @@ and /tmp/yomoku-browser-profile-*. No emulator started.
   real-provider/browser/collection, physical-device, broad lifecycle/performance
   check. Next: note insertion/layout/deck/duplicates/explicit placement, then
   durable pending/uncertain recovery and typed app/settings/UI wiring.
+
+## 2026-10-31 — Isolated Anki note insertion
+
+- Started clean; continued the next provider slice. Added worker-only
+  `AnkiProviderNoteInserter` with frozen payload/model/layout/deck transport and
+  shared exact-surface escaping validation. Full layout/nonfiltered-deck checks
+  precede an immediate cross-model/deck duplicate recheck. No app/FFI/UI call site.
+- Validate the returned canonical note URI and exact fields before touching its
+  one ordinal-zero card, explicitly move to the frozen deck and require fresh
+  note/card/deck readback. Refresh host/spec/permission between calls. Any failure
+  after submission is uncertain, retaining payload/deck/known returned ID. No
+  retry/repair/delete; read-only reconciliation cannot establish placement or
+  permit insertion after an empty result. Durable ownership is still required.
+- PASS: 16 new fake-provider cases plus prior provider/CoreSession regressions
+  (51 total, 0.304 s), API-36 x86_64 isolated 8 GiB AVD; debug/test APKs, strict
+  lint, repository Kotlin formatting and diff. Native/bindings/probe/assets reused.
+  Initial sandbox Gradle wildcard-IP/ADB socket failures resolved with approved
+  execution. APKs installed without clearing data; task-owned emulator stopped.
+  No open blocker. Logs: /tmp/yomoku-anki-insert-{android,tests,install,format,
+  format-check,emulator}.log.
+- Updated plan, API evidence, architecture, decisions, commands and handoff.
+  No Rust/schema/dependency/protocol/UI change or host Rust/Clippy/Rustfmt,
+  independent Full-loader, real collection/browser, physical-device, broader
+  UI/lifecycle/performance run. Next: durable pending/uncertain recovery with no
+  restart mutation replay, typed app/FFI ownership and deck/settings/UI handling.

@@ -404,7 +404,7 @@ internal class AnkiProviderReader(
 
         // Identity representation only; note content/templates remain owned by Rust. Keep parity
         // with yomoku-core::anki::escape, including inert media syntax and field delimiters.
-        private fun escapeSurface(surface: String): String = buildString {
+        internal fun escapeSurface(surface: String): String = buildString {
             for (character in surface) {
                 append(
                     when (character) {

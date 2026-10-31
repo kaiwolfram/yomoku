@@ -52,6 +52,7 @@ class AnkiProviderReaderTest {
                     "CREATE TABLE notes(id INTEGER PRIMARY KEY, mid INTEGER, flds TEXT, did INTEGER)"
                 )
                 execSQL("CREATE TABLE decks(deck_id INTEGER, deck_name TEXT, deck_dyn INTEGER)")
+                execSQL("CREATE TABLE cards(note_id INTEGER, ord INTEGER, deck_id INTEGER)")
             }
         var queries = 0
         var replacement: (() -> Cursor?)? = null
@@ -65,6 +66,9 @@ class AnkiProviderReaderTest {
         val updates = mutableListOf<Pair<Uri, ContentValues>>()
         var insertReplacement: ((Uri, ContentValues) -> Uri?)? = null
         var updateReplacement: ((Uri, ContentValues) -> Int)? = null
+        var beforeQuery: ((Uri) -> Unit)? = null
+        var queryResult: ((Uri, Cursor?) -> Cursor?)? = null
+        val operations = mutableListOf<String>()
 
         override fun onCreate() = true
 
@@ -83,8 +87,40 @@ class AnkiProviderReaderTest {
             lastProjection = projection?.toList()
             lastSelection = selection
             lastArguments = args?.toList()
+            operations.add("query:${uri.path}")
+            beforeQuery?.invoke(uri)
+            val cursor = queryRows(uri, projection, selection, args, order)
+            val transform = queryResult
+            return if (transform == null) cursor else transform(uri, cursor)
+        }
+
+        private fun queryRows(
+            uri: Uri,
+            projection: Array<out String>?,
+            selection: String?,
+            args: Array<out String>?,
+            order: String?,
+        ): Cursor? {
             replacement?.let {
                 return it()
+            }
+            if (uri.pathSegments.first() == "notes") {
+                val noteId = uri.pathSegments[1]
+                return if (uri.lastPathSegment == "cards") {
+                    database.query(
+                        "cards",
+                        projection,
+                        "note_id = ?",
+                        arrayOf(noteId),
+                        null,
+                        null,
+                        null,
+                    )
+                } else {
+                    val columns =
+                        projection?.map { if (it == "_id") "id AS _id" else it }?.toTypedArray()
+                    database.query("notes", columns, "id = ?", arrayOf(noteId), null, null, null)
+                }
             }
             if (uri.pathSegments.first() == "models") {
                 val isTemplate = uri.lastPathSegment == "templates"
@@ -117,6 +153,7 @@ class AnkiProviderReaderTest {
             val handler = insertReplacement ?: error("Unexpected insert")
             val snapshot = ContentValues(checkNotNull(values))
             inserts.add(uri to snapshot)
+            operations.add("insert:${uri.path}")
             return handler(uri, snapshot)
         }
 
@@ -131,6 +168,7 @@ class AnkiProviderReaderTest {
             val handler = updateReplacement ?: error("Unexpected update")
             val snapshot = ContentValues(checkNotNull(values))
             updates.add(uri to snapshot)
+            operations.add("update:${uri.path}")
             return handler(uri, snapshot)
         }
 
@@ -173,6 +211,7 @@ class AnkiProviderReaderTest {
             }
         val reader = AnkiProviderReader(ContentResolver.wrap(provider), environment)
         val creator = AnkiProviderModelCreator(ContentResolver.wrap(provider), environment)
+        val inserter = AnkiProviderNoteInserter(ContentResolver.wrap(provider), environment)
         // Comparison inputs stand in for the future Rust-owned layout transport, not production
         // copies of the core's HTML/CSS constants.
         val layout =
@@ -247,6 +286,46 @@ class AnkiProviderReaderTest {
             }
         }
 
+        fun noteRequest(
+            surface: String = "猫",
+            fields: List<String> =
+                listOf(
+                    AnkiProviderReader.escapeSurface(surface),
+                    "ねこ",
+                    "<ol><li>cat</li></ol>",
+                    "<strong>猫</strong>。",
+                ),
+            deckId: Long = Long.MAX_VALUE,
+            modelId: Long = 7,
+        ) = AnkiProviderNoteRequest(surface, fields, AnkiProviderModelId(modelId), deckId, layout)
+
+        fun enableNoteInsertion(id: Long = Long.MAX_VALUE) {
+            model()
+            provider.database.execSQL(
+                "INSERT INTO decks VALUES(?, 'Frozen deck', 0)",
+                arrayOf<Any?>(Long.MAX_VALUE),
+            )
+            provider.insertReplacement = { uri, values ->
+                check(uri.pathSegments == listOf("notes"))
+                provider.database.execSQL(
+                    "INSERT INTO notes VALUES(?, ?, ?, 1)",
+                    arrayOf<Any?>(id, values.getAsLong("mid"), values.getAsString("flds")),
+                )
+                provider.database.execSQL("INSERT INTO cards VALUES(?, 0, 1)", arrayOf<Any?>(id))
+                uri.buildUpon().appendPath(id.toString()).build()
+            }
+            provider.updateReplacement = { uri, values ->
+                check(uri.pathSegments == listOf("notes", id.toString(), "cards", "0"))
+                check(values.keySet() == setOf("deck_id"))
+                provider.database.update(
+                    "cards",
+                    values,
+                    "note_id = ? AND ord = 0",
+                    arrayOf(id.toString()),
+                )
+            }
+        }
+
         override fun close() = provider.close()
     }
 
@@ -254,6 +333,475 @@ class AnkiProviderReaderTest {
 
     private fun failed(reason: AnkiReadError, result: AnkiReadResult<*>) {
         assertEquals(AnkiReadResult.Failed(reason), result)
+    }
+
+    @Test
+    fun noteInsertionValidatesThenPlacesOnlyTheNewCardInTheFrozenDeck() {
+        Fixture().use { f ->
+            f.enableNoteInsertion()
+            val modelId = Long.MAX_VALUE - 1
+            f.model(modelId)
+            f.provider.note(1, "犬", model = 9, deck = 3)
+            val before = f.provider.rows()
+            val models = f.provider.models.mapValues { it.value.toList() }
+            val templates = f.provider.templates.mapValues { it.value.map { row -> row.toList() } }
+            val request = f.noteRequest(modelId = modelId)
+            assertEquals(
+                AnkiNoteInsertionResult.Inserted(AnkiProviderNoteId(Long.MAX_VALUE)),
+                f.inserter.insert(request),
+            )
+            assertEquals(before.single(), f.provider.rows().first())
+            assertEquals(models, f.provider.models.mapValues { it.value.toList() })
+            assertEquals(
+                templates,
+                f.provider.templates.mapValues { it.value.map { row -> row.toList() } },
+            )
+            val (uri, values) = f.provider.inserts.single()
+            assertEquals("content://${AnkiProviderReader.AUTHORITY}/notes", uri.toString())
+            assertEquals(setOf("mid", "flds"), values.keySet())
+            assertEquals(modelId, values.getAsLong("mid"))
+            assertEquals(request.joinedFields, values.getAsString("flds"))
+            val (card, placement) = f.provider.updates.single()
+            assertEquals("/notes/${Long.MAX_VALUE}/cards/0", card.path)
+            assertEquals(setOf("deck_id"), placement.keySet())
+            assertEquals(Long.MAX_VALUE, placement.getAsLong("deck_id"))
+            f.provider.database.rawQuery("SELECT deck_id FROM cards", null).use {
+                assertTrue(it.moveToFirst())
+                assertEquals(Long.MAX_VALUE, it.getLong(0))
+            }
+            assertEquals(
+                listOf(
+                    "query:/models/$modelId",
+                    "query:/models/$modelId/templates",
+                    "query:/decks",
+                    "query:/notes_v2",
+                    "insert:/notes",
+                    "query:/notes/${Long.MAX_VALUE}",
+                    "query:/notes/${Long.MAX_VALUE}/cards",
+                    "update:/notes/${Long.MAX_VALUE}/cards/0",
+                    "query:/notes/${Long.MAX_VALUE}",
+                    "query:/notes/${Long.MAX_VALUE}/cards",
+                ),
+                f.provider.operations,
+            )
+        }
+    }
+
+    @Test
+    fun insertionRechecksNewExactDuplicatesAcrossModelsAndDecksImmediatelyBeforeSubmission() {
+        Fixture().use { f ->
+            f.enableNoteInsertion()
+            f.provider.beforeQuery = { uri ->
+                if (uri.lastPathSegment == "notes_v2") {
+                    f.provider.note(8, "猫", model = 4, deck = 9)
+                    f.provider.note(9, "猫", model = 5, deck = 10)
+                }
+            }
+            assertEquals(
+                AnkiNoteInsertionResult.Existing(
+                    listOf(AnkiProviderNoteId(8), AnkiProviderNoteId(9))
+                ),
+                f.inserter.insert(f.noteRequest()),
+            )
+            assertTrue(f.provider.inserts.isEmpty())
+            assertTrue(f.provider.updates.isEmpty())
+        }
+    }
+
+    @Test
+    fun missingOrIncompatibleModelAndMissingOrFilteredFrozenDeckPreventSubmission() {
+        for (scenario in 0..3) Fixture().use { f ->
+            f.enableNoteInsertion()
+            when (scenario) {
+                0 -> f.provider.models.clear()
+                1 -> f.provider.templates[7]!!.single()[3] = "User-edited question"
+                2 -> f.provider.database.execSQL("DELETE FROM decks")
+                3 -> f.provider.database.execSQL("UPDATE decks SET deck_dyn = 1")
+            }
+            val reason =
+                if (scenario < 2) AnkiNoteInsertionError.LayoutMismatch
+                else AnkiNoteInsertionError.DeckUnavailable
+            assertEquals(AnkiNoteInsertionResult.Failed(reason), f.inserter.insert(f.noteRequest()))
+            assertTrue(f.provider.inserts.isEmpty())
+            assertTrue(f.provider.updates.isEmpty())
+        }
+    }
+
+    @Test
+    fun insertionUnavailableHostUnsupportedSpecAndDeniedPermissionNeverSubmit() {
+        for (scenario in 0..2) Fixture().use { f ->
+            f.enableNoteInsertion()
+            val error =
+                when (scenario) {
+                    0 -> {
+                        f.environment.info = null
+                        AnkiReadError.ProviderUnavailable
+                    }
+                    1 -> {
+                        f.environment.info!!.metaData.putInt(AnkiProviderReader.SPEC_KEY, 1)
+                        AnkiReadError.UnsupportedProvider
+                    }
+                    else -> {
+                        f.environment.permitted = false
+                        AnkiReadError.PermissionDenied
+                    }
+                }
+            assertEquals(
+                AnkiNoteInsertionResult.Failed(AnkiNoteInsertionError.ReadFailed(error)),
+                f.inserter.insert(f.noteRequest()),
+            )
+            assertEquals(0, f.provider.queries)
+            assertTrue(f.provider.inserts.isEmpty())
+        }
+    }
+
+    @Test
+    fun preInsertReadNullTransportMalformedAndCloseFailuresNeverMeanNoDuplicates() {
+        for (path in listOf("/models/7", "/models/7/templates", "/decks", "/notes_v2")) {
+            for (failure in 0..3) Fixture().use { f ->
+                f.enableNoteInsertion()
+                var closed = false
+                f.provider.queryResult = { uri, cursor ->
+                    if (uri.path != path) cursor
+                    else {
+                        cursor!!.close()
+                        when (failure) {
+                            0 -> null
+                            1 -> throw IllegalStateException("collection locked")
+                            2 -> MatrixCursor(arrayOf("wrong_schema"))
+                            else ->
+                                object : CursorWrapper(MatrixCursor(cursor.columnNames)) {
+                                    override fun close() {
+                                        super.close()
+                                        closed = true
+                                        throw IllegalStateException("close failed")
+                                    }
+                                }
+                        }
+                    }
+                }
+                assertTrue(
+                    "$path failure=$failure",
+                    f.inserter.insert(f.noteRequest()) is AnkiNoteInsertionResult.Failed,
+                )
+                if (failure == 3) assertTrue(closed)
+                assertTrue(f.provider.inserts.isEmpty())
+                assertTrue(f.provider.updates.isEmpty())
+            }
+        }
+    }
+
+    @Test
+    fun insertionRefreshesHostSpecAndPermissionBetweenEveryPreflightCall() {
+        for (path in listOf("/models/7", "/models/7/templates", "/decks", "/notes_v2")) {
+            for (change in 0..2) Fixture().use { f ->
+                f.enableNoteInsertion()
+                f.provider.queryResult = { uri, cursor ->
+                    if (uri.path == path)
+                        when (change) {
+                            0 -> f.environment.permitted = false
+                            1 -> f.environment.info!!.packageName = "replacement.host"
+                            else ->
+                                f.environment.info!!.metaData.putInt(AnkiProviderReader.SPEC_KEY, 1)
+                        }
+                    cursor
+                }
+                val error =
+                    when (change) {
+                        0 -> AnkiReadError.PermissionDenied
+                        1 -> AnkiReadError.ProviderUnavailable
+                        else -> AnkiReadError.UnsupportedProvider
+                    }
+                assertEquals(
+                    "$path change=$change",
+                    AnkiNoteInsertionResult.Failed(AnkiNoteInsertionError.ReadFailed(error)),
+                    f.inserter.insert(f.noteRequest()),
+                )
+                assertTrue(f.provider.inserts.isEmpty())
+                assertTrue(f.provider.updates.isEmpty())
+            }
+        }
+    }
+
+    @Test
+    fun nullThrownAndCommittedButLostNoteInsertResponsesAreAlwaysUncertain() {
+        for (committed in listOf(false, true)) for (failure in 0..3) Fixture().use { f ->
+            f.enableNoteInsertion()
+            val insert = f.provider.insertReplacement!!
+            f.provider.insertReplacement = { uri, values ->
+                if (committed) insert(uri, values)
+                when (failure) {
+                    0 -> null
+                    1 -> throw IllegalStateException("transport lost")
+                    2 -> throw SecurityException("permission revoked during insert")
+                    else -> throw IllegalArgumentException("provider rejected request")
+                }
+            }
+            val request = f.noteRequest()
+            val result = f.inserter.insert(request) as AnkiNoteInsertionResult.Uncertain
+            assertSame(request, result.request)
+            assertNull(result.id)
+            assertEquals(if (committed) 1 else 0, f.provider.rows().size)
+            assertEquals(1, f.provider.inserts.size)
+            assertTrue(f.provider.updates.isEmpty())
+        }
+    }
+
+    @Test
+    fun untrustedReturnedNoteUrisNeverSelectACardForMutation() {
+        val base = "content://${AnkiProviderReader.AUTHORITY}"
+        for (response in
+            listOf(
+                "$base/notes/0",
+                "$base/notes/-1",
+                "$base/notes/01",
+                "$base/notes/+1",
+                "$base/notes/9223372036854775808",
+                "$base/models/1",
+                "$base/notes/1/cards",
+                "$base/notes/1?x=y",
+                "$base/notes/1#fragment",
+                "content://other/notes/1",
+                "https://${AnkiProviderReader.AUTHORITY}/notes/1",
+            )) {
+            Fixture().use { f ->
+                f.enableNoteInsertion()
+                val insert = f.provider.insertReplacement!!
+                f.provider.insertReplacement = { uri, values ->
+                    insert(uri, values)
+                    Uri.parse(response)
+                }
+                val result = f.inserter.insert(f.noteRequest()) as AnkiNoteInsertionResult.Uncertain
+                assertNull(result.id)
+                assertEquals(AnkiNoteInsertionError.InvalidResponse, result.error)
+                assertTrue(f.provider.updates.isEmpty())
+                assertEquals(1, f.provider.rows().size)
+            }
+        }
+    }
+
+    @Test
+    fun returnedUnrelatedNoteCannotHaveItsCardMoved() {
+        Fixture().use { f ->
+            f.enableNoteInsertion()
+            f.provider.note(8, "User note", model = 7, deck = 99)
+            val before = f.provider.rows().single()
+            val insert = f.provider.insertReplacement!!
+            f.provider.insertReplacement = { uri, values ->
+                insert(uri, values)
+                Uri.parse("content://${AnkiProviderReader.AUTHORITY}/notes/8")
+            }
+            val result = f.inserter.insert(f.noteRequest()) as AnkiNoteInsertionResult.Uncertain
+            assertEquals(AnkiProviderNoteId(8), result.id)
+            assertEquals(AnkiNoteInsertionError.InvalidResponse, result.error)
+            assertEquals(before, f.provider.rows().first())
+            assertTrue(f.provider.updates.isEmpty())
+        }
+    }
+
+    @Test
+    fun missingMalformedAndExtraNoteOrCardRowsFailClosedAndCloseBeforePlacement() {
+        for (card in listOf(false, true)) {
+            val columns =
+                if (card) arrayOf("note_id", "ord", "deck_id") else arrayOf("_id", "mid", "flds")
+            for (failure in 0..8) Fixture().use { f ->
+                f.enableNoteInsertion()
+                var closed = false
+                val request = f.noteRequest()
+                f.provider.queryResult = { uri, cursor ->
+                    if (
+                        uri.pathSegments.first() != "notes" ||
+                            (uri.lastPathSegment == "cards") != card
+                    )
+                        cursor
+                    else {
+                        cursor!!.close()
+                        if (failure == 0) null
+                        else {
+                            val row =
+                                if (card) arrayOf<Any?>(Long.MAX_VALUE, 0L, 1L)
+                                else arrayOf<Any?>(Long.MAX_VALUE, 7L, request.joinedFields)
+                            when (failure) {
+                                2 -> row[0] = 8L
+                                3 -> row[1] = if (card) 1L else 9L
+                                4 -> row[2] = if (card) 0L else "different fields"
+                                5 -> row[0] = Long.MAX_VALUE.toString()
+                                6 -> row[2] = null
+                            }
+                            val matrix =
+                                MatrixCursor(columns).apply {
+                                    if (failure != 1) addRow(row)
+                                    if (failure == 7) addRow(row)
+                                }
+                            object : CursorWrapper(matrix) {
+                                override fun close() {
+                                    super.close()
+                                    closed = true
+                                    if (failure == 8) throw IllegalStateException("close failed")
+                                }
+                            }
+                        }
+                    }
+                }
+                val result = f.inserter.insert(request) as AnkiNoteInsertionResult.Uncertain
+                assertEquals(AnkiProviderNoteId(Long.MAX_VALUE), result.id)
+                if (failure != 0) assertTrue(closed)
+                assertTrue(f.provider.updates.isEmpty())
+                assertEquals(1, f.provider.inserts.size)
+            }
+        }
+    }
+
+    @Test
+    fun failedOrLostPlacementRetainsKnownNoteAndNeverReplaysOrDeletes() {
+        for (committed in listOf(false, true)) for (failure in 0..4) Fixture().use { f ->
+            f.enableNoteInsertion()
+            val update = f.provider.updateReplacement!!
+            f.provider.updateReplacement = { uri, values ->
+                if (committed) update(uri, values)
+                when (failure) {
+                    0 -> 0
+                    1 -> 2
+                    2 -> throw SecurityException("permission revoked")
+                    3 -> throw IllegalStateException("lost response")
+                    else -> throw IllegalArgumentException("deck disappeared")
+                }
+            }
+            val request = f.noteRequest()
+            val result = f.inserter.insert(request) as AnkiNoteInsertionResult.Uncertain
+            assertSame(request, result.request)
+            assertEquals(AnkiProviderNoteId(Long.MAX_VALUE), result.id)
+            assertEquals(request.joinedFields, f.provider.rows().single()[2])
+            assertEquals(1, f.provider.inserts.size)
+            assertEquals(1, f.provider.updates.size)
+        }
+    }
+
+    @Test
+    fun successfulPlacementCountNeedsExactNoteAndDeckReadback() {
+        for (failure in 0..5) Fixture().use { f ->
+            f.enableNoteInsertion()
+            val update = f.provider.updateReplacement!!
+            f.provider.updateReplacement = { uri, values ->
+                if (failure != 0) update(uri, values)
+                when (failure) {
+                    1 -> f.provider.database.execSQL("UPDATE notes SET flds = 'edited'")
+                    2 -> f.provider.database.execSQL("DELETE FROM cards")
+                    3 -> f.provider.database.execSQL("INSERT INTO cards SELECT * FROM cards")
+                    4 -> f.provider.queryResult = { _, cursor ->
+                            cursor!!.close()
+                            null
+                        }
+                    5 -> f.provider.queryResult = { _, cursor ->
+                            object : CursorWrapper(cursor) {
+                                override fun close() {
+                                    super.close()
+                                    throw IllegalStateException("close failed")
+                                }
+                            }
+                        }
+                }
+                1
+            }
+            val result = f.inserter.insert(f.noteRequest()) as AnkiNoteInsertionResult.Uncertain
+            assertEquals(AnkiProviderNoteId(Long.MAX_VALUE), result.id)
+            assertEquals(1, f.provider.inserts.size)
+            assertEquals(1, f.provider.updates.size)
+        }
+    }
+
+    @Test
+    fun hostAndPermissionChangesAfterSubmissionOrPlacementRemainUncertain() {
+        for (afterUpdate in listOf(false, true)) for (change in 0..2) Fixture().use { f ->
+            f.enableNoteInsertion()
+            val changeEnvironment = {
+                when (change) {
+                    0 -> f.environment.permitted = false
+                    1 -> f.environment.info!!.packageName = "replacement.host"
+                    else -> f.environment.info!!.metaData.putInt(AnkiProviderReader.SPEC_KEY, 1)
+                }
+            }
+            if (afterUpdate) {
+                val update = f.provider.updateReplacement!!
+                f.provider.updateReplacement = { uri, values ->
+                    update(uri, values).also { changeEnvironment() }
+                }
+            } else {
+                val insert = f.provider.insertReplacement!!
+                f.provider.insertReplacement = { uri, values ->
+                    insert(uri, values).also { changeEnvironment() }
+                }
+            }
+            val result = f.inserter.insert(f.noteRequest()) as AnkiNoteInsertionResult.Uncertain
+            assertEquals(AnkiProviderNoteId(Long.MAX_VALUE), result.id)
+            assertEquals(1, f.provider.inserts.size)
+            assertEquals(if (afterUpdate) 1 else 0, f.provider.updates.size)
+        }
+    }
+
+    @Test
+    fun uncertainPayloadAndDeckSurviveReadOnlyUnresolvedAndExistingReconciliation() {
+        Fixture().use { f ->
+            f.enableNoteInsertion()
+            f.provider.insertReplacement = { _, _ -> null }
+            val fields = mutableListOf("猫", "ねこ", "", "猫。<strong>猫</strong>。")
+            val request = f.noteRequest(fields = fields)
+            fields[0] = "犬"
+            val result = f.inserter.insert(request) as AnkiNoteInsertionResult.Uncertain
+            repeat(2) {
+                assertEquals(
+                    AnkiReadReconciliation.Unresolved,
+                    f.reader.reconcile(result.request.surface),
+                )
+            }
+            f.provider.note(9, "猫", model = 88, deck = 99)
+            assertEquals(
+                AnkiReadReconciliation.Existing(listOf(AnkiProviderNoteId(9))),
+                f.reader.reconcile(result.request.surface),
+            )
+            assertEquals("猫\u001fねこ\u001f\u001f猫。<strong>猫</strong>。", result.request.joinedFields)
+            assertEquals(Long.MAX_VALUE, result.request.deckId)
+            assertEquals(1, f.provider.inserts.size)
+            assertTrue(f.provider.updates.isEmpty())
+        }
+    }
+
+    @Test
+    fun noteRequestFreezesFieldsAndRejectsInvalidIdentityOrTransport() {
+        Fixture().use { f ->
+            val raw = "<&\"'>[sound:猫.mp3]\u001f"
+            val escaped = "&lt;&amp;&quot;&#39;&gt;&#91;sound:猫.mp3&#93;&#31;"
+            val fields = mutableListOf(escaped, "", "", "sentence")
+            val request = f.noteRequest(surface = raw, fields = fields)
+            fields[3] = "changed"
+            assertEquals("$escaped\u001f\u001f\u001fsentence", request.joinedFields)
+            for (bad in
+                listOf(
+                    listOf("猫"),
+                    listOf("犬", "", "", ""),
+                    listOf("猫", "\u001f", "", ""),
+                    listOf("猫", "", "\u0000", ""),
+                )) {
+                assertThrows(IllegalArgumentException::class.java) { f.noteRequest(fields = bad) }
+            }
+            assertThrows(IllegalArgumentException::class.java) { f.noteRequest(surface = "") }
+            assertThrows(IllegalArgumentException::class.java) {
+                f.noteRequest(surface = "猫\u0000")
+            }
+            assertThrows(IllegalArgumentException::class.java) { f.noteRequest(deckId = 0) }
+        }
+    }
+
+    @Test
+    fun noteInsertionRefusesMainThreadBeforeAnyProviderCall() {
+        Fixture().use { f ->
+            val request = f.noteRequest()
+            InstrumentationRegistry.getInstrumentation().runOnMainSync {
+                assertThrows(IllegalStateException::class.java) { f.inserter.insert(request) }
+            }
+            assertEquals(0, f.provider.queries)
+            assertTrue(f.provider.inserts.isEmpty())
+        }
     }
 
     @Test

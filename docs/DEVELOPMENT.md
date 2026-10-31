@@ -7776,3 +7776,37 @@ AnkiDroid/browser/collection test or compatibility claim. Host Rust/Clippy/Rustf
 independent Full-loader, physical device, broader UI/lifecycle and performance
 checks were not run. Next: note insertion with fresh layout/deck/duplicate checks
 and explicit placement, then durable export recovery and typed app wiring.
+
+## Isolated Android Anki note insertion
+
+Use the pinned environment and isolated 8 GiB AVD from the preceding sections.
+`AnkiProviderNoteInserter` remains unconnected; fake mutations use in-memory
+Android SQLite only, without an AnkiDroid installation or real collection.
+
+```sh
+./android/gradlew -p android :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug --offline --console=plain
+"$ANDROID_HOME/platform-tools/adb" -s emulator-5554 install -r -t android/app/build/outputs/apk/debug/app-debug.apk
+"$ANDROID_HOME/platform-tools/adb" -s emulator-5554 install -r -t android/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+"$ANDROID_HOME/platform-tools/adb" -s emulator-5554 shell am instrument -w -r -e class app.yomoku.AnkiProviderReaderTest,app.yomoku.CoreSessionTest app.yomoku.test/androidx.test.runner.AndroidJUnitRunner
+JAVA_HOME="$JAVA_HOME" tools/format-kotlin.sh --check
+git diff --check
+```
+
+2026-10-31 PASS: sixteen new insertion cases plus 32 prior provider cases and
+three CoreSession regressions (51 total, 0.304 s), API-36 x86_64; debug/test APKs,
+strict Android lint, repository Kotlin formatting and diff. Native/bindings/probe/
+assets reused. Cases cover immutable field/deck transport, exact long IDs/layout,
+nonfiltered frozen-deck checks, last-read cross-model/deck duplicates, fresh gates,
+malformed/null/failed/close-failed preflight and note/card reads, unrelated returned
+notes, invalid URIs, explicit placement and exact readback. Committed-but-lost
+insert/update responses remain uncertain with payload/known ID; read-only empty
+reconciliation does not replay. No automatic retry, repair or deletion.
+
+Initial sandbox Gradle wildcard-IP and ADB socket access failed; approved offline
+Gradle/ADB/emulator execution passed. Both APKs installed without clearing data.
+Task-owned emulator stopped; no outstanding failure/blocker. Logs:
+`/tmp/yomoku-anki-insert-{android,tests,install,format,format-check,emulator}.log`.
+No Rust/schema/dependency/protocol/UI change or real AnkiDroid/browser/collection
+compatibility claim. Host Rust/Clippy/Rustfmt, independent Full-loader, physical
+device, broader UI/lifecycle and performance checks were not run. Next: durable
+pending/uncertain recovery, typed retained app/FFI bridge and settings/UI wiring.

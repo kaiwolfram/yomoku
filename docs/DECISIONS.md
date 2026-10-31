@@ -4441,3 +4441,36 @@ A partial/orphan model can remain. These non-atomic observations are not ownersh
 or compatibility leases. Note insertion must still revalidate layout/deck, recheck
 exact duplicates, explicitly place cards and preserve submission uncertainty.
 Durable export recovery remains required before enabling live app calls.
+
+## 2026-10-31 — Isolated Anki note insertion and explicit deck placement
+
+Continue the mutating adapter as an unconnected worker-only prerequisite. Use a
+frozen shell-local request with raw surface, joined four prepared fields, exact
+model ID/layout and configured positive deck ID. Snapshot caller field lists;
+reject NUL/delimiter transport ambiguities and mismatched escaped first-field
+identity. Share the reader's escaping for validation; Rust retains content/layout
+ownership. No new dependency, schema, Event/FFI or product UI is introduced.
+
+Revalidate the complete layout and existing nonfiltered frozen deck, then recheck
+exact duplicates across models/decks as the last collection read before insertion.
+Return every exact match without mutation. Check host/spec/permission between
+provider calls and after readback. These observations cannot fence concurrent
+AnkiDroid edits or make check-and-add atomic.
+
+Follow the pinned API's supported two-stage note/card path: `notes` insertion
+uses the model default deck, so do not invent a deck insertion column or change
+that default. Validate the returned canonical positive signed-64 note URI and
+exact note ID/model/fields before updating only its one ordinal-zero card's deck.
+Require count one for that single property and exact fresh note/card/deck readback
+before reporting inserted. No tags, model mutation, deck selection/creation or
+changes to discovered existing notes are needed.
+
+Any failure after submission remains uncertain, including an exception/null
+insert response, invalid ID, failed/malformed/close-failed readback, placement
+failure or lost update response. Retain the full request/deck and a validated
+returned ID when known. Do not retry, repair or delete: the note may remain in
+the model default deck. Surface reconciliation is read-only, establishes note
+existence rather than completed placement, and never authorizes insertion after
+an empty result. Before wiring app calls, the durable owner must persist pending
+submission, enforce one invocation and restore read-only uncertainty on restart.
+Real-provider/Binder/collection/browser behavior and query cost remain unverified.
