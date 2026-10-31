@@ -197,3 +197,9 @@ Failures during later validation discard earlier matches. Crux retains callback
 provenance and both journals natively until the SQLite evidence commit. Rechecked
 the pinned contract and Android ContentResolver documentation for this wiring;
 no new provider API, dependency/minimum-version or real-provider claim is adopted.
+
+The native app now owns frozen-export preflight handles and validates complete
+typed deck/model/duplicate observations before selecting an existing-note result,
+model reuse or model creation. This is read-only native lifecycle ownership;
+provider dispatch, durable live begin/outcome gates and visible export remain
+unfinished. No additional API, dependency or compatibility claim is adopted.

@@ -2051,3 +2051,26 @@ and a fresh observation. Only Begin/Retry are new public Events; native handles,
 callbacks, commits and journal snapshots still reject shell serialization. No
 mutation/replay, schema/dependency change or visible recovery/deck/Add action is
 introduced. Preflight and durable live begin/outcome dispatch remain unfinished.
+
+
+### Native Anki export preflight ownership
+
+`BeginAnkiExportPreflight` captures the prepared export in a fresh native shared
+handle. `Model::pending_anki_export_preflight` exposes it to the future dispatcher;
+`AnkiExportPreflightFinished` accepts only that active handle, unchanged intent
+and empty restored journals with no pending/failed recovery work. No reader I/O
+slot is acquired. Navigation/dictionary changes cannot substitute note fields,
+surface, deck or layout. Foreign/stale/duplicate callbacks cannot consume reads.
+
+Complete typed deck/model/duplicate observations validate IDs and the frozen
+nonfiltered deck. Existing exact-note IDs terminate without insertion. Otherwise
+one exact-name full-layout match selects reuse; absence of that name selects
+creation; incompatible/ambiguous names fail. Adapter failures must discard partial
+observations. `anki_export_preflight_result` retains only a read observation,
+never a live mutation token or authority to bypass later journal/provider checks.
+Explicit Retry invalidates any previous read/result and captures a fresh handle.
+Clear drops only this unsubmitted work; durable recovery obligations remain.
+New owners retain neither preparation nor preflight. These native Events have no
+shell codec/effect or UI; typed platform dispatch and durable live begin/outcome
+commits remain the next implementation boundaries. Persistent data/schema and
+existing recovery-read transport are unchanged.

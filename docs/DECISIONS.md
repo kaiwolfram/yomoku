@@ -4699,3 +4699,33 @@ supplies the real adapter, while low-level sessions default to unavailable. No
 automatic reads, permission prompt or recovery UI is introduced in this slice.
 Provider writes still require app-owned preflight and durable live begin/outcome
 gates before invoking the existing isolated mutating adapters.
+
+
+## 2026-10-31 — Native Anki export preflight ownership
+
+Keep preflight separate from the isolated CheckAndAdd session: it is read-only
+and cannot grant live journal tokens. Capture an allocation-identified handle
+from the app's already authenticated frozen export. Begin coalesces an existing
+read/result; explicit Retry replaces a lost, failed or completed observation with
+a fresh handle over the same payload. Clear may invalidate this read and intent,
+but never a durable obligation. A restart restores no preflight or prepared data.
+
+The future adapter must return complete typed deck/model/exact-duplicate reads
+or one failure, discarding partial results. Validate positive IDs and distinct
+deck/model IDs; duplicate note IDs deduplicate without changing observed order.
+Require the exact frozen nonfiltered deck, with no fallback. Existing exact notes
+end the preflight without insertion regardless of a model-name conflict. Otherwise
+reuse only one exact-name model whose entire layout matched the frozen request;
+create only when that name is absent. Multiple same-name models or incompatible
+layouts fail conservatively; do not choose, rename or overwrite a user model.
+The model-match observation must include the existing adapter's type/sort/fields/
+CSS/template/browser checks; false is a complete mismatch, not a failed read.
+
+Check both restored-empty journal gates and pending/failed recovery work at
+capture and callback acceptance. Foreign/stale/duplicate handles cannot consume a
+new read. Keep errors outside reader/persistence state; reader departure or other
+local I/O does not invalidate frozen content. These observations are not leases:
+future durable begin must recheck gates, and mutating adapters must repeat fresh
+provider/deck/model/duplicate checks. This bounded step adds no effect, shell
+codec, provider call, persistence, dependency or UI. Typed dispatch and durable
+live begin/outcome routing remain unfinished.

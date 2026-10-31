@@ -16,9 +16,7 @@ impl Model {
         deck: AnkiDeckId,
     ) -> Option<AnkiExport> {
         if self.prepared_anki_export.is_some()
-            || !self.anki_recovery.allows_preparation()
-            || self.anki_recovery_commit.is_some()
-            || self.anki_recovery_commit_error.is_some()
+            || !self.anki_export_gate_open()
             || self.storage_busy
             || self.settings_open
             || self.pending_time_checkpoint.is_some()
@@ -91,7 +89,12 @@ impl Yomoku {
             }
             // Only unsubmitted data exists here. Never extend this to clearing a
             // live request or recovery obligation when dispatch is connected.
-            Event::ClearPreparedAnkiExport => model.prepared_anki_export = None,
+            Event::ClearPreparedAnkiExport => {
+                model.prepared_anki_export = None;
+                // Preflight is read-only; invalidate its handle and observation.
+                // Future submitted mutations must retain their separate journal.
+                model.anki_export_preflight = None;
+            }
             _ => return None,
         }
         Some(Command::done())

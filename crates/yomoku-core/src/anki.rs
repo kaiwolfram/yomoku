@@ -7,6 +7,8 @@ use crate::{
 };
 
 mod export;
+mod preflight;
+pub use preflight::*;
 mod projection;
 mod recovery;
 pub use recovery::*;

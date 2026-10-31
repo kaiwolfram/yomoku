@@ -8213,3 +8213,35 @@ trial recommendation still applies before further integration.
 
 Logs: `/tmp/yomoku-anki-dispatch-{focused,workspace,clippy,rustfmt,protocol,jni,format,format-check,host-format,kotlin-precheck,android,emulator,typegen-check,codegen-diff,android-codegen-diff}.log`;
 Android XML remains in `android/app/build/outputs/androidTest-results/connected/debug/`.
+
+
+## Native Anki export preflight ownership
+
+Native-only lifecycle/observation slice; no platform dispatch, schema, dependency,
+public codec, generated Kotlin or ViewModel change.
+
+```sh
+cargo test -p yomoku-core -p yomoku-ffi anki --all-features --locked --offline
+cargo test --workspace --all-features --locked --offline --quiet
+cargo build --workspace --all-features --locked --offline
+cargo clippy --workspace --all-targets --all-features --locked --offline -- -D warnings
+cargo fmt --all -- --check
+cargo run -p yomoku-ffi --bin generate-kotlin --features facet_typegen --locked --offline -- /tmp/yomoku-anki-preflight-kotlin
+diff -r target/generated/kotlin /tmp/yomoku-anki-preflight-kotlin
+git diff --check
+```
+
+PASS: 11 new app lifecycle cases; 54 focused core/FFI cases; 931 workspace cases,
+17 opt-in fixtures ignored; workspace build, strict Clippy, Rustfmt and identical
+Kotlin generation. Cases cover original/effective frozen content, reader departure/
+error isolation, all journal gates, foreign/stale/duplicate/late callbacks,
+lost-read/failed-result explicit Retry, clear/reprepare/restart, durable-obligation
+preservation, provider failures, malformed/long IDs, configured deck validation,
+exact duplicates and missing/compatible/incompatible/ambiguous named models.
+Existing preparation/clear codec rejection also covers native Begin/Retry.
+
+No failed verification or open blocker. Logs:
+`/tmp/yomoku-anki-preflight-{focused,workspace,build,clippy,rustfmt,typegen,codec-diff}.log`.
+Android APK/lint/emulator, JNI, physical schema-23 upgrade and real AnkiDroid trials
+were not rerun for this native-only step. Preflight emits no provider/storage
+effect or write token; platform dispatch and durable begin/outcome commits remain.

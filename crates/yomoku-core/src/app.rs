@@ -82,6 +82,7 @@ pub struct ImportSummary {
 #[derive(Default)]
 pub struct Model {
     prepared_anki_export: Option<crate::anki::AnkiExport>,
+    anki_export_preflight: Option<crate::anki::AnkiPreflight>,
     anki_recovery_read: Option<crate::anki::AnkiRecoveryReadRequest>,
     anki_recovery_read_error: Option<crate::anki::AnkiExportError>,
     anki_recovery: crate::anki::AnkiRecoveryState,
@@ -317,6 +318,22 @@ pub enum Event {
     #[serde(skip)]
     #[cfg_attr(feature = "facet_typegen", facet(skip))]
     ClearPreparedAnkiExport,
+    /// Native read ownership only, pending typed provider dispatch/durable begin.
+    #[serde(skip)]
+    #[cfg_attr(feature = "facet_typegen", facet(skip))]
+    BeginAnkiExportPreflight,
+    /// Explicitly abandon a lost read or old observation and capture a fresh handle.
+    #[serde(skip)]
+    #[cfg_attr(feature = "facet_typegen", facet(skip))]
+    RetryAnkiExportPreflight,
+    #[serde(skip)]
+    #[cfg_attr(feature = "facet_typegen", facet(skip))]
+    AnkiExportPreflightFinished(
+        #[cfg_attr(feature = "facet_typegen", facet(opaque))]
+        Box<crate::anki::AnkiPreflightRequest>,
+        #[cfg_attr(feature = "facet_typegen", facet(opaque))]
+        Result<crate::anki::AnkiPreflightObservation, crate::anki::AnkiExportError>,
+    ),
     /// Runtime startup only; no shell codec and no provider mutation.
     #[serde(skip)]
     #[cfg_attr(feature = "facet_typegen", facet(skip))]
@@ -1627,6 +1644,9 @@ impl App for Yomoku {
             | Event::RestoreAnkiRecovery
             | Event::PrepareAnkiExport { .. }
             | Event::ClearPreparedAnkiExport
+            | Event::BeginAnkiExportPreflight
+            | Event::RetryAnkiExportPreflight
+            | Event::AnkiExportPreflightFinished(..)
             | Event::RetryAnkiRecovery
             | Event::AnkiRecoveryFinished(..)
             | Event::CommitAnkiRecovery(_)

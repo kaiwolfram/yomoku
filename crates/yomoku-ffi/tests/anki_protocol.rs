@@ -68,6 +68,8 @@ fn anki_export_preparation_and_clear_have_no_shell_codec() {
             deck: i64::MAX.try_into().unwrap(),
         },
         Event::ClearPreparedAnkiExport,
+        Event::BeginAnkiExportPreflight,
+        Event::RetryAnkiExportPreflight,
     ] {
         assert!(BincodeFfiFormat::serialize(&mut vec![], &event).is_err());
     }

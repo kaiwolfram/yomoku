@@ -4056,3 +4056,25 @@ and /tmp/yomoku-browser-profile-*. No emulator started.
   recovery/deck/Add actions and a disposable real collection/browser trial. A
   phone upgrade trial with the existing Library/history is recommended now; no
   optimized release, physical or real-provider trial was performed this session.
+
+
+## 2026-10-31 — Native Anki export preflight ownership
+
+- Continued the Anki plan with app-owned read-only handles for frozen exports and
+  complete typed deck/model/exact-duplicate observations. Retain payloads across
+  navigation; reject foreign/stale/duplicate responses and changed journal gates.
+  Explicit Retry/clear invalidate reads without removing durable obligations.
+- Validate the frozen nonfiltered deck and conservative exact-name/full-layout
+  model selection. Preserve duplicate IDs, conflicts and provider errors without
+  granting live tokens or touching reader/vocabulary/history state. Shared reader
+  fixtures support original/effective preparation and preflight regressions.
+- PASS: 11 new app cases; 54 focused cases; 931 workspace cases/17 ignored; build,
+  strict Clippy/Rustfmt, identical Kotlin generation and diff checks. No failed
+  check/blocker. Commands/logs: DEVELOPMENT.md, native Anki export preflight section.
+- No effect, shell codec, provider invocation, schema/dependency or UI change.
+  Android/JNI/device/real-provider trials were not rerun. No remaining
+  implementation/verification work for this slice; next is typed Android preflight
+  dispatch and durable live begin/outcome routing, then recovery/deck/Add actions.
+- A phone schema-23 upgrade trial with the existing Library/history remains more
+  valuable now than enabling live integration without that checkpoint. No release
+  build requested; real Anki validation still requires a disposable collection.
