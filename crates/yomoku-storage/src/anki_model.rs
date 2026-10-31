@@ -2,11 +2,11 @@
 //! comparison, never creation, template repair, renaming or deletion.
 
 use rusqlite::{params, Connection, TransactionBehavior};
-use yomoku_core::anki::{AnkiModelCreation, AnkiModelId, AnkiModelLayout};
+use yomoku_core::anki::{AnkiModelCreation, AnkiModelId};
 
 use crate::{anki::AnkiJournalError, Storage};
 
-pub use yomoku_core::anki::{AnkiModelCreationId, AnkiModelRecovery};
+pub use yomoku_core::anki::{AnkiModelCreationId, AnkiModelReconciliation, AnkiModelRecovery};
 
 /// Only newly committed preparation produces a live callback token. There is
 /// no serialization, cloning or reconstruction from a recovery ID.
@@ -29,18 +29,6 @@ pub enum AnkiModelCreationOutcome {
     NotCreated,
     Created(AnkiModelId),
     Uncertain { known_model_id: Option<AnkiModelId> },
-}
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum AnkiModelReconciliation {
-    /// Full normal/sort-zero/single-card provider readback, not name-only
-    /// discovery. A matching layout establishes usability, never ownership.
-    Observed {
-        id: AnkiModelId,
-        layout: Box<AnkiModelLayout>,
-    },
-    /// Empty, failed, partial, ambiguous or incompatible provider reads.
-    Unresolved,
 }
 
 impl Storage {
@@ -123,31 +111,7 @@ impl Storage {
         let transaction = self
             .connection
             .transaction_with_behavior(TransactionBehavior::Immediate)?;
-        let recovery = read_recovery(&transaction)?.ok_or(AnkiJournalError::StaleCallback)?;
-        if recovery.id != id {
-            return Err(AnkiJournalError::StaleCallback);
-        }
-        let existing = match observation {
-            AnkiModelReconciliation::Observed { id, layout }
-                if layout.as_ref() == recovery.creation.layout()
-                    && recovery.known_model_id.is_none_or(|known| known == id) =>
-            {
-                Some(id)
-            }
-            _ => None,
-        };
-        let state = if existing.is_some() {
-            "existing"
-        } else {
-            "uncertain"
-        };
-        let changed = transaction.execute(
-            "UPDATE anki_model_creations SET state = ?2, existing_model_id = ?3 WHERE id = ?1",
-            params![id.value(), state, existing.map(i64::from)],
-        )?;
-        if changed != 1 {
-            return Err(AnkiJournalError::StaleCallback);
-        }
+        reconcile_in(&transaction, id, observation)?;
         transaction.commit()?;
         Ok(())
     }
@@ -188,4 +152,33 @@ pub(crate) fn read_recovery(
         return Err(AnkiJournalError::InvalidRecord);
     }
     Ok(Some(recovery))
+}
+
+pub(crate) fn reconcile_in(
+    connection: &Connection,
+    id: AnkiModelCreationId,
+    observation: AnkiModelReconciliation,
+) -> Result<(), AnkiJournalError> {
+    let recovery = read_recovery(connection)?.ok_or(AnkiJournalError::StaleCallback)?;
+    if recovery.id != id {
+        return Err(AnkiJournalError::StaleCallback);
+    }
+    let resolves = observation.resolves(&recovery);
+    let existing = match observation {
+        AnkiModelReconciliation::Observed { id, .. } if resolves => Some(id),
+        _ => None,
+    };
+    let state = if existing.is_some() {
+        "existing"
+    } else {
+        "uncertain"
+    };
+    let changed = connection.execute(
+        "UPDATE anki_model_creations SET state = ?2, existing_model_id = ?3 WHERE id = ?1",
+        params![id.value(), state, existing.map(i64::from)],
+    )?;
+    if changed != 1 {
+        return Err(AnkiJournalError::StaleCallback);
+    }
+    Ok(())
 }

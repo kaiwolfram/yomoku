@@ -3892,3 +3892,25 @@ and /tmp/yomoku-browser-profile-*. No emulator started.
   collection/browser, separate Full-loader, physical device, broader lifecycle
   or performance verification. Next: live export ownership, durable dispatch/
   outcome/reconciliation gates, then visible recovery Retry/settings/actions.
+
+## 2026-10-31 — App-owned Anki recovery evidence commits
+
+- Started clean. Added native app/FIFO transport for read-only provider evidence
+  commits, carrying the exact frozen restored pair. Under one immediate SQLite
+  transaction, compare both journals, reuse existing reconciliation, validate the
+  resulting pair and commit before returning it. Shared pure model-layout/known-ID
+  rules now live in core with the previous storage reexport. No migration/dependency.
+- App retains the obligation while saving; validates allowed results and attempt
+  IDs. Errors, lost responses, stale/duplicate callbacks and newer obligations
+  cannot open the gate. Failed commits require explicit read-only restore instead
+  of replay. Reader busy/errors/checkpoints stay independent. Provider reads/writes,
+  live export ownership, begin/outcome routing and visible UI remain unconnected.
+- PASS: 18 new cases, 63 focused Anki cases, 909 workspace tests/17 ignored fixtures;
+  build, strict Clippy, Rustfmt/diff and unchanged generated Kotlin output. Fixed
+  two initial test-only unused-command warnings; final checks clean. No open blocker.
+  Logs: /tmp/yomoku-anki-reconcile-*.log.
+- Updated architecture/data model, decisions, plan, verification and handoff. No
+  public codec/Kotlin/UI change. No Android, host JNI JVM, real provider/collection/
+  browser, separate Full-loader, physical device, broader lifecycle or performance
+  verification. Next: live export ownership, typed provider read/preflight dispatch
+  and durable begin/outcome gates, then recovery Retry/settings/actions.

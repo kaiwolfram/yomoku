@@ -1955,6 +1955,33 @@ refreshes do not retry failures. Explicit native Retry is available for future
 UI wiring. Reader/import busy/error/checkpoint state is independent. No new
 shell Event/ViewModel payload, settings, provider action or replay is enabled.
 
+## App-owned Anki recovery evidence commits (schema 0022 unchanged)
+
+`AnkiRecoveryCommit` contains the complete frozen `AnkiRecoverySnapshot` and a
+note `AnkiReconciliation` or model `AnkiModelReconciliation` observation. These
+pure values and native commit/results/callbacks have no generated shell codec.
+Model observation data now belongs to core, reexported at its old storage path.
+Its shared predicate requires exact frozen layout and the known ID when present.
+
+`Storage::commit_anki_recovery` acquires an immediate transaction, re-reads both
+journals and requires exact equality with the frozen pair before applying the
+existing reconciliation SQL. It validates the post-write pair and commits before
+returning it. Changed payloads/known IDs, another journal's new obligation and
+stale/duplicate terminal evidence fail without changing either journal. Statement,
+post-write validation and COMMIT failures roll back the whole transaction.
+Terminal rows/payload/results remain stored. Note matches establish existence,
+not placement; empty/failed reads and partial/mismatched models retain uncertainty.
+
+The app retains a separate pending commit, attempt ID and persistence error.
+An observation must target an obligation in its exact current restored pair.
+While saving, the old obligation remains gated; only a matching callback with
+the exact allowed resulting pair can replace it. Wrong kinds, false empty results,
+stale/duplicate callbacks and attempt exhaustion keep the gate closed. Local
+reader busy/errors/checkpoints stay independent. A failed or lost commit response
+blocks further evidence commits until explicit native Retry restores both journals
+read-only. No automatic observation/provider replay or cleanup is added.
+Provider read/dispatch, live begin/outcome routing and UI projection remain next.
+
 ## Read-only Vocabulary browser (schema 0020 unchanged)
 
 `Storage::vocabulary_page(&VocabularyQuery, offset)` returns a full matching count,

@@ -1985,6 +1985,28 @@ remain pure native data with no generated codec, analyzer/dictionary read,
 provider command or recovery mutation. Live tokens remain in storage and cannot
 be constructed from the core's validated recovery IDs.
 
-This is startup ownership only. Live export/session ownership, durable begin/
-outcome/reconciliation routing and provider/FFI/UI activation remain unfinished.
-The earlier isolated journal/provider descriptions do not imply enabled actions.
+Startup ownership now feeds the native evidence-commit path below. Live export/
+session ownership, durable begin/outcome routing and provider/FFI/UI activation
+remain unfinished. Earlier journal/provider descriptions imply no enabled actions.
+
+### App-owned Anki recovery evidence commits
+
+Native `CommitAnkiRecovery` accepts the exact restored pair and typed note/model
+evidence from a future read-only provider dispatcher. The retained model validates
+the target and pair, owns a pending commit/attempt ID, and keeps the old obligation
+while the existing FIFO performs the local journal write. Reader/import busy,
+errors, checkpoints and normal navigation stay independent. Startup refreshes do
+not retry a failed commit; explicit native Retry restores both journals read-only.
+
+`Storage::commit_anki_recovery` uses one immediate transaction to compare both
+journals with the frozen observed pair, reconcile only the target, validate the
+resulting pair and commit. It reuses the existing single-journal SQL helpers.
+Both app and repository require the exact allowed result; a changed obligation,
+wrong result kind, false empty result or stale/duplicate callback cannot release
+newer work. Errors and lost responses retain the app gate until fresh restore;
+there is no automatic commit/provider replay. Note existence does not assert deck
+placement. Model evidence requires frozen full layout and known returned ID.
+
+The typed commit, result and callback have no shell codec. Provider observations
+and dispatch remain unconnected, as do live export ownership and durable begin/
+outcome routing. Existing terminal payload/ID retention and schema 0022 remain.

@@ -4561,3 +4561,34 @@ recovery itself has no shell projection yet. No analyzer or dictionary loading,
 provider calls, restart replay or journal state changes occur during restore.
 App-owned live export, preparation/outcome commits, read-only reconciliation,
 typed provider/FFI dispatch and visible Retry/settings/actions remain next.
+
+## 2026-10-31 — Commit read-only Anki recovery evidence through the app
+
+Continue the durable recovery path before live export/provider activation. Pure
+`AnkiRecoveryCommit` carries the exact restored pair plus a typed note/model
+read-only observation. Move model observation data into core with the existing
+storage reexport; share full-layout/known-ID comparison across app and repository.
+No dependency, migration, platform I/O in core or public shell codec is added.
+
+Under one immediate transaction, re-read both journals, require exact equality
+with the observed pair, apply the existing journal reconciliation and read the
+resulting pair before COMMIT. This rejects changed payloads/known IDs, another
+journal's new obligation, duplicate terminal observations and older IDs. A note
+match establishes existence only; missing/failed reads keep uncertainty. A model
+match requires the frozen full layout and original known returned ID. Preserve
+terminal payloads/results; no provider mutation, cleanup or data deletion occurs.
+
+The app owns a separate pending commit and native attempt ID, retaining the old
+obligation until success. Validate the returned pair against the precise allowed
+transition; wrong kinds or an unexpected empty result cannot open the gate.
+Commit errors remain independent of local reader errors/busy/checkpoint state.
+After a failed/lost response, reject further observation commits until explicit
+Retry restores both journals read-only. Never replay an observation or provider
+write automatically. A committed-but-lost terminal result becomes visible through
+that restore, while rolled-back results retain the original obligation.
+
+This connects only native app/FIFO journal commits. The future read dispatcher
+must capture the frozen pair when issuing its read, provide validated supported
+provider observations and reject obsolete shell selections. No provider read or
+write, live export/session ownership, begin/outcome dispatch, visible recovery
+Retry or Settings/Add to Anki call site is enabled by this slice.

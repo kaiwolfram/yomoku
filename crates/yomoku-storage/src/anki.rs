@@ -163,21 +163,7 @@ impl Storage {
         let transaction = self
             .connection
             .transaction_with_behavior(TransactionBehavior::Immediate)?;
-        let recovery = read_recovery(&transaction)?.ok_or(AnkiJournalError::StaleCallback)?;
-        if recovery.id != id {
-            return Err(AnkiJournalError::StaleCallback);
-        }
-        let (state, existing) = match observation {
-            AnkiReconciliation::Existing(ids) => ("existing", Some(ids)),
-            AnkiReconciliation::Unresolved | AnkiReconciliation::Failed(_) => ("uncertain", None),
-        };
-        let changed = transaction.execute(
-            "UPDATE anki_submissions SET state = ?2, existing_ids = ?3 WHERE id = ?1",
-            params![id.value(), state, encode_existing(existing)?],
-        )?;
-        if changed != 1 {
-            return Err(AnkiJournalError::StaleCallback);
-        }
+        reconcile_in(&transaction, id, observation)?;
         transaction.commit()?;
         Ok(())
     }
@@ -226,4 +212,27 @@ pub(crate) fn read_recovery(
         return Err(AnkiJournalError::InvalidRecord);
     }
     Ok(Some(recovery))
+}
+
+pub(crate) fn reconcile_in(
+    connection: &Connection,
+    id: AnkiSubmissionId,
+    observation: AnkiReconciliation,
+) -> Result<(), AnkiJournalError> {
+    let recovery = read_recovery(connection)?.ok_or(AnkiJournalError::StaleCallback)?;
+    if recovery.id != id {
+        return Err(AnkiJournalError::StaleCallback);
+    }
+    let (state, existing) = match observation {
+        AnkiReconciliation::Existing(ids) => ("existing", Some(ids)),
+        AnkiReconciliation::Unresolved | AnkiReconciliation::Failed(_) => ("uncertain", None),
+    };
+    let changed = connection.execute(
+        "UPDATE anki_submissions SET state = ?2, existing_ids = ?3 WHERE id = ?1",
+        params![id.value(), state, encode_existing(existing)?],
+    )?;
+    if changed != 1 {
+        return Err(AnkiJournalError::StaleCallback);
+    }
+    Ok(())
 }

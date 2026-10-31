@@ -91,6 +91,11 @@ pub enum StorageOperation {
     #[serde(skip)]
     #[cfg_attr(feature = "facet_typegen", facet(skip))]
     LoadAnkiRecovery,
+    #[serde(skip)]
+    #[cfg_attr(feature = "facet_typegen", facet(skip))]
+    CommitAnkiRecovery(
+        #[cfg_attr(feature = "facet_typegen", facet(opaque))] Box<crate::anki::AnkiRecoveryCommit>,
+    ),
 }
 
 impl StorageOperation {
@@ -177,6 +182,12 @@ pub enum StorageResult {
     #[serde(skip)]
     #[cfg_attr(feature = "facet_typegen", facet(skip))]
     AnkiRecoveryLoaded(
+        #[cfg_attr(feature = "facet_typegen", facet(opaque))]
+        Box<crate::anki::AnkiRecoverySnapshot>,
+    ),
+    #[serde(skip)]
+    #[cfg_attr(feature = "facet_typegen", facet(skip))]
+    AnkiRecoveryCommitted(
         #[cfg_attr(feature = "facet_typegen", facet(opaque))]
         Box<crate::anki::AnkiRecoverySnapshot>,
     ),

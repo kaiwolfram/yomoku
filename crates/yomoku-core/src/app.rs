@@ -84,6 +84,8 @@ pub struct Model {
     anki_recovery: crate::anki::AnkiRecoveryState,
     anki_recovery_sequence: u64,
     anki_recovery_request: Option<u64>,
+    anki_recovery_commit: Option<(u64, Box<crate::anki::AnkiRecoveryCommit>)>,
+    anki_recovery_commit_error: Option<DocumentError>,
     vocabulary: crate::vocabulary::VocabularyState,
     vocabulary_request: Option<vocabulary::VocabularyRequest>,
     vocabulary_request_sequence: u64,
@@ -310,6 +312,14 @@ pub enum Event {
     #[serde(skip)]
     #[cfg_attr(feature = "facet_typegen", facet(skip))]
     AnkiRecoveryFinished(u64, StorageResult),
+    #[serde(skip)]
+    #[cfg_attr(feature = "facet_typegen", facet(skip))]
+    CommitAnkiRecovery(
+        #[cfg_attr(feature = "facet_typegen", facet(opaque))] Box<crate::anki::AnkiRecoveryCommit>,
+    ),
+    #[serde(skip)]
+    #[cfg_attr(feature = "facet_typegen", facet(skip))]
+    AnkiRecoveryCommitFinished(u64, StorageResult),
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -1253,7 +1263,8 @@ impl App for Yomoku {
                     | StorageResult::VocabularyLoaded(_)
                     | StorageResult::VocabularyMatchingIds(_)
                     | StorageResult::VocabularyBulkApplied(_)
-                    | StorageResult::AnkiRecoveryLoaded(_) => {
+                    | StorageResult::AnkiRecoveryLoaded(_)
+                    | StorageResult::AnkiRecoveryCommitted(_) => {
                         model.document_error = Some(DocumentError::InvalidDocument);
                     }
                     StorageResult::ImportCancelled => {}
@@ -1584,7 +1595,9 @@ impl App for Yomoku {
             | Event::StatisticsFinished(..)
             | Event::RestoreAnkiRecovery
             | Event::RetryAnkiRecovery
-            | Event::AnkiRecoveryFinished(..) => unreachable!(),
+            | Event::AnkiRecoveryFinished(..)
+            | Event::CommitAnkiRecovery(_)
+            | Event::AnkiRecoveryCommitFinished(..) => unreachable!(),
         }
         render::render()
     }

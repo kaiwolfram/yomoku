@@ -12,6 +12,7 @@ use super::*;
 mod analysis;
 mod anki;
 mod anki_model;
+mod anki_reconciliation;
 mod anki_recovery;
 mod completions;
 mod custom_dictionary;

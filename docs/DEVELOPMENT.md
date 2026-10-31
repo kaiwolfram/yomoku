@@ -7917,3 +7917,41 @@ No Android APK/lint/emulator, host Kotlin/JNI JVM, real collection/browser,
 independent Full-loader, physical arm64, broader lifecycle or performance check.
 Next: live export ownership and durable begin/outcome/reconciliation routing,
 typed provider/FFI dispatch and compact visible recovery/settings/action state.
+
+## App-owned Anki recovery evidence commits
+
+Verified 2026-10-31 with the Rust PATH workaround above. Native host slice; no
+provider or Android installation is required.
+
+```sh
+cargo test -p yomoku-core -p yomoku-storage -p yomoku-runtime -p yomoku-ffi anki --all-features --locked --offline
+cargo test --workspace --all-features --locked --offline --quiet
+cargo build --workspace --locked --offline
+cargo clippy --workspace --all-targets --all-features --locked --offline -- -D warnings
+cargo fmt --all -- --check
+cargo run -p yomoku-ffi --bin generate-kotlin --features facet_typegen --locked --offline -- /tmp/yomoku-anki-reconcile-kotlin
+diff -r target/generated/kotlin /tmp/yomoku-anki-reconcile-kotlin
+git diff --check
+```
+
+PASS: 18 new cases (6 app, 7 repository, 4 worker, 1 FFI codec); 63 focused Anki
+cases; 909 workspace tests, 17 opt-in fixtures ignored; workspace build, strict
+Clippy, Rustfmt and diff. Generated Kotlin output remains byte-for-byte identical;
+all new commit/result/callback payloads reject shell serialization.
+Coverage includes exact frozen note/deck/model/layout/known-ID evidence; missing/
+failed/partial observations; known-ID mismatches; app gate until commit; stale/
+duplicate/wrong-result callbacks; attempt exhaustion; one target preserving another
+obligation; changed snapshots/newer journals; concurrent observations; statement
+and deferred-COMMIT rollback; actual committed-but-lost worker responses; restart/
+read-only Retry; and a blocked SQLite write with responsive local core navigation.
+No provider read/write, automatic replay, cleanup or reader/vocabulary mutation.
+
+Initial focused compilation warned about two unused test commands; explicitly
+checked their empty effects, then final workspace/Clippy passed without warnings.
+No open blocker. Logs: `/tmp/yomoku-anki-reconcile-*.log` (core, storage, focused,
+workspace, check, build, clippy, format, typegen and codec-diff).
+No dependency, migration, Kotlin/provider/UI or public Event/ViewModel change.
+No Android APK/lint/emulator, host Kotlin/JNI JVM, real collection/browser,
+independent Full-loader, physical arm64, broader lifecycle or performance check.
+Next: live export ownership, typed provider reads/preflight/callback provenance,
+durable begin/outcome routing, then visible recovery Retry/settings/actions.

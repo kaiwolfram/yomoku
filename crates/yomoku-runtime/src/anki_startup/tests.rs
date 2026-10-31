@@ -25,19 +25,36 @@ use super::*;
 use crate::storage::StorageEffects;
 
 #[derive(Default)]
-struct Probe;
+struct Probe {
+    lose_commit_response: bool,
+}
 impl App for Probe {
     type Event = Event;
     type Model = Model;
-    type ViewModel = (ViewModel, AnkiRecoveryState);
+    type ViewModel = (ViewModel, AnkiRecoveryState, bool, Option<DocumentError>);
     type Effect = Effect;
 
     fn update(&self, event: Event, model: &mut Model) -> Command<Effect, Event> {
+        let event = match event {
+            Event::AnkiRecoveryCommitFinished(
+                id,
+                yomoku_core::storage::StorageResult::AnkiRecoveryCommitted(_),
+            ) if self.lose_commit_response => Event::AnkiRecoveryCommitFinished(
+                id,
+                yomoku_core::storage::StorageResult::Failed(DocumentError::Unavailable),
+            ),
+            event => event,
+        };
         Yomoku.update(event, model)
     }
 
     fn view(&self, model: &Model) -> Self::ViewModel {
-        (Yomoku.view(model), model.anki_recovery().clone())
+        (
+            Yomoku.view(model),
+            model.anki_recovery().clone(),
+            model.anki_recovery_saving(),
+            model.anki_recovery_commit_error(),
+        )
     }
 }
 
@@ -59,6 +76,9 @@ impl Database {
         self.0.join("user.sqlite3")
     }
     fn router(&self, effective: bool) -> Router {
+        self.router_with_loss(effective, false)
+    }
+    fn router_with_loss(&self, effective: bool, lose_commit_response: bool) -> Router {
         let (worker, _) = StorageEffects::with_dictionaries(
             self.path(),
             Box::new(|| panic!("startup must never load analyzer")),
@@ -67,7 +87,9 @@ impl Database {
         .unwrap();
         AnkiStartupLayer::new(
             Core::new_with(
-                Probe,
+                Probe {
+                    lose_commit_response,
+                },
                 if effective {
                     Model::with_effective_reader()
                 } else {
@@ -98,8 +120,10 @@ fn refresh(router: &Router) -> (ViewModel, AnkiRecoveryState) {
     );
     let view = router.view();
     assert!(!view.0.storage_busy);
-    view
+    (view.0, view.1)
 }
+
+mod reconciliation;
 
 fn submission() -> AnkiSubmission {
     let surface = Surface::new("𠮷猫").unwrap();

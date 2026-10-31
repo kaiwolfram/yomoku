@@ -4,6 +4,8 @@
 use super::*;
 use crate::anki::AnkiRecoveryState;
 
+mod reconciliation;
+
 impl Model {
     pub fn anki_recovery(&self) -> &AnkiRecoveryState {
         &self.anki_recovery
@@ -16,10 +18,15 @@ impl Yomoku {
         event: &Event,
         model: &mut Model,
     ) -> Option<Command<Effect, Event>> {
+        if let Some(command) = self.update_anki_reconciliation(event, model) {
+            return Some(command);
+        }
         match event {
             Event::RestoreAnkiRecovery if model.anki_recovery == AnkiRecoveryState::Unrestored => {}
             Event::RetryAnkiRecovery
-                if matches!(model.anki_recovery, AnkiRecoveryState::Failed(_)) => {}
+                if model.anki_recovery_commit.is_none()
+                    && (matches!(model.anki_recovery, AnkiRecoveryState::Failed(_))
+                        || model.anki_recovery_commit_error.is_some()) => {}
             Event::RestoreAnkiRecovery | Event::RetryAnkiRecovery => {
                 return Some(Command::done());
             }
@@ -45,6 +52,7 @@ impl Yomoku {
         };
         model.anki_recovery_sequence = id;
         model.anki_recovery_request = Some(id);
+        model.anki_recovery_commit_error = None;
         model.anki_recovery = AnkiRecoveryState::Loading;
         Some(
             Command::request_from_shell(StorageOperation::LoadAnkiRecovery)

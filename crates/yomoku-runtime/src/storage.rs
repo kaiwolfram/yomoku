@@ -252,6 +252,10 @@ fn execute(
     }
     let storage = storage.as_mut().expect("opened storage");
     match operation {
+        StorageOperation::CommitAnkiRecovery(command) => storage
+            .commit_anki_recovery(&command)
+            .map(StorageResult::AnkiRecoveryCommitted)
+            .map_err(|_| DocumentError::Unavailable),
         StorageOperation::LoadAnkiRecovery => storage
             .anki_recovery_snapshot()
             .map(|snapshot| StorageResult::AnkiRecoveryLoaded(Box::new(snapshot)))
