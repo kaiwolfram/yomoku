@@ -7667,3 +7667,44 @@ APK/lint/Full-loader, provider installation/export, device or profiling runs.
 No emulator started. The session guard is in-memory; app-owned state/typed bridge,
 durable pending/uncertain insertion recovery, adapter/fake-provider tests and a
 disposable real collection remain prerequisites for the optional action.
+
+
+## Read-only Android Anki provider contract
+
+No Anki API dependency is needed for `AnkiProviderReader`. The adapter remains
+unconnected to app/UI/FFI; in-process fake providers exercise ContentResolver and
+real Android SQLite. Use the existing isolated 8 GiB API-36 x86_64 image documented
+above; the default 6 GiB image may not have space to replace the dictionary APK.
+Do not clear app data to make space. Start/stop only the task-owned emulator.
+
+```sh
+export PATH="/home/kai/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin:$PATH"
+export JAVA_HOME="$PWD/.local/jdk-17/jdk-17.0.21+9"
+export GRADLE_USER_HOME="$PWD/.local/gradle"
+export ANDROID_HOME=/home/kai/Android/Sdk
+./android/gradlew -p android :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug --offline --console=plain
+"$ANDROID_HOME/platform-tools/adb" -s emulator-5554 install -r -t android/app/build/outputs/apk/debug/app-debug.apk
+"$ANDROID_HOME/platform-tools/adb" -s emulator-5554 install -r -t android/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+"$ANDROID_HOME/platform-tools/adb" -s emulator-5554 shell am instrument -w -r -e class app.yomoku.AnkiProviderReaderTest,app.yomoku.CoreSessionTest app.yomoku.test/androidx.test.runner.AndroidJUnitRunner
+JAVA_HOME="$JAVA_HOME" tools/format-kotlin.sh --check
+git diff --check
+```
+
+2026-10-31 PASS: 12 new provider cases plus three CoreSession regressions (15 total,
+0.129 s), debug/test APKs, strict Android lint, repository Kotlin formatting and
+`git diff --check`. Gradle regenerated Kotlin/JNI for both ABIs and rebuilt the debug
+Sudachi probe; dictionary assets reused. No independent Full-loader run. Tests
+cover fresh gates/revocation, long IDs/filtered flags, exact surfaces across models/
+decks, bound SQL/escaping/Unicode, malformed/null/partial/close-failed cursors,
+read-only unresolved reconciliation, supported link resolution and thread guards.
+
+Initial Kotlin mixed-array inference errors and resource/URI lint findings were
+corrected. Cursor cleanup is explicit try/finally and tested on failure. Sandbox
+Gradle lock/ADB socket access required approved execution. Default-image install
+failed for insufficient storage; switching to the documented isolated 8 GiB image
+allowed installation without clearing app data. Both task-started emulator runs
+were stopped. No outstanding failure/blocker. Logs:
+`/tmp/yomoku-anki-read-{android,tests,format}.log`; emulator logs use `-emulator.log`
+and `-isolated-emulator.log`. No real AnkiDroid collection, permission grant,
+browser launch, model/note mutation or compatibility claim. Host Rust/Clippy/
+Rustfmt, independent Full-loader, broader UI/lifecycle and profiling were not run.

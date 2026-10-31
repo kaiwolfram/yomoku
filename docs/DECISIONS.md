@@ -4367,3 +4367,33 @@ app/provider/UI wiring, persist pending/uncertain obligations across process dea
 and prevent replay of mutating requests. Do not claim restart idempotency, runtime
 provider compatibility or a safe post-uncertainty insert retry from these pure
 tests. This adds no dependency, schema, Event/FFI, settings or visible UI behavior.
+
+## 2026-10-31 — Read-only Android Anki provider prerequisite
+
+Continue the retained export contract with an independently testable read-only
+ContentResolver boundary before model/note mutation and app/FFI ownership. No new
+dependency is required: the pinned AnkiDroid 2.25.3 contract defines the small URI,
+column, metadata and permission surface (ANKIDROID_API.md). Declare narrow known-
+provider package visibility and database permission now; keep calls/UI/permission
+prompts unconnected until durable insertion recovery exists. Kotlin result types
+are shell-local, not a new transport protocol. Recheck availability/spec/permission
+on every operation and enforce worker execution.
+
+Use bound whole-first-field candidates over notes_v2 across all models/decks.
+Recognize exact core escaping (including media/delimiter escaping) and syntax-free
+literal plain text. Do not decode arbitrary HTML/entities or normalize identity.
+SQL equality/prefix-with-field-delimiter filters reduce returned rows; verify
+entire first fields again locally. No index/performance claim: scan costs must be
+measured before popup-triggered discovery. Reject embedded NUL conservatively;
+lossless Android SQLite cursor transport for that identity is not established.
+Return all distinct exact positive signed-64 note IDs. Reject malformed/null/
+partial/failed reads, including iteration/close failures, without publishing IDs.
+Successful empty reconciliation remains unresolved, never safe-to-insert.
+
+Preserve deck labels/IDs and report filtered-deck metadata without deciding UI
+selection behavior. Accept the provider's actual Boolean/string deck_dyn form
+alongside documented integer 0/1. Resolve existing-note browser links with the
+current provider package and exact URI-encoded note-ID search; return an intent
+without launching. Fake-provider tests use ContentResolver.wrap and real Android
+SQLite, with metadata/permission/link resolution injected. They cover adapter
+semantics, not installed AnkiDroid/Binder/browser compatibility or process death.

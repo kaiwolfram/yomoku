@@ -1,7 +1,8 @@
 # AnkiDroid integration evidence
 
-Reviewed 2026-10-31 for PRODUCT_SPEC.md §6. Source inspection only; no provider
-installation, permission grant, collection access or export has run yet.
+Reviewed 2026-10-31 for PRODUCT_SPEC.md §6. Primary-source inspection governs the
+adapter below; no AnkiDroid installation, permission grant, real collection
+access or export has run yet.
 The official [latest release](https://github.com/ankidroid/Anki-Android/releases/tag/v2.25.3)
 resolved to **2.25.3**, commit prefix `d9bf072`. Links below use that release tag.
 The older [API guide](https://github.com/ankidroid/Anki-Android/wiki/AnkiDroid-API)
@@ -105,8 +106,37 @@ existing-note IDs resolve it. This is a pure in-memory prerequisite, not app wir
 no Event, FFI type, settings, schema, dependency or UI action is added. Preparation
 and export have no mutable vocabulary/history input or effect.
 
-Next implement the Android provider adapter and fake-provider contract suite,
-then app-owned state/typed transport and durable pending/uncertain insertion
+The read-only Android prerequisite is now `AnkiProviderReader`. It checks current
+provider metadata/spec >=2, enabled/exported state and permission before every
+operation, enumerates decks without selecting/creating one, queries exact-surface
+duplicates and reconciles read-only. Shell-local result types are not an adopted
+Event/FFI protocol. The manifest declares only the known provider visibility query
+and database permission; no permission prompt or app call site is enabled.
+
+Duplicate candidates are the exact Yomoku escaped first field and, when it has no
+HTML/entity/media/delimiter syntax, the literal plain surface. Bound `flds = ?`
+or `instr(flds, <candidate plus U+001F>) = 1` filters match the entire first field,
+including one-field notes; returned fields are compared again in Kotlin. No
+model/deck/checksum restriction, Unicode normalization or arbitrary HTML decoding
+is used. Embedded NUL input fails closed because lossless Android SQLite string
+transport is not established. This query may scan notes: collection-size cost is
+unmeasured and it is not dispatched on popup entry. Null/malformed/partial/failed
+reads never produce a successful empty observation. Even a successful empty read
+maps to unresolved reconciliation, preserving the core's no-insert obligation.
+
+The reviewed provider's `addDeckToCursor` puts a Boolean into `deck_dyn`, despite
+the contract's documented integer 0/1. Accept exact `true`/`false` string cursor
+representations as well as integer 0/1, rejecting other forms. Existing-note links
+use the current provider package, URI-encoded `nid:<positive signed-64 ID>` and
+installed-handler resolution. The adapter returns the resolved intent without
+launching an Activity. Resolution is not proof of actual browser/return behavior.
+Android's supported [ContentResolver.wrap(ContentProvider)](https://developer.android.com/reference/android/content/ContentResolver#wrap(android.content.ContentProvider))
+allows in-process fake-provider tests on minSdk 29; these use real Android SQLite
+for bound query semantics and injected permission/metadata/resolution observations.
+They do not establish real Binder/provider/runtime compatibility.
+
+Next implement model-layout validation and the mutating adapter contract, then
+app-owned state/typed transport and durable pending/uncertain insertion
 recovery before enabling live wiring. A process restart must not erase insert
 uncertainty or replay an old mutating request. No supported provider completion
 fence for safe retry after empty reconciliation has been established. Verify model

@@ -1845,8 +1845,22 @@ remain existing notes, not permission to insert. No provider completion fence or
 atomic check-and-add guarantee is invented to permit a retry after an empty read.
 
 This session is not yet owned by the app Model or exposed through Event/FFI.
-Settings, provider adapter and Compose wiring remain open. Before enabling the
+Settings, mutating provider adapter and Compose wiring remain open. Before enabling the
 action, preserve pending/uncertain insertion obligations durably across process
 death; recreating an empty in-memory session cannot establish safe retry. Do not
 advertise runtime compatibility until fake-provider and disposable-collection
 tests verify the actual adapter and its error classification.
+
+Android's unconnected `AnkiProviderReader` implements the read-only prerequisite:
+fresh availability/spec/permission checks, deck enumeration, bound exact-first-
+field candidate queries across models/decks and read-only reconciliation. It
+accepts exact canonical escaping or syntax-free plain surfaces; arbitrary HTML
+decoding/normalization is not an identity proof. Failed/null/partial reads fail
+closed, and successful empty reconciliation stays unresolved. Embedded NUL input
+is rejected conservatively. Cursor IDs retain positive signed-64 values; multiple
+verified IDs are retained. Existing-note intents target the current provider's
+package and are returned only after supported browser-link resolution, without
+launching. All entry points reject the main thread; no reader/core/database handle
+is available to this adapter. Manifest visibility/permission declarations do not
+request permission or dispatch I/O. Local Kotlin types are prerequisites for the
+future typed bridge, not a second app state machine or serialized protocol.

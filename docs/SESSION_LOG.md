@@ -3715,3 +3715,35 @@ and /tmp/yomoku-browser-profile-*. No emulator started.
   settings/UI and disposable real collection, then remaining Android profiling/
   lifecycle/accessibility. Full Add to Anki stays unchecked; Q188 and user-deferred
   physical arm64 remain unchanged.
+
+
+## 2026-10-31 — Read-only Android Anki provider boundary
+
+- Started clean; continued the next Anki prerequisite with unconnected
+  AnkiProviderReader and narrow manifest provider visibility/database permission.
+  Recheck enabled/exported provider, spec >=2 and permission for each worker-only
+  operation; enumerate decks without selecting/creating. Preserve positive long
+  IDs, labels and actual Boolean/string or documented integer filtered flags.
+- Bound exact whole-first-field candidates span models/decks; compare complete
+  returned fields again. Recognize canonical core escaping and syntax-free plain
+  surfaces without arbitrary HTML decoding/normalization. Embedded NUL fails
+  closed; query costs remain unmeasured. Null/failed/malformed/partial/close-failed
+  cursors never publish empty/partial success. Empty reconciliation stays unresolved.
+  Resolve note-ID browser links only in the current provider package, without launch.
+- PASS: 12 new fake-provider cases with real Android SQLite plus three CoreSession
+  regressions (15 total, 0.129 s), debug/test APKs, strict Android lint, repository
+  Kotlin formatting and diff. Gradle rebuilt generated Kotlin/JNI for both ABIs
+  and the debug Sudachi probe; assets reused. No independent Full-loader check.
+- Corrected initial Kotlin fixture inference and cursor/URI lint findings. Approved
+  execution resolved sandbox Gradle/ADB sockets. Default 6 GiB image install failed
+  for storage; documented isolated 8 GiB image succeeded without clearing app data.
+  Both task-started AVD runs stopped. No remaining failure/blocker. Logs:
+  /tmp/yomoku-anki-read-{android,tests,format}.log and emulator logs.
+- Updated plan, API evidence, architecture, decisions, commands and brief handoff.
+  No dependency/schema/Rust source/Event/FFI/UI change or AnkiDroid installation,
+  permission grant, real collection access or note export. Host Rust/Clippy/Rustfmt,
+  physical device, broader UI/lifecycle, Full-loader and profiling were not rerun.
+- Next: model-layout/mutating provider contracts, app/typed bridge/durable recovery,
+  settings/UI and disposable real-collection/browser checks, then remaining Android
+  profiling/accessibility/lifecycle work. Full Add to Anki remains unchecked; Q188
+  and user-deferred physical arm64 are unchanged.
