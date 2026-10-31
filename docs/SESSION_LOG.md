@@ -3932,3 +3932,22 @@ and /tmp/yomoku-browser-profile-*. No emulator started.
   separate Full-loader, physical arm64, broad lifecycle or performance checks.
 - Updated plan, architecture/data model, decisions, verification and handoff.
   Next: typed preflight/recovery reads and durable begin/outcome dispatch gates.
+
+
+## 2026-10-31 — Native Anki recovery read callback ownership
+
+- Started clean. Added one native read handle capturing both restored journals
+  and a target; identity is unique to the app/read attempt. Foreign/stale/duplicate
+  callbacks cannot consume newer reads. Wrong kinds/changed pairs fail closed;
+  accepted evidence enters the existing durable commit gate with its frozen pair.
+- Explicit Retry invalidates a lost read before restoring both journals. Pending
+  journal commits cannot be abandoned; failed/lost commits need restore + fresh
+  read. Reader state remains independent. No provider effect, shell codec, UI,
+  dependency or schema change; Android dispatch/preflight/live gates remain open.
+- PASS: 13 new cases, 50 focused Anki cases, 932 workspace tests/17 ignored;
+  workspace build, strict Clippy, Rustfmt/diff and unchanged Kotlin generation.
+  No open blocker. Logs: /tmp/yomoku-anki-read-*.log. No Android, host JNI JVM,
+  real provider/collection/browser, separate Full-loader, physical arm64, broad
+  lifecycle or performance checks.
+- Updated plan, architecture/data model, decisions, verification and handoff.
+  Next: typed Android/FFI reads/preflight and durable live begin/outcome routing.

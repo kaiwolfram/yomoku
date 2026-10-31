@@ -31,7 +31,13 @@ struct Probe {
 impl App for Probe {
     type Event = Event;
     type Model = Model;
-    type ViewModel = (ViewModel, AnkiRecoveryState, bool, Option<DocumentError>);
+    type ViewModel = (
+        ViewModel,
+        AnkiRecoveryState,
+        bool,
+        Option<DocumentError>,
+        Option<yomoku_core::anki::AnkiRecoveryReadRequest>,
+    );
     type Effect = Effect;
 
     fn update(&self, event: Event, model: &mut Model) -> Command<Effect, Event> {
@@ -54,6 +60,7 @@ impl App for Probe {
             model.anki_recovery().clone(),
             model.anki_recovery_saving(),
             model.anki_recovery_commit_error(),
+            model.pending_anki_recovery_read().cloned(),
         )
     }
 }
@@ -123,6 +130,7 @@ fn refresh(router: &Router) -> (ViewModel, AnkiRecoveryState) {
     (view.0, view.1)
 }
 
+mod reads;
 mod reconciliation;
 
 fn submission() -> AnkiSubmission {

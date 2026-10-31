@@ -2032,3 +2032,27 @@ live callback token. Neither event has a public shell codec; the ViewModel stays
 unchanged. App-owned preflight/callback provenance, durable begin/outcome dispatch
 and visible Settings/Add to Anki/recovery actions remain unfinished. The standalone
 `AnkiExportSession` is still isolated and must not bypass those durable gates.
+
+
+### Native Anki recovery read lifecycle
+
+`BeginAnkiRecoveryRead(Note|Model)` now retains one `AnkiRecoveryReadRequest`
+only for an existing target in the restored pair, with no pending/failed recovery
+commit. Its immutable shared allocation captures both journals and identifies
+this app's read attempt. Native `pending_anki_recovery_read` exposes the handle
+for a future coordinator to capture before invoking the provider; beginning the
+lifecycle currently emits no effect and performs no I/O.
+
+`AnkiRecoveryReadFinished` accepts only that active handle, the matching observation
+kind and an unchanged full pair. Foreign, stale and duplicate callbacks cannot
+consume newer work. A matching invalid callback records a separate read error,
+without changing either journal. Accepted evidence automatically enters the existing
+FIFO evidence-commit path with the captured pair, keeping obligations gated until
+commit. Direct native evidence commits cannot compete with an active read.
+
+Explicit Retry can invalidate a lost read and restore both journals read-only.
+It cannot abandon a pending commit; failed/lost commit results require restore
+before a fresh read. Reader busy/errors and prepared intent remain independent.
+Handles have no shell codec or restart representation and authorize no provider
+mutation. Android/FFI read dispatch, preflight, live begin/outcome routing and
+visible recovery/deck/Add to Anki actions remain unconnected.

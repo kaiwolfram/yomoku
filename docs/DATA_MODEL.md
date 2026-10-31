@@ -1998,6 +1998,24 @@ no effect and creates no journal row or live token. Neither native preparation/
 clear event nor this data has a generated shell codec or ViewModel projection.
 Durable begin/outcome dispatch and provider/UI activation remain unfinished.
 
+## Native Anki recovery read ownership (no migration)
+
+`Model` retains at most one `AnkiRecoveryReadRequest` and a separate optional
+`AnkiExportError` for invalid callbacks. The request freezes the complete restored
+pair and a note/model target behind a private shared allocation; equality means
+that exact allocation, not equivalent IDs or contents. A new app/read attempt
+cannot reconstruct it. Native begin/callback events and these values have no
+shell codec or ViewModel projection.
+
+A callback must match the active handle, target kind and current full pair.
+Accepted evidence consumes the handle and creates the existing durable recovery
+commit from its captured snapshot. No callback can supply a replacement pair.
+An active read blocks direct native evidence commits. Explicit Retry can discard
+a lost read handle before restoring both journals; late callbacks are ignored.
+Pending commits cannot be discarded, and failed/lost commit responses require
+restore and a fresh read. No journal row/state change occurs at read begin; no
+provider dispatch or mutation, replay, migration or dependency is introduced.
+
 ## Read-only Vocabulary browser (schema 0020 unchanged)
 
 `Storage::vocabulary_page(&VocabularyQuery, offset)` returns a full matching count,

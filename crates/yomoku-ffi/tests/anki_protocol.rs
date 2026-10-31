@@ -73,3 +73,48 @@ fn anki_export_preparation_and_clear_have_no_shell_codec() {
         assert!(BincodeFfiFormat::serialize(&mut vec![], &event).is_err());
     }
 }
+
+#[test]
+fn anki_recovery_read_begin_and_captured_callback_have_no_shell_codec() {
+    use crux_core::App;
+    use yomoku_core::{
+        anki::{
+            AnkiModelCreation, AnkiModelLayout, AnkiModelReconciliation, AnkiModelRecovery,
+            AnkiRecoveryObservation, AnkiRecoveryReadTarget, AnkiRecoverySnapshot,
+        },
+        app::{Model, Yomoku},
+    };
+    for target in [AnkiRecoveryReadTarget::Note, AnkiRecoveryReadTarget::Model] {
+        assert!(
+            BincodeFfiFormat::serialize(&mut vec![], &Event::BeginAnkiRecoveryRead(target))
+                .is_err()
+        );
+    }
+    let mut model = Model::default();
+    let _restore = Yomoku.update(Event::RestoreAnkiRecovery, &mut model);
+    let _finished = Yomoku.update(
+        Event::AnkiRecoveryFinished(
+            1,
+            StorageResult::AnkiRecoveryLoaded(Box::new(AnkiRecoverySnapshot {
+                note: None,
+                model: Some(AnkiModelRecovery {
+                    id: 1.try_into().unwrap(),
+                    creation: AnkiModelCreation::new(AnkiModelLayout::yomoku()).unwrap(),
+                    known_model_id: None,
+                }),
+            })),
+        ),
+        &mut model,
+    );
+    let _begin = Yomoku.update(
+        Event::BeginAnkiRecoveryRead(AnkiRecoveryReadTarget::Model),
+        &mut model,
+    );
+    let event = Event::AnkiRecoveryReadFinished(
+        Box::new(model.pending_anki_recovery_read().unwrap().clone()),
+        Box::new(AnkiRecoveryObservation::Model(
+            AnkiModelReconciliation::Unresolved,
+        )),
+    );
+    assert!(BincodeFfiFormat::serialize(&mut vec![], &event).is_err());
+}

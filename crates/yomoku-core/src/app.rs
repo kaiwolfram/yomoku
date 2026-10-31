@@ -82,6 +82,8 @@ pub struct ImportSummary {
 #[derive(Default)]
 pub struct Model {
     prepared_anki_export: Option<crate::anki::AnkiExport>,
+    anki_recovery_read: Option<crate::anki::AnkiRecoveryReadRequest>,
+    anki_recovery_read_error: Option<crate::anki::AnkiExportError>,
     anki_recovery: crate::anki::AnkiRecoveryState,
     anki_recovery_sequence: u64,
     anki_recovery_request: Option<u64>,
@@ -333,6 +335,20 @@ pub enum Event {
     #[serde(skip)]
     #[cfg_attr(feature = "facet_typegen", facet(skip))]
     AnkiRecoveryCommitFinished(u64, StorageResult),
+    /// Native read lifecycle only; no provider invocation or shell codec yet.
+    #[serde(skip)]
+    #[cfg_attr(feature = "facet_typegen", facet(skip))]
+    BeginAnkiRecoveryRead(
+        #[cfg_attr(feature = "facet_typegen", facet(opaque))] crate::anki::AnkiRecoveryReadTarget,
+    ),
+    #[serde(skip)]
+    #[cfg_attr(feature = "facet_typegen", facet(skip))]
+    AnkiRecoveryReadFinished(
+        #[cfg_attr(feature = "facet_typegen", facet(opaque))]
+        Box<crate::anki::AnkiRecoveryReadRequest>,
+        #[cfg_attr(feature = "facet_typegen", facet(opaque))]
+        Box<crate::anki::AnkiRecoveryObservation>,
+    ),
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -1612,7 +1628,9 @@ impl App for Yomoku {
             | Event::RetryAnkiRecovery
             | Event::AnkiRecoveryFinished(..)
             | Event::CommitAnkiRecovery(_)
-            | Event::AnkiRecoveryCommitFinished(..) => unreachable!(),
+            | Event::AnkiRecoveryCommitFinished(..)
+            | Event::BeginAnkiRecoveryRead(_)
+            | Event::AnkiRecoveryReadFinished(..) => unreachable!(),
         }
         render::render()
     }

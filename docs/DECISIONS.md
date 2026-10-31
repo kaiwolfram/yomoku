@@ -4616,3 +4616,30 @@ ViewModel until typed preflight, durable begin/outcome commits and one-invocatio
 dispatch are connected. Do not reuse the isolated session's CheckAndAdd request
 as an app command before those gates exist. No schema, dependency or product UI
 change is needed for this bounded prerequisite.
+
+
+## 2026-10-31 — Native Anki recovery read callback ownership
+
+Capture a native read handle before connecting the Android provider dispatcher.
+`BeginAnkiRecoveryRead` retains exactly one immutable pair of restored journals
+and a note/model target. Its shared allocation identifies the attempt and app
+owner: equal payloads or IDs in another attempt/process cannot recreate callback
+provenance. The future dispatcher must capture that handle before reading and
+return it with the observation; it cannot supply a replacement journal snapshot.
+
+Accept a callback only for the active handle, matching target and unchanged pair.
+Then consume it and route its frozen evidence through the existing durable
+commit gate. Direct native evidence commits are blocked during a read. Failed,
+empty, partial or incompatible observations retain existing reconciliation rules;
+no read grants mutation authority or proves note placement. Read-state errors
+remain separate from local reader errors and journal persistence failures.
+
+Explicit Retry may invalidate a lost read handle and restore both journals;
+late callbacks cannot consume a later read. Retry cannot abandon an outstanding
+journal commit. Failed/lost commit responses still require restore and a fresh
+read, never observation replay. Constructors restart without any read handle.
+
+This bounded native lifecycle emits no provider effect and adds no shell codec,
+ViewModel projection, schema, dependency or product UI. The Android dispatcher,
+export preflight and durable live begin/outcome gates remain separate unfinished
+work. Native accessors are for that future coordinator, not a shell polling API.

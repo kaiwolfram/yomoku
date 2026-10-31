@@ -5,6 +5,7 @@ use super::*;
 use crate::anki::AnkiRecoveryState;
 
 mod preparation;
+mod reads;
 mod reconciliation;
 
 impl Model {
@@ -22,6 +23,9 @@ impl Yomoku {
         if let Some(command) = self.update_anki_preparation(event, model) {
             return Some(command);
         }
+        if let Some(command) = self.update_anki_recovery_read(event, model) {
+            return Some(command);
+        }
         if let Some(command) = self.update_anki_reconciliation(event, model) {
             return Some(command);
         }
@@ -29,7 +33,8 @@ impl Yomoku {
             Event::RestoreAnkiRecovery if model.anki_recovery == AnkiRecoveryState::Unrestored => {}
             Event::RetryAnkiRecovery
                 if model.anki_recovery_commit.is_none()
-                    && (matches!(model.anki_recovery, AnkiRecoveryState::Failed(_))
+                    && (model.anki_recovery_read.is_some()
+                        || matches!(model.anki_recovery, AnkiRecoveryState::Failed(_))
                         || model.anki_recovery_commit_error.is_some()) => {}
             Event::RestoreAnkiRecovery | Event::RetryAnkiRecovery => {
                 return Some(Command::done());
@@ -50,6 +55,10 @@ impl Yomoku {
             }
             _ => return None,
         }
+        // Explicit Retry can abandon a lost read callback: invalidate its
+        // read-only handle before restoring. It cannot abandon a journal commit.
+        model.anki_recovery_read = None;
+        model.anki_recovery_read_error = None;
         let Some(id) = model.anki_recovery_sequence.checked_add(1) else {
             model.anki_recovery = AnkiRecoveryState::Failed(DocumentError::Unavailable);
             return Some(Command::done());

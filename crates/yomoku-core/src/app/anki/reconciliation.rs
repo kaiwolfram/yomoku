@@ -23,7 +23,8 @@ impl Yomoku {
                 let AnkiRecoveryState::Restored(snapshot) = &model.anki_recovery else {
                     return Some(Command::done());
                 };
-                if model.anki_recovery_commit.is_some()
+                if model.anki_recovery_read.is_some()
+                    || model.anki_recovery_commit.is_some()
                     || model.anki_recovery_commit_error.is_some()
                     || command.expected != *snapshot
                     || command.expected_result().is_none()

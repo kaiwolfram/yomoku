@@ -10,6 +10,8 @@ mod export;
 mod projection;
 mod recovery;
 pub use recovery::*;
+mod recovery_read;
+pub use recovery_read::*;
 mod submission;
 pub use export::*;
 pub use submission::*;

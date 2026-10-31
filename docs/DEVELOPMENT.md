@@ -7990,3 +7990,38 @@ lint/emulator, host Kotlin/JNI JVM, real provider/collection/browser, independen
 Full-loader, physical arm64, broader lifecycle or performance checks were run.
 Next: typed provider read/preflight callback provenance plus durable begin/outcome
 routing before one live invocation; visible recovery/deck/actions follow.
+
+
+## Native Anki recovery read callback ownership
+
+Verified 2026-10-31 with the Rust PATH workaround above. Native host-only slice;
+read lifecycle ownership emits no platform/provider effect.
+
+```sh
+cargo test -p yomoku-core -p yomoku-runtime -p yomoku-ffi anki --all-features --locked --offline
+cargo test --workspace --all-features --locked --offline --quiet
+cargo build --workspace --locked --offline
+cargo clippy --workspace --all-targets --all-features --locked --offline -- -D warnings
+cargo fmt --all -- --check
+cargo run -p yomoku-ffi --bin generate-kotlin --features facet_typegen --locked --offline -- /tmp/yomoku-anki-read-kotlin
+diff -r target/generated/kotlin /tmp/yomoku-anki-read-kotlin
+git diff --check
+```
+
+PASS: 13 new cases (9 app, 3 worker, 1 FFI codec); 50 focused Anki cases;
+932 workspace tests, 17 opt-in fixtures ignored; workspace build, strict Clippy,
+Rustfmt and diff. Generated Kotlin codecs remain byte-for-byte unchanged.
+Coverage includes exact frozen note/deck/full model layout/known long IDs;
+restored-target/commit gates; foreign/duplicate/stale/wrong-kind callbacks and
+changed pairs; another owner's identical snapshot; explicit lost-read Retry;
+read/commit attempt exhaustion; failed/empty/incompatible observations; separate
+reader state; commit failure and actual committed-but-lost worker responses;
+external journal transitions; restore/fresh-read requirements and absent shell
+codecs. No provider invocation or mutation replay occurs. No open blocker.
+
+Logs: `/tmp/yomoku-anki-read-{core,focused,workspace,build,clippy,format,typegen,codec-diff,diff}.log`.
+No schema, dependency, public codec, Kotlin/provider or UI change. No Android
+APK/lint/emulator, host Kotlin/JNI JVM, real provider/collection/browser,
+independent Full-loader, physical arm64, broad lifecycle or performance checks.
+Next: actual typed Android/FFI read dispatch and prepared-export preflight,
+then durable begin/outcome gates before live model/note invocation and UI actions.
