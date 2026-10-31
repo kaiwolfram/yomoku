@@ -7391,3 +7391,41 @@ loader/optimized/lifecycle/broader device matrices were not rerun. Initial
 sandbox Gradle lock-socket access required approved rerun; no open failure.
 ADB confirms scratch directories absent; task-started isolated AVD stopped.
 Logs: `/tmp/yomoku-request-{android,format-check,regressions,10000,100000,validation}.log`.
+
+## Controlled Vocabulary ID-list decoding
+
+Use the pinned build/install/environment and isolated API-36 emulator commands
+above. This new harness opens no database or CoreSession and is opt-in; its two
+correctness cases run normally. Production generated code remains unchanged.
+
+```sh
+tools/format-kotlin.sh --check
+./android/gradlew -p android :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug --offline --console=plain
+"$ANDROID_HOME/platform-tools/adb" -s emulator-5554 install -r -t android/app/build/outputs/apk/debug/app-debug.apk
+"$ANDROID_HOME/platform-tools/adb" -s emulator-5554 install -r -t android/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+"$ANDROID_HOME/platform-tools/adb" -s emulator-5554 shell am instrument -w -r -e class app.yomoku.CoreSessionTest,app.yomoku.VocabularySelectionLookupTest,app.yomoku.VocabularyDecodingTest app.yomoku.test/androidx.test.runner.AndroidJUnitRunner
+"$ANDROID_HOME/platform-tools/adb" -s emulator-5554 shell am instrument -w -r -e class 'app.yomoku.VocabularyDecodingTest#measureIdenticalIdPayloads' -e yomokuMeasureDecode true -e yomokuVocabularyEntries 10000 -e yomokuMeasureIterations 8 app.yomoku.test/androidx.test.runner.AndroidJUnitRunner
+"$ANDROID_HOME/platform-tools/adb" -s emulator-5554 shell am instrument -w -r -e class 'app.yomoku.VocabularyDecodingTest#measureIdenticalIdPayloads' -e yomokuMeasureDecode true -e yomokuVocabularyEntries 100000 -e yomokuMeasureIterations 8 app.yomoku.test/androidx.test.runner.AndroidJUnitRunner
+"$JAVA_HOME/bin/javap" -c -p android/app/build/intermediates/built_in_kotlinc/debug/compileDebugKotlin/classes/com/novi/serde/BinaryDeserializer.class
+git diff --check
+```
+
+2026-10-31 PASS: debug/test APKs, strict lint, repository Kotlin formatting/diff;
+native/bindings/assets reused Gradle outputs. Six regressions plus the default
+measurement assumption skip (seven reported, 0.720 s). Two opt-in processes per
+size pass (10k/1 0.671 s, 100k/1 2.156 s, 100k/2 2.135 s, 10k/2 0.651 s), with no
+competing builds/tests/profilers. Four warmup/eight measured balanced rounds per
+process. All 128 raw rows, exact-ID/generated-byte round trips, immutable inputs,
+malformed lengths/truncation/trailers and counters validate. See
+VOCABULARY_ANDROID_PERFORMANCE.md, controlled ID-list section, and
+measurements/vocabulary-decoding-android-2026-10-31.csv for results and limits.
+Capacity-only timings overlap generated; specialized readers are faster in these
+synthetic samples but omit generic/container calls too. Bytecode exposes per-read
+range/progression construction in generated 64-bit loops. Approximate process ART
+deltas include lag/GC/unrelated work and do not establish exact allocations or
+peak/retained memory. Do not infer full snapshot/action/composition improvements.
+No production/Rust/schema/dependency/wire change. Initial sandbox Gradle socket
+failure needed approved rerun; no open source/test failure. Host Rust/Clippy/JNI,
+independent generation and full Compose/native/optimized/arm64/lifecycle profiles
+were not rerun. Logs: /tmp/yomoku-decoding-{android,format-check,regressions,
+10000-1,10000-2,100000-1,100000-2,validation}.log; bytecode -bytecode.txt.

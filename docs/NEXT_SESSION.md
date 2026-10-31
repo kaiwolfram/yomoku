@@ -1,35 +1,33 @@
 # Resume here
-Updated: 2026-10-31. Vocabulary request phases and equal snapshots verified.
+Updated: 2026-10-31. Controlled Vocabulary ID-list decoding comparisons verified.
 Commit guidance: explanatory bodies; merges include provenance. Keep verification
 results in session/progress docs and reports, out of commit message bodies.
 
 ## Current slice
-- Opt-in CoreSession diagnostics now separate event encoding, synchronous JNI
-  update and generated request decoding; callback native intervals stay absent.
-  Normal path reads no clocks and creates no measurement records. Native callback
-  work/handler queue delay and composition remain outside these intervals.
-- Diagnostic main-thread snapshot replay requires a render observer/open session,
-  reuses production decode/publication, and sends no event/requests/notification.
-  Equal frozen confirmations retain the existing state instance and all IDs.
-  Product event guards and structural equality policy remain intact.
-- Separate debug API-36 x86_64 phone/light 10k/100k processes: 1,000 retained rows,
-  one full warmup/five samples. At 100k Select All/confirmation synchronous native
-  update medians are 0.298/0.335 ms; request decoding max is 0.090 ms overall.
-- At 100k equal-confirmation native/decode/publication medians are
-  61.037/192.500/5.594 ms; publication range 3.936–35.825 ms. All ten equal
-  renders retain prior state; 70 changed renders publish. No equality-policy,
-  speed/frame-rate or isolated composition inference. Replay shares GC history
-  with preceding serialization/assertions, so it is not a paired microbenchmark.
-- Raw 80 render/70 request/60 action rows and 111 frames validate. Process-memory
-  sampling/debug/dialog-window limits apply; no exact peak/PSS claim.
-- No Rust/schema/dependency/wire/threading/destructive change. Schema 0020.
-  No Nostr starter data; configuration empty. Ask Q188 before forwarding.
+- Added test-only VocabularyDecodingTest: exact generated list/element decoder,
+  validated preallocation and growing/preallocated fixed-width ByteBuffer readers.
+  No production runtime/generation/schema/dependency/wire/equality/event change.
+- Two correctness cases cover empty/100k/gapped/>2^53/signed wire IDs, generated
+  byte round trips, all short-payload truncations, bad lengths and trailing bytes.
+- Four opt-in debug API-36 x86_64 processes (two per 10k/100k size), four warmup/
+  eight measured balanced rounds. All 128 raw rows validate and inputs stay exact.
+- At 100k generated medians are 25.502/23.098 ms versus capacity 25.341/23.795;
+  buffered+capacity 3.303/3.029 ms (long samples up to 46.911 ms). These are single
+  lists, not full snapshots/actions; specialized readers also omit generic and
+  per-ID container calls. No production speed/composition/peak-memory claim.
+- Bytecode shows RangesKt.until/step for each deserialize_u64/getLong invocation
+  from the pinned runtime's `0 until 64 step 8` loops. Target these allocations;
+  current comparisons do not isolate their contribution. ART allocation/GC
+  counters are approximate/process-wide, lag (including zero samples) and include
+  unrelated work. Keep full selected/frozen IDs and production replay guards.
+- Schema 0020. Nostr starter configuration empty; ask Q188 before forwarding.
 
 ## Next tasks (ordered)
-1. Investigate large-ID Kotlin decoding/allocation with controlled comparisons;
-   profile asynchronous native callback work and composition separately. Keep
-   exact frozen/read-only/replay guards; extend optimized/fully loaded/heavy-
-   history/diverse-book cases and exact peaks before broader performance claims.
+1. Test an allocation-free scalar 64-bit loop through reproducible Kotlin
+   generation, preserving byte order, errors/offsets and signed/unsigned values;
+   compare against legacy scalar loops, then full frozen snapshots. Avoid adopting
+   specialized list readers as arbitrary schema decoders. Async native callback/
+   composition, optimized/heavy-history/diverse-book/full-load/peak work remains.
 2. Verify supported AnkiDroid provider/deck/model/duplicate APIs against primary
    documentation; record feasible exact-surface duplicate behavior before wiring.
 3. Extend remaining accessibility/process-death/lifecycle matrix. Physical arm64
@@ -37,30 +35,29 @@ results in session/progress docs and reports, out of commit message bodies.
 
 ## Verification / blockers
 - PASS: debug/test APKs, strict Android lint, repository Kotlin formatting/diff;
-  native/bindings/assets reused Gradle outputs. Twenty-one passing regressions
-  plus harness default assumption skip (22 reported, 240.384 s), including replay
-  identity/no requests/no notification and observer thread/removal tests.
-- PASS: separate opt-in 10k/100k profiles (38.092/60.011 s). Exact rows/selected/
-  frozen IDs, unchanged bytes, zero analyzer/reading effects, integrity/FK/native
-  closure/scratch cleanup and all raw metrics validate. ADB confirms scratch
-  directories absent; task-started isolated AVD stopped with phone/light retained.
-- Results/hashes/limits: VOCABULARY_ANDROID_PERFORMANCE.md, final request/replay
-  section; measurements/vocabulary-request-android-2026-10-31*.csv. Exact pinned
-  build/install/regression/profile commands: DEVELOPMENT.md, final Vocabulary
-  sections; include CoreSessionTest in regression class list.
-- Build: ./android/gradlew -p android :app:assembleDebug
+  native/bindings/assets reused Gradle outputs. Production debug APK unchanged.
+- PASS: CoreSessionTest, VocabularySelectionLookupTest, VocabularyDecodingTest:
+  six passing cases plus measurement default assumption skip (seven, 0.720 s).
+- PASS: four profiles (10k/1 0.671 s, 100k/1 2.156 s, 100k/2 2.135 s,
+  10k/2 0.651 s). All 128 raw rows/positions/payloads/counters/round trips validate.
+- Results/hashes/method/limits: VOCABULARY_ANDROID_PERFORMANCE.md, controlled
+  ID-list section; measurements/vocabulary-decoding-android-2026-10-31.csv.
+  Exact commands: DEVELOPMENT.md, final Controlled Vocabulary ID-list section.
+- Build: PATH="$HOME/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin:$PATH"
+  JAVA_HOME="$PWD/.local/jdk-17/jdk-17.0.21+9" GRADLE_USER_HOME="$PWD/.local/gradle"
+  ANDROID_HOME=/home/kai/Android/Sdk ./android/gradlew -p android :app:assembleDebug
   :app:assembleDebugAndroidTest :app:lintDebug --offline --console=plain
 - Format: JAVA_HOME="$PWD/.local/jdk-17/jdk-17.0.21+9"
   tools/format-kotlin.sh --check; git diff --check.
 - Profile: adb shell am instrument -w -r -e class
-  app.yomoku.VocabularyPerformanceTest -e yomokuMeasure true
-  -e yomokuMeasureRender true -e yomokuVocabularyEntries 100000
-  -e yomokuVocabularyLoaded 1000 -e yomokuMeasureIterations 5
-  app.yomoku.test/androidx.test.runner.AndroidJUnitRunner
-  No competing builds/tests/profilers; no input corpus needed.
-- Logs: /tmp/yomoku-request-{android,format-check,regressions,10000,100000,
-  validation}.log. Initial sandbox Gradle lock-socket access needed approved
-  rerun; no source/test failures or open blocker. Existing ignored caches kept.
-- Host Rust/Clippy, independent JNI/codegen/Full-loader, optimized/tablet/dark/
-  continuous-fling/heavy-history/diverse-book/fully loaded, exact peaks/PSS,
-  process-death and physical arm64 not rerun. Broader tasks stay open.
+  'app.yomoku.VocabularyDecodingTest#measureIdenticalIdPayloads'
+  -e yomokuMeasureDecode true -e yomokuVocabularyEntries 100000
+  -e yomokuMeasureIterations 8 app.yomoku.test/androidx.test.runner.AndroidJUnitRunner
+  No competing builds/tests/profilers; no database/corpus/analyzer needed.
+- Logs: /tmp/yomoku-decoding-{android,format-check,regressions,10000-1,10000-2,
+  100000-1,100000-2,validation}.log; bytecode -bytecode.txt. Initial sandbox Gradle
+  socket startup needed approved rerun; no source/test failure or open blocker.
+- Task-started isolated AVD stopped; existing ignored caches/image retained.
+- Host Rust/Clippy/JNI/independent generation, full Compose/native/optimized/
+  tablet/dark/continuous-fling/heavy-history/diverse-book/fully loaded/exact peaks,
+  process-death and physical arm64 not rerun. Broader tasks stay unchecked.

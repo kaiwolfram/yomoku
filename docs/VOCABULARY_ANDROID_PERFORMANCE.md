@@ -470,3 +470,92 @@ failure remains. No Rust/schema/dependency/wire or product event-policy change.
 Host Rust/Clippy, independent JNI/codegen/Full-loader, optimized/tablet/dark/
 continuous-fling/heavy-history/diverse-book/fully loaded lists, exact peak/PSS,
 process-death and physical arm64 were not rerun or claimed. Broader tasks remain.
+
+## Controlled ID-list decoding and allocation comparisons — 2026-10-31
+
+`VocabularyDecodingTest` isolates one generated bincode `List<VocabularyId>`.
+It opens no database/native handle, loads no analyzer, dispatches no event and
+publishes no Compose state. All candidates consume the same immutable generated
+bytes and return full `VocabularyId` lists. This is not a complete snapshot,
+selection action, callback or composition benchmark. A frozen snapshot contains
+both selection and confirmation lists; do not multiply these timings to predict
+its decode time or compare them directly to the preceding full-render profiles.
+
+Four candidates: `generated` calls the production generated list/element helper;
+`capacity` uses the same higher-order loop and generated element decoder with
+validated initial ArrayList capacity; `buffered` and `buffered_capacity` read
+fixed-width little-endian longs through ByteBuffer into growing/preallocated
+lists. The latter pair also omit generated per-ID container calls and generic
+element dispatch: their difference from generated is not solely byte reading.
+Candidates are test-only and cannot replace arbitrary/nested schema decoding.
+Lengths are checked against available fixed-width bytes before preallocation.
+Regular tests cover all IDs at 0/1/2/100/10k/100k, gapped IDs, >2^53, signed wire
+extremes, every truncation of a three-ID payload, invalid/oversized lengths and
+trailing bytes. Codec signed-range coverage does not change valid domain IDs.
+
+Two separate instrumentation processes per size, debug API-36 x86_64 medium_phone
+(1080×2400), same build fingerprint/environment as earlier sections. Run order:
+10k/1, 100k/1, 100k/2, 10k/2; no competing builds/tests/profilers. Each process
+does four full warmup rounds and eight measured forward/reverse rotated rounds;
+each candidate occupies every order position twice. Decode runs on the main
+thread. Timing excludes scheduling, counter reads, assertions, re-encoding and
+output. Four results remain alive until round-end validation; re-encoding then
+shares GC history with the next round. No forced GC. Balanced ordering reduces
+order bias without removing JIT/scheduling/GC/debug/emulator effects.
+
+Median decode milliseconds (eight samples per candidate/process):
+
+| IDs | Process | Generated | Capacity | Buffered | Buffered + capacity |
+| ---: | ---: | ---: | ---: | ---: | ---: |
+| 10,000 | 1 | 4.551 | 4.379 | 0.648 | 0.526 |
+| 10,000 | 2 | 4.199 | 4.136 | 0.562 | 0.498 |
+| 100,000 | 1 | 25.502 | 25.341 | 3.243 | 3.303 |
+| 100,000 | 2 | 23.098 | 23.795 | 3.694 | 3.029 |
+
+Capacity-only timing ranges overlap generated in every process. The combined
+buffered/preallocated candidate ranges 2.583–46.911 ms and 2.473–39.388 ms at
+100k: lower medians do not remove long samples. At 10k, median reported allocated
+bytes for generated/capacity/buffered/buffered+capacity are respectively
+888,832/692,224/397,312/200,704 in both processes, with zero reported GC during
+sample intervals. At 100k these medians are 7,880,704/6,819,840/3,035,136/2,002,944
+(process 1) and 7,827,456/6,852,608/3,035,136/2,002,944 (process 2).
+
+These ART counter deltas are approximate and process-wide, include counter-read
+allocations/unrelated threads, and may reflect allocations later than the sample
+that produced them. Some 100k samples report zero bytes and others up to
+20,025,344; GC count/time deltas also include concurrent collector work. They
+are not exact per-decode allocations, synchronous GC pauses, retained bytes,
+PSS or peaks. Supported semantics verified against the primary
+[Android Debug API](https://developer.android.com/reference/android/os/Debug#getRuntimeStat(java.lang.String)).
+
+Bytecode inspection with the pinned JDK `javap -c -p` on compiled
+`com/novi/serde/BinaryDeserializer.class` shows `RangesKt.until` and
+`RangesKt.step` in `deserialize_u64` and `getLong`, before their eight-byte loops.
+The pinned facet_generate 0.19.1 runtime uses `0 until 64 step 8` in both places;
+`deserialize_i64` calls the unsigned method. These are concrete allocation
+sites to remove with a separately verified scalar-loop change. The combined
+buffered comparison does not isolate their contribution; do not claim the
+entire timing/allocation difference comes from progressions, or change the
+production wire/equality policy on this evidence.
+
+All [128 raw rows](measurements/vocabulary-decoding-android-2026-10-31.csv)
+validate exact sizes/payload lengths, eight samples/candidate/process, balanced
+positions and finite nonnegative timings/counters. Every timed result passes
+full-ID equality and generated-byte round trip after the round; original input
+bytes remain unchanged. Payload bytes/SHA-256:
+
+- 10k: 80,008 / `a3ef41217038ab501cc25165e2601d8a21f6d0217430bd834dd167b30b1781e0`.
+- 100k: 800,008 / `4c743bd42937a700214622ce01f6ac07f82a5f7b415a9bf0a1a0ad1330ffad23`.
+
+PASS: debug/test APKs, strict lint, repository Kotlin formatting/diff; six passing
+codec/selection/CoreSession regressions plus default assumption skip (seven
+reported, 0.720 s). Four opt-in processes pass in 0.671/2.156/2.135/0.651 s
+(10k/1, 100k/1, 100k/2, 10k/2). Production baseline `fb5fc16`; debug APK unchanged:
+`f75c30ead000f74f40e0b011edf56f8cbc25fab8f47fda7c686c8df664a656d4`;
+test APK `a5132a9ed3430f99507131a49a27b97b19bfbd025e984b2a590425ebc212ed19`.
+Native/bindings/assets reused Gradle outputs; no runtime/schema/dependency change.
+Logs: `/tmp/yomoku-decoding-{android,format-check,regressions,10000-1,10000-2,
+100000-1,100000-2,validation}.log`; bytecode `/tmp/yomoku-decoding-bytecode.txt`.
+Initial sandbox Gradle socket startup needed approved rerun; no source failure.
+Host Rust/Clippy/JNI/codegen, full Compose/native profiles, optimized/arm64 and
+broader history/lifecycle/peak-memory checks were not rerun. Broad tasks stay open.
