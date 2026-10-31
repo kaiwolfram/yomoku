@@ -3,6 +3,13 @@ Updated: 2026-10-31. Native Anki recovery read callback ownership verified.
 Commit guidance: explanatory bodies; merges include provenance. Keep verification
 results in session/progress docs and reports, out of commit message bodies.
 
+## User checkpoints
+- Announce when no plan steps remain; ask when product opinions/clarifications
+  are needed. Recommend physical testing when it is more useful than more code.
+- A short physical arm64 reader/import/dictionary trial is now recommended:
+  local workflows are implemented; device usability/performance/lifecycle remain
+  unverified. User chooses timing; existing physical validation stays unchecked.
+
 ## Current slice
 - Native BeginAnkiRecoveryRead(Note|Model) retains one immutable handle with the
   exact restored pair. Capture it BEFORE provider read dispatch; callback must

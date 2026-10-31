@@ -3951,3 +3951,13 @@ and /tmp/yomoku-browser-profile-*. No emulator started.
   lifecycle or performance checks.
 - Updated plan, architecture/data model, decisions, verification and handoff.
   Next: typed Android/FFI reads/preflight and durable live begin/outcome routing.
+
+## 2026-10-31 — User completion and physical-device checkpoints
+
+- Recorded the user's request in AGENTS.md and the handoff: announce exhausted
+  steps, recommend physical-device testing when it is more valuable than the
+  next implementation step, and ask for needed product opinions/clarifications.
+- Recommend a short physical arm64 local-reader/import/dictionary trial now;
+  those workflows are implemented, while hardware usability/performance/lifecycle
+  remain unverified. User chooses timing; no task was checked off.
+- Documentation-only change; diff/whitespace checks pass. No code checks rerun.

@@ -34,6 +34,11 @@ requirements governing the slice. It is the product source of truth.
   of commit message bodies. Record them in session/progress docs and user-facing
   reports instead.
 - Report implemented tasks, changed files, test results, next steps and blockers.
+- Tell the user explicitly when no implementation/verification steps remain.
+  At handoffs, assess whether a physical-device trial would provide more value
+  than the next planned implementation step; recommend it when that point is
+  reached, without waiting for every feature to be complete. Ask for the user's
+  opinion or clarification whenever a product decision or ambiguity needs it.
 - Never commit credentials/signing keys. Publishing signed releases requires approval.
 
 Nostr starter data is not supplied: keep configuration empty until provided.
