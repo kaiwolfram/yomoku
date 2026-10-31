@@ -1212,8 +1212,10 @@ An app-level keyed Compose effect consumes positive CompletionNotice and display
 a short Android Toast once; zero stays silent and recreation does not replay it.
 Settings exposes five radio choices, disabled while unknown/busy, and offline
 Sudachi licenses/notices and JMdict/JMnedict credits. Dialog visibility survives Activity recreation.
-Nostr remains a placeholder. Busy/error/retry state comes from
-Rust; the unsaved form draft and notice dialog visibility use rememberSaveable.
+Feed renders only “Coming Soon! 🌱”. The shell maps the existing internal
+`Destination::Nostr` / `Destination.NOSTR` variant to Feed; Nostr integration is
+deferred beyond the first MVP, with no network or identity setup. Busy/error/retry
+state comes from Rust; the unsaved form draft and notice dialog visibility use rememberSaveable.
 The draft is retained through Settings/recreation.
 Navigation uses a bottom bar below 600dp and a scrollable rail above; Settings,
 paste and reader routes hide it. Toolbar/system Back return through Rust routes.
@@ -1258,7 +1260,9 @@ returns to Library and celebrates each newly Recorded command, including rereads
 Effective segmentation edits are connected as described below. Read-only lifetime
 aggregation, vocabulary timelines and calendar buckets are implemented; transport and UI remain
 separate tasks. Add analysis/import crates only with
-actual behavior; Sudachi Full defaults to B, JMdict/JMnedict remain offline data, and future Nostr I/O stays in Rust. Configuration is empty.
+actual behavior; Sudachi Full defaults to B, JMdict/JMnedict remain offline data,
+and any future Nostr I/O stays in Rust. Nostr is outside the first MVP;
+configuration remains empty.
 ## Guarded effective boundary repositories
 
 `yomoku-storage::effective_overrides` adds a native-only read/choice/save/reverse

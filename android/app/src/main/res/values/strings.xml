@@ -25,7 +25,7 @@
     <string name="import_file_skipped">Skipped</string>
     <string name="app_name">Yomoku</string>
     <string name="library_title">Library</string>
-    <string name="nostr_title">Nostr</string>
+    <string name="feed_title">Feed</string>
     <string name="statistics_title">Statistics</string>
     <string name="vocabulary_title">Vocabulary</string>
     <string name="settings_title">Settings</string>
@@ -34,7 +34,7 @@
     <string name="library_search_titles">Search titles</string>
     <string name="library_clear_search">Clear</string>
     <string name="library_search_empty">No matching titles.</string>
-    <string name="nostr_empty">Nostr is not configured.</string>
+    <string name="feed_empty">Coming Soon! 🌱</string>
     <string name="statistics_empty">No reading history yet.</string>
     <string name="statistics_occurrences">Japanese words read</string>
     <string name="statistics_statuses">Word statuses</string>

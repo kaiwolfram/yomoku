@@ -3991,3 +3991,21 @@ and /tmp/yomoku-browser-profile-*. No emulator started.
   needed to continue implementation; polish is deferred at the user's request.
 - Documentation only: handoff, plan and session log updated; diff/whitespace
   checks pass. No app tests or builds rerun.
+
+## 2026-10-31 — Defer Nostr and show Feed placeholder
+
+- User reduced the first MVP after a phone trial: no Nostr integration. Phone
+  bottom navigation and tablet rail/title now say Feed; content is only
+  `Coming Soon! 🌱`. Existing internal destination and generic icon remain.
+- Updated shell resources and existing navigation checks; product spec, plan,
+  README, architecture/data notes, decisions and handoff record the reduced scope.
+  Nostr tasks remain unchecked in a deferred section; backup work excludes its
+  identity. No schema, dependency, codec or persistence change.
+- PASS: debug/test APKs, strict lintDebug, Kotlin formatting/diff; both navigation
+  cases on API-36 x86_64 phone and tablet-sized rail layouts (four executions).
+  Initial install failed for emulator space; cache trimming resolved it without
+  clearing app data. Display restored. Commands/results: DEVELOPMENT.md Feed
+  section; logs /tmp/yomoku-feed-*. No open blocker or remaining Feed work.
+- Rust/JNI suites, release packaging and physical trials not rerun. Emulator
+  checks suffice for this presentation change; next value is typed Anki recovery
+  read/preflight/dispatch, followed by real provider and physical validation.

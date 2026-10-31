@@ -4643,3 +4643,16 @@ This bounded native lifecycle emits no provider effect and adds no shell codec,
 ViewModel projection, schema, dependency or product UI. The Android dispatcher,
 export preflight and durable live begin/outcome gates remain separate unfinished
 work. Native accessors are for that future coordinator, not a shell polling API.
+
+
+## 2026-10-31 — First-MVP Feed placeholder
+
+The user reduced first-MVP scope after their phone trial: defer all Nostr
+integration and expose Feed with only `Coming Soon! 🌱`. Use the same label and
+content on phone bottom navigation and tablet rail. Retain the existing internal
+`Destination::Nostr` / `Destination.NOSTR` variant and generic post icon: this is
+a presentation-only change with no schema, codec, dependency or persistence
+change. The destination already has no network or identity call site. Move Nostr
+plan tasks outside the first-MVP checklist and remove identity work from current
+backup requirements. Keep deferred requirements and Q188 for a future scope
+discussion; they do not block the first release.

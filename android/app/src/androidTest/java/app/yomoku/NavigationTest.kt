@@ -34,15 +34,20 @@ class NavigationTest {
         compose
             .onNodeWithTag(if (wide) "bottom_navigation" else "navigation_rail")
             .assertDoesNotExist()
-        for (title in listOf("Nostr", "Statistics", "Vocabulary", "Library")) {
+        for (title in listOf("Feed", "Statistics", "Vocabulary", "Library")) {
             compose.onNode(hasText(title) and hasClickAction()).performClick().assertIsSelected()
             compose.onNodeWithTag("screen_title").assertTextEquals(title)
+            if (title == "Feed") {
+                compose.onNodeWithText("Coming Soon! 🌱").assertIsDisplayed()
+                compose.onNodeWithText("Nostr").assertDoesNotExist()
+            }
             compose.onNodeWithText("Settings").performClick()
             compose.onNodeWithTag("screen_title").assertTextEquals("Settings")
             compose.onNodeWithTag("bottom_navigation").assertDoesNotExist()
             compose.onNodeWithTag("navigation_rail").assertDoesNotExist()
             compose.onNodeWithText("Back").performClick()
             compose.onNodeWithTag("screen_title").assertTextEquals(title)
+            if (title == "Feed") compose.onNodeWithText("Coming Soon! 🌱").assertIsDisplayed()
         }
         compose.onNodeWithText("Settings").performClick()
         compose.waitForIdle()

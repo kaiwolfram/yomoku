@@ -8074,3 +8074,36 @@ The sandbox initially blocked Gradle's local file-lock socket; the same offline
 build succeeded with sandbox escalation. No open blocker. Logs:
 `/tmp/yomoku-phone-release-{native,gradle,signature,alignment,manifest,package}.log`;
 packaged-library details: `/tmp/yomoku-phone-release-check/`.
+
+## First-MVP Feed placeholder
+
+2026-10-31: first-MVP scope excludes Nostr. Configure the JDK/SDK/Gradle/Cargo
+paths as above, then run:
+
+```sh
+tools/format-kotlin.sh --check
+./android/gradlew -p android :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug --offline --console=plain
+./android/gradlew -p android :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=app.yomoku.NavigationTest --offline --console=plain
+# Repeat NavigationTest with a tablet-sized viewport, then restore defaults.
+"$ANDROID_HOME/platform-tools/adb" shell wm size 2560x1600
+"$ANDROID_HOME/platform-tools/adb" shell wm density 240
+./android/gradlew -p android :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=app.yomoku.NavigationTest --offline --console=plain
+"$ANDROID_HOME/platform-tools/adb" shell wm size reset
+"$ANDROID_HOME/platform-tools/adb" shell wm density reset
+git diff --check
+```
+
+PASS: debug/test APK assembly, strict lintDebug, repository Kotlin formatting
+and diff checks. Both existing NavigationTest cases pass on API-36 x86_64 at
+phone (1080×2400, 420 dpi) and tablet (2560×1600, 240 dpi) sizes: Feed label/title,
+`Coming Soon! 🌱`, Settings round trip, retained native session and final close.
+Display overrides were reset afterward. The initial phone run could not install
+the APK due to emulator storage pressure; `adb shell pm trim-caches 2G` reclaimed
+cache space and the rerun passed. No app-data reset was needed.
+
+No Rust source/schema/dependency/codec changes; host Rust/JNI suites, release
+packaging and physical-phone trials were not rerun for this presentation change.
+No open blocker; further phone testing adds less value here than the next planned
+typed Anki preflight/dispatch slice. Logs: `/tmp/yomoku-feed-{build,format,phone,phone-retry,tablet,emulator}.log`;
+phone results: `/tmp/yomoku-feed-phone-results`; tablet XML remains in
+`android/app/build/outputs/androidTest-results/connected/debug/`.

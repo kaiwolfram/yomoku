@@ -75,8 +75,8 @@ progress. Explicitly reopening a finished book persists page 1; active-reader
 recreation and completion reloads keep their current position. Finish Book (or a
 final-page left swipe) completes the save and returns to Library with brief confetti
 on each newly recorded completion, including rereads with zero new words.
-Nostr currently shows a placeholder. Vocabulary supports literal surface-prefix
-search, five-status filters, four sorts, matching counts and 100-row infinite
+Feed shows “Coming Soon! 🌱”; Nostr integration is deferred beyond the first MVP.
+Vocabulary supports literal surface-prefix search, five-status filters, four sorts, matching counts and 100-row infinite
 scroll with explicit Retry. Tap or long press selects words; global Select All
 includes unloaded matches and preserves hidden selections. Confirmed bulk status
 changes and permanent deletion expose explicit Retry/Cancel and retain selection
@@ -146,7 +146,7 @@ rollback, duplicates, original analysis/status/progress and failed-file recovery
 Android supports mixed EPUB/TXT/SRT batches, per-file encoding/errors, progress,
 Cancel and completion summaries. Imports return to Library without opening a reader.
 Planned v1 features include custom missing-word definitions,
-reading statistics, optional AnkiDroid integration, curated Nostr reading and
+reading statistics, optional AnkiDroid integration and
 manual encrypted backups. See the [product specification](docs/PRODUCT_SPEC.md)
 for scope and the [implementation checklist](docs/IMPLEMENTATION_PLAN.md) for
 verified progress.

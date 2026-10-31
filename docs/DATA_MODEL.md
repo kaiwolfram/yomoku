@@ -1347,6 +1347,9 @@ remains open.
 
 ## Transient application state
 `app::Destination` is Library (default), Nostr, Statistics or Vocabulary.
+The existing internal Nostr variant renders as **Feed**, a static
+**`Coming Soon! 🌱`** placeholder. Nostr integration is deferred beyond the first
+MVP; this presentation change needs no schema migration or wire-format change.
 `Model` owns the selected destination; `ViewModel` projects it for the shell.
 `Event::SelectDestination` selects a destination and requests a render. Event,
 destination and view derive Serde serialization. The host bridge now uses Crux

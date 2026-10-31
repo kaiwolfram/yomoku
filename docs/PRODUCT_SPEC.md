@@ -1,7 +1,7 @@
 # Yomoku product specification
 
 **Yomoku** — *“Read Japanese, naturally.”* A native, offline-first Android app
-for reading Japanese books, text, subtitles, and curated Nostr posts while
+for reading Japanese books, text, and subtitles while
 tracking vocabulary and reading progress. Inspired by Lute, but this is its own
 product.
 
@@ -18,10 +18,11 @@ must not change without user approval.
 
 ## 1. Product scope and priorities
 
-**v1 includes:** native Android app; native Japanese reader; local library of imported EPUB/TXT/SRT and pasted text; offline word segmentation and dictionaries; vocabulary status workflows; historical reading/vocabulary statistics; optional AnkiDroid integration; curated Nostr reading with reactions; secure manual encrypted backups; configurable settings; release tooling.
+**v1 includes:** native Android app; native Japanese reader; local library of imported EPUB/TXT/SRT and pasted text; offline word segmentation and dictionaries; vocabulary status workflows; historical reading/vocabulary statistics; optional AnkiDroid integration; a Feed placeholder; secure manual encrypted backups; configurable settings; release tooling.
 
 **Important late scope changes that override earlier brainstorming:**
 
+- **No Nostr integration in the first MVP** (user phone-trial scope reduction, 2026-10-31). Rename its navigation destination to **Feed**; the view shows only **`Coming Soon! 🌱`**. No relay configuration/networking, post reading, signing identity, reactions or forwarding in this release. The Nostr requirements in section 5 are deferred beyond the first MVP.
 - **No in-app AI features in v1**, including BYOK API keys/provider/model settings, AI-generated definitions or translations, and AI regeneration. Do not scaffold AI merely because older design notes might mention it.
 - **Only EPUB, TXT, SRT, and pasted text**. No WebVTT `.vtt`, no ASS/SSA `.ass`, no PDF, no NHK integration, and no Android Share-intent import in v1.
 - **No Nostr multi-device sync or Blossom cloud backups in v1.** Secure **manual encrypted export/import** remains.
@@ -37,7 +38,7 @@ must not change without user approval.
 - **Japanese analysis:** Rust **Sudachi.rs**, bundled **Sudachi Full dictionary**, default segmentation **Mode B** with A/C options where relevant.
 - **Offline dictionary data:** bundle **JMdict (English definitions)** and **JMnedict (names)** with the APK. Version them and satisfy redistribution/attribution requirements. Both sources appear in separate sections when both match.
 - **Persistence:** SQLite, accessed from a separate Rust I/O/persistence layer using `rusqlite` / `tokio-rusqlite` as suitable. Keep SQL and Android-specific I/O **outside the pure Crux core**. Track schema migrations from the start.
-- **Rust effects:** Rust-side `EffectRouter` executes Rust I/O. Nostr networking through Rust **`nostr-sdk`**, not duplicated in Kotlin.
+- **Rust effects:** Rust-side `EffectRouter` executes Rust I/O. The first MVP has no Nostr networking. If Nostr is resumed later, networking belongs in Rust through **`nostr-sdk`**, not duplicated in Kotlin.
 - **Android bridge:** Kotlin handles Compose, file picker, notifications/background execution, Android Keystore, AnkiDroid provider integration, and platform APIs; expose a narrowly scoped Rust FFI interface. Prefer explicit, typed state/actions over ad hoc strings.
 - **Workstation workflow:** Gradle/Cargo CLI, terminal-based Android SDK/emulator/`adb`; **no Android Studio requirement** for normal build/test/run. Document native library build, ABI packaging, emulator setup, and release signing without committing secrets.
 - **Repository:** MIT license for original code, respecting third-party licenses; clear module boundaries; local Rust/Kotlin tests, lint, and Android builds. CI/GitHub Actions is not required (user clarification 2026-10-27). Manual approval for signed publishing. Eventual APK distribution via GitHub Releases and Zapstore, not Google Play/F-Droid for initial publishing.
@@ -48,7 +49,7 @@ If a chosen library does not support a required capability or architecture in cu
 
 ### 3.1 Documents and pagination
 
-- App opens on **Library**. Four top-level destinations: **Library, Nostr, Statistics, Vocabulary**; Settings accessed via toolbar. Use bottom navigation on phones, rail on tablets; hide main navigation while actively reading.
+- App opens on **Library**. Four top-level destinations: **Library, Feed, Statistics, Vocabulary**; Settings accessed via toolbar. Use bottom navigation on phones, rail on tablets; hide main navigation while actively reading.
 - Reader is **horizontal text only**, single centered column even on landscape tablets; comfortable maximum text width, tablet margins. Dictionary panel on wide displays, bottom sheet on phones. Both portrait and landscape supported.
 - Logical page length setting has **presets 250 / 500 / 750 / 1,000 / 1,500 characters**, default **500**. Count all non-whitespace Unicode characters, including punctuation and Latin text (user clarification 2026-10-22); supplementary characters count once. Split at a paragraph boundary after reaching the threshold; if a paragraph is extremely long, split after an appropriate following sentence. **Never cross an EPUB chapter boundary** when forming a logical page. TXT has no automatically inferred chapter boundaries.
 - Logical pages may **scroll vertically**, e.g. for long text or images. **Never persist vertical scroll positions**: navigating forward or backward, or reopening a document, starts at the top of the destination page. Page boundaries don't depend on screen dimensions. Page-length changes reflow pages while preserving the exact underlying reading text offset.
@@ -67,7 +68,7 @@ If a chosen library does not support a required capability or architecture in cu
 - Status colors: New blue (`#A9CCFF` light / `#28558D` dark), Learning light red (`#FFC5C0` / `#783E44`), Familiar yellow (`#FFE29A` / `#725A2D`), **Known unhighlighted in text** (green in graphs), Ignored pronounced gray (`#BEC5CF` / `#505B6B`). Follow Android light/dark system theme; **no in-app manual theme override**.
 - Vocabulary identity is the **exact written surface form**, NOT a lemma: `食べる`, `食べた`, `食べます` are separate entries with separate statuses and encounter counts. Same spelling with different readings is **one** status entry; show all appropriate dictionary readings/senses. Link each surface form to a dictionary form determined automatically by Sudachi, for aggregate lemma statistics.
 - **No manual correction of surface→dictionary-form mappings in v1** (complexity reduction). Don't edit built-in JMdict/JMnedict definitions; allow user-created, editable/deletable **English meaning + reading** dictionary entry when no dictionary match exists. No global overriding of built-in definitions.
-- Default every newly encountered/imported written Japanese word to **New**. Upon **book import**, register **all unique word surfaces in its content immediately**, not lazily only when read. For Nostr, register vocabulary when a post is **first displayed**, even if it is later skipped. Registration is different from a **reading encounter**.
+- Default every newly encountered/imported written Japanese word to **New**. Upon **book import**, register **all unique word surfaces in its content immediately**, not lazily only when read. Deferred Nostr behavior: register vocabulary when a post is **first displayed**, even if it is later skipped. Registration is different from a **reading encounter**.
 - Word tap opens dictionary UI with original surface form, readings, linked base form, all **JMdict English senses immediately expanded and grouped by sense**, compact human-readable grammatical labels (e.g. noun, Ichidan/Godan verb, adjectives), and **JMnedict name readings/categories in a separate section** when available. Proper names are treated like other vocabulary, not excluded.
 - Display **`Encountered 47 times`** (lifetime completed-reading occurrence count) for that surface. Opening popup does **not** change status; use one visible row of **five direct status choices** with no increment/decrement controls. Show Anki integration action if applicable.
 - Sudachi defaults to Mode B. Users may adjust token boundaries manually (merge/split) and access A/B/C alternate segmentation when necessary. On override prompt **All occurrences** (default) vs **This occurrence**; overrides persist and can be reversed globally where applicable. Conjugated expressions should remain usable as selectable surface forms. Make this testable before large-scale data population because text anchoring/migrations are sensitive.
@@ -107,7 +108,13 @@ If a chosen library does not support a required capability or architecture in cu
 - Filter by five statuses; show total matching count; query 100 at a time with infinite scroll.
 - Select All targets **every matching row, including results not loaded on screen**. Bulk change status or permanently delete with confirmation. Record status change events; enforce delete/history semantics above.
 
-## 5. Nostr reading (curated, not a general social client)
+## 5. Feed placeholder and deferred Nostr reading
+
+The first MVP exposes **Feed** in the phone bottom bar and tablet rail, with a
+**Feed** toolbar title and only **`Coming Soon! 🌱`** as its content.
+
+The following Nostr requirements are retained for future scope discussions only;
+they are **outside the first MVP** and must not drive first-release implementation.
 
 - Use Rust `nostr-sdk`. Fetch only **kind-1** text events from **explicitly enabled/curated author npubs** across enabled relays, with editable lists and add-custom options. **Never sample arbitrary relay authors**. Filter candidate post text **locally** for Japanese with lightweight hiragana/katakana + kanji heuristics; accept occasional inaccuracies. Hardcoded starter author/relay lists are a product-data decision: **do not invent accounts or relay endpoints; ask if no actual curated list is supplied**, or use a clearly empty/configurable list initially.
 - One full post at a time; no social feed, no long-form kind 30023, no repost kind 6. Replies posted by curated authors may appear with reply indicator. Offer **View Parent** for immediate reply parent (fetch parent on demand if needed); deeper navigation is on demand. Just viewing parents must not create reading stats.
@@ -131,9 +138,9 @@ If a chosen library does not support a required capability or architecture in cu
 
 ## 7. Secure manual backup and restore
 
-- **Manual export/import only**: all content, reading position/completion, vocabulary and history, settings, custom dictionary records, and the generated Nostr mnemonic/identity. No Nostr sync, Blossom, cloud account, or automatic backups.
+- **Manual export/import only**: all content, reading position/completion, vocabulary and history, settings, and custom dictionary records. The first MVP has no Nostr mnemonic/identity to export. No Nostr sync, Blossom, cloud account, or automatic backups.
 - Password-encrypted archive with a well-reviewed authenticated design (e.g. **Argon2id** KDF and **AEAD** encryption); record schema/format version, salt/nonce/KDF parameters. Do not invent home-grown cryptography or log secrets.
-- Restore is a **complete replacement, never merge**. Authenticate/decrypt and validate backup before destructive work, warn and confirm before replacement, swap atomically/transactionally as possible. An incorrect password/corrupt backup must **leave existing installation intact**. Ensure key/mnemonic re-encryption for current device's Keystore as needed.
+- Restore is a **complete replacement, never merge**. Authenticate/decrypt and validate backup before destructive work, warn and confirm before replacement, swap atomically/transactionally as possible. An incorrect password/corrupt backup must **leave existing installation intact**.
 - Tests: correct password round trip, bad password, tampering, interrupted restore, new version/backward-compatible schema strategy, and complete state restoration.
 
 ## 8. UX and other confirmed decisions
@@ -147,6 +154,6 @@ If a chosen library does not support a required capability or architecture in cu
 
 ## 9. Open questions and inputs
 
-**Known unresolved:** **Question 188:** If a completed Nostr post is to be forwarded to optional Citrine while Citrine is offline, should Yomoku (A) persist it in a retry queue or (B) only attempt forwarding immediately and drop on failure? Ask the user before implementing that behavior. The existence of an **offline retry queue for heart reactions** is a *separate, already-confirmed requirement*.
+**Deferred beyond the first MVP:** **Question 188:** If a completed Nostr post is to be forwarded to optional Citrine while Citrine is offline, should Yomoku (A) persist it in a retry queue or (B) only attempt forwarding immediately and drop on failure? Ask the user before implementing that behavior. The existence of an **offline retry queue for heart reactions** is a *separate, already-confirmed requirement*.
 
-Actual curated Nostr starter npubs and relay URLs, technical license/data packaging, final text-token offset encoding, and any dependency API feasibility must be settled during implementation, not invented as product facts.
+Curated Nostr starter npubs, relay URLs and Q188 are not first-MVP blockers; revisit them only if Nostr integration is resumed. Technical license/data packaging, final text-token offset encoding, and dependency API feasibility must be settled during implementation, not invented as product facts.

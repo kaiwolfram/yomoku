@@ -1,5 +1,5 @@
 # Resume here
-Updated: 2026-10-31. User phone trial acceptable; resume implementation next session.
+Updated: 2026-10-31. First MVP excludes Nostr; Feed is a static placeholder.
 Commit guidance: explanatory bodies; merges include provenance. Keep verification
 results in session/progress docs and reports, out of commit message bodies.
 
@@ -8,17 +8,19 @@ results in session/progress docs and reports, out of commit message bodies.
   are needed. Recommend physical testing when it is more useful than more code.
 - User reports the app works reasonably well on their physical phone. Many small
   polish issues can wait; continue the implementation plan next session.
-- Device/Android/build and individual workflows/measurements were not reported.
-  Keep detailed physical validation unchecked; do not block implementation on it.
+- Detailed physical validation remains unchecked; phone feedback is acceptable.
+- Feed replaces Nostr in navigation and shows only `Coming Soon! 🌱`. Nostr tasks,
+  identity and Q188 are deferred beyond the first MVP (PRODUCT_SPEC.md §5).
 
 ## Physical test APK
 - `target/releases/yomoku-0.1.0-0374365-release.apk` (~242 MiB), Android 10+,
   arm64/x86_64; optimized Rust + release app, locally development-signed.
 - PASS: assembleRelease/lintRelease, signature, ZIP/ELF alignment, CRC/assets/probe
   exclusion. User reports acceptable phone use; no agent-run hardware checks.
-  Rebuild commands: DEVELOPMENT.md final section.
+  Rebuild commands: DEVELOPMENT.md “Local optimized release APK” section.
 
 ## Current slice
+- Feed UI/resources and navigation regression updated; docs reflect reduced scope.
 - Native BeginAnkiRecoveryRead(Note|Model) retains one immutable handle with the
   exact restored pair. Capture it BEFORE provider read dispatch; callback must
   return that handle, matching target and unchanged pair. Identity is per shared
@@ -54,7 +56,7 @@ results in session/progress docs and reports, out of commit message bodies.
   unowned; do not use CheckAndAdd to bypass durable gates.
 - Isolated Android worker provider adapters have no app call site or real-provider
   claim. API evidence: ANKIDROID_API.md, pinned 2.25.3; no Anki dependency/minimum
-  adopted. Nostr config empty; ask Q188 before forwarding.
+  adopted. Nostr is outside the first MVP; ask Q188 only if forwarding is resumed.
 
 ## Next tasks (ordered)
 1. Connect native recovery handles and prepared intent to typed Android/FFI
@@ -66,9 +68,11 @@ results in session/progress docs and reports, out of commit message bodies.
    return/query cost. Performance/accessibility matrix remains in the plan.
 
 ## Verification / blockers
-- PASS: 13 new cases; 50 focused core/runtime/FFI Anki cases; 932 workspace tests/
-  17 opt-in fixtures ignored; build, strict Clippy, Rustfmt/diff. Kotlin generation
-  identical. Native commands: DEVELOPMENT.md native-read section. Logs: /tmp/yomoku-anki-read-*.
-- Native-slice limits: no emulator/host Kotlin/JNI JVM, real provider/
-  collection/browser, independent Full-loader, physical arm64, broader lifecycle
-  or performance check. No open blocker; native read/preparation unencodable.
+- PASS: Feed debug/test APKs, strict lintDebug, Kotlin format/diff; NavigationTest
+  2/2 on phone and 2/2 on tablet-sized API-36 x86_64 emulator. Display reset.
+  Commands: DEVELOPMENT.md final Feed section; logs: /tmp/yomoku-feed-*.
+- Initial emulator install lacked space; trim-caches resolved it, no data reset.
+- No open blocker or remaining work for Feed request. Rust/JNI, release and phone
+  trials not rerun; prior native verification is in DEVELOPMENT.md native-read.
+- Next value: typed Anki reads/preflight before another physical trial; real
+  provider/collection/browser, arm64 and broader performance matrix remain open.
