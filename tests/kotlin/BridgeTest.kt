@@ -43,6 +43,8 @@ private inline fun <reified T : Throwable> expectFailure(block: () -> Unit) {
 }
 
 fun main(args: Array<String>) {
+    app.yomoku.verifyScalarDecoding()
+    app.yomoku.verifyScalarSnapshots()
     verifyVocabularyCodecs(args.single())
     verifyVocabularyBridge()
     verifyStatisticsCodecs(args.single())

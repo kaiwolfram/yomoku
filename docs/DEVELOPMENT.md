@@ -7429,3 +7429,61 @@ failure needed approved rerun; no open source/test failure. Host Rust/Clippy/JNI
 independent generation and full Compose/native/optimized/arm64/lifecycle profiles
 were not rerun. Logs: /tmp/yomoku-decoding-{android,format-check,regressions,
 10000-1,10000-2,100000-1,100000-2,validation}.log; bytecode -bytecode.txt.
+
+
+## Scalar Kotlin decoder integration
+
+The payload generator adapts only the pinned unsigned/signed 64-bit loops; all
+other generated files and list/container code remain unchanged. Shared scalar
+and frozen-snapshot checks run in both the host JNI runner and Android tests.
+The opt-in comparison uses unchanged generated codecs with the test-only legacy
+scalar reader. No database, analyzer, Compose publication or event is involved.
+
+```sh
+export PATH=/home/kai/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin:$PATH
+export JAVA_HOME="$PWD/.local/jdk-17/jdk-17.0.21+9"
+export JAVA_BIN="$JAVA_HOME/bin/java"
+export GRADLE_USER_HOME="$PWD/.local/gradle"
+export ANDROID_HOME=/home/kai/Android/Sdk
+cargo test -p yomoku-ffi --bin generate-kotlin --features facet_typegen --locked --offline
+cargo clippy -p yomoku-ffi --bin generate-kotlin --features facet_typegen --locked --offline -- -D warnings
+cargo fmt --all -- --check
+tools/test-kotlin-bridge.sh
+# No concurrent bridge/native builds during generation.
+cargo run -p yomoku-ffi --bin generate-kotlin --features facet_typegen --locked --offline -- target/generated/kotlin-scalar-repeat
+diff -r target/generated/kotlin target/generated/kotlin-scalar-repeat
+./android/gradlew -p android :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug --offline --console=plain
+tools/format-kotlin.sh --check
+git diff --check
+"$ANDROID_HOME/platform-tools/adb" -s emulator-5554 install -r -t android/app/build/outputs/apk/debug/app-debug.apk
+"$ANDROID_HOME/platform-tools/adb" -s emulator-5554 install -r -t android/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+"$ANDROID_HOME/platform-tools/adb" -s emulator-5554 shell am instrument -w -r -e class app.yomoku.CoreSessionTest,app.yomoku.VocabularySelectionLookupTest,app.yomoku.VocabularyDecodingTest,app.yomoku.ScalarDecodingTest app.yomoku.test/androidx.test.runner.AndroidJUnitRunner
+"$ANDROID_HOME/platform-tools/adb" -s emulator-5554 shell am instrument -w -r -e class app.yomoku.VocabularyProductionTest,app.yomoku.StatisticsProductionTest,app.yomoku.EffectiveReaderProductionTest app.yomoku.test/androidx.test.runner.AndroidJUnitRunner
+# Four fresh instrumentation processes, sequentially: 10k/1, 100k/1, 100k/2, 10k/2.
+# Substitute 10000/100000 for the entry count; no competing builds/tests/profilers.
+"$ANDROID_HOME/platform-tools/adb" -s emulator-5554 shell am instrument -w -r -e class 'app.yomoku.ScalarDecodingTest#measureLegacyAndGenerated' -e yomokuMeasureScalar true -e yomokuVocabularyEntries 100000 app.yomoku.test/androidx.test.runner.AndroidJUnitRunner
+"$JAVA_HOME/bin/javap" -c -p android/app/build/intermediates/built_in_kotlinc/debug/compileDebugKotlin/classes/com/novi/serde/BinaryDeserializer.class
+"$JAVA_HOME/bin/javap" -c -p android/app/build/intermediates/built_in_kotlinc/debugAndroidTest/compileDebugAndroidTestKotlin/classes/app/yomoku/LegacyScalarDeserializer.class
+```
+
+
+2026-10-31 PASS: generator drift guard, targeted strict Clippy, Rustfmt, shared/
+repository Kotlin formatting/diff, full real-Full host JNI/codecs/Unicode fixtures,
+latest shared JVM checks and all 17 repeated Kotlin files identical. Only the two
+BinaryDeserializer loops differ from the previous output. Production bytecode
+has no RangesKt calls; legacy oracle has until/step in both loops. Debug/test APKs
+and strict Android lint pass. Eight focused cases plus two default assumption
+skips pass (10 reported, 1.226 s); all eight production Vocabulary/Statistics/
+effective-reader cases pass (249.438 s). Four measurement processes pass in
+1.441/3.433/3.416/0.922 s, with all 128 rows/positions/payload hashes/exact IDs/
+round trips validated. 100k synthetic frozen medians legacy 55.207/53.924 ms
+versus scalar 34.515/35.366 ms; not a full callback/composition/speed/peak claim.
+Results/raw CSV/hashes/limits: VOCABULARY_ANDROID_PERFORMANCE.md, final section.
+Initial sandbox Gradle lock sockets required approved rerun; existing nonfatal
+host teardown diagnostics persist, with no source/test failure or open blocker.
+Logs: /tmp/yomoku-scalar-{generator-test,clippy,bridge,host,codegen,codegen-diff,
+android,format,regressions,production,10000-1,10000-2,100000-1,100000-2,
+validation}.log; -bytecode.txt and -legacy-bytecode.txt. Task-started isolated AVD
+stopped; ignored caches/image retained. No schema/dependency/wire change. Full
+workspace Rust/Clippy, broader history/Compose/optimized/arm64/peak/lifecycle
+checks remain outside this slice; see the handoff.

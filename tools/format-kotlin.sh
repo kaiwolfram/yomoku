@@ -20,5 +20,5 @@ if [[ ! -f "$formatter" ]]; then
     echo 'Install ktfmt 0.64 as documented in docs/DEVELOPMENT.md or set KTFMT_JAR.' >&2
     exit 1
 fi
-mapfile -d '' -t sources < <(rg --files -0 android -g '*.kt' -g '*.kts')
+mapfile -d '' -t sources < <(rg --files -0 android tests/shared -g '*.kt' -g '*.kts')
 "$java_bin" -jar "$formatter" "${options[@]}" "${sources[@]}"

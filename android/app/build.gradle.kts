@@ -110,6 +110,9 @@ android {
     sourceSets.named("debug") {
         jniLibs.directories += nativeOutput.dir("sudachi-probe/jniLibs").asFile.absolutePath
     }
+    sourceSets.named("androidTest") {
+        kotlin.directories += repoDirectory.dir("tests/shared/kotlin").asFile.absolutePath
+    }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17

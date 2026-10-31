@@ -559,3 +559,110 @@ Logs: `/tmp/yomoku-decoding-{android,format-check,regressions,10000-1,10000-2,
 Initial sandbox Gradle socket startup needed approved rerun; no source failure.
 Host Rust/Clippy/JNI/codegen, full Compose/native profiles, optimized/arm64 and
 broader history/lifecycle/peak-memory checks were not rerun. Broad tasks stay open.
+
+
+## Scalar-loop integration and frozen-snapshot comparisons — 2026-10-31
+
+The reproducible Rust Kotlin generator now adapts exactly the pinned
+facet_generate 0.19.1 unsigned/signed 64-bit reader loops to scalar `while` loops.
+It fails if either complete legacy loop is missing, duplicated or changed.
+All 17 generated Kotlin files match repeat generation; comparison with the
+previous output changes only those two loops in BinaryDeserializer. License,
+byte-at-a-time reads, bounds checks, partial-read offsets, wire representation,
+container budgets, generated list helpers and serialization remain unchanged.
+`javap -c -p` finds no RangesKt calls in production BinaryDeserializer; both
+legacy test loops still call until/step. This establishes removal of those
+allocation sites, not allocation-free complete decoding.
+
+The shared host/Android oracle retains the legacy scalar loops in a test-only
+BinaryDeserializer subclass, with the pinned bincode float/length/variant methods.
+Both paths use the same generated element/list/nested ViewModel codecs. Scalar
+checks include each bit position, 1,000 seeded random patterns, signed extremes,
+>2^53 values, both Int.MAX_VALUE length boundaries, signed/unsigned 128-bit
+values, raw floating-point zero/infinity/NaN payloads, every 8/16-byte truncation
+and prefixed offsets. Generated snapshots cover 0/1/2/100/10k/100k IDs, Unicode,
+unsigned maximum counts and exact byte round trips; all truncations of a small
+nested snapshot and trailing bytes produce matching errors and offsets.
+
+`ScalarDecodingTest` compares unchanged generated growing-list decoding against
+that legacy scalar oracle. Its second shape is a complete synthetic frozen
+ViewModel containing 100 loaded Vocabulary rows, the entire sorted selection and
+the entire confirmation ID list. Both use gapped IDs ending with >2^53 and
+Long.MAX_VALUE. The two shapes are measured separately, list first. The full
+snapshot measures decoding only, not an actual native callback, publication,
+equality check, composition or user interaction. No database or analyzer opens.
+It is not the prior 1,000-row production profile and cannot directly establish
+before/after application speed or predict it by multiplying list timings.
+
+Each fresh instrumentation process runs four warmup and eight measured rounds
+per shape, alternating the two decoder orders (four measured appearances in
+each position). Decoding runs on Android's main thread; scheduling, ART counter
+reads, hashes, assertions, serialization and output are outside timing. Both
+results remain live until round-end equality/byte verification; original inputs
+remain immutable. No forced GC. Re-encoding and prior rounds affect subsequent
+heap/GC state. The two decoder classes also differ in dispatch/JIT opportunities;
+these debug-emulator comparisons do not attribute the full difference solely to
+progression allocations. Approximate process ART allocated-byte deltas can lag,
+include counter reads/unrelated threads and report zero; they do not measure
+per-thread allocations, retained bytes, GC pauses or peaks.
+
+Environment: the existing isolated API-36 x86_64 medium_phone AVD, 1080×2400,
+KVM/two cores/swangle/Vulkan disabled; build fingerprint
+`google/sdk_gphone64_x86_64/emu64xa:16/BE2A.250530.026.D1/13818094:user/release-keys`.
+No competing builds/tests/profilers during measurement. Source baseline
+`7475f27`; debug APK SHA-256
+`983eaf50d5ce139b1cdeaa98a9b4126b2945fca5ac5666d3935e17c83a8b2504`;
+test APK `d85484e0636f9a8ab359d67f3fdf5c1fce37993b93c07eefdec8def6a6cdd51d`.
+
+
+Four fresh processes ran in order 10k/1, 100k/1, 100k/2, 10k/2. Median decode
+milliseconds (eight samples per decoder/shape/process):
+
+| IDs | Process | List legacy | List scalar | Frozen legacy | Frozen scalar |
+| ---: | ---: | ---: | ---: | ---: | ---: |
+| 10,000 | 1 | 7.599 | 4.975 | 6.483 | 4.629 |
+| 10,000 | 2 | 4.459 | 2.898 | 6.442 | 4.836 |
+| 100,000 | 1 | 23.685 | 15.379 | 55.207 | 34.515 |
+| 100,000 | 2 | 23.322 | 15.462 | 53.924 | 35.366 |
+
+The 100k frozen scalar ranges are 33.302–36.810 and 30.729–42.865 ms, versus
+legacy 52.591–58.667 and 50.543–55.819 ms in these processes. At 10k, list
+ranges overlap in process 1 and frozen ranges overlap in process 2; retain the
+raw long samples and avoid a universal latency claim. At 100k the reported ART
+allocated-byte medians are legacy/scalar 7,827,456/3,043,328 for lists in both
+processes, and 15,839,232/6,205,440 then 15,826,944/6,152,192 for frozen snapshots.
+Some frozen scalar intervals report zero and others up to 22,163,456 bytes;
+these approximate process counters do not establish exact allocation savings.
+
+All [128 raw rows](measurements/vocabulary-scalar-android-2026-10-31.csv) validate
+sizes, payload lengths, eight samples per decoder/shape/process, balanced order
+positions and finite nonnegative timings/counters. Every timed result passes
+full equality and generated-byte round trip; inputs stay exact. Payload bytes
+and SHA-256 (identical across processes):
+
+- 10k list: 80,008 / `a3ef41217038ab501cc25165e2601d8a21f6d0217430bd834dd167b30b1781e0`.
+- 100k list: 800,008 / `4c743bd42937a700214622ce01f6ac07f82a5f7b415a9bf0a1a0ad1330ffad23`.
+- 10k frozen: 164,880 / `2a132e769f4b37fc5055b1006ecb48bdf214e12f36c32d67206e72cf2610da91`.
+- 100k frozen: 1,604,880 / `c0b1792aab81aee88eda1b9a6c071a3d9be2315bd4e3f27179723310433e4131`.
+
+PASS: pinned-loop generator guard, targeted strict generator Clippy, Rustfmt,
+repository/shared Kotlin formatting, full real-Full host JNI/codecs/Unicode
+fixtures, latest shared JVM cases, reproducible generation, debug/test APKs,
+strict Android lint and diff checks. Eight scalar/codec/selection/session cases
+plus two default opt-in skips pass (10 reported, 1.226 s). Eight production
+Vocabulary/Statistics/effective-reader cases pass (249.438 s), including exact
+frozen retries, persistence, recreation, scope changes, Library and furigana.
+Four measurement processes pass (1.441/3.433/3.416/0.922 s in run order).
+Initial sandbox Gradle lock-socket startup required approved rerun; existing
+nonfatal host teardown diagnostics remain, with no source/test failure.
+
+Commands: DEVELOPMENT.md, Scalar Kotlin decoder integration. Logs:
+`/tmp/yomoku-scalar-{generator-test,clippy,bridge,host,codegen,codegen-diff,android,
+format,regressions,production,10000-1,10000-2,100000-1,100000-2,validation}.log`;
+bytecode `-bytecode.txt` and `-legacy-bytecode.txt`. The task-started isolated AVD
+was stopped; existing ignored image/caches retained. No schema, dependency,
+product event, equality, threading or generated wire change. Full workspace
+Rust/Clippy, independent Full-loader matrix, full native callback/Compose
+profiles, optimized/arm64, diverse/heavy histories, full-load lists, lifecycle/
+process-death and exact peak-memory work were not rerun or claimed. Broad tasks
+remain open; next measure the actual callback/composition path with this decoder.

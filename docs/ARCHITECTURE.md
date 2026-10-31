@@ -1153,6 +1153,14 @@ Core-only effects stay private. Facet generates Event/ViewModel/Requests and
 document codecs in app.yomoku.shared; BoltFFI generates the native package and JNI C.
 Native wrappers require explicit close; no global singleton exists.
 
+The Kotlin payload generator narrowly adapts facet_generate 0.19.1's two
+64-bit deserializer loops to scalar `while` loops, removing range/progression
+construction. It requires exactly one matching unsigned and signed helper loop
+and fails generation on drift. Byte-at-a-time bounds checks, partial-read offsets,
+endianness, wire schemas and generated list/container handling stay unchanged.
+Shared host/Android tests retain the legacy scalar loops as an independent
+comparison path through the same generated nested codecs.
+
 One hundred and ninety-five data-free Rust tests cover analysis classification/
 checksum, domain, storage and bridge behavior, including an actual SQLite write
 lock proving dispatch/view/navigation remain responsive.

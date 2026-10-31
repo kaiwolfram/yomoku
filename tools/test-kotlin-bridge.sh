@@ -47,7 +47,7 @@ cargo run -p yomoku-ffi --example unicode-fixtures --locked --offline -- write t
     -Ltarget/debug -lyomoku_ffi '-Wl,-rpath,$ORIGIN/debug' -Wl,-z,defs \
     -o target/libyomoku_jni.so
 "$kotlinc_bin" target/generated/kotlin/app target/generated/kotlin/com \
-    target/generated/native/app tests/kotlin \
+    target/generated/native/app tests/kotlin tests/shared/kotlin \
     android/app/src/main/java/app/yomoku/ReaderTokenRanges.kt \
     android/app/src/main/java/app/yomoku/ReaderBoundaryDraft.kt \
     -jvm-target 17 -Werror -include-runtime -d target/bridge-tests.jar

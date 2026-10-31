@@ -3524,3 +3524,44 @@ and /tmp/yomoku-browser-profile-*. No emulator started.
   arm64 checks not rerun. Broader tasks stay unchecked. Next: isolate/remove scalar
   loop progression allocations through reproducible generation, then full frozen
   snapshots; continue async callback/composition, Anki API and lifecycle tasks.
+
+
+## 2026-10-31 — Generated scalar Kotlin decoder integration
+
+- Started clean; continued the ordered scalar-allocation task. The Rust payload
+  generator replaces only both pinned 64-bit stepped ranges with scalar loops,
+  rejecting changed/missing/duplicated matches. All 17 files match repeat
+  generation; only BinaryDeserializer differs from prior output. Bytecode removes
+  production RangesKt calls while both legacy test loops retain until/step.
+- Added shared host/Android legacy-oracle checks and opt-in generated-list/full
+  synthetic frozen-ViewModel comparisons. Per-byte checks, signed/unsigned/float/
+  128-bit values, errors/offsets, nested truncations/trailers, Unicode and exact
+  empty/100k/gapped/>2^53 IDs/bytes remain correct. Generated list/container/wire,
+  equality, product events, schema and dependencies stay unchanged.
+- PASS: generator guard/targeted strict Clippy/Rustfmt, full real-Full host JNI/
+  codecs/Unicode fixtures and latest shared JVM checks, reproducible generation,
+  debug/test APKs, strict Android lint, repository/shared Kotlin formatting/diff.
+  Eight focused cases plus two default skips pass (10 reported, 1.226 s); eight
+  production Vocabulary/Statistics/effective-reader cases pass (249.438 s),
+  including frozen retries, persistence, recreation, scope/Library/furigana.
+- PASS: four separate opt-in processes (10k/1 1.441 s, 100k/1 3.433 s,
+  100k/2 3.416 s, 10k/2 0.922 s), four warmup/eight balanced measured rounds per
+  shape. All 128 raw rows validate sizes/positions/payload hashes/nonnegative
+  counters/timings and every exact-ID/generated-byte/immutable-input guard.
+  At 100k synthetic frozen-view decode medians legacy 55.207/53.924 ms improve
+  to scalar 34.515/35.366 ms. No whole-app/callback/composition speed inference;
+  classes/JIT/debug/GC/emulator matter. Lagged process ART allocation deltas
+  include zeros/unrelated work and do not establish exact savings or peaks.
+- Results/raw CSV/hashes/limits: VOCABULARY_ANDROID_PERFORMANCE.md, final section.
+  Commands: DEVELOPMENT.md, Scalar Kotlin decoder integration. Logs:
+  /tmp/yomoku-scalar-{generator-test,clippy,bridge,host,codegen,codegen-diff,
+  android,format,regressions,production,10000-1,10000-2,100000-1,100000-2,
+  validation}.log; -bytecode.txt and -legacy-bytecode.txt. Initial sandbox Gradle
+  socket startup needed approved rerun; existing nonfatal host teardown messages
+  persist. No source/test failure or open blocker. Stopped the task-started
+  isolated AVD; kept the existing ignored caches/image.
+- Full workspace Rust/Clippy, independent Full-loader matrix, full native/Compose/
+  optimized/tablet/dark/fling/heavy-history/diverse-book/fully loaded/exact peaks,
+  process-death/physical arm64 not rerun. Broad tasks remain unchecked. Next:
+  measure actual callbacks/composition with the scalar decoder, then Anki API
+  verification and remaining lifecycle/accessibility matrix.

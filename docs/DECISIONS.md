@@ -4216,3 +4216,27 @@ do not measure retained bytes, per-thread allocations or peak memory. Verify
 the supported counter semantics against Android's primary API documentation.
 Preserve production generation, full selected/frozen IDs, publication policy,
 wire format and event guards pending a separately verified integration.
+
+## 2026-10-31 — Scalar Kotlin deserializer loops
+
+Adapt only the two pinned facet_generate 0.19.1 `BinaryDeserializer` 64-bit
+loops during the existing Rust Kotlin-generation command. Replace the stepped
+range with an integer shift and `while`; retain each original getByte call,
+mask, shift, return type, license and all surrounding generated code. Requiring
+exactly one match for each complete loop makes upstream drift a generation
+error. Do not edit ignored generated output by hand or fork the dependency.
+This removes the demonstrated progression construction without adopting a
+schema-specific list decoder, preallocating from untrusted lengths or changing
+partial-read errors/offsets, container budgets, equality or events.
+
+Keep a test-only BinaryDeserializer subclass with the legacy scalar loops and
+the pinned bincode length/float/variant semantics. Run shared correctness checks
+on host JVM and Android: bit patterns, signed/unsigned 64/128-bit values, raw
+floating-point bits, malformed lengths, every scalar and small nested snapshot
+truncation, prefix offsets, trailing bytes, large exact IDs and byte round trips.
+Compare both paths through unchanged generated ID-list and full frozen ViewModel
+codecs, with 100 loaded rows and all selected/confirmation IDs. The opt-in main
+thread comparison alternates decoder order across four warmup/eight measured
+rounds, retaining both results until validation outside timing. Approximate ART
+allocated-byte deltas are process-wide and may lag; no exact allocation, peak,
+composition, real interaction or hardware performance claim follows.
