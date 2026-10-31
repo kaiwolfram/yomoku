@@ -1819,8 +1819,34 @@ translations once, including supplied grammatical qualifiers. Readings join with
 built-in matches; otherwise available analyzer reading is the final fallback.
 Missing data stays empty. No old B metadata is inferred for manual segments.
 
-There is no mutable model/history input or effect. Retained export state,
-settings, transport and Compose actions remain unimplemented. Android will own
+There is no mutable vocabulary/history input or effect. Android will own
 ContentResolver/permission/deck/model/open-link I/O; no SQL/provider access belongs
 in core. Current primary-source evidence and duplicate/retry limits are in
 ANKIDROID_API.md; no provider installation or supported-version claim is implied.
+
+`AnkiExportSession` is the pure retained command/result prerequisite. Its original/
+effective entry points validate current selection content through those constructors
+and freeze selection, exact raw surface, four HTML fields and a positive signed-64
+external deck ID. The owner must supply its actual current selection, applying
+stale shell-event guards before calling. Requests share immutable content, have
+fresh checked attempt numbers and match their owning allocation on callback;
+duplicate, earlier-attempt and other-session results cannot consume pending work.
+Known pre-insert failures permit explicit Retry with identical content/deck.
+Success and verified existing-note IDs end the request without another write.
+
+The `CheckAndAdd` adapter contract requires availability/spec/permission checks,
+deck/model layout validation and a complete conservative exact-surface duplicate
+query across models/decks immediately before insertion. Null IDs, exceptions or
+transport loss after submission are uncertain, never known-safe failures. An
+uncertain insert survives clear/replacement attempts; Retry can only `Reconcile`
+read-only. Failed or empty reconciliation and mismatched result kinds cannot
+enable insertion. Verified existing notes resolve the obligation; multiple IDs
+remain existing notes, not permission to insert. No provider completion fence or
+atomic check-and-add guarantee is invented to permit a retry after an empty read.
+
+This session is not yet owned by the app Model or exposed through Event/FFI.
+Settings, provider adapter and Compose wiring remain open. Before enabling the
+action, preserve pending/uncertain insertion obligations durably across process
+death; recreating an empty in-memory session cannot establish safe retry. Do not
+advertise runtime compatibility until fake-provider and disposable-collection
+tests verify the actual adapter and its error classification.

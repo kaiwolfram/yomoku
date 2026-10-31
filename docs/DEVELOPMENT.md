@@ -7638,3 +7638,32 @@ No failed check or blocker. Logs:
 No dependency/schema/protocol or Android change. No APK/lint/Kotlin/JNI/codegen/
 Full-loader, provider installation/export, native/Compose profiling or device
 checks ran. Retained export commands/results and provider/settings/UI remain open.
+
+## Retained Anki export commands/results
+
+Verified 2026-10-31, pure core only. With the pinned Rust toolchain:
+
+```sh
+export PATH=/home/kai/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin:$PATH
+cargo test -p yomoku-core --test anki_selection --all-features --locked --offline
+cargo test --workspace --all-features --locked --offline
+cargo clippy --workspace --all-targets --all-features --locked --offline -- -D warnings
+cargo build --workspace --locked --offline
+cargo fmt --all -- --check
+git diff --check
+```
+
+PASS: 20 focused selection/export cases including ten new retained-export cases;
+851 workspace tests/17 ignored data-dependent fixtures; strict all-target/
+all-feature Clippy, workspace build and Rustfmt/diff. Cover current original/
+effective note/selection/deck retention, known pre-insert failure Retry, stale/
+repeated/other-session callbacks, clear/replacement/busy guards, uncertain insert
+reconciliation, empty/failed reads, wrong result kinds, exact long provider IDs,
+multiple existing matches and unchanged status/encounters/reader/dictionary inputs.
+Logs: `/tmp/yomoku-anki-export-{workspace,build,clippy}.log`. No failed check/blocker.
+
+No new dependency/schema/protocol or app/Android wiring. No Kotlin/JNI/codegen/
+APK/lint/Full-loader, provider installation/export, device or profiling runs.
+No emulator started. The session guard is in-memory; app-owned state/typed bridge,
+durable pending/uncertain insertion recovery, adapter/fake-provider tests and a
+disposable real collection remain prerequisites for the optional action.

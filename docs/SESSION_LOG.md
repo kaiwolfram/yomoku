@@ -3686,3 +3686,32 @@ and /tmp/yomoku-browser-profile-*. No emulator started.
 - Next: retained export commands/results, Android provider contract/live tests,
   then remaining native/optimized Vocabulary profiling and lifecycle/accessibility
   checks. Full Add to Anki stays unchecked; Q188/physical arm64 remain as before.
+
+## 2026-10-31 — Retained Anki export commands/results
+
+- Started clean; continued the next Anki prerequisite with pure AnkiExportSession.
+  Current original/effective constructors validate and freeze note, selection and
+  external deck. Immutable shared payloads survive reader/dictionary/deck changes;
+  fresh checked attempts and owning allocation identity reject stale, repeated
+  and other-session callbacks. Typed positive signed-64 IDs retain exact values.
+- Known pre-insert failures require explicit Retry with the accepted payload.
+  Uncertain insertion survives clear/replacement; Retry only reconciles read-only.
+  Empty/failed queries and wrong result kinds never permit another insert.
+  Verified nonempty existing-note results resolve uncertainty; retain multiple
+  matches without issuing a write. No vocabulary/history inputs can be mutated.
+- PASS: ten new cases/20 focused selection-export cases, 851 workspace tests/
+  17 ignored data-dependent fixtures, strict all-target/all-feature Clippy,
+  workspace build and Rustfmt/diff. Cover frozen original/effective content,
+  pre-insert failures, stale/corrupt selections, stale/foreign callbacks,
+  uncertainty/reconciliation, long IDs/multiple matches and unchanged statuses,
+  encounters, canonical text, page/analysis and dictionary inputs.
+- Updated plan, architecture, API continuation, decisions, commands and handoff.
+  Logs: /tmp/yomoku-anki-export-{workspace,build,clippy}.log. No failure/blocker.
+- No dependency/schema/Event/FFI or Android/app/UI change. No APK/lint/Kotlin/JNI/
+  codegen/Full-loader, provider, device or profiling check; no emulator started.
+  Session-only guards do not establish process-death safety: durable pending/
+  uncertain recovery and prevention of mutating replay are required before UI
+  activation. Next: Android adapter/fake-provider tests, app/typed bridge/recovery/
+  settings/UI and disposable real collection, then remaining Android profiling/
+  lifecycle/accessibility. Full Add to Anki stays unchecked; Q188 and user-deferred
+  physical arm64 remain unchanged.

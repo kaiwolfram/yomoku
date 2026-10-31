@@ -95,12 +95,21 @@ canonical text, extract a full chapter-local sentence and project licensed
 readings/English senses or the permitted custom fallback. They preserve complete
 cross-page words, exact surface identity and one occurrence highlight. See
 ARCHITECTURE.md and DECISIONS.md for sentence/definition projection rules.
-Callers must supply their actual current selection, then retain the prepared note
-across export callbacks. No Event, FFI type, settings, schema, dependency or UI
-action is added. Preparing a note has no mutable vocabulary/history input or effect.
+Callers must supply their actual current selection. `AnkiExportSession` now freezes
+the prepared note, selection and external deck ID across typed requests/results.
+Fresh attempts plus owning allocation identity reject stale/repeated/other-session
+callbacks. Only known pre-insert failures allow a mutating Retry. Uncertain insert
+outcomes require read-only reconciliation; an empty/failed read never establishes
+safe insertion, and clear/replacement cannot erase the obligation. Verified exact
+existing-note IDs resolve it. This is a pure in-memory prerequisite, not app wiring;
+no Event, FFI type, settings, schema, dependency or UI action is added. Preparation
+and export have no mutable vocabulary/history input or effect.
 
-Next implement typed retained export commands/results and an Android provider
-adapter with a fake-provider contract suite before live wiring. Verify model
+Next implement the Android provider adapter and fake-provider contract suite,
+then app-owned state/typed transport and durable pending/uncertain insertion
+recovery before enabling live wiring. A process restart must not erase insert
+uncertainty or replay an old mutating request. No supported provider completion
+fence for safe retry after empty reconciliation has been established. Verify model
 layout before reuse; never overwrite an existing user model merely by name.
 Cover missing provider, unsupported spec, permission denial, unconfigured/locked
 collection, missing deck/model, duplicate ambiguity, failure after insertion,

@@ -1,12 +1,14 @@
-//! Pure Anki note content. Provider access and export commands belong outside
-//! this module; preparing a note cannot change vocabulary or reading history.
+//! Pure Anki note content and retained export commands. Provider access belongs
+//! outside core; neither preparation nor export changes vocabulary/history.
 
 use crate::{
     document::{InvalidTextValue, TextRange},
     vocabulary::Surface,
 };
 
+mod export;
 mod projection;
+pub use export::*;
 
 /// One forward card, with the exact written surface as its first field.
 /// These are original templates, not copied Yomitan assets. Android must verify

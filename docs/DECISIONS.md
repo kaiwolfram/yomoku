@@ -4340,3 +4340,30 @@ reading use available metadata for this exact selected token; never borrow old B
 readings for unresolved manual parts. Absent readings/meanings stay empty. These
 are routine content-projection choices within the specified four-field model;
 there is no new provider API, dependency, schema or product UI behavior.
+
+## 2026-10-31 — Retained Anki commands and uncertain insertion
+
+Add a pure, Rust-only `AnkiExportSession` prerequisite before extending app/FFI or
+enabling the optional action. Accept notes only through the current original/
+effective selection constructors; freeze selection, fields, raw surface and deck.
+Use distinct validated positive signed-64 deck/note IDs, nonempty deduplicated
+existing-note observations and typed add/reconciliation results. Share immutable
+payloads across retries; fresh checked attempt numbers and allocation identity
+reject old, repeated and other-session callbacks even for identical selections.
+
+The Android `CheckAndAdd` contract must validate provider/spec/permission, deck and
+complete model layout and recheck exact-surface duplicates across decks/models
+before insertion. A failed query is not absence. Only a known pre-insert failure
+permits explicit CheckAndAdd Retry, always using the accepted content/deck.
+Submission followed by null result/exception/transport loss is uncertain. It
+survives dismissal/replacement; Retry issues only read-only Reconcile. Empty or
+failed reconciliation, or a wrong result kind, cannot authorize another insert.
+Verified existing notes resolve uncertainty; multiple matches never trigger add.
+The session conservatively blocks replacement until that obligation resolves.
+No atomic provider operation/completion fence is assumed and no notes are deleted.
+
+These guards currently last only for the retained core session. Before shipping
+app/provider/UI wiring, persist pending/uncertain obligations across process death
+and prevent replay of mutating requests. Do not claim restart idempotency, runtime
+provider compatibility or a safe post-uncertainty insert retry from these pure
+tests. This adds no dependency, schema, Event/FFI, settings or visible UI behavior.

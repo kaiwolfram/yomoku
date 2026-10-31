@@ -11,6 +11,9 @@ use yomoku_core::{
     vocabulary::VocabularyStatus,
 };
 
+#[path = "anki_selection/export.rs"]
+mod export;
+
 fn range(text: &str, start: usize, end: usize) -> TextRange {
     TextRange {
         start: TextOffset::at(text, start).unwrap(),
