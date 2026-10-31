@@ -7708,3 +7708,37 @@ were stopped. No outstanding failure/blocker. Logs:
 and `-isolated-emulator.log`. No real AnkiDroid collection, permission grant,
 browser launch, model/note mutation or compatibility claim. Host Rust/Clippy/
 Rustfmt, independent Full-loader, broader UI/lifecycle and profiling were not run.
+
+## Read-only Android Anki model validation
+
+Use the isolated 8 GiB AVD and JDK/SDK/Gradle environment from the preceding
+section. No AnkiDroid installation, collection or API dependency is required.
+The fake provider returns contract metadata/templates; unexpected mutations throw.
+
+```sh
+./android/gradlew -p android :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug --offline --console=plain
+"$ANDROID_HOME/platform-tools/adb" -s emulator-5554 install -r -t android/app/build/outputs/apk/debug/app-debug.apk
+"$ANDROID_HOME/platform-tools/adb" -s emulator-5554 install -r -t android/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+"$ANDROID_HOME/platform-tools/adb" -s emulator-5554 shell am instrument -w -r -e class app.yomoku.AnkiProviderReaderTest,app.yomoku.CoreSessionTest app.yomoku.test/androidx.test.runner.AndroidJUnitRunner
+JAVA_HOME="$JAVA_HOME" tools/format-kotlin.sh --check
+git diff --check
+```
+
+2026-10-31 PASS: nine new model cases plus 12 prior provider cases and three
+CoreSession regressions (24 total, 0.162 s), API-36 x86_64; debug/test APKs, strict
+Android lint, repository Kotlin formatting and diff. Native bridge/bindings,
+Sudachi probe and dictionary assets were up-to-date and reused. Cases cover
+same-name models, exact long IDs, fresh layouts, every metadata/template mismatch,
+actual template counts/browser overrides, malformed schema/rows, null/transport/
+partial/close failures, between-query host/permission changes, worker guards and
+defensive expected-field snapshots. Production HTML/CSS remains Rust-owned.
+
+Sandbox Gradle lock/ADB sockets required approved execution. One installation
+attempt before emulator boot finished failed; both APKs installed after boot.
+No data was cleared. The task-owned emulator was stopped. No open blocker.
+Logs: `/tmp/yomoku-anki-model-{android,tests,format,format-check,emulator}.log`.
+No Rust/schema/dependency/protocol/UI change, model/note mutation, real AnkiDroid
+collection/browser verification or compatibility claim. Host Rust/Clippy/Rustfmt,
+independent Full-loader, broader UI/lifecycle, physical device and performance
+checks were not run. Creation/insertion, durable recovery and typed app wiring
+remain the precise continuation point in NEXT_SESSION.md.

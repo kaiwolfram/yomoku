@@ -59,6 +59,8 @@ class AnkiProviderReaderTest {
         var lastProjection: List<String>? = null
         var lastSelection: String? = null
         var lastArguments: List<String>? = null
+        val models = linkedMapOf<Long, Array<Any?>>()
+        val templates = linkedMapOf<Long, List<Array<Any?>>>()
 
         override fun onCreate() = true
 
@@ -79,6 +81,20 @@ class AnkiProviderReaderTest {
             lastArguments = args?.toList()
             replacement?.let {
                 return it()
+            }
+            if (uri.pathSegments.first() == "models") {
+                val isTemplate = uri.lastPathSegment == "templates"
+                val columns = if (isTemplate) TEMPLATE_COLUMNS else MODEL_COLUMNS
+                val rows =
+                    if (isTemplate) templates[uri.pathSegments[1].toLong()].orEmpty()
+                    else if (uri.pathSegments.size == 1) models.values.toList()
+                    else listOfNotNull(models[uri.pathSegments[1].toLong()])
+                val requested = projection ?: columns
+                return MatrixCursor(requested).apply {
+                    rows.forEach { row ->
+                        addRow(requested.map { row[columns.indexOf(it)] }.toTypedArray())
+                    }
+                }
             }
             val table =
                 when (uri.lastPathSegment) {
@@ -139,6 +155,42 @@ class AnkiProviderReaderTest {
                 )
             }
         val reader = AnkiProviderReader(ContentResolver.wrap(provider), environment)
+        // Comparison inputs stand in for the future Rust-owned layout transport, not production
+        // copies of the core's HTML/CSS constants.
+        val layout =
+            AnkiProviderModelLayout(
+                "Yomoku v1",
+                listOf("Surface", "Reading", "Meanings", "Sentence"),
+                ".card { color: black; }",
+                "Japanese word",
+                "{{Surface}}",
+                "{{Sentence}}",
+            )
+
+        fun model(id: Long = 7, name: String = layout.name) {
+            provider.models[id] =
+                arrayOf(
+                    id,
+                    name,
+                    layout.joinedFieldNames,
+                    1L,
+                    layout.css,
+                    0L,
+                    0L,
+                )
+            provider.templates[id] =
+                listOf(
+                    arrayOf(
+                        id,
+                        0L,
+                        layout.cardName,
+                        layout.questionFormat,
+                        layout.answerFormat,
+                        "",
+                        "",
+                    )
+                )
+        }
 
         override fun close() = provider.close()
     }
@@ -147,6 +199,297 @@ class AnkiProviderReaderTest {
 
     private fun failed(reason: AnkiReadError, result: AnkiReadResult<*>) {
         assertEquals(AnkiReadResult.Failed(reason), result)
+    }
+
+    @Test
+    fun modelsPreserveSameNamesAndLongIdsWithoutAssumingCompatibility() {
+        Fixture().use { f ->
+            assertEquals(emptyList<AnkiProviderModel>(), value(f.reader.models()))
+            f.model(7)
+            f.model(Long.MAX_VALUE)
+            f.provider.models[7]!![2] = "Front\u001fBack"
+            assertEquals(
+                listOf(
+                    AnkiProviderModel(AnkiProviderModelId(7), f.layout.name),
+                    AnkiProviderModel(AnkiProviderModelId(Long.MAX_VALUE), f.layout.name),
+                ),
+                value(f.reader.models()),
+            )
+            assertFalse(value(f.reader.modelMatches(AnkiProviderModelId(7), f.layout)))
+            assertTrue(value(f.reader.modelMatches(AnkiProviderModelId(Long.MAX_VALUE), f.layout)))
+            assertEquals("Front\u001fBack", f.provider.models[7]!![2])
+        }
+    }
+
+    @Test
+    fun modelValidationReadsExactIdAndDoesNotCacheTemplatesOrNames() {
+        Fixture().use { f ->
+            val id = AnkiProviderModelId(Long.MAX_VALUE)
+            assertFalse(value(f.reader.modelMatches(id, f.layout)))
+            f.model(id.value)
+            assertTrue(value(f.reader.modelMatches(id, f.layout)))
+            assertEquals(
+                listOf("models", id.value.toString(), "templates"),
+                f.provider.lastUri!!.pathSegments,
+            )
+            assertNull(f.provider.lastSelection)
+            assertNull(f.provider.lastArguments)
+            f.provider.templates[id.value]!!.single()[3] = "{{Reading}}"
+            assertFalse(value(f.reader.modelMatches(id, f.layout)))
+            f.model(id.value, "Renamed")
+            assertFalse(value(f.reader.modelMatches(id, f.layout)))
+            f.provider.models.clear()
+            assertFalse(value(f.reader.modelMatches(id, f.layout)))
+        }
+    }
+
+    @Test
+    fun everyMetadataLayoutDifferenceRejectsReuseWithoutWriting() {
+        Fixture().use { f ->
+            val changes =
+                listOf(
+                    1 to "yomoku v1",
+                    2 to "Reading\u001fSurface\u001fMeanings\u001fSentence",
+                    2 to "Surface\u001fReading\u001fMeanings\u001fSentence\u001fExtra",
+                    2 to "Surface\u001fReading\u001fMeanings\u001fSentence\u001f",
+                    3 to 0L,
+                    3 to 2L,
+                    4 to "${f.layout.css}\n",
+                    5 to 1L,
+                    6 to 1L,
+                )
+            changes.forEach { (column, changed) ->
+                f.model()
+                f.provider.models[7]!![column] = changed
+                assertFalse(
+                    "Column $column: $changed",
+                    value(f.reader.modelMatches(AnkiProviderModelId(7), f.layout)),
+                )
+                assertEquals(changed, f.provider.models[7]!![column])
+            }
+        }
+    }
+
+    @Test
+    fun everyTemplateDifferenceAndActualTemplateCountRejectReuse() {
+        Fixture().use { f ->
+            val changes =
+                listOf(
+                    1 to 1L,
+                    2 to "Renamed",
+                    3 to "{{Reading}}",
+                    4 to "{{Meanings}}",
+                    5 to "{{Surface}}",
+                    6 to "{{Sentence}}",
+                )
+            changes.forEach { (column, changed) ->
+                f.model()
+                f.provider.templates[7]!!.single()[column] = changed
+                assertFalse(
+                    "Column $column: $changed",
+                    value(f.reader.modelMatches(AnkiProviderModelId(7), f.layout)),
+                )
+                assertEquals(changed, f.provider.templates[7]!!.single()[column])
+            }
+            f.provider.templates[7] = emptyList()
+            assertFalse(value(f.reader.modelMatches(AnkiProviderModelId(7), f.layout)))
+            f.model()
+            f.provider.templates[7] = List(2) { f.provider.templates[7]!!.single().clone() }
+            assertFalse(value(f.reader.modelMatches(AnkiProviderModelId(7), f.layout)))
+        }
+    }
+
+    @Test
+    fun malformedModelListsAndSchemasNeverPublishPartialSuccess() {
+        Fixture().use { f ->
+            for (row in
+                listOf(
+                    arrayOf<Any?>(0L, "Model"),
+                    arrayOf<Any?>("7", "Model"),
+                    arrayOf<Any?>(7L, null),
+                    arrayOf<Any?>(7L, ""),
+                    arrayOf<Any?>(1L, "Repeated"),
+                )) {
+                val cursor =
+                    MatrixCursor(arrayOf("_id", "name")).apply {
+                        addRow(arrayOf<Any?>(1L, "Valid"))
+                        addRow(row)
+                    }
+                f.provider.replacement = { cursor }
+                failed(AnkiReadError.InvalidResponse, f.reader.models())
+                assertTrue(cursor.isClosed)
+            }
+            val cursor = MatrixCursor(arrayOf("_id"))
+            f.provider.replacement = { cursor }
+            failed(AnkiReadError.InvalidResponse, f.reader.models())
+            assertTrue(cursor.isClosed)
+        }
+    }
+
+    @Test
+    fun malformedModelAndTemplateResponsesFailInsteadOfClaimingIncompatibility() {
+        Fixture().use { f ->
+            for (templates in listOf(false, true)) {
+                val columns = if (templates) TEMPLATE_COLUMNS else MODEL_COLUMNS
+                val changes =
+                    if (templates) listOf(0 to 8L, 0 to "7", 1 to "0", 3 to null)
+                    else listOf(0 to 8L, 0 to "7", 3 to "1", 5 to null, 2 to null)
+                changes.forEach { (column, changed) ->
+                    f.model()
+                    val row =
+                        if (templates) f.provider.templates[7]!!.single()
+                        else f.provider.models[7]!!
+                    row[column] = changed
+                    failed(
+                        AnkiReadError.InvalidResponse,
+                        f.reader.modelMatches(AnkiProviderModelId(7), f.layout),
+                    )
+                }
+                f.model()
+                var closed = false
+                f.provider.replacement = {
+                    val isTemplateQuery = f.provider.lastUri!!.lastPathSegment == "templates"
+                    if (isTemplateQuery != templates) {
+                        MatrixCursor(MODEL_COLUMNS).apply { addRow(f.provider.models[7]) }
+                    } else
+                        object : CursorWrapper(MatrixCursor(columns.dropLast(1).toTypedArray())) {
+                            override fun close() {
+                                super.close()
+                                closed = true
+                            }
+                        }
+                }
+                failed(
+                    AnkiReadError.InvalidResponse,
+                    f.reader.modelMatches(AnkiProviderModelId(7), f.layout),
+                )
+                assertTrue(closed)
+                f.provider.replacement = null
+            }
+            f.model()
+            f.provider.replacement = {
+                MatrixCursor(MODEL_COLUMNS).apply {
+                    repeat(2) { addRow(f.provider.models[7]) }
+                }
+            }
+            failed(
+                AnkiReadError.InvalidResponse,
+                f.reader.modelMatches(AnkiProviderModelId(7), f.layout),
+            )
+        }
+    }
+
+    @Test
+    fun modelReadsDiscardNullTransportPartialAndCloseFailuresAtEveryStage() {
+        Fixture().use { f ->
+            f.model()
+            for (stage in listOf("models", "7", "templates")) {
+                for (failure in listOf("null", "transport", "iteration", "close")) {
+                    var closed = false
+                    f.provider.replacement = {
+                        val columns =
+                            if (stage == "models") arrayOf("_id", "name")
+                            else if (stage == "templates") TEMPLATE_COLUMNS else MODEL_COLUMNS
+                        if (f.provider.lastUri!!.lastPathSegment != stage) {
+                            MatrixCursor(MODEL_COLUMNS).apply { addRow(f.provider.models[7]) }
+                        } else
+                            when (failure) {
+                                "null" -> null
+                                "transport" -> throw android.os.DeadObjectException()
+                                else ->
+                                    object :
+                                        CursorWrapper(
+                                            MatrixCursor(columns).apply {
+                                                addRow(
+                                                    when (stage) {
+                                                        "models" -> arrayOf<Any?>(7L, f.layout.name)
+                                                        "templates" ->
+                                                            f.provider.templates[7]!!.single()
+                                                        else -> f.provider.models[7]!!
+                                                    }
+                                                )
+                                            }
+                                        ) {
+                                        var moves = 0
+
+                                        override fun moveToNext(): Boolean {
+                                            if (++moves == 2 && failure == "iteration")
+                                                error("Partial read")
+                                            return super.moveToNext()
+                                        }
+
+                                        override fun close() {
+                                            super.close()
+                                            closed = true
+                                            if (failure == "close") error("Close failed")
+                                        }
+                                    }
+                            }
+                    }
+                    val result =
+                        if (stage == "models") f.reader.models()
+                        else f.reader.modelMatches(AnkiProviderModelId(7), f.layout)
+                    failed(AnkiReadError.CollectionUnavailable, result)
+                    if (failure in listOf("iteration", "close")) assertTrue(closed)
+                }
+            }
+        }
+    }
+
+    @Test
+    fun modelOperationsRecheckPermissionSpecAndProviderBetweenReads() {
+        Fixture().use { f ->
+            f.environment.permitted = false
+            failed(AnkiReadError.PermissionDenied, f.reader.models())
+            failed(
+                AnkiReadError.PermissionDenied,
+                f.reader.modelMatches(AnkiProviderModelId(7), f.layout),
+            )
+            assertEquals(0, f.provider.queries)
+            f.environment.permitted = true
+            f.environment.info!!.metaData.putInt(AnkiProviderReader.SPEC_KEY, 1)
+            failed(AnkiReadError.UnsupportedProvider, f.reader.models())
+            failed(
+                AnkiReadError.UnsupportedProvider,
+                f.reader.modelMatches(AnkiProviderModelId(7), f.layout),
+            )
+            f.environment.info!!.metaData.putInt(AnkiProviderReader.SPEC_KEY, 2)
+            f.model()
+            for (replacePackage in listOf(false, true)) {
+                f.environment.permitted = true
+                f.environment.info!!.packageName = "test.anki.host"
+                f.provider.replacement = {
+                    if (replacePackage) f.environment.info!!.packageName = "test.other.host"
+                    else f.environment.permitted = false
+                    MatrixCursor(MODEL_COLUMNS).apply { addRow(f.provider.models[7]) }
+                }
+                val before = f.provider.queries
+                failed(
+                    if (replacePackage) AnkiReadError.ProviderUnavailable
+                    else AnkiReadError.PermissionDenied,
+                    f.reader.modelMatches(AnkiProviderModelId(7), f.layout),
+                )
+                assertEquals(before + 1, f.provider.queries)
+            }
+        }
+    }
+
+    @Test
+    fun expectedModelLayoutSnapshotsFieldsAndRejectsInvalidTransportInputs() {
+        val fields = mutableListOf("Surface", "Reading", "Meanings", "Sentence")
+        fun layout() = AnkiProviderModelLayout("Model", fields, "css", "Card", "question", "answer")
+        val expected = layout()
+        fields.reverse()
+        assertEquals("Surface\u001fReading\u001fMeanings\u001fSentence", expected.joinedFieldNames)
+        fields[0] = "bad\u001ffield"
+        assertThrows(IllegalArgumentException::class.java) { layout() }
+        fields[0] = "bad\u0000field"
+        assertThrows(IllegalArgumentException::class.java) { layout() }
+        fields[0] = fields[1]
+        assertThrows(IllegalArgumentException::class.java) { layout() }
+        fields.removeAt(0)
+        assertThrows(IllegalArgumentException::class.java) { layout() }
+        assertThrows(IllegalArgumentException::class.java) { AnkiProviderModelId(0) }
     }
 
     @Test
@@ -473,6 +816,8 @@ class AnkiProviderReaderTest {
                 val operations =
                     listOf<() -> Any?>(
                         { f.reader.availability() },
+                        { f.reader.models() },
+                        { f.reader.modelMatches(AnkiProviderModelId(7), f.layout) },
                         { f.reader.decks() },
                         { f.reader.duplicates("猫") },
                         { f.reader.reconcile("猫") },
@@ -484,5 +829,20 @@ class AnkiProviderReaderTest {
             }
             assertEquals(0, f.provider.queries)
         }
+    }
+
+    companion object {
+        private val MODEL_COLUMNS =
+            arrayOf("_id", "name", "field_names", "num_cards", "css", "sort_field_index", "type")
+        private val TEMPLATE_COLUMNS =
+            arrayOf(
+                "model_id",
+                "ord",
+                "card_template_name",
+                "question_format",
+                "answer_format",
+                "browser_question_format",
+                "browser_answer_format",
+            )
     }
 }

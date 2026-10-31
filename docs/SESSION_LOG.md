@@ -3747,3 +3747,31 @@ and /tmp/yomoku-browser-profile-*. No emulator started.
   settings/UI and disposable real-collection/browser checks, then remaining Android
   profiling/accessibility/lifecycle work. Full Add to Anki remains unchecked; Q188
   and user-deferred physical arm64 are unchanged.
+
+## 2026-10-31 — Read-only Android Anki model validation
+
+- Started clean; continued the next independently testable Anki prerequisite.
+  Added model ID/name discovery and fresh metadata/template validation by exact
+  positive signed-64 ID. Same-name models remain distinct and never imply reuse.
+  Require exact four-field order/CSS/name, normal type/sort field zero and one
+  actual ordinal-zero forward template with exact name/question/answer and empty
+  browser overrides. Default deck is separate from layout; future mutation must
+  explicitly place cards in the frozen configured deck. Expected fields are
+  snapshotted; production templates remain Rust-owned for the future typed bridge.
+- Missing/incompatible models return false without mutation. Malformed/null/
+  partial/close-failed reads fail; host/spec/permission refresh between queries
+  rejects revocation/host replacement. No observation is an atomic reuse lease.
+  No app/FFI/UI call site, model creation/overwrite or note insertion is enabled.
+- PASS: nine new fake-provider cases plus 12 prior provider cases and three
+  CoreSession regressions (24 total, 0.162 s), API-36 x86_64 isolated 8 GiB AVD;
+  debug/test APKs, strict Android lint, repository Kotlin formatting and diff.
+  Native/bindings/probe/assets reused; no independent Rust/Full-loader checks.
+- Gradle/ADB sandbox sockets required approved execution. One pre-boot APK install
+  failed; installation after boot succeeded. No app data cleared. Task-owned
+  emulator stopped; no open blocker. Logs:
+  /tmp/yomoku-anki-model-{android,tests,format,format-check,emulator}.log.
+- Updated plan, API evidence, architecture, decisions, commands and brief handoff.
+  No dependency/schema/protocol change or real collection/browser/physical-device/
+  broader UI/lifecycle/performance run. Next: mutating adapter/model creation/deck
+  placement, then durable pending/uncertain recovery and typed app/settings/UI
+  wiring. Real collection checks remain required before compatibility claims.

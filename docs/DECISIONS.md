@@ -4397,3 +4397,24 @@ current provider package and exact URI-encoded note-ID search; return an intent
 without launching. Fake-provider tests use ContentResolver.wrap and real Android
 SQLite, with metadata/permission/link resolution injected. They cover adapter
 semantics, not installed AnkiDroid/Binder/browser compatibility or process death.
+
+## 2026-10-31 — Read-only Anki model layout validation
+
+Split model discovery from validation: return all exact ID/name pairs, including
+same-name models, and validate a requested ID with fresh metadata/template reads.
+Never infer ownership from a name or overwrite/repair an incompatible model.
+Use caller-supplied expected layout data instead of copying Rust's production
+templates into Kotlin; snapshot ordered field names at construction. No new
+dependency, protocol, schema, UI or provider mutation is needed for this slice.
+
+Require the expected name, all four fields in order, exact CSS, normal type,
+sort field zero and exactly one actual ordinal-zero forward template with exact
+name/question/answer and empty browser overrides. Ignore default model deck as
+a compatibility criterion: the future adapter must explicitly place cards in
+the frozen configured deck. Preserve full positive signed-64 model IDs; use
+template ord rather than its unstable synthetic _id. Return false for missing/
+incompatible layouts and typed failure for malformed/null/partial/failed reads,
+including close failures. Refresh provider/spec/permission before both queries
+and reject a host package change between them. This is a non-atomic observation;
+repeat validation in the future mutating operation, retain duplicate recheck and
+uncertain-submission rules, and enable no live calls before durable recovery.

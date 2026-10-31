@@ -1864,3 +1864,15 @@ launching. All entry points reject the main thread; no reader/core/database hand
 is available to this adapter. Manifest visibility/permission declarations do not
 request permission or dispatch I/O. Local Kotlin types are prerequisites for the
 future typed bridge, not a second app state machine or serialized protocol.
+
+Model discovery returns positive signed-64 IDs and exact names without inferring
+compatibility or selecting a same-name model. `modelMatches` performs fresh
+metadata/template reads by ID against an `AnkiProviderModelLayout` supplied by the
+future core bridge. Rust retains production names/HTML/CSS; Kotlin snapshots field
+order and verifies normal type, sort field zero, four ordered fields, exact CSS,
+one ordinal-zero card, exact templates and empty browser overrides. Default deck
+does not define layout; explicit configured-deck placement remains a mutating
+adapter obligation. Null/malformed/partial/close-failed reads fail; missing or
+incompatible layouts return false without changing provider state. Recheck host
+and permission between reads. This snapshot cannot prevent concurrent user edits;
+future submission must revalidate. No creation/update/delete path is enabled.

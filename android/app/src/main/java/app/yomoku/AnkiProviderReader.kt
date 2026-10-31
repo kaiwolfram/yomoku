@@ -84,6 +84,150 @@ internal class AnkiProviderReader(
 
     fun availability(): AnkiReadResult<String> = read(AnkiReadError.ProviderFailure) { host() }
 
+    /** Discovery only. A name (even an exact match) never establishes a reusable layout. */
+    fun models(): AnkiReadResult<List<AnkiProviderModel>> =
+        read(AnkiReadError.CollectionUnavailable) {
+            host()
+            val cursor =
+                resolver.query(uri("models"), arrayOf("_id", "name"), null, null, null)
+                    ?: fail(AnkiReadError.CollectionUnavailable)
+            try {
+                val id = cursor.getColumnIndexOrThrow("_id")
+                val name = cursor.getColumnIndexOrThrow("name")
+                val models = linkedMapOf<AnkiProviderModelId, AnkiProviderModel>()
+                while (cursor.moveToNext()) {
+                    val modelId = AnkiProviderModelId(cursor.positiveId(id))
+                    val label = cursor.requiredString(name)
+                    if (label.isEmpty() || models.containsKey(modelId)) {
+                        fail(AnkiReadError.InvalidResponse)
+                    }
+                    models[modelId] = AnkiProviderModel(modelId, label)
+                }
+                models.values.toList()
+            } finally {
+                cursor.close()
+            }
+        }
+
+    /**
+     * Fresh read-only validation by ID, including the actual template rows. A false result means
+     * missing/incompatible, never permission to overwrite a same-name user model. This observation
+     * is not a lease: a future mutating adapter must validate again before submission.
+     */
+    fun modelMatches(
+        id: AnkiProviderModelId,
+        expected: AnkiProviderModelLayout,
+    ): AnkiReadResult<Boolean> =
+        read(AnkiReadError.CollectionUnavailable) {
+            val packageName = host()
+            val modelUri = uri("models").buildUpon().appendPath(id.value.toString()).build()
+            val cursor =
+                resolver.query(
+                    modelUri,
+                    arrayOf(
+                        "_id",
+                        "name",
+                        "field_names",
+                        "num_cards",
+                        "css",
+                        "sort_field_index",
+                        "type",
+                    ),
+                    null,
+                    null,
+                    null,
+                ) ?: fail(AnkiReadError.CollectionUnavailable)
+            val metadataMatches =
+                try {
+                    // Resolve all columns even for an empty cursor: a malformed schema is failure.
+                    val columns =
+                        listOf(
+                                "_id",
+                                "name",
+                                "field_names",
+                                "num_cards",
+                                "css",
+                                "sort_field_index",
+                                "type",
+                            )
+                            .map { cursor.getColumnIndexOrThrow(it) }
+                    if (!cursor.moveToNext()) false
+                    else {
+                        if (cursor.positiveId(columns[0]) != id.value)
+                            fail(AnkiReadError.InvalidResponse)
+                        val name = cursor.requiredString(columns[1])
+                        val fields = cursor.requiredString(columns[2])
+                        val count = cursor.requiredLong(columns[3])
+                        val css = cursor.requiredString(columns[4])
+                        val sort = cursor.requiredLong(columns[5])
+                        val type = cursor.requiredLong(columns[6])
+                        if (cursor.moveToNext()) fail(AnkiReadError.InvalidResponse)
+                        name == expected.name &&
+                            fields == expected.joinedFieldNames &&
+                            count == 1L &&
+                            css == expected.css &&
+                            sort == 0L &&
+                            type == 0L
+                    }
+                } finally {
+                    cursor.close()
+                }
+            if (!metadataMatches) return@read false
+            // Permission/provider observations must remain fresh between the two provider calls.
+            if (host() != packageName) fail(AnkiReadError.ProviderUnavailable)
+            val templates =
+                resolver.query(
+                    modelUri.buildUpon().appendPath("templates").build(),
+                    arrayOf(
+                        "model_id",
+                        "ord",
+                        "card_template_name",
+                        "question_format",
+                        "answer_format",
+                        "browser_question_format",
+                        "browser_answer_format",
+                    ),
+                    null,
+                    null,
+                    null,
+                ) ?: fail(AnkiReadError.CollectionUnavailable)
+            try {
+                val columns =
+                    listOf(
+                            "model_id",
+                            "ord",
+                            "card_template_name",
+                            "question_format",
+                            "answer_format",
+                            "browser_question_format",
+                            "browser_answer_format",
+                        )
+                        .map { templates.getColumnIndexOrThrow(it) }
+                if (!templates.moveToNext()) false
+                else {
+                    if (templates.positiveId(columns[0]) != id.value)
+                        fail(AnkiReadError.InvalidResponse)
+                    val ordinal = templates.requiredLong(columns[1])
+                    val name = templates.requiredString(columns[2])
+                    val question = templates.requiredString(columns[3])
+                    val answer = templates.requiredString(columns[4])
+                    val browserQuestion = templates.requiredString(columns[5])
+                    val browserAnswer = templates.requiredString(columns[6])
+                    // Do not confuse the provider's synthetic, one-based _id with zero-based ord.
+                    val extra = templates.moveToNext()
+                    !extra &&
+                        ordinal == 0L &&
+                        name == expected.cardName &&
+                        question == expected.questionFormat &&
+                        answer == expected.answerFormat &&
+                        browserQuestion.isEmpty() &&
+                        browserAnswer.isEmpty()
+                }
+            } finally {
+                templates.close()
+            }
+        }
+
     fun decks(): AnkiReadResult<List<AnkiProviderDeck>> =
         read(AnkiReadError.CollectionUnavailable) {
             host()

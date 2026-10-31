@@ -135,7 +135,21 @@ allows in-process fake-provider tests on minSdk 29; these use real Android SQLit
 for bound query semantics and injected permission/metadata/resolution observations.
 They do not establish real Binder/provider/runtime compatibility.
 
-Next implement model-layout validation and the mutating adapter contract, then
+The read-only reader also enumerates model IDs/names and validates a specific
+model ID against caller-supplied core layout data. The release contract and
+provider expose `models/<id>` metadata and `models/<id>/templates` rows. Require
+the exact name, ordered four fields, CSS, normal type, first-field sorting and
+one forward template with exact name/question/answer and empty browser overrides.
+Use zero-based `ord`, not synthetic template `_id`. Discovery preserves same-name
+models and does not choose one; incompatible/missing models return false without
+mutation. Failed/malformed reads remain failures. Recheck host/permission between
+queries. Default model deck is deliberately not a layout constraint: the future
+adapter must place cards in the frozen configured deck explicitly. Validation is
+an observation, not an atomic reuse guarantee, and must run again before mutation.
+No production template constants are copied into Kotlin; the future typed bridge
+must supply Rust's layout. No model is created, repaired or overwritten here.
+
+Next implement the mutating adapter contract, then
 app-owned state/typed transport and durable pending/uncertain insertion
 recovery before enabling live wiring. A process restart must not erase insert
 uncertainty or replay an old mutating request. No supported provider completion
