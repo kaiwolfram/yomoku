@@ -3,6 +3,7 @@
 //! Persistence, tokenization, and platform effects belong outside this crate.
 pub mod active_time;
 pub mod analysis;
+pub mod anki;
 pub mod app;
 pub mod completion;
 pub mod dictionary;

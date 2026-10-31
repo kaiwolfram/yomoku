@@ -4290,3 +4290,26 @@ default builds exclude the hooks. Preserve the core, full IDs, equality, failure
 Retry/replay guards, callback codec and Android API. Compare feature-off optimized
 host runs with observed runs, without treating their difference as a speedup or
 an Android native/interaction decomposition. Add no dependency.
+
+## 2026-10-31 — Anki API evidence and pure note preparation
+
+Continue the planned external integration with primary-source API verification
+and a small, platform-independent content step. Pin the evidence to AnkiDroid
+2.25.3 rather than assuming the old wiki's API artifact matches current source;
+record links, exact APIs, first-field/model limitations and the supported browser
+link in ANKIDROID_API.md. No new library/version is adopted. The proposed Android
+adapter uses supported ContentResolver operations; compatibility/permission,
+cross-model comparison and ambiguous insert reconciliation require their own
+contract/live tests before wiring. Do not infer absent duplicates from a failed
+query or overwrite external notes/models.
+
+Use an original `Yomoku v1` model with Surface/Reading/Meanings/Sentence fields,
+one forward card and the required word-only front. Keep templates/content rules
+in pure core, while Android owns provider I/O. Preserve supplied text/order and
+the raw Surface; escape HTML/media brackets/U+001F in field content. Highlight
+one validated sentence-local UTF-8 span, not every textual match. Empty reading
+or meanings remain empty. The caller must supply licensed dictionary/custom
+data and a current canonical sentence; this step invents no sentence-boundary,
+selection or dictionary-choice policy and adds no export event, status change,
+settings, migration, transport or UI. Rendering control characters cannot be
+assumed lossless even though the raw identity retains them.

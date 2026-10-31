@@ -3636,3 +3636,28 @@ and /tmp/yomoku-browser-profile-*. No emulator started.
   despite that failed check. Follow-up normalizes only line endings, revalidates
   all raw values/guards and updates the digest. Final staged diff passes; no code
   changed and no benchmarks or Rust tests were repeated for this artifact fix.
+
+## 2026-10-31 — Anki API evidence and pure note preparation
+
+- Started clean; continued the planned Anki integration with primary-source
+  inspection of release 2.25.3. ANKIDROID_API.md records wrapper/contract/provider/
+  permission/deck/model APIs, exact first-field cross-model feasibility and HTML/
+  layout limits, separate query/insert ambiguity and a supported browser-link
+  candidate needing live resolution tests. No API dependency/version adopted.
+- Added pure core AnkiNote and original Yomoku v1 four-field HTML/CSS model. Front
+  contains only the surface; back has reading, ordered meanings and supplied
+  canonical sentence with exactly one validated UTF-8 occurrence highlighted.
+  Preserve raw identity; escape HTML/media brackets/provider separators. Missing
+  reading/meanings remain empty. No mutable history/status input or effect.
+- PASS: workspace build, 831 tests/17 ignored data-dependent fixtures, strict
+  workspace/all-target/all-feature Clippy, Rustfmt/diff. Five new cases cover
+  repeated words, exact Unicode/whitespace/inflection, absent definitions, literal
+  markup/media/separators and malformed/stale/non-scalar target ranges.
+- Updated architecture/decisions/checklist/handoff/commands. Logs:
+  /tmp/yomoku-anki-{workspace,build,clippy}.log. No failed check or blocker.
+- No Event/FFI/schema/dependency/Android behavior change. No APK/lint/Kotlin/JNI/
+  codegen/Full-loader, provider export, device or performance runs. No emulator
+  started. Next: canonical context/dictionary projection and retained typed
+  export, Android provider contract/live tests, then pending native/optimized
+  Vocabulary profiling and lifecycle/accessibility coverage. Full Add to Anki
+  stays unchecked; physical arm64 remains user-deferred and Q188 remains pending.

@@ -7588,3 +7588,25 @@ setup and diagnostic enum-size lint; no open blocker. Android/Kotlin/JNI/Full-lo
 optimized Android/arm64/exact-peak/lifecycle/diverse-book checks were not run.
 Final staged diff caught CSV CRLF endings; a follow-up normalizes them to LF,
 revalidates the data and updates its recorded digest. Use LF for CSV export.
+
+## Anki note preparation
+
+This slice uses only pure Rust and primary-source API inspection. It installs no
+AnkiDroid/API artifact and needs no emulator. Use the pinned Rust PATH above:
+
+```sh
+cargo build --workspace --locked --offline
+cargo test --workspace --all-features --locked --offline
+cargo clippy --workspace --all-targets --all-features --locked --offline -- -D warnings
+cargo fmt --all -- --check
+git diff --check
+```
+
+2026-10-31 PASS: workspace build, 831 tests/17 ignored data-dependent fixtures,
+strict all-feature/all-target workspace Clippy, Rustfmt/diff. Five new core cases
+exercise note fields, exact repeated-occurrence/Unicode/whitespace/inflection
+identity, literal HTML/media/separators and malformed/stale/non-scalar targets.
+Logs: `/tmp/yomoku-anki-{workspace,build,clippy}.log`. No failed check or blocker.
+Primary API evidence/remaining provider tests: ANKIDROID_API.md. No dependency,
+schema, Event/FFI or Android change. No APK/lint/Kotlin/JNI/codegen/Full-loader,
+live provider, native/Compose profiler or device checks ran in this slice.

@@ -1790,3 +1790,20 @@ capture Back abandons capture/selection. Query/paging effects and toolbar/main
 navigation pause while frozen. Settings still retains ordinary selection.
 Activity recreation projects the same native selection/prompt/error; shell menus
 hold no command payload. No persistence/FFI/dependency change is needed.
+
+## Anki note preparation boundary
+
+`yomoku-core::anki` owns pure `AnkiNote` content preparation and the original
+four-field `Yomoku v1` single-card HTML/CSS model. The constructor takes an exact
+`Surface`, caller-resolved reading/ordered meanings, canonical sentence and a
+sentence-local `TextRange`. It validates UTF-8 boundaries and exact surface equality
+before escaping and highlighting only the selected occurrence. The raw surface
+remains independent of HTML for future exact-identity checks. Escaping covers
+HTML, bracket media syntax and the provider's U+001F field delimiter.
+
+There is no mutable model/history input or effect. Sentence extraction,
+applicable original/effective dictionary projection, retained export state,
+settings, transport and Compose actions remain unimplemented. Android will own
+ContentResolver/permission/deck/model/open-link I/O; no SQL/provider access belongs
+in core. Current primary-source evidence and duplicate/retry limits are in
+ANKIDROID_API.md; no provider installation or supported-version claim is implied.

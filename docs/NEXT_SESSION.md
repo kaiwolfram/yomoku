@@ -1,58 +1,53 @@
 # Resume here
-Updated: 2026-10-31. Opt-in native Vocabulary host phase diagnostics verified.
+Updated: 2026-10-31. Anki API evidence and pure note preparation verified.
 Commit guidance: explanatory bodies; merges include provenance. Keep verification
 results in session/progress docs and reports, out of commit message bodies.
 
 ## Current slice
-- Default-off Rust storage-measurements feature observes Vocabulary page/ID reads
-  over the existing effective-reader FIFO. Normal constructors read no diagnostic
-  clocks or allocate metadata; default builds exclude hooks. No JNI API added.
-- Boundaries: pre-send to worker start; repository/open/cleanup; resolver through
-  return (core response + request serialization + synchronous host callback).
-  Resolution components remain combined; view encoding is separately measured.
-  Observer runs after callback on worker; do not block/reenter. Queue includes
-  diagnostic allocation/send/scheduling; observer work can delay later jobs.
-- Four sequential release host processes (10k off, 100k observed, 100k off, 10k
-  observed), ten status rounds/1k rereads/50k occurrences, warmup + seven samples.
-  136 metric rows/952 raw durations validate with exact full IDs/bytes/cleanup.
-- 100k Select All queue/execute/resolve medians: 0.035759/7.748635/0.186407 ms;
-  feature-off callback median 7.806115 ms. Repository dominates this host path;
-  no production optimization, Android phase/speed/memory/hardware claim.
-- Results/hashes/raw CSV: VOCABULARY_PERFORMANCE.md, final section;
-  measurements/vocabulary-worker-host-2026-10-31.csv.
-- Prior scalar decoder and Android callback/Compose observers remain intact.
-  VOCABULARY_ANDROID_PERFORMANCE.md retains their separate debug-emulator results;
-  do not subtract these host phases from Android idle time or add nested spans.
+- Reviewed official AnkiDroid 2.25.3 wrapper/contract/provider/manifest/handler;
+  exact methods, permission/spec gates, cross-model first-field limits, ambiguous
+  insertion Retry and browser-link candidate are in ANKIDROID_API.md.
+- No API dependency or minimum app version adopted; no provider installed/read
+  or note exported. API wiki's old artifact must not be assumed current.
+- Pure core anki::AnkiNote prepares four escaped fields and retains raw Surface.
+  Original Yomoku v1 single-card HTML/CSS: word-only front; reading/ordered English
+  meanings/supplied canonical sentence with one selected occurrence on the back.
+  Validate UTF-8 target and exact surface; escape HTML/media brackets/U+001F.
+  Preserve Unicode/whitespace/inflection; absent readings/meanings stay empty.
+- No state mutation, Event/FFI, provider I/O, settings or UI action yet. Callers
+  still resolve sentence boundaries, current selection and applicable dictionary/
+  custom data; the builder does not invent those policies. Architecture/decisions
+  and implementation checklist updated; full Add to Anki remains unchecked.
 - Schema 0020. Nostr starter configuration empty; ask Q188 before forwarding.
 
 ## Next tasks (ordered)
-1. Profile actual Android native phases and 100k Select All Compose costs; compare
-   an observer-free optimized Android workload before a production change. Host
-   phases do not explain device costs; combined core/serialization remains open.
-   Preserve full IDs, structural equality and event/replay guards. Heavy-history/
-   diverse-book/full-load/exact peak work remains.
-2. Verify supported AnkiDroid provider/deck/model/duplicate APIs against primary
-   documentation; record feasible exact-surface duplicate behavior before wiring.
-3. Extend remaining accessibility/process-death/lifecycle matrix. Physical arm64
-   remains user-deferred; emulator/host results do not establish viability.
+1. Project canonical sentence/selected target and applicable readings/English
+   meanings from original/effective dictionary selections; add retained typed
+   Anki export commands/results with stale-selection/unchanged-status tests.
+2. Implement Android ContentResolver adapter and fake-provider contract tests:
+   availability/spec/permission, deck/model validation, conservative exact-surface
+   duplicates, insert ambiguity and supported open-link resolution. Wire default
+   deck/settings/Add to Anki only with verified results; test a disposable real
+   collection before claiming runtime compatibility. See ANKIDROID_API.md.
+3. Resume actual Android native-phase/100k Select All Compose and observer-free
+   optimized profiling, plus remaining accessibility/process-death matrix. Preserve
+   full IDs/equality/replay guards. Host phases cannot explain device costs;
+   heavy-history/diverse-book/full-load/exact peaks remain. Physical arm64 is
+   user-deferred; emulator/host results do not establish hardware viability.
 
 ## Verification / blockers
-- PASS: workspace build, 826 workspace tests/17 ignored data-dependent fixtures,
-  three harness cases in each feature mode, strict workspace/all-target/all-feature
-  and feature-off harness Clippy, Rustfmt/diff. Two new FFI tests cover blocked
-  FIFO, callback/sample order/thread, full IDs/frozen prompt, failure/exact Retry.
-- All four profiles pass full-ID/read-only bytes/no-analyzer/dictionary/integrity/
-  FK/cleanup guards. Validator checks all raw summaries/metric sets/phase bounds.
-- Commands: DEVELOPMENT.md, final Native Vocabulary worker diagnostics. Pinned
-  Rust PATH; cargo test --workspace --all-features --locked --offline; cargo clippy
+- PASS: workspace build; 831 workspace tests/17 ignored data-dependent fixtures;
+  strict workspace/all-target/all-feature Clippy; Rustfmt and diff check.
+- Five new core cases cover repeated-word occurrence highlighting, literal
+  HTML/media/separator content, escaped sentence context, exact Unicode/whitespace/
+  inflection identity/absent definitions and invalid/stale/non-scalar ranges.
+- Commands: DEVELOPMENT.md, final Anki note preparation section. Pinned Rust PATH;
+  cargo test --workspace --all-features --locked --offline; cargo clippy
   --workspace --all-targets --all-features --locked --offline -- -D warnings.
-- Profile: build measure_vocabulary --release with/without storage-measurements;
-  executable args 10000/100000 10 1000 7. No concurrent builds/tests/profilers.
-- Logs: /tmp/yomoku-worker-{workspace,harness,harness-base,focused,clippy,
-  clippy-base,build,build-base,build-measured,validation}.log, size/mode CSV/log
-  pairs; validator /tmp/yomoku-validate-worker.py. Corrected initial replay-test
-  setup, diagnostic enum-size lint and CSV CRLF endings (follow-up commit/data
-  revalidation/digest update). No remaining blocker; no emulator started.
-- Android/Kotlin/JNI/codegen, independent Full-loader, physical arm64, lifecycle/
-  accessibility, optimized Android, exact peaks and diverse books not run here.
-  Broad tasks remain open. Schema/dependencies/product behavior unchanged.
+- Logs: /tmp/yomoku-anki-{workspace,build,clippy}.log. No failed check or blocker.
+  Android/Kotlin/JNI/codegen/Full-loader/device/profile checks were not run for
+  this pure-core/doc slice. No dependency/schema/protocol/product behavior change.
+- Prior native diagnostics/results: VOCABULARY_PERFORMANCE.md final section and
+  VOCABULARY_ANDROID_PERFORMANCE.md; DEVELOPMENT.md retains commands. Default-off
+  storage-measurements factory remains host-only; Android native-phase and
+  observer-free optimized comparisons are still open. No emulator started here.
