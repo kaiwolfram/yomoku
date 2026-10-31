@@ -51,7 +51,8 @@ results in session/progress docs and reports, out of commit message bodies.
 - Logs: /tmp/yomoku-worker-{workspace,harness,harness-base,focused,clippy,
   clippy-base,build,build-base,build-measured,validation}.log, size/mode CSV/log
   pairs; validator /tmp/yomoku-validate-worker.py. Corrected initial replay-test
-  setup and diagnostic enum-size lint. No remaining blocker; no emulator started.
+  setup, diagnostic enum-size lint and CSV CRLF endings (follow-up commit/data
+  revalidation/digest update). No remaining blocker; no emulator started.
 - Android/Kotlin/JNI/codegen, independent Full-loader, physical arm64, lifecycle/
   accessibility, optimized Android, exact peaks and diverse books not run here.
   Broad tasks remain open. Schema/dependencies/product behavior unchanged.

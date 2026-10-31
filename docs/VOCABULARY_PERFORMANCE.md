@@ -417,7 +417,7 @@ All [136 metric rows/952 raw durations](measurements/vocabulary-worker-host-2026
 validate: seven finite nonnegative samples per row, exact min/median/max, metric
 sets, sample-aligned queue+execute boundaries preceding callback, fixture row/
 payload counts, unchanged database bytes and scratch cleanup. CSV SHA-256:
-`4d99c8f7d39968408f809bf1edef3b8f6e55ec3bcc44f9b7f873c1ed78f2e069`.
+`12a59b0655be6b8b280499d410e2d706cb3f8617f1211696c3ac8c78415dcb4f`.
 The existing integrity/FK and panic-on-analyzer/dictionary guards pass in all
 four runs. Profiles contain 28 measured observed reads (84 phase durations),
 plus their warmups and appended pages checked outside the reported phase rows.
@@ -431,6 +431,9 @@ read-only behavior, errors and explicit exact Retry. Initial test setup wrongly
 repeated Select All before freezing; corrected it to test rejection while frozen.
 Initial Clippy exposed diagnostic job growth; boxing only observed metadata
 resolved it without allocating on the default path. No remaining blocker.
+The staged diff check later caught CSV CRLF endings after the implementation
+commit proceeded; normalized the artifact to LF, revalidated all data and updated
+its digest in a follow-up commit. Final staged whitespace checks pass.
 
 Commands: DEVELOPMENT.md, Native Vocabulary worker diagnostics. Logs:
 `/tmp/yomoku-worker-{workspace,harness,harness-base,focused,clippy,clippy-base,build,

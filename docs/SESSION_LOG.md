@@ -3632,3 +3632,7 @@ and /tmp/yomoku-browser-profile-*. No emulator started.
   accessibility, optimized Android, exact peaks/diverse books not run here. Broad
   tasks stay unchecked. Next: actual Android native/observer-free optimized
   comparison, Anki API evidence, remaining lifecycle/accessibility matrix.
+- Final staged diff caught CSV CRLF endings; the implementation commit proceeded
+  despite that failed check. Follow-up normalizes only line endings, revalidates
+  all raw values/guards and updates the digest. Final staged diff passes; no code
+  changed and no benchmarks or Rust tests were repeated for this artifact fix.

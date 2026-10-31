@@ -7586,3 +7586,5 @@ build-base,build-measured,validation}.log`, four size/mode CSV/log pairs;
 validator `/tmp/yomoku-validate-worker.py`. Corrected initial frozen-replay test
 setup and diagnostic enum-size lint; no open blocker. Android/Kotlin/JNI/Full-loader,
 optimized Android/arm64/exact-peak/lifecycle/diverse-book checks were not run.
+Final staged diff caught CSV CRLF endings; a follow-up normalizes them to LF,
+revalidates the data and updates its recorded digest. Use LF for CSV export.
