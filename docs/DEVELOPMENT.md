@@ -9262,3 +9262,65 @@ validation,validation-final,workspace,workspace-final,build,build-final,clippy,
 clippy-final,arm64,x86_64}.log` (one per suffix). Final focused log is
 `focused-verified`; final workspace/build/Clippy logs have `-final`. Final format/
 doc-link/diff results are in the session transcript.
+
+## Private restore schema preflight
+
+2026-11-01: added write-only `BackupCandidate` private staging and opaque
+`SchemaCheckedBackup`. Require successful complete decryption before structural
+preflight. Exact header/page/file length and rollback-mode input precede hardened
+SQLite introspection; exact bundled schema/journal matches precede integrity/CHECK/
+FK checks. Supported schemas 1–24 migrate only in the private candidate, then
+recheck/sync/close. No application validation, confirmation or activation authority
+is exposed. Snapshot/candidate cleanup shares fixed database/sidecar removal;
+unexpected files remain. Only existing pinned rusqlite's limits feature is added.
+Primary API/security evidence and limitations: BACKUP_FORMAT.md.
+
+```sh
+cargo test -p yomoku-storage --locked --offline candidate
+cargo test --workspace --all-features --locked --offline --quiet
+cargo build --workspace --all-features --locked --offline
+cargo clippy --workspace --all-targets --all-features --locked --offline -- -D warnings
+export CC_aarch64_linux_android=/home/kai/Android/Sdk/ndk/30.0.16248370/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android29-clang
+export AR_aarch64_linux_android=/home/kai/Android/Sdk/ndk/30.0.16248370/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-ar
+export CC_x86_64_linux_android=/home/kai/Android/Sdk/ndk/30.0.16248370/toolchains/llvm/prebuilt/linux-x86_64/bin/x86_64-linux-android29-clang
+export AR_x86_64_linux_android=/home/kai/Android/Sdk/ndk/30.0.16248370/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-ar
+cargo build -p yomoku-storage --target aarch64-linux-android --target x86_64-linux-android --locked --offline
+cargo fmt --all -- --check
+git diff --check
+```
+
+PASS: 14 new cases. A real-password full-state encrypted snapshot retains every
+durable table/schema object/sequence and both journals. Every numbered schema
+migrates privately; populated schema-23 upgrade retains the complete expected
+current state and a pending note submission without replay. Unsupported/version-
+disagreeing manifests, wrong/missing/extra journal entries, malformed SQL, views
+impersonating the journal, extra tables/indexes/views/triggers/virtual/statistics
+objects, changed columns/constraints, missing objects, invalid CHECK/FK rows,
+non-SQLite/truncated/WAL/invalid-page/trailing-length input are refused. Direct
+hardening regression blocks writes/views/triggers/attachments/writable_schema.
+All cancellation polls for current/migrating candidates discard staging; file
+failures preserve source bytes. Permissions/existing-path/symlink refusal,
+abandoned/decryption failure disposal, known-sidecar cleanup and nonrecursive
+explicit cleanup failure reporting pass. Source data is never mutated.
+
+Initial compile errors in borrowed SQL value error conversion and fixture API
+argument order/PageLength accessor were corrected before final verification.
+PASS: 1063 workspace tests, zero failures, 17 existing opt-in ignored; all-feature
+workspace build, strict all-target/all-feature Clippy, Rustfmt, both Android
+storage target library builds, local documentation links and diff checks. Build/
+tests offline; no dependency downloads. No APK/lint/JNI/codegen/emulator/release/
+physical or resource trials run. No remaining implementation/verification steps
+or blockers for this structural preflight slice.
+
+Application invariants (payloads, text/analysis/anchors, history, singleton rows,
+sequence contents) remain required before a restore-ready handle or confirmation.
+Runtime crash cleanup/checkpoint/mutation gates, nonserialized secrets, descriptor/
+UI actions and atomic activation/recovery remain separate work. Conservative exact
+schema matching and synchronous cancellation/resource limitations are documented.
+Recommend schema-24 phone upgrade and disposable real Anki/permission/browser/
+Back trial now; no new APK was requested or built.
+
+Logs: `/tmp/yomoku-candidate-{focused,focused-final,workspace,build,clippy,android}.log`.
+Final focused log includes all 14 cases; the initial focused log covers the first
+11. Corrected compiler diagnostics and format/doc-link/diff results are in the
+session transcript.

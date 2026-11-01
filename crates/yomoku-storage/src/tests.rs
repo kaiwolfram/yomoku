@@ -16,6 +16,7 @@ mod anki_model;
 mod anki_reconciliation;
 mod anki_recovery;
 mod anki_settings;
+mod backup_candidate;
 mod backup_snapshot;
 mod completions;
 mod custom_dictionary;

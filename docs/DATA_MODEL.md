@@ -2222,8 +2222,8 @@ checks the decrypted manifest/exact payload length through Last/EOF before succe
 Only caller-owned private staging receives plaintext; failed outputs are disposable.
 Authentication still establishes neither SQLite/schema validity nor replacement
 authority. Compact application-origin snapshot creation and encrypted full-state
-fixture round trips are implemented in storage. Hardened import validation and
-replacement remain unimplemented.
+fixture round trips are implemented in storage. Private structural/schema checks
+and migration are implemented; application validation and replacement remain.
 
 All existing durable state is included, including original imported bytes/EPUB
 assets, analysis identities, deleted-document provenance, history, pending time,
@@ -2237,3 +2237,13 @@ their normal startup mutation gates closed. Preserve journals through restore wi
 writes. User-confirmed policy requires authoritative recovery of the current
 installation's pending/uncertain Anki writes before replacement. No schema,
 runtime, FFI, external-write authority or destructive operation changes here.
+
+`BackupCandidate` writes only new private staging. After full stream authentication,
+exact header/file length and allowlisted schema/journal/integrity/CHECK/FK checks
+precede supported private migration and the same post-migration checks. All schema
+versions 1–24 migrate through the bundled chain; populated schema-23 data retains
+pending Anki obligations and all other durable rows/high-water marks. The opaque
+`SchemaCheckedBackup` cannot expose SQL or authorize confirmation/replacement.
+Singleton presence, serialized application payloads, relational text/analysis/
+history semantics and sqlite_sequence contents still need explicit validation;
+structural success alone is insufficient. No schema migration is added.

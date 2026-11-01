@@ -196,10 +196,10 @@ fn validate_app_snapshot(path: &Path, sqlite_len: u64) -> Result<u32, SnapshotEr
         .map_err(|_| SnapshotError::InvalidSnapshot)
 }
 
-struct StagingDirectory(PathBuf);
+pub(super) struct StagingDirectory(PathBuf);
 
 impl StagingDirectory {
-    fn create(path: &Path) -> Result<Self, SnapshotError> {
+    pub(super) fn create(path: &Path) -> Result<Self, SnapshotError> {
         #[cfg(not(unix))]
         return Err(SnapshotError::Io(io::ErrorKind::Unsupported));
         #[cfg(unix)]
@@ -221,15 +221,23 @@ impl StagingDirectory {
         }
     }
 
-    fn path(&self) -> PathBuf {
+    pub(super) fn path(&self) -> PathBuf {
         self.0.join("snapshot.sqlite3")
     }
 
-    fn cleanup(&self) -> io::Result<()> {
-        match fs::remove_file(self.path()) {
-            Ok(()) => {}
-            Err(error) if error.kind() == io::ErrorKind::NotFound => {}
-            Err(error) => return Err(error),
+    pub(super) fn cleanup(&self) -> io::Result<()> {
+        // Only our fixed database and SQLite sidecars, never recursive deletion.
+        for name in [
+            "snapshot.sqlite3",
+            "snapshot.sqlite3-journal",
+            "snapshot.sqlite3-wal",
+            "snapshot.sqlite3-shm",
+        ] {
+            match fs::remove_file(self.0.join(name)) {
+                Ok(()) => {}
+                Err(error) if error.kind() == io::ErrorKind::NotFound => {}
+                Err(error) => return Err(error),
+            }
         }
         match fs::remove_dir(&self.0) {
             Ok(()) => Ok(()),

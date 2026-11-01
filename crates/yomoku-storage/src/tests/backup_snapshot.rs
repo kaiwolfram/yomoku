@@ -33,7 +33,7 @@ fn rows(connection: &Connection, sql: &str) -> Vec<Vec<Value>> {
         .unwrap()
 }
 
-fn state(connection: &Connection) -> Vec<(String, Vec<Vec<Value>>)> {
+pub(super) fn state(connection: &Connection) -> Vec<(String, Vec<Vec<Value>>)> {
     let tables = rows(
         connection,
         "SELECT name FROM sqlite_schema WHERE type = 'table' ORDER BY name",
@@ -107,7 +107,7 @@ fn complete(storage: &mut Storage, imported: &AnalyzedPaste) {
 
 const HIGH_WATER: i64 = 9_007_199_254_740_993;
 
-fn populate(storage: &mut Storage) {
+pub(super) fn populate(storage: &mut Storage) {
     let deleted = storage
         .create_analyzed_paste(&PasteText::new("猫 猫 犬 𠮷".into()).unwrap(), 100, fixture)
         .unwrap();

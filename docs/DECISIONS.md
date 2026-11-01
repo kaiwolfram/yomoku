@@ -5150,3 +5150,38 @@ private migration and replacement as separate work. Before app integration the
 runtime must own checkpoint drain/mutation gating and private staging crash
 cleanup; cancellation currently polls only between synchronous calls. No live
 export/import action or serialized password transfer is introduced here.
+
+## 2026-11-01 — Private restore schema preflight before application validation
+
+Add write-only `BackupCandidate` staging using the existing new-directory private
+lifecycle. Require the authenticated stream manifest only after complete decryption;
+check SQLite header/file length and reject WAL-format input before SQLite opens it.
+Use READ_WRITE without CREATE/URI so SQLite retains CHECK expressions, while
+query_only, defensive mode, trusted_schema off, disabled triggers/views/attachments,
+cell checks and reduced parser/VM limits precede schema introspection. Enable only
+the existing pinned rusqlite limits feature; no new library/version. Primary API
+and security references are recorded in BACKUP_FORMAT.md.
+
+Require exact schema-object type/name/table/SQL equality against a private in-memory
+reference built from the bundled migration prefix, including internal objects.
+Do not normalize or execute imported SQL. Only then query the exact numbered
+journal and run integrity/CHECK/FK checks. Migrate supported versions through the
+existing bundled chain only on this private candidate, and recheck/sync/close.
+Conservative exact SQL matching needs preserved published fixtures/explicit work
+if future SQLite or migration changes affect compatibility. This first format is
+not yet exposed through the app.
+
+Return an opaque `SchemaCheckedBackup` exposing only original/current versions
+and discard. Structural success cannot authorize replacement or ordinary Storage
+reads. Keep application-level text/analysis/anchor/history/payload/singleton/sequence
+validation and a later restore-ready confirmation handle as separate work. Both
+Anki journals are retained without replay or live mutation authority. Current
+installation recovery still must resolve before replacement. No destructive
+semantics, schema, runtime/core/FFI/Android or secret transport changes.
+
+Cleanup removes only fixed database/SQLite sidecar names and preserves unexpected
+files. Drop/error/cancel is best effort; explicit discard reports errors. Runtime
+process-death cleanup remains required. Parser limits and borrowed metadata
+comparisons reduce exposure but do not bound total SQLite memory/time; cancellation
+polls between synchronous SQL/row/sync operations. Resource trials and full restore
+activation remain unimplemented.

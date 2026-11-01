@@ -155,8 +155,9 @@ The [manual backup format](docs/BACKUP_FORMAT.md) specifies the full-state snaps
 and encryption profile. The isolated Rust backup crate implements strict metadata
 and bounded authenticated snapshot streams. Rust storage now creates compact
 private SQLite snapshots; complete encrypted fixture round trips preserve every
-durable table and ID sequence. App export/import, hardened candidate validation
-and confirmed replacement restore are not yet implemented.
+durable table and ID sequence. Private candidate structure/schema checks and
+supported migrations are implemented. Application validation, app export/import
+and confirmed replacement restore remain incomplete.
 
 The Rust TXT parser, atomic repository and typed worker/JNI path support strict
 UTF-8/Shift-JIS decoding with explicit selection for ambiguous bytes, preserved hard

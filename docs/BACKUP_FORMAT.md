@@ -2,8 +2,9 @@
 
 Status: strict metadata codecs and bounded authenticated snapshot Read/Write in
 `yomoku-backup`, compact app-owned SQLite snapshots in `yomoku-storage` and complete
-encrypted fixture round trips implemented on 2026-11-01. Hardened import validation,
-crash cleanup/orchestration, export/import UI and replacement are not implemented. The wire
+encrypted fixture round trips implemented on 2026-11-01. Private candidate
+structural/schema validation and supported migration are implemented; application
+validation, crash cleanup/orchestration, export/import UI and replacement remain. The wire
 fixtures define the first format; this is not yet an exported-file compatibility
 or end-to-end security claim.
 
@@ -239,6 +240,55 @@ supported older candidate, validate again, and retain it behind an opaque fresh
 session-local confirmation handle. Authentication is not authorization to execute
 schema-provided SQL or skip semantic validation. Implementation must enumerate
 these checks and test hostile schemas before enabling replacement.
+
+### Implemented structural preflight (not restore authority)
+
+`BackupCandidate::create` owns a new private 0700 directory/0600 write-only file.
+Stream decryption can write into it without SQL or adoption of an existing path.
+Only after authenticated decryption returns should the caller consume it through
+`check_schema` with that manifest's schema and exact length. No bulk bytes or
+secrets enter core/FFI. Drop/error/cancel disposes best effort; explicit discard
+reports cleanup failures. Only the fixed database/SQLite sidecar names are removed;
+unexpected files are preserved. Process-death cleanup remains a runtime obligation.
+
+The check refuses unsupported versions, mismatched lengths, non-SQLite headers,
+WAL-format input, invalid page sizes/page counts and trailing bytes. Before schema
+introspection the no-CREATE/no-URI READ_WRITE connection sets defensive mode,
+trusted_schema off, triggers/views off, attach create/write off, query_only,
+cell_size_check and memory temporary storage. Parser/SQL/column/expression/VM/
+attachment/trigger/worker limits are reduced without lowering document/blob row
+length limits. These measures reduce attack surface; they are not a fixed memory
+budget or an in-statement cancellation/deadline guarantee.
+
+Every `main.sqlite_schema` type/name/table/SQL value must exactly match an in-memory
+reference built from the bundled migration prefix. This includes internal indexes
+and sqlite_sequence; no extra objects (including statistics tables), missing
+objects, edited constraints, views, triggers or virtual tables are accepted.
+Candidate SQL is never executed as a statement; SQLite necessarily parses schema
+definitions during introspection. Row comparisons borrow SQLite values rather
+than allocating candidate-sized Rust strings. Only after that match is the exact
+contiguous migration journal queried, then integrity/CHECK/index/foreign-key checks
+run. All versions 1–24 use the existing numbered chain on the private candidate;
+the resulting current schema/journal/integrity/FKs are checked again and the file
+is synced/closed. The original source and live database are never opened for writes.
+Exact SQL matching deliberately rejects schema variants; keep published archive
+fixtures when future SQLite/migration changes require explicit compatibility work.
+
+The opaque `SchemaCheckedBackup` exposes only schema versions and discard. It has
+no SQL/path/reader/confirmation/activation API. **Application invariants remain
+unchecked**, including serialized payload semantics, text/analysis/anchor relations,
+history replay consistency, singleton rows and sequence contents. Do not pass this
+result to replacement confirmation or ordinary `Storage::open`. Further validation
+must enumerate these requirements before adding any restore-ready handle. Both
+Anki journals survive this layer unchanged; they never become mutation permits.
+Cancellation polls between synchronous operations/rows, not inside SQL or sync.
+
+API/security evidence: [SQLite untrusted-input guidance](https://www.sqlite.org/security.html),
+[connection configuration](https://www.sqlite.org/c3ref/c_dbconfig_defensive.html),
+[schema-table semantics](https://www.sqlite.org/schematab.html),
+[rusqlite 0.40.2 DbConfig](https://docs.rs/rusqlite/0.40.2/rusqlite/config/enum.DbConfig.html)
+and the installed 0.40.2 `limits.rs`/`config.rs` primary sources. Only the existing
+pinned rusqlite `limits` feature is enabled; no new library/version is adopted.
 
 **User decision (2026-11-01): require Anki recovery first.** If the current
 installation has pending/uncertain note/model writes, restore cannot replace it

@@ -4439,3 +4439,22 @@ and /tmp/yomoku-browser-profile-*. No emulator started.
   No APK/JNI/emulator/physical/release trial; no remaining steps or blockers for
   this slice. Next: hardened private validation/migration, runtime staging/secret
   handoff. Recommend schema-24 phone upgrade and disposable Anki trial now.
+
+## 2026-11-01 — Private restore structural/schema preflight
+
+- Added write-only private candidate staging, hardened SQLite schema introspection,
+  exact bundled schema/journal/integrity/CHECK/FK checks, supported private migration
+  and recheck/sync/close. Opaque results expose only versions/discard; application
+  semantics and restore confirmation/activation remain unavailable.
+- Added full-state encrypted and populated schema-23/pending Anki preservation,
+  every schema 1–24, hostile schema/header/constraint/FK, direct hardening, I/O,
+  private cleanup and all cancellation-poll cases. Source bytes remain intact;
+  no live I/O/provider replay. Shared cleanup now removes known SQLite sidecars.
+- PASS: 14 new cases, 1063 workspace tests/17 opt-in ignored, all-feature build,
+  strict Clippy/Rustfmt, both Android storage library targets and doc links/diff.
+  Initial borrowed SQL/fixture API compile errors corrected. Commands/limits/logs:
+  DEVELOPMENT.md, Private restore schema preflight. No Android app/device trial.
+- Updated format/architecture/data model/decisions/plan/README/handoff. No remaining
+  implementation/verification steps or blockers for this slice. Next: complete
+  application invariants, then runtime staging/secret handoff; restore umbrellas
+  stay unchecked. Recommend schema-24 phone upgrade and disposable Anki trial now.

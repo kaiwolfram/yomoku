@@ -16,7 +16,7 @@ the manifest after authenticated Last, EOF, exact length and flush. Errors may
 leave partial output; callers must discard it, sync/close successful files and
 clean up after crashes. Password ownership bypasses serialization; Rust guards
 clear password/key/KDF scratch/chunk buffers. Cancellation is cooperative between
-synchronous KDF/I/O calls. Hardened import validation and replacement remain unimplemented.
+synchronous KDF/I/O calls. Application-level import validation and replacement remain unimplemented.
 
 `Storage::create_backup_snapshot` now produces the compact full database using
 bound VACUUM INTO in a newly owned private 0700 directory/0600 file. The app-origin
@@ -31,14 +31,25 @@ Only storage tests depend on the crypto crate; encrypted fixtures preserve every
 table/schema object and ID sequence, including live and deleted-source history,
 imports/images/analysis, pending time, settings and both Anki journals.
 
-Subsequent work keeps hardened SQLite validation in storage and Rust encryption
+`BackupCandidate` now owns write-only private staging for decrypted data. After
+complete authentication, it checks exact file/header length, hardens SQLite before
+introspection, compares every schema object to a trusted bundled migration prefix,
+checks the exact journal/integrity/CHECKs/FKs, privately migrates versions 1–24,
+and rechecks/syncs/closes. Triggers/views/trusted schema/attachments are disabled;
+parser limits are reduced. `SchemaCheckedBackup` exposes only versions/discard,
+with no reader/path/SQL or restore confirmation authority. Application-level
+payload/anchor/history/sequence validation remains required. Cleanup shares the
+snapshot's fixed-file lifecycle, now also removing known SQLite sidecars, without
+recursive deletion. See BACKUP_FORMAT.md for exact checks and resource limits.
+
+Subsequent work keeps application validation in storage and Rust encryption
 in the backup crate, coordinated by EffectRouter. Pure core owns correlated
 intent/confirmation; Kotlin owns the password UI/file picker. Secret transfer
 must bypass serializable events/views. Validate and migrate a separate private
 candidate before confirmed atomic replacement and session retirement. Current
 pending/uncertain Anki recovery blocks replacement until resolved (user decision);
 restored journal records never confer external mutation permits. No live backup
-or restore action is implemented yet; hostile import validation and interrupted
+or restore action is implemented yet; hostile application-data and interrupted
 activation tests remain.
 
 ## Implemented

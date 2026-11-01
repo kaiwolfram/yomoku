@@ -16,52 +16,56 @@ Commit guidance: concise subject/explanatory body; keep verification in docs.
 
 ## Current backup boundary
 - Version-1 format/profile: BACKUP_FORMAT.md. Independent `yomoku-backup` owns
-  bounded authenticated streams; fixed Argon2id/STREAM BE32/XChaCha20Poly1305,
-  fresh salt/nonce, exact lengths/AAD and mandatory Last/EOF. Secrets bypass
-  serialization; guarded Rust buffers cannot clear caller/JVM copies.
-- `Storage::create_backup_snapshot` now uses bound VACUUM INTO in a NEW private
-  0700 directory/0600 file. Checks integrity/FKs/current migration journal/zero
-  freelist/page length, syncs, exposes only a read-only reader plus schema/length.
-  Explicit discard reports cleanup errors; Drop/error/cancel clean best effort.
-- SQLite 3.53.2 read-only B-trees omit CHECK expressions. Validate only the owned
-  copy through READ_WRITE without CREATE and query_only before schema parsing.
-  Corrupt-settings regression covers this. This is not hardened import validation.
-- Full encrypted fixtures populate/compare every durable table/schema object and
-  sequence, preserving deleted provenance, imports/images/analysis/history/time/
-  settings/custom records/both Anki journals; reads and allocations remain usable.
-  Crypto is a storage dev dependency only; no new production dependency/schema.
-- Runtime must still own checkpoint drain/mutation gating and private-parent crash
-  cleanup. Cancellation polls between synchronous calls, not inside VACUUM/KDF/
-  validation/sync. Never copy live SQLite/WAL bytes for backups.
-- Decrypt only into new private disposable staging; late failure can leave prior
-  plaintext. Full authentication/length/EOF/flush is not schema/restore authority.
-  Hardened validation/private migration, activation and secret FFI/UI remain undone.
+  bounded authenticated streams; Argon2id/STREAM BE32/XChaCha20Poly1305, fresh
+  salt/nonce, exact lengths/AAD and mandatory Last/EOF. Secrets bypass serialization.
+- `Storage::create_backup_snapshot`: bound VACUUM INTO, NEW private 0700/0600 copy,
+  integrity/FKs/current journal/compact size/sync, read-only stream + schema/length.
+  Full encrypted fixtures compare every durable table/schema object/high-water ID.
+- `BackupCandidate::create`: NEW private write-only decryption staging. Only after
+  full stream authentication, consume with manifest schema/length via check_schema.
+  Header/page/file length and rollback-mode input checked before SQLite opens it.
+- Harden no-CREATE/no-URI READ_WRITE before introspection: defensive/query_only,
+  trusted_schema/triggers/views/attach off, cell checks, memory temp and parser/VM
+  limits. READ_WRITE retains CHECK parsing (read-only B-trees omit it).
+- Exact all-object type/name/table/SQL match against bundled migration prefix,
+  then exact journal/integrity/CHECK/FKs. Versions 1–24 migrate privately, recheck,
+  sync/close. Current full state and populated schema-23 pending Anki survive.
+- Opaque SchemaCheckedBackup exposes versions/discard ONLY, no path/SQL/reader or
+  confirmation authority. Application payload/text/analysis/anchor/history/singleton/
+  sequence invariants remain unchecked. Never authorize replacement from this type.
+- Fixed-file/SQLite-sidecar cleanup only, preserving unexpected files. Explicit
+  discard reports errors; Drop/error/cancel best effort. Crash cleanup still undone.
+  Cancellation polls between synchronous calls/rows, not inside SQL/KDF/sync.
+  Limits reduce exposure, not a fixed SQLite memory/time budget.
+- Runtime checkpoint drain/mutation gating, secret handoff, external descriptors/UI,
+  application validation/confirmation and activation/recovery remain unimplemented.
+  Never copy live SQLite/WAL bytes or decrypt outside new private disposable staging.
 
 ## Existing Anki boundary
-- Exact original/effective preparation needs Ready acknowledged configured deck
-  and retained regular-deck discovery. Explicit Check/Create/Add/Clear; no replay.
+- Ready acknowledged configured deck + retained regular-deck discovery required.
+  Explicit Check/Create/Add/Clear; no replay. Frozen original/effective preparation.
 - FIFO/journal generations, commit acknowledgement and one native permit own
-  provider writes. Startup/retry restores read-only; empty evidence resolves none.
-- Per-note Open accepts only frozen Existing/acknowledged NoteAdded IDs. Exact
-  package-scoped resolution on provider FIFO; resumed-only Activity launcher.
-  Pause/close/changed projection cancels queued/late work; no return/recreation replay.
-- Details: ARCHITECTURE.md, DATA_MODEL.md, ANKIDROID_API.md and DECISIONS.md.
+  provider writes. Startup/retry read-only; empty evidence resolves none.
+- Per-note Open accepts frozen Existing/acknowledged NoteAdded IDs only. Package-
+  scoped FIFO resolution; resumed-only launcher; pause/close/change cancels queued/
+  late work. No return/recreation replay. Architecture/data/API/decisions have detail.
 
 ## Next tasks (ordered)
-1. Implement hardened private SQLite/schema/application validation and supported
-   migration before any restore confirmation; hostile schema/failure tests.
+1. Enumerate and implement complete candidate application invariants (including
+   journals/serialized payloads, anchors/history, singleton/sequence contents),
+   hostile-data tests and opaque restore-ready validation before any confirmation.
 2. Add runtime export sequencing/checkpoint drain/mutation gating and private
    staging crash cleanup; design nonserialized secret handoff before FFI/UI.
 3. Real phone schema-24 upgrade and disposable Anki collection/permission/browser/
    Back/lifecycle trial. Anki umbrella remains unchecked pending this validation.
 
 ## Verification / blockers
-- PASS: nine new snapshot cases; 1049 workspace tests/17 opt-in ignored, all-feature
-  build, strict Clippy/Rustfmt, both Android storage target library builds, local
-  doc links and diff checks. Initial API/fixture/CHECK-validation issues corrected.
-- Commands/logs: DEVELOPMENT.md, Compact full-state backup snapshots. Checks offline.
-  No blockers or implementation/verification steps remain for this snapshot slice.
-- No hardened import validation/replacement, APK/lint/JNI/codegen/emulator, physical
+- PASS: 14 new candidate cases; 1063 workspace tests/17 opt-in ignored, all-feature
+  build, strict Clippy/Rustfmt, both Android storage library builds, doc links/diff.
+- Commands/logs/fixed initial API compile errors: DEVELOPMENT.md, Private restore
+  schema preflight. Build/tests offline. No blockers or remaining implementation/
+  verification steps for this structural preflight slice.
+- No application validation/replacement, APK/lint/JNI/codegen/emulator, physical
   phone/resource trial or optimized release run for this storage-only slice.
 
 ## Latest release checkpoint
