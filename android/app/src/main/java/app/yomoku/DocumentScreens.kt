@@ -340,6 +340,7 @@ internal fun ReaderScreen(
     dispatch: (Event) -> Unit,
     onInteraction: () -> Unit,
     imageLoader: EpubImageLoader? = null,
+    ankiDecks: AnkiDeckDiscoveryState = AnkiDeckDiscoveryState.Unchecked,
 ) {
     val scroll =
         remember(sessionKey, view.reader?.documentId, view.reader?.anchor) { ScrollState(0) }
@@ -438,9 +439,16 @@ internal fun ReaderScreen(
                 FinishedCheckmark(Modifier.testTag("reader_finished"))
             }
             if (effective) {
-                EffectiveReaderWords(view, sessionKey, dispatch, onInteraction, imageLoader)
+                EffectiveReaderWords(
+                    view,
+                    sessionKey,
+                    dispatch,
+                    onInteraction,
+                    imageLoader,
+                    ankiDecks,
+                )
             } else {
-                ReaderWords(view, dispatch, onInteraction, imageLoader)
+                ReaderWords(view, dispatch, onInteraction, imageLoader, ankiDecks)
             }
             Row(
                 modifier = Modifier.fillMaxWidth(),

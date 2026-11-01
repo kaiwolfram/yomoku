@@ -53,6 +53,7 @@ import androidx.compose.ui.unit.em
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupProperties
 import androidx.core.net.toUri
+import app.yomoku.shared.AnkiSelection
 import app.yomoku.shared.Event
 import app.yomoku.shared.ReaderStatusChange
 import app.yomoku.shared.ReaderTextSpan
@@ -190,6 +191,7 @@ internal fun ReaderWords(
     dispatch: (Event) -> Unit,
     onInteraction: () -> Unit,
     imageLoader: EpubImageLoader? = null,
+    ankiDecks: AnkiDeckDiscoveryState = AnkiDeckDiscoveryState.Unchecked,
 ) {
     val page = view.reader ?: return
     val key = view.readerAnalysis?.let { ReaderTokenKey(page.documentId, page.anchor, it) }
@@ -305,8 +307,17 @@ internal fun ReaderWords(
             StorageStatus(view)
             val details =
                 view.readerWord?.takeIf {
-                    it.token == selected && it.key == view.readerWordSelection?.key
+                    it.token == selected && it.key == key && view.readerWordSelection == selection
                 }
+            ReaderAnkiPanel(
+                selection?.takeIf { details != null }?.let { AnkiSelection.Original(it) },
+                view.ankiSettings,
+                view.ankiExport,
+                ankiDecks,
+                canWrite,
+                dispatch,
+                onInteraction,
+            )
             if (details != null) {
                 ReaderDictionary(details)
                 if (details.candidates.words.isEmpty() && details.candidates.names.isEmpty()) {

@@ -7,70 +7,65 @@ results in progress docs/reports, out of commit message bodies.
 - Announce when no plan steps remain; ask about product ambiguities. Recommend
   physical testing when it provides more value than the next implementation step.
 - User's phone trial was acceptable; detailed validation remains unchecked.
-  Recommend a schema-24 phone upgrade with existing Library/history before the
-  full visible Add flow; rebuild optimized APK only when requested.
+  Recommend a schema-24 phone upgrade with existing Library/history now, before
+  further provider integration. Rebuild optimized APK only when requested.
 - Feed is only `Coming Soon! 🌱`; Nostr/identity/Q188 are beyond the first MVP.
 - Statistics retains cumulative occurrences and all five statuses including Known.
   Schema 0023 drops unused forms; 0024 adds initially unconfigured Anki settings.
 
-## Current Anki configuration boundary
-- Settings explicitly loads/reloads the retained native preference, selects
-  a regular provider deck or clears the default. Saves require native Ready and
-  publish only matching committed acknowledgements. Failed/lost-response Retry
-  reads authoritative settings on the same SQLite FIFO without repeating writes.
-- Separate Check AnkiDroid uses existing read-only decks() on the provider FIFO.
-  CoreSession retains Unchecked/Loading/Ready/Failed; repeated pending checks
-  coalesce. Missing/filtered saved IDs stay visible without substitution/clear.
-  Names are presentation; positive signed-64 IDs remain exact through i64::MAX.
-- Only PermissionDenied offers an explicit permission action with rationale.
-  MainActivity's RequestPermission grant rechecks if Settings remains open;
-  denial leaves the error with no automatic prompt/retry. Actual dialogs untried.
-- Composition/navigation starts no settings/provider I/O. Activity recreation
-  retains observations; close skips queued/drops late discovery. A new session
-  starts Unchecked/Unloaded. No schema/dependency/codec/native ABI changes here.
-- NEW: PrepareReaderAnkiExport carries only the current selection. Native code
-  requires Ready acknowledged configured settings and freezes that exact deck;
-  other settings phases/no deck reject without implicit I/O. Settings changes/
-  clear never retarget accepted intent; authoritative Retry readback must finish
-  before new preparation after failed/lost saves. Settings dismisses the word;
-  reopen it after configuration. Visible dictionary Add remains next.
+## Current dictionary / Anki boundary
+- NEW: both dictionary paths show Add after Ready acknowledged configuration and
+  retained successful discovery containing that exact regular deck. Otherwise an
+  explicit Settings route explains setup; composition/preparation starts no I/O.
+  Settings dismisses the word; reopen after configuration. Discovery is no permit.
+- Add sends only the authenticated loaded original/effective selection to native
+  preparation. Rejected preparation shows generic Settings/recovery guidance,
+  never automatic Retry. Original details must match presented token/key/selection.
+- Accepted intent shows existing frozen export controls in the dictionary and
+  Settings: explicit Check/recheck, correlated Create/Add/Clear, busy phases and
+  durable outcomes. Selecting another word/occurrence or changing/clearing the
+  preference cannot relabel/retarget it. Actions count as reader interaction.
+- Settings explicitly loads/reloads the preference, selects a regular deck or
+  clears it. Saves publish matching committed acknowledgements only. Failed/lost
+  saves require authoritative FIFO readback before new preparation; no write Retry.
+- Check AnkiDroid uses read-only decks() on the provider FIFO. CoreSession retains
+  Unchecked/Loading/Ready/Failed, coalesces pending reads and keeps missing/filtered
+  saved IDs without substitution. Names are presentation; IDs remain exact i64.
+- Only PermissionDenied offers the explicit permission action/rationale. Grant
+  rechecks if Settings remains open; denial never auto-prompts/retries. Actual
+  dialogs untried. Activity recreation retains state; close skips queued/drops
+  late work. New sessions start Unchecked/Unloaded. No schema/dependency/codec change.
 
 ## Existing Anki invariants
-- Native preparation freezes the loaded original/effective selection, fields,
-  layout and deck. Preparation generations never recycle. Begin matches phase/
-  generation plus both journal gates; Clear preserves active/failed live work
-  and obligations. Shell owns no fields/handles/permits. Settings never retargets.
-- FIFO owns committed live attempts; acknowledgement grants one native permit.
-  CoreSession posts once per Ready generation and rechecks phase/close. Provider
-  worker cancels queued work/drops late responses; restart never replays writes.
-- Settings export/recovery controls are explicit; model creation never auto-adds.
-  IDs/success stay behind durable acknowledgement. Uncertainty requires read-only
-  recovery; empty results do not resolve obligations. No real-provider claim.
-- Provider refreshes host/spec/permission/nonfiltered frozen deck/full model/exact
-  duplicates before writes. A preference/discovery snapshot grants no authority.
-  Settings owns no reader busy/errors, history, export or journal gates. Details:
-  ARCHITECTURE.md, DATA_MODEL.md, ANKIDROID_API.md and DECISIONS.md.
+- Native preparation freezes selection/fields/layout/deck. Generations never
+  recycle. Begin matches phase/generation and both journals; Clear preserves
+  active/failed live work and obligations. Shell owns no fields/handles/permits.
+- FIFO owns committed live attempts; matching acknowledgement grants one native
+  permit. CoreSession posts once per Ready generation and rechecks phase/close.
+  Provider close cancels queued work/drops late responses; restart replays no write.
+- Model creation never auto-adds. Success/IDs stay behind durable acknowledgement.
+  Uncertainty requires read-only recovery; empty observations resolve nothing.
+- Provider refreshes host/spec/permission/frozen regular deck/full model/exact
+  duplicates before writes. Settings owns no reader busy/errors/history or gates.
+  Details: ARCHITECTURE.md, DATA_MODEL.md, ANKIDROID_API.md and DECISIONS.md.
 
 ## Next tasks (ordered)
-1. Add current dictionary Add presentation using the selection-only native action
-   and existing frozen export projection/controls. Keep original/effective identity
-   authentication and explicit provider/configuration behavior; no composition I/O.
-2. Complete existing-note browser/return and remaining retained lifecycle checks;
-   validate disposable real AnkiDroid collection/permission behavior and unchanged
-   vocabulary/history. Include the schema-24 phone upgrade checkpoint.
+1. Implement existing-note browser/open and return handling using supported APIs;
+   retain exact frozen identity/IDs and verify unavailable handlers and lifecycle.
+2. Validate a disposable real AnkiDroid collection/permission/browser flow and
+   unchanged vocabulary/history; include the schema-24 phone upgrade checkpoint.
 3. Encrypted-backup format/library review follows completed Anki integration.
 
 ## Verification / blockers
-- PASS: six new Rust cases; all 1013 workspace tests/17 opt-in ignored, strict
-  Clippy, Rustfmt/Kotlin formatting, full host JNI, identical independent/Android
-  Kotlin generation, both-ABI debug/test APKs, strict lintDebug, all 19 selected
-  API-36 x86_64 emulator cases and diff checks. Commands/results: DEVELOPMENT.md,
-  Native Anki preparation from the configured deck. No implementation/verification
-  steps or blockers remain for this prerequisite. Broader Anki work remains above.
-- Initial FIFO fixtures incorrectly retained a word after Settings dismissal;
-  fixed by reopening it, with no production reader change. Local Gradle/ADB/
-  emulator sockets/KVM required normal escalation; no dependency downloads.
-- Actual permission dialogs, real collection/browser, tablet, optimized release
-  and physical upgrade/performance trials remain unrun. Older phone APK is source
-  0374365; no release requested. Recommend the schema-24 phone upgrade checkpoint
-  before the next visible dictionary Add slice; no compatibility claim yet.
+- PASS: seven new cases; 49/50 initial selected API-36 x86_64 emulator cases, then
+  corrected legacy highlight assertion passes its targeted rerun. All 50 unique
+  selected cases verified; final debug/test APKs, strict lintDebug, Kotlin format
+  and diff checks pass. Commands/results: DEVELOPMENT.md, Dictionary Add to Anki
+  presentation. No implementation/verification steps or blockers remain here.
+- Legacy assertion inspected a dynamic link style removed by the earlier renderer;
+  it now checks the existing background span, with no production highlight change.
+  Gradle/ADB/emulator needed normal local-socket/KVM escalation. No downloads.
+- Kotlin-only slice: host Rust/Clippy/JNI/codegen not rerun; emulator cases exercise
+  actual packaged JNI/FIFO/SQLite with fake provider operations. No compatibility
+  claim. Actual dialogs/collection/browser, phone/tablet, optimized release and
+  performance trials remain unrun. Older phone APK is source 0374365.

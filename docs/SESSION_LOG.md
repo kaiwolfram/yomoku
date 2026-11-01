@@ -4305,3 +4305,29 @@ and /tmp/yomoku-browser-profile-*. No emulator started.
   Actual permission dialogs, real collection/browser, tablet, physical phone and
   optimized release trials remain unrun. Recommend the schema-24 phone upgrade
   with existing Library/history before the next visible dictionary Add slice.
+
+## 2026-11-01 — Dictionary Add to Anki presentation
+
+- Both dictionary paths now expose explicit selection-only preparation after
+  acknowledged settings and successful discovery of the configured regular deck.
+  Unknown/failed provider state and unready/missing configuration route to
+  Settings without I/O; rejected native preparation offers generic recovery
+  guidance without automatic retry. Tightened original details/selection matching.
+- Reused frozen export controls for explicit Check, correlated Create/Add/Clear
+  and durable outcomes. Other selections, preference changes and popup dismissal
+  retain the accepted word/deck; Settings/recovery remains reachable. Actions
+  record reader interaction. No Rust/schema/dependency/provider API/codec change.
+- PASS: seven new cases; initial selected emulator run passes 49/50, with only a
+  legacy dynamic-link highlight assertion failing. Corrected it to inspect the
+  existing text background span; its targeted rerun passes, verifying all 50
+  unique selected API-36 x86_64 cases. Final debug/test APK builds, strict lint,
+  Kotlin formatting and diff checks pass. Tooling/logs: DEVELOPMENT.md.
+- Native integration cases verify exact repeated-sentence highlighting, unchanged
+  reader/vocabulary/encounters/statistics, provider disappearance and duplicates
+  without writes. Existing close/restart/no-replay and Activity retention pass.
+  Host Rust/Clippy/JNI/codegen were not rerun for this Kotlin-only change.
+- No implementation/verification steps or blockers remain for this slice. Next:
+  existing-note browser/return and disposable real collection/permission trials.
+  Recommend the schema-24 phone upgrade with existing Library/history now; actual
+  dialogs/collection/browser, physical phone/tablet, performance and optimized APK
+  trials remain unrun. Older phone APK remains source 0374365; no release requested.

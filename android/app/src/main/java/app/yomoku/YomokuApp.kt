@@ -186,6 +186,7 @@ internal fun YomokuApp(
                                 dispatch,
                                 onReaderInteraction,
                                 imageLoader,
+                                ankiDecks,
                             )
                         view.destination == Destination.LIBRARY ->
                             LibraryScreen(

@@ -26,7 +26,10 @@ class EffectiveReaderWordsTest {
     private val owner = mutableStateOf("session-one")
     private val frame = mutableStateOf(fixture())
     private var failLookup = false
+    private var originalReader = false
     private var interactions = 0
+    private val ankiDecks =
+        AnkiDeckDiscoveryState.Ready(listOf(AnkiProviderDeck(Long.MAX_VALUE, "日本語", false)))
 
     private fun anchor(start: Long, end: Long) =
         TextAnchor(
@@ -112,7 +115,21 @@ class EffectiveReaderWordsTest {
         compose.setContent {
             YomokuTheme {
                 Column(Modifier.verticalScroll(rememberScrollState())) {
-                    EffectiveReaderWords(frame.value, owner.value, ::dispatch, { interactions++ })
+                    if (originalReader) {
+                        ReaderWords(
+                            frame.value,
+                            ::dispatch,
+                            { interactions++ },
+                            ankiDecks = ankiDecks,
+                        )
+                    } else
+                        EffectiveReaderWords(
+                            frame.value,
+                            owner.value,
+                            ::dispatch,
+                            { interactions++ },
+                            ankiDecks = ankiDecks,
+                        )
                 }
             }
         }
@@ -120,6 +137,26 @@ class EffectiveReaderWordsTest {
 
     private fun dispatch(event: Event) {
         events.add(event)
+        if (event is Event.LoadReaderWord) {
+            val token =
+                frame.value.readerTokens!!.tokens.single { it.tokenIndex == event.value.tokenIndex }
+            frame.value =
+                frame.value.copy(
+                    readerWordSelection = event.value,
+                    readerWord =
+                        ReaderWordDetails(
+                            event.value.key,
+                            token,
+                            ULong.MAX_VALUE,
+                            DictionaryCandidates(
+                                token.surface,
+                                token.dictionaryForm,
+                                emptyList(),
+                                emptyList(),
+                            ),
+                        ),
+                )
+        }
         if (event is Event.LoadEffectiveReaderWord) {
             val token =
                 frame.value.effectiveReaderTokens!!.tokens.single {
@@ -155,11 +192,13 @@ class EffectiveReaderWordsTest {
             frame.value =
                 frame.value.copy(
                     effectiveReaderWord =
-                        frame.value.effectiveReaderWord!!.copy(
+                        frame.value.effectiveReaderWord?.copy(
                             selection = null,
                             details = null,
                             error = null,
-                        )
+                        ),
+                    readerWordSelection = null,
+                    readerWord = null,
                 )
     }
 
@@ -177,6 +216,87 @@ class EffectiveReaderWordsTest {
     }
 
     private fun click(tag: String) = compose.onNodeWithTag(tag).performScrollTo().performClick()
+
+    @Test
+    fun dictionaryAddUsesLoadedCompactSelectionAndRespectsReaderBusyGates() {
+        frame.value =
+            frame.value.copy(
+                ankiSettings = AnkiSettingsView(AnkiSettingsPhase.READY, Long.MAX_VALUE, null)
+            )
+        show()
+        tap(2)
+        val selected = frame.value.effectiveReaderWord!!.selection!!
+        click("word_anki_add")
+        assertEquals(
+            Event.PrepareReaderAnkiExport(AnkiSelection.Effective(selected)),
+            events.last(),
+        )
+        compose.runOnUiThread { frame.value = frame.value.copy(readingTimeSavePending = true) }
+        compose.onNodeWithTag("word_anki_add").assertIsNotEnabled()
+        compose.runOnUiThread { frame.value = frame.value.copy(readingTimeSavePending = false) }
+        val before = events.size
+        compose.waitForIdle()
+        assertEquals(before, events.size)
+        click("word_anki_settings")
+        assertEquals(Event.OpenSettings, events.last())
+        assertTrue(
+            events.none { it is Event.SetEffectiveReaderStatus || it is Event.SetReaderStatus }
+        )
+    }
+
+    @Test
+    fun originalDictionaryAddAuthenticatesDetailsAgainstThePresentedSelection() {
+        originalReader = true
+        val snapshot = frame.value.effectiveReaderTokens!!
+        frame.value =
+            frame.value.copy(
+                ankiSettings = AnkiSettingsView(AnkiSettingsPhase.READY, Long.MAX_VALUE, null),
+                effectiveReaderWord = null,
+                effectiveReaderTokens = null,
+                readerTokens =
+                    ReaderTokenSnapshot(
+                        snapshot.identity.base.documentId,
+                        snapshot.identity.base.page,
+                        snapshot.identity.base.analysis,
+                        snapshot.tokens.map {
+                            ReaderToken(
+                                it.segmentIndex,
+                                it.anchor,
+                                it.displayRange,
+                                it.surface,
+                                it.reading,
+                                it.dictionaryForm,
+                                it.vocabulary,
+                            )
+                        },
+                    ),
+            )
+        show()
+        tap(2)
+        val selected = frame.value.readerWordSelection!!
+        click("word_anki_add")
+        assertEquals(Event.PrepareReaderAnkiExport(AnkiSelection.Original(selected)), events.last())
+        val details = frame.value.readerWord!!
+        compose.runOnUiThread {
+            frame.value =
+                frame.value.copy(
+                    readerWord =
+                        details.copy(
+                            key =
+                                details.key.copy(analysis = ReaderAnalysis.Available(AnalysisId(7)))
+                        )
+                )
+        }
+        compose.onNodeWithTag("word_anki_add").assertDoesNotExist()
+        compose.runOnUiThread {
+            frame.value = frame.value.copy(readerWord = details, completionSavePending = true)
+        }
+        compose.onNodeWithTag("word_anki_add").assertIsNotEnabled()
+        assertEquals(1, events.filterIsInstance<Event.PrepareReaderAnkiExport>().size)
+        assertTrue(
+            events.none { it is Event.LoadEffectiveReaderWord || it is Event.SetReaderStatus }
+        )
+    }
 
     @Test
     fun manualUnicodeSelectionUsesCompactIdentityAndAllFiveStatusesWithoutGuessingMetadata() {
@@ -424,12 +544,9 @@ class EffectiveReaderWordsTest {
                         android.content.res.Configuration.UI_MODE_NIGHT_MASK ==
                         android.content.res.Configuration.UI_MODE_NIGHT_YES,
                 ),
-                text
-                    .getLinkAnnotations(cat.start, cat.end)
-                    .single()
+                text.spanStyles
+                    .first { it.start == cat.start && it.end == cat.end }
                     .item
-                    .styles!!
-                    .style!!
                     .background,
             )
         }

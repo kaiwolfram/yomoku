@@ -2008,10 +2008,10 @@ Both original/effective preparation and the isolated export session use the same
 pure export constructors; the latter now freezes the complete layout as well.
 
 Preparation emits no effect, journal write or provider request and creates no
-live callback token. Neither event has a public shell codec; the ViewModel stays
-unchanged. Typed read-only preflight and native durable begin/outcome ownership
-are described below; provider dispatch and visible Settings/Add to Anki/recovery
-actions remain unfinished. The standalone
+live callback token. These native-only events have no public shell codec; the
+selection-only shell action and export projection are described below along with
+typed preflight, durable begin/outcome ownership and visible dictionary/Settings
+controls. The standalone
 `AnkiExportSession` is still isolated and must not bypass those durable gates.
 
 
@@ -2160,9 +2160,9 @@ for read-only startup recovery. No work is copied into a new session. The provid
 dispatcher refreshes host/spec/permission/deck/layout/exact-duplicate checks through
 the existing adapters; model creation rechecks deck/duplicates immediately before
 submission. Unexpected adapter exceptions remain uncertain. No schema, dependency
-or native-export ABI change. Visible preparation/begin/Add, deck/permission
-UI and a disposable real collection/browser trial remain unfinished. There is no
-reachable user mutation flow or real AnkiDroid compatibility claim yet.
+or native-export ABI change. The visible dictionary/Settings controls are
+described below. A disposable real collection/permission/browser trial remains
+unfinished; no real AnkiDroid compatibility claim is made.
 
 ### Settings Anki recovery presentation
 
@@ -2184,8 +2184,8 @@ Empty observations remain unresolved and a successful provider read remains pend
 until the FIFO commit acknowledgement. No pending recovery is solely a journal
 statement; it makes no claim about deck placement or provider availability. Errors
 remain separate from local-reader saves. Shell preparation/begin, Ready
-orchestration and frozen live presentation are described below; permission/deck/
-dictionary Add/browser UI still precede a complete visible export workflow.
+orchestration, frozen live presentation and permission/deck/dictionary controls
+are described below; existing-note browser/return remains unfinished.
 
 ### Frozen Anki export presentation
 
@@ -2261,8 +2261,9 @@ and Add send the projected preparation generation and phase through the native
 begin gate. Model success starts no follow-on note insertion. Dismiss is absent
 while live work is active/failed; uncertainty directs the user to the separate
 read-only recovery controls. Composition and opening Settings dispatch nothing.
-The dictionary Add entry and browser actions remain unfinished, so this is not
-yet a complete visible export workflow. Deck/permission configuration is below.
+The dictionary consumes the same controls as described below. Existing-note
+browser actions and real-provider validation remain unfinished. Deck/permission
+configuration is below.
 
 ### Configured Anki default deck storage
 
@@ -2338,3 +2339,31 @@ triggers another explicit-flow read if Settings remains open; denial leaves the
 error and does not prompt/retry automatically. No launch, model creation or note
 insertion occurs in this configuration flow. Real collection/permission/browser
 compatibility remains unverified. No schema, dependency or codec change here.
+
+### Dictionary Anki export presentation
+
+Both original and effective word panels pass only the authenticated loaded
+selection to `ReaderAnkiPanel`. Original details must match the presented token,
+page key and current native selection; effective details also match their compact
+page revision/segment identity. Add to Anki appears only with Ready acknowledged
+settings and a retained successful provider discovery containing the configured
+regular deck. Unknown/failed discovery, missing/filtered decks and unready settings
+offer an explicit Settings route without implicit reads or permission prompts.
+The discovery snapshot is presentation only; native preparation and subsequent
+provider preflight/live dispatch still independently check all their gates.
+
+The first Add action sends only `PrepareReaderAnkiExport(selection)`; it performs
+no provider I/O. If native preparation is rejected, show generic guidance toward
+Settings/recovery without guessing the cause or retrying automatically. Accepted
+intent displays the existing `AnkiExportPanel`, including its frozen surface and
+deck, explicit Check/recheck, correlated Create/Add/Clear and durable outcomes.
+Selecting another word/occurrence, dismissing the dictionary or changing settings
+never relabels or replaces that export. Settings remains another place to inspect
+it and access recovery; opening Settings dismisses the word as before. All
+dictionary export actions count as reader interactions. Composition starts no
+Anki read/write, and neither preparation nor export changes vocabulary/history.
+
+This is Kotlin/Compose routing over the existing typed native commands and
+retained Ready orchestration; no new journal, schema, dependency or codec. Actual
+permission/collection/browser behavior requires a disposable real AnkiDroid trial
+before compatibility claims. Existing-note browser/return remains a later slice.

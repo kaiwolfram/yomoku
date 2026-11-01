@@ -5,8 +5,10 @@ import android.os.Handler
 import android.os.Looper
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.text.LinkAnnotation
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import app.yomoku.shared.*
@@ -33,6 +35,7 @@ class AnkiExportSessionTest {
     private var createModel = false
     private var preflightFailure: AnkiExportError? = null
     private var duplicates = emptyList<Long>()
+    private var preflightReads = 0
     private val executor = Executors.newSingleThreadExecutor()
     private lateinit var core: CoreSession
 
@@ -64,6 +67,7 @@ class AnkiExportSessionTest {
                         if (useExecutor) executor else Executors.newSingleThreadExecutor(),
                     readAnkiPreflight = {
                         assertNotEquals(Looper.getMainLooper(), Looper.myLooper())
+                        preflightReads++
                         preflightFailure?.let { failure -> AnkiPreflightResult.Failed(failure) }
                             ?: AnkiPreflightResult.Complete(
                                 AnkiPreflightObservation(
@@ -80,6 +84,9 @@ class AnkiExportSessionTest {
                                         ),
                                 )
                             )
+                    },
+                    readAnkiDecks = {
+                        AnkiReadResult.Value(listOf(AnkiProviderDeck(Long.MAX_VALUE, "日本語", false)))
                     },
                     invokeAnkiLive = {
                         assertNotEquals(Looper.getMainLooper(), Looper.myLooper())
@@ -173,6 +180,136 @@ class AnkiExportSessionTest {
         compose.waitUntil(30_000) { core.isClosed }
         assertTrue(executor.awaitTermination(30, TimeUnit.SECONDS))
         directory.deleteRecursively()
+    }
+
+    private fun tapCat(last: Boolean) {
+        val cats = core.view.effectiveReaderTokens!!.tokens.filter { it.surface == "猫" }
+        val token = if (last) cats.last() else cats.first()
+        val text =
+            compose
+                .onNodeWithTag("reader_text")
+                .fetchSemanticsNode()
+                .config[SemanticsProperties.Text]
+                .single()
+        val link =
+            text
+                .getLinkAnnotations(0, text.length)
+                .single {
+                    (it.item as? LinkAnnotation.Clickable)?.tag ==
+                        "reader_token_${token.segmentIndex}"
+                }
+                .item
+        compose.runOnUiThread { link.linkInteractionListener!!.onClick(link) }
+        await { it.effectiveReaderWord?.details?.token?.segmentIndex == token.segmentIndex }
+        compose.waitForIdle()
+    }
+
+    private fun showDictionary() {
+        val prepared = prepare()
+        send(Event.ClearAnkiExport(prepared.preparationId))
+        send(Event.OpenSettings)
+        instrumentation.runOnMainSync { core.checkAnkiDecks() }
+        compose.waitUntil(30_000) { core.ankiDecks.state is AnkiDeckDiscoveryState.Ready }
+        send(Event.CloseSettings)
+        compose.setContent {
+            YomokuTheme {
+                YomokuApp(
+                    core.view,
+                    core.sessionKey,
+                    core::dispatch,
+                    ankiDecks = core.ankiDecks.state,
+                )
+            }
+        }
+        tapCat(last = true)
+    }
+
+    private fun click(tag: String) = compose.onNodeWithTag(tag).performScrollTo().performClick()
+
+    @Test
+    fun dictionaryAddFreezesTappedOccurrenceAcrossDismissalAndKeepsReaderState() {
+        open()
+        try {
+            showDictionary()
+            val original = core.view
+            assertEquals(0, preflightReads)
+            assertTrue(operations.isEmpty())
+            click("word_anki_add")
+            assertEquals(AnkiExportPhase.Prepared, core.view.ankiExport?.phase)
+            compose.onNodeWithTag("word_anki_add").assertDoesNotExist()
+            assertEquals(0, preflightReads)
+            val prepared = core.view.ankiExport
+            send(Event.DismissReaderWord)
+            compose.onNodeWithTag("reader_word_panel").assertDoesNotExist()
+            tapCat(last = false)
+            assertEquals(prepared, core.view.ankiExport)
+            assertEquals(0, preflightReads)
+            click("anki_export_check")
+            await { it.ankiExport?.phase is AnkiExportPhase.ReuseModel }
+            click("anki_export_begin")
+            val operation =
+                checkNotNull(operations.poll(60, TimeUnit.SECONDS)) as AnkiLiveOperation.InsertNote
+            assertEquals(Long.MAX_VALUE, operation.deckId)
+            assertEquals("猫", operation.fields[0])
+            assertEquals("猫と<strong class=\"yomoku-target\">猫</strong>。", operation.fields[3])
+            results.add(AnkiLiveResult.NoteAdded(Long.MAX_VALUE))
+            await { it.ankiExport?.phase == AnkiExportPhase.NoteAdded(Long.MAX_VALUE) }
+            compose
+                .onNodeWithTag("anki_export_status")
+                .performScrollTo()
+                .assertTextEquals("Added to AnkiDroid.")
+            assertEquals(original.reader, core.view.reader)
+            assertEquals(original.effectiveReaderTokens, core.view.effectiveReaderTokens)
+            assertEquals(original.statistics, core.view.statistics)
+            assertEquals(original.completionNotice, core.view.completionNotice)
+            tapCatAfterDismissal()
+            assertEquals(
+                original.effectiveReaderWord?.details,
+                core.view.effectiveReaderWord?.details,
+            )
+            assertTrue(operations.isEmpty())
+        } finally {
+            close()
+        }
+    }
+
+    private fun tapCatAfterDismissal() {
+        send(Event.DismissReaderWord)
+        compose.onNodeWithTag("reader_word_panel").assertDoesNotExist()
+        tapCat(last = true)
+    }
+
+    @Test
+    fun dictionaryPreflightRechecksAvailabilityAndShowsDuplicatesWithoutWrites() {
+        preflightFailure = AnkiExportError.PROVIDERUNAVAILABLE
+        open()
+        try {
+            showDictionary()
+            click("word_anki_add")
+            click("anki_export_check")
+            await { it.ankiExport?.phase is AnkiExportPhase.ProviderFailed }
+            compose
+                .onNodeWithTag("anki_export_status")
+                .performScrollTo()
+                .assertTextEquals("AnkiDroid is unavailable.")
+            compose.onNodeWithTag("anki_export_begin").assertDoesNotExist()
+            compose.onNodeWithTag("word_anki_settings").assertExists()
+            preflightFailure = null
+            duplicates = listOf(Long.MAX_VALUE, 9007199254740993L)
+            click("anki_export_check")
+            await { it.ankiExport?.phase == AnkiExportPhase.Existing(duplicates) }
+            compose
+                .onNodeWithTag("anki_export_status")
+                .performScrollTo()
+                .assertTextEquals(
+                    "Already in AnkiDroid. Note IDs: ${duplicates.joinToString(", ")}"
+                )
+            compose.onNodeWithTag("anki_export_begin").assertDoesNotExist()
+            assertTrue(operations.isEmpty())
+            assertEquals(2, preflightReads)
+        } finally {
+            close()
+        }
     }
 
     @Test

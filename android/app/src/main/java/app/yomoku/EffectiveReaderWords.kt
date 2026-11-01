@@ -19,6 +19,7 @@ import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.core.net.toUri
+import app.yomoku.shared.AnkiSelection
 import app.yomoku.shared.EffectiveReaderSelection
 import app.yomoku.shared.Event
 import app.yomoku.shared.ReaderTokenKey
@@ -32,10 +33,18 @@ internal fun EffectiveReaderWords(
     dispatch: (Event) -> Unit,
     onInteraction: () -> Unit,
     imageLoader: EpubImageLoader? = null,
+    ankiDecks: AnkiDeckDiscoveryState = AnkiDeckDiscoveryState.Unchecked,
 ) {
     // Compact revisions belong to one native session. A replacement cannot reuse a selection/draft.
     key(sessionKey) {
-        EffectiveReaderWordContent(view, sessionKey, dispatch, onInteraction, imageLoader)
+        EffectiveReaderWordContent(
+            view,
+            sessionKey,
+            dispatch,
+            onInteraction,
+            imageLoader,
+            ankiDecks,
+        )
     }
 }
 
@@ -46,6 +55,7 @@ private fun EffectiveReaderWordContent(
     dispatch: (Event) -> Unit,
     onInteraction: () -> Unit,
     imageLoader: EpubImageLoader?,
+    ankiDecks: AnkiDeckDiscoveryState,
 ) {
     val page = view.reader ?: return
     val word = view.effectiveReaderWord ?: return
@@ -211,6 +221,15 @@ private fun EffectiveReaderWordContent(
                         it.token == token &&
                         word.selection == display.selection
                 }
+            ReaderAnkiPanel(
+                details?.let { AnkiSelection.Effective(it.selection) },
+                view.ankiSettings,
+                view.ankiExport,
+                ankiDecks,
+                canRead,
+                dispatch,
+                onInteraction,
+            )
             if (details != null) {
                 ReaderDictionary(details.encountered, details.candidates)
                 if (details.candidates.words.isEmpty() && details.candidates.names.isEmpty()) {

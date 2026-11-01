@@ -4991,3 +4991,26 @@ together; no persisted format, schema, dependency, provider API or native-export
 ABI changes. Keep dictionary Add presentation/browser work separate from this
 independently verifiable ownership prerequisite. Provider preflight/live dispatch
 still revalidate availability/permission/frozen regular deck/model/duplicates.
+
+## 2026-11-01 — Dictionary Add uses explicit preparation and frozen export controls
+
+Reuse the existing native selection-only preparation and Compose export panel in
+both dictionary paths. Match loaded details to the presented selection; carry no
+shell-built fields, target deck, journal handle or permit. Expose Add only after
+Ready acknowledged settings and explicit provider discovery show the saved deck
+as regular. This snapshot controls presentation only; preflight/live work still
+refreshes all provider gates. Unchecked/failed discovery, unready configuration
+or a missing/filtered deck routes explicitly to Settings, with no composition I/O.
+
+The first Add prepares native intent; Check and Create/Add remain explicit using
+the existing phase/generation controls. If preparation yields no projection, show
+generic Settings/recovery guidance without claiming a specific failure. Do not
+auto-check or auto-submit. Show any retained export under its own frozen surface
+and deck even after selecting a different word or repeated occurrence. A new
+selection cannot replace it; Clear uses the existing native live-work gates.
+Keep Settings/recovery reachable from the dictionary, retain established word
+dismissal on Settings navigation, and report those actions as reader interaction.
+
+No schema, dependency, provider API, codec or destructive behavior changes.
+Existing-note browser/return and a disposable real-provider/permission trial
+remain separate work; no compatibility claim is made from fake provider tests.

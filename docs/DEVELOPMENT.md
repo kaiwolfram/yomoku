@@ -8921,3 +8921,60 @@ Logs: `/tmp/yomoku-anki-configured-{core,fifo,workspace,workspace-final,clippy,
 rustfmt,jni,format,format-check,host-format-check,typegen,codegen-diff,
 android-codegen-diff,android,emulator,emulator-boot}.log` (one file per suffix).
 Final XML: `android/app/build/outputs/androidTest-results/connected/debug/`.
+
+## Dictionary Add to Anki presentation
+
+2026-11-01: Kotlin/Compose only, reusing the existing typed native preparation,
+preflight and durable export controls. No Rust/schema/dependency/provider API/
+codec/native-export ABI change. Both reader paths receive retained provider
+discovery through YomokuApp/ReaderScreen; composition starts no Anki I/O. Reuse
+the packaged both-ABI native libraries and existing isolated statistics-ui-avd.
+
+```sh
+export PATH=/home/kai/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin:$PATH
+export JAVA_HOME="$PWD/.local/jdk-17/jdk-17.0.21+9"
+export GRADLE_USER_HOME="$PWD/.local/gradle"
+export ANDROID_HOME=/home/kai/Android/Sdk
+tools/format-kotlin.sh --check
+./android/gradlew -p android :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug --offline --console=plain
+./android/gradlew -p android :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=app.yomoku.ReaderAnkiPanelTest,app.yomoku.EffectiveReaderWordsTest,app.yomoku.ReaderWordsTest,app.yomoku.AnkiExportSessionTest,app.yomoku.AnkiExportPanelTest,app.yomoku.AnkiSettingsPanelTest,app.yomoku.AnkiSettingsSessionTest,app.yomoku.AnkiSettingsActivityTest,app.yomoku.AnkiRecoveryPanelTest,app.yomoku.CoreSessionTest,app.yomoku.NavigationTest --offline --console=plain
+./android/gradlew -p android :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=app.yomoku.EffectiveReaderWordsTest#repeatedStatusesAndDeletionUpdateHighlightsAndDisableUnregisteredChoices --offline --console=plain
+git diff --check
+```
+
+Seven new cases cover exact original/effective identities and long IDs, busy and
+acknowledged-configuration gates, every discovery failure plus unchecked/loading/
+missing/filtered decks, explicit preparation with rejected-gate guidance and no
+automatic retry, correlated model/note actions, and frozen presentation across
+selection/configuration/provider changes. Actual YomokuApp/Compose/JNI/FIFO/SQLite
+cases use a fake provider to verify no preflight on composition/preparation,
+refreshed provider availability, duplicate indicators without writes, one committed
+note invocation, exact repeated-sentence target highlighting and unchanged reader,
+vocabulary details/encounters, statistics and completion state after reopening.
+
+Initial sandboxed Gradle could not create its local lock socket; normal escalation
+ran the offline build and strict lint successfully. Initial selected emulator run
+found a legacy EffectiveReaderWordsTest assertion dereferencing the intentionally
+empty dynamic link style. Update it to inspect the existing background text span,
+as ReaderWordsTest already does; production highlighting is unchanged.
+
+PASS: all seven new cases and 49 of the initial 50 selected API-36 x86_64 cases;
+the sole failure is the legacy assertion above. Its corrected targeted rerun
+passes (one case, zero failures/errors/skips), verifying all 50 unique selected
+cases across both runs. Final debug/test APK builds, strict lintDebug, Kotlin
+formatting and diff checks pass. No production failure occurred. Rust tests/
+Clippy, host JNI and codegen reproducibility were not rerun for this Kotlin-only
+step; Android cases exercise the existing actual JNI/FIFO/SQLite libraries.
+
+No implementation/verification steps or blockers remain for this presentation
+slice. Existing-note browser/return and real-provider collection/permission
+validation remain before Anki completion/compatibility claims. No actual
+permission dialogs, real collection/browser, physical phone/tablet, performance
+or optimized release trial was run. Recommend the phone schema-24 upgrade with
+existing Library/history now, before further provider integration. Older phone
+APK remains source 0374365; no optimized APK rebuild was requested.
+
+Logs: `/tmp/yomoku-dictionary-anki-{format,format-check,format-final,
+format-final-check,android,emulator,emulator-boot,final}.log` (one per suffix).
+Initial XML: `/tmp/yomoku-dictionary-anki-initial-xml/`; corrected-case final XML:
+`android/app/build/outputs/androidTest-results/connected/debug/`.

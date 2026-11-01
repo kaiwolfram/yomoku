@@ -254,6 +254,9 @@
     <string name="anki_export_check_again">Check again</string>
     <string name="anki_export_create">Create note model</string>
     <string name="anki_export_add">Add to Anki</string>
+    <string name="word_anki_setup">Check AnkiDroid and configure a default deck in Settings, then reopen this word.</string>
+    <string name="word_anki_settings">AnkiDroid settings and recovery</string>
+    <string name="word_anki_not_prepared">This word could not be prepared for export. Check AnkiDroid settings and recovery, then reopen the word.</string>
     <string name="anki_settings_title">AnkiDroid</string>
     <string name="anki_settings_description">Choose a default deck for future word exports.</string>
     <string name="anki_settings_unloaded">Saved Anki settings have not been loaded.</string>
