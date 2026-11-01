@@ -9377,3 +9377,54 @@ remain synchronous and resource trials remain outstanding (BACKUP_FORMAT.md).
 
 Logs: `/tmp/yomoku-candidate-controls-{focused,workspace,build,clippy,android}.log`.
 Formatting/local-link/diff checks are in the session transcript.
+
+## Restore candidate saved-entry validation
+
+2026-11-01: completed the independent vocabulary/custom-entry domain group from
+RESTORE_VALIDATION.md. Scan every saved entry before/after private migration,
+reusing the repository's vocabulary decoder and existing Surface/custom-entry
+constructors. Reject Unicode-blank and invalid UTF-8 fields. Preserve exact text,
+five statuses, full i64 dates/IDs, wall-clock rollback and custom records without
+vocabulary registration. No analyzer/dictionary lookup, normalization or repair.
+Shared unchanged-state fixture helper moved to the parent candidate test module.
+Updated format/architecture/data/inventory/decisions/plan/handoff documentation.
+No dependency, schema, runtime/core/FFI or Android source change.
+
+```sh
+export PATH=/home/kai/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin:$PATH
+cargo test -p yomoku-storage --locked --offline candidate
+cargo test --workspace --all-features --locked --offline --quiet
+cargo build --workspace --all-features --locked --offline
+cargo clippy --workspace --all-targets --all-features --locked --offline -- -D warnings
+export CC_aarch64_linux_android=/home/kai/Android/Sdk/ndk/30.0.16248370/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android29-clang
+export AR_aarch64_linux_android=/home/kai/Android/Sdk/ndk/30.0.16248370/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-ar
+export CC_x86_64_linux_android=/home/kai/Android/Sdk/ndk/30.0.16248370/toolchains/llvm/prebuilt/linux-x86_64/bin/x86_64-linux-android29-clang
+export AR_x86_64_linux_android=/home/kai/Android/Sdk/ndk/30.0.16248370/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-ar
+cargo build -p yomoku-storage --target aarch64-linux-android --target x86_64-linux-android --locked --offline
+cargo fmt --all -- --check
+git diff --check
+```
+
+PASS: five new cases, all 28 candidate cases and 1077 workspace tests, zero
+failures, 17 existing opt-in ignored. Coverage includes blank surfaces/meaning/
+reading across historical prefixes, invalid UTF-8 SQLite TEXT in every saved text
+field, all five statuses, literal whitespace/decomposed/supplementary Unicode/NULs,
+deleted/unregistered custom entries, IDs above 2^53, maximum dates and clock
+rollback. Populated historical schemas migrate privately without rewriting saved
+entries; every accepted/rejected case preserves source bytes. Existing complete
+encrypted fixture and cancellation-at-every-poll tests continue to pass.
+All-feature workspace build, strict all-target/all-feature Clippy, both Android
+storage target builds, Rustfmt, local links in 17 Markdown files and diff pass.
+All checks offline; no failed runs or blockers. No APK/lint/JNI/codegen/emulator/
+release/phone/resource trial was run.
+
+No implementation/verification steps remain for this bounded saved-entry slice.
+Effective payloads/text/analysis/anchors/history (including vocabulary event
+chains/final status) still require validation before restore-ready authority;
+runtime drain/gating/crash cleanup, secret handoff/UI and atomic replacement
+remain separate work. Recommend a schema-24 phone upgrade retaining Library/
+history and disposable real Anki collection/permission/browser/Back trial now.
+No new APK was requested or built.
+
+Logs: `/tmp/yomoku-candidate-vocabulary-{focused,workspace,build,clippy,android}.log`.
+Formatting/local-link/diff checks are in the session transcript.

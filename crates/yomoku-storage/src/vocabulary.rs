@@ -118,11 +118,11 @@ pub(crate) fn encode_status(status: VocabularyStatus) -> &'static str {
 
 type EntryColumns = (i64, String, String, i64);
 
-fn entry_columns(row: &rusqlite::Row<'_>) -> rusqlite::Result<EntryColumns> {
+pub(crate) fn entry_columns(row: &rusqlite::Row<'_>) -> rusqlite::Result<EntryColumns> {
     Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?))
 }
 
-fn validate_entry(
+pub(crate) fn validate_entry(
     (id, surface, status, timestamp): EntryColumns,
 ) -> Result<VocabularyEntry, StorageError> {
     validate_timestamp(timestamp)?;

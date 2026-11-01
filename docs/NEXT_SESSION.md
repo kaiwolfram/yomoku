@@ -31,8 +31,10 @@ Commit guidance: concise subject/explanatory body; keep verification in docs.
 - Partial application checks now before/after migration: required singleton rows,
   Library ordinals/clock, trusted AUTOINCREMENT sequence names/types/uniqueness/
   surviving-ID lower bounds, all Anki payloads (including terminal rows), existing
-  note ID lists and known/reconciled model identity. No repair/replay; preserve
-  historical layouts and deleted/exhausted counters. RESTORE_VALIDATION.md
+  note ID lists and known/reconciled model identity, vocabulary/custom-entry
+  domains via existing validators. No repair/replay; preserve exact text, custom
+  entries without registration, historical layouts and deleted/exhausted counters.
+  RESTORE_VALIDATION.md
   inventories every durable table group and remaining semantic checks.
 - Opaque SchemaCheckedBackup exposes versions/discard ONLY. Effective payloads,
   text/analysis/anchors/history and historical counter references remain unchecked.
@@ -54,17 +56,17 @@ Commit guidance: concise subject/explanatory body; keep verification in docs.
 ## Next tasks (ordered)
 1. Continue RESTORE_VALIDATION.md: effective payload/text/analysis/anchor/history
    invariants, hostile-data tests and opaque restore-ready validation before any
-   confirmation. Control-record substep is complete; umbrella remains unchecked.
+   confirmation. Control/saved-entry substeps complete; umbrella remains unchecked.
 2. Runtime export sequencing/checkpoint drain/mutation gating and private staging
    crash cleanup; design nonserialized secret handoff before FFI/UI.
 3. Real phone schema-24 upgrade and disposable Anki collection/permission/browser/
    Back/lifecycle trial. Anki umbrella remains unchecked pending this validation.
 
 ## Verification / blockers
-- PASS: 9 new/23 total candidate cases; 1072 workspace tests/17 opt-in ignored,
+- PASS: 5 new/28 total candidate cases; 1077 workspace tests/17 opt-in ignored,
   all-feature build, strict Clippy/Rustfmt, both Android storage builds, links/diff.
-- Commands/logs/fixed test compile issues: DEVELOPMENT.md, Restore candidate
-  control-record validation. Offline; no blockers or remaining implementation/
+- Commands/logs: DEVELOPMENT.md, Restore candidate saved-entry validation.
+  Offline; no blockers or remaining implementation/
   verification steps for this bounded slice. No APK/lint/JNI/codegen/emulator/
   release/phone/resource trial run.
 

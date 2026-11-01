@@ -2248,8 +2248,13 @@ Singleton presence, Anki serialized payloads (all states), existing-note ID sets
 known/reconciled model identity, Library ordinal/clock relations and sqlite_sequence
 names/types/uniqueness/surviving-ID lower bounds now pass partial application
 checks before/after migration. No counters or historical layouts are rewritten;
-valid exhausted/deleted high-water marks remain intact. Effective-completion
-payloads, relational text/analysis/anchor/history semantics and surviving historical
+valid exhausted/deleted high-water marks remain intact. Saved vocabulary entries
+reuse the existing typed repository decoder; versioned custom records use Surface
+and `CustomDictionaryEntry` constructors, including rejection of blank/invalid
+UTF-8 fields. Exact Unicode/whitespace and custom records without registration
+remain valid. Status-event/final-status relations are still unchecked.
+Effective-completion payloads, relational text/analysis/anchor/history semantics
+and surviving historical
 counter references remain unchecked. [RESTORE_VALIDATION.md](RESTORE_VALIDATION.md)
 lists all current table groups and precise boundaries. No restore-ready authority
 or schema migration is added.

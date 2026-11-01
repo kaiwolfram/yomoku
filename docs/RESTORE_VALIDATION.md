@@ -11,6 +11,8 @@ type can exist. Do not invent stricter product rules while filling these gaps.
 - [x] Validate file/header, exact bundled schema objects and migration journal,
   integrity/CHECKs and foreign keys; migrate supported schemas privately/recheck.
 - [x] Validate the control records below before and after private migration.
+- [x] Validate vocabulary/custom entry domains before and after private migration;
+  status-event/history relations remain a separate unchecked group.
 - [ ] Validate every remaining group below, including cross-group relations and
   legacy/deleted-content cases; only then design an opaque restore-ready result.
 
@@ -36,6 +38,22 @@ cannot be reconstructed after deletion. Surviving historical document/analysis
 references inside the groups below still need checking against counters.
 [SQLite documents the allocation semantics and writable sequence contents](https://www.sqlite.org/autoinc.html).
 
+## Implemented saved entry domains
+
+| Tables | Checks beyond schema/integrity/FKs |
+| --- | --- |
+| `vocabulary` | Existing repository entry decoder validates positive typed ID, exact nonblank UTF-8 Surface, all five status spellings and nonnegative i64 registration date. No Japanese detection or normalization. |
+| `custom_dictionary_entries` | Version 1, exact nonblank UTF-8 Surface and existing `CustomDictionaryEntry` constructor for nonblank meaning/reading. No required vocabulary registration, live document or built-in dictionary lookup. |
+
+Apply these checks to each supported prefix where its tables exist, then again
+after private migration. Preserve literal Unicode/whitespace/NULs permitted by
+the domain constructors, inflected spellings, deleted registrations and custom
+entries without registered vocabulary. Clock rollback remains accepted; do not
+introduce timestamp monotonicity. No candidate record is rewritten or repaired.
+Poll cancellation between rows and use fixed diagnostics for malformed data.
+Registration/transition chains, final status and completion/date ownership still
+require the history checks below; entry success alone grants no restore authority.
+
 ## Required remaining groups
 
 | Tables | Required semantic review/checks using existing contracts |
@@ -48,7 +66,6 @@ references inside the groups below still need checking against counters.
 | `epub_spans`, `epub_inline_images` | Contiguous indices, UTF-8 anchors, kind/target/link policy and image placeholder/path/asset relations through the existing domain contracts. |
 | `chapter_analyses`, `analyzed_tokens` | Version/identity/revision domains, contiguous indices, complete ordered original analysis coverage, exact anchored surfaces/metadata and Japanese flags. Preserve explicit legacy analysis absence; no analyzer rerun. |
 | `segmentation_overrides`, `segmentation_override_parts` | Exact anchored surfaces, scope/provenance, ordered parts reconstructing the selection, domain split/merge constraints and active-rule consistency. Deleted originating text must not invalidate retained global rules. |
-| `vocabulary`, `custom_dictionary_entries` | Exact nonblank Surface/custom-record domains, status/date types; custom records need not have a registered vocabulary entry. |
 | `completion_commands`, `reading_completions`, `completion_analyses`, `reading_occurrences` | Historical ownership, immutable ranges/analysis identities and occurrence membership/surfaces, page/time semantics and surviving counter lower bounds. Account for vocabulary deletion removing encounters and document deletion removing live text/analysis. Legacy unanalyzed completions remain valid. |
 | `effective_completion_commands` | Full versioned typed frozen payload validation, not only json_valid; command/payload/receipt/history consistency, including unfinished reservations. Frozen historical data cannot require current overrides/live content/vocabulary. Never replay reservations. |
 | `vocabulary_status_events` | Registration/transition chain and final retained status, cause/completion ownership/date relations using existing event-order rules. Vocabulary deletion legitimately removes its events/occurrences. |

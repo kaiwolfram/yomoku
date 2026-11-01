@@ -281,6 +281,11 @@ terminal rows, uses its existing versioned domain decoder; existing-note IDs mus
 be positive/distinct/nonempty and known/reconciled model IDs must agree. Historical
 layouts and pending/uncertain records remain unchanged; exhausted/deleted-ID
 high-water marks remain valid. Invalid data returns a fixed diagnostic.
+Saved vocabulary rows reuse the repository's typed entry decoder; custom entries
+reuse exact Surface and `CustomDictionaryEntry` constructors. Reject blank or
+invalid UTF-8 fields without normalization, dictionary lookup or requiring a
+custom entry's vocabulary registration. Literal text and deleted registrations
+survive unchanged. Status-event chains/final status remain unchecked history work.
 
 The opaque `SchemaCheckedBackup` exposes only schema versions and discard. It has
 no SQL/path/reader/confirmation/activation API. **Other application invariants

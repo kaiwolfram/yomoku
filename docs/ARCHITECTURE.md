@@ -39,7 +39,10 @@ and rechecks/syncs/closes. Triggers/views/trusted schema/attachments are disable
 parser limits are reduced. `SchemaCheckedBackup` exposes only versions/discard,
 with no reader/path/SQL or restore confirmation authority. Partial application
 checks now validate all Anki journal payloads/IDs, singleton presence, Library
-ordinals and allocation counters before/after migration. Remaining effective
+ordinals and allocation counters before/after migration. Saved vocabulary/custom
+entry domains now use existing repository/domain validators at the same boundary,
+without dictionary lookup or requiring custom-entry vocabulary registration.
+Status-event/final-status relations remain unchecked. Remaining effective
 payload/text/anchor/history checks are inventoried in
 [RESTORE_VALIDATION.md](RESTORE_VALIDATION.md). Cleanup shares the
 snapshot's fixed-file lifecycle, now also removing known SQLite sidecars, without

@@ -5217,3 +5217,20 @@ runtime drain/gating, crash cleanup, secret handoff and atomic replacement as
 separate required work. No dependency/version, schema or destructive semantics
 change. Fixed errors disclose no payload; cooperative cancellation remains between
 records/calls, with no interruption inside SQL, JSON decoding or sync.
+
+## 2026-11-01 — Restore validation of saved vocabulary and custom entries
+
+Continue the semantic inventory with a bounded independent saved-entry group.
+Before and after private migration, scan every vocabulary row with the existing
+repository entry decoder, and every custom entry with the existing Surface and
+`CustomDictionaryEntry` constructors. SQL nonempty CHECKs alone do not reject
+Unicode whitespace-only text; STRICT SQLite TEXT also needs UTF-8 validation.
+Keep fixed candidate diagnostics, row cancellation and unchanged source bytes.
+
+Preserve exact Unicode, whitespace and NULs accepted by the constructors, all
+five statuses, full signed-64 dates/IDs and wall-clock rollback. Custom entries
+survive independently of vocabulary registration and live content; do not consult
+the installed dictionary during restore validation. No normalization, repair,
+new schema/dependency or product restriction is introduced. Status-event chains,
+final retained status and completion/date ownership remain separate history work.
+The opaque schema result still grants no confirmation/replacement authority.

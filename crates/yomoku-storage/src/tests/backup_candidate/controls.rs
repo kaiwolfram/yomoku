@@ -8,21 +8,6 @@ use yomoku_core::document::PasteText;
 
 use super::*;
 
-fn accept_unchanged(database: &TestDatabase, version: u32) {
-    let before = fs::read(database.path()).unwrap();
-    let expected =
-        super::super::backup_snapshot::state(&Connection::open(database.path()).unwrap());
-    let directory = database.0.join("accepted");
-    let checked = candidate(&directory, &before)
-        .check_schema(version, before.len() as u64, || false)
-        .unwrap();
-    let copy = Connection::open(directory.join("snapshot.sqlite3")).unwrap();
-    assert_eq!(super::super::backup_snapshot::state(&copy), expected);
-    drop(copy);
-    checked.discard().unwrap();
-    assert_eq!(fs::read(database.path()).unwrap(), before);
-}
-
 #[test]
 fn backup_candidate_controls_require_singletons_before_private_migration() {
     for (version, table) in [
