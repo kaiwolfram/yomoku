@@ -1,8 +1,12 @@
-//! Versioned backup metadata. See docs/BACKUP_FORMAT.md for the complete contract.
+//! Versioned backup metadata and bounded authenticated snapshot streams.
+//! See docs/BACKUP_FORMAT.md for the complete contract.
 //!
-//! This prerequisite performs no cryptography, randomness, SQLite or file I/O.
-//! Parsed metadata is untrusted: it never authorizes restoration. Authentication
-//! of the entire stream and validation of the staged database must happen first.
+//! Decryption writes only to caller-owned private staging. Success authenticates
+//! the complete stream, not SQLite validity or authority to replace live data.
+
+mod stream;
+
+pub use stream::{decrypt_snapshot, encrypt_snapshot, BackupError, Password};
 
 use std::{error::Error, fmt};
 
@@ -61,8 +65,8 @@ pub struct Header {
 }
 
 impl Header {
-    /// The future encryption caller must generate fresh independent OS randomness
-    /// for both arrays on every export, including retries. Parsing cannot prove it.
+    /// Metadata constructor only. `encrypt_snapshot` generates its own fresh OS
+    /// randomness on every attempt; parsing cannot prove freshness.
     pub fn new(salt: [u8; SALT_LEN], stream_nonce: [u8; STREAM_NONCE_LEN]) -> Self {
         Self { salt, stream_nonce }
     }
@@ -182,7 +186,7 @@ impl Manifest {
 }
 
 /// Bounded public framing. Also authenticate these exact bytes as frame AAD.
-/// Only the future STREAM decryptor can verify order, finality and authentication.
+/// Only the STREAM decryptor can verify order, finality and authentication.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct FrameHeader {
     is_last: bool,

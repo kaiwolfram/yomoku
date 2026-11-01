@@ -1,12 +1,22 @@
 # Architecture
 
-## Manual backup prerequisite
+## Manual backup stream prerequisite
 
-`yomoku-backup` is an independent, dependency-free Rust leaf crate containing
-strict envelope, encrypted-manifest and frame metadata codecs. It is a workspace
-member, not yet a dependency of runtime/core/FFI/Android. It does no encryption,
-randomness, SQL or I/O, and parsing never grants restore authority. The versioned
-contract and primary dependency evidence are in [BACKUP_FORMAT.md](BACKUP_FORMAT.md).
+`yomoku-backup` is an independent Rust leaf crate containing strict envelope,
+encrypted-manifest and frame metadata codecs plus bounded authenticated Read/Write
+snapshot streams. Pinned RustCrypto Argon2id and STREAM BE32/XChaCha20Poly1305,
+OS randomness and guarded secret buffers implement the version-1 profile. It is
+not yet a dependency of runtime/core/FFI/Android. It owns no SQL, filesystem paths,
+staging cleanup, activation or restore authority. The contract and dependency
+evidence are in [BACKUP_FORMAT.md](BACKUP_FORMAT.md).
+
+Encryption requires an already validated coherent snapshot. Decryption writes
+per-frame authenticated plaintext only to caller-owned private staging and returns
+the manifest after authenticated Last, EOF, exact length and flush. Errors may
+leave partial output; callers must discard it, sync/close successful files and
+clean up after crashes. Password ownership bypasses serialization; Rust guards
+clear password/key/KDF scratch/chunk buffers. Cancellation is cooperative between
+synchronous KDF/I/O calls. SQLite validation and replacement remain unimplemented.
 
 Subsequent work keeps SQLite snapshot/validation in storage and Rust encryption
 in the backup crate, coordinated by EffectRouter. Pure core owns correlated

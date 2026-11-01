@@ -9130,3 +9130,65 @@ Logs: `/tmp/yomoku-backup-format-{focused,workspace,build,clippy,clippy-final,
 rustfmt}.log` (one per suffix). Initial focused lint output is in the session
 tool transcript; final lint is `clippy-final`. Crypto candidates/remaining gates:
 [BACKUP_FORMAT.md](BACKUP_FORMAT.md).
+
+## Bounded authenticated backup stream prerequisite
+
+2026-11-01: adopted exact reviewed crypto dependencies and bounded synchronous
+snapshot Read/Write in the independent `yomoku-backup` leaf crate. No SQL/schema
+change, filesystem staging/activation, app dependency, core/runtime/FFI/Android UI
+or serializable secret handoff. README, architecture/data/format/decision/plan and
+resume documents describe the current boundary.
+
+```sh
+export PATH=/home/kai/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin:$PATH
+cargo fetch
+python3 tools/backup-reference-vectors.py
+cargo test -p yomoku-backup --all-features --locked --offline
+cargo test --workspace --all-features --locked --offline --quiet
+cargo build --workspace --all-features --locked --offline
+cargo clippy --workspace --all-targets --all-features --locked --offline -- -D warnings
+cargo build -p yomoku-backup --target aarch64-linux-android --locked --offline
+cargo build -p yomoku-backup --target x86_64-linux-android --locked --offline
+cargo fmt --all -- --check
+git diff --check
+```
+
+The one initial fetch resolved/downloaded the new graph; unrelated package
+versions remain unchanged. Direct dependencies: argon2 0.5.3 (only zeroize feature),
+chacha20poly1305 0.11.0 (defaults off, alloc/zeroize), aead-stream 0.6.0 (defaults
+off), getrandom 0.4.3 and zeroize 1.9.0. Primary docs/source API/license evidence
+is in BACKUP_FORMAT.md. Subsequent commands are offline. No build/test/download
+escalation was needed. Optional independent fixture reproduction uses installed
+libargon2-20190702-10.fc44 and libsodium-1.0.22-1.fc44; neither becomes an app
+dependency. Its fixed password/key inputs are public test data.
+
+PASS: 18 new stream tests plus nine metadata cases. Published RFC-9106 Argon2id
+and XChaCha draft vectors, production-profile reference Argon2 key and libsodium
+BE32 fixtures agree. Password round trip preserves literal Unicode/whitespace;
+separate exports have distinct salt/nonce. Both entropy failures fail closed.
+Cases exercise canonical empty Last, chunk boundaries, short/EINTR I/O, every
+small-archive truncation/ciphertext-byte tamper, header/frame binding, frame reorder/
+repeat/splice/missing/extra Last, authenticated invalid manifest/exact length,
+hostile sizes before reads, stream counter/total limits, read/write/EOF-probe/flush
+faults, zero writes, every stream cancellation poll and sanitized diagnostics.
+Late failures deliberately demonstrate prior plaintext in disposable staging.
+
+PASS: 1040 workspace tests, zero failures, 17 existing opt-in ignored; all-feature
+workspace build, strict all-target/all-feature Clippy and Rustfmt. Initial compile
+API/type adjustments and one hex-helper Clippy finding were fixed. The full suite
+precedes two added explicit pre-KDF cancellation polls; final focused cases,
+workspace build/Clippy and both Android target builds include those polls.
+Both target checks produce Rust libraries, not APK/JNI integration/runtime claims.
+Reference reproduction, local documentation links and diff checks pass.
+
+No SQLite snapshot/full-state round trip, private staging crash cleanup, hardened
+candidate validation, confirmed restore, Android APK/lint/JNI/codegen/emulator,
+optimized release, device resource/performance or actual AnkiDroid checks run for
+this isolated slice. No implementation/verification steps or blockers remain for
+the stream prerequisite. Next: compact full-state snapshots, then hardened private
+candidate validation; Android integration must add dependency notices and resource
+trials. Schema-24 phone upgrade/disposable Anki collection trials remain recommended.
+
+Logs: `/tmp/yomoku-backup-stream-{focused,focused-final,workspace,build,build-final,
+clippy,clippy-final,arm64,arm64-final,x86_64,x86_64-final,rustfmt,reference}.log`
+(one per suffix). Initial compiler/focused lint output is in the tool transcript.

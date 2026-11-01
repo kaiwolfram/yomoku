@@ -1,9 +1,10 @@
 # Manual backup format, version 1
 
-Status: design and strict metadata codecs implemented on 2026-11-01 in
-`yomoku-backup`. Encryption, snapshot I/O, export/import UI and replacement are
-not implemented. The wire fixtures define the first format; this is not yet an
-exported-file compatibility or end-to-end security claim.
+Status: design, strict metadata codecs and bounded authenticated snapshot Read/Write
+implemented on 2026-11-01 in `yomoku-backup`. SQLite snapshot creation/validation,
+staging lifecycle, export/import UI and replacement are not implemented. The wire
+fixtures define the first format; this is not yet an exported-file compatibility
+or end-to-end security claim.
 
 Requirements: [PRODUCT_SPEC.md §7](PRODUCT_SPEC.md#7-secure-manual-backup-and-restore).
 The format is independent of the internal Crux/Bincode/FFI representation.
@@ -62,20 +63,23 @@ an established online authenticated-encryption construction to handle databases
 larger than RAM. [RustCrypto's STREAM documentation](https://docs.rs/aead-stream/0.6.0/aead_stream/)
 describes the construction and its ordering/truncation properties.
 
-Reviewed exact candidates for the next implementation step, **not yet added to
-Cargo.toml/Cargo.lock or compiled for Android**:
+Adopted exact direct dependencies in Cargo.toml/Cargo.lock. Published documentation
+and downloaded source APIs/features were rechecked, and the isolated crate builds
+for both Android targets. It is not linked into the app yet:
 
-| Library | Intended API/features and evidence |
+| Library | Adopted API/features and evidence |
 | --- | --- |
-| `argon2 =0.5.3` | Pure Rust, MIT/Apache-2.0. Explicit `Algorithm::Argon2id`, `Version::V0x13`, `Params::new(65536, 3, 4, Some(32))`. Use the binary key derivation API, never PHC password-verification strings. Disable defaults; enable `alloc`/`zeroize`, explicitly clear owned KDF working memory. [Key derivation](https://docs.rs/argon2/0.5.3/argon2/), [parameters](https://docs.rs/argon2/0.5.3/argon2/struct.Params.html), [features](https://docs.rs/crate/argon2/0.5.3/features). |
+| `argon2 =0.5.3` | Pure Rust, MIT/Apache-2.0. Explicit `Algorithm::Argon2id`, `Version::V0x13`, `Params::new(65536, 3, 4, Some(32))`. Binary `hash_password_into_with_memory`, never PHC password-verification strings. Defaults disabled; only `zeroize` enabled. Caller-owned fallibly allocated `Zeroizing<Vec<Block>>` clears KDF scratch on every exit. [Key derivation](https://docs.rs/argon2/0.5.3/argon2/), [parameters](https://docs.rs/argon2/0.5.3/argon2/struct.Params.html), [features](https://docs.rs/crate/argon2/0.5.3/features). |
 | `chacha20poly1305 =0.11.0` | Pure Rust, MIT/Apache-2.0; `XChaCha20Poly1305` has a 24-byte full nonce and a 32-byte key. Disable defaults, enable `alloc`/`zeroize`; no reduced-round cipher. The crate reports a historical NCC Group audit; that does not audit this application, STREAM composition or every later release. Its constant-time multiplication requirement fits the supported arm64/x86_64 targets; runtime verification remains. [Security notes](https://docs.rs/crate/chacha20poly1305/0.11.0), [manifest/features](https://docs.rs/crate/chacha20poly1305/0.11.0/source/Cargo.toml). |
 | `aead-stream =0.6.0` | MIT/Apache-2.0, pure Rust; same `aead 0.6` dependency family as the selected cipher. `EncryptorBE32`/`DecryptorBE32`, `new`, `*_next_in_place`/`*_last_in_place` with AAD. `last` consumes the state. [API](https://docs.rs/aead-stream/0.6.0/aead_stream/struct.Encryptor.html), [manifest](https://docs.rs/crate/aead-stream/0.6.0/source/Cargo.toml), [counter/nonce source](https://docs.rs/aead-stream/0.6.0/src/aead_stream/lib.rs.html). |
-| `getrandom =0.4.3` | Existing locked version; `fill` obtains OS randomness on Linux/Android. Fail closed on entropy errors; no clock/ID/random fallback. Generate independent fresh salt and prefix for every attempt, including Retry. [API/targets](https://docs.rs/getrandom/0.4.3/getrandom/). |
-| `zeroize =1.9.0` | Existing locked version; MIT/Apache-2.0. Use `Zeroizing`/explicit clearing for password bytes, key, KDF memory and plaintext buffers. Owned Rust buffers can be cleared; this cannot promise elimination of Android/JVM copies, allocator copies, registers or OS caches. [Guarantees/limits](https://docs.rs/zeroize/1.9.0/zeroize/). |
+| `getrandom =0.4.3` | MIT/Apache-2.0; `fill` obtains OS randomness on Linux/Android. Fail closed on entropy errors; no clock/ID/random fallback. Generate independent fresh salt and prefix for every attempt, including Retry. [API/targets](https://docs.rs/getrandom/0.4.3/getrandom/). |
+| `zeroize =1.9.0` | MIT/Apache-2.0, `alloc` enabled. Use `Zeroizing`/explicit clearing for password bytes, key, KDF memory and plaintext buffers. Owned Rust buffers can be cleared; this cannot promise elimination of Android/JVM copies, allocator copies, registers or OS caches. [Guarantees/limits](https://docs.rs/zeroize/1.9.0/zeroize/). |
 
-No new native service, network access or runtime is required. Recheck actual
-feature/API compilation and lock the complete graph when adding these dependencies;
-include published known-answer vectors and both Android ABIs before integration.
+No new native service, network access or runtime is required. The complete graph
+is locked, including shared `aead 0.6.1`; existing unrelated versions are unchanged.
+Published known-answer vectors, independent reference fixtures and both Android
+target library builds pass. Native runtime/resource checks and redistribution
+notices for the added graph are required before Android integration/distribution.
 The selected Argon2 and STREAM implementations are not claimed independently
 audited here. This review is a design/API review, not a cryptographic audit.
 
@@ -166,13 +170,30 @@ using the supported numbered migration chain; never merge or reimport content.
 
 ## Export and restore boundaries for subsequent slices
 
-Rust storage owns SQLite validation/snapshot I/O. `yomoku-backup` will own Rust
+Rust storage owns SQLite validation/snapshot I/O. `yomoku-backup` owns Rust
 encryption and bounded `Read`/`Write` processing. The runtime EffectRouter owns
 sequencing/cancellation; pure core owns correlated intent/confirmation phases.
 Kotlin owns password UI, file picker/descriptor lifecycle and Activity handling.
 Do not put SQL/platform I/O in core or bulk database bytes in Crux view/FFI state.
 No raw passwords enter serializable events/views, journals, diagnostics or saved
 instance state. A narrow nonserializing secret handoff needs design before FFI.
+
+The implemented stream API consumes an owned non-Debug/non-Clone/nonserialized
+`Password`, clearing it after KDF. The KDF key and 64-MiB scratch and one reusable
+65,552-byte chunk buffer are guarded/cleared; AEAD key clearing is enabled. No
+allocation depends on declared database length. Header profile parsing precedes
+KDF allocation, and frame parsing bounds ciphertext before reading. Read/Write
+loops handle short calls/EINTR and cancellation at every call, plus before/after
+KDF and final flush. Cancellation cannot interrupt an in-progress KDF, blocking
+I/O or flush. The crate does not open files or choose paths/permissions.
+
+`encrypt_snapshot` accepts a coherent, validated snapshot plus its manifest and
+rejects short/extra database bytes. `decrypt_snapshot` strips the authenticated
+manifest and writes database bytes only to caller-owned new private staging. The
+manifest returns only after Last/tag/EOF/exact-length/output-flush success. Wrong
+password/failed tags share one authentication error; diagnostics retain only I/O
+error kinds, never arbitrary source messages. Errors/cancellation may leave partial
+staging; disposal/crash cleanup and success sync/close remain caller obligations.
 
 Export first stages in app-private storage, encrypts completely and closes the
 output before reporting success. An incomplete external destination must never
@@ -215,16 +236,28 @@ through normal startup; no active reader/selection/export authority is restored.
 
 ## Verification scope
 
-Current tests freeze golden header/manifest/frame bytes, exact u64 lengths,
-every changed profile byte, reserved/version/length rejection, all truncations,
-opaque salt/nonce values, every allowed final segment length, hostile frame sizes
-and checked stream-size limits. They perform no cryptography, SQL or file I/O.
+Metadata cases freeze golden header/manifest/frame bytes, exact u64 lengths,
+every profile/reserved/version/length rejection, all truncations, every final
+segment length, hostile frame sizes and checked stream limits. Stream cases add
+[RFC 9106 §5.3 Argon2id](https://www.rfc-editor.org/rfc/rfc9106.html#section-5.3),
+[the XChaCha draft vector](https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-xchacha-03#appendix-A.3.1),
+production-profile/reference-Argon2 and reference-libsodium BE32 fixtures, actual
+password/stream round trips, fresh salt/nonce and both entropy-failure paths.
+[backup-reference-vectors.py](../tools/backup-reference-vectors.py) reproduces the
+independent fixtures with system libraries; these are optional tooling only, not
+application dependencies. This host used libargon2 20190702 and libsodium 1.0.22.
 
-Before encrypted export is complete: library known-answer vectors, actual KDF/
-AEAD/STREAM round trips, wrong-password/header/tag/payload tampering, missing or
-extra Last, reordered/repeated/spliced/truncated frames, I/O faults/cancellation,
-fresh entropy and full-state snapshot round trips including deleted records and
-ID high-water marks. Before restore is complete: unknown/newer/older versions,
+Cases reject every small-archive ciphertext-byte tamper/truncation, changed header/
+frame metadata, wrong password, reordered/repeated/spliced/missing/extra frames,
+authenticated invalid manifest/length, hostile lengths before payload reads,
+short/interrupted/failed reads/writes/EOF probes/flushes, zero writes and cancellation
+at every stream poll (including after flush/repeated EINTR). Earlier authenticated
+chunks may exist in disposable staging after a late failure. No SQL is validated.
+
+Before encrypted export is complete: full-state compact SQLite snapshot round
+trips including deleted records and ID high-water marks, private staging lifecycle,
+secret FFI handoff, Android UI/descriptors and real-phone resource trials. Before
+restore is complete: unknown/newer/older database schemas,
 malformed SQLite/application data, preserved target on every rejected stage,
 confirmation correlation/Anki gates, migration and activation failure injection,
 process-death recovery, Android descriptor/lifecycle and real phone resource trials.

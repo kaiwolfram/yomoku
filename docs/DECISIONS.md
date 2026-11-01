@@ -5087,3 +5087,36 @@ clear. Recheck at confirmation/activation; a generic destructive confirmation
 cannot discard the obligations. Preserve source-backup journals and restart only
 read-only recovery, never old live invocation authority. Record this clarification
 in PRODUCT_SPEC.md; no replacement path is enabled by this prerequisite.
+
+## 2026-11-01 — Bounded authenticated backup streams before SQLite integration
+
+Adopt the previously reviewed exact Argon2 0.5.3, XChaCha20Poly1305 0.11.0,
+AEAD-STREAM 0.6.0, getrandom 0.4.3 and zeroize 1.9.0 dependencies in the isolated
+`yomoku-backup` crate. Recheck primary APIs/features and lock the full graph without
+upgrading unrelated packages. Disable Argon2 defaults, enable only zeroize and
+provide fallibly allocated guarded Block scratch to the binary derivation API.
+Enable cipher alloc/zeroize and delegate every stream nonce/counter/finality
+operation to the library. No crate connects to core/runtime/FFI/Android yet.
+
+Keep one bounded reusable frame buffer plus fixed 64-MiB KDF memory, with no
+allocation/preallocation from database lengths. Consume an owned non-Debug,
+non-Clone, nonserialized password and guard password/key/scratch/plaintext buffers.
+Generate independent OS salt/nonce bytes for every export attempt; fail closed
+on entropy errors. Error diagnostics expose fixed messages/I/O kinds only. This
+does not claim removal of JVM/UI/caller copies or an independent crypto audit.
+
+Encryption takes a coherent, already validated private snapshot and checks its
+exact length. Decryption writes per-frame verified database bytes to new private
+disposable staging; return the manifest only after Last/EOF/exact length/flush.
+Later failures can leave prior plaintext chunks, so storage/orchestration must
+own failure/process-death cleanup before integration. Stream success never grants
+SQLite validity, migration/activation permission or Anki mutation authority.
+The crate opens no paths, syncs/closes no files and cannot replace live data.
+Poll cooperative cancellation on short/interrupted reads/writes and around KDF/
+flush; in-progress synchronous KDF/blocking I/O cannot be interrupted.
+
+Use published RFC/draft primitive vectors and independent system reference
+Argon2/libsodium fixtures alongside adversarial stream tests. Optional reference
+reproduction tooling uses public fixed test inputs and adds no application native
+dependency. Keep full-state SQLite snapshots/validation, private staging lifecycle,
+secret FFI transfer, app UI and confirmed activation as separate required slices.

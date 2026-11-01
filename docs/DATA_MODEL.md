@@ -2217,8 +2217,11 @@ are implemented; real-provider collection/permission/browser/Back trials remain.
 encrypted manifest preceding a compact SQLite snapshot. Envelope, payload and
 positive database migration versions are independent. The manifest carries an
 exact checked u64 database length; it is not a trusted input to allocation,
-migration or replacement. The dependency-free `yomoku-backup` codecs enforce
-structural limits only; authentication and database validation are not implemented.
+migration or replacement. `yomoku-backup` now authenticates bounded streams and
+checks the decrypted manifest/exact payload length through Last/EOF before success.
+Only caller-owned private staging receives plaintext; failed outputs are disposable.
+Authentication still establishes neither SQLite/schema validity nor replacement
+authority. Snapshot creation, database validation and replacement are unimplemented.
 
 All existing durable state is included, including original imported bytes/EPUB
 assets, analysis identities, deleted-document provenance, history, pending time,
