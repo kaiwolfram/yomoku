@@ -4350,3 +4350,21 @@ and /tmp/yomoku-browser-profile-*. No emulator started.
   Next implementation remains existing-note browser/return handling. A schema-24
   phone upgrade retaining existing Library/history would provide more value
   before further provider work; use the documented local-test signing path.
+
+## 2026-11-01 — Optimized local release APK rebuild
+
+- Built source 0ddb81d with both optimized Rust/JNI ABIs and generated bindings;
+  release APK assembly and strict lintRelease pass. Signed using the existing
+  local development key; its certificate matches the previous phone APK.
+- Artifact: `target/releases/yomoku-0.1.0-0ddb81d-release.apk` (254,060,224 bytes),
+  also available at README path `target/releases/yomoku-release.apk`. Checksum
+  is alongside the versioned APK; old artifacts are preserved and all stay ignored.
+- PASS: signature, 16 KiB ZIP/ELF alignment, machines/JNI exports, fresh native
+  pipeline byte matches, complete ZIP CRC, 24 exact bundled assets, non-debuggable
+  manifest and debug-probe library/DEX exclusion. Corrected a temporary verifier's
+  assumption excluding the existing AndroidX graphics libraries; final checks pass.
+- Gradle needed normal local-socket escalation; no downloads or application
+  changes. Commands/results/logs: DEVELOPMENT.md. Diff check passes. No host
+  suites, installation/runtime/performance trials or publishing were performed.
+- No build/verification steps or blockers remain. Recommend the schema-24 phone
+  upgrade preserving existing Library/history before further provider work.

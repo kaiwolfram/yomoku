@@ -70,11 +70,10 @@ results in progress docs/reports, out of commit message bodies.
   claim. Actual dialogs/collection/browser, phone/tablet, optimized release and
   performance trials remain unrun. Older phone APK is source 0374365.
 
-## Latest documentation checkpoint
-- README.md now contains release build/sign/install steps and upgrade-key guidance.
-- PASS: four shell blocks (`bash -n`), local links, installed CLI options and
-  `./android/gradlew -p android :app:assembleRelease :app:lintRelease -x :app:buildRustBridge --offline --console=plain --dry-run`.
-- Used the DEVELOPMENT.md local JDK/SDK/Gradle environment; Gradle required normal
-  socket escalation. Log: `/tmp/yomoku-readme-release-gradle.log`. No blocker.
-- Documentation only: no APK rebuild, signing, installation or runtime tests.
-  No implementation/verification steps remain for this request; next tasks above.
+## Latest release checkpoint
+- Built source 0ddb81d: `target/releases/yomoku-0.1.0-0ddb81d-release.apk` (~242.3 MiB).
+- PASS: optimized native ABIs, assembleRelease/strict lintRelease, signature,
+  ZIP/ELF 16 KiB alignment, CRC, assets, JNI/manifest and debug-probe exclusion.
+- Certificate matches phone APK 0374365. No install/runtime trial or publishing.
+- Checksum beside APK; commands/logs: DEVELOPMENT.md. Gradle needed socket access.
+- No build/verification steps or blockers remain; phone upgrade is recommended.

@@ -8982,3 +8982,47 @@ Logs: `/tmp/yomoku-dictionary-anki-{format,format-check,format-final,
 format-final-check,android,emulator,emulator-boot,final}.log` (one per suffix).
 Initial XML: `/tmp/yomoku-dictionary-anki-initial-xml/`; corrected-case final XML:
 `android/app/build/outputs/androidTest-results/connected/debug/`.
+
+## 2026-11-01 — Optimized local release APK rebuild
+
+Built source `0ddb81d1541cd66d40aec280413b4fab7745a071` with the README release
+sequence, existing development certificate and no application/configuration changes.
+The artifact is `target/releases/yomoku-0.1.0-0ddb81d-release.apk` with the same
+bytes also at `target/releases/yomoku-release.apk`: 254,060,224 bytes (~242.3 MiB).
+SHA-256: `c248a80f0658ae20d021d24a6665ec371834615f5a5213f0501acaa44d85ad63`.
+The versioned `.apk.sha256` file records this checksum; prior APKs are preserved.
+
+Environment and build commands, executed sequentially before README alignment/signing:
+
+```sh
+export PATH=/home/kai/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin:$PATH
+export JAVA_HOME="$PWD/.local/jdk-17/jdk-17.0.21+9"
+export PATH="$JAVA_HOME/bin:$PATH"
+export GRADLE_USER_HOME="$PWD/.local/gradle"
+export ANDROID_HOME=/home/kai/Android/Sdk
+export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/30.0.16248370"
+export CARGO_NET_OFFLINE=true
+python3 tools/verify-sudachi-source.py
+cargo run -p yomoku-ffi --bin generate-kotlin --features facet_typegen --locked --offline -- target/generated/kotlin
+(cd crates/yomoku-ffi && ../../.local/bin/boltffi pack android --release --deny-skipped --cargo-arg=--locked --cargo-arg=--offline)
+./android/gradlew -p android :app:assembleRelease :app:lintRelease -x :app:buildRustBridge --offline --console=plain
+```
+
+PASS: source verification, both optimized native ABIs, binding generation,
+assembleRelease and strict lintRelease. Gradle used normal local-socket escalation;
+no downloads. APK signature and 16 KiB ZIP alignment pass. Certificate matches
+the earlier source-0374365 phone APK. Both ELF architectures/JNI exports and
+16 KiB load alignment pass; merged JNI bytes match fresh native output and
+packaged JNI bytes match Gradle's stripped output. AndroidX graphics path native
+libraries match the previous APK. Full ZIP CRC, all 24 exact generated/main
+dictionary/source/license assets, non-debuggable API-29/target-36 manifest and
+debug-probe native/DEX exclusion pass. A temporary verifier initially assumed
+only Yomoku JNI libraries; corrected its allowlist for the existing AndroidX
+graphics path libraries and reran successfully. No application/package defect.
+
+Logs: `/tmp/yomoku-release-0ddb81d-{gradle,signature,previous-signature,manifest,package}.log`;
+temporary verifier: `/tmp/yomoku-release-0ddb81d-verify.py`. `git diff --check` passes.
+Native build output is in the session tool transcript. No host suites, device
+installation/runtime/instrumentation, performance trial or publishing was run.
+No build/verification steps or blockers remain for this request. Recommend the
+schema-24 physical-phone upgrade retaining Library/history before further provider work.
