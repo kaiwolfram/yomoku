@@ -42,8 +42,12 @@ checks now validate all Anki journal payloads/IDs, singleton presence, Library
 ordinals and allocation counters before/after migration. Saved vocabulary/custom
 entry domains now use existing repository/domain validators at the same boundary,
 without dictionary lookup or requiring custom-entry vocabulary registration.
-Status-event/final-status relations remain unchecked. Remaining effective
-payload/text/anchor/history checks are inventoried in
+Private typed version-1 effective wire records now validate detached command,
+segment/metadata/projection/issued-ID bounds and completed-receipt consistency at
+that boundary, without constructing live completion commands. Frozen history and
+unfinished reservations survive deleted content/rules/vocabulary without replay.
+Canonical-text/page/analysis relations and status-event/final-status/history checks
+remain incomplete and are inventoried in
 [RESTORE_VALIDATION.md](RESTORE_VALIDATION.md). Cleanup shares the
 snapshot's fixed-file lifecycle, now also removing known SQLite sidecars, without
 recursive deletion. See BACKUP_FORMAT.md for exact checks and resource limits.

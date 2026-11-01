@@ -5234,3 +5234,31 @@ the installed dictionary during restore validation. No normalization, repair,
 new schema/dependency or product restriction is introduced. Status-event chains,
 final retained status and completion/date ownership remain separate history work.
 The opaque schema result still grants no confirmation/replacement authority.
+
+## 2026-11-01 — Detached effective-completion restore validation
+
+Continue the storage-only semantic inventory with private version-1 wire records
+for effective reservations. Do not add Deserialize to live effective commands:
+validation cannot mint a command or mutation permit. Mirror the saved shape with
+required/explicit-nullable fields, reject unknown/duplicate fields, reuse core
+numeric/enum/duration decoders and existing Surface domains. Storage directly
+uses the already-locked Serde 1.0.228 derive dependency; no version change or new
+package. Primary Serde API evidence is linked in BACKUP_FORMAT.md.
+
+Before and after private migration, check internal command/key/page/position and
+segment/metadata provenance, UTF-8 boundaries inside retained surfaces and exact
+start-owned occurrence projection. Require historical document/analysis/rule IDs
+within allocation high-water marks even without live rows. Match any completed
+receipt's full page/time payload, B profile/header and every surviving encounter.
+Preserve unfinished reservations, old/inactive rules, alternate A/C metadata,
+clock rollback, full i64 values and vocabulary erasure/re-registration. Never
+replay, normalize, repair or require current rule resolution/vocabulary snapshots.
+
+This is detached validation, not completion of the entire semantic group. Saved
+segments can omit whitespace gaps, and document deletion removes live analyses.
+Do not synthesize erased canonical bytes or infer erased IDs. Surviving canonical
+text/logical-page/original and alternate analysis associations, other history and
+status chains remain required by RESTORE_VALIDATION.md. Opaque schema results
+still expose only versions/discard. No schema/core/runtime/FFI/UI/destructive
+semantics change. Cancellation polls between records/segments/encounters; JSON,
+SQL and sync remain synchronous with no total resource budget.

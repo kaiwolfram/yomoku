@@ -2253,8 +2253,13 @@ reuse the existing typed repository decoder; versioned custom records use Surfac
 and `CustomDictionaryEntry` constructors, including rejection of blank/invalid
 UTF-8 fields. Exact Unicode/whitespace and custom records without registration
 remain valid. Status-event/final-status relations are still unchecked.
-Effective-completion payloads, relational text/analysis/anchor/history semantics
-and surviving historical
-counter references remain unchecked. [RESTORE_VALIDATION.md](RESTORE_VALIDATION.md)
+Private typed version-1 effective wire records now check detached domains,
+command/page/position/segment/metadata/occurrence consistency, historical issued-ID
+bounds and completed receipts/headers/surviving encounters. No live command can be
+constructed from these decoded records. Unfinished reservations, deleted-content
+history and erased/re-registered vocabulary remain valid without replay.
+Surviving canonical text/logical pages/original and alternate analysis associations,
+other relational text/anchor/history semantics and their counter references remain
+unchecked. [RESTORE_VALIDATION.md](RESTORE_VALIDATION.md)
 lists all current table groups and precise boundaries. No restore-ready authority
 or schema migration is added.

@@ -11,8 +11,8 @@ Commit guidance: concise subject/explanatory body; keep verification in docs.
 - Feed is only `Coming Soon! 🌱`; Nostr/identity/Q188 are beyond the first MVP.
 - Statistics keeps cumulative occurrences and all five statuses including Known.
 - Resolve current pending/uncertain Anki writes before restore replacement.
-  Unknown/failed recovery is not clear. Preserve backup journals without replay.
-  PRODUCT_SPEC.md §7 and BACKUP_FORMAT.md govern; no replacement exists yet.
+  Unknown/failed recovery does not clear this gate. Preserve backup journals
+  without replay. PRODUCT_SPEC.md §7/BACKUP_FORMAT.md govern; no replacement yet.
 
 ## Current backup boundary
 - Version-1 format/profile: BACKUP_FORMAT.md. Independent `yomoku-backup` owns
@@ -28,21 +28,21 @@ Commit guidance: concise subject/explanatory body; keep verification in docs.
   parser/VM limits/cell checks/memory temp before schema parsing (retains CHECKs).
 - Exact all-object type/name/table/SQL against bundled migration prefix, then
   journal/integrity/CHECK/FKs. Versions 1–24 migrate privately/recheck/sync/close.
-- Partial application checks now before/after migration: required singleton rows,
-  Library ordinals/clock, trusted AUTOINCREMENT sequence names/types/uniqueness/
-  surviving-ID lower bounds, all Anki payloads (including terminal rows), existing
-  note ID lists and known/reconciled model identity, vocabulary/custom-entry
-  domains via existing validators. No repair/replay; preserve exact text, custom
-  entries without registration, historical layouts and deleted/exhausted counters.
-  RESTORE_VALIDATION.md
-  inventories every durable table group and remaining semantic checks.
-- Opaque SchemaCheckedBackup exposes versions/discard ONLY. Effective payloads,
-  text/analysis/anchors/history and historical counter references remain unchecked.
+- Partial checks before/after migration: required singleton rows, Library ordinals/
+  clock, trusted AUTOINCREMENT counters, all Anki payloads/IDs, saved vocabulary/
+  custom-entry domains. Preserve exact text/historical layouts/deleted counters.
+- Private typed effective records now validate detached command/segment/metadata/
+  projection/issued-ID bounds and receipts/headers/surviving encounters. No live
+  command construction. Preserve unfinished reservations, old rules and erased
+  content/vocabulary without replay. Saved segments can omit whitespace gaps.
+- Opaque SchemaCheckedBackup exposes versions/discard ONLY. Surviving canonical
+  text/logical pages/analysis associations and other anchor/history/status checks
+  remain incomplete: RESTORE_VALIDATION.md inventories precise continuation points.
   Cannot reconstruct erased high-water history. No confirmation/restore authority.
 - Fixed-file/SQLite-sidecar cleanup preserves unexpected files; explicit discard
   reports errors, Drop/error/cancel best effort. Crash cleanup remains undone.
-  Cancellation between calls/rows, not inside SQL/JSON/KDF/sync; no total resource
-  budget. Runtime drain/gating, secrets/descriptors/UI and activation remain undone.
+  Cancellation between calls/rows/segments, not inside SQL/JSON/KDF/sync; no total
+  resource budget. Runtime drain/gating, secrets/descriptors/UI/activation undone.
 
 ## Existing Anki boundary
 - Ready acknowledged configured deck + retained regular-deck discovery required.
@@ -54,20 +54,20 @@ Commit guidance: concise subject/explanatory body; keep verification in docs.
   late work. No return/recreation replay. Architecture/data/API/decisions have detail.
 
 ## Next tasks (ordered)
-1. Continue RESTORE_VALIDATION.md: effective payload/text/analysis/anchor/history
-   invariants, hostile-data tests and opaque restore-ready validation before any
-   confirmation. Control/saved-entry substeps complete; umbrella remains unchecked.
+1. Continue RESTORE_VALIDATION.md: surviving text/page/analysis associations and
+   other anchor/history/status semantics; hostile-data tests before restore-ready.
+   Detached effective checks complete; no confirmation/replacement authority yet.
 2. Runtime export sequencing/checkpoint drain/mutation gating and private staging
    crash cleanup; design nonserialized secret handoff before FFI/UI.
 3. Real phone schema-24 upgrade and disposable Anki collection/permission/browser/
    Back/lifecycle trial. Anki umbrella remains unchecked pending this validation.
 
 ## Verification / blockers
-- PASS: 5 new/28 total candidate cases; 1077 workspace tests/17 opt-in ignored,
+- PASS: 9 new/37 candidate cases; 1086 workspace tests/17 opt-in ignored,
   all-feature build, strict Clippy/Rustfmt, both Android storage builds, links/diff.
-- Commands/logs: DEVELOPMENT.md, Restore candidate saved-entry validation.
-  Offline; no blockers or remaining implementation/
-  verification steps for this bounded slice. No APK/lint/JNI/codegen/emulator/
+- Commands/logs: DEVELOPMENT.md, Restore candidate detached effective records.
+  Initial decoder/fixture issues corrected. Checks offline; no blockers or remaining
+  implementation/verification steps for this slice. No APK/lint/JNI/codegen/emulator/
   release/phone/resource trial run.
 
 ## Latest release checkpoint

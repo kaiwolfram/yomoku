@@ -6,6 +6,7 @@ use super::*;
 use crate::{BackupCandidate, CandidateError};
 
 mod controls;
+mod effective;
 mod vocabulary;
 
 fn accept_unchanged(database: &TestDatabase, version: u32) {

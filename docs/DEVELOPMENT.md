@@ -9428,3 +9428,61 @@ No new APK was requested or built.
 
 Logs: `/tmp/yomoku-candidate-vocabulary-{focused,workspace,build,clippy,android}.log`.
 Formatting/local-link/diff checks are in the session transcript.
+
+## Restore candidate detached effective records
+
+2026-11-01: added private typed version-1 effective wire records in storage,
+without making live core commands deserializable. Before/after private migration,
+validate required/nullable fields, domains, command/key/page/position agreement,
+ordered exact-byte segment ranges, metadata provenance, scalar boundaries within
+retained surfaces, exact start-owned occurrence projection, historical issued-ID
+bounds and matching completed receipts/headers/surviving encounters. Preserve
+unfinished reservations, inactive rules, erased/re-registered vocabulary and deleted
+content without replay. The same locked Serde 1.0.228 is now a direct dependency;
+no package/version/schema/core/runtime/FFI/Android source change. Updated semantic
+inventory, architecture/data/format/decisions/plan/session/handoff documentation.
+
+```sh
+cargo test -p yomoku-storage --locked --offline candidate
+cargo test --workspace --all-features --locked --offline --quiet
+cargo build --workspace --all-features --locked --offline
+cargo clippy --workspace --all-targets --all-features --locked --offline -- -D warnings
+export CC_aarch64_linux_android=/home/kai/Android/Sdk/ndk/30.0.16248370/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android29-clang
+export AR_aarch64_linux_android=/home/kai/Android/Sdk/ndk/30.0.16248370/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-ar
+export CC_x86_64_linux_android=/home/kai/Android/Sdk/ndk/30.0.16248370/toolchains/llvm/prebuilt/linux-x86_64/bin/x86_64-linux-android29-clang
+export AR_x86_64_linux_android=/home/kai/Android/Sdk/ndk/30.0.16248370/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-ar
+cargo build -p yomoku-storage --target aarch64-linux-android --target x86_64-linux-android --locked --offline
+cargo fmt --all -- --check
+git diff --check
+```
+
+PASS: nine new cases, all 37 candidate cases and 1086 workspace tests, zero
+failures, 17 existing opt-in ignored. Coverage includes unknown/duplicate/missing
+fields, bad numeric/enum/text/projection/provenance domains, receipt/header/encounter
+mismatches, detached counter regression, populated schema-18–24 private migration,
+deleted text/vocabulary and re-registration, literal alternate A/C metadata,
+clock rollback/max dates, >2^53/max i64 IDs/exhausted counters, page-crossing words,
+empty occurrence lists and EOF departure. Existing populated every-cancellation-poll
+and encrypted full-state fixtures pass; accepted/rejected sources remain unchanged.
+All-feature workspace build, strict all-target/all-feature Clippy, both Android
+storage library builds, Rustfmt, local links in 17 Markdown files and diff pass.
+Checks ran offline; primary Serde documentation was consulted for API evidence.
+
+Initial compile rejected Surface deserialization (corrected to private String
+wire values plus the existing constructor). Initial three fixture failures used
+a newer reader API on schema 18 or tried deleting an FK-protected header; corrected
+to the historical single-text reader and a valid relational missing-header fixture.
+Focused rerun and final workspace checks pass. No blockers remain. No APK/lint/JNI/
+codegen/emulator/release/phone/resource trial was run.
+
+No implementation/verification steps remain for this bounded detached-record slice.
+Saved segments omit some whitespace gaps; deleted text loses live analyses. Surviving
+canonical text/logical pages/original and alternate analysis associations and other
+history/status chains remain unchecked before restore-ready authority. Runtime
+drain/gating/crash cleanup, secrets/UI and replacement remain separate work.
+A schema-24 phone upgrade retaining Library/history and disposable Anki collection/
+permission/browser/Back trial would now add more integration evidence than another
+host-only validator; recommend it without delaying independent local backup work.
+
+Logs: `/tmp/yomoku-candidate-effective-{focused,focused-final,new,workspace,build,clippy,android}.log`.
+Formatting/local-link/diff checks are in the session transcript.

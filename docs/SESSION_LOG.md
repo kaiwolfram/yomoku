@@ -4458,3 +4458,18 @@ and /tmp/yomoku-browser-profile-*. No emulator started.
   implementation/verification steps or blockers for this slice. Next: complete
   application invariants, then runtime staging/secret handoff; restore umbrellas
   stay unchecked. Recommend schema-24 phone upgrade and disposable Anki trial now.
+
+## 2026-11-01 — Detached effective-completion restore records
+
+- Added private strict version-1 wire decoding and internal command/segment/metadata/
+  occurrence, issued-ID and receipt/header/surviving-encounter checks before/after
+  migration. Preserve reservations, old rules, deleted content and erased vocabulary
+  without live command authority, repair or replay. No schema/platform changes.
+- PASS: nine new cases/37 candidate cases, 1086 workspace tests/17 opt-in ignored,
+  all-feature build, strict Clippy/Rustfmt, both Android storage builds, links/diff.
+  Initial Surface decoder and historical/FK fixture issues corrected; no blockers.
+  Commands/limits/logs: DEVELOPMENT.md, Restore candidate detached effective records.
+- No implementation/verification steps remain for this bounded slice. Next: surviving
+  text/page/analysis associations and other history/status semantics, then runtime
+  staging/secret handoff. Restore umbrellas remain unchecked. No APK/device trial;
+  recommend the schema-24 phone upgrade and disposable real Anki browser/Back trial.

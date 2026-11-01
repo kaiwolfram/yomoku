@@ -287,10 +287,19 @@ invalid UTF-8 fields without normalization, dictionary lookup or requiring a
 custom entry's vocabulary registration. Literal text and deleted registrations
 survive unchanged. Status-event chains/final status remain unchecked history work.
 
+Detached version-1 effective records now use private typed wire decoders with
+required/nullable fields and rejected unknown/duplicate fields. Validate internal
+command/page/position/segment/metadata/occurrence consistency, surviving issued-ID
+bounds and any completed receipt/header/surviving encounters. Preserve unfinished
+reservations and deleted-content/vocabulary history without replay or current-rule
+requirements. Canonical text, logical pages and surviving original/alternate
+analysis associations still need checks; missing historical whitespace/analysis
+cannot be reconstructed from frozen segments. See RESTORE_VALIDATION.md.
+
 The opaque `SchemaCheckedBackup` exposes only schema versions and discard. It has
 no SQL/path/reader/confirmation/activation API. **Other application invariants
-remain unchecked**, including effective-completion payloads, text/analysis/anchor
-relations and history consistency. [RESTORE_VALIDATION.md](RESTORE_VALIDATION.md)
+remain unchecked**, including surviving text/page/analysis/anchor relations and
+other history consistency. [RESTORE_VALIDATION.md](RESTORE_VALIDATION.md)
 inventories checked/remaining table groups and limits, including unverifiable
 erased allocation history. Do not pass this result to replacement confirmation
 or ordinary `Storage::open`. Further validation is required before a restore-ready
@@ -302,7 +311,11 @@ API/security evidence: [SQLite untrusted-input guidance](https://www.sqlite.org/
 [schema-table semantics](https://www.sqlite.org/schematab.html),
 [rusqlite 0.40.2 DbConfig](https://docs.rs/rusqlite/0.40.2/rusqlite/config/enum.DbConfig.html)
 and the installed 0.40.2 `limits.rs`/`config.rs` primary sources. Only the existing
-pinned rusqlite `limits` feature is enabled; no new library/version is adopted.
+pinned rusqlite `limits` feature is enabled. Storage now directly uses the same
+already-locked Serde 1.0.228 derive dependency for its private wire records;
+[Serde container attributes](https://serde.rs/container-attrs.html) and
+[field attributes](https://serde.rs/field-attrs.html) govern rejection/required
+nullable-field handling. No dependency version is changed.
 
 **User decision (2026-11-01): require Anki recovery first.** If the current
 installation has pending/uncertain note/model writes, restore cannot replace it

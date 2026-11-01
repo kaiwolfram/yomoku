@@ -13,6 +13,9 @@ type can exist. Do not invent stricter product rules while filling these gaps.
 - [x] Validate the control records below before and after private migration.
 - [x] Validate vocabulary/custom entry domains before and after private migration;
   status-event/history relations remain a separate unchecked group.
+- [x] Decode detached effective records and validate internal domains/projections,
+  historical issued-ID bounds and matching receipts before/after migration.
+  Surviving text/analysis relations remain in the unchecked groups below.
 - [ ] Validate every remaining group below, including cross-group relations and
   legacy/deleted-content cases; only then design an opaque restore-ready result.
 
@@ -54,6 +57,34 @@ Poll cancellation between rows and use fixed diagnostics for malformed data.
 Registration/transition chains, final status and completion/date ownership still
 require the history checks below; entry success alone grants no restore authority.
 
+## Implemented detached effective records
+
+Version-1 `effective_completion_commands` uses private typed wire records with
+required fields, explicit nullable fields, rejected unknown/duplicate fields and
+existing core identity/offset/page-length/duration decoders. These records cannot
+become live commands. Check command/key/page/position agreement, nonnegative dates,
+nonblank profile/reading/dictionary-form domains, ordered nonoverlapping exact-byte
+segment lengths, source/chapter ownership, original-B versus alternate-A/C metadata
+identity/index consistency, and exact start-owned occurrence projection including
+clipping/eligibility/metadata and absent vocabulary snapshots. Check scalar boundaries
+where page/position offsets intersect retained segment surfaces.
+
+Document/original/metadata-analysis/override references must fit their surviving
+allocation counters even after document deletion. Match any completed receipt's
+entire page/time payload, B analysis/profile header and every surviving occurrence's
+index/anchor/surface/metadata/vocabulary spelling. Missing encounters remain valid
+after vocabulary erasure/re-registration; an unfinished reservation needs no receipt
+and is never replayed. Frozen rules need not be active or match today's resolution.
+
+Apply to every supported schema since 18 before and after private migration. Preserve
+literal metadata, clock rollback, full signed-64 identities/durations, deleted documents,
+crossing tokens and pages without start-owned occurrences. Cancellation polls between
+records/segments/occurrences, not inside decoding or SQL. Saved segmentation can omit
+whitespace gaps and deleted documents lose their original analyses: detached success
+cannot establish original coverage or reconstruct missing bytes. Checking surviving
+canonical text, logical page derivation and original/alternate analysis associations
+remains required below; so do the other history/status chains. No restore authority.
+
 ## Required remaining groups
 
 | Tables | Required semantic review/checks using existing contracts |
@@ -67,7 +98,7 @@ require the history checks below; entry success alone grants no restore authorit
 | `chapter_analyses`, `analyzed_tokens` | Version/identity/revision domains, contiguous indices, complete ordered original analysis coverage, exact anchored surfaces/metadata and Japanese flags. Preserve explicit legacy analysis absence; no analyzer rerun. |
 | `segmentation_overrides`, `segmentation_override_parts` | Exact anchored surfaces, scope/provenance, ordered parts reconstructing the selection, domain split/merge constraints and active-rule consistency. Deleted originating text must not invalidate retained global rules. |
 | `completion_commands`, `reading_completions`, `completion_analyses`, `reading_occurrences` | Historical ownership, immutable ranges/analysis identities and occurrence membership/surfaces, page/time semantics and surviving counter lower bounds. Account for vocabulary deletion removing encounters and document deletion removing live text/analysis. Legacy unanalyzed completions remain valid. |
-| `effective_completion_commands` | Full versioned typed frozen payload validation, not only json_valid; command/payload/receipt/history consistency, including unfinished reservations. Frozen historical data cannot require current overrides/live content/vocabulary. Never replay reservations. |
+| `effective_completion_commands` | Detached typed payload/internal projection/issued bounds/receipt checks implemented above. Still check surviving canonical text, logical pages and original/alternate analysis associations with the text/analysis groups. Preserve deleted-content records and old frozen rules without current override/vocabulary requirements. Never replay reservations. |
 | `vocabulary_status_events` | Registration/transition chain and final retained status, cause/completion ownership/date relations using existing event-order rules. Vocabulary deletion legitimately removes its events/occurrences. |
 | `documents.finished_at_least_once` | Permanent marker/history consistency under existing completion and legacy migration semantics; backward position/reflow do not clear it. |
 
