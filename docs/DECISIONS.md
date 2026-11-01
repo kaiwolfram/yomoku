@@ -5185,3 +5185,35 @@ process-death cleanup remains required. Parser limits and borrowed metadata
 comparisons reduce exposure but do not bound total SQLite memory/time; cancellation
 polls between synchronous SQL/row/sync operations. Resource trials and full restore
 activation remain unimplemented.
+
+## 2026-11-01 — Partial restore validation for control records
+
+Continue application validation as a bounded storage-only step while retaining
+the opaque `SchemaCheckedBackup` without confirmation/activation authority. Run
+control checks after proven schema/integrity/FKs both before and after private
+migration, so migration cannot mask missing settings or damaged counters. Require
+the existing reader/Anki/Library singleton rows and consistent distinct Library
+read ordinals. Never repair candidate data to make validation pass.
+
+Derive AUTOINCREMENT table identifiers only from the bundled reference schema.
+Require unique correctly typed nonnegative sequence entries and surviving-ID
+lower bounds; allow absent entries for never-written empty tables and preserve
+deleted/exhausted high-water marks. Do not infer erased history. Historical IDs
+inside completion data still need checks in the later payload/history step.
+SQLite's primary allocation evidence is linked in RESTORE_VALIDATION.md.
+
+Decode every Anki payload with the existing versioned domain decoder, including
+terminal rows omitted by ordinary recovery. Preserve valid old layouts instead
+of matching today's constants; inspect existing-note ID lists for positive,
+distinct, nonempty signed-64 values and require known/reconciled model IDs to
+agree. A known note may differ from later exact-surface evidence, as existing
+reconciliation deliberately preserves that uncertain original ID. Validate data
+without creating live tokens, provider effects or resolving any obligation.
+
+RESTORE_VALIDATION.md inventories every current durable table group and remaining
+semantic work. Effective-completion payloads/text/anchors/history and an opaque
+restore-ready result remain incomplete. Keep current-installation Anki recovery,
+runtime drain/gating, crash cleanup, secret handoff and atomic replacement as
+separate required work. No dependency/version, schema or destructive semantics
+change. Fixed errors disclose no payload; cooperative cancellation remains between
+records/calls, with no interruption inside SQL, JSON decoding or sync.

@@ -274,14 +274,23 @@ is synced/closed. The original source and live database are never opened for wri
 Exact SQL matching deliberately rejects schema variants; keep published archive
 fixtures when future SQLite/migration changes require explicit compatibility work.
 
+Before and after migration, partial application checks now require all singleton
+rows, consistent Library read ordinals and valid sqlite_sequence contents derived
+from the trusted AUTOINCREMENT table list. Every Anki journal payload, including
+terminal rows, uses its existing versioned domain decoder; existing-note IDs must
+be positive/distinct/nonempty and known/reconciled model IDs must agree. Historical
+layouts and pending/uncertain records remain unchanged; exhausted/deleted-ID
+high-water marks remain valid. Invalid data returns a fixed diagnostic.
+
 The opaque `SchemaCheckedBackup` exposes only schema versions and discard. It has
-no SQL/path/reader/confirmation/activation API. **Application invariants remain
-unchecked**, including serialized payload semantics, text/analysis/anchor relations,
-history replay consistency, singleton rows and sequence contents. Do not pass this
-result to replacement confirmation or ordinary `Storage::open`. Further validation
-must enumerate these requirements before adding any restore-ready handle. Both
-Anki journals survive this layer unchanged; they never become mutation permits.
-Cancellation polls between synchronous operations/rows, not inside SQL or sync.
+no SQL/path/reader/confirmation/activation API. **Other application invariants
+remain unchecked**, including effective-completion payloads, text/analysis/anchor
+relations and history consistency. [RESTORE_VALIDATION.md](RESTORE_VALIDATION.md)
+inventories checked/remaining table groups and limits, including unverifiable
+erased allocation history. Do not pass this result to replacement confirmation
+or ordinary `Storage::open`. Further validation is required before a restore-ready
+handle. Both Anki journals survive unchanged without mutation permits.
+Cancellation polls between synchronous operations/rows, not inside SQL/JSON/sync.
 
 API/security evidence: [SQLite untrusted-input guidance](https://www.sqlite.org/security.html),
 [connection configuration](https://www.sqlite.org/c3ref/c_dbconfig_defensive.html),

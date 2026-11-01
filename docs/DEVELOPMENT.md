@@ -9324,3 +9324,56 @@ Logs: `/tmp/yomoku-candidate-{focused,focused-final,workspace,build,clippy,andro
 Final focused log includes all 14 cases; the initial focused log covers the first
 11. Corrected compiler diagnostics and format/doc-link/diff results are in the
 session transcript.
+
+## Restore candidate control-record validation
+
+2026-11-01: extended hardened private candidate checks with partial application
+validation before/after migration. Require reader/Anki/Library singleton rows,
+consistent distinct Library read ordinals, valid trusted-table allocation
+counters and every Anki journal payload, including terminal rows omitted by
+ordinary recovery. Reuse existing versioned domain decoders, preserve historical
+layouts/uncertain IDs and reject malformed existing-note lists/model identity.
+Keep the opaque schema result without confirmation/activation authority.
+RESTORE_VALIDATION.md inventories all current durable table groups and remaining
+checks. No schema/dependency/core/runtime/FFI/Android source change.
+
+```sh
+cargo test -p yomoku-storage --locked --offline candidate
+cargo test --workspace --all-features --locked --offline --quiet
+cargo build --workspace --all-features --locked --offline
+cargo clippy --workspace --all-targets --all-features --locked --offline -- -D warnings
+export CC_aarch64_linux_android=/home/kai/Android/Sdk/ndk/30.0.16248370/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android29-clang
+export AR_aarch64_linux_android=/home/kai/Android/Sdk/ndk/30.0.16248370/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-ar
+export CC_x86_64_linux_android=/home/kai/Android/Sdk/ndk/30.0.16248370/toolchains/llvm/prebuilt/linux-x86_64/bin/x86_64-linux-android29-clang
+export AR_x86_64_linux_android=/home/kai/Android/Sdk/ndk/30.0.16248370/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-ar
+cargo build -p yomoku-storage --target aarch64-linux-android --target x86_64-linux-android --locked --offline
+cargo fmt --all -- --check
+git diff --check
+```
+
+PASS: all 23 candidate cases, including nine new cases exercising all journal
+states/unknown versions/fields/malformed JSON/invalid identities/ID lists, absent
+singleton rows (also before private migration), missing/duplicate/unrecognized/
+wrongly typed/negative/regressed counters, Library clock regression/ties, exact
+preservation of historical layouts/all valid states/deleted/exhausted counters
+and cancellation at every populated-row boundary with source bytes preserved.
+The earlier supported-schema/full-state encrypted fixtures continue to pass.
+Initial test compilation needed a missing PasteText import and boxed layout in
+the existing reconciliation API; corrected before successful verification.
+
+PASS: 1072 workspace tests, zero failures, 17 existing opt-in ignored; all-feature
+workspace build, strict all-target/all-feature Clippy, both Android storage target
+builds, Rustfmt, 18 Markdown files' local links and diff checks. Builds/tests were
+offline. No APK/lint/JNI/codegen/emulator/release/phone/resource trials were run.
+No blockers or remaining implementation/verification steps for this bounded slice.
+
+Next: effective-completion payload and text/analysis/anchor/history validation,
+including surviving historical counter references, before restore-ready authority.
+Runtime drain/mutation gating/crash cleanup, nonserialized secrets/UI and atomic
+replacement/recovery remain separate work. Recommend schema-24 phone upgrade and
+disposable real Anki/permission/browser/Back trial now; no new APK was requested.
+Counter validation cannot reconstruct erased high-water history; SQL/JSON/sync
+remain synchronous and resource trials remain outstanding (BACKUP_FORMAT.md).
+
+Logs: `/tmp/yomoku-candidate-controls-{focused,workspace,build,clippy,android}.log`.
+Formatting/local-link/diff checks are in the session transcript.

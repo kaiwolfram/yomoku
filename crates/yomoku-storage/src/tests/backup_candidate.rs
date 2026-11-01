@@ -5,6 +5,8 @@ use yomoku_backup::{decrypt_snapshot, encrypt_snapshot, Manifest, Password};
 use super::*;
 use crate::{BackupCandidate, CandidateError};
 
+mod controls;
+
 fn candidate(directory: &Path, bytes: &[u8]) -> BackupCandidate {
     let mut candidate = BackupCandidate::create(directory).unwrap();
     // Streaming decryption may deliver arbitrary short writes.

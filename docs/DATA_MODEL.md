@@ -2244,6 +2244,12 @@ precede supported private migration and the same post-migration checks. All sche
 versions 1–24 migrate through the bundled chain; populated schema-23 data retains
 pending Anki obligations and all other durable rows/high-water marks. The opaque
 `SchemaCheckedBackup` cannot expose SQL or authorize confirmation/replacement.
-Singleton presence, serialized application payloads, relational text/analysis/
-history semantics and sqlite_sequence contents still need explicit validation;
-structural success alone is insufficient. No schema migration is added.
+Singleton presence, Anki serialized payloads (all states), existing-note ID sets,
+known/reconciled model identity, Library ordinal/clock relations and sqlite_sequence
+names/types/uniqueness/surviving-ID lower bounds now pass partial application
+checks before/after migration. No counters or historical layouts are rewritten;
+valid exhausted/deleted high-water marks remain intact. Effective-completion
+payloads, relational text/analysis/anchor/history semantics and surviving historical
+counter references remain unchecked. [RESTORE_VALIDATION.md](RESTORE_VALIDATION.md)
+lists all current table groups and precise boundaries. No restore-ready authority
+or schema migration is added.

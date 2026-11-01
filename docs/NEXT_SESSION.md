@@ -20,26 +20,27 @@ Commit guidance: concise subject/explanatory body; keep verification in docs.
   salt/nonce, exact lengths/AAD and mandatory Last/EOF. Secrets bypass serialization.
 - `Storage::create_backup_snapshot`: bound VACUUM INTO, NEW private 0700/0600 copy,
   integrity/FKs/current journal/compact size/sync, read-only stream + schema/length.
-  Full encrypted fixtures compare every durable table/schema object/high-water ID.
-- `BackupCandidate::create`: NEW private write-only decryption staging. Only after
-  full stream authentication, consume with manifest schema/length via check_schema.
-  Header/page/file length and rollback-mode input checked before SQLite opens it.
-- Harden no-CREATE/no-URI READ_WRITE before introspection: defensive/query_only,
-  trusted_schema/triggers/views/attach off, cell checks, memory temp and parser/VM
-  limits. READ_WRITE retains CHECK parsing (read-only B-trees omit it).
-- Exact all-object type/name/table/SQL match against bundled migration prefix,
-  then exact journal/integrity/CHECK/FKs. Versions 1–24 migrate privately, recheck,
-  sync/close. Current full state and populated schema-23 pending Anki survive.
-- Opaque SchemaCheckedBackup exposes versions/discard ONLY, no path/SQL/reader or
-  confirmation authority. Application payload/text/analysis/anchor/history/singleton/
-  sequence invariants remain unchecked. Never authorize replacement from this type.
-- Fixed-file/SQLite-sidecar cleanup only, preserving unexpected files. Explicit
-  discard reports errors; Drop/error/cancel best effort. Crash cleanup still undone.
-  Cancellation polls between synchronous calls/rows, not inside SQL/KDF/sync.
-  Limits reduce exposure, not a fixed SQLite memory/time budget.
-- Runtime checkpoint drain/mutation gating, secret handoff, external descriptors/UI,
-  application validation/confirmation and activation/recovery remain unimplemented.
-  Never copy live SQLite/WAL bytes or decrypt outside new private disposable staging.
+  Encrypted fixtures compare every durable table/schema object/high-water ID.
+- `BackupCandidate::create`: NEW private write-only staging. Only after full
+  authentication, consume with manifest schema/length via check_schema.
+- Exact header/page/file length and rollback format before no-CREATE/no-URI SQLite
+  READ_WRITE. Harden defensive/query_only/trusted_schema/triggers/views/attachments,
+  parser/VM limits/cell checks/memory temp before schema parsing (retains CHECKs).
+- Exact all-object type/name/table/SQL against bundled migration prefix, then
+  journal/integrity/CHECK/FKs. Versions 1–24 migrate privately/recheck/sync/close.
+- Partial application checks now before/after migration: required singleton rows,
+  Library ordinals/clock, trusted AUTOINCREMENT sequence names/types/uniqueness/
+  surviving-ID lower bounds, all Anki payloads (including terminal rows), existing
+  note ID lists and known/reconciled model identity. No repair/replay; preserve
+  historical layouts and deleted/exhausted counters. RESTORE_VALIDATION.md
+  inventories every durable table group and remaining semantic checks.
+- Opaque SchemaCheckedBackup exposes versions/discard ONLY. Effective payloads,
+  text/analysis/anchors/history and historical counter references remain unchecked.
+  Cannot reconstruct erased high-water history. No confirmation/restore authority.
+- Fixed-file/SQLite-sidecar cleanup preserves unexpected files; explicit discard
+  reports errors, Drop/error/cancel best effort. Crash cleanup remains undone.
+  Cancellation between calls/rows, not inside SQL/JSON/KDF/sync; no total resource
+  budget. Runtime drain/gating, secrets/descriptors/UI and activation remain undone.
 
 ## Existing Anki boundary
 - Ready acknowledged configured deck + retained regular-deck discovery required.
@@ -51,25 +52,24 @@ Commit guidance: concise subject/explanatory body; keep verification in docs.
   late work. No return/recreation replay. Architecture/data/API/decisions have detail.
 
 ## Next tasks (ordered)
-1. Enumerate and implement complete candidate application invariants (including
-   journals/serialized payloads, anchors/history, singleton/sequence contents),
-   hostile-data tests and opaque restore-ready validation before any confirmation.
-2. Add runtime export sequencing/checkpoint drain/mutation gating and private
-   staging crash cleanup; design nonserialized secret handoff before FFI/UI.
+1. Continue RESTORE_VALIDATION.md: effective payload/text/analysis/anchor/history
+   invariants, hostile-data tests and opaque restore-ready validation before any
+   confirmation. Control-record substep is complete; umbrella remains unchecked.
+2. Runtime export sequencing/checkpoint drain/mutation gating and private staging
+   crash cleanup; design nonserialized secret handoff before FFI/UI.
 3. Real phone schema-24 upgrade and disposable Anki collection/permission/browser/
    Back/lifecycle trial. Anki umbrella remains unchecked pending this validation.
 
 ## Verification / blockers
-- PASS: 14 new candidate cases; 1063 workspace tests/17 opt-in ignored, all-feature
-  build, strict Clippy/Rustfmt, both Android storage library builds, doc links/diff.
-- Commands/logs/fixed initial API compile errors: DEVELOPMENT.md, Private restore
-  schema preflight. Build/tests offline. No blockers or remaining implementation/
-  verification steps for this structural preflight slice.
-- No application validation/replacement, APK/lint/JNI/codegen/emulator, physical
-  phone/resource trial or optimized release run for this storage-only slice.
+- PASS: 9 new/23 total candidate cases; 1072 workspace tests/17 opt-in ignored,
+  all-feature build, strict Clippy/Rustfmt, both Android storage builds, links/diff.
+- Commands/logs/fixed test compile issues: DEVELOPMENT.md, Restore candidate
+  control-record validation. Offline; no blockers or remaining implementation/
+  verification steps for this bounded slice. No APK/lint/JNI/codegen/emulator/
+  release/phone/resource trial run.
 
 ## Latest release checkpoint
 - Source 0ddb81d: `target/releases/yomoku-0.1.0-0ddb81d-release.apk` (~242.3 MiB).
 - Optimized ABIs/lint/signature/16-KiB alignment/assets verified; same certificate
-  as earlier 0374365 phone APK. Checksum beside APK. No publishing or runtime
-  trial; browser/backup changes absent. DEVELOPMENT.md has the release log.
+  as earlier 0374365 phone APK. Checksum beside APK. No publishing/runtime trial;
+  browser/backup changes absent. DEVELOPMENT.md has the release log.
