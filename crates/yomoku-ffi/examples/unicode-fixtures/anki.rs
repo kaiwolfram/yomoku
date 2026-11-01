@@ -1,3 +1,4 @@
+use crux_core::bridge::FfiFormat;
 use std::{error::Error, fs, path::Path};
 
 use yomoku_core::{
@@ -5,9 +6,12 @@ use yomoku_core::{
         AnkiExportError, AnkiExportPhase, AnkiExportView, AnkiLiveOperation, AnkiLiveResult,
         AnkiModelCreation, AnkiModelLayout, AnkiNote, AnkiPreflightDeck, AnkiPreflightModel,
         AnkiPreflightObservation, AnkiPreflightOperation, AnkiPreflightResult, AnkiReadModelLayout,
-        AnkiRecoveryPhase, AnkiRecoveryView, AnkiSubmission,
+        AnkiRecoveryPhase, AnkiRecoveryView, AnkiSelection, AnkiSubmission,
     },
-    document::{TextOffset, TextRange},
+    app::Event,
+    document::{TextAnchor, TextOffset, TextRange},
+    effective_session::{EffectivePageIdentity, EffectiveReaderSelection},
+    reader::{ReaderAnalysis, ReaderTokenKey, ReaderWordSelection},
     storage::DocumentError,
     vocabulary::Surface,
 };
@@ -15,6 +19,65 @@ use yomoku_storage::Storage;
 
 pub fn exchange(dir: &Path, writing: bool) -> Result<(), Box<dyn Error>> {
     fs::create_dir_all(dir)?;
+    let key = ReaderTokenKey {
+        document_id: i64::MAX.try_into()?,
+        page: TextAnchor {
+            source_id: 9007199254740993.try_into()?,
+            chapter_id: i64::MAX.try_into()?,
+            range: TextRange {
+                start: TextOffset::START,
+                end: 3.try_into()?,
+            },
+        },
+        analysis: ReaderAnalysis::Available(i64::MAX.try_into()?),
+    };
+    for (index, event) in [
+        Event::PrepareReaderAnkiExport {
+            selection: AnkiSelection::Original(ReaderWordSelection {
+                key,
+                token_index: u64::MAX,
+            }),
+            deck_id: i64::MAX,
+        },
+        Event::PrepareReaderAnkiExport {
+            selection: AnkiSelection::Effective(EffectiveReaderSelection {
+                page: EffectivePageIdentity {
+                    base: key,
+                    revision: u64::MAX,
+                },
+                segment_index: u64::MAX,
+            }),
+            deck_id: i64::MAX,
+        },
+        Event::BeginPreparedAnkiExport {
+            preparation_id: u64::MAX,
+            expected_phase: AnkiExportPhase::CreateModel,
+        },
+        Event::BeginPreparedAnkiExport {
+            preparation_id: u64::MAX,
+            expected_phase: AnkiExportPhase::ReuseModel(9007199254740993),
+        },
+        Event::ClearAnkiExport {
+            preparation_id: u64::MAX,
+        },
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let bytes = super::encode(&event);
+        assert_eq!(
+            crux_core::bridge::BincodeFfiFormat::deserialize::<Event>(&bytes)?,
+            event
+        );
+        if writing {
+            fs::write(dir.join(format!("anki-action-{index}.bin")), bytes)?;
+        } else {
+            assert_eq!(
+                fs::read(dir.join(format!("anki-action-{index}-return.bin")))?,
+                bytes
+            );
+        }
+    }
     for (index, phase) in [
         AnkiExportPhase::Prepared,
         AnkiExportPhase::Checking,
@@ -39,6 +102,7 @@ pub fn exchange(dir: &Path, writing: bool) -> Result<(), Box<dyn Error>> {
     .enumerate()
     {
         let view = AnkiExportView {
+            preparation_id: u64::MAX,
             surface: "𠮷猫".into(),
             deck_id: i64::MAX,
             phase,
@@ -88,7 +152,7 @@ pub fn exchange(dir: &Path, writing: bool) -> Result<(), Box<dyn Error>> {
     let mut layout = AnkiModelLayout::yomoku();
     layout.css.push_str("/* frozen 𠮷 */");
     // Exercise both directions of the shell protocol with Rust-owned comparison
-    // data, Unicode and signed-64 IDs. Native preparation remains unexposed.
+    // data, Unicode and signed-64 IDs. Native callbacks remain unexposed.
     let operation = AnkiPreflightOperation {
         surface: "𠮷猫".into(),
         deck_id: i64::MAX,

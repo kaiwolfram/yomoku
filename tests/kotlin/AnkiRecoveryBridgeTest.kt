@@ -9,7 +9,40 @@ import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.TimeUnit
 
 internal fun verifyAnkiRecoveryBridge(fixtures: String) {
+    verifyAnkiExportBridge()
     val root = File(fixtures)
+    for (index in 0..4) {
+        val bytes = root.resolve("anki-action-$index.bin").readBytes()
+        val event = Event.bincodeDeserialize(bytes)
+        when (event) {
+            is Event.PrepareReaderAnkiExport -> {
+                check(event.deckId == Long.MAX_VALUE)
+                when (val selected = event.selection) {
+                    is AnkiSelection.Original -> {
+                        check(index == 0 && selected.value.tokenIndex == ULong.MAX_VALUE)
+                        check(selected.value.key.documentId.value == Long.MAX_VALUE)
+                    }
+                    is AnkiSelection.Effective -> {
+                        check(index == 1 && selected.value.segmentIndex == ULong.MAX_VALUE)
+                        check(selected.value.page.revision == ULong.MAX_VALUE)
+                        check(selected.value.page.base.documentId.value == Long.MAX_VALUE)
+                    }
+                }
+            }
+            is Event.BeginPreparedAnkiExport -> {
+                check(event.preparationId == ULong.MAX_VALUE)
+                check(
+                    event.expectedPhase ==
+                        if (index == 2) AnkiExportPhase.CreateModel
+                        else AnkiExportPhase.ReuseModel(9007199254740993L)
+                )
+            }
+            is Event.ClearAnkiExport -> check(index == 4 && event.preparationId == ULong.MAX_VALUE)
+            else -> error("Unexpected Anki action")
+        }
+        check(event.bincodeSerialize().contentEquals(bytes))
+        root.resolve("anki-action-$index-return.bin").writeBytes(event.bincodeSerialize())
+    }
     val exportPhases =
         listOf(
             AnkiExportPhase.Prepared,
@@ -36,7 +69,7 @@ internal fun verifyAnkiRecoveryBridge(fixtures: String) {
             AnkiExportView.bincodeDeserialize(
                 root.resolve("anki-export-view-$index.bin").readBytes()
             )
-        check(view == AnkiExportView("𠮷猫", Long.MAX_VALUE, phase))
+        check(view == AnkiExportView(ULong.MAX_VALUE, "𠮷猫", Long.MAX_VALUE, phase))
         root.resolve("anki-export-view-$index-return.bin").writeBytes(view.bincodeSerialize())
     }
     for ((index, phase) in AnkiRecoveryPhase.entries.withIndex()) {

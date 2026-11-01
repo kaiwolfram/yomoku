@@ -4203,3 +4203,25 @@ and /tmp/yomoku-browser-profile-*. No emulator started.
   followed by deck/permission/Add/browser flow. Recommend the schema-23 phone
   Library/history upgrade before live integration; real collection/browser and
   physical/release trials remain unrun. No schema/dependency/provider change.
+
+## 2026-11-01 — Correlated Anki shell actions
+
+- Exposed typed current-selection preparation and generation-bound begin/clear.
+  Begin also matches the presented phase, then reuses native preflight and both
+  journal gates. Clear cannot drop active/failed work or durable obligations.
+  Generations never recycle on Clear/Retry; restart restores no frozen intent.
+- Added four core cases and real JNI shell-to-SQLite lifecycle/codec coverage;
+  existing FIFO cases now exercise shell preparation/begin for both readers and
+  both mutation kinds. Kept provider payloads/handles native and vocabulary/
+  history behavior unchanged. No schema/dependency/native-export ABI change.
+- PASS: 989 workspace tests/17 ignored, eight FIFO cases, strict Clippy/
+  formatting, full host JNI/build, identical independent/Android generation,
+  both-ABI debug/test APKs, lint and 11 API-36 emulator cases with zero failures/
+  errors/skips. See DEVELOPMENT.md, Correlated Anki shell actions. No blocker
+  or implementation/verification work remains for this slice. Initial JNI
+  fixture missed the startup Library restore trigger; production gates correctly
+  rejected it, and the fixture was corrected.
+- Next: CoreSession Ready orchestration and Compose status, then configured
+  deck/permission/Add/browser UI and disposable real-provider validation.
+  Recommend the physical schema-23 Library/history upgrade trial before visible
+  live integration; no physical, optimized-release or real-provider trial run.

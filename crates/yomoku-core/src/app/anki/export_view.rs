@@ -56,6 +56,7 @@ impl Model {
             AnkiExportPhase::Prepared
         };
         Some(AnkiExportView {
+            preparation_id: self.anki_preparation_sequence,
             surface: export.note().surface().as_str().to_owned(),
             deck_id: export.deck().into(),
             phase,

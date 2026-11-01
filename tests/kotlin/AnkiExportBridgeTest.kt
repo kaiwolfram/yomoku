@@ -1,0 +1,230 @@
+package app.yomoku.tests
+
+import app.yomoku.nativebridge.EffectsListener
+import app.yomoku.nativebridge.FfiError
+import app.yomoku.nativebridge.NativeBridge
+import app.yomoku.shared.*
+import java.nio.file.Files
+import java.util.concurrent.LinkedBlockingQueue
+import java.util.concurrent.TimeUnit
+
+/** Real JNI/SQLite ownership, with explicit fake provider responses and no Android provider. */
+internal fun verifyAnkiExportBridge() {
+    val directory = Files.createTempDirectory("yomoku-anki-export-jni-").toFile()
+    val callbacks = LinkedBlockingQueue<ByteArray>()
+    val listener =
+        object : EffectsListener {
+            override fun onEffects(requests: ByteArray) {
+                callbacks.add(requests)
+            }
+
+            override fun onError(error: FfiError) {
+                error("Unexpected bridge failure: $error")
+            }
+        }
+    fun view(bridge: NativeBridge) = ViewModel.bincodeDeserialize(bridge.view())
+    fun renders(bytes: ByteArray) {
+        check(Requests.bincodeDeserialize(bytes).value.all { it.effect is ShellEffect.Render })
+    }
+    fun send(bridge: NativeBridge, event: Event): List<Request> {
+        val bytes = event.bincodeSerialize()
+        check(Event.bincodeDeserialize(bytes) == event)
+        return Requests.bincodeDeserialize(bridge.update(bytes)).value
+    }
+    fun awaitView(bridge: NativeBridge, predicate: (ViewModel) -> Boolean): ViewModel {
+        val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(60)
+        while (true) {
+            val snapshot = view(bridge)
+            if (predicate(snapshot)) return snapshot
+            val remaining = deadline - System.nanoTime()
+            check(remaining > 0) { "Native Anki state timed out: ${snapshot.ankiExport}" }
+            renders(checkNotNull(callbacks.poll(remaining, TimeUnit.NANOSECONDS)))
+        }
+    }
+    try {
+        for (create in listOf(false, true)) {
+            callbacks.clear()
+            val database = directory.resolve("export-$create.sqlite3")
+            val documentId =
+                NativeBridge(database.path, listener, HostDictionary()).use { bridge ->
+                    send(bridge, Event.RefreshLibrary)
+                    awaitView(bridge) { !it.storageBusy }
+                    send(bridge, Event.CreatePaste("猫と猫。"))
+                    val documentId =
+                        awaitView(bridge) { it.documents.size == 1 && !it.storageBusy }
+                            .documents
+                            .single()
+                            .documentId
+                            .value
+                    send(bridge, Event.OpenReader(DocumentId(documentId)))
+                    val opened = awaitView(bridge) { it.reader != null && !it.storageBusy }
+                    val page = checkNotNull(opened.reader)
+                    send(
+                        bridge,
+                        Event.LoadReaderTokens(
+                            ReaderTokenKey(
+                                DocumentId(documentId),
+                                page.anchor,
+                                checkNotNull(opened.readerAnalysis),
+                            )
+                        ),
+                    )
+                    val tokens =
+                        checkNotNull(
+                            awaitView(bridge) {
+                                    it.effectiveReaderTokens != null && !it.storageBusy
+                                }
+                                .effectiveReaderTokens
+                        )
+                    val token = tokens.tokens.last { it.surface == "猫" }
+                    val selected = EffectiveReaderSelection(tokens.identity, token.segmentIndex)
+                    send(bridge, Event.LoadEffectiveReaderWord(selected))
+                    val loaded =
+                        awaitView(bridge) {
+                            it.effectiveReaderWord?.details != null && !it.storageBusy
+                        }
+                    val before = checkNotNull(loaded.effectiveReaderWord?.details)
+                    val prepare =
+                        Event.PrepareReaderAnkiExport(
+                            AnkiSelection.Effective(selected),
+                            Long.MAX_VALUE,
+                        )
+                    send(bridge, prepare)
+                    val old = checkNotNull(view(bridge).ankiExport)
+                    check(old.phase == AnkiExportPhase.Prepared && old.surface == "猫")
+                    send(bridge, Event.ClearAnkiExport(old.preparationId))
+                    send(bridge, prepare)
+                    val frozen = checkNotNull(view(bridge).ankiExport)
+                    check(frozen.preparationId > old.preparationId)
+                    send(bridge, Event.ClearAnkiExport(old.preparationId))
+                    check(view(bridge).ankiExport == frozen)
+                    val preflight =
+                        send(bridge, Event.BeginAnkiExportPreflight).single {
+                            it.effect is ShellEffect.AnkiExportPreflight
+                        }
+                    val operation = (preflight.effect as ShellEffect.AnkiExportPreflight).value
+                    check(operation.surface == "猫" && operation.deckId == Long.MAX_VALUE)
+                    renders(
+                        bridge.resolve(
+                            preflight.id,
+                            AnkiPreflightResult.Complete(
+                                    AnkiPreflightObservation(
+                                        listOf(AnkiPreflightDeck(Long.MAX_VALUE, false)),
+                                        emptyList(),
+                                        if (create) emptyList()
+                                        else
+                                            listOf(
+                                                AnkiPreflightModel(
+                                                    9007199254740993L,
+                                                    operation.layout.name,
+                                                    true,
+                                                )
+                                            ),
+                                    )
+                                )
+                                .bincodeSerialize(),
+                        )
+                    )
+                    val checked = checkNotNull(view(bridge).ankiExport)
+                    check(
+                        checked.phase ==
+                            if (create) AnkiExportPhase.CreateModel
+                            else AnkiExportPhase.ReuseModel(9007199254740993L)
+                    )
+                    check(
+                        send(
+                                bridge,
+                                Event.BeginPreparedAnkiExport(old.preparationId, checked.phase),
+                            )
+                            .isEmpty()
+                    )
+                    check(
+                        send(
+                                bridge,
+                                Event.BeginPreparedAnkiExport(
+                                    checked.preparationId,
+                                    AnkiExportPhase.Prepared,
+                                ),
+                            )
+                            .isEmpty()
+                    )
+                    check(send(bridge, Event.DispatchAnkiLive).isEmpty())
+                    send(
+                        bridge,
+                        Event.BeginPreparedAnkiExport(checked.preparationId, checked.phase),
+                    )
+                    awaitView(bridge) { it.ankiExport?.phase == AnkiExportPhase.Ready }
+                    check(
+                        send(
+                                bridge,
+                                Event.BeginPreparedAnkiExport(checked.preparationId, checked.phase),
+                            )
+                            .isEmpty()
+                    )
+                    send(bridge, Event.ClearAnkiExport(checked.preparationId))
+                    check(view(bridge).ankiExport?.phase == AnkiExportPhase.Ready)
+                    val live =
+                        send(bridge, Event.DispatchAnkiLive).single {
+                            it.effect is ShellEffect.AnkiLive
+                        }
+                    check(send(bridge, Event.DispatchAnkiLive).isEmpty())
+                    val liveOperation = (live.effect as ShellEffect.AnkiLive).value
+                    val result =
+                        if (create) {
+                            check(
+                                liveOperation ==
+                                    AnkiLiveOperation.CreateModel(
+                                        "猫",
+                                        Long.MAX_VALUE,
+                                        operation.layout,
+                                    )
+                            )
+                            AnkiLiveResult.ModelCreated(9007199254740993L)
+                        } else {
+                            liveOperation as AnkiLiveOperation.InsertNote
+                            check(liveOperation.fields[0] == "猫")
+                            check(
+                                liveOperation.fields[3] ==
+                                    "猫と<strong class=\"yomoku-target\">猫</strong>。"
+                            )
+                            AnkiLiveResult.NoteUncertain(Long.MAX_VALUE)
+                        }
+                    renders(bridge.resolve(live.id, result.bincodeSerialize()))
+                    val expected =
+                        if (create) AnkiExportPhase.ModelCreated(9007199254740993L)
+                        else AnkiExportPhase.NoteUncertain(Long.MAX_VALUE)
+                    val finished = awaitView(bridge) { it.ankiExport?.phase == expected }
+                    check(finished.effectiveReaderWord?.details == before)
+                    check(
+                        finished.reader == loaded.reader &&
+                            finished.completionNotice == loaded.completionNotice
+                    )
+                    check(send(bridge, Event.DispatchAnkiLive).isEmpty())
+                    documentId
+                }
+            callbacks.clear()
+            NativeBridge(database.path, listener, HostDictionary()).use { bridge ->
+                send(bridge, Event.RefreshLibrary)
+                awaitView(bridge) { it.documents.size == 1 && !it.storageBusy }
+                check(view(bridge).ankiExport == null)
+                check(send(bridge, Event.DispatchAnkiLive).isEmpty())
+                check(
+                    send(bridge, Event.BeginPreparedAnkiExport(2UL, AnkiExportPhase.CreateModel))
+                        .isEmpty()
+                )
+                send(bridge, Event.OpenSettings)
+                if (create) check(view(bridge).ankiRecovery == null)
+                else check(view(bridge).ankiRecovery?.notePending == true)
+                send(bridge, Event.CloseSettings)
+                send(bridge, Event.OpenReader(DocumentId(documentId)))
+                awaitView(bridge) { it.reader != null && !it.storageBusy }
+                check(view(bridge).ankiExport == null)
+            }
+        }
+    } finally {
+        check(directory.deleteRecursively())
+    }
+    println(
+        "PASS: authenticated Anki shell preparation/begin/clear, exact frozen fields, durable model/note outcomes, one dispatch and restart without replay"
+    )
+}

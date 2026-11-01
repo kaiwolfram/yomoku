@@ -8571,3 +8571,57 @@ Logs: `/tmp/yomoku-export-view-{workspace,clippy,rustfmt,jni,format-check,
 host-format,host-format-check,typegen,codegen-diff,android,emulator,emulator-boot}.log`
 (one file per suffix). Final XML:
 `android/app/build/outputs/androidTest-results/connected/debug/`.
+
+## Correlated Anki shell actions
+
+2026-11-01: no dependencies, schema, provider APIs or native-export ABI change.
+Use the pinned offline toolchains; keep host JNI sequential with Android native
+packaging and reuse the isolated 8 GiB statistics-ui-avd without wiping data.
+
+```sh
+export PATH=/home/kai/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin:$PATH
+export JAVA_HOME="$PWD/.local/jdk-17/jdk-17.0.21+9"
+export JAVA_BIN="$JAVA_HOME/bin/java"
+export GRADLE_USER_HOME="$PWD/.local/gradle"
+export ANDROID_HOME=/home/kai/Android/Sdk
+cargo test --workspace --all-features --locked --offline --quiet
+cargo test -p yomoku-runtime anki_live --all-features --locked --offline
+cargo clippy --workspace --all-targets --all-features --locked --offline -- -D warnings
+cargo fmt --all -- --check
+tools/test-kotlin-bridge.sh
+tools/format-kotlin.sh --check
+"$JAVA_BIN" -jar .local/ktfmt-0.64.jar --kotlinlang-style --dry-run --set-exit-if-changed tests/kotlin/AnkiExportBridgeTest.kt tests/kotlin/AnkiRecoveryBridgeTest.kt
+cargo run -p yomoku-ffi --bin generate-kotlin --features facet_typegen --locked --offline -- /tmp/yomoku-anki-shell-kotlin
+diff -r target/generated/kotlin /tmp/yomoku-anki-shell-kotlin
+./android/gradlew -p android :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug --offline --console=plain
+./android/gradlew -p android :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=app.yomoku.AnkiRecoveryPanelTest,app.yomoku.AnkiRecoverySessionTest,app.yomoku.CoreSessionTest,app.yomoku.NavigationTest,app.yomoku.ScalarDecodingTest#scalarValuesErrorsAndOffsetsMatchLegacy,app.yomoku.ScalarDecodingTest#generatedFrozenSnapshotsMatchLegacy --offline --console=plain
+git diff --check
+```
+
+PASS: four new core cases; 989 workspace tests/17 opt-in ignored, eight
+real SQLite/FIFO cases using shell preparation/begin, strict Clippy, Rustfmt/
+Kotlin formatting and identical independent Kotlin generation. Tests reject
+invalid decks, stale/hidden/unloaded selections, obsolete begin/clear after
+identical re-preparation, wrong phase, closed recovery gates, active-live Clear
+and sequence overflow; duplicate actions cannot begin twice. Shell codec exchange
+includes both selection kinds, u64::MAX generations/indices and exact signed-64
+provider IDs. Native begin/callback/storage variants retain no shell codec.
+
+PASS: full host Kotlin/JNI, including the new shell-to-SQLite lifecycle with fake
+provider responses, exact target-only sentence highlight, unchanged reader/word
+state, durable model success/note uncertainty, one dispatch and no restart replay.
+PASS: both-ABI debug/test APKs, lintDebug and identical Android Kotlin generation.
+PASS: all 11 selected API-36 x86_64 emulator cases, zero failures/errors/skips.
+No implementation/verification work or open blocker remains for this slice.
+Initial JNI fixture omitted the Library refresh
+that triggers startup journal restoration, so preparation correctly stayed closed;
+fixed the fixture to follow CoreSession startup. An initial JAVA_HOME pointed at
+the JNI header directory; corrected to the documented JDK before running JNI.
+
+Logs: `/tmp/yomoku-anki-shell-{focused,workspace,fifo,clippy,rustfmt,jni,typegen,
+codegen-diff,android-codegen-diff,format,host-format,android,emulator,emulator-boot}.log`
+(one file per suffix). Final XML: `android/app/build/outputs/androidTest-results/connected/debug/`.
+Ready orchestration, Compose status/Add, configured deck/permission and
+browser flow remain. No real AnkiDroid, optimized release or physical trial was
+run; recommend the schema-23 phone Library/history upgrade trial before visible
+live integration and a disposable real collection before compatibility claims.

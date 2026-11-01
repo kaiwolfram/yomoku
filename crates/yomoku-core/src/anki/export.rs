@@ -44,7 +44,9 @@ provider_id!(
     "An external AnkiDroid model ID, never a Yomoku ID."
 );
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
+#[repr(C)]
 pub enum AnkiSelection {
     Original(ReaderWordSelection),
     Effective(EffectiveReaderSelection),

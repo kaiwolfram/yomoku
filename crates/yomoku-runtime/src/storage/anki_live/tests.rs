@@ -248,9 +248,9 @@ impl Harness {
             self.local(Event::LoadReaderWord(selection));
             AnkiSelection::Original(selection)
         };
-        self.local(Event::PrepareAnkiExport {
+        self.local(Event::PrepareReaderAnkiExport {
             selection,
-            deck: i64::MAX.try_into().unwrap(),
+            deck_id: i64::MAX,
         });
         assert!(self.router.view().3.is_some());
         let mut effects = self.local(Event::BeginAnkiExportPreflight);
@@ -281,9 +281,14 @@ impl Harness {
             .unwrap();
     }
     fn begin(&self) {
-        self.dispatch(Event::BeginAnkiLive, |v| {
-            v.2 != Some(AnkiLiveProgress::Beginning)
-        });
+        let target = self.router.view().0.anki_export.unwrap();
+        self.dispatch(
+            Event::BeginPreparedAnkiExport {
+                preparation_id: target.preparation_id,
+                expected_phase: target.phase,
+            },
+            |v| v.2 != Some(AnkiLiveProgress::Beginning),
+        );
     }
     fn take(&self) -> AnkiLiveInvocation {
         self.invocation.lock().unwrap().take().unwrap()

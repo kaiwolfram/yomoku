@@ -2213,3 +2213,24 @@ submission, performs I/O or changes reader/vocabulary/history state. Render is
 emitted when the projected state changes; duplicate/stale callbacks stay silent.
 Generated Kotlin carries all phases and exact signed-64 provider IDs. Compose
 live status presentation and authenticated Add orchestration remain next work.
+
+### Shell actions for frozen Anki preparation
+
+`PrepareReaderAnkiExport { selection, deck_id }` carries an original/effective
+reader selection, never note fields. The core converts the positive provider deck
+ID and reuses native current-owner/loaded-dictionary and journal/busy gates.
+Accepted preparation increments a checked session-local sequence, exposed as
+`AnkiExportView::preparation_id`. Clear and Retry never recycle the sequence;
+restart restores no frozen intent or action authority.
+
+`BeginPreparedAnkiExport { preparation_id, expected_phase }` first matches the
+current projection, then uses native `BeginAnkiLive` to require the matching
+complete preflight and both empty journals. This rejects a delayed button action
+after identical content is prepared again or the preflight plan changes.
+`ClearAnkiExport { preparation_id }` dismisses only that intent through the
+existing active/failed-live gates. Native preparation/begin/callback/storage
+variants retain no shell codec. These public actions cannot submit provider work
+without durable begin acknowledgement and the one-use Ready permit. CoreSession
+Ready orchestration and visible Compose Add/status controls remain continuation
+work; the low-level typed actions are exercised through real JNI/SQLite with
+fake provider observations/results, without a real-provider compatibility claim.

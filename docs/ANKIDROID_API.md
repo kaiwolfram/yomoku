@@ -220,3 +220,10 @@ submission; the adapter still refreshes host/permission and name conflicts.
 Unexpected exceptions or invalid response IDs remain uncertain. Neither startup
 restoration nor a standalone dispatch event can prepare/begin a mutation. No new
 provider API, minimum version, permission flow or real-provider claim is adopted.
+
+The shell can now request current-selection preparation and correlate begin/clear
+with a volatile preparation generation (begin also matches the presented phase).
+It supplies no note fields, native handles or journal callbacks. This reuses the
+provider operations above without changing their API assumptions. Ready dispatch
+remains explicit pending CoreSession orchestration; deck/permission/Add/browser
+UI and disposable real-provider validation remain unfinished.

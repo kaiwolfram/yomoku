@@ -626,3 +626,122 @@ fn anki_live_take_and_outcome_ack_recheck_pair_and_reject_foreign_owners() {
 
 mod dispatch;
 mod export_view;
+
+#[test]
+fn anki_shell_begin_requires_current_generation_phase_preflight_and_recovery_gates() {
+    use crate::anki::AnkiExportPhase;
+    for effective in [false, true] {
+        for create in [false, true] {
+            let mut model = prepared(effective, create);
+            let view = Yomoku.view(&model).anki_export.unwrap();
+            let action = Event::BeginPreparedAnkiExport {
+                preparation_id: view.preparation_id,
+                expected_phase: view.phase.clone(),
+            };
+            for event in [
+                Event::BeginPreparedAnkiExport {
+                    preparation_id: 0,
+                    expected_phase: view.phase.clone(),
+                },
+                Event::BeginPreparedAnkiExport {
+                    preparation_id: view.preparation_id,
+                    expected_phase: AnkiExportPhase::Prepared,
+                },
+                Event::BeginPreparedAnkiExport {
+                    preparation_id: view.preparation_id,
+                    expected_phase: if create {
+                        AnkiExportPhase::ReuseModel(1)
+                    } else {
+                        AnkiExportPhase::CreateModel
+                    },
+                },
+            ] {
+                assert!(Yomoku.update(event, &mut model).effects().next().is_none());
+                assert!(model.anki_live.is_none());
+            }
+            model.anki_recovery_read_error = Some(AnkiExportError::PermissionDenied);
+            assert!(Yomoku
+                .update(action.clone(), &mut model)
+                .effects()
+                .next()
+                .is_none());
+            assert!(model.anki_live.is_none());
+            model.anki_recovery_read_error = None;
+            // The frozen intent remains valid after dismissal/navigation.
+            model.clear_reader_word();
+            model.close_document();
+            let mut command = Yomoku.update(action.clone(), &mut model);
+            assert!(command.effects().any(|effect| matches!(effect, Effect::Storage(request) if matches!(request.operation, StorageOperation::BeginAnkiLive(_)))));
+            assert_eq!(
+                model.anki_live_progress(),
+                Some(AnkiLiveProgress::Beginning)
+            );
+            assert!(Yomoku.update(action, &mut model).effects().next().is_none());
+            let _clear = Yomoku.update(
+                Event::ClearAnkiExport {
+                    preparation_id: view.preparation_id,
+                },
+                &mut model,
+            );
+            assert!(model.prepared_anki_export().is_some());
+        }
+    }
+}
+
+#[test]
+fn anki_shell_stale_begin_cannot_start_identical_reprepared_intent() {
+    for effective in [false, true] {
+        let mut model = prepared(effective, false);
+        let old = Yomoku.view(&model).anki_export.unwrap();
+        let selection = model.prepared_anki_export().unwrap().selection();
+        update(
+            &mut model,
+            Event::ClearAnkiExport {
+                preparation_id: old.preparation_id,
+            },
+        );
+        update(
+            &mut model,
+            Event::PrepareReaderAnkiExport {
+                selection,
+                deck_id: i64::MAX,
+            },
+        );
+        let _preflight = Yomoku.update(Event::BeginAnkiExportPreflight, &mut model);
+        let request = model.pending_anki_export_preflight().unwrap().clone();
+        update(
+            &mut model,
+            Event::AnkiExportPreflightFinished(
+                Box::new(request),
+                Ok(AnkiPreflightObservation {
+                    decks: vec![AnkiPreflightDeck {
+                        id: i64::MAX,
+                        filtered: false,
+                    }],
+                    duplicate_note_ids: vec![],
+                    models: vec![AnkiPreflightModel {
+                        id: 9007199254740993,
+                        name: crate::anki::MODEL_NAME.into(),
+                        matches_layout: true,
+                    }],
+                }),
+            ),
+        );
+        assert_eq!(
+            Yomoku.view(&model).anki_export.as_ref().unwrap().phase,
+            old.phase
+        );
+        assert!(Yomoku
+            .update(
+                Event::BeginPreparedAnkiExport {
+                    preparation_id: old.preparation_id,
+                    expected_phase: old.phase
+                },
+                &mut model
+            )
+            .effects()
+            .next()
+            .is_none());
+        assert!(model.anki_live.is_none());
+    }
+}

@@ -82,6 +82,7 @@ pub struct ImportSummary {
 #[derive(Default)]
 pub struct Model {
     prepared_anki_export: Option<crate::anki::AnkiExport>,
+    anki_preparation_sequence: u64,
     anki_live: Option<crate::anki::AnkiLiveState>,
     anki_export_preflight: Option<crate::anki::AnkiPreflight>,
     anki_recovery_read: Option<crate::anki::AnkiRecoveryReadRequest>,
@@ -302,6 +303,20 @@ pub enum Event {
     BeginAnkiRecoveryRead(crate::anki::AnkiRecoveryReadTarget),
     /// Consume an already committed native permit once; cannot prepare or begin a write.
     DispatchAnkiLive,
+    /// Freeze only the current loaded dictionary selection. Invalid decks/selections do nothing.
+    PrepareReaderAnkiExport {
+        selection: crate::anki::AnkiSelection,
+        deck_id: i64,
+    },
+    /// Begin only the exact frozen intent and preflight phase the shell presented.
+    BeginPreparedAnkiExport {
+        preparation_id: u64,
+        expected_phase: crate::anki::AnkiExportPhase,
+    },
+    /// Dismiss only the matching frozen intent; native live/recovery gates still apply.
+    ClearAnkiExport {
+        preparation_id: u64,
+    },
     #[serde(skip)]
     #[cfg_attr(feature = "facet_typegen", facet(skip))]
     EffectiveStorageFinished(
@@ -1693,6 +1708,9 @@ impl App for Yomoku {
             | Event::RestoreAnkiRecovery
             | Event::BeginAnkiLive
             | Event::DispatchAnkiLive
+            | Event::PrepareReaderAnkiExport { .. }
+            | Event::BeginPreparedAnkiExport { .. }
+            | Event::ClearAnkiExport { .. }
             | Event::AnkiLiveBeginFinished(..)
             | Event::FinishAnkiLive(..)
             | Event::AnkiLiveOutcomeFinished(..)

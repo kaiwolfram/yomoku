@@ -31,6 +31,8 @@ pub enum AnkiExportPhase {
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
 pub struct AnkiExportView {
+    /// Session-local generation of the frozen intent; never restored or reused.
+    pub preparation_id: u64,
     pub surface: String,
     pub deck_id: i64,
     pub phase: AnkiExportPhase,

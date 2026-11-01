@@ -2158,3 +2158,15 @@ until the matching outcome transaction acknowledgement; failed/lost acknowledgem
 project storage failure. Presentation survives navigation, never restart. No new
 table, column or journal format is introduced, and reader/history/vocabulary
 transactions are unchanged.
+
+## Anki shell action correlation (schema 0023 unchanged)
+
+The volatile export view also carries `preparation_id: u64`, a checked generation
+allocated only after accepted current-owner preparation. It is never stored in
+SQLite, reset on Clear/Retry or used as a provider/journal ID. Begin matches this
+value and the expected typed phase; Clear matches the value before native live
+and recovery gates. Exhaustion rejects further preparation in that session.
+Neither a copied generation nor a restarted journal reconstructs native callback
+ownership or a mutation permit. Original/effective selections reuse their
+existing typed wire identities; deck IDs cross as signed-64 values and are
+validated positive before native preparation.

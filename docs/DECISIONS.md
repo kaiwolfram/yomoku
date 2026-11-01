@@ -4858,3 +4858,26 @@ Render on changes to either Anki projection, including asynchronous callbacks.
 Keep preparation/begin shell codecs and visible Add/model/deck/permission/browser
 actions for the next slice. This changes the internal typed view payload, not
 the native-export ABI, schema, dependencies or provider behavior.
+
+## 2026-11-01 — Correlate shell Anki actions with frozen preparation
+
+Expose `PrepareReaderAnkiExport` with the existing typed original/effective
+selection and a signed-64 deck ID. Convert/validate the deck natively and reuse
+current-owner dictionary validation; shell text, fields, layout and callback
+handles cannot replace the native frozen payload. Invalid or stale preparation
+is silent, matching the existing reader action policy. Configured-deck selection
+and provider visibility remain future UI work.
+
+Give each accepted preparation a checked, session-local u64 generation, carried
+in `AnkiExportView`. Never reset/reuse the sequence on Clear/Retry; exhaustion
+rejects preparation. `BeginPreparedAnkiExport` requires that generation and the
+exact phase the caller saw, then reuses the native preflight/journal begin gates.
+This rejects stale callbacks after identical re-preparation or a changed plan.
+`ClearAnkiExport` also matches the generation and preserves active/failed live
+work and all durable obligations. These are stale-action correlation values,
+not persisted IDs or mutation permits. Native begin/callback/storage codecs stay
+unavailable to the shell. Ready dispatch still consumes only a committed permit.
+
+Keep this independently verifiable boundary separate from CoreSession Ready
+orchestration and visible Compose controls. No provider APIs, dependencies,
+schema, vocabulary/history behavior or data-destructive semantics change.

@@ -82,8 +82,32 @@ impl Yomoku {
         model: &mut Model,
     ) -> Option<Command<Effect, Event>> {
         match event {
+            Event::PrepareReaderAnkiExport { selection, deck_id } => {
+                let Ok(deck) = AnkiDeckId::try_from(*deck_id) else {
+                    return Some(Command::done());
+                };
+                return self.update_anki_preparation(
+                    &Event::PrepareAnkiExport {
+                        selection: *selection,
+                        deck,
+                    },
+                    model,
+                );
+            }
+            Event::ClearAnkiExport { preparation_id } => {
+                if model.prepared_anki_export.is_none()
+                    || model.anki_preparation_sequence != *preparation_id
+                {
+                    return Some(Command::done());
+                }
+                return self.update_anki_preparation(&Event::ClearPreparedAnkiExport, model);
+            }
             Event::PrepareAnkiExport { selection, deck } => {
+                let Some(id) = model.anki_preparation_sequence.checked_add(1) else {
+                    return Some(Command::done());
+                };
                 if let Some(export) = model.prepare_anki_export(*selection, *deck) {
+                    model.anki_preparation_sequence = id;
                     model.prepared_anki_export = Some(export);
                 }
             }

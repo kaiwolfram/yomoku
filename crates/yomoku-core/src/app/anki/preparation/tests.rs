@@ -267,3 +267,101 @@ fn anki_preparation_and_clear_cannot_erase_note_recovery_or_a_pending_commit() {
         assert_eq!(model.anki_recovery_commit.as_ref().unwrap().1, commit);
     }
 }
+
+#[test]
+fn anki_shell_preparation_validates_selection_deck_and_never_reuses_generations() {
+    for effective in [false, true] {
+        let (mut model, selection) = fixture(effective);
+        for deck_id in [i64::MIN, -1, 0] {
+            assert!(Yomoku
+                .update(
+                    Event::PrepareReaderAnkiExport { selection, deck_id },
+                    &mut model
+                )
+                .effects()
+                .next()
+                .is_none());
+            assert!(model.prepared_anki_export().is_none());
+        }
+        let event = Event::PrepareReaderAnkiExport {
+            selection,
+            deck_id: i64::MAX,
+        };
+        let _prepare = Yomoku.update(event.clone(), &mut model);
+        let first = Yomoku.view(&model).anki_export.unwrap();
+        assert_eq!(first.preparation_id, 1);
+        let _duplicate = Yomoku.update(event.clone(), &mut model);
+        assert_eq!(Yomoku.view(&model).anki_export, Some(first.clone()));
+        let _foreign_clear =
+            Yomoku.update(Event::ClearAnkiExport { preparation_id: 0 }, &mut model);
+        assert_eq!(Yomoku.view(&model).anki_export, Some(first.clone()));
+        let _clear = Yomoku.update(
+            Event::ClearAnkiExport {
+                preparation_id: first.preparation_id,
+            },
+            &mut model,
+        );
+        assert!(model.prepared_anki_export().is_none());
+        let _prepare = Yomoku.update(event.clone(), &mut model);
+        let second = Yomoku.view(&model).anki_export.unwrap();
+        assert_eq!(second.preparation_id, 2);
+        let _stale_clear = Yomoku.update(
+            Event::ClearAnkiExport {
+                preparation_id: first.preparation_id,
+            },
+            &mut model,
+        );
+        assert_eq!(Yomoku.view(&model).anki_export, Some(second));
+        let _clear = Yomoku.update(Event::ClearAnkiExport { preparation_id: 2 }, &mut model);
+        model.anki_preparation_sequence = u64::MAX;
+        let _exhausted = Yomoku.update(event, &mut model);
+        assert!(model.prepared_anki_export().is_none());
+    }
+}
+
+#[test]
+fn anki_shell_preparation_cannot_select_hidden_stale_or_unloaded_dictionary_data() {
+    for effective in [false, true] {
+        for mutate in [
+            (|m: &mut Model| m.clear_reader_word()) as fn(&mut Model),
+            |m| m.settings_open = true,
+            |m| m.storage_busy = true,
+            |m| m.anki_recovery = AnkiRecoveryState::Unrestored,
+            |m| m.close_document(),
+        ] {
+            let (mut model, selection) = fixture(effective);
+            mutate(&mut model);
+            assert!(Yomoku
+                .update(
+                    Event::PrepareReaderAnkiExport {
+                        selection,
+                        deck_id: 1
+                    },
+                    &mut model
+                )
+                .effects()
+                .next()
+                .is_none());
+            assert!(model.prepared_anki_export().is_none());
+        }
+        let (mut model, selection) = fixture(effective);
+        let stale = match selection {
+            AnkiSelection::Original(mut value) => {
+                value.token_index += 1;
+                AnkiSelection::Original(value)
+            }
+            AnkiSelection::Effective(mut value) => {
+                value.page.revision += 1;
+                AnkiSelection::Effective(value)
+            }
+        };
+        let _stale = Yomoku.update(
+            Event::PrepareReaderAnkiExport {
+                selection: stale,
+                deck_id: 1,
+            },
+            &mut model,
+        );
+        assert!(model.prepared_anki_export().is_none());
+    }
+}

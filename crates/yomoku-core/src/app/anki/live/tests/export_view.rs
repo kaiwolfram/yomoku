@@ -52,6 +52,7 @@ fn anki_export_view_freezes_surface_and_deck_renders_once_and_survives_navigatio
         assert_render(&effects(&mut model, event.clone()));
         assert_eq!(reader_view(&model), before);
         let expected = AnkiExportView {
+            preparation_id: 1,
             surface: "猫".into(),
             deck_id: i64::MAX,
             phase: Phase::Prepared,

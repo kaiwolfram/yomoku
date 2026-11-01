@@ -43,6 +43,17 @@ impl Yomoku {
         model: &mut Model,
     ) -> Option<Command<Effect, Event>> {
         match event {
+            Event::BeginPreparedAnkiExport {
+                preparation_id,
+                expected_phase,
+            } => {
+                if !model.anki_export_view().is_some_and(|view| {
+                    view.preparation_id == *preparation_id && view.phase == *expected_phase
+                }) {
+                    return Some(Command::done());
+                }
+                return self.update_anki_live(&Event::BeginAnkiLive, model);
+            }
             Event::DispatchAnkiLive => {
                 let Some(export) = model.prepared_anki_export.as_ref() else {
                     return Some(Command::done());
