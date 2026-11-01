@@ -1,5 +1,6 @@
 package app.yomoku
 
+import android.content.Intent
 import android.database.sqlite.SQLiteDatabase
 import android.os.Handler
 import android.os.Looper
@@ -87,6 +88,10 @@ class AnkiExportSessionTest {
                     },
                     readAnkiDecks = {
                         AnkiReadResult.Value(listOf(AnkiProviderDeck(Long.MAX_VALUE, "日本語", false)))
+                    },
+                    resolveAnkiNote = {
+                        assertNotEquals(Looper.getMainLooper(), Looper.myLooper())
+                        AnkiReadResult.Value(Intent("test.note.${it.value}"))
                     },
                     invokeAnkiLive = {
                         assertNotEquals(Looper.getMainLooper(), Looper.myLooper())
@@ -218,6 +223,7 @@ class AnkiExportSessionTest {
                     core.sessionKey,
                     core::dispatch,
                     ankiDecks = core.ankiDecks.state,
+                    ankiBrowser = core.ankiBrowser,
                 )
             }
         }
@@ -475,6 +481,56 @@ class AnkiExportSessionTest {
             send(Event.BeginPreparedAnkiExport(export.preparationId, export.phase))
             send(Event.DispatchAnkiLive)
             assertTrue(operations.isEmpty())
+        } finally {
+            close()
+        }
+    }
+
+    @Test
+    fun dictionaryExistingNoteOpensExactIdsAndReturnsWithFrozenReaderAndHistory() {
+        duplicates = listOf(Long.MAX_VALUE, 9007199254740993L)
+        open()
+        try {
+            showDictionary()
+            click("word_anki_add")
+            click("anki_export_check")
+            await { it.ankiExport?.phase == AnkiExportPhase.Existing(duplicates) }
+            val frozen = core.view
+            val opened = mutableListOf<String?>()
+            instrumentation.runOnMainSync {
+                core.ankiBrowser.attach { opened.add(it.action) }
+            }
+            for (id in duplicates) {
+                click("anki_note_open_$id")
+                compose.waitUntil(30_000) { opened.size == duplicates.indexOf(id) + 1 }
+                instrumentation.runOnMainSync {
+                    // Same retained session on pause/resume or Activity replacement. Browser
+                    // return has no result that can acknowledge a provider/storage mutation.
+                    core.ankiBrowser.detach()
+                    core.ankiBrowser.attach { opened.add(it.action) }
+                }
+                assertEquals(frozen.ankiExport, core.view.ankiExport)
+                assertEquals(frozen.reader, core.view.reader)
+                assertEquals(frozen.effectiveReaderWord, core.view.effectiveReaderWord)
+                assertEquals(frozen.vocabulary, core.view.vocabulary)
+                assertEquals(frozen.statistics, core.view.statistics)
+            }
+            assertEquals(duplicates.map { "test.note.$it" }, opened)
+            send(Event.OpenSettings)
+            compose
+                .onNodeWithTag("anki_note_open_${Long.MAX_VALUE}")
+                .performScrollTo()
+                .assertExists()
+            val before = opened.size
+            send(Event.ClearAnkiExport(checkNotNull(frozen.ankiExport).preparationId))
+            instrumentation.runOnMainSync {
+                core.ankiBrowser.open(checkNotNull(frozen.ankiExport), Long.MAX_VALUE)
+            }
+            executor.submit {}.get(30, TimeUnit.SECONDS)
+            instrumentation.waitForIdleSync()
+            assertEquals(before, opened.size)
+            assertTrue(operations.isEmpty())
+            assertEquals(1, preflightReads)
         } finally {
             close()
         }

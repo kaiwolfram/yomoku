@@ -192,6 +192,7 @@ internal fun ReaderWords(
     onInteraction: () -> Unit,
     imageLoader: EpubImageLoader? = null,
     ankiDecks: AnkiDeckDiscoveryState = AnkiDeckDiscoveryState.Unchecked,
+    ankiBrowser: AnkiNoteBrowser? = null,
 ) {
     val page = view.reader ?: return
     val key = view.readerAnalysis?.let { ReaderTokenKey(page.documentId, page.anchor, it) }
@@ -317,6 +318,7 @@ internal fun ReaderWords(
                 canWrite,
                 dispatch,
                 onInteraction,
+                ankiBrowser,
             )
             if (details != null) {
                 ReaderDictionary(details)

@@ -5023,3 +5023,29 @@ fresh native outputs before exclusion. Document local development-key signing
 for existing phone-test upgrades and a separate private-key option for distribution;
 retain external keystores and interactive release-password entry. This documents
 the existing manual workflow without changing Gradle defaults or publishing.
+
+
+## 2026-11-01 — Explicit existing-note browser navigation
+
+Keep navigation in the Android shell over native frozen export projections. Offer
+one Open per exact positive Existing note ID, and for the durably acknowledged
+NoteAdded ID; never use a model ID or uncertain note ID. Validate the whole frozen
+export and current dictionary/Settings presentation before queueing and launch.
+Do not infer a target from the current word, configured deck or a text search.
+Use the already reviewed provider-scoped browser link and exact note-ID search;
+refresh provider/spec/permission and resolve on the existing provider FIFO.
+
+Retain platform failure presentation in CoreSession, but attach the Activity
+launcher only while resumed. Pause cancels queued/in-flight navigation, and
+resume/recreation does not replay it. Cancelled results cannot consume fresh
+requests, even for identical targets. Session close drops work and releases the
+Activity callback. Failures leave explicit Open available; no automatic Retry,
+permission prompt, native export event or provider write follows navigation.
+
+Use normal ACTION_VIEW/Back navigation without an Activity Result contract: the
+exported AnkiDroid handler can redirect/finish and exposes no supported editing
+result. Reader time follows the existing Activity pause/resume policy. Returning
+does not acknowledge a mutation, refresh the provider or alter vocabulary/history.
+Primary handler/note-search evidence is linked in ANKIDROID_API.md. Disposable
+real-collection/permission/browser and physical upgrade trials remain outstanding.
+No new dependency, schema, codec, journal or data-destructive behavior.

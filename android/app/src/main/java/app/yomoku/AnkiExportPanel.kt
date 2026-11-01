@@ -16,7 +16,12 @@ import app.yomoku.shared.Event
 
 /** Frozen native intent, independent of the currently open dictionary selection. */
 @Composable
-internal fun AnkiExportPanel(state: AnkiExportView, dispatch: (Event) -> Unit) {
+internal fun AnkiExportPanel(
+    state: AnkiExportView,
+    dispatch: (Event) -> Unit,
+    browser: AnkiNoteBrowser? = null,
+    onInteraction: () -> Unit = {},
+) {
     val phase = state.phase
     Column(Modifier.testTag("anki_export"), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(
@@ -50,6 +55,30 @@ internal fun AnkiExportPanel(state: AnkiExportView, dispatch: (Event) -> Unit) {
                     stringResource(R.string.anki_export_storage_failed)
             }
         Text(message, Modifier.testTag("anki_export_status"))
+        if (browser != null) {
+            val attempt = browser.state?.takeIf { it.export == state }
+            for (id in state.openableNoteIds()) {
+                TextButton(
+                    onClick = {
+                        onInteraction()
+                        browser.open(state, id)
+                    },
+                    enabled = attempt?.phase != AnkiBrowserPhase.Resolving,
+                    modifier = Modifier.testTag("anki_note_open_$id"),
+                ) {
+                    Text(stringResource(R.string.anki_note_open, id.toString()))
+                }
+            }
+            attempt?.let {
+                val status =
+                    when (val value = it.phase) {
+                        AnkiBrowserPhase.Resolving -> R.string.anki_note_opening
+                        AnkiBrowserPhase.Unavailable -> R.string.anki_note_browser_unavailable
+                        is AnkiBrowserPhase.Failed -> value.error.exportError().messageResource()
+                    }
+                Text(stringResource(status), Modifier.testTag("anki_note_browser_status"))
+            }
+        }
         when (phase) {
             AnkiExportPhase.Prepared ->
                 TextButton(

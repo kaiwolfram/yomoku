@@ -63,6 +63,7 @@ internal fun YomokuApp(
     ankiDecks: AnkiDeckDiscoveryState = AnkiDeckDiscoveryState.Unchecked,
     checkAnkiProvider: () -> Unit = {},
     requestAnkiPermission: () -> Unit = {},
+    ankiBrowser: AnkiNoteBrowser? = null,
     onImportFiles: (() -> Unit)? = null,
 ) {
     val context = LocalContext.current
@@ -176,6 +177,7 @@ internal fun YomokuApp(
                                 ankiDecks,
                                 checkAnkiProvider,
                                 requestAnkiPermission,
+                                ankiBrowser,
                             )
                         view.contentRoute == ContentRoute.PASTE ->
                             PasteScreen(view, pasteText, { pasteText = it }, dispatch)
@@ -187,6 +189,7 @@ internal fun YomokuApp(
                                 onReaderInteraction,
                                 imageLoader,
                                 ankiDecks,
+                                ankiBrowser,
                             )
                         view.destination == Destination.LIBRARY ->
                             LibraryScreen(

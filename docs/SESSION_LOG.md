@@ -4368,3 +4368,28 @@ and /tmp/yomoku-browser-profile-*. No emulator started.
   suites, installation/runtime/performance trials or publishing were performed.
 - No build/verification steps or blockers remain. Recommend the schema-24 phone
   upgrade preserving existing Library/history before further provider work.
+
+
+## 2026-11-01 — Existing Anki note browser navigation
+
+- Added retained platform navigation on the provider FIFO and explicit exact-ID
+  Open controls in original/effective dictionary export panels and Settings.
+  Only current frozen Existing/acknowledged NoteAdded IDs may open; stale targets,
+  model IDs and uncertain outcomes cannot. No provider write or export mutation.
+- MainActivity attaches a launcher only while resumed. Pause/close/target changes
+  cancel queued/in-flight navigation; late cancelled responses cannot consume a
+  fresh request for the same note. Return/recreation never replay navigation or
+  infer a successful collection mutation. Missing handlers and failures remain
+  visible, requiring explicit Open. Reader timing uses existing lifecycle logic.
+- PASS: nine new cases; 89 initial and six final browser executions verify 90
+  unique API-36 x86_64 cases with zero failures/errors/skips. Debug/test APKs,
+  strict lintDebug, repository Kotlin formatting and diff checks pass. Gradle,
+  ADB and emulator required normal local-socket/KVM escalation; no downloads.
+- Updated architecture/API evidence, decisions, plan, development commands and
+  handoff. No Rust/schema/dependency/codec change; host Rust/Clippy/JNI/codegen
+  not rerun. Android cases exercise packaged JNI/FIFO/SQLite with fake providers.
+- No implementation/verification steps or blockers remain for this slice.
+  Anki's umbrella task remains unchecked until disposable real collection,
+  permission dialogs and browser/Back behavior are validated. Recommend schema-24
+  phone upgrade retaining existing Library/history before backup implementation.
+  No physical/tablet, real-provider, optimized-release or performance trial run.

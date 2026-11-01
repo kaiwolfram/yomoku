@@ -26,6 +26,7 @@ internal fun ReaderAnkiPanel(
     enabled: Boolean,
     dispatch: (Event) -> Unit,
     onInteraction: () -> Unit,
+    ankiBrowser: AnkiNoteBrowser? = null,
 ) {
     val interact: (Event) -> Unit = {
         onInteraction()
@@ -33,7 +34,7 @@ internal fun ReaderAnkiPanel(
     }
     if (export != null) {
         // A different word/page or preference must never relabel or retarget accepted work.
-        AnkiExportPanel(export, interact)
+        AnkiExportPanel(export, interact, ankiBrowser, onInteraction)
     } else if (selection != null) {
         val configured =
             settings.phase == AnkiSettingsPhase.READY &&

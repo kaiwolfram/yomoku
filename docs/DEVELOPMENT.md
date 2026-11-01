@@ -9026,3 +9026,59 @@ Native build output is in the session tool transcript. No host suites, device
 installation/runtime/instrumentation, performance trial or publishing was run.
 No build/verification steps or blockers remain for this request. Recommend the
 schema-24 physical-phone upgrade retaining Library/history before further provider work.
+
+
+## Existing Anki note browser navigation
+
+2026-11-01: Kotlin/Compose only. `AnkiNoteBrowser` uses the existing provider FIFO
+and package-scoped note-ID intent resolver. Original/effective dictionary panels
+and Settings show explicit actions for frozen Existing/acknowledged NoteAdded
+IDs. MainActivity attaches a launcher only while resumed. Pause/close/changed
+exports cancel pending launches; return/recreation never replay navigation or
+infer a provider mutation. No Rust/schema/dependency/codec/provider API change.
+Use the packaged both-ABI native libraries and existing isolated statistics-ui-avd.
+
+```sh
+export JAVA_HOME="$PWD/.local/jdk-17/jdk-17.0.21+9"
+export GRADLE_USER_HOME="$PWD/.local/gradle"
+export ANDROID_HOME=/home/kai/Android/Sdk
+tools/format-kotlin.sh
+tools/format-kotlin.sh --check
+./android/gradlew -p android :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=app.yomoku.AnkiNoteBrowserTest,app.yomoku.AnkiExportPanelTest,app.yomoku.AnkiExportSessionTest,app.yomoku.ReaderAnkiPanelTest,app.yomoku.AnkiSettingsActivityTest,app.yomoku.AnkiProviderReaderTest,app.yomoku.CoreSessionTest,app.yomoku.NavigationTest --offline --console=plain
+git diff --check
+```
+
+The sandboxed Gradle attempt could not create its local locking socket. Normal
+escalation runs the offline build/lint and emulator with local-socket/KVM access.
+ADB likewise needs local server access. No downloads or new dependencies.
+
+PASS: all 89 initially selected API-36 x86_64 cases, then all six browser cases
+after adding the same-note cancelled-response regression (90 unique cases,
+95 executions; zero failures/errors/skips). Nine new cases cover exact long IDs,
+stale generations/phases/unknown IDs, acknowledged versus uncertain IDs, explicit
+coalescing/retry, every provider error, missing handlers, resolver/launch exceptions,
+queued/in-flight pause/close/changed-export cancellation, same-target replacement
+and no return replay. Actual Compose/JNI/FIFO/SQLite dictionary and Settings wiring
+checks unchanged frozen export/reader/vocabulary/statistics and no provider writes.
+Existing provider, Activity recreation, reader and navigation regressions pass.
+
+The initial suite had already compiled when the final same-note regression was
+added. Rebuild the final test APK, rerun all six browser cases and strict lint:
+
+```sh
+./android/gradlew -p android :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=app.yomoku.AnkiNoteBrowserTest --offline --console=plain
+```
+
+Final debug/test APKs, strict lintDebug, repository Kotlin formatting and diff
+checks pass. No host Rust/Clippy/JNI/codegen rerun for this Kotlin-only slice;
+emulator cases exercise the packaged actual JNI/FIFO/SQLite with fake provider
+operations. No schema/dependency/native-export ABI change or compatibility claim.
+Actual external AnkiDroid collection/permission dialogs/browser/Back, physical
+phone/tablet, optimized APK and performance trials were not run. No implementation
+or verification steps or blockers remain for this slice. Recommend the schema-24
+phone upgrade retaining Library/history and disposable real-collection trial
+before encrypted-backup implementation; the Anki umbrella task stays unchecked.
+
+Logs: `/tmp/yomoku-anki-browser-{build,tests,final,format,format-final,format-check,
+emulator}.log` (one per suffix). Initial XML: `/tmp/yomoku-anki-browser-initial-xml/`;
+final browser XML: `android/app/build/outputs/androidTest-results/connected/debug/`.

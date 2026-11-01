@@ -1,4 +1,7 @@
 <resources>
+    <string name="anki_note_open">Open note %1$s in AnkiDroid</string>
+    <string name="anki_note_opening">Opening AnkiDroid…</string>
+    <string name="anki_note_browser_unavailable">The AnkiDroid note browser is unavailable. You can try Open again.</string>
     <string name="anki_recovery_title">AnkiDroid recovery</string>
     <string name="anki_recovery_loading">Loading recovery state…</string>
     <string name="anki_recovery_ready">No pending AnkiDroid recovery.</string>

@@ -2366,4 +2366,33 @@ Anki read/write, and neither preparation nor export changes vocabulary/history.
 This is Kotlin/Compose routing over the existing typed native commands and
 retained Ready orchestration; no new journal, schema, dependency or codec. Actual
 permission/collection/browser behavior requires a disposable real AnkiDroid trial
-before compatibility claims. Existing-note browser/return remains a later slice.
+before compatibility claims.
+
+### Existing Anki note navigation
+
+`CoreSession` owns a platform-only `AnkiNoteBrowser` on the existing provider FIFO.
+The export panel exposes one Open action per exact positive note ID in Existing,
+or the durably acknowledged NoteAdded result. Model IDs and uncertain note IDs
+offer no browser action. Open validates the entire current frozen export before
+queueing and again before launch; Settings or a selected reader dictionary must
+still be presented. Changing a reader selection or configured deck never changes
+the frozen target. Native export commands/journals remain authoritative and are
+not changed by navigation.
+
+The worker uses `AnkiProviderReader.existingNoteIntent`, refreshing provider/spec/
+permission and resolving only the current provider package's supported
+`anki://x-callback-url/browser?search=nid:<id>` link. Only MainActivity's resumed
+lifecycle attaches an Activity launcher. Pause detaches it and cancels pending
+navigation; queued reads are skipped and late results are dropped. A later resume
+or Activity recreation requires another explicit Open rather than replaying the
+cancelled action. A fresh request is distinguished by allocation identity even
+when it targets the same frozen note. Session close cancels and releases the host.
+
+Missing handlers and resolver/launch failures remain local visible errors, with
+explicit Open available again. There is no automatic permission prompt or Retry.
+The launch is consumed before calling Android. Use normal ACTION_VIEW navigation:
+the exported handler may redirect/finish, and has no supported editing-result
+contract. Existing Activity pause/resume reading-clock behavior handles departure
+and return; no result can trigger an export, recheck or vocabulary/history change.
+Nothing persists a navigation intent or replays it after process death. Actual
+AnkiDroid collection/handler/Back behavior still requires the disposable trial.

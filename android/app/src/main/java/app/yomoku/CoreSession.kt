@@ -1,5 +1,6 @@
 package app.yomoku
 
+import android.content.Intent
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
@@ -18,6 +19,7 @@ import app.yomoku.shared.AnkiPreflightOperation
 import app.yomoku.shared.AnkiPreflightResult
 import app.yomoku.shared.AnkiRecoveryReadOperation
 import app.yomoku.shared.AnkiRecoveryReadResult
+import app.yomoku.shared.ContentRoute
 import app.yomoku.shared.Event
 import app.yomoku.shared.ReaderClockAction
 import app.yomoku.shared.ReaderClockSample
@@ -83,6 +85,9 @@ internal class CoreSession(
         AnkiLiveResult.NoSubmission
     },
     readAnkiDecks: () -> AnkiReadResult<List<AnkiProviderDeck>> = {
+        AnkiReadResult.Failed(AnkiReadError.ProviderUnavailable)
+    },
+    resolveAnkiNote: (AnkiProviderNoteId) -> AnkiReadResult<Intent?> = {
         AnkiReadResult.Failed(AnkiReadError.ProviderUnavailable)
     },
 ) : AutoCloseable {
@@ -168,6 +173,15 @@ internal class CoreSession(
         private set
 
     val ankiDecks = AnkiDeckDiscovery(ankiExecutor, readAnkiDecks)
+    val ankiBrowser =
+        AnkiNoteBrowser(ankiExecutor, resolveAnkiNote) {
+            view.ankiExport?.takeIf {
+                view.settingsOpen ||
+                    (view.contentRoute == ContentRoute.READER &&
+                        (view.readerWordSelection != null ||
+                            view.effectiveReaderWord?.selection != null))
+            }
+        }
 
     fun checkAnkiDecks() {
         requireMainThread()
@@ -418,6 +432,7 @@ internal class CoreSession(
             )
         )
         dispatchReadyAnki()
+        ankiBrowser.refresh()
     }
 
     /** Only a durably acknowledged begin can expose Ready; native code owns the permit. */
@@ -501,6 +516,7 @@ internal class CoreSession(
             pauseClock()
             closing = true
             ankiDecks.close()
+            ankiBrowser.close()
             ankiLiveWorker.close()
             readerActive = false
             driveReaderClock()

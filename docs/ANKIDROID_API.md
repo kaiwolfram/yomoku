@@ -133,6 +133,17 @@ representations as well as integer 0/1, rejecting other forms. Existing-note lin
 use the current provider package, URI-encoded `nid:<positive signed-64 ID>` and
 installed-handler resolution. The adapter returns the resolved intent without
 launching an Activity. Resolution is not proof of actual browser/return behavior.
+The app now consumes this intent through `AnkiNoteBrowser`: explicit per-note
+actions use only native frozen Existing/acknowledged NoteAdded IDs, resolve on
+the provider FIFO and launch on the resumed Activity. Pause cancels outstanding
+navigation; resume/recreation/process restart never replay it. Missing handlers
+and launch-time failure remain visible and require another explicit Open. The
+reviewed exported handler can redirect and finish, so normal ACTION_VIEW is used
+without inferring an editing result or successful collection mutation. Existing
+reader pause/resume timing handles return. See the
+[handler source](https://github.com/ankidroid/Anki-Android/blob/v2.25.3/AnkiDroid/src/main/java/com/ichi2/anki/IntentHandler.kt)
+and [exact note-ID search](https://docs.ankiweb.net/manual/searching#object-ids),
+reviewed again 2026-11-01. Real handler/collection/Back behavior remains untried.
 Android's supported [ContentResolver.wrap(ContentProvider)](https://developer.android.com/reference/android/content/ContentResolver#wrap(android.content.ContentProvider))
 allows in-process fake-provider tests on minSdk 29; these use real Android SQLite
 for bound query semantics and injected permission/metadata/resolution observations.

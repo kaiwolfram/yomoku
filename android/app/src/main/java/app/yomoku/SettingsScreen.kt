@@ -42,6 +42,7 @@ internal fun SettingsScreen(
     ankiDecks: AnkiDeckDiscoveryState = AnkiDeckDiscoveryState.Unchecked,
     checkAnkiProvider: () -> Unit = {},
     requestAnkiPermission: () -> Unit = {},
+    ankiBrowser: AnkiNoteBrowser? = null,
 ) {
     var showNotices by rememberSaveable { mutableStateOf(false) }
     var showWordNotices by rememberSaveable { mutableStateOf(false) }
@@ -76,7 +77,7 @@ internal fun SettingsScreen(
             checkAnkiProvider,
             requestAnkiPermission,
         )
-        view.ankiExport?.let { AnkiExportPanel(it, dispatch) }
+        view.ankiExport?.let { AnkiExportPanel(it, dispatch, ankiBrowser) }
         view.ankiRecovery?.let { AnkiRecoveryPanel(it, dispatch) }
         val typography = view.readerTypography
         val typographyEnabled =

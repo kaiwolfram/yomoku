@@ -34,6 +34,7 @@ internal fun EffectiveReaderWords(
     onInteraction: () -> Unit,
     imageLoader: EpubImageLoader? = null,
     ankiDecks: AnkiDeckDiscoveryState = AnkiDeckDiscoveryState.Unchecked,
+    ankiBrowser: AnkiNoteBrowser? = null,
 ) {
     // Compact revisions belong to one native session. A replacement cannot reuse a selection/draft.
     key(sessionKey) {
@@ -44,6 +45,7 @@ internal fun EffectiveReaderWords(
             onInteraction,
             imageLoader,
             ankiDecks,
+            ankiBrowser,
         )
     }
 }
@@ -56,6 +58,7 @@ private fun EffectiveReaderWordContent(
     onInteraction: () -> Unit,
     imageLoader: EpubImageLoader?,
     ankiDecks: AnkiDeckDiscoveryState,
+    ankiBrowser: AnkiNoteBrowser?,
 ) {
     val page = view.reader ?: return
     val word = view.effectiveReaderWord ?: return
@@ -229,6 +232,7 @@ private fun EffectiveReaderWordContent(
                 canRead,
                 dispatch,
                 onInteraction,
+                ankiBrowser,
             )
             if (details != null) {
                 ReaderDictionary(details.encountered, details.candidates)

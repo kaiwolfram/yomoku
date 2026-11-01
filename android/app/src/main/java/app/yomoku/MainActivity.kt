@@ -67,6 +67,7 @@ class MainActivity : ComponentActivity() {
                     core.covers,
                     libraryActionsEnabled = !fileImports.active,
                     ankiDecks = core.ankiDecks.state,
+                    ankiBrowser = core.ankiBrowser,
                     checkAnkiProvider = core::checkAnkiDecks,
                     requestAnkiPermission = {
                         if (
@@ -102,10 +103,12 @@ class MainActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
+        core.ankiBrowser.attach { startActivity(it) }
         core.setReaderActive(true)
     }
 
     override fun onPause() {
+        core.ankiBrowser.detach()
         core.setReaderActive(false)
         super.onPause()
     }
