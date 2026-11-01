@@ -2170,3 +2170,24 @@ Neither a copied generation nor a restarted journal reconstructs native callback
 ownership or a mutation permit. Original/effective selections reuse their
 existing typed wire identities; deck IDs cross as signed-64 values and are
 validated positive before native preparation.
+
+## Configured Anki default deck (migration 0024)
+
+`anki_settings` is a separate STRICT singleton (`id = 1`) containing nullable
+`default_deck_id`. NULL means unconfigured; a selected external deck is a positive
+signed-64 integer, preserving values above 2^53 and through i64::MAX exactly.
+Fresh databases and upgrades insert the unconfigured row. No foreign key targets
+external Anki data, and no provider/deck/model name, availability or permission is
+cached. Reader settings and existing journal tables are unchanged.
+
+`Storage::anki_default_deck` distinguishes a valid NULL from a missing/corrupt
+row. `save_anki_default_deck(Option<AnkiDeckId>)` validates the old row, updates
+and verifies the requested value under one immediate transaction, then returns
+only after commit. Failed statements/readback/COMMIT retain the previous value;
+missing/corrupt settings are never silently repaired. Replacing/clearing the
+preference cannot update a frozen journal payload or resolve any obligation.
+
+This repository is not yet connected to app events, FIFO/FFI or visible controls.
+Future preparation must resolve the persisted preference, keep its own frozen
+deck and revalidate current provider/spec/permission/nonfiltered-deck state before
+export. A stored ID alone never permits provider dispatch or write retries.

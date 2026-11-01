@@ -2255,3 +2255,19 @@ while live work is active/failed; uncertainty directs the user to the separate
 read-only recovery controls. Composition and opening Settings dispatch nothing.
 The dictionary Add entry, deck/permission configuration and browser actions
 remain unfinished, so this is not yet a complete visible export workflow.
+
+### Configured Anki default deck storage
+
+Migration 0024 adds an independent nullable default-deck preference. Rust SQLite
+I/O exposes `anki_default_deck` and `save_anki_default_deck` using the pure core's
+existing `AnkiDeckId`; SQL and connection ownership remain outside core. An
+immediate save validates the current singleton, checks the updated value and
+publishes after commit. No provider read, external mutation or journal transition
+occurs. Reader/history and pending/uncertain Anki payloads remain independent of
+future preference changes.
+
+Fresh installs and upgrades remain unconfigured. The stored external ID is not
+availability/permission evidence and does not change frozen export targets or
+live invocation gates. Retained settings events/FIFO/FFI, provider discovery,
+permission/deck controls and dictionary Add presentation remain to be connected.
+No dependency, generated codec or native-export ABI changes in this storage slice.

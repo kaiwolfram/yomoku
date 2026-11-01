@@ -5,7 +5,7 @@ use super::*;
 
 // Insert the shapes actually available at each historical version. Current
 // repository readers deliberately require the current schema.
-fn seed_history(connection: &Connection, version: usize) {
+pub(super) fn seed_history(connection: &Connection, version: usize) {
     connection
         .execute_batch(
             "INSERT INTO sources VALUES (41, 'paste', '原本 猫 𠮷 が');
@@ -322,11 +322,12 @@ fn failed_late_upgrade_preserves_populated_history_and_retries_without_partial_r
 
 // Snapshot every remaining table so the scope reduction cannot silently discard
 // reader state, vocabulary/status history, dictionaries or Anki obligations.
+// Anki settings are added later in 0024 and verified in anki_settings tests.
 fn state_without_known_form_links(connection: &Connection) -> Vec<(String, Vec<Vec<Value>>)> {
     let mut statement = connection
         .prepare(
             "SELECT name FROM sqlite_schema WHERE type = 'table'
-         AND name NOT IN ('schema_migrations', 'vocabulary_dictionary_forms') ORDER BY name",
+         AND name NOT IN ('schema_migrations', 'vocabulary_dictionary_forms', 'anki_settings') ORDER BY name",
         )
         .unwrap();
     let names = statement
@@ -363,7 +364,7 @@ fn removing_known_forms_migrates_populated_database_and_preserves_all_other_stat
     drop(connection);
     for _ in 0..2 {
         let storage = Storage::open(database.path()).unwrap();
-        assert_eq!(storage.schema_version().unwrap(), 23);
+        assert_eq!(storage.schema_version().unwrap(), 24);
         assert!(!storage
             .connection
             .table_exists(None, "vocabulary_dictionary_forms")

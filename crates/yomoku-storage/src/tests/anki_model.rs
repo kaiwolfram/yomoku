@@ -477,7 +477,7 @@ fn anki_model_migration_preserves_pending_note_and_rolls_back_on_conflict() {
         .unwrap();
     drop(connection);
     let mut storage = Storage::open(database.path()).unwrap();
-    assert_eq!(storage.schema_version().unwrap(), 23);
+    assert_eq!(storage.schema_version().unwrap(), 24);
     assert_eq!(storage.anki_model_recovery().unwrap(), None);
     assert_eq!(storage.anki_recovery().unwrap().unwrap().submission, note);
     assert!(matches!(

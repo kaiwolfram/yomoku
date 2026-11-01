@@ -4901,3 +4901,21 @@ schema, vocabulary/history behavior or data-destructive semantics change.
 - Dictionary Add entry, configured-deck/permission/browser workflows and a real
   disposable AnkiDroid collection remain separate implementation/validation work.
   No schema, dependency, provider API or generated/native-export ABI changes.
+
+## 2026-11-01 — Persist the optional Anki default deck independently
+
+Use migration 0024's separate STRICT `anki_settings` singleton with a nullable
+positive signed-64 `default_deck_id`. Fresh installs and upgrades start with no
+configured deck; no provider default, deck name or sample ID is inferred. Reuse
+the existing pure `AnkiDeckId` at the repository boundary. Provider discovery,
+permission and current nonfiltered-deck validation remain platform/app work;
+persisting an ID is only a preference and grants no export authority.
+
+Read and update only the existing settings row, rejecting corruption/missing rows
+without repair. Use an immediate transaction, verify the saved value and publish
+only after commit. Clearing/replacing the preference changes no reader setting,
+frozen export, vocabulary/history row or pending/uncertain Anki journal. A later
+deck selection applies to future preparations; submitted work retains its frozen
+deck and existing recovery gates. Keep the storage prerequisite independently
+testable before adding retained events, provider/deck/permission UI and Add wiring.
+No dependency, FFI, external provider API or destructive semantics change.

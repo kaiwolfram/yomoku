@@ -7,6 +7,7 @@ pub mod anki;
 pub mod anki_live;
 pub mod anki_model;
 mod anki_recovery;
+mod anki_settings;
 mod completions;
 pub mod custom_dictionary;
 pub mod dictionary;
@@ -166,6 +167,11 @@ const MIGRATIONS: &[Migration] = &[
         version: 23,
         name: "0023_remove_known_forms",
         sql: include_str!("../migrations/0023_remove_known_forms.sql"),
+    },
+    Migration {
+        version: 24,
+        name: "0024_anki_settings",
+        sql: include_str!("../migrations/0024_anki_settings.sql"),
     },
 ];
 

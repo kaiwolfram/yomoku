@@ -310,7 +310,7 @@ fn migration_backfills_only_live_document_eof_history_and_preserves_existing_sta
     drop(old);
     for _ in 0..2 {
         let mut storage = Storage::open(database.path()).unwrap();
-        assert_eq!(storage.schema_version().unwrap(), 23);
+        assert_eq!(storage.schema_version().unwrap(), 24);
         assert_eq!(storage.list_documents().unwrap(), expected);
         assert_eq!(storage.page_length().unwrap(), PageLength::Characters750);
         assert_eq!(

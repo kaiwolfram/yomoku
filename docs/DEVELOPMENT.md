@@ -8687,3 +8687,58 @@ emulator-initial,token-fixture,emulator-boot}.log` (one file per suffix).
 Initial XML: `/tmp/yomoku-anki-ready-initial-xml/` and
 `/tmp/yomoku-anki-ready-token-fixture-xml/`. Final XML:
 `android/app/build/outputs/androidTest-results/connected/debug/`.
+
+## Configured Anki deck storage
+
+2026-11-01: migration 0024 adds an initially unconfigured default-deck preference.
+No dependency, core event, generated-codec, native-export ABI or Kotlin change.
+Use the pinned offline toolchains; host JNI precedes Android native packaging.
+
+```sh
+export PATH=/home/kai/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin:$PATH
+export JAVA_HOME="$PWD/.local/jdk-17/jdk-17.0.21+9"
+export JAVA_BIN="$JAVA_HOME/bin/java"
+export GRADLE_USER_HOME="$PWD/.local/gradle"
+export ANDROID_HOME=/home/kai/Android/Sdk
+cargo test -p yomoku-storage anki_settings --locked --offline
+cargo test --workspace --all-features --locked --offline --quiet
+cargo clippy --workspace --all-targets --all-features --locked --offline -- -D warnings
+cargo fmt --all -- --check
+tools/test-kotlin-bridge.sh
+./android/gradlew -p android :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug --offline --console=plain
+git diff --check
+```
+
+Seven new repository cases cover unconfigured startup, exact positive signed-64
+IDs through i64::MAX, clear/reopen, singleton/type constraints, statement/deferred
+COMMIT failures with exact retries, corrupt/missing rows without repair,
+ignored/rewritten/deleted update readback, failed migration rollback and concurrent
+writers. Populated schema-23 upgrades exercise pending and uncertain note/model
+journals independently, preserving every preexisting table's data, reader text/
+position/preferences, vocabulary/history and journal payloads/known IDs. Changing
+or clearing the preference never opens either journal mutation gate.
+
+The first seven focused cases passed. The first workspace run caught two legacy
+downgrade fixtures retaining the new table and one multiline schema-version
+assertion still expecting 23. Updated the simulated old schemas to drop
+anki_settings and corrected the version assertion; no production migration or
+repository behavior was changed to accommodate the fixtures. Initial log:
+`/tmp/yomoku-anki-settings-workspace.log`. Final verification follows below.
+
+PASS: final rerun has 996 workspace tests passed/17 opt-in ignored, including all
+seven new repository cases and every historical-schema preservation regression.
+Strict Clippy, Rustfmt, full host Kotlin/JNI (including workspace build), both-ABI
+Android native packaging, debug/test APK builds, strict lintDebug and diff checks
+pass. No Kotlin/generator changes were made. Offline Gradle required the normal
+local-socket sandbox escalation; no dependency downloads were needed.
+
+No implementation/verification steps or blockers remain for this storage slice.
+The preference has no app/FIFO/FFI/UI call site yet; provider/deck/permission,
+dictionary Add and actual browser/return behavior remain. No emulator/device,
+real collection/browser, optimized APK or physical upgrade/performance trial was
+run. Recommend a phone schema-24 upgrade trial with existing Library/history
+before completing the visible Add flow, followed by a disposable real collection
+before compatibility claims. Older phone APK remains source 0374365.
+
+Logs: `/tmp/yomoku-anki-settings-{focused,workspace,workspace-final,clippy,rustfmt,
+jni,android,diff}.log` (one file per suffix).
