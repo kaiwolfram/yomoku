@@ -8029,6 +8029,10 @@ then durable begin/outcome gates before live model/note invocation and UI action
 
 ## Local optimized release APK for physical-device testing
 
+The current copyable build/sign/install instructions are in
+[README.md](../README.md#release-apk), including private-key signing for distribution.
+The commands and artifact details below preserve the earlier phone-test checkpoint.
+
 The normal Gradle native preBuild task currently selects Rust debug. To build
 an optimized local release, generate codecs and package both native ABIs with
 BoltFFI's verified `pack android --release` option first, then exclude only that

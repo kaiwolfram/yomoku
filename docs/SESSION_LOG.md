@@ -4331,3 +4331,22 @@ and /tmp/yomoku-browser-profile-*. No emulator started.
   Recommend the schema-24 phone upgrade with existing Library/history now; actual
   dialogs/collection/browser, physical phone/tablet, performance and optimized APK
   trials remain unrun. Older phone APK remains source 0374365; no release requested.
+
+## 2026-11-01 — README release APK instructions
+
+- Added prerequisite, optimized Rust/both-ABI, unsigned Gradle APK, 16 KiB
+  alignment, local/private-key signing, verification and installation steps to
+  README.md. Explained shared-output sequencing and existing-install certificate
+  requirements; linked Android's primary signing documentation.
+- Linked the development guide's historical recipe to the current README and
+  recorded the documentation checkpoint in the plan, decisions and handoff.
+- PASS: four shell blocks parse with `bash -n`; README local links resolve;
+  BoltFFI 0.30.1, SDK 36.0.0 signing/alignment and JDK 17 keytool options checked.
+  Offline `assembleRelease`/`lintRelease` dry run passes with native task excluded;
+  Gradle needed normal local-socket escalation. `git diff --check` passes.
+  Command/environment and log: NEXT_SESSION.md. No APK rebuilt, key created,
+  signing, installation, full lint execution or runtime tests for this docs-only step.
+- No implementation/verification steps or blockers remain for this request.
+  Next implementation remains existing-note browser/return handling. A schema-24
+  phone upgrade retaining existing Library/history would provide more value
+  before further provider work; use the documented local-test signing path.

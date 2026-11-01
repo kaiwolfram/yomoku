@@ -260,6 +260,96 @@ Android execution has been verified on an API 36 x86_64 emulator; physical arm64
 validation remains pending. Measurements and their limits are recorded in
 [Sudachi measurements](docs/SUDACHI_MEASUREMENTS.md).
 
+### Release APK
+
+Complete the Rust and Android setup above first, including both Rust Android
+targets, BoltFFI 0.30.1, prepared Sudachi Full and the pinned word/name index.
+Fetch Cargo and Gradle dependencies once before using these offline commands.
+Run from the repository root with `JAVA_HOME` and `ANDROID_HOME` set.
+
+**1. Build optimized native libraries and the unsigned release APK.** The normal
+Gradle native task builds Rust in debug mode, even for `assembleRelease`. Build
+both native ABIs explicitly with `--release`, then exclude that task from Gradle:
+
+```sh
+export ANDROID_NDK_HOME="$ANDROID_HOME/ndk/30.0.16248370"
+export CARGO_NET_OFFLINE=true
+
+# Stop if any command fails; do not package stale native libraries.
+(
+  set -eu
+  python3 tools/verify-sudachi-source.py
+  cargo run -p yomoku-ffi --bin generate-kotlin --features facet_typegen \
+    --locked --offline -- target/generated/kotlin
+  (cd crates/yomoku-ffi && ../../.local/bin/boltffi pack android --release \
+    --deny-skipped --cargo-arg=--locked --cargo-arg=--offline)
+  ./android/gradlew -p android :app:assembleRelease :app:lintRelease \
+    -x :app:buildRustBridge --offline --console=plain
+)
+```
+
+Always run the complete sequence; `-x :app:buildRustBridge` alone can package
+stale or debug libraries. Do not run other native/debug builds or binding
+generation concurrently. The unsigned output is
+`android/app/build/outputs/apk/release/app-release-unsigned.apk`; it supports
+Android 10+ and includes `arm64-v8a` and `x86_64`. It cannot be installed until signed.
+
+**2. Align and sign for local phone testing.** This uses the workstation's existing
+development key, also used by debug builds and the earlier phone-test APK.
+If `$HOME/.android/debug.keystore` does not exist, build a debug APK using the
+Android app instructions above, then repeat step 1 to restore optimized libraries.
+
+```sh
+mkdir -p target/releases
+"$ANDROID_HOME/build-tools/36.0.0/zipalign" -f -P 16 4 \
+  android/app/build/outputs/apk/release/app-release-unsigned.apk \
+  target/releases/yomoku-release-aligned.apk
+"$ANDROID_HOME/build-tools/36.0.0/apksigner" sign \
+  --ks "$HOME/.android/debug.keystore" --ks-key-alias androiddebugkey \
+  --ks-pass pass:android --key-pass pass:android \
+  --out target/releases/yomoku-release.apk target/releases/yomoku-release-aligned.apk
+```
+
+These are standard development-key passwords. For distribution, use your own
+private release key instead. Create it once outside the repository if you do not
+already have one, then replace the `apksigner sign` command above with:
+
+```sh
+# One-time creation only; keytool prompts for passwords and certificate details.
+mkdir -p "$HOME/.android"
+"$JAVA_HOME/bin/keytool" -genkeypair -keystore "$HOME/.android/yomoku-release.jks" \
+  -alias yomoku -keyalg RSA -keysize 3072 -validity 10000
+
+# Reuse the same key for later releases; apksigner prompts for its password.
+"$ANDROID_HOME/build-tools/36.0.0/apksigner" sign \
+  --ks "$HOME/.android/yomoku-release.jks" --ks-key-alias yomoku \
+  --out target/releases/yomoku-release.apk target/releases/yomoku-release-aligned.apk
+```
+
+Keep private keys/passwords out of Git and back up the release key securely.
+Before distributing a new version, increase `versionCode` and update `versionName`
+in `android/app/build.gradle.kts`, then rebuild. Publishing signed releases
+requires approval.
+
+**3. Verify and install.** Align before signing; modifying the signed APK
+invalidates its signature. See Android's
+[command-line signing guide](https://developer.android.com/build/building-cmdline#sign_cmdline)
+and [apksigner reference](https://developer.android.com/tools/apksigner).
+
+```sh
+"$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose --print-certs \
+  target/releases/yomoku-release.apk
+"$ANDROID_HOME/build-tools/36.0.0/zipalign" -c -P 16 4 target/releases/yomoku-release.apk
+"$ANDROID_HOME/platform-tools/adb" install -r target/releases/yomoku-release.apk
+"$ANDROID_HOME/platform-tools/adb" shell am start -n app.yomoku/.MainActivity
+```
+
+The installable APK is **`target/releases/yomoku-release.apk`**. Updating an existing
+installation requires its signing certificate and a compatible version code;
+use the original workstation development key to update earlier local test builds.
+If Android reports a certificate mismatch, use the matching key. Uninstalling
+deletes the local Library, vocabulary and history.
+
 ## Contributing
 
 Start with [AGENTS.md](AGENTS.md) and the [current handoff](docs/NEXT_SESSION.md),

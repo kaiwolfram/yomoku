@@ -5014,3 +5014,12 @@ dismissal on Settings navigation, and report those actions as reader interaction
 No schema, dependency, provider API, codec or destructive behavior changes.
 Existing-note browser/return and a disposable real-provider/permission trial
 remain separate work; no compatibility claim is made from fake provider tests.
+
+## 2026-11-01 — README release APK instructions
+
+Expose the existing explicit optimized BoltFFI build followed by Gradle with
+`buildRustBridge` excluded in README.md. Keep the build sequential and require
+fresh native outputs before exclusion. Document local development-key signing
+for existing phone-test upgrades and a separate private-key option for distribution;
+retain external keystores and interactive release-password entry. This documents
+the existing manual workflow without changing Gradle defaults or publishing.
