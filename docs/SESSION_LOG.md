@@ -4283,3 +4283,25 @@ and /tmp/yomoku-browser-profile-*. No emulator started.
   with existing Library/history before the full visible Add flow. Actual provider
   permission dialogs, real collection/browser, optimized release and physical
   phone trials remain unrun; no compatibility claim is made.
+
+
+## 2026-11-01 — Native Anki preparation from the configured deck
+
+- Narrowed shell preparation to the current original/effective selection; native
+  code resolves the Ready acknowledged default deck. Unready/unconfigured settings
+  start no I/O. Failed/lost saves require authoritative readback, and preference
+  change/clear cannot retarget frozen export fields/deck or durable obligations.
+- Updated Rust/FIFO/JNI/Android fixtures to configure explicitly and reopen the
+  word after Settings, preserving existing dictionary-dismissal behavior. Six new
+  Rust cases cover acknowledgement/phase gates, long IDs, frozen fields/targets,
+  failure/COMMIT rollback/readback and reopen without implicit settings loading.
+- PASS: all 1013 workspace tests/17 opt-in ignored, strict Clippy/Rustfmt/Kotlin
+  formatting, full host JNI, identical independent/Android generation, both-ABI
+  debug/test APKs, strict lintDebug and all 19 selected API-36 x86_64 cases, zero
+  failures/errors/skips. Initial fixture correction/tooling: DEVELOPMENT.md.
+- No implementation/verification steps or blockers remain for this prerequisite.
+  Dictionary Add presentation and browser/return remain. No schema/dependency/
+  provider API/native-export ABI changes; the Event codec loses its deck field.
+  Actual permission dialogs, real collection/browser, tablet, physical phone and
+  optimized release trials remain unrun. Recommend the schema-24 phone upgrade
+  with existing Library/history before the next visible dictionary Add slice.

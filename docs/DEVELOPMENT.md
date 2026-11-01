@@ -8857,3 +8857,67 @@ Next: app-owned preparation from the saved deck and dictionary Add presentation,
 followed by existing-note browser/return handling. Logs:
 `/tmp/yomoku-anki-config-{format,format-check,android,emulator,emulator-boot}.log`.
 XML: `android/app/build/outputs/androidTest-results/connected/debug/`.
+
+## Native Anki preparation from the configured deck
+
+2026-11-01: `PrepareReaderAnkiExport` now carries only the original/effective
+selection. Native preparation resolves the Ready acknowledged deck, rejecting
+other settings phases/no configured deck without implicit I/O. Frozen exports
+retain their target across preference changes/clear. No schema, dependency,
+provider API or native-export ABI changes; regenerate the narrowed Event codec.
+Use the pinned offline toolchains, host JNI before Android native packaging,
+and the existing isolated 8 GiB statistics-ui-avd image without wiping data.
+
+```sh
+export PATH=/home/kai/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin:$PATH
+export JAVA_HOME="$PWD/.local/jdk-17/jdk-17.0.21+9"
+export JAVA_BIN="$JAVA_HOME/bin/java"
+export GRADLE_USER_HOME="$PWD/.local/gradle"
+export ANDROID_HOME=/home/kai/Android/Sdk
+cargo test -p yomoku-core anki --all-features --locked --offline
+cargo test -p yomoku-runtime storage::anki_live --all-features --locked --offline
+cargo test --workspace --all-features --locked --offline --quiet
+cargo clippy --workspace --all-targets --all-features --locked --offline -- -D warnings
+cargo fmt --all -- --check
+tools/test-kotlin-bridge.sh
+tools/format-kotlin.sh --check
+"$JAVA_BIN" -jar .local/ktfmt-0.64.jar --kotlinlang-style --dry-run --set-exit-if-changed tests/kotlin/AnkiExportBridgeTest.kt tests/kotlin/AnkiRecoveryBridgeTest.kt
+cargo run -p yomoku-ffi --bin generate-kotlin --features facet_typegen --locked --offline -- /tmp/yomoku-anki-configured-kotlin
+diff -r target/generated/kotlin /tmp/yomoku-anki-configured-kotlin
+./android/gradlew -p android :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug --offline --console=plain
+./android/gradlew -p android :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=app.yomoku.AnkiExportSessionTest,app.yomoku.AnkiExportPanelTest,app.yomoku.AnkiSettingsSessionTest,app.yomoku.AnkiSettingsActivityTest,app.yomoku.AnkiRecoverySessionTest,app.yomoku.CoreSessionTest,app.yomoku.NavigationTest,app.yomoku.ScalarDecodingTest#scalarValuesErrorsAndOffsetsMatchLegacy,app.yomoku.ScalarDecodingTest#generatedFrozenSnapshotsMatchLegacy --offline --console=plain
+git diff --check
+```
+
+Six new Rust cases cover both reader selection paths: acknowledged settings only,
+all unready phases/no deck/invalid IDs, exact IDs through i64::MAX, failed/wrong/
+stale/lost save acknowledgements and read-only recovery, exact sentence occurrence,
+frozen targets across change/clear, reopen requiring explicit preference loading,
+and SQLite statement/deferred-COMMIT rollback with no repeated update. Existing
+live FIFO tests now prepare through actual acknowledged configuration. Host JNI
+and Android CoreSession fixtures also configure explicitly and reopen the word.
+
+Initial full workspace run caught the fixtures preparing the old selection after
+OpenSettings, which intentionally dismisses dictionary data. Corrected the
+fixtures to load the word again after configuration, preserving production reader
+behavior. The next focused run passes all ten live FIFO cases; the final workspace
+run passes all 1013 tests/17 opt-in ignored. Strict Clippy, Rustfmt/Kotlin formatting
+and independent identical generation pass. The initial sandboxed emulator could
+not use local sockets/AVD state; normal local-socket/KVM escalation boots the
+existing image. ADB also requires local-socket escalation.
+
+PASS: full host Kotlin/JNI, narrowed action Rust/Kotlin exchange and exact configured
+targets through actual native settings/SQLite; frozen targets survive preference
+changes and restart retains no mutation authority. PASS: both-ABI Android native
+packaging, debug/test APKs, strict lintDebug, identical Android-generated Kotlin
+and all 19 selected API-36 x86_64 emulator cases (zero failures/errors/skips).
+Final diff check passes. No implementation/verification steps or blockers remain
+for this prerequisite. Dictionary Add presentation/browser, actual permission
+dialogs/disposable collection and physical-device checks remain. No optimized
+release or real-provider trial run; recommend the schema-24 phone Library/history
+upgrade before completing visible dictionary Add, then the real collection trial.
+
+Logs: `/tmp/yomoku-anki-configured-{core,fifo,workspace,workspace-final,clippy,
+rustfmt,jni,format,format-check,host-format-check,typegen,codegen-diff,
+android-codegen-diff,android,emulator,emulator-boot}.log` (one file per suffix).
+Final XML: `android/app/build/outputs/androidTest-results/connected/debug/`.

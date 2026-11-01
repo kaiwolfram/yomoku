@@ -4965,3 +4965,29 @@ discovery if Settings is still open; denial leaves the error with no automatic
 prompt/retry. Do not open system Settings or a collection automatically. A
 disposable real collection/permission trial remains required before compatibility
 claims. No dependency, provider API, schema, codec or destructive-semantics change.
+
+
+## 2026-11-01 — Resolve dictionary export targets from acknowledged native settings
+
+Narrow `PrepareReaderAnkiExport` to the current original/effective selection only.
+Resolve the deck from the app-owned Ready acknowledged preference; reject other
+settings phases and no configured deck without an implicit read/save or provider
+operation. In particular, a previous acknowledged deck retained during Saving or
+Failed is not available for new preparations. Settings Retry must complete its
+authoritative FIFO read first. Native preparation still authenticates the loaded
+current selection and all existing reader/journal gates; no new mutation permit
+or provider availability inference is introduced.
+
+Freeze the exact deck with the note/layout as before. Preference changes/clear
+cannot retarget accepted intent, pending provider work or durable obligations.
+After explicit Clear, a future preparation uses the then-acknowledged preference.
+A new owner starts Unloaded even when SQLite contains a deck. Existing Settings
+navigation dismisses the dictionary, so fixtures and future UI must reopen the
+word after configuration; preserve that established reader behavior.
+
+Replace the pre-release shell payload's explicit deck field rather than retaining
+a second bypass. Event generation and both Rust/Kotlin wire fixtures change
+together; no persisted format, schema, dependency, provider API or native-export
+ABI changes. Keep dictionary Add presentation/browser work separate from this
+independently verifiable ownership prerequisite. Provider preflight/live dispatch
+still revalidate availability/permission/frozen regular deck/model/duplicates.

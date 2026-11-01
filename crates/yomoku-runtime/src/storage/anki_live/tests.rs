@@ -18,7 +18,8 @@ use yomoku_core::{
     anki::{
         AnkiExport, AnkiExportPhase, AnkiLiveInvocation, AnkiLiveOutcome, AnkiLiveProgress,
         AnkiModelCreationOutcome, AnkiPreflightDeck, AnkiPreflightModel, AnkiPreflightObservation,
-        AnkiPreflightResult, AnkiRecoveryState, AnkiSelection, AnkiSubmissionOutcome,
+        AnkiPreflightResult, AnkiRecoveryState, AnkiSelection, AnkiSettingsPhase,
+        AnkiSubmissionOutcome,
     },
     app::{Effect, Event, Model, ViewModel, Yomoku},
     document::{ChapterText, PasteText, TextAnchor, TextOffset, TextRange},
@@ -219,7 +220,15 @@ impl Harness {
     fn local(&self, event: Event) -> Vec<Effect> {
         self.dispatch(event, |v| !v.0.storage_busy)
     }
-    fn prime(&self, fixture: &Fixture, create: bool) {
+    fn settings(&self, event: Event) {
+        self.dispatch(event, |v| {
+            !matches!(
+                v.0.anki_settings.phase,
+                AnkiSettingsPhase::Loading | AnkiSettingsPhase::Saving
+            )
+        });
+    }
+    fn select(&self, fixture: &Fixture) -> AnkiSelection {
         self.dispatch(Event::RestoreAnkiRecovery, |v| v.1.allows_preparation());
         self.local(Event::RefreshLibrary);
         let id = fixture.storage().list_documents().unwrap()[0].document_id;
@@ -232,7 +241,7 @@ impl Harness {
             analysis: view.reader_analysis.unwrap(),
         }));
         let view = self.router.view().0;
-        let selection = if let Some(page) = view.effective_reader_tokens {
+        if let Some(page) = view.effective_reader_tokens {
             let selection = yomoku_core::effective_session::EffectiveReaderSelection {
                 page: page.identity,
                 segment_index: page.tokens[0].segment_index,
@@ -247,11 +256,22 @@ impl Harness {
             };
             self.local(Event::LoadReaderWord(selection));
             AnkiSelection::Original(selection)
-        };
-        self.local(Event::PrepareReaderAnkiExport {
-            selection,
-            deck_id: i64::MAX,
+        }
+    }
+    fn load_word(&self, selection: AnkiSelection) {
+        self.local(match selection {
+            AnkiSelection::Original(selected) => Event::LoadReaderWord(selected),
+            AnkiSelection::Effective(selected) => Event::LoadEffectiveReaderWord(selected),
         });
+    }
+    fn prime(&self, fixture: &Fixture, create: bool) {
+        let selection = self.select(fixture);
+        self.local(Event::OpenSettings);
+        self.settings(Event::LoadAnkiSettings);
+        self.settings(Event::SetAnkiDefaultDeck(Some(i64::MAX)));
+        self.local(Event::CloseSettings);
+        self.load_word(selection);
+        self.local(Event::PrepareReaderAnkiExport { selection });
         assert!(self.router.view().3.is_some());
         let mut effects = self.local(Event::BeginAnkiExportPreflight);
         let Some(Effect::AnkiExportPreflight(request)) = effects.first_mut() else {
@@ -676,4 +696,139 @@ fn anki_live_worker_external_changed_pair_refuses_outcome_and_consumes_attempt()
             .unwrap(),
         "{}"
     );
+}
+
+#[test]
+fn anki_configured_preparation_fifo_freezes_acknowledged_deck_across_change_clear_and_reopen() {
+    for effective in [false, true] {
+        let fixture = Fixture::new();
+        let harness = fixture.router(effective, false, false);
+        let selection = harness.select(&fixture);
+        harness.local(Event::PrepareReaderAnkiExport { selection });
+        assert!(harness.router.view().3.is_none());
+        harness.local(Event::OpenSettings);
+        harness.settings(Event::LoadAnkiSettings);
+        harness.local(Event::CloseSettings);
+        harness.load_word(selection);
+        harness.local(Event::PrepareReaderAnkiExport { selection });
+        assert!(harness.router.view().3.is_none());
+        harness.local(Event::OpenSettings);
+        harness.settings(Event::SetAnkiDefaultDeck(Some(i64::MAX)));
+        harness.local(Event::PrepareReaderAnkiExport { selection });
+        assert!(harness.router.view().3.is_none()); // The dictionary is hidden by Settings.
+        harness.local(Event::CloseSettings);
+        harness.load_word(selection);
+        let before = harness.router.view().0;
+        let bytes = std::fs::read(fixture.path()).unwrap();
+        assert!(harness
+            .local(Event::PrepareReaderAnkiExport { selection })
+            .iter()
+            .all(|effect| matches!(effect, Effect::Render(_))));
+        let frozen = harness.router.view().3.unwrap();
+        assert_eq!(i64::from(frozen.deck()), i64::MAX);
+        assert_eq!(frozen.selection(), selection);
+        assert_eq!(frozen.note().fields()[0], "𠮷猫");
+        assert_eq!(
+            frozen.note().fields()[3],
+            "<strong class=\"yomoku-target\">𠮷猫</strong>。"
+        );
+        let mut after = harness.router.view().0;
+        after.anki_export = None;
+        assert_eq!(after, before);
+        assert_eq!(std::fs::read(fixture.path()).unwrap(), bytes);
+        harness.local(Event::OpenSettings);
+        harness.settings(Event::SetAnkiDefaultDeck(Some(9007199254740993)));
+        harness.local(Event::CloseSettings);
+        harness.load_word(selection);
+        harness.local(Event::PrepareReaderAnkiExport { selection });
+        assert_eq!(harness.router.view().3.as_ref(), Some(&frozen));
+        let id = harness.router.view().0.anki_export.unwrap().preparation_id;
+        harness.local(Event::ClearAnkiExport { preparation_id: id });
+        harness.local(Event::PrepareReaderAnkiExport { selection });
+        assert_eq!(
+            i64::from(harness.router.view().3.unwrap().deck()),
+            9007199254740993
+        );
+        harness.local(Event::OpenSettings);
+        harness.settings(Event::SetAnkiDefaultDeck(None));
+        harness.local(Event::CloseSettings);
+        harness.load_word(selection);
+        let id = harness.router.view().0.anki_export.unwrap().preparation_id;
+        harness.local(Event::ClearAnkiExport { preparation_id: id });
+        harness.local(Event::PrepareReaderAnkiExport { selection });
+        assert!(harness.router.view().3.is_none());
+        drop(harness);
+        fixture
+            .storage()
+            .save_anki_default_deck(Some(i64::MAX.try_into().unwrap()))
+            .unwrap();
+        let reopened = fixture.router(effective, false, false);
+        let selection = reopened.select(&fixture);
+        reopened.local(Event::PrepareReaderAnkiExport { selection });
+        assert!(reopened.router.view().3.is_none()); // A new owner still needs its explicit read.
+        reopened.local(Event::OpenSettings);
+        reopened.settings(Event::LoadAnkiSettings);
+        reopened.local(Event::CloseSettings);
+        reopened.load_word(selection);
+        reopened.local(Event::PrepareReaderAnkiExport { selection });
+        assert_eq!(
+            i64::from(reopened.router.view().3.unwrap().deck()),
+            i64::MAX
+        );
+    }
+}
+
+#[test]
+fn anki_configured_preparation_fifo_blocks_failed_save_until_readback_without_repeating_write() {
+    for effective in [false, true] {
+        for deferred in [false, true] {
+            let fixture = Fixture::new();
+            fixture
+                .storage()
+                .save_anki_default_deck(Some(1.try_into().unwrap()))
+                .unwrap();
+            let harness = fixture.router(effective, false, false);
+            let selection = harness.select(&fixture);
+            harness.local(Event::OpenSettings);
+            harness.settings(Event::LoadAnkiSettings);
+            let sql = fixture.sql();
+            sql.execute_batch(if deferred {
+                "CREATE TABLE settings_parent(id INTEGER PRIMARY KEY); CREATE TABLE settings_child(id INTEGER REFERENCES settings_parent(id) DEFERRABLE INITIALLY DEFERRED); CREATE TRIGGER fail_settings AFTER UPDATE ON anki_settings BEGIN INSERT INTO settings_child VALUES(1); END;"
+            } else {
+                "CREATE TRIGGER fail_settings BEFORE UPDATE ON anki_settings BEGIN SELECT RAISE(ABORT, 'settings failure'); END;"
+            }).unwrap();
+            harness.settings(Event::SetAnkiDefaultDeck(Some(i64::MAX)));
+            assert_eq!(
+                harness.router.view().0.anki_settings.phase,
+                AnkiSettingsPhase::Failed
+            );
+            assert_eq!(
+                harness.router.view().0.anki_settings.default_deck_id,
+                Some(1)
+            );
+            harness.local(Event::CloseSettings);
+            harness.load_word(selection);
+            harness.local(Event::PrepareReaderAnkiExport { selection });
+            assert!(harness.router.view().3.is_none());
+            sql.execute_batch("DROP TRIGGER fail_settings; CREATE TABLE settings_writes(id INTEGER); CREATE TRIGGER count_settings AFTER UPDATE ON anki_settings BEGIN INSERT INTO settings_writes VALUES(1); END;").unwrap();
+            harness.local(Event::OpenSettings);
+            harness.settings(Event::RetryAnkiSettings);
+            harness.local(Event::CloseSettings);
+            harness.load_word(selection);
+            harness.local(Event::PrepareReaderAnkiExport { selection });
+            assert_eq!(i64::from(harness.router.view().3.unwrap().deck()), 1);
+            assert_eq!(
+                sql.query_row("SELECT COUNT(*) FROM settings_writes", [], |row| row
+                    .get::<_, i64>(0))
+                    .unwrap(),
+                0
+            );
+            assert_eq!(
+                fixture.storage().anki_recovery_snapshot().unwrap(),
+                Default::default()
+            );
+            assert!(harness.router.view().2.is_none());
+            assert!(harness.invocation.lock().unwrap().is_none());
+        }
+    }
 }

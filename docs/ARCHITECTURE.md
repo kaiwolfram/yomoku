@@ -2216,9 +2216,17 @@ consumes this projection through the explicit controls described below.
 
 ### Shell actions for frozen Anki preparation
 
-`PrepareReaderAnkiExport { selection, deck_id }` carries an original/effective
-reader selection, never note fields. The core converts the positive provider deck
-ID and reuses native current-owner/loaded-dictionary and journal/busy gates.
+`PrepareReaderAnkiExport { selection }` carries only an original/effective
+reader selection. Native preparation requires the retained Anki settings phase
+Ready with a positive acknowledged configured deck; Unloaded, Loading, Saving,
+Failed and acknowledged no-deck reject preparation without I/O. The shell cannot
+supply another target or trigger an implicit preference load. The core reuses
+native current-owner/loaded-dictionary and journal/busy gates. Opening Settings
+dismisses the dictionary, so the user must reopen the word after configuration.
+Accepted intent freezes the acknowledged deck with its fields; later preference
+changes/clear affect only future preparations. Provider discovery grants no
+preparation or write authority; preflight/live dispatch still revalidate access,
+the frozen regular deck, model and exact duplicates.
 Accepted preparation increments a checked session-local sequence, exposed as
 `AnkiExportView::preparation_id`. Clear and Retry never recycle the sequence;
 restart restores no frozen intent or action authority.
@@ -2281,7 +2289,8 @@ loads coalesce and neither navigation nor composition initiates I/O. Native
 and a separate storage error. The compact presentation remains available across
 navigation for future reader consumers. It contains no provider availability or
 permission evidence. Explicit Settings controls now dispatch these events; the
-dictionary entry and configured-deck preparation remain future work.
+dictionary entry remains future work. Shell preparation consumes the acknowledged
+configured deck as described above.
 
 The app validates positive signed-64 IDs and owns an independent checked request
 sequence. Saves require Ready and publish the exact requested value only after
@@ -2296,8 +2305,8 @@ save response is lost. The read queues behind the old operation on the same FIFO
 and invalidates its callback generation. Another save requires the authoritative
 read acknowledgement; Retry never repeats a write or queries the provider. A
 new session begins Unloaded and restores the preference only by reading SQLite.
-Configured-deck preparation, dictionary Add and browser/return behavior remain
-unfinished. Schema/dependencies and the native-export ABI are unchanged;
+Dictionary Add and browser/return behavior remain unfinished. Configured-deck
+preparation consumes only Ready settings and never reloads or saves implicitly. Schema/dependencies and the native-export ABI are unchanged;
 generated Event/ViewModel codecs changed in this retained-settings slice.
 
 ### Explicit Android Anki configuration

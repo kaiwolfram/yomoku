@@ -84,11 +84,26 @@ internal fun verifyAnkiExportBridge() {
                             it.effectiveReaderWord?.details != null && !it.storageBusy
                         }
                     val before = checkNotNull(loaded.effectiveReaderWord?.details)
-                    val prepare =
-                        Event.PrepareReaderAnkiExport(
-                            AnkiSelection.Effective(selected),
-                            Long.MAX_VALUE,
-                        )
+                    val prepare = Event.PrepareReaderAnkiExport(AnkiSelection.Effective(selected))
+                    check(send(bridge, prepare).isEmpty())
+                    check(view(bridge).ankiExport == null)
+                    send(bridge, Event.OpenSettings)
+                    send(bridge, Event.LoadAnkiSettings)
+                    awaitView(bridge) { it.ankiSettings.phase == AnkiSettingsPhase.READY }
+                    check(view(bridge).ankiSettings.defaultDeckId == null)
+                    send(bridge, Event.CloseSettings)
+                    send(bridge, Event.LoadEffectiveReaderWord(selected))
+                    awaitView(bridge) { it.effectiveReaderWord?.details != null && !it.storageBusy }
+                    check(send(bridge, prepare).isEmpty())
+                    check(view(bridge).ankiExport == null)
+                    send(bridge, Event.OpenSettings)
+                    send(bridge, Event.SetAnkiDefaultDeck(Long.MAX_VALUE))
+                    awaitView(bridge) { it.ankiSettings.phase == AnkiSettingsPhase.READY }
+                    check(view(bridge).ankiSettings.defaultDeckId == Long.MAX_VALUE)
+                    check(send(bridge, prepare).isEmpty()) // The selection is hidden in Settings.
+                    send(bridge, Event.CloseSettings)
+                    send(bridge, Event.LoadEffectiveReaderWord(selected))
+                    awaitView(bridge) { it.effectiveReaderWord?.details != null && !it.storageBusy }
                     send(bridge, prepare)
                     val old = checkNotNull(view(bridge).ankiExport)
                     check(old.phase == AnkiExportPhase.Prepared && old.surface == "猫")
@@ -97,6 +112,14 @@ internal fun verifyAnkiExportBridge() {
                     val frozen = checkNotNull(view(bridge).ankiExport)
                     check(frozen.preparationId > old.preparationId)
                     send(bridge, Event.ClearAnkiExport(old.preparationId))
+                    check(view(bridge).ankiExport == frozen)
+                    send(bridge, Event.OpenSettings)
+                    send(bridge, Event.SetAnkiDefaultDeck(9007199254740993L))
+                    awaitView(bridge) { it.ankiSettings.phase == AnkiSettingsPhase.READY }
+                    send(bridge, Event.CloseSettings)
+                    send(bridge, Event.LoadEffectiveReaderWord(selected))
+                    awaitView(bridge) { it.effectiveReaderWord?.details != null && !it.storageBusy }
+                    send(bridge, prepare)
                     check(view(bridge).ankiExport == frozen)
                     val preflight =
                         send(bridge, Event.BeginAnkiExportPreflight).single {
@@ -212,7 +235,11 @@ internal fun verifyAnkiExportBridge() {
                     send(bridge, Event.BeginPreparedAnkiExport(2UL, AnkiExportPhase.CreateModel))
                         .isEmpty()
                 )
+                check(view(bridge).ankiSettings.phase == AnkiSettingsPhase.UNLOADED)
                 send(bridge, Event.OpenSettings)
+                send(bridge, Event.LoadAnkiSettings)
+                awaitView(bridge) { it.ankiSettings.phase == AnkiSettingsPhase.READY }
+                check(view(bridge).ankiSettings.defaultDeckId == 9007199254740993L)
                 if (create) check(view(bridge).ankiRecovery == null)
                 else check(view(bridge).ankiRecovery?.notePending == true)
                 send(bridge, Event.CloseSettings)
@@ -225,6 +252,6 @@ internal fun verifyAnkiExportBridge() {
         check(directory.deleteRecursively())
     }
     println(
-        "PASS: authenticated Anki shell preparation/begin/clear, exact frozen fields, durable model/note outcomes, one dispatch and restart without replay"
+        "PASS: native configured-deck preparation, acknowledged-only targets, frozen fields/deck, durable model/note outcomes, one dispatch and restart without replay"
     )
 }

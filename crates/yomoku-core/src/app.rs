@@ -306,10 +306,10 @@ pub enum Event {
     BeginAnkiRecoveryRead(crate::anki::AnkiRecoveryReadTarget),
     /// Consume an already committed native permit once; cannot prepare or begin a write.
     DispatchAnkiLive,
-    /// Freeze only the current loaded dictionary selection. Invalid decks/selections do nothing.
+    /// Freeze the current loaded dictionary selection with the acknowledged configured deck.
+    /// Unready/unconfigured settings and invalid selections do nothing; no I/O is started.
     PrepareReaderAnkiExport {
         selection: crate::anki::AnkiSelection,
-        deck_id: i64,
     },
     /// Begin only the exact frozen intent and preflight phase the shell presented.
     BeginPreparedAnkiExport {

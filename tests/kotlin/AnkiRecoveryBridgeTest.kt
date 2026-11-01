@@ -16,7 +16,6 @@ internal fun verifyAnkiRecoveryBridge(fixtures: String) {
         val event = Event.bincodeDeserialize(bytes)
         when (event) {
             is Event.PrepareReaderAnkiExport -> {
-                check(event.deckId == Long.MAX_VALUE)
                 when (val selected = event.selection) {
                     is AnkiSelection.Original -> {
                         check(index == 0 && selected.value.tokenIndex == ULong.MAX_VALUE)

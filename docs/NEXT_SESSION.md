@@ -14,7 +14,7 @@ results in progress docs/reports, out of commit message bodies.
   Schema 0023 drops unused forms; 0024 adds initially unconfigured Anki settings.
 
 ## Current Anki configuration boundary
-- NEW: Settings explicitly loads/reloads the retained native preference, selects
+- Settings explicitly loads/reloads the retained native preference, selects
   a regular provider deck or clears the default. Saves require native Ready and
   publish only matching committed acknowledgements. Failed/lost-response Retry
   reads authoritative settings on the same SQLite FIFO without repeating writes.
@@ -28,8 +28,12 @@ results in progress docs/reports, out of commit message bodies.
 - Composition/navigation starts no settings/provider I/O. Activity recreation
   retains observations; close skips queued/drops late discovery. A new session
   starts Unchecked/Unloaded. No schema/dependency/codec/native ABI changes here.
-- Dictionary preparation still takes an explicit deck; consuming the retained
-  configured preference natively and visible dictionary Add are next.
+- NEW: PrepareReaderAnkiExport carries only the current selection. Native code
+  requires Ready acknowledged configured settings and freezes that exact deck;
+  other settings phases/no deck reject without implicit I/O. Settings changes/
+  clear never retarget accepted intent; authoritative Retry readback must finish
+  before new preparation after failed/lost saves. Settings dismisses the word;
+  reopen it after configuration. Visible dictionary Add remains next.
 
 ## Existing Anki invariants
 - Native preparation freezes the loaded original/effective selection, fields,
@@ -48,18 +52,25 @@ results in progress docs/reports, out of commit message bodies.
   ARCHITECTURE.md, DATA_MODEL.md, ANKIDROID_API.md and DECISIONS.md.
 
 ## Next tasks (ordered)
-1. Add app-owned configured-deck preparation and current dictionary Add presentation.
+1. Add current dictionary Add presentation using the selection-only native action
+   and existing frozen export projection/controls. Keep original/effective identity
+   authentication and explicit provider/configuration behavior; no composition I/O.
 2. Complete existing-note browser/return and remaining retained lifecycle checks;
    validate disposable real AnkiDroid collection/permission behavior and unchanged
    vocabulary/history. Include the schema-24 phone upgrade checkpoint.
 3. Encrypted-backup format/library review follows completed Anki integration.
 
 ## Verification / blockers
-- PASS: eight new Android cases; all 22 selected API-36 x86_64 emulator cases,
-  debug/test APKs (existing both-ABI native packaging), strict lintDebug, Kotlin
-  formatting and diff checks. Commands/results: DEVELOPMENT.md, Explicit Anki
-  configuration in Settings. No implementation/verification steps or blockers
-  remain for this slice. Full host Rust/Clippy/JNI not rerun for Kotlin-only work.
+- PASS: six new Rust cases; all 1013 workspace tests/17 opt-in ignored, strict
+  Clippy, Rustfmt/Kotlin formatting, full host JNI, identical independent/Android
+  Kotlin generation, both-ABI debug/test APKs, strict lintDebug, all 19 selected
+  API-36 x86_64 emulator cases and diff checks. Commands/results: DEVELOPMENT.md,
+  Native Anki preparation from the configured deck. No implementation/verification
+  steps or blockers remain for this prerequisite. Broader Anki work remains above.
+- Initial FIFO fixtures incorrectly retained a word after Settings dismissal;
+  fixed by reopening it, with no production reader change. Local Gradle/ADB/
+  emulator sockets/KVM required normal escalation; no dependency downloads.
 - Actual permission dialogs, real collection/browser, tablet, optimized release
   and physical upgrade/performance trials remain unrun. Older phone APK is source
-  0374365; no release requested. Configuration UI is ready for device review.
+  0374365; no release requested. Recommend the schema-24 phone upgrade checkpoint
+  before the next visible dictionary Add slice; no compatibility claim yet.

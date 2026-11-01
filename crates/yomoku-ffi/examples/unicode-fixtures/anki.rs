@@ -37,7 +37,6 @@ pub fn exchange(dir: &Path, writing: bool) -> Result<(), Box<dyn Error>> {
                 key,
                 token_index: u64::MAX,
             }),
-            deck_id: i64::MAX,
         },
         Event::PrepareReaderAnkiExport {
             selection: AnkiSelection::Effective(EffectiveReaderSelection {
@@ -47,7 +46,6 @@ pub fn exchange(dir: &Path, writing: bool) -> Result<(), Box<dyn Error>> {
                 },
                 segment_index: u64::MAX,
             }),
-            deck_id: i64::MAX,
         },
         Event::BeginPreparedAnkiExport {
             preparation_id: u64::MAX,

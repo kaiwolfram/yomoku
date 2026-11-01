@@ -132,7 +132,27 @@ class AnkiExportSessionTest {
             )
         send(Event.LoadEffectiveReaderWord(selected))
         await { it.effectiveReaderWord?.details != null && !it.storageBusy }
-        send(Event.PrepareReaderAnkiExport(AnkiSelection.Effective(selected), Long.MAX_VALUE))
+        val prepare = Event.PrepareReaderAnkiExport(AnkiSelection.Effective(selected))
+        send(prepare)
+        assertEquals(null, core.view.ankiExport)
+        send(Event.OpenSettings)
+        send(Event.LoadAnkiSettings)
+        await { it.ankiSettings.phase == AnkiSettingsPhase.READY }
+        assertEquals(null, core.view.ankiSettings.defaultDeckId)
+        send(Event.CloseSettings)
+        send(Event.LoadEffectiveReaderWord(selected))
+        await { it.effectiveReaderWord?.details != null && !it.storageBusy }
+        send(prepare)
+        assertEquals(null, core.view.ankiExport)
+        send(Event.OpenSettings)
+        send(Event.SetAnkiDefaultDeck(Long.MAX_VALUE))
+        await { it.ankiSettings.phase == AnkiSettingsPhase.READY }
+        send(prepare)
+        assertEquals(null, core.view.ankiExport)
+        send(Event.CloseSettings)
+        send(Event.LoadEffectiveReaderWord(selected))
+        await { it.effectiveReaderWord?.details != null && !it.storageBusy }
+        send(prepare)
         return checkNotNull(core.view.ankiExport)
     }
 

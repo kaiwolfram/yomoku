@@ -1,7 +1,7 @@
 //! Freeze only the current owner's selection. This data authorizes no I/O.
 
 use super::*;
-use crate::anki::{AnkiDeckId, AnkiExport, AnkiSelection};
+use crate::anki::{AnkiDeckId, AnkiExport, AnkiSelection, AnkiSettingsPhase};
 
 impl Model {
     /// Native immutable intent, retained across popup/page changes. Before live
@@ -82,8 +82,14 @@ impl Yomoku {
         model: &mut Model,
     ) -> Option<Command<Effect, Event>> {
         match event {
-            Event::PrepareReaderAnkiExport { selection, deck_id } => {
-                let Ok(deck) = AnkiDeckId::try_from(*deck_id) else {
+            Event::PrepareReaderAnkiExport { selection } => {
+                if model.anki_settings.phase != AnkiSettingsPhase::Ready {
+                    return Some(Command::done());
+                }
+                let Some(deck) = model.anki_settings.default_deck_id else {
+                    return Some(Command::done());
+                };
+                let Ok(deck) = AnkiDeckId::try_from(deck) else {
                     return Some(Command::done());
                 };
                 return self.update_anki_preparation(

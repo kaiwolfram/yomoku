@@ -700,13 +700,12 @@ fn anki_shell_stale_begin_cannot_start_identical_reprepared_intent() {
                 preparation_id: old.preparation_id,
             },
         );
-        update(
-            &mut model,
-            Event::PrepareReaderAnkiExport {
-                selection,
-                deck_id: i64::MAX,
-            },
-        );
+        model.anki_settings = crate::anki::AnkiSettingsView {
+            phase: crate::anki::AnkiSettingsPhase::Ready,
+            default_deck_id: Some(i64::MAX),
+            storage_error: None,
+        };
+        update(&mut model, Event::PrepareReaderAnkiExport { selection });
         let _preflight = Yomoku.update(Event::BeginAnkiExportPreflight, &mut model);
         let request = model.pending_anki_export_preflight().unwrap().clone();
         update(

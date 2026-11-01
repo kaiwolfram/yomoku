@@ -2168,8 +2168,10 @@ value and the expected typed phase; Clear matches the value before native live
 and recovery gates. Exhaustion rejects further preparation in that session.
 Neither a copied generation nor a restarted journal reconstructs native callback
 ownership or a mutation permit. Original/effective selections reuse their
-existing typed wire identities; deck IDs cross as signed-64 values and are
-validated positive before native preparation.
+existing typed wire identities. The preparation action carries no deck ID;
+native code resolves the Ready acknowledged preference, validates its positive
+signed-64 ID and freezes it with the intent. Other settings phases/no configured
+deck reject preparation without implicit I/O.
 
 ## Configured Anki default deck (migration 0024)
 
@@ -2197,7 +2199,12 @@ no additional schema or durable journal. A restart begins Unloaded.
 
 Visible Settings controls now use these events, with read-only Android deck
 discovery kept only in the retained session. Deck names, availability and
-permission are never persisted. Configured-deck preparation remains unfinished.
-Future preparation must resolve the persisted preference, keep its own frozen deck and
-revalidate current provider/spec/permission/nonfiltered-deck state before export.
-A stored ID alone never permits provider dispatch or write retries.
+permission are never persisted. Shell preparation resolves only the retained
+Ready acknowledged preference and keeps its own frozen deck; Saving/Failed cannot
+use a previous acknowledged value, and a new session must explicitly load settings.
+Read-only Retry's authoritative acknowledgement enables future preparation after
+a failed/lost save; the old write is never repeated. Later preference changes or
+clear cannot retarget prepared/live/journal payloads. Preflight/live dispatch
+still revalidate current provider/spec/permission/nonfiltered-deck state before
+export. A stored ID alone never permits provider dispatch or write retries.
+Dictionary Add presentation and existing-note browser/return remain unfinished.

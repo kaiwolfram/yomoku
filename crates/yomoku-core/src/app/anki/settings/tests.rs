@@ -230,9 +230,9 @@ fn anki_settings_callbacks_preserve_reader_and_frozen_export_for_both_selection_
     for effective in [false, true] {
         let (mut model, selection) = super::super::test_support::fixture(effective);
         drop(Yomoku.update(
-            Event::PrepareReaderAnkiExport {
+            Event::PrepareAnkiExport {
                 selection,
-                deck_id: 1,
+                deck: 1.try_into().unwrap(),
             },
             &mut model,
         ));
