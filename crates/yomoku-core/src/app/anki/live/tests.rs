@@ -1,4 +1,5 @@
 use super::*;
+use crate::app::anki::test_support::reader_view;
 use crate::{
     anki::{
         AnkiExportError, AnkiLiveCallback, AnkiLiveOutcome, AnkiModelCreationOutcome,
@@ -124,10 +125,10 @@ fn anki_live_frozen_both_selections_and_kinds_issue_one_permit_without_reader_wr
     for effective in [false, true] {
         for create in [false, true] {
             let mut model = prepared(effective, create);
-            let reader_before = Yomoku.view(&model);
+            let reader_before = reader_view(&model);
             let frozen = model.prepared_anki_export().unwrap().clone();
             let request = ready(&mut model);
-            assert_eq!(Yomoku.view(&model), reader_before);
+            assert_eq!(reader_view(&model), reader_before);
             assert!(!model.anki_recovery().allows_preparation());
             let _navigation = Yomoku.update(Event::OpenSettings, &mut model);
             let invocation = model.take_anki_live_invocation().unwrap();
@@ -141,10 +142,10 @@ fn anki_live_frozen_both_selections_and_kinds_issue_one_permit_without_reader_wr
                 AnkiLiveIntent::Model(creation) => assert_eq!(creation.layout(), frozen.layout()),
             }
             assert!(model.take_anki_live_invocation().is_none());
-            let mut before = Yomoku.view(&model);
+            let mut before = reader_view(&model);
             let callback = invocation.complete(terminal(create));
             let _command = save(&mut model, callback.clone());
-            assert_eq!(Yomoku.view(&model), before);
+            assert_eq!(reader_view(&model), before);
             update(
                 &mut model,
                 Event::FinishAnkiLive(Box::new(callback.clone())),
@@ -164,8 +165,8 @@ fn anki_live_frozen_both_selections_and_kinds_issue_one_permit_without_reader_wr
             assert_eq!(model.anki_live_progress(), Some(AnkiLiveProgress::Finished));
             assert!(model.anki_recovery().allows_preparation());
             assert!(model.take_anki_live_invocation().is_none());
-            before.anki_recovery = Yomoku.view(&model).anki_recovery;
-            assert_eq!(Yomoku.view(&model), before);
+            before.anki_recovery = reader_view(&model).anki_recovery;
+            assert_eq!(reader_view(&model), before);
             update(&mut model, Event::BeginAnkiLive);
             update(&mut model, Event::ClearPreparedAnkiExport);
             assert!(model.prepared_anki_export().is_none());
@@ -319,8 +320,8 @@ fn anki_live_active_stages_block_clear_recovery_and_preflight_without_blocking_r
             assert_eq!(model.prepared_anki_export(), frozen.as_ref());
         }
         let _command = Yomoku.update(Event::OpenSettings, &mut model);
-        assert!(Yomoku.view(&model).settings_open);
-        assert!(!Yomoku.view(&model).storage_busy);
+        assert!(reader_view(&model).settings_open);
+        assert!(!reader_view(&model).storage_busy);
     }
 }
 
@@ -624,3 +625,4 @@ fn anki_live_take_and_outcome_ack_recheck_pair_and_reject_foreign_owners() {
 }
 
 mod dispatch;
+mod export_view;

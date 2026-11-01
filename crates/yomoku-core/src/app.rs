@@ -410,6 +410,8 @@ pub enum Event {
 pub struct ViewModel {
     /// Settings-only recovery presentation; journal payloads and handles stay native.
     pub anki_recovery: Option<crate::anki::AnkiRecoveryView>,
+    /// Session-owned frozen export status; observed IDs carry no callback authority.
+    pub anki_export: Option<crate::anki::AnkiExportView>,
     pub vocabulary: crate::vocabulary::VocabularyState,
     pub statistics: crate::statistics::StatisticsState,
     pub destination: Destination,
@@ -485,10 +487,10 @@ impl App for Yomoku {
     type Effect = Effect;
 
     fn update(&self, event: Event, model: &mut Model) -> Command<Effect, Event> {
-        let anki_before = model.anki_recovery_view();
+        let anki_before = (model.anki_recovery_view(), model.anki_export_view());
         if let Some(command) = self.update_anki_recovery(&event, model) {
             model.remember_anki_recovery_attention();
-            if anki_before != model.anki_recovery_view() {
+            if anki_before != (model.anki_recovery_view(), model.anki_export_view()) {
                 return command.and(render::render());
             }
             return command;
@@ -1715,6 +1717,7 @@ impl App for Yomoku {
     fn view(&self, model: &Model) -> ViewModel {
         ViewModel {
             anki_recovery: model.anki_recovery_view(),
+            anki_export: model.anki_export_view(),
             vocabulary: model.vocabulary.clone(),
             statistics: model.statistics.clone(),
             destination: model.destination,

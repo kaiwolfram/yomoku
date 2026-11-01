@@ -2170,9 +2170,9 @@ reachable user mutation flow or real AnkiDroid compatibility claim yet.
 projects loading/clear/unresolved/checking/saving/busy/failed phases, pending-kind
 flags, typed storage/provider errors and read/Retry eligibility. It shares the
 native action guards and carries no journal IDs, payloads or callback authority.
-Anki updates emit Render when this visible projection changes, including worker
-restore/commit callbacks. Outside Settings the projection is absent and those
-updates retain the existing reader render policy.
+Anki updates emit Render when either recovery or export presentation changes,
+including worker restore/commit callbacks. The recovery projection is absent
+outside Settings; export presentation has its own independent lifetime below.
 Clean startup with empty journals shows no panel. A volatile native notice flag
 keeps the panel visible after recovery needed attention, including its cleared
 state, until session closure; it is not restored across process restart.
@@ -2184,5 +2184,32 @@ Empty observations remain unresolved and a successful provider read remains pend
 until the FIFO commit acknowledgement. No pending recovery is solely a journal
 statement; it makes no claim about deck placement or provider availability. Errors
 remain separate from local-reader saves. Authenticated shell preparation/begin,
-Ready orchestration, live outcome presentation and permission/deck/Add/browser UI
+Ready orchestration, live outcome UI and permission/deck/Add/browser UI
 still precede a complete visible export workflow.
+
+### Frozen Anki export presentation
+
+`ViewModel::anki_export` carries an optional `AnkiExportView` containing the
+frozen exact surface, target deck and a typed `AnkiExportPhase`. It is absent
+until native preparation succeeds, persists across popup dismissal/navigation,
+and disappears on accepted Clear or read-only restoration after a failed live
+attempt. Startup journal restoration never recreates this presentation or live
+authority. No shell preparation/begin action is added by this projection.
+
+Preflight projects Checking, CreateModel, ReuseModel, exact Existing note IDs or
+the typed provider error, including model conflicts. Live work projects Beginning,
+Ready, Invoking and Saving. Provider results and returned IDs stay hidden behind
+Saving until the exact durable outcome acknowledgement. Only then can it show
+NoteAdded, ModelCreated, Existing, NotSubmitted or kind-specific uncertainty with
+an optional known ID. Failed/lost/mismatched journal acknowledgements show a
+storage error; a committed provider success cannot bypass that failure. The live
+protocol supplies no failure reason for NoSubmission, so none is fabricated.
+
+Terminal phases describe the last durably acknowledged attempt, retained until
+Clear/Retry. Subsequent read-only reconciliation changes current recovery
+obligations, not that historical outcome. These IDs are observations, not native
+handles or mutation permits. The projection never starts another model/note
+submission, performs I/O or changes reader/vocabulary/history state. Render is
+emitted when the projected state changes; duplicate/stale callbacks stay silent.
+Generated Kotlin carries all phases and exact signed-64 provider IDs. Compose
+live status presentation and authenticated Add orchestration remain next work.

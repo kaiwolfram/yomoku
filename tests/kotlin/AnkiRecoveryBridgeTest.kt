@@ -10,6 +10,35 @@ import java.util.concurrent.TimeUnit
 
 internal fun verifyAnkiRecoveryBridge(fixtures: String) {
     val root = File(fixtures)
+    val exportPhases =
+        listOf(
+            AnkiExportPhase.Prepared,
+            AnkiExportPhase.Checking,
+            AnkiExportPhase.CreateModel,
+            AnkiExportPhase.ReuseModel(9007199254740993L),
+            AnkiExportPhase.Existing(listOf(Long.MAX_VALUE, 9007199254740993L)),
+            AnkiExportPhase.Beginning,
+            AnkiExportPhase.Ready,
+            AnkiExportPhase.Invoking,
+            AnkiExportPhase.Saving,
+            AnkiExportPhase.NoteAdded(Long.MAX_VALUE),
+            AnkiExportPhase.ModelCreated(9007199254740993L),
+            AnkiExportPhase.NotSubmitted,
+            AnkiExportPhase.NoteUncertain(null),
+            AnkiExportPhase.NoteUncertain(Long.MAX_VALUE),
+            AnkiExportPhase.ModelUncertain(null),
+            AnkiExportPhase.ModelUncertain(9007199254740993L),
+            AnkiExportPhase.ProviderFailed(AnkiExportError.INCOMPATIBLEMODEL),
+            AnkiExportPhase.StorageFailed(DocumentError.UNAVAILABLE),
+        )
+    for ((index, phase) in exportPhases.withIndex()) {
+        val view =
+            AnkiExportView.bincodeDeserialize(
+                root.resolve("anki-export-view-$index.bin").readBytes()
+            )
+        check(view == AnkiExportView("𠮷猫", Long.MAX_VALUE, phase))
+        root.resolve("anki-export-view-$index-return.bin").writeBytes(view.bincodeSerialize())
+    }
     for ((index, phase) in AnkiRecoveryPhase.entries.withIndex()) {
         val view =
             AnkiRecoveryView.bincodeDeserialize(

@@ -2,10 +2,10 @@ use std::{error::Error, fs, path::Path};
 
 use yomoku_core::{
     anki::{
-        AnkiExportError, AnkiLiveOperation, AnkiLiveResult, AnkiModelCreation, AnkiModelLayout,
-        AnkiNote, AnkiPreflightDeck, AnkiPreflightModel, AnkiPreflightObservation,
-        AnkiPreflightOperation, AnkiPreflightResult, AnkiReadModelLayout, AnkiRecoveryPhase,
-        AnkiRecoveryView, AnkiSubmission,
+        AnkiExportError, AnkiExportPhase, AnkiExportView, AnkiLiveOperation, AnkiLiveResult,
+        AnkiModelCreation, AnkiModelLayout, AnkiNote, AnkiPreflightDeck, AnkiPreflightModel,
+        AnkiPreflightObservation, AnkiPreflightOperation, AnkiPreflightResult, AnkiReadModelLayout,
+        AnkiRecoveryPhase, AnkiRecoveryView, AnkiSubmission,
     },
     document::{TextOffset, TextRange},
     storage::DocumentError,
@@ -15,6 +15,44 @@ use yomoku_storage::Storage;
 
 pub fn exchange(dir: &Path, writing: bool) -> Result<(), Box<dyn Error>> {
     fs::create_dir_all(dir)?;
+    for (index, phase) in [
+        AnkiExportPhase::Prepared,
+        AnkiExportPhase::Checking,
+        AnkiExportPhase::CreateModel,
+        AnkiExportPhase::ReuseModel(9007199254740993),
+        AnkiExportPhase::Existing(vec![i64::MAX, 9007199254740993]),
+        AnkiExportPhase::Beginning,
+        AnkiExportPhase::Ready,
+        AnkiExportPhase::Invoking,
+        AnkiExportPhase::Saving,
+        AnkiExportPhase::NoteAdded(i64::MAX),
+        AnkiExportPhase::ModelCreated(9007199254740993),
+        AnkiExportPhase::NotSubmitted,
+        AnkiExportPhase::NoteUncertain(None),
+        AnkiExportPhase::NoteUncertain(Some(i64::MAX)),
+        AnkiExportPhase::ModelUncertain(None),
+        AnkiExportPhase::ModelUncertain(Some(9007199254740993)),
+        AnkiExportPhase::ProviderFailed(AnkiExportError::IncompatibleModel),
+        AnkiExportPhase::StorageFailed(DocumentError::Unavailable),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let view = AnkiExportView {
+            surface: "𠮷猫".into(),
+            deck_id: i64::MAX,
+            phase,
+        };
+        let bytes = super::encode(&view);
+        if writing {
+            fs::write(dir.join(format!("anki-export-view-{index}.bin")), bytes)?;
+        } else {
+            assert_eq!(
+                fs::read(dir.join(format!("anki-export-view-{index}-return.bin")))?,
+                bytes
+            );
+        }
+    }
     for (index, phase) in [
         AnkiRecoveryPhase::Loading,
         AnkiRecoveryPhase::Ready,

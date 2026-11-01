@@ -4,6 +4,7 @@
 use super::*;
 use crate::anki::AnkiRecoveryState;
 
+mod export_view;
 mod live;
 mod preflight;
 mod preparation;

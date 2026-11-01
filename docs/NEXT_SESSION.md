@@ -15,6 +15,12 @@ results in progress docs/reports, out of commit message bodies.
   vocabulary, token dictionary metadata and Anki journals are preserved.
 
 ## Current Anki boundary
+- `ViewModel::anki_export` now projects frozen surface/deck, preflight plans/
+  conflicts/errors, live phases and last durably acknowledged outcomes. Results/
+  IDs remain hidden in Saving until the exact outcome acknowledgement; failures
+  show storage error. Accepted Clear or recovery Retry after a failed live attempt
+  removes it; restart never restores it. Reconciliation changes current recovery.
+  Asynchronous changes render; Compose live status UI is still unimplemented.
 - Settings now exposes compact recovery phases/pending-kind flags/errors and
   native-gated Check note/Check model/Retry. Clean startup hides the panel; after
   attention is needed, completion stays visible only within that native session.
@@ -35,13 +41,13 @@ results in progress docs/reports, out of commit message bodies.
   work on close and drops late/in-flight results. Durable journals restore read-only.
   Abandon-before-Retry handles lost live callbacks; Clear cannot erase obligations.
 - IMPORTANT: preparation/begin still have no shell codec or visible Add workflow.
-  Authenticated actions, Ready orchestration and live outcome presentation remain.
+  Authenticated actions, Ready orchestration and Compose live outcome UI remain.
   No schema/dependency/native-export ABI change or real-provider compatibility claim.
   Details: ARCHITECTURE.md, DATA_MODEL.md and ANKIDROID_API.md (2.25.3 evidence).
 
 ## Next tasks (ordered)
 1. Expose authenticated current-selection preparation/begin actions, coordinate
-   Ready dispatch and project preflight/model-conflict/live finished/error outcomes.
+   Ready dispatch and consume the typed export status in Compose live outcome UI.
    Preserve frozen intent, native ownership and no mutation replay on restart.
 2. Add configured-deck settings, permission flow and Add/existing-note actions.
    Validate complete CoreSession lifecycle, then a disposable real AnkiDroid
@@ -49,14 +55,15 @@ results in progress docs/reports, out of commit message bodies.
 3. Encrypted-backup format/library review follows completed Anki integration.
 
 ## Verification / blockers
-- PASS: 7 new core/2 new Compose cases; 979 workspace tests/17 ignored; strict
-  Clippy, Rustfmt/Kotlin formatting, workspace build, identical generation, full
-  host JNI plus final focused recheck, both-ABI debug/test APKs, lintDebug and all
-  13 selected API-36 x86_64 emulator cases (zero failures/errors/skips on final run).
-  Commands/logs: DEVELOPMENT.md, Settings Anki recovery presentation.
-- Initial compilation/legacy no-render assertions were corrected. Initial Android
-  read-only SQL polling raced the commit; fixed by awaiting projected durable state.
-  No open blocker or implementation/verification work remains for this slice.
+- PASS: 6 new core cases plus extended SQLite/FIFO lifecycle assertions;
+  985 workspace tests/17 ignored, strict Clippy, Rustfmt/Kotlin formatting,
+  workspace build, identical generation, all-phase Rust/Kotlin exchange, full
+  host JNI, both-ABI debug/test APKs, lintDebug and all 11 selected API-36 x86_64
+  emulator cases (zero failures/errors/skips). Commands/logs: DEVELOPMENT.md,
+  Frozen Anki export status projection.
+- Initial iterator borrow/legacy render assertions and a stale generated-comment
+  comparison were corrected. No open blocker or implementation/verification work
+  remains for this projection slice; the complete Add workflow is still unfinished.
 - Real collection/browser, optimized release and physical upgrade/performance
   trials were not run. Broad device/schema-23 upgrade validation remains open.
   Older phone APK is source 0374365; no release requested.

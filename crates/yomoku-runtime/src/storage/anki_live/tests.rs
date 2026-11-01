@@ -16,7 +16,7 @@ use std::{
 use yomoku_core::{
     analysis::{AnalysisProfile, AnalyzedToken, ChapterAnalysis, SplitMode},
     anki::{
-        AnkiExport, AnkiLiveInvocation, AnkiLiveOutcome, AnkiLiveProgress,
+        AnkiExport, AnkiExportPhase, AnkiLiveInvocation, AnkiLiveOutcome, AnkiLiveProgress,
         AnkiModelCreationOutcome, AnkiPreflightDeck, AnkiPreflightModel, AnkiPreflightObservation,
         AnkiPreflightResult, AnkiRecoveryState, AnkiSelection, AnkiSubmissionOutcome,
     },
@@ -317,9 +317,10 @@ fn anki_live_fifo_app_owns_frozen_begin_and_committed_outcomes_for_both_readers(
             let fixture = Fixture::new();
             let harness = fixture.router(effective, false, false);
             harness.prime(&fixture, create);
-            let before = harness.router.view().0;
+            let mut before = harness.router.view().0;
             harness.begin();
             assert_eq!(harness.router.view().2, Some(AnkiLiveProgress::Invoking));
+            before.anki_export.as_mut().unwrap().phase = AnkiExportPhase::Invoking;
             assert_eq!(harness.router.view().0, before);
             let invocation = harness.take();
             let callback = invocation.complete(terminal(create));
@@ -330,6 +331,11 @@ fn anki_live_fifo_app_owns_frozen_begin_and_committed_outcomes_for_both_readers(
             harness.finish(callback.clone());
             assert_eq!(harness.router.view().2, Some(AnkiLiveProgress::Finished));
             assert!(harness.router.view().1.allows_preparation());
+            before.anki_export.as_mut().unwrap().phase = if create {
+                AnkiExportPhase::ModelCreated(i64::MAX)
+            } else {
+                AnkiExportPhase::NoteAdded(i64::MAX)
+            };
             assert_eq!(harness.router.view().0, before);
             assert_eq!(
                 fixture.storage().anki_recovery_snapshot().unwrap(),
@@ -369,7 +375,12 @@ fn anki_live_fifo_lost_begin_and_outcome_responses_restore_without_new_authority
                 harness.router.view().2,
                 Some(AnkiLiveProgress::Failed(DocumentError::Unavailable))
             );
+            assert_eq!(
+                harness.router.view().0.anki_export.unwrap().phase,
+                AnkiExportPhase::StorageFailed(DocumentError::Unavailable)
+            );
             harness.restore();
+            assert!(harness.router.view().0.anki_export.is_none());
             assert_eq!(harness.router.view().1.allows_preparation(), !lose_begin);
             assert!(harness.router.view().3.is_none());
             harness.local(Event::BeginAnkiLive);
@@ -379,6 +390,7 @@ fn anki_live_fifo_lost_begin_and_outcome_responses_restore_without_new_authority
                 !matches!(v.1, AnkiRecoveryState::Loading)
             });
             assert_eq!(restarted.router.view().1, harness.router.view().1);
+            assert!(restarted.router.view().0.anki_export.is_none());
             assert!(restarted.invocation.lock().unwrap().is_none());
         }
     }
@@ -550,11 +562,18 @@ fn anki_live_fifo_blocked_commit_keeps_navigation_responsive_and_abandon_revokes
     harness.prime(&fixture, false);
     let sql = fixture.sql();
     sql.execute_batch("BEGIN IMMEDIATE").unwrap();
-    assert!(harness
-        .router
-        .update(Event::BeginAnkiLive, |_| {})
-        .is_empty());
+    assert!(matches!(
+        harness
+            .router
+            .update(Event::BeginAnkiLive, |_| {})
+            .as_slice(),
+        [Effect::Render(_)]
+    ));
     assert_eq!(harness.router.view().2, Some(AnkiLiveProgress::Beginning));
+    assert_eq!(
+        harness.router.view().0.anki_export.unwrap().phase,
+        AnkiExportPhase::Beginning
+    );
     harness.local(Event::OpenSettings);
     assert!(harness.router.view().0.settings_open);
     assert!(!harness.router.view().0.storage_busy);

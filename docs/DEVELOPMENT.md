@@ -8518,3 +8518,56 @@ ADB/Gradle/emulator sockets/KVM required normal sandbox escalation.
 Logs: `/tmp/yomoku-recovery-ui-{core,workspace,build,clippy,rustfmt,jni,jni-final,
 format,format-check,host-format,host-format-check,kotlin-precheck,android,emulator,
 emulator-boot,typegen,codegen-diff,android-codegen-diff,diff}.log`.
+
+## Frozen Anki export status projection
+
+2026-11-01: use the pinned Rust PATH/JAVA_HOME/GRADLE_USER_HOME/ANDROID_HOME
+environment above, with JAVA_BIN set to `$JAVA_HOME/bin/java`. Keep host JNI
+sequential with Android native packaging; reuse the isolated 8 GiB
+statistics-ui-avd image without wiping data. No dependency/version/schema change.
+
+```sh
+cargo test --workspace --all-features --locked --offline --quiet
+cargo clippy --workspace --all-targets --all-features --locked --offline -- -D warnings
+cargo fmt --all -- --check
+tools/test-kotlin-bridge.sh
+tools/format-kotlin.sh --check
+"$JAVA_BIN" -jar .local/ktfmt-0.64.jar --kotlinlang-style --dry-run --set-exit-if-changed tests/kotlin/AnkiRecoveryBridgeTest.kt
+cargo run -p yomoku-ffi --bin generate-kotlin --features facet_typegen --locked --offline -- /tmp/yomoku-export-view-kotlin
+diff -r target/generated/kotlin /tmp/yomoku-export-view-kotlin
+./android/gradlew -p android :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug --offline --console=plain
+./android/gradlew -p android :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=app.yomoku.AnkiRecoveryPanelTest,app.yomoku.AnkiRecoverySessionTest,app.yomoku.CoreSessionTest,app.yomoku.NavigationTest,app.yomoku.ScalarDecodingTest#scalarValuesErrorsAndOffsetsMatchLegacy,app.yomoku.ScalarDecodingTest#generatedFrozenSnapshotsMatchLegacy --offline --console=plain
+git diff --check
+```
+
+PASS: six new core cases; 985 workspace tests/17 opt-in ignored, strict Clippy,
+Rustfmt/Kotlin formatting, full host Kotlin/JNI (including workspace build) and
+identical independent/Android Kotlin generation. Every phase crosses Rust/Kotlin
+both ways with Unicode and exact signed-64 IDs. Lifecycle cases cover both
+selection kinds, frozen surface/deck/navigation, model conflicts, duplicates,
+all terminal/uncertain outcomes, invalid response kinds, stale/foreign callbacks,
+lost/failed/mismatched acknowledgements and restart without replay. Extended
+SQLite/FIFO cases verify projected outcomes only after durable acknowledgement,
+including lost responses after committed transactions and blocked-begin renders.
+
+PASS: both-ABI debug/test APK builds, lintDebug and all 11 selected API-36 x86_64
+emulator cases, zero failures/errors/skips (2 panel, 2 recovery session,
+3 CoreSession, 2 navigation and 2 scalar codec cases). Reused the isolated image
+without wiping data. Initial Rust test compilation needed the effects iterator
+dropped before event access; legacy no-render/full-view assertions were updated
+for the new presentation. A first generation comparison saw an older generated
+doc comment; the final regenerated comparison is identical. Local ADB sockets/
+KVM/Gradle required normal escalation. No open implementation/verification work
+or blocker remains for this projection slice.
+
+Authenticated preparation/begin, Ready dispatch, Compose live status UI and
+deck/permission/Add/browser flow remain. No shell action, provider behavior,
+schema/dependency/native-export ABI or vocabulary/history semantics changed.
+Recommend the schema-23 phone Library/history upgrade trial before visible live
+integration. Real collection/browser, optimized APK and physical trials were not
+run; there is no complete visible Add/CoreSession or compatibility claim yet.
+
+Logs: `/tmp/yomoku-export-view-{workspace,clippy,rustfmt,jni,format-check,
+host-format,host-format-check,typegen,codegen-diff,android,emulator,emulator-boot}.log`
+(one file per suffix). Final XML:
+`android/app/build/outputs/androidTest-results/connected/debug/`.

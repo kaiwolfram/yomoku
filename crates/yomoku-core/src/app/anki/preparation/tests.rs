@@ -1,6 +1,7 @@
 use super::super::test_support::fixture;
 use super::*;
 use crate::anki::{AnkiModelCreation, AnkiModelLayout, AnkiModelRecovery, AnkiRecoverySnapshot};
+use crate::app::anki::test_support::reader_view;
 
 fn prepare(model: &mut Model, selection: AnkiSelection, deck: i64) {
     assert!(Yomoku
@@ -12,15 +13,14 @@ fn prepare(model: &mut Model, selection: AnkiSelection, deck: i64) {
             model
         )
         .effects()
-        .next()
-        .is_none());
+        .all(|effect| matches!(effect, Effect::Render(_))));
 }
 
 #[test]
-fn anki_preparation_freezes_current_original_and_effective_without_effects_or_reader_changes() {
+fn anki_preparation_freezes_current_original_and_effective_without_io_or_reader_changes() {
     for effective in [false, true] {
         let (mut model, selection) = fixture(effective);
-        let before = Yomoku.view(&model);
+        let before = reader_view(&model);
         prepare(&mut model, selection, i64::MAX);
         let export = model.prepared_anki_export().unwrap();
         assert_eq!(export.selection(), selection);
@@ -32,7 +32,7 @@ fn anki_preparation_freezes_current_original_and_effective_without_effects_or_re
             export.note().fields()[3],
             "猫と𠮷と<strong class=\"yomoku-target\">猫</strong>。"
         );
-        assert_eq!(Yomoku.view(&model), before);
+        assert_eq!(reader_view(&model), before);
     }
 }
 
@@ -154,8 +154,7 @@ fn anki_preparation_survives_dismissal_navigation_and_duplicate_events_until_exp
         assert!(Yomoku
             .update(Event::ClearPreparedAnkiExport, &mut model)
             .effects()
-            .next()
-            .is_none());
+            .all(|effect| matches!(effect, Effect::Render(_))));
         assert!(model.prepared_anki_export().is_none());
         assert_eq!(
             model.anki_recovery,
@@ -178,10 +177,10 @@ fn anki_preparation_rejects_pending_or_failed_effective_dictionary_mutations() {
         if fail {
             assert!(session.finish_word_request(&request, Err(DocumentError::Unavailable)));
         }
-        let before = Yomoku.view(&model);
+        let before = reader_view(&model);
         prepare(&mut model, AnkiSelection::Effective(selected), 1);
         assert!(model.prepared_anki_export().is_none());
-        assert_eq!(Yomoku.view(&model), before);
+        assert_eq!(reader_view(&model), before);
     }
     let (mut model, AnkiSelection::Effective(selected)) = fixture(true) else {
         unreachable!()
@@ -211,8 +210,7 @@ fn anki_preparation_keeps_frozen_definitions_until_clear_then_accepts_current_da
     assert!(Yomoku
         .update(Event::ClearPreparedAnkiExport, &mut model)
         .effects()
-        .next()
-        .is_none());
+        .all(|effect| matches!(effect, Effect::Render(_))));
     prepare(&mut model, selection, 8);
     let current = model.prepared_anki_export().unwrap();
     assert_eq!(i64::from(current.deck()), 8);
@@ -252,8 +250,7 @@ fn anki_preparation_and_clear_cannot_erase_note_recovery_or_a_pending_commit() {
         assert!(Yomoku
             .update(Event::ClearPreparedAnkiExport, &mut model)
             .effects()
-            .next()
-            .is_none());
+            .all(|effect| matches!(effect, Effect::Render(_))));
         prepare(&mut model, selected, 1);
         assert!(model.prepared_anki_export().is_none());
         assert_eq!(

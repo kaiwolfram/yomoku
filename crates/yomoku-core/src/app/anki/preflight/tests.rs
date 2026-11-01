@@ -1,4 +1,5 @@
 use super::*;
+use crate::app::anki::test_support::reader_view;
 use crate::{
     anki::{
         AnkiModelCreation, AnkiModelLayout, AnkiModelRecovery, AnkiPreflightDeck,
@@ -15,7 +16,10 @@ fn update(model: &mut Model, event: Event) {
         Event::BeginAnkiExportPreflight | Event::RetryAnkiExportPreflight
     );
     let mut command = Yomoku.update(event, model);
-    let effects: Vec<_> = command.effects().collect();
+    let effects: Vec<_> = command
+        .effects()
+        .filter(|effect| !matches!(effect, Effect::Render(_)))
+        .collect();
     assert!(
         effects.is_empty()
             || (dispatch
@@ -111,7 +115,7 @@ fn close_gate(model: &mut Model, kind: usize) {
 fn anki_preflight_freezes_both_selection_kinds_and_survives_reader_departure() {
     for effective in [false, true] {
         let mut model = prepared(effective);
-        let before = Yomoku.view(&model);
+        let before = reader_view(&model);
         let request = begin(&mut model);
         assert_eq!(request.export(), model.prepared_anki_export().unwrap());
         assert_eq!(request.export().note().surface().as_str(), "猫");
@@ -122,7 +126,7 @@ fn anki_preflight_freezes_both_selection_kinds_and_survives_reader_departure() {
         );
         assert_eq!(request.export().layout(), &AnkiModelLayout::yomoku());
         assert_eq!(i64::from(request.export().deck()), i64::MAX);
-        assert_eq!(Yomoku.view(&model), before);
+        assert_eq!(reader_view(&model), before);
         update(&mut model, Event::BeginAnkiExportPreflight);
         assert_eq!(model.pending_anki_export_preflight(), Some(&request));
         model.clear_reader_word();
@@ -130,9 +134,9 @@ fn anki_preflight_freezes_both_selection_kinds_and_survives_reader_departure() {
         // This read owns no reader slot; an unrelated reader failure is retained.
         model.storage_busy = true;
         model.document_error = Some(DocumentError::MissingAnalysis);
-        let before = Yomoku.view(&model);
+        let before = reader_view(&model);
         finish(&mut model, &request, Ok(observation()));
-        assert_eq!(Yomoku.view(&model), before);
+        assert_eq!(reader_view(&model), before);
         assert_eq!(
             model.anki_export_preflight_result(),
             Some(&Ok(AnkiPreflightPlan::CreateModel))
@@ -172,14 +176,14 @@ fn anki_preflight_changed_journal_gates_or_intent_reject_even_matching_callbacks
             model.prepared_anki_export = None;
         }
         let journals = model.anki_recovery.clone();
-        let before = Yomoku.view(&model);
+        let before = reader_view(&model);
         finish(&mut model, &request, Ok(observation()));
         assert_eq!(
             model.anki_export_preflight_result(),
             Some(&Err(AnkiExportError::InvalidResponse))
         );
         assert_eq!(model.anki_recovery, journals);
-        assert_eq!(Yomoku.view(&model), before);
+        assert_eq!(reader_view(&model), before);
     }
 }
 
@@ -322,7 +326,7 @@ fn anki_preflight_exact_duplicates_win_over_model_conflicts_and_never_grant_inse
     let mut value = observation();
     value.models = vec![candidate(1, false), candidate(2, true)];
     value.duplicate_note_ids = vec![i64::MAX, 9007199254740993, i64::MAX];
-    let before = Yomoku.view(&model);
+    let before = reader_view(&model);
     finish(&mut model, &request, Ok(value));
     let Some(Ok(AnkiPreflightPlan::Existing(notes))) = model.anki_export_preflight_result() else {
         panic!("exact existing notes")
@@ -336,7 +340,7 @@ fn anki_preflight_exact_duplicates_win_over_model_conflicts_and_never_grant_inse
             .collect::<Vec<_>>(),
         vec![i64::MAX, 9007199254740993]
     );
-    assert_eq!(Yomoku.view(&model), before);
+    assert_eq!(reader_view(&model), before);
     assert!(model.anki_recovery.allows_preparation());
 }
 
@@ -420,12 +424,12 @@ fn anki_preflight_provider_errors_never_become_empty_success_or_reader_errors() 
     ] {
         let mut model = prepared(false);
         let request = begin(&mut model);
-        let before = Yomoku.view(&model);
+        let before = reader_view(&model);
         finish(&mut model, &request, Err(error));
         assert_eq!(model.anki_export_preflight_result(), Some(&Err(error)));
         assert!(model.pending_anki_export_preflight().is_none());
         assert_eq!(model.prepared_anki_export(), Some(request.export()));
-        assert_eq!(Yomoku.view(&model), before);
+        assert_eq!(reader_view(&model), before);
         assert!(model.anki_recovery.allows_preparation());
     }
 }
@@ -435,7 +439,9 @@ fn provider_callback(model: &mut Model, event: Event, result: AnkiPreflightResul
     let Some(Effect::AnkiExportPreflight(mut effect)) = command.effects().next() else {
         panic!("one typed read-only preflight")
     };
-    assert!(command.effects().next().is_none());
+    assert!(command
+        .effects()
+        .all(|effect| matches!(effect, Effect::Render(_))));
     let request = model.pending_anki_export_preflight().unwrap();
     assert_eq!(effect.operation, request.operation());
     assert_eq!(effect.operation.surface, "猫");
@@ -450,7 +456,7 @@ fn provider_callback(model: &mut Model, event: Event, result: AnkiPreflightResul
 fn anki_preflight_typed_dispatch_returns_only_read_evidence_for_each_selection_kind() {
     for effective in [false, true] {
         let mut model = prepared(effective);
-        let before = Yomoku.view(&model);
+        let before = reader_view(&model);
         let callback = provider_callback(
             &mut model,
             Event::BeginAnkiExportPreflight,
@@ -462,7 +468,7 @@ fn anki_preflight_typed_dispatch_returns_only_read_evidence_for_each_selection_k
             Some(&Ok(AnkiPreflightPlan::CreateModel))
         );
         update(&mut model, callback);
-        assert_eq!(Yomoku.view(&model), before);
+        assert_eq!(reader_view(&model), before);
         assert!(model.anki_recovery.allows_preparation());
         assert!(!model.anki_recovery_saving());
     }
@@ -599,7 +605,9 @@ fn anki_preflight_bincode_bridge_resolves_only_the_captured_attempt() {
         type Effect = Effect;
         type ViewModel = (bool, bool);
         fn update(&self, event: Event, model: &mut Model) -> Command<Effect, Event> {
-            Yomoku.update(event, model)
+            // This narrow wire harness maps only provider reads; production
+            // presentation renders are covered by the export view tests.
+            Yomoku.update_anki_preflight(&event, model).unwrap()
         }
         fn view(&self, model: &Model) -> Self::ViewModel {
             (

@@ -4835,3 +4835,26 @@ journals, not successful note placement or provider availability. Show actionabl
 provider errors without prompting for permission in this slice. Add/deck/permission
 and authenticated preparation/begin remain separate continuation work. No schema,
 dependency, destructive semantics or reachable provider mutation is introduced.
+
+## 2026-11-01 — Frozen Anki export status before shell actions
+
+Add a separate optional `AnkiExportView` to the typed view model rather than
+overloading Settings recovery with live operation outcomes. Its frozen surface
+and deck identify the retained intent across navigation. A data-bearing phase
+enum distinguishes preflight plans/conflicts, live progress, exact observed IDs,
+known non-submission and note/model uncertainty without contradictory status
+flags. Readiness is presentation only; native journal/permit gates remain the
+authority for every action.
+
+Expose terminal provider results only after the matching durable outcome commit
+acknowledgement. Failed/lost acknowledgements show storage failure even when the
+provider or SQLite may have committed; Retry restores read-only and removes the
+live presentation. A terminal phase is the last acknowledged attempt, while the
+separate recovery view represents current obligations after reconciliation. No
+reason is invented for the protocol's reasonless NoSubmission result. Session
+restart restores obligations without reconstructing an export presentation.
+
+Render on changes to either Anki projection, including asynchronous callbacks.
+Keep preparation/begin shell codecs and visible Add/model/deck/permission/browser
+actions for the next slice. This changes the internal typed view payload, not
+the native-export ABI, schema, dependencies or provider behavior.

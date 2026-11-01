@@ -2146,3 +2146,15 @@ journals and read-only reconciliation/Retry semantics are unchanged. Clear means
 no unresolved journal obligations, not proof of note placement or provider access.
 A volatile native notice flag retains completion presentation only after recovery
 needed attention during this session; clean startup keeps the panel absent.
+
+## Frozen Anki export projection (schema 0023 unchanged)
+
+`AnkiExportView` is volatile and separate from current recovery obligations. It
+contains the retained exact surface, signed-64 deck ID and a typed phase for
+preflight, live progress or the last durably acknowledged outcome. Exact note/
+model IDs and uncertainty's optional known ID are observations; they cannot
+restore native callback/permit authority. Provider result IDs remain unprojected
+until the matching outcome transaction acknowledgement; failed/lost acknowledgements
+project storage failure. Presentation survives navigation, never restart. No new
+table, column or journal format is introduced, and reader/history/vocabulary
+transactions are unchanged.

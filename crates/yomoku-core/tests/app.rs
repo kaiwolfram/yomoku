@@ -8,6 +8,7 @@ fn starts_in_library() {
         core.view(),
         ViewModel {
             anki_recovery: None,
+            anki_export: None,
             vocabulary: Default::default(),
             statistics: Default::default(),
             library_rename: None,

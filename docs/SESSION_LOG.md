@@ -4186,3 +4186,20 @@ and /tmp/yomoku-browser-profile-*. No emulator started.
   schema-23 Library/history upgrade remains recommended before visible live work;
   real-provider, release, physical/performance trials unrun. Commands/logs:
   DEVELOPMENT.md, Settings Anki recovery presentation.
+## 2026-11-01 — Frozen Anki export status projection
+
+- Added typed frozen surface/deck, preflight/model-conflict/provider-error phases,
+  live progress and durably acknowledged outcomes to the Rust/Kotlin view model.
+  Render updates are independent of reader I/O. Returned IDs stay hidden until
+  the exact outcome acknowledgement; restart restores no live presentation.
+- Added six core lifecycle cases, extended real SQLite/FIFO assertions and
+  all-phase Rust/Kotlin codec exchange. PASS: 985 workspace tests/17 ignored,
+  strict Clippy/formatting, full JNI/workspace build, identical generation,
+  both-ABI debug/test APKs, lint and 11 emulator cases with zero failures/skips.
+- Corrected initial iterator borrowing, legacy no-render assertions and a stale
+  generated-comment comparison. No open blocker or remaining work for this slice.
+  Commands/logs: DEVELOPMENT.md, Frozen Anki export status projection.
+- Next: authenticated preparation/begin, Ready dispatch and Compose status UI,
+  followed by deck/permission/Add/browser flow. Recommend the schema-23 phone
+  Library/history upgrade before live integration; real collection/browser and
+  physical/release trials remain unrun. No schema/dependency/provider change.

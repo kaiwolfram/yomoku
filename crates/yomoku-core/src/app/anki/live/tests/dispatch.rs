@@ -1,5 +1,6 @@
 use super::*;
 use crate::anki::{AnkiLiveOperation, AnkiLiveResult};
+use crate::app::anki::test_support::reader_view;
 
 fn dispatch(model: &mut Model, result: AnkiLiveResult) -> Event {
     let frozen = model.prepared_anki_export().unwrap().clone();
@@ -7,7 +8,9 @@ fn dispatch(model: &mut Model, result: AnkiLiveResult) -> Event {
     let Some(Effect::AnkiLive(mut effect)) = command.effects().next() else {
         panic!("one owning live provider request")
     };
-    assert!(command.effects().next().is_none());
+    assert!(command
+        .effects()
+        .all(|effect| matches!(effect, Effect::Render(_))));
     match &effect.operation {
         AnkiLiveOperation::InsertNote {
             surface,
@@ -60,7 +63,7 @@ fn anki_live_dispatch_freezes_both_selections_and_kinds_and_routes_every_outcome
             );
             let mut model = prepared(effective, create);
             let request = ready(&mut model);
-            let before = Yomoku.view(&model);
+            let before = reader_view(&model);
             let event = dispatch(&mut model, result.clone());
             let Event::FinishAnkiLive(callback) = &event else {
                 unreachable!()
@@ -82,7 +85,7 @@ fn anki_live_dispatch_freezes_both_selections_and_kinds_and_routes_every_outcome
                 ),
                 _ => assert_eq!(*expected, AnkiRecoverySnapshot::default()),
             }
-            assert_eq!(Yomoku.view(&model), before);
+            assert_eq!(reader_view(&model), before);
             let mut saving = Yomoku.update(event.clone(), &mut model);
             assert!(
                 matches!(saving.effects().next(), Some(Effect::Storage(effect))
@@ -98,7 +101,7 @@ fn anki_live_dispatch_freezes_both_selections_and_kinds_and_routes_every_outcome
             );
             assert_eq!(model.anki_live_progress(), Some(AnkiLiveProgress::Finished));
             update(&mut model, Event::DispatchAnkiLive);
-            assert_eq!(Yomoku.view(&model), before);
+            assert_eq!(reader_view(&model), before);
         }
     }
 }
@@ -210,7 +213,8 @@ fn anki_live_dispatch_bincode_bridge_retains_callback_owner_and_rejects_duplicat
         type ViewModel = bool;
         fn update(&self, event: Event, model: &mut Model) -> Command<Effect, Event> {
             let finish = matches!(event, Event::FinishAnkiLive(_));
-            let mut command = Yomoku.update(event, model);
+            // This narrow wire harness maps only invocation effects.
+            let mut command = Yomoku.update_anki_live(&event, model).unwrap();
             if finish {
                 // The owning closure must produce the normal durable outcome command.
                 assert!(
