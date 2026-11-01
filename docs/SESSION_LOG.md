@@ -4141,3 +4141,25 @@ and /tmp/yomoku-browser-profile-*. No emulator started.
 - JNI, APK/lint/emulator, real-provider, physical upgrade and performance checks
   were not rerun. Recommend the schema-23 phone upgrade with existing Library/
   history before enabling live integration; no release requested.
+
+
+## 2026-11-01 — Typed committed Anki invocation dispatch
+
+- Consumed Ready native permits once through typed Crux/FFI operations; captured
+  callbacks route accepted outcomes through FinishAnkiLive and the existing FIFO.
+  Invalid/wrong-kind results and unexpected exceptions preserve uncertainty.
+- Connected provider adapters to CoreSession's separate worker/main path. Retained
+  session-local effect-ID ownership cancels queued work on close and drops late
+  responses; pending journals recover read-only. Model creation rechecks the
+  frozen deck/exact duplicates immediately before submission.
+- PASS: 5 new native/9 Android cases; 972 workspace tests/17 ignored, strict Clippy,
+  formatting, identical generation, full JNI/build, both-ABI debug/test APKs,
+  lintDebug and 74 API-36 x86_64 emulator cases (zero failures/skips).
+  Initial new Retry test bypassed the existing Abandon gate; corrected the test.
+- Updated architecture/API/decision/progress/handoff docs. No schema/dependency/
+  native-export ABI change, real-provider claim or reachable user mutation flow.
+- No open blocker or remaining work for this verified slice. Native preparation/
+  begin/Ready orchestration and recovery/permission/deck/Add/browser UI remain.
+  Recommend the physical schema-23 Library/history upgrade before visible live
+  integration. Real collection/browser, release, physical/performance trials unrun.
+  Commands/logs: DEVELOPMENT.md, Typed committed Anki invocation dispatch.

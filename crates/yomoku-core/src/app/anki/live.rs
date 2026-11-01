@@ -1,5 +1,5 @@
 //! App-owned begin, one native permit and durable outcome acceptance. Provider
-//! dispatch is deliberately a later boundary; this module performs no I/O.
+//! dispatch uses a typed effect and owning response closure; this module performs no I/O.
 
 use super::*;
 use crate::anki::{
@@ -18,7 +18,7 @@ impl Model {
     }
 
     /// Native dispatcher prerequisite, consumed once after matching successful
-    /// begin. No shell call site yet. Fresh provider checks remain mandatory.
+    /// begin. Typed dispatch consumes it once. Fresh provider checks remain mandatory.
     pub fn take_anki_live_invocation(&mut self) -> Option<AnkiLiveInvocation> {
         let live = self.anki_live.as_mut()?;
         if live.progress != AnkiLiveProgress::Ready
@@ -43,6 +43,22 @@ impl Yomoku {
         model: &mut Model,
     ) -> Option<Command<Effect, Event>> {
         match event {
+            Event::DispatchAnkiLive => {
+                let Some(export) = model.prepared_anki_export.as_ref() else {
+                    return Some(Command::done());
+                };
+                let surface = export.note().surface().as_str().to_owned();
+                let deck_id = export.deck().into();
+                let Some(invocation) = model.take_anki_live_invocation() else {
+                    return Some(Command::done());
+                };
+                let operation = invocation.operation(surface, deck_id);
+                return Some(
+                    Command::request_from_shell(operation).then_send(move |result| {
+                        Event::FinishAnkiLive(Box::new(invocation.complete_provider(result)))
+                    }),
+                );
+            }
             Event::BeginAnkiLive => {
                 if !model.anki_export_gate_open() {
                     return Some(Command::done());

@@ -132,9 +132,10 @@ fn storage_commands_are_serialized_while_navigation_remains_available() {
         .iter_mut()
         .find_map(|effect| match effect {
             Effect::Storage(request) => Some(request),
-            Effect::Render(_) | Effect::AnkiRecoveryRead(_) | Effect::AnkiExportPreflight(_) => {
-                None
-            }
+            Effect::Render(_)
+            | Effect::AnkiRecoveryRead(_)
+            | Effect::AnkiExportPreflight(_)
+            | Effect::AnkiLive(_) => None,
         })
         .unwrap();
     assert_eq!(request.operation, StorageOperation::List);

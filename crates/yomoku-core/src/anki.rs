@@ -8,7 +8,9 @@ use crate::{
 
 mod export;
 mod live;
+mod live_dispatch;
 pub use live::*;
+pub use live_dispatch::*;
 mod preflight;
 pub use preflight::*;
 mod projection;

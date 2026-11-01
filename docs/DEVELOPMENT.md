@@ -8392,3 +8392,59 @@ A schema-23 physical upgrade trial with existing Library/history remains useful
 before enabling live integration. No compatibility claim or release requested.
 
 Logs: `/tmp/yomoku-anki-owner-{core,runtime,focused,workspace,build,clippy,rustfmt,typegen,codec-diff,diff}.log`.
+
+## Typed committed Anki invocation dispatch
+
+2026-11-01: pinned Rust/JDK/Gradle/SDK environment above; no dependency/version
+change. Run host JNI before Android native packaging, using the existing isolated
+8 GiB statistics-ui-avd image without wiping data.
+
+```sh
+cargo test -p yomoku-core --lib anki_live_dispatch --all-features --locked --offline
+cargo test --workspace --all-features --locked --offline --quiet
+cargo clippy --workspace --all-targets --all-features --locked --offline -- -D warnings
+cargo fmt --all -- --check
+tools/test-kotlin-bridge.sh
+tools/format-kotlin.sh --check
+"$JAVA_BIN" -jar .local/ktfmt-0.64.jar --kotlinlang-style --dry-run --set-exit-if-changed tests/kotlin/AnkiRecoveryBridgeTest.kt
+./android/gradlew -p android :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug --offline --console=plain
+./android/gradlew -p android :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=app.yomoku.AnkiProviderReaderTest,app.yomoku.AnkiLiveWorkerTest,app.yomoku.AnkiRecoverySessionTest,app.yomoku.CoreSessionTest,app.yomoku.NavigationTest --offline --console=plain
+cargo run -p yomoku-ffi --bin generate-kotlin --features facet_typegen --locked --offline -- /tmp/yomoku-live-dispatch-kotlin
+diff -r target/generated/kotlin /tmp/yomoku-live-dispatch-kotlin
+git diff --check
+```
+
+PASS: 972 workspace tests/17 ignored opt-in fixtures, strict Clippy, Rustfmt,
+Kotlin formatting, full host Kotlin/JNI (including workspace build) and identical
+independent/Android Kotlin generation. Five new native cases cover both selections
+and invocation kinds, frozen payload/deck/layout/long IDs, all outcomes, malformed
+and wrong-kind responses, journal gates, duplicate dispatch, foreign/abandoned/
+retried callbacks and actual Bincode bridge ownership/duplicate resolution. The
+JNI fixture exchanges both live operation variants and all eight result cases;
+restored journals and standalone dispatch cannot mint invocation authority.
+Initial new Retry test bypassed the existing Abandon gate; corrected the test,
+then reran the final workspace and focused checks successfully.
+
+PASS: both-ABI debug/test APK builds, strict lintDebug and all 74 selected API-36
+x86_64 emulator cases with zero failures/skips (63 provider, 4 live worker,
+2 retained recovery session, 3 CoreSession and 2 navigation). Nine new Android
+cases cover frozen note/model result translation, duplicates/name conflicts,
+missing/filtered or changed decks, exact duplicate rechecks immediately before
+model submission, provider/permission loss, known partial IDs, single off-main
+invocation/main delivery, cancellation of queued work, late responses/new owners
+and conservative exception classification. Kotlin compilation precheck also passed.
+Worker tests exercise the exact helper owned by CoreSession; native preparation/
+begin are still unexposed, so there is no complete visible Add/CoreSession workflow
+or real AnkiDroid compatibility claim. No schema/dependency/native-export ABI change.
+
+No open blocker or implementation/verification work remains for this slice.
+Next: recovery/error/finished projection, authenticated current-selection actions
+and Ready dispatch orchestration, then permission/deck/Add/browser UI and a
+real disposable collection trial. Recommend a physical schema-23 upgrade with
+existing Library/history before enabling the visible live flow. No optimized
+release, real-provider/browser, physical upgrade or performance trial was run.
+Logs: `/tmp/yomoku-live-dispatch-{core,workspace,clippy,rustfmt,jni,format,
+format-check,host-format,host-format-check,kotlin-precheck,android,emulator,
+emulator-boot,typegen,typegen-check,codegen-diff}.log` (one path per suffix).
+Final Android XML: `android/app/build/outputs/androidTest-results/connected/debug/`.
+Local ADB/Gradle/emulator sockets/KVM required normal sandbox escalation.

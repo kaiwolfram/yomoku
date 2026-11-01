@@ -54,6 +54,23 @@ internal interface AnkiProviderEnvironment {
     fun resolves(intent: Intent): Boolean
 }
 
+internal class AndroidAnkiProviderEnvironment(context: Context) : AnkiProviderEnvironment {
+    private val app = context.applicationContext
+
+    @Suppress("DEPRECATION")
+    override fun provider(): ProviderInfo? =
+        app.packageManager.resolveContentProvider(
+            AnkiProviderReader.AUTHORITY,
+            PackageManager.GET_META_DATA,
+        )
+
+    override fun hasPermission(): Boolean =
+        app.checkSelfPermission(AnkiProviderReader.PERMISSION) == PackageManager.PERMISSION_GRANTED
+
+    override fun resolves(intent: Intent): Boolean =
+        intent.resolveActivity(app.packageManager) != null
+}
+
 /**
  * Read-only ContentResolver boundary. Call on a worker. No provider state is cached and no
  * permission dialog, Activity launch, model creation or note mutation occurs here. Explicit
@@ -67,19 +84,7 @@ internal class AnkiProviderReader(
         context: Context
     ) : this(
         context.applicationContext.contentResolver,
-        object : AnkiProviderEnvironment {
-            private val app = context.applicationContext
-
-            @Suppress("DEPRECATION")
-            override fun provider(): ProviderInfo? =
-                app.packageManager.resolveContentProvider(AUTHORITY, PackageManager.GET_META_DATA)
-
-            override fun hasPermission(): Boolean =
-                app.checkSelfPermission(PERMISSION) == PackageManager.PERMISSION_GRANTED
-
-            override fun resolves(intent: Intent): Boolean =
-                intent.resolveActivity(app.packageManager) != null
-        },
+        AndroidAnkiProviderEnvironment(context),
     )
 
     fun availability(): AnkiReadResult<String> = read(AnkiReadError.ProviderFailure) { host() }

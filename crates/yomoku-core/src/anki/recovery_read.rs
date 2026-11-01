@@ -14,7 +14,7 @@ pub enum AnkiRecoveryReadTarget {
     Model,
 }
 
-/// Compact read comparison DTO. Use a sequence for Kotlin's generated list
+/// Compact provider layout DTO. Use a sequence for Kotlin's generated list
 /// codec; the authoritative native layout retains its fixed four-field array.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]

@@ -33,6 +33,38 @@ internal fun verifyAnkiRecoveryBridge(fixtures: String) {
         } else check(result == AnkiPreflightResult.Failed(AnkiExportError.PERMISSIONDENIED))
         root.resolve("anki-preflight-result-$i-return.bin").writeBytes(result.bincodeSerialize())
     }
+    for (i in 0..1) {
+        val operation =
+            AnkiLiveOperation.bincodeDeserialize(
+                root.resolve("anki-live-operation-$i.bin").readBytes()
+            )
+        if (operation is AnkiLiveOperation.InsertNote) {
+            check(
+                operation.surface == "𠮷猫" &&
+                    operation.deckId == Long.MAX_VALUE &&
+                    operation.modelId == 9007199254740993L
+            )
+            check(operation.layout == frozen && operation.fields.size == 4)
+        } else check(operation == AnkiLiveOperation.CreateModel("𠮷猫", Long.MAX_VALUE, frozen))
+        root.resolve("anki-live-operation-$i-return.bin").writeBytes(operation.bincodeSerialize())
+    }
+    val liveResults =
+        listOf(
+            AnkiLiveResult.NoSubmission,
+            AnkiLiveResult.NoteAdded(Long.MAX_VALUE),
+            AnkiLiveResult.NoteExisting(listOf(Long.MAX_VALUE, 9007199254740993L)),
+            AnkiLiveResult.NoteUncertain(null),
+            AnkiLiveResult.NoteUncertain(Long.MAX_VALUE),
+            AnkiLiveResult.ModelCreated(9007199254740993L),
+            AnkiLiveResult.ModelUncertain(null),
+            AnkiLiveResult.ModelUncertain(Long.MAX_VALUE),
+        )
+    for ((i, expected) in liveResults.withIndex()) {
+        val result =
+            AnkiLiveResult.bincodeDeserialize(root.resolve("anki-live-result-$i.bin").readBytes())
+        check(result == expected)
+        root.resolve("anki-live-result-$i-return.bin").writeBytes(result.bincodeSerialize())
+    }
     for (model in listOf(false, true)) {
         val name = if (model) "model" else "note"
         val database = root.resolve("anki-$name-jni.sqlite3")
@@ -81,7 +113,11 @@ internal fun verifyAnkiRecoveryBridge(fixtures: String) {
             )
             barrier(bridge)
             for (preflightEvent in
-                listOf(Event.BeginAnkiExportPreflight, Event.RetryAnkiExportPreflight)) {
+                listOf(
+                    Event.DispatchAnkiLive,
+                    Event.BeginAnkiExportPreflight,
+                    Event.RetryAnkiExportPreflight,
+                )) {
                 check(
                     Requests.bincodeDeserialize(bridge.update(preflightEvent.bincodeSerialize()))
                         .value

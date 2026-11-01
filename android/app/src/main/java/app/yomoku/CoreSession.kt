@@ -11,6 +11,8 @@ import app.yomoku.nativebridge.EffectsListener
 import app.yomoku.nativebridge.FfiError
 import app.yomoku.nativebridge.NativeBridge
 import app.yomoku.shared.AnkiExportError
+import app.yomoku.shared.AnkiLiveOperation
+import app.yomoku.shared.AnkiLiveResult
 import app.yomoku.shared.AnkiPreflightOperation
 import app.yomoku.shared.AnkiPreflightResult
 import app.yomoku.shared.AnkiRecoveryReadOperation
@@ -75,6 +77,9 @@ internal class CoreSession(
     private val ankiExecutor: ExecutorService = Executors.newSingleThreadExecutor(),
     private val readAnkiPreflight: (AnkiPreflightOperation) -> AnkiPreflightResult = {
         AnkiPreflightResult.Failed(AnkiExportError.PROVIDERUNAVAILABLE)
+    },
+    private val invokeAnkiLive: (AnkiLiveOperation) -> AnkiLiveResult = {
+        AnkiLiveResult.NoSubmission
     },
 ) : AutoCloseable {
     // Retained with this handle across Activity recreation; never restored into a new handle.
@@ -141,6 +146,18 @@ internal class CoreSession(
             },
             dictionary,
         )
+
+    private val ankiLiveWorker =
+        AnkiLiveWorker(
+            ankiExecutor,
+            invokeAnkiLive,
+            { mainHandler.post(it) },
+        ) { id, result ->
+            if (!closing && !isClosed) {
+                render(bridge.resolve(id, result.bincodeSerialize()))
+                driveReaderClock()
+            }
+        }
 
     var view: ViewModel by mutableStateOf(ViewModel.bincodeDeserialize(bridge.view()))
         private set
@@ -364,6 +381,10 @@ internal class CoreSession(
                             .bincodeSerialize()
                     }
                 }
+                is ShellEffect.AnkiLive -> {
+                    val operation = request.effect.value
+                    ankiLiveWorker.dispatch(request.id, operation)
+                }
                 is ShellEffect.AnkiExportPreflight -> {
                     val operation = request.effect.value
                     readAnki(request.id, { readAnkiPreflight(operation).bincodeSerialize() }) {
@@ -441,6 +462,7 @@ internal class CoreSession(
             images.close()
             pauseClock()
             closing = true
+            ankiLiveWorker.close()
             readerActive = false
             driveReaderClock()
         }

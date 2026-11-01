@@ -25,6 +25,7 @@ pub enum ShellEffect {
     Render(RenderOperation),
     AnkiRecoveryRead(yomoku_core::anki::AnkiRecoveryReadOperation),
     AnkiExportPreflight(yomoku_core::anki::AnkiPreflightOperation),
+    AnkiLive(yomoku_core::anki::AnkiLiveOperation),
 }
 
 impl From<Effect> for ShellEffect {
@@ -35,12 +36,13 @@ impl From<Effect> for ShellEffect {
             Effect::Render(request) => Self::Render(request),
             Effect::AnkiRecoveryRead(request) => Self::AnkiRecoveryRead(request),
             Effect::AnkiExportPreflight(request) => Self::AnkiExportPreflight(request),
+            Effect::AnkiLive(request) => Self::AnkiLive(request),
             Effect::Storage(_) => unreachable!("storage effects are consumed by Rust middleware"),
         }
     }
 }
 
-/// SQLite effects stay native; render and explicit read-only Anki requests cross FFI.
+/// SQLite effects stay native; render and typed Anki provider requests cross FFI.
 pub type EffectRouter =
     AnkiStartupLayer<MapEffectLayer<HandleEffectLayer<Core<Yomoku>, StorageEffects>, ShellEffect>>;
 

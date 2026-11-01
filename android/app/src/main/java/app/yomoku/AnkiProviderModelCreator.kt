@@ -29,10 +29,10 @@ internal sealed interface AnkiModelCreationResult {
 }
 
 /**
- * Worker-only creation prerequisite, deliberately unconnected to app/FFI/UI. Only the fresh ID
- * returned by this invocation can receive a template update. There is no repair/delete API or
- * automatic retry/cleanup. Rust supplies the expected layout; creation is not a lease for note
- * insertion. Durable export recovery is required before enabling any live calls.
+ * Worker-only creation boundary used by the retained typed dispatcher. Only the fresh ID returned
+ * by this invocation can receive a template update. There is no repair/delete API or automatic
+ * retry/cleanup. Rust supplies the expected layout; creation is not a lease for note insertion. The
+ * dispatcher requires a durably committed native permit before any live call.
  */
 internal class AnkiProviderModelCreator(
     private val resolver: ContentResolver,
@@ -40,14 +40,17 @@ internal class AnkiProviderModelCreator(
 ) {
     private val reader = AnkiProviderReader(resolver, environment)
 
-    fun create(expected: AnkiProviderModelLayout): AnkiModelCreationResult {
+    fun create(
+        expected: AnkiProviderModelLayout,
+        beforeSubmit: () -> Boolean = { true },
+    ): AnkiModelCreationResult {
         check(Looper.myLooper() != Looper.getMainLooper()) { "Anki provider access on main thread" }
         var submitted = false
         var createdId: AnkiProviderModelId? = null
         return try {
             val host = value(reader.availability())
             val existing = value(reader.models())
-            // Name collision policy belongs to the future owner. Never repair or silently rename
+            // Discovery never repairs or silently renames
             // an existing user's model; discovery/validation can establish reuse separately.
             if (existing.any { it.name == expected.name }) fail(AnkiModelCreationError.NameConflict)
             val values =
@@ -59,6 +62,7 @@ internal class AnkiProviderModelCreator(
                     put("sort_field_index", 0)
                     put("type", 0)
                 }
+            if (!beforeSubmit()) fail(AnkiModelCreationError.ProviderFailure)
             sameHost(host)
             // From here, even an exception/null response may follow a committed provider write.
             submitted = true

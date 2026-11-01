@@ -580,6 +580,7 @@ fn anki_preflight_bincode_bridge_resolves_only_the_captured_attempt() {
         fn from(effect: Effect) -> Self {
             match effect {
                 Effect::AnkiExportPreflight(request) => Self::Read(request),
+                Effect::AnkiLive(_) => panic!("unexpected live invocation"),
                 _ => panic!("preflight must emit only a read"),
             }
         }

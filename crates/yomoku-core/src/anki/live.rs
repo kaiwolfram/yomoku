@@ -1,5 +1,5 @@
 //! Native live ownership. Restored payloads and journal IDs cannot mint requests
-//! or invocation permits, and none of these types has a shell codec.
+//! or invocation permits, and none of these ownership types has a shell codec.
 
 use std::sync::{Arc, Weak};
 
@@ -90,9 +90,9 @@ impl AnkiLiveRequestWeak {
     }
 }
 
-/// Move-only native permit. Taking it consumes the app's Ready state. The future
-/// provider dispatcher must consume it once, refresh all provider prerequisites
-/// and return a classified outcome even when no mutation was submitted.
+/// Move-only native permit. Taking it consumes the app's Ready state. Typed
+/// dispatch retains it in the response closure; the provider refreshes all
+/// prerequisites and returns an outcome even when no mutation was submitted.
 #[derive(Debug)]
 pub struct AnkiLiveInvocation {
     request: AnkiLiveRequest,

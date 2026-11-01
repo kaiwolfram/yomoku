@@ -2,9 +2,9 @@ use std::{error::Error, fs, path::Path};
 
 use yomoku_core::{
     anki::{
-        AnkiExportError, AnkiModelCreation, AnkiModelLayout, AnkiNote, AnkiPreflightDeck,
-        AnkiPreflightModel, AnkiPreflightObservation, AnkiPreflightOperation, AnkiPreflightResult,
-        AnkiReadModelLayout, AnkiSubmission,
+        AnkiExportError, AnkiLiveOperation, AnkiLiveResult, AnkiModelCreation, AnkiModelLayout,
+        AnkiNote, AnkiPreflightDeck, AnkiPreflightModel, AnkiPreflightObservation,
+        AnkiPreflightOperation, AnkiPreflightResult, AnkiReadModelLayout, AnkiSubmission,
     },
     document::{TextOffset, TextRange},
     vocabulary::Surface,
@@ -48,6 +48,55 @@ pub fn exchange(dir: &Path, writing: bool) -> Result<(), Box<dyn Error>> {
         } else {
             assert_eq!(
                 fs::read(dir.join(format!("anki-preflight-{name}-return.bin")))?,
+                bytes
+            );
+        }
+    }
+    let operations = [
+        AnkiLiveOperation::InsertNote {
+            surface: "𠮷猫".into(),
+            fields: vec![
+                "𠮷猫".into(),
+                "ねこ".into(),
+                "<ol><li>cat</li></ol>".into(),
+                "<strong>𠮷猫</strong>。".into(),
+            ],
+            deck_id: i64::MAX,
+            model_id: 9007199254740993,
+            layout: Box::new((&layout).into()),
+        },
+        AnkiLiveOperation::CreateModel {
+            surface: "𠮷猫".into(),
+            deck_id: i64::MAX,
+            layout: Box::new((&layout).into()),
+        },
+    ];
+    let live_results = [
+        AnkiLiveResult::NoSubmission,
+        AnkiLiveResult::NoteAdded(i64::MAX),
+        AnkiLiveResult::NoteExisting(vec![i64::MAX, 9007199254740993]),
+        AnkiLiveResult::NoteUncertain(None),
+        AnkiLiveResult::NoteUncertain(Some(i64::MAX)),
+        AnkiLiveResult::ModelCreated(9007199254740993),
+        AnkiLiveResult::ModelUncertain(None),
+        AnkiLiveResult::ModelUncertain(Some(i64::MAX)),
+    ];
+    for (name, bytes) in operations
+        .iter()
+        .enumerate()
+        .map(|(i, op)| (format!("operation-{i}"), super::encode(op)))
+        .chain(
+            live_results
+                .iter()
+                .enumerate()
+                .map(|(i, result)| (format!("result-{i}"), super::encode(result))),
+        )
+    {
+        if writing {
+            fs::write(dir.join(format!("anki-live-{name}.bin")), bytes)?;
+        } else {
+            assert_eq!(
+                fs::read(dir.join(format!("anki-live-{name}-return.bin")))?,
                 bytes
             );
         }

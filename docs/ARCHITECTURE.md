@@ -2144,8 +2144,22 @@ live/prepared/preflight state. A late success cannot grant another permit. Fresh
 sessions restore data only. Clear cannot erase active/failed live ownership, and
 clearing a finished presentation preserves every durable recovery obligation.
 
-This is a native lifecycle prerequisite. The permit has no production consumer;
-no FFI/Kotlin provider mutation or visible action is enabled. The next dispatcher
-must capture this permit once, enforce Android worker/main/close ownership, refresh
-provider/spec/permission/deck/layout/duplicate checks and classify every outcome.
-Real collection/browser validation and recovery/deck/Add UI remain unfinished.
+`DispatchAnkiLive` consumes an already committed Ready permit into one typed
+`AnkiLiveOperation` response closure. It cannot prepare or begin an export; those
+commands and ownership handles still have no shell codec. Note payloads carry the
+exact fields/surface/deck/model/full layout. Model creation additionally carries
+the frozen export surface/deck for a fresh prerequisite check. Each typed result
+becomes `FinishAnkiLive` and uses the existing outcome transaction. Wrong-kind,
+invalid-ID and empty-duplicate results preserve uncertainty; no submission can
+only be reported with positive knowledge that no mutating call was submitted.
+
+CoreSession routes live effects through its separate Anki executor and main-thread
+resolution. Its session-local worker deduplicates effect IDs, cancels queued work
+on close and drops late/in-flight responses; the durable journal remains pending
+for read-only startup recovery. No work is copied into a new session. The provider
+dispatcher refreshes host/spec/permission/deck/layout/exact-duplicate checks through
+the existing adapters; model creation rechecks deck/duplicates immediately before
+submission. Unexpected adapter exceptions remain uncertain. No schema, dependency
+or native-export ABI change. Visible preparation/begin/Add, recovery/deck/permission
+UI and a disposable real collection/browser trial remain unfinished. There is no
+reachable user mutation flow or real AnkiDroid compatibility claim yet.

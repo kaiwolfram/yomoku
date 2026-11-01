@@ -298,6 +298,8 @@ pub enum Event {
     RetryAnkiRecovery,
     /// Explicit read-only recovery; native handles stay in the response closure.
     BeginAnkiRecoveryRead(crate::anki::AnkiRecoveryReadTarget),
+    /// Consume an already committed native permit once; cannot prepare or begin a write.
+    DispatchAnkiLive,
     #[serde(skip)]
     #[cfg_attr(feature = "facet_typegen", facet(skip))]
     EffectiveStorageFinished(
@@ -466,6 +468,7 @@ pub enum Effect {
     Storage(StorageOperation),
     AnkiRecoveryRead(crate::anki::AnkiRecoveryReadOperation),
     AnkiExportPreflight(crate::anki::AnkiPreflightOperation),
+    AnkiLive(crate::anki::AnkiLiveOperation),
 }
 
 #[derive(Default)]
@@ -1678,6 +1681,7 @@ impl App for Yomoku {
             | Event::StatisticsFinished(..)
             | Event::RestoreAnkiRecovery
             | Event::BeginAnkiLive
+            | Event::DispatchAnkiLive
             | Event::AnkiLiveBeginFinished(..)
             | Event::FinishAnkiLive(..)
             | Event::AnkiLiveOutcomeFinished(..)

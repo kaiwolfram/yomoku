@@ -128,6 +128,7 @@ fn anki_recovery_read_dispatch_is_public_but_captured_callback_has_no_shell_code
 fn anki_public_read_events_round_trip_after_skipped_native_callbacks() {
     use yomoku_core::anki::AnkiRecoveryReadTarget;
     for event in [
+        Event::DispatchAnkiLive,
         Event::BeginAnkiExportPreflight,
         Event::RetryAnkiExportPreflight,
         Event::RetryAnkiRecovery,

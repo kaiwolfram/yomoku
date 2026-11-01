@@ -112,7 +112,8 @@ operation, enumerates decks without selecting/creating one, queries exact-surfac
 duplicates and reconciles read-only. Shell-local results translate to the typed core recovery protocol. The manifest
 declares only the known provider visibility query and database permission; no
 permission prompt or automatic provider read is enabled. Explicit recovery reads
-now dispatch through CoreSession; live mutations and visible actions remain gated.
+now dispatch through CoreSession; live dispatch requires a committed native permit,
+and visible actions remain gated.
 
 Duplicate candidates are the exact Yomoku escaped first field and, when it has no
 HTML/entity/media/delimiter syntax, the literal plain surface. Bound `flds = ?`
@@ -150,7 +151,7 @@ an observation, not an atomic reuse guarantee, and must run again before mutatio
 No production template constants are copied into Kotlin; the future typed bridge
 must supply Rust's layout. The reader never creates, repairs or overwrites models.
 
-The separate unconnected `AnkiProviderModelCreator` follows the release wrapper's
+The separate worker-only `AnkiProviderModelCreator` follows the release wrapper's
 two-stage creation: insert metadata/four fields/one dummy template, then update
 only that new ID's ordinal-zero template. Discovery refuses exact-name conflicts
 without overwriting or renaming user models. Validate the returned content URI,
@@ -164,7 +165,7 @@ return uncertainty, preserving a validated new ID when known. No retry, repair o
 delete is attempted: a partial/orphan model may remain. Concurrent collection edits
 are not fenced. Fake-provider coverage does not establish real-provider behavior.
 
-The isolated `AnkiProviderNoteInserter` now revalidates layout, an existing
+The worker-only `AnkiProviderNoteInserter` revalidates layout, an existing
 nonfiltered frozen deck and exact duplicates before submission. The reviewed
 [`addNoteForContentValues`](https://github.com/ankidroid/Anki-Android/blob/v2.25.3/api/src/main/java/com/ichi2/anki/api/AddContentApi.kt)
 inserts a note, then moves its cards: there is no deck column for single-note
@@ -176,11 +177,12 @@ initially uses the model default deck; the adapter never changes that default.
 Any failure after insertion submission is uncertain, retaining the payload/deck
 and validated returned ID when available. No retry/repair/delete occurs; a note
 may remain in the default deck. Read-only exact-surface reconciliation establishes
-existence, not placement success. This remains unconnected to app/FFI/UI and does
-not establish installed-provider compatibility or an atomic check-and-add.
+existence, not placement success. The typed live dispatcher now invokes this
+adapter only for a committed native permit. Visible UI remains unfinished; fake
+coverage does not establish installed-provider compatibility or an atomic check-and-add.
 
-Next implement app-owned state/typed transport and durable pending/uncertain insertion
-recovery before enabling live wiring. A process restart must not erase insert
+App-owned state, durable pending/uncertain journals and typed live dispatch are now
+implemented; settings, authenticated visible actions and recovery projection remain. A process restart must not erase insert
 uncertainty or replay an old mutating request. No supported provider completion
 fence for safe retry after empty reconciliation has been established. Verify model
 layout before reuse; never overwrite an existing user model merely by name.
@@ -203,5 +205,16 @@ typed deck/model/duplicate observations before selecting an existing-note result
 model reuse or model creation. Typed preflight now dispatches through
 `AnkiPreflightReader` using only the already reviewed queries. Every exact-name
 candidate receives full layout validation; any failed read discards all earlier
-evidence. Durable live begin/outcome gates and visible export remain unfinished.
+evidence. Durable live begin/outcome gates and typed invocation are now implemented;
+visible export remains unfinished.
 No additional API, dependency or compatibility claim is adopted.
+
+The live dispatcher uses the same reviewed insert/update/query APIs. Typed
+`DispatchAnkiLive` consumes a Ready permit once and keeps its owner in Crux's
+response closure. CoreSession invokes it off-main with session/close gates and
+returns classified outcomes through the native durable outcome transaction.
+Model creation refreshes the frozen deck/exact duplicates immediately before
+submission; the adapter still refreshes host/permission and name conflicts.
+Unexpected exceptions or invalid response IDs remain uncertain. Neither startup
+restoration nor a standalone dispatch event can prepare/begin a mutation. No new
+provider API, minimum version, permission flow or real-provider claim is adopted.

@@ -16,6 +16,8 @@ import android.os.Looper
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import app.yomoku.shared.AnkiExportError
+import app.yomoku.shared.AnkiLiveOperation
+import app.yomoku.shared.AnkiLiveResult
 import app.yomoku.shared.AnkiPreflightDeck
 import app.yomoku.shared.AnkiPreflightModel
 import app.yomoku.shared.AnkiPreflightOperation
@@ -335,6 +337,117 @@ class AnkiProviderReaderTest {
         }
 
         override fun close() = provider.close()
+    }
+
+    private fun Fixture.liveNote(): AnkiLiveOperation.InsertNote {
+        val request = noteRequest("𠮷猫")
+        return AnkiLiveOperation.InsertNote(
+            request.surface,
+            request.joinedFields.split('\u001f'),
+            request.deckId,
+            request.modelId.value,
+            recoveryModel().layout,
+        )
+    }
+
+    private fun Fixture.liveModel(): AnkiLiveOperation.CreateModel =
+        AnkiLiveOperation.CreateModel("𠮷猫", Long.MAX_VALUE, recoveryModel().layout)
+
+    private fun Fixture.dispatch(operation: AnkiLiveOperation): AnkiLiveResult =
+        AnkiLiveDispatcher(ContentResolver.wrap(provider), environment).invoke(operation)
+
+    @Test
+    fun liveDispatchPreservesFrozenNoteAndMapsAddedExistingAndUncertainResults() {
+        Fixture().use { f ->
+            f.enableNoteInsertion()
+            val operation = f.liveNote()
+            assertEquals(AnkiLiveResult.NoteAdded(Long.MAX_VALUE), f.dispatch(operation))
+            assertEquals(1, f.provider.inserts.size)
+            assertEquals(AnkiLiveResult.NoteExisting(listOf(Long.MAX_VALUE)), f.dispatch(operation))
+            assertEquals(1, f.provider.inserts.size)
+        }
+        Fixture().use { f ->
+            f.enableNoteInsertion()
+            f.provider.updateReplacement = { _, _ -> throw IllegalStateException("lost placement") }
+            assertEquals(AnkiLiveResult.NoteUncertain(Long.MAX_VALUE), f.dispatch(f.liveNote()))
+            assertEquals(1, f.provider.inserts.size)
+        }
+    }
+
+    @Test
+    fun liveDispatchMapsCreationAndRetainsPartialModelIds() {
+        for (uncertain in listOf(false, true)) Fixture().use { f ->
+            f.enableCreation(9007199254740993L)
+            f.provider.database.execSQL(
+                "INSERT INTO decks VALUES(?, 'Frozen', 0)",
+                arrayOf<Any?>(Long.MAX_VALUE),
+            )
+            if (uncertain) f.provider.updateReplacement = { _, _ -> 0 }
+            val expected =
+                if (uncertain) AnkiLiveResult.ModelUncertain(9007199254740993L)
+                else AnkiLiveResult.ModelCreated(9007199254740993L)
+            assertEquals(expected, f.dispatch(f.liveModel()))
+            assertEquals(1, f.provider.inserts.size)
+            assertEquals(AnkiLiveResult.NoSubmission, f.dispatch(f.liveModel()))
+            assertEquals(1, f.provider.inserts.size)
+        }
+    }
+
+    @Test
+    fun liveDispatchRejectsMissingFilteredDeckDuplicatesAndConflictsBeforeCreating() {
+        for (gate in 0..4) Fixture().use { f ->
+            f.enableCreation()
+            if (gate != 0)
+                f.provider.database.execSQL(
+                    "INSERT INTO decks VALUES(?, 'Frozen', ?)",
+                    arrayOf<Any?>(Long.MAX_VALUE, if (gate == 1) 1 else 0),
+                )
+            when (gate) {
+                2 -> f.provider.database.execSQL("INSERT INTO notes VALUES(8, 9, '𠮷猫', 1)")
+                3 -> f.model()
+                4 -> f.environment.permitted = false
+            }
+            assertEquals(AnkiLiveResult.NoSubmission, f.dispatch(f.liveModel()))
+            assertTrue(f.provider.inserts.isEmpty())
+            assertTrue(f.provider.updates.isEmpty())
+        }
+    }
+
+    @Test
+    fun liveDispatchRefreshesDeckAndDuplicatesImmediatelyBeforeModelSubmission() {
+        for (duplicate in listOf(false, true)) Fixture().use { f ->
+            f.enableCreation()
+            f.provider.database.execSQL(
+                "INSERT INTO decks VALUES(?, 'Frozen', 0)",
+                arrayOf<Any?>(Long.MAX_VALUE),
+            )
+            var modelReads = 0
+            f.provider.beforeQuery = { uri ->
+                if (uri.pathSegments == listOf("models") && ++modelReads == 2) {
+                    if (duplicate)
+                        f.provider.database.execSQL("INSERT INTO notes VALUES(8, 9, '𠮷猫', 1)")
+                    else f.provider.database.execSQL("UPDATE decks SET deck_dyn = 1")
+                }
+            }
+            assertEquals(AnkiLiveResult.NoSubmission, f.dispatch(f.liveModel()))
+            assertEquals(2, modelReads)
+            assertTrue(f.provider.inserts.isEmpty())
+        }
+    }
+
+    @Test
+    fun liveDispatchClassifiesProviderLossBeforeAndAfterSubmission() {
+        for (after in listOf(false, true)) Fixture().use { f ->
+            f.enableNoteInsertion()
+            if (after)
+                f.provider.insertReplacement = { _, _ -> throw SecurityException("lost response") }
+            else f.environment.permitted = false
+            assertEquals(
+                if (after) AnkiLiveResult.NoteUncertain(null) else AnkiLiveResult.NoSubmission,
+                f.dispatch(f.liveNote()),
+            )
+            assertEquals(if (after) 1 else 0, f.provider.inserts.size)
+        }
     }
 
     private fun <T> value(result: AnkiReadResult<T>): T = (result as AnkiReadResult.Value).value

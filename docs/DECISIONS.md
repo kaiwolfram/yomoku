@@ -4792,3 +4792,24 @@ The native permit has no production consumer yet. Typed provider dispatch must
 still enforce CoreSession worker/main/close ownership and fresh provider/deck/
 layout/duplicate checks. These tests establish native ownership, not Android close
 behavior, a real provider invocation or AnkiDroid compatibility.
+
+## 2026-11-01 — Typed committed Anki invocation dispatch
+
+Expose only `DispatchAnkiLive` as a shell intent for consuming a Ready native
+permit. Preparation, durable begin and callback handles remain native. This keeps
+provider invocation independently testable before adding the deck/action UI and
+prevents a shell payload or recovered journal from minting mutation authority.
+Capture the move-only permit in the typed Crux response closure and classify every
+accepted result through `FinishAnkiLive`; invalid IDs, wrong result kinds and
+unexpected shell exceptions preserve uncertainty. Explicit no-submission requires
+positive knowledge that no mutating provider call was submitted.
+
+Use CoreSession's existing separate Anki executor and a session-local invocation
+worker. Retain issued effect IDs for that session, check close before starting
+queued work, and deliver results on main only while the owner remains open.
+Closing drops callbacks rather than waiting for an external provider; pending
+journals recover read-only after restart. An operation already started can finish
+its provider validation/placement, but its late response cannot enter a closed or
+new bridge. Model creation refreshes the frozen surface/deck again immediately
+before submission as well as refreshing host/permission and model conflicts.
+No dependencies, schema, destructive semantics or visible actions are changed.

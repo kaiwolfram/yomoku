@@ -11,6 +11,7 @@ internal class CoreSessionOwner(application: Application) : AndroidViewModel(app
             sudachiDictionaryProvider(application),
             readAnkiRecovery = AnkiRecoveryReader(AnkiProviderReader(application))::read,
             readAnkiPreflight = AnkiPreflightReader(AnkiProviderReader(application))::read,
+            invokeAnkiLive = AnkiLiveDispatcher(application)::invoke,
         )
     val fileImports: FileImports =
         FileImports(

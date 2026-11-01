@@ -6,7 +6,7 @@ import android.database.Cursor
 import android.net.Uri
 import android.os.Looper
 
-/** Frozen shell-local transport; core owns content/layout and the future durable export owner. */
+/** Frozen provider transport; core owns content/layout and the durable export lifecycle. */
 internal class AnkiProviderNoteRequest(
     val surface: String,
     fields: List<String>,
@@ -54,10 +54,10 @@ internal sealed interface AnkiNoteInsertionResult {
 }
 
 /**
- * Unconnected worker-only prerequisite. The future owner must durably record pending submission
- * before invoking this boundary, invoke once per authorized request and never replay on restart.
- * There is no retry/repair/delete here. Reconciliation uses the separate read-only reader; an empty
- * observation cannot fence a submitted write or authorize another insertion.
+ * Worker-only insertion boundary. The retained dispatcher consumes a committed native permit before
+ * invoking this boundary, invokes once per request and never replays on restart. There is no
+ * retry/repair/delete here. Reconciliation uses the separate read-only reader; an empty observation
+ * cannot fence a submitted write or authorize another insertion.
  */
 internal class AnkiProviderNoteInserter(
     private val resolver: ContentResolver,
