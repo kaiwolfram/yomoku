@@ -4881,3 +4881,23 @@ unavailable to the shell. Ready dispatch still consumes only a committed permit.
 Keep this independently verifiable boundary separate from CoreSession Ready
 orchestration and visible Compose controls. No provider APIs, dependencies,
 schema, vocabulary/history behavior or data-destructive semantics change.
+
+## 2026-11-01 — Retained Ready dispatch and frozen export panel
+
+- CoreSession posts a main-thread dispatch after rendering native Ready, once per
+  preparation generation. Delivery rechecks generation, phase and the close gate;
+  Rust still owns and consumes the committed invocation permit. This avoids
+  recursive render/observer calls and does not reconstruct authority on restart.
+  AnkiLiveWorker retains its separate queued/in-flight close gates.
+- Show the optional frozen export panel in Settings beside recovery. Opening
+  Settings or composing any phase performs no provider operation. Explicit Check,
+  Check again and generation/phase-correlated begin actions use the existing
+  typed protocol. Create model and Add are separate acknowledged operations;
+  model creation never implicitly inserts a note. Dismiss uses correlated Clear.
+- Busy/failed journal phases offer no dismiss/write retry. Uncertain outcomes
+  point to the existing read-only recovery flow; provider conflicts/errors can
+  only recheck. Display success only from the durable native outcome projection.
+  The panel retains the frozen surface/deck independently of popup navigation.
+- Dictionary Add entry, configured-deck/permission/browser workflows and a real
+  disposable AnkiDroid collection remain separate implementation/validation work.
+  No schema, dependency, provider API or generated/native-export ABI changes.

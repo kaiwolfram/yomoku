@@ -63,6 +63,7 @@ internal fun SettingsScreen(view: ViewModel, dispatch: (Event) -> Unit) {
     ) {
         StorageStatus(view)
         ReaderSaveRetry(view, dispatch)
+        view.ankiExport?.let { AnkiExportPanel(it, dispatch) }
         view.ankiRecovery?.let { AnkiRecoveryPanel(it, dispatch) }
         val typography = view.readerTypography
         val typographyEnabled =

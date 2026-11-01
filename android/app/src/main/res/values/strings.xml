@@ -234,4 +234,24 @@
     <string name="boundary_reload">Reload</string>
     <string name="word_custom_pending_failed">Custom entry change failed. Retry or cancel the pending change.</string>
     <string name="word_status_pending_failed">Status change failed. Retry or cancel the pending change.</string>
+    <string name="anki_export_title">AnkiDroid export</string>
+    <string name="anki_export_deck">Target deck ID: %1$s</string>
+    <string name="anki_export_prepared">Ready to check AnkiDroid.</string>
+    <string name="anki_export_checking">Checking deck, note model and existing notes…</string>
+    <string name="anki_export_create_model">The Yomoku note model needs to be created.</string>
+    <string name="anki_export_reuse_model">Ready to add this word to the selected deck.</string>
+    <string name="anki_export_existing">Already in AnkiDroid. Note IDs: %1$s</string>
+    <string name="anki_export_beginning">Preparing AnkiDroid export…</string>
+    <string name="anki_export_invoking">Sending to AnkiDroid…</string>
+    <string name="anki_export_saving">Saving the export result…</string>
+    <string name="anki_export_added">Added to AnkiDroid.</string>
+    <string name="anki_export_model_created">Note model created. Close and select the word again to add it.</string>
+    <string name="anki_export_not_submitted">Nothing was submitted to AnkiDroid.</string>
+    <string name="anki_export_note_uncertain">The note may have been added. Use Check note in AnkiDroid recovery before another export.</string>
+    <string name="anki_export_model_uncertain">The note model may have been created. Use Check model in AnkiDroid recovery before another export.</string>
+    <string name="anki_export_storage_failed">The export result could not be confirmed locally. Use Retry in AnkiDroid recovery, then check AnkiDroid.</string>
+    <string name="anki_export_check">Check AnkiDroid</string>
+    <string name="anki_export_check_again">Check again</string>
+    <string name="anki_export_create">Create note model</string>
+    <string name="anki_export_add">Add to Anki</string>
 </resources>

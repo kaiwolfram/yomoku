@@ -4225,3 +4225,21 @@ and /tmp/yomoku-browser-profile-*. No emulator started.
   deck/permission/Add/browser UI and disposable real-provider validation.
   Recommend the physical schema-23 Library/history upgrade trial before visible
   live integration; no physical, optimized-release or real-provider trial run.
+
+## 2026-11-01 — Retained Anki Ready dispatch and export controls
+
+- Added one-post-per-generation Ready dispatch in CoreSession with native phase,
+  generation and close rechecks; the native committed permit still owns writes.
+- Added Settings export panel for frozen surface/deck, explicit typed preflight/
+  begin/dismiss controls, conflicts/errors, progress and durable outcomes. Failed
+  and uncertain work uses existing recovery; model creation never auto-adds a note.
+- PASS: seven new Android cases, all 20 selected API-36 x86_64 cases (zero
+  failures/errors/skips), eight native FIFO cases, debug/test APKs, strict lint,
+  Kotlin formatting and diff checks. Initial test fixtures incorrectly relied on
+  same-process cross-SQLite locking/transient-phase polling and Library refresh
+  preserving cached tokens; corrected fixtures. See DEVELOPMENT.md for details.
+- No implementation/verification work or blocker remains for this slice. Next:
+  configured deck/permission and dictionary Add entry/presentation, existing-note
+  browser/return and disposable real collection validation. No schema/dependency/
+  provider API/native-export ABI change. Physical schema-23 Library/history upgrade
+  remains recommended before the full visible flow; no release/device trial run.

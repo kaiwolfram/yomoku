@@ -224,6 +224,8 @@ provider API, minimum version, permission flow or real-provider claim is adopted
 The shell can now request current-selection preparation and correlate begin/clear
 with a volatile preparation generation (begin also matches the presented phase).
 It supplies no note fields, native handles or journal callbacks. This reuses the
-provider operations above without changing their API assumptions. Ready dispatch
-remains explicit pending CoreSession orchestration; deck/permission/Add/browser
-UI and disposable real-provider validation remain unfinished.
+provider operations above without changing their API assumptions. CoreSession
+now dispatches a rendered Ready generation once, with close/phase/owner rechecks;
+Settings consumes the frozen export projection through explicit typed controls.
+Deck/permission/dictionary Add/browser UI and disposable real-provider validation
+remain unfinished. No new provider operation or compatibility claim is adopted.

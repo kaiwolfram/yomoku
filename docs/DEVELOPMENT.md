@@ -8625,3 +8625,65 @@ Ready orchestration, Compose status/Add, configured deck/permission and
 browser flow remain. No real AnkiDroid, optimized release or physical trial was
 run; recommend the schema-23 phone Library/history upgrade trial before visible
 live integration and a disposable real collection before compatibility claims.
+
+## Retained Anki Ready dispatch and Compose export controls
+
+2026-11-01: Kotlin-only production change; no schema/dependency/provider API or
+native-export/generated-codec change. Use the pinned offline toolchains and the
+existing isolated 8 GiB statistics-ui-avd without wiping data.
+
+```sh
+export PATH=/home/kai/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin:$PATH
+export JAVA_HOME="$PWD/.local/jdk-17/jdk-17.0.21+9"
+export GRADLE_USER_HOME="$PWD/.local/gradle"
+export ANDROID_HOME=/home/kai/Android/Sdk
+cargo test -p yomoku-runtime anki_live --all-features --locked --offline
+tools/format-kotlin.sh --check
+./android/gradlew -p android :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=app.yomoku.AnkiExportPanelTest,app.yomoku.AnkiExportSessionTest,app.yomoku.AnkiRecoveryPanelTest,app.yomoku.AnkiRecoverySessionTest,app.yomoku.AnkiLiveWorkerTest,app.yomoku.CoreSessionTest,app.yomoku.NavigationTest --offline --console=plain
+git diff --check
+```
+
+New Android cases use the actual CoreSession/JNI/SQLite path with fake provider
+calls: committed pending journal before invocation, frozen signed-64 deck and
+single selected sentence occurrence, durable note result, repeated begin/dispatch,
+unchanged reader/vocabulary/encounters, no implicit note insert after model
+creation, unavailable/duplicate preflight, queued Ready close, in-flight close,
+late callback and restart without replay. Two Compose cases cover every export
+phase, frozen generation/phase actions, explicit read checks, conflicts/errors,
+no composition side effects and no mutating retry/dismiss during failed/live work.
+
+Initial build caught a missing test setContent import; a later test edit caught
+an unnecessary safe call under -Werror. Corrected both. Initial emulator run
+passed 19/20, timing out while polling the transient Saving phase. Diagnostic
+trace showed Saving followed by the acknowledged NoteAdded: the same-process
+Android SQLite lock fixture did not hold back the bundled native SQLite write.
+Replaced timing-based assertions with reads of committed pending/added journal
+states at provider invocation/result presentation; synthetic panel coverage checks
+Saving, and native FIFO cases cover blocked commits/rollback/lost responses.
+The next run reached durable success but caught an unrelated fixture RefreshLibrary
+invalidation of cached reader tokens. Replaced that refresh with a Settings render
+before asserting unchanged tokens and reloading dismissed word details.
+
+Local Gradle/ADB sockets and emulator KVM need normal sandbox escalation. Full
+workspace Rust/Clippy and standalone host JNI were not rerun for Kotlin-only
+changes; targeted native FIFO tests reuse the unchanged durable protocol. No
+real collection/browser, optimized APK or physical upgrade/performance trial was
+run. Recommend the physical schema-23 Library/history upgrade checkpoint before
+completing the visible Add workflow, then a disposable real AnkiDroid collection
+before compatibility claims. Final verification results follow below.
+
+PASS: all eight native FIFO cases, Kotlin formatting and diff checks, debug/test
+APK builds (existing both-ABI native packaging), strict lintDebug and all 20
+selected API-36 x86_64 emulator cases, zero failures/errors/skips. Seven new cases
+are two panel and five real CoreSession cases; remaining coverage is two recovery
+panel, two retained recovery session, four live worker, three CoreSession and two
+navigation regressions. The final queued-close test posts close ahead of the
+scheduled Ready delivery, exercising cancellation of an already queued dispatch.
+No implementation/verification work or blocker remains for this slice. Dictionary
+Add entry/presentation, deck/permission/browser and real collection work remain.
+
+Logs: `/tmp/yomoku-anki-ready-{format,format-check,android,fifo,focused,final,
+emulator-initial,token-fixture,emulator-boot}.log` (one file per suffix).
+Initial XML: `/tmp/yomoku-anki-ready-initial-xml/` and
+`/tmp/yomoku-anki-ready-token-fixture-xml/`. Final XML:
+`android/app/build/outputs/androidTest-results/connected/debug/`.

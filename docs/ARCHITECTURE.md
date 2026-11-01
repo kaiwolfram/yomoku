@@ -2183,9 +2183,9 @@ and abandons only eligible lost read ownership; a fresh provider check is separa
 Empty observations remain unresolved and a successful provider read remains pending
 until the FIFO commit acknowledgement. No pending recovery is solely a journal
 statement; it makes no claim about deck placement or provider availability. Errors
-remain separate from local-reader saves. Authenticated shell preparation/begin,
-Ready orchestration, live outcome UI and permission/deck/Add/browser UI
-still precede a complete visible export workflow.
+remain separate from local-reader saves. Shell preparation/begin, Ready
+orchestration and frozen live presentation are described below; permission/deck/
+dictionary Add/browser UI still precede a complete visible export workflow.
 
 ### Frozen Anki export presentation
 
@@ -2194,7 +2194,7 @@ frozen exact surface, target deck and a typed `AnkiExportPhase`. It is absent
 until native preparation succeeds, persists across popup dismissal/navigation,
 and disappears on accepted Clear or read-only restoration after a failed live
 attempt. Startup journal restoration never recreates this presentation or live
-authority. No shell preparation/begin action is added by this projection.
+authority. Shell preparation/begin are separately guarded as described below.
 
 Preflight projects Checking, CreateModel, ReuseModel, exact Existing note IDs or
 the typed provider error, including model conflicts. Live work projects Beginning,
@@ -2211,8 +2211,8 @@ obligations, not that historical outcome. These IDs are observations, not native
 handles or mutation permits. The projection never starts another model/note
 submission, performs I/O or changes reader/vocabulary/history state. Render is
 emitted when the projected state changes; duplicate/stale callbacks stay silent.
-Generated Kotlin carries all phases and exact signed-64 provider IDs. Compose
-live status presentation and authenticated Add orchestration remain next work.
+Generated Kotlin carries all phases and exact signed-64 provider IDs. Settings
+consumes this projection through the explicit controls described below.
 
 ### Shell actions for frozen Anki preparation
 
@@ -2231,6 +2231,27 @@ after identical content is prepared again or the preflight plan changes.
 existing active/failed-live gates. Native preparation/begin/callback/storage
 variants retain no shell codec. These public actions cannot submit provider work
 without durable begin acknowledgement and the one-use Ready permit. CoreSession
-Ready orchestration and visible Compose Add/status controls remain continuation
-work; the low-level typed actions are exercised through real JNI/SQLite with
-fake provider observations/results, without a real-provider compatibility claim.
+Ready orchestration and Compose controls are described below. Both are exercised
+through real JNI/SQLite with fake provider observations/results, without a
+real-provider compatibility claim.
+
+### Retained Ready dispatch and Compose export presentation
+
+CoreSession now observes the native `Ready` export phase after every request
+batch, posts at most one dispatch for that preparation generation, then rechecks
+phase/generation/session closure before sending `DispatchAnkiLive`. It runs after
+the current render/observer stack. The guard is session-local scheduling only;
+Rust's committed move-only permit remains the sole invocation authority. Close
+before delivery prevents dispatch; the worker independently cancels queued
+provider work and ignores late in-flight callbacks. Restored journals expose no
+Ready projection and never trigger a replay.
+
+Settings renders the optional `AnkiExportPanel` beside recovery. It displays the
+frozen surface/deck, preflight errors/conflicts, busy phases and only durably
+acknowledged outcomes. Check/recheck are explicit provider reads; Create model
+and Add send the projected preparation generation and phase through the native
+begin gate. Model success starts no follow-on note insertion. Dismiss is absent
+while live work is active/failed; uncertainty directs the user to the separate
+read-only recovery controls. Composition and opening Settings dispatch nothing.
+The dictionary Add entry, deck/permission configuration and browser actions
+remain unfinished, so this is not yet a complete visible export workflow.

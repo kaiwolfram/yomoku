@@ -84,7 +84,7 @@ internal fun AnkiRecoveryPanel(state: AnkiRecoveryView, dispatch: (Event) -> Uni
     }
 }
 
-private fun AnkiExportError.messageResource(): Int =
+internal fun AnkiExportError.messageResource(): Int =
     when (this) {
         AnkiExportError.PROVIDERUNAVAILABLE -> R.string.anki_error_unavailable
         AnkiExportError.UNSUPPORTEDPROVIDER -> R.string.anki_error_unsupported

@@ -11,6 +11,7 @@ import app.yomoku.nativebridge.EffectsListener
 import app.yomoku.nativebridge.FfiError
 import app.yomoku.nativebridge.NativeBridge
 import app.yomoku.shared.AnkiExportError
+import app.yomoku.shared.AnkiExportPhase
 import app.yomoku.shared.AnkiLiveOperation
 import app.yomoku.shared.AnkiLiveResult
 import app.yomoku.shared.AnkiPreflightOperation
@@ -93,6 +94,7 @@ internal class CoreSession(
     private var readerActive = false
     private var clockRunning = false
     private var tickScheduled = false
+    private var scheduledAnkiPreparation: ULong? = null
     private val tick = Runnable {
         tickScheduled = false
         if (closing) {
@@ -405,6 +407,32 @@ internal class CoreSession(
                 decoded.size,
             )
         )
+        dispatchReadyAnki()
+    }
+
+    /** Only a durably acknowledged begin can expose Ready; native code owns the permit. */
+    private fun dispatchReadyAnki() {
+        val export = view.ankiExport ?: return
+        if (
+            closing ||
+                export.phase != AnkiExportPhase.Ready ||
+                scheduledAnkiPreparation == export.preparationId
+        )
+            return
+        scheduledAnkiPreparation = export.preparationId
+        // Leave the render/observer stack before consuming the permit. Recheck the retained
+        // owner on delivery so close or an intervening state change cannot launch queued work.
+        mainHandler.post {
+            if (
+                !closing &&
+                    !isClosed &&
+                    view.ankiExport?.preparationId == export.preparationId &&
+                    view.ankiExport?.phase == AnkiExportPhase.Ready
+            ) {
+                send(Event.DispatchAnkiLive)
+                driveReaderClock()
+            }
+        }
     }
 
     /** Both read protocols share worker/main delivery and the retained handle's close gate. */
