@@ -2207,4 +2207,25 @@ a failed/lost save; the old write is never repeated. Later preference changes or
 clear cannot retarget prepared/live/journal payloads. Preflight/live dispatch
 still revalidate current provider/spec/permission/nonfiltered-deck state before
 export. A stored ID alone never permits provider dispatch or write retries.
-Dictionary Add presentation and existing-note browser/return remain unfinished.
+Dictionary Add presentation and lifecycle-safe existing-note browser navigation
+are implemented; real-provider collection/permission/browser/Back trials remain.
+
+## Versioned manual backup metadata (no database migration)
+
+[BACKUP_FORMAT.md](BACKUP_FORMAT.md) defines the separate version-1 archive:
+72-byte fixed-profile public header, bounded STREAM frame metadata and a 32-byte
+encrypted manifest preceding a compact SQLite snapshot. Envelope, payload and
+positive database migration versions are independent. The manifest carries an
+exact checked u64 database length; it is not a trusted input to allocation,
+migration or replacement. The dependency-free `yomoku-backup` codecs enforce
+structural limits only; authentication and database validation are not implemented.
+
+All existing durable state is included, including original imported bytes/EPUB
+assets, analysis identities, deleted-document provenance, history, pending time,
+custom dictionary, reader/Anki settings, both Anki journals and ID high-water
+marks. Transient routes/callbacks/permits and bundled read-only dictionaries are
+excluded. Planned snapshot vacuum removes deleted free-page content without
+changing the live database. Preserve journals through restore without replaying
+writes. User-confirmed policy requires authoritative recovery of the current
+installation's pending/uncertain Anki writes before replacement. No schema,
+runtime, FFI, external-write authority or destructive operation changes here.

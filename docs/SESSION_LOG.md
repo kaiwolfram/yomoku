@@ -4393,3 +4393,29 @@ and /tmp/yomoku-browser-profile-*. No emulator started.
   permission dialogs and browser/Back behavior are validated. Recommend schema-24
   phone upgrade retaining existing Library/history before backup implementation.
   No physical/tablet, real-provider, optimized-release or performance trial run.
+
+## 2026-11-01 — Versioned full-state backup format and metadata
+
+- Started clean. Continued phase 7 independently of unavailable physical Anki
+  compatibility trials. Added BACKUP_FORMAT.md with complete current SQLite state
+  coverage, compact snapshot design, explicit Argon2id/AEAD/STREAM parameters,
+  primary dependency/API/license/security-limit evidence, exact wire tables,
+  version policy and staged authenticated validation/replacement requirements.
+- Added dependency-free `yomoku-backup` workspace member with strict bounded
+  public-header, encrypted-manifest and frame codecs. No crypto dependencies,
+  actual encryption/randomness, I/O, SQL, runtime/core/FFI/Android or restore action.
+- Asked the Anki replacement ambiguity; user chose to require recovery of current
+  pending/uncertain writes before replacement. Recorded in PRODUCT_SPEC.md and
+  decisions/design. Backed-up journals remain recovery records, never write permits.
+- PASS: nine new metadata tests; 1022 workspace tests/17 opt-in ignored, all-feature
+  build, strict Clippy, Rustfmt, local doc links and diff checks. Two initial lint
+  findings (`is_multiple_of`, fixture `as_chunks`) corrected; final focused tests,
+  full lint and format pass. Commands/results/logs: DEVELOPMENT.md. No downloads;
+  Git metadata writes require normal escalation from the read-only sandbox.
+- Updated README layout, architecture/data model, decisions, plan and handoff.
+  No implementation/verification steps or blockers remain for this prerequisite.
+  Next: reviewed library adoption/authenticated stream I/O, compact snapshot
+  repository, then typed secret-safe export. Full-state round trip and restore
+  tasks remain unchecked. No Android/JNI/emulator/real-crypto/release trials run.
+  Recommend the schema-24 physical upgrade retaining Library/history plus a
+  disposable real Anki collection/permission/browser/Back trial now.

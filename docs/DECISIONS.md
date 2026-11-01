@@ -5049,3 +5049,41 @@ does not acknowledge a mutation, refresh the provider or alter vocabulary/histor
 Primary handler/note-search evidence is linked in ANKIDROID_API.md. Disposable
 real-collection/permission/browser and physical upgrade trials remain outstanding.
 No new dependency, schema, codec, journal or data-destructive behavior.
+
+## 2026-11-01 — Versioned backup format before encrypted I/O
+
+Continue phase 7 while real-device/Anki compatibility trials remain unavailable.
+Specify one full-state compact SQLite snapshot rather than reconstructing mutable
+tables through FFI or importing original books again. Current durable images and
+original files are database BLOBs; preserve analysis identities, histories, ID
+sequences and both Anki journals as part of the coherent snapshot. Planned
+`VACUUM INTO` purges deleted free-page content from the private copy and leaves
+the source untouched. It must finish/validate before export. No schema migration.
+
+Choose explicit RFC-9106 memory-constrained Argon2id v1.3 parameters (64 MiB,
+3 passes, 4 lanes, 16-byte salt, 32-byte key) and RustCrypto STREAM BE32 over
+XChaCha20Poly1305 (19-byte random nonce prefix). Use library counter/finality
+handling with fixed 64-KiB chunks and mandatory short/empty authenticated Last;
+bind exact envelope and frame metadata as AAD. A strict fixed KDF profile prevents
+untrusted import metadata selecting arbitrary work factors. No home-grown cipher,
+KDF or nonce construction; this slice implements only public metadata codecs.
+
+Dependency/API/license/security-limit review and primary links, exact wire tables,
+compatibility policy and required subsequent tests are in BACKUP_FORMAT.md. The
+selected pure-Rust candidates are argon2 0.5.3, chacha20poly1305 0.11.0 and
+aead-stream 0.6.0, with existing getrandom 0.4.3 and zeroize 1.9.0. They have
+not been added or compiled; adoption/feature checks, known-answer tests, Android
+ABIs and resource trials belong to encrypted export. Historical cipher audit
+evidence does not establish an independent audit of Argon2/STREAM/Yomoku.
+
+Add `yomoku-backup` as a dependency-free Rust workspace leaf for strict fixed-size
+header/manifest/frame parsing. Keep SQL/SQLite validation in storage, encryption
+outside core and orchestration in EffectRouter. Do not extend Crux/FFI until the
+secret handoff avoids serialized passwords. No Android/runtime integration yet.
+
+**User decision:** require recovery of pending/uncertain Anki writes in the current
+installation before full restore can replace it. Unknown/failed recovery is not
+clear. Recheck at confirmation/activation; a generic destructive confirmation
+cannot discard the obligations. Preserve source-backup journals and restart only
+read-only recovery, never old live invocation authority. Record this clarification
+in PRODUCT_SPEC.md; no replacement path is enabled by this prerequisite.

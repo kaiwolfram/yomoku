@@ -9082,3 +9082,51 @@ before encrypted-backup implementation; the Anki umbrella task stays unchecked.
 Logs: `/tmp/yomoku-anki-browser-{build,tests,final,format,format-final,format-check,
 emulator}.log` (one per suffix). Initial XML: `/tmp/yomoku-anki-browser-initial-xml/`;
 final browser XML: `android/app/build/outputs/androidTest-results/connected/debug/`.
+
+## Versioned backup metadata prerequisite
+
+2026-11-01: added dependency-free `yomoku-backup` workspace member and
+BACKUP_FORMAT.md. No runtime/core/FFI/Android integration, database migration,
+crypto dependency adoption, encryption, file I/O or replacement. Primary library
+API/security-limit/license and SQLite snapshot evidence is linked in that design.
+
+```sh
+export PATH=/home/kai/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin:$PATH
+cargo test -p yomoku-backup --all-features --locked --offline
+cargo test --workspace --all-features --locked --offline --quiet
+cargo build --workspace --all-features --locked --offline
+cargo clippy --workspace --all-targets --all-features --locked --offline -- -D warnings
+cargo fmt --all -- --check
+git diff --check
+```
+
+PASS: all nine new metadata cases; 1022 workspace tests, zero failures, 17 existing
+opt-in ignored. Wire fixtures freeze exact header/manifest/frame bytes; cases
+cover every changed header profile byte, hostile KDF work factors, every header/
+manifest/frame truncation, unknown versions/reserved fields, exact u64 lengths,
+database alignment/stream bounds, opaque salt/nonce values and all 65,536 final
+segment sizes. None of these cases verifies encryption or SQLite restoration.
+
+PASS: all-feature workspace build, strict all-target/all-feature Clippy, Rustfmt
+and diff checks. Initial focused Clippy flagged manual `is_multiple_of`; the
+initial full Clippy flagged `chunks_exact` in the hex-fixture helper. Applied the
+recommended APIs and reran the nine cases, full Clippy and formatting successfully.
+The workspace run includes the final production code; only the hex helper and a
+format-limit assertion changed afterward, covered by the final focused rerun.
+Local documentation link target checks pass. No downloads or build/test escalation
+needed. Git metadata is read-only in the sandbox; staging/commit require the
+normal authorized metadata-write escalation.
+
+No Android APK/lint/emulator, Kotlin/JNI, code generation, crypto vectors/round
+trips, physical phone/AnkiDroid or optimized release checks run for this isolated
+format slice. No implementation/verification steps or blockers remain for it.
+Next: adopt/verify reviewed crypto APIs and implement bounded authenticated stream
+I/O, followed by validated compact full-state snapshots. The user confirmed that
+current pending/uncertain Anki writes must be recovered before full replacement;
+source-backup journals remain intact without replay. Physical schema-24 upgrade
+and disposable Anki collection/permission/browser/Back trial are still recommended.
+
+Logs: `/tmp/yomoku-backup-format-{focused,workspace,build,clippy,clippy-final,
+rustfmt}.log` (one per suffix). Initial focused lint output is in the session
+tool transcript; final lint is `clippy-final`. Crypto candidates/remaining gates:
+[BACKUP_FORMAT.md](BACKUP_FORMAT.md).

@@ -1,5 +1,22 @@
 # Architecture
 
+## Manual backup prerequisite
+
+`yomoku-backup` is an independent, dependency-free Rust leaf crate containing
+strict envelope, encrypted-manifest and frame metadata codecs. It is a workspace
+member, not yet a dependency of runtime/core/FFI/Android. It does no encryption,
+randomness, SQL or I/O, and parsing never grants restore authority. The versioned
+contract and primary dependency evidence are in [BACKUP_FORMAT.md](BACKUP_FORMAT.md).
+
+Subsequent work keeps SQLite snapshot/validation in storage and Rust encryption
+in the backup crate, coordinated by EffectRouter. Pure core owns correlated
+intent/confirmation; Kotlin owns the password UI/file picker. Secret transfer
+must bypass serializable events/views. Validate and migrate a separate private
+candidate before confirmed atomic replacement and session retirement. Current
+pending/uncertain Anki recovery blocks replacement until resolved (user decision);
+restored journal records never confer external mutation permits. No live backup
+or restore action is implemented yet; full-state and failure-path tests remain.
+
 ## Implemented
 `yomoku-core` is a pure Crux 0.20.0 application. It owns Library-default
 navigation, persisted page-length/font-size/line-spacing Settings, storage busy/error state, Library

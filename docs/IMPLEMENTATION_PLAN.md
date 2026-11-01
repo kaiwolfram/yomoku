@@ -232,7 +232,7 @@ position/encounter history. Keep incremental builds green.
 
 ## 7 — Backup, hardening and release
 - [x] Build an optimized local release APK from source 0ddb81d for the next phone upgrade. Both native ABIs, assembleRelease/strict lintRelease, matching earlier phone certificate, ZIP/ELF alignment, CRC, assets and debug-probe exclusion verified; artifact/checksum in target/releases. Device execution and publishing remain separate.
-- [ ] Specify versioned full-state backup format with reviewed Argon2id/AEAD libraries/parameters; record design and dependency evidence.
+- [x] Specify versioned full-state backup format with reviewed Argon2id/AEAD libraries/parameters; record design and dependency evidence. BACKUP_FORMAT.md defines the compact full SQLite snapshot, explicit RFC-9106 Argon2id profile, library STREAM BE32/XChaCha20Poly1305, authenticated metadata, compatibility and staged replacement boundaries. Dependency-free yomoku-backup codecs and nine new tests cover golden wire fixtures, unsupported/hostile metadata, every final-frame length and size limits; 1022 workspace tests/17 ignored, all-feature build, strict Clippy/Rustfmt and local documentation links pass. User requires current Anki recovery before replacement. Crypto dependencies are reviewed candidates, not adopted/compiled; encryption, snapshot I/O, FFI/UI and restore remain below.
 - [ ] Implement encrypted export of documents/history/settings/custom entries (no Nostr identity in the first MVP); test complete round trip.
 - [ ] Validate/authenticate before confirmed replace restore; test wrong password, tampering, interrupted replacement and preserved original state.
 - [ ] Test supported schema/version upgrades and complete local-state restoration; never merge backups.

@@ -151,6 +151,10 @@ manual encrypted backups. See the [product specification](docs/PRODUCT_SPEC.md)
 for scope and the [implementation checklist](docs/IMPLEMENTATION_PLAN.md) for
 verified progress.
 
+The [manual backup format](docs/BACKUP_FORMAT.md) now specifies the full-state
+snapshot and encryption profile, with strict versioned metadata codecs. Encrypted
+export and confirmed replacement restore are not yet implemented.
+
 The Rust TXT parser, atomic repository and typed worker/JNI path support strict
 UTF-8/Shift-JIS decoding with explicit selection for ambiguous bytes, preserved hard
 breaks, and common
@@ -172,6 +176,7 @@ remain, and unfinished files require a new explicit selection.
 | `crates/yomoku-storage/` | SQLite repositories and numbered migrations |
 | `crates/yomoku-analysis/` | Sudachi adapter and validated token snapshots |
 | `crates/yomoku-import/` | Pure EPUB extraction, TXT/Aozora decoding and SRT parsing |
+| `crates/yomoku-backup/` | Versioned backup metadata codecs; encryption/I/O integration pending |
 | `crates/yomoku-ffi/` | Typed Crux/BoltFFI bridge and Kotlin payload generation |
 | `third_party/sudachi/` | Pinned engine source, Android patch and license records |
 | `third_party/dictionaries/` | JMdict/JMnedict source lock, attribution and index contract |

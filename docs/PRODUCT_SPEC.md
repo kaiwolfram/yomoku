@@ -142,6 +142,7 @@ they are **outside the first MVP** and must not drive first-release implementati
 - **Manual export/import only**: all content, reading position/completion, vocabulary and history, settings, and custom dictionary records. The first MVP has no Nostr mnemonic/identity to export. No Nostr sync, Blossom, cloud account, or automatic backups.
 - Password-encrypted archive with a well-reviewed authenticated design (e.g. **Argon2id** KDF and **AEAD** encryption); record schema/format version, salt/nonce/KDF parameters. Do not invent home-grown cryptography or log secrets.
 - Restore is a **complete replacement, never merge**. Authenticate/decrypt and validate backup before destructive work, warn and confirm before replacement, swap atomically/transactionally as possible. An incorrect password/corrupt backup must **leave existing installation intact**.
+- **Resolve current Anki recovery before restore** (user clarification, 2026-11-01): pending/uncertain Anki note or model writes in the current installation must be resolved before replacement. A generic replacement confirmation cannot discard those records. Preserve the backup's own recovery records without replaying external writes.
 - Tests: correct password round trip, bad password, tampering, interrupted restore, new version/backward-compatible schema strategy, and complete state restoration.
 
 ## 8. UX and other confirmed decisions
