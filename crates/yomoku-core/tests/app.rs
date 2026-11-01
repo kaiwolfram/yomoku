@@ -7,6 +7,7 @@ fn starts_in_library() {
     assert_eq!(
         core.view(),
         ViewModel {
+            anki_recovery: None,
             vocabulary: Default::default(),
             statistics: Default::default(),
             library_rename: None,

@@ -30,11 +30,7 @@ impl Yomoku {
                 let AnkiRecoveryState::Restored(snapshot) = &model.anki_recovery else {
                     return Some(Command::done());
                 };
-                if model.anki_live_blocks_recovery()
-                    || model.anki_recovery_read.is_some()
-                    || model.anki_recovery_commit.is_some()
-                    || model.anki_recovery_commit_error.is_some()
-                {
+                if !model.can_check_anki_recovery() {
                     return Some(Command::done());
                 }
                 if let Some(request) = AnkiRecoveryReadRequest::new(snapshot.clone(), *target) {

@@ -16,6 +16,8 @@ pub use preflight::*;
 mod projection;
 mod recovery;
 pub use recovery::*;
+mod recovery_view;
+pub use recovery_view::*;
 mod recovery_read;
 pub use recovery_read::*;
 mod submission;

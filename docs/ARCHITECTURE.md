@@ -2160,6 +2160,29 @@ for read-only startup recovery. No work is copied into a new session. The provid
 dispatcher refreshes host/spec/permission/deck/layout/exact-duplicate checks through
 the existing adapters; model creation rechecks deck/duplicates immediately before
 submission. Unexpected adapter exceptions remain uncertain. No schema, dependency
-or native-export ABI change. Visible preparation/begin/Add, recovery/deck/permission
+or native-export ABI change. Visible preparation/begin/Add, deck/permission
 UI and a disposable real collection/browser trial remain unfinished. There is no
 reachable user mutation flow or real AnkiDroid compatibility claim yet.
+
+### Settings Anki recovery presentation
+
+`ViewModel::anki_recovery` is a Settings-only optional `AnkiRecoveryView`. Core
+projects loading/clear/unresolved/checking/saving/busy/failed phases, pending-kind
+flags, typed storage/provider errors and read/Retry eligibility. It shares the
+native action guards and carries no journal IDs, payloads or callback authority.
+Anki updates emit Render when this visible projection changes, including worker
+restore/commit callbacks. Outside Settings the projection is absent and those
+updates retain the existing reader render policy.
+Clean startup with empty journals shows no panel. A volatile native notice flag
+keeps the panel visible after recovery needed attention, including its cleared
+state, until session closure; it is not restored across process restart.
+
+`AnkiRecoveryPanel` offers Check note/Check model and explicit Retry. Composition,
+Settings entry and navigation do not initiate provider reads. Retry reloads SQLite
+and abandons only eligible lost read ownership; a fresh provider check is separate.
+Empty observations remain unresolved and a successful provider read remains pending
+until the FIFO commit acknowledgement. No pending recovery is solely a journal
+statement; it makes no claim about deck placement or provider availability. Errors
+remain separate from local-reader saves. Authenticated shell preparation/begin,
+Ready orchestration, live outcome presentation and permission/deck/Add/browser UI
+still precede a complete visible export workflow.

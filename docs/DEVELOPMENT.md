@@ -8448,3 +8448,73 @@ format-check,host-format,host-format-check,kotlin-precheck,android,emulator,
 emulator-boot,typegen,typegen-check,codegen-diff}.log` (one path per suffix).
 Final Android XML: `android/app/build/outputs/androidTest-results/connected/debug/`.
 Local ADB/Gradle/emulator sockets/KVM required normal sandbox escalation.
+
+## Settings Anki recovery presentation
+
+2026-11-01: use the pinned Rust PATH/JAVA_HOME/GRADLE_USER_HOME/ANDROID_HOME above;
+set JAVA_BIN to `$JAVA_HOME/bin/java`. No dependency/version/schema change. Host
+JNI preceded native Android packaging; reuse the isolated statistics-ui-avd image
+without wiping data. The final focused JNI recheck uses the existing compiled
+host jar (the later visibility guard does not change Kotlin wire types).
+
+```sh
+cargo test --workspace --all-features --locked --offline --quiet
+cargo clippy --workspace --all-targets --all-features --locked --offline -- -D warnings
+cargo fmt --all -- --check
+tools/test-kotlin-bridge.sh
+cargo build --workspace --locked --offline
+cat > /tmp/AnkiRecoveryJniCheck.java <<'JAVA'
+public class AnkiRecoveryJniCheck {
+    public static void main(String[] args) {
+        app.yomoku.tests.AnkiRecoveryBridgeTestKt.verifyAnkiRecoveryBridge(args[0]);
+    }
+}
+JAVA
+"$JAVA_BIN" --enable-native-access=ALL-UNNAMED -Xcheck:jni --add-opens=java.base/java.io=ALL-UNNAMED --add-opens=java.base/sun.nio.fs=ALL-UNNAMED -Djava.library.path=target --class-path target/bridge-tests.jar /tmp/AnkiRecoveryJniCheck.java target/unicode-fixtures
+tools/format-kotlin.sh --check
+"$JAVA_BIN" -jar .local/ktfmt-0.64.jar --kotlinlang-style --dry-run --set-exit-if-changed tests/kotlin/AnkiRecoveryBridgeTest.kt
+cargo run -p yomoku-ffi --bin generate-kotlin --features facet_typegen --locked --offline -- /tmp/yomoku-recovery-ui-kotlin
+diff -r target/generated/kotlin /tmp/yomoku-recovery-ui-kotlin
+./android/gradlew -p android :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug --offline --console=plain
+./android/gradlew -p android :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=app.yomoku.AnkiRecoveryPanelTest,app.yomoku.AnkiRecoverySessionTest,app.yomoku.CoreSessionTest,app.yomoku.NavigationTest,app.yomoku.ReaderTypographySettingsTest,app.yomoku.ScalarDecodingTest#scalarValuesErrorsAndOffsetsMatchLegacy,app.yomoku.ScalarDecodingTest#generatedFrozenSnapshotsMatchLegacy --offline --console=plain
+git diff --check
+```
+
+PASS: 979 workspace tests/17 ignored opt-in fixtures, strict Clippy, Rustfmt,
+Kotlin formatting, workspace build, full host JNI plus final focused recovery
+JNI recheck, identical independent/Android Kotlin generation, both-ABI debug/test
+APKs and lintDebug. An independent Kotlin compilation precheck also passed.
+Seven new pure cases cover Settings scoping, empty startup, failed restore and
+explicit Retry, read/commit/live gates, lost/stale callbacks, empty observations,
+durable success and reader independence. Rust/Kotlin exchange covers every
+recovery phase with typed errors/flags. The session-only attention flag hides the
+optional integration on clean startup and retains cleared recovery in-session.
+
+Initial compilation corrected a missing Facet enum representation and mismatched
+borrowed error arm. One old native no-render assertion was updated for the visible
+projection. Initial emulator run passed 12/13, failing the recovery test's concurrent
+Android read-only SQLite poll with SQLITE_READONLY_ROLLBACK. The observer now waits
+for the projected durable acknowledgement before checking SQLite read-only; it
+does not widen DB access, retry the write or alter production storage semantics.
+Initial log/XML: `/tmp/yomoku-recovery-ui-emulator-initial.log` and
+`/tmp/yomoku-recovery-ui-initial-xml/`.
+
+PASS: final rerun of all 13 selected API-36 x86_64 emulator cases, zero failures,
+errors or skips (2 new panel, 2 retained recovery, 3 CoreSession, 2 navigation,
+2 reader typography and 2 scalar codec cases). Recovery UI drives the real native
+bridge/SQLite with injected worker-only provider reads; errors, explicit local
+Retry, subsequent checks and durable clearing update without RefreshLibrary.
+Close/restart still retains obligations and rejects old-owner results. XML:
+`android/app/build/outputs/androidTest-results/connected/debug/`.
+
+No implementation/verification steps or open blocker remain for this slice.
+Authenticated current-selection shell preparation/begin, Ready orchestration,
+live outcome presentation, permission/deck/Add/browser UI and a disposable real
+AnkiDroid trial remain. Recommend the physical schema-23 Library/history upgrade
+checkpoint before enabling visible live integration; a real collection/browser,
+optimized release and physical upgrade/performance matrix were not run. Local
+ADB/Gradle/emulator sockets/KVM required normal sandbox escalation.
+
+Logs: `/tmp/yomoku-recovery-ui-{core,workspace,build,clippy,rustfmt,jni,jni-final,
+format,format-check,host-format,host-format-check,kotlin-precheck,android,emulator,
+emulator-boot,typegen,codegen-diff,android-codegen-diff,diff}.log`.

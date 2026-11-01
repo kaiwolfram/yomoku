@@ -10,6 +10,26 @@ import java.util.concurrent.TimeUnit
 
 internal fun verifyAnkiRecoveryBridge(fixtures: String) {
     val root = File(fixtures)
+    for ((index, phase) in AnkiRecoveryPhase.entries.withIndex()) {
+        val view =
+            AnkiRecoveryView.bincodeDeserialize(
+                root.resolve("anki-recovery-view-$index.bin").readBytes()
+            )
+        check(
+            view ==
+                AnkiRecoveryView(
+                    phase,
+                    index % 2 == 0,
+                    index % 2 != 0,
+                    DocumentError.UNAVAILABLE,
+                    AnkiExportError.PERMISSIONDENIED,
+                    index % 2 == 0,
+                    false,
+                    index % 2 != 0,
+                )
+        )
+        root.resolve("anki-recovery-view-$index-return.bin").writeBytes(view.bincodeSerialize())
+    }
     val frozen = AnkiReadModelLayout.bincodeDeserialize(root.resolve("anki-layout.bin").readBytes())
     root.resolve("anki-layout-return.bin").writeBytes(frozen.bincodeSerialize())
     val preflight =

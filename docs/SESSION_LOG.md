@@ -4163,3 +4163,26 @@ and /tmp/yomoku-browser-profile-*. No emulator started.
   Recommend the physical schema-23 Library/history upgrade before visible live
   integration. Real collection/browser, release, physical/performance trials unrun.
   Commands/logs: DEVELOPMENT.md, Typed committed Anki invocation dispatch.
+
+## 2026-11-01 — Settings Anki recovery presentation
+- Added Settings-only typed recovery phases, pending-kind flags and independent
+  storage/provider errors. Shared native read/Retry guards with presentation;
+  render asynchronous acknowledgements without unrelated reader refreshes.
+- Added explicit Check note/Check model and read-only Retry. Empty observations
+  retain obligations, commit acknowledgements control clearing, clean startup
+  hides the panel and a volatile notice retains completion only in-session.
+- Verified 7 new core cases, all-phase Rust/Kotlin exchange, 979 workspace tests/
+  17 ignored, build/strict Clippy/formatting, full host JNI plus final focused
+  recheck, identical independent/Android generation, both-ABI APKs/lint and all
+  13 selected API-36 emulator cases (zero failures/errors/skips on final run).
+- Corrected enum/error compilation and an old no-render test expectation.
+  Initial emulator read-only SQLite polling raced the native commit; the observer
+  now waits for its projected acknowledgement before checking durable state.
+- Updated architecture/data/API/decision/plan/handoff docs. No schema/dependency/
+  native-export ABI change or reachable user mutation flow. No open blocker or
+  implementation/verification work remains for this recovery slice.
+- Next: authenticated preparation/begin, Ready orchestration and live outcomes,
+  then permission/deck/Add/browser UI and a disposable real collection. Physical
+  schema-23 Library/history upgrade remains recommended before visible live work;
+  real-provider, release, physical/performance trials unrun. Commands/logs:
+  DEVELOPMENT.md, Settings Anki recovery presentation.

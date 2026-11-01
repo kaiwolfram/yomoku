@@ -10,7 +10,9 @@ use crate::{
 
 fn update(model: &mut Model, event: Event) {
     let mut command = Yomoku.update(event, model);
-    assert!(command.effects().next().is_none());
+    assert!(command
+        .effects()
+        .all(|effect| matches!(effect, Effect::Render(_))));
 }
 
 fn prepared(effective: bool, create: bool) -> Model {
@@ -139,7 +141,7 @@ fn anki_live_frozen_both_selections_and_kinds_issue_one_permit_without_reader_wr
                 AnkiLiveIntent::Model(creation) => assert_eq!(creation.layout(), frozen.layout()),
             }
             assert!(model.take_anki_live_invocation().is_none());
-            let before = Yomoku.view(&model);
+            let mut before = Yomoku.view(&model);
             let callback = invocation.complete(terminal(create));
             let _command = save(&mut model, callback.clone());
             assert_eq!(Yomoku.view(&model), before);
@@ -162,6 +164,7 @@ fn anki_live_frozen_both_selections_and_kinds_issue_one_permit_without_reader_wr
             assert_eq!(model.anki_live_progress(), Some(AnkiLiveProgress::Finished));
             assert!(model.anki_recovery().allows_preparation());
             assert!(model.take_anki_live_invocation().is_none());
+            before.anki_recovery = Yomoku.view(&model).anki_recovery;
             assert_eq!(Yomoku.view(&model), before);
             update(&mut model, Event::BeginAnkiLive);
             update(&mut model, Event::ClearPreparedAnkiExport);

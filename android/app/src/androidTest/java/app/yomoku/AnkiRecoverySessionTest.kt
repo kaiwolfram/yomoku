@@ -2,6 +2,14 @@ package app.yomoku
 
 import android.database.sqlite.SQLiteDatabase
 import android.os.Looper
+import androidx.activity.ComponentActivity
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertTextEquals
+import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import app.yomoku.nativebridge.DictionaryProvider
@@ -14,12 +22,14 @@ import java.util.concurrent.TimeUnit
 import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.Assert.*
+import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 
 /** Real Android JNI/SQLite and retained shell worker; provider reads are injected. */
 @RunWith(AndroidJUnit4::class)
 class AnkiRecoverySessionTest {
+    @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
     private val instrumentation = InstrumentationRegistry.getInstrumentation()
     private val dictionary =
         object : DictionaryProvider {
@@ -42,6 +52,14 @@ class AnkiRecoverySessionTest {
         while (!condition()) {
             check(System.nanoTime() < deadline) { "Anki recovery did not complete" }
             Thread.sleep(10)
+        }
+    }
+
+    private fun awaitPhase(core: CoreSession, phase: AnkiRecoveryPhase) {
+        await {
+            var matches = false
+            instrumentation.runOnMainSync { matches = core.view.ankiRecovery?.phase == phase }
+            matches
         }
     }
 
@@ -120,35 +138,50 @@ class AnkiRecoverySessionTest {
             }
         try {
             assertTrue(operations.isEmpty())
-            begin(core)
+            instrumentation.runOnMainSync { core.dispatch(Event.OpenSettings) }
+            compose.setContent {
+                app.yomoku.theme.YomokuTheme { SettingsScreen(core.view, core::dispatch) }
+            }
+            compose
+                .onNodeWithTag("anki_recovery_status")
+                .assertTextEquals("An earlier AnkiDroid operation needs checking.")
+            compose.onNodeWithTag("anki_recovery_model").performClick()
             assertEquals(
                 AnkiRecoveryReadOperation.Model(null, layout),
                 operations.poll(30, TimeUnit.SECONDS),
             )
             begin(core)
+            compose.onNodeWithTag("anki_recovery_status").assertTextEquals("Checking AnkiDroid…")
+            compose.onNodeWithTag("anki_recovery_model").assertIsNotEnabled()
             instrumentation.runOnMainSync {
                 core.dispatch(Event.SelectDestination(Destination.NOSTR))
                 assertEquals(Destination.NOSTR, core.view.destination)
                 assertNull(core.view.documentError)
+                core.dispatch(Event.OpenSettings)
             }
             assertTrue(operations.isEmpty())
             assertEquals("pending" to null, state(database))
             responses.add(AnkiRecoveryReadResult.Failed(AnkiExportError.PERMISSIONDENIED))
-            await { state(database).first == "uncertain" }
-            instrumentation.runOnMainSync { core.dispatch(Event.RefreshLibrary) }
-            await {
-                var idle = false
-                instrumentation.runOnMainSync { idle = !core.view.storageBusy }
-                idle
-            }
-            begin(core)
+            // The projected acknowledgement is the commit barrier. A concurrent
+            // Android read-only connection can require rollback-journal recovery.
+            awaitPhase(core, AnkiRecoveryPhase.FAILED)
+            assertEquals("uncertain" to null, state(database))
+            compose.onNodeWithText("AnkiDroid access permission is required.").assertIsDisplayed()
+            compose.onNodeWithTag("anki_recovery_retry").performClick()
+            awaitPhase(core, AnkiRecoveryPhase.UNRESOLVED)
+            assertTrue(operations.isEmpty()) // Retry restores SQLite only.
+            compose.onNodeWithTag("anki_recovery_model").performClick()
             assertEquals(
                 AnkiRecoveryReadOperation.Model(null, layout),
                 operations.poll(30, TimeUnit.SECONDS),
             )
             responses.add(AnkiRecoveryReadResult.Model(Long.MAX_VALUE))
-            await { state(database).first == "existing" }
+            awaitPhase(core, AnkiRecoveryPhase.READY)
             assertEquals("existing" to Long.MAX_VALUE, state(database))
+            compose
+                .onNodeWithTag("anki_recovery_status")
+                .assertTextEquals("No pending AnkiDroid recovery.")
+            compose.onNodeWithTag("anki_recovery_model").assertDoesNotExist()
             begin(core)
             assertTrue(operations.isEmpty())
         } finally {
@@ -186,6 +219,7 @@ class AnkiRecoverySessionTest {
             }
         try {
             assertTrue(reads.isEmpty())
+            instrumentation.runOnMainSync { fresh.dispatch(Event.OpenSettings) }
             begin(fresh)
             checkNotNull(reads.poll(30, TimeUnit.SECONDS))
             oldResponse.add(AnkiRecoveryReadResult.Model(Long.MAX_VALUE))
@@ -193,7 +227,7 @@ class AnkiRecoverySessionTest {
             instrumentation.waitForIdleSync()
             assertEquals("pending" to null, state(database))
             responses.add(AnkiRecoveryReadResult.Model(9007199254740993L))
-            await { state(database).first == "existing" }
+            awaitPhase(fresh, AnkiRecoveryPhase.READY)
             assertEquals("existing" to 9007199254740993L, state(database))
         } finally {
             oldResponse.offer(AnkiRecoveryReadResult.Model(null))

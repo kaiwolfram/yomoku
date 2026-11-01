@@ -4,15 +4,49 @@ use yomoku_core::{
     anki::{
         AnkiExportError, AnkiLiveOperation, AnkiLiveResult, AnkiModelCreation, AnkiModelLayout,
         AnkiNote, AnkiPreflightDeck, AnkiPreflightModel, AnkiPreflightObservation,
-        AnkiPreflightOperation, AnkiPreflightResult, AnkiReadModelLayout, AnkiSubmission,
+        AnkiPreflightOperation, AnkiPreflightResult, AnkiReadModelLayout, AnkiRecoveryPhase,
+        AnkiRecoveryView, AnkiSubmission,
     },
     document::{TextOffset, TextRange},
+    storage::DocumentError,
     vocabulary::Surface,
 };
 use yomoku_storage::Storage;
 
 pub fn exchange(dir: &Path, writing: bool) -> Result<(), Box<dyn Error>> {
     fs::create_dir_all(dir)?;
+    for (index, phase) in [
+        AnkiRecoveryPhase::Loading,
+        AnkiRecoveryPhase::Ready,
+        AnkiRecoveryPhase::Unresolved,
+        AnkiRecoveryPhase::Checking,
+        AnkiRecoveryPhase::Saving,
+        AnkiRecoveryPhase::Busy,
+        AnkiRecoveryPhase::Failed,
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let view = AnkiRecoveryView {
+            phase,
+            note_pending: index % 2 == 0,
+            model_pending: index % 2 != 0,
+            storage_error: Some(DocumentError::Unavailable),
+            provider_error: Some(AnkiExportError::PermissionDenied),
+            can_retry: index % 2 == 0,
+            can_check_note: false,
+            can_check_model: index % 2 != 0,
+        };
+        let bytes = super::encode(&view);
+        if writing {
+            fs::write(dir.join(format!("anki-recovery-view-{index}.bin")), bytes)?;
+        } else {
+            assert_eq!(
+                fs::read(dir.join(format!("anki-recovery-view-{index}-return.bin")))?,
+                bytes
+            );
+        }
+    }
     let mut layout = AnkiModelLayout::yomoku();
     layout.css.push_str("/* frozen 𠮷 */");
     // Exercise both directions of the shell protocol with Rust-owned comparison

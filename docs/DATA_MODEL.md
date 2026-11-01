@@ -2135,3 +2135,14 @@ remain durable, as in the existing journals. Any write/readback/commit error
 rolls back; lost responses require read-only recovery, never mutation replay.
 The future app/worker dispatcher also owns session/callback authentication and
 one-invocation gating. No provider, core protocol, FFI, settings or schema change.
+
+## Settings Anki recovery projection (schema 0023 unchanged)
+
+The volatile typed `AnkiRecoveryView` exposes a phase, pending note/model flags,
+optional DocumentError/AnkiExportError and can_retry/can_check_note/can_check_model.
+It exists only in the Settings view; it neither persists presentation state nor
+exposes journal IDs, frozen payloads or native handles. The existing durable
+journals and read-only reconciliation/Retry semantics are unchanged. Clear means
+no unresolved journal obligations, not proof of note placement or provider access.
+A volatile native notice flag retains completion presentation only after recovery
+needed attention during this session; clean startup keeps the panel absent.

@@ -11,6 +11,7 @@ mod reads;
 mod reconciliation;
 #[cfg(test)]
 mod test_support;
+mod view;
 
 impl Model {
     pub fn anki_recovery(&self) -> &AnkiRecoveryState {
@@ -41,20 +42,7 @@ impl Yomoku {
         }
         match event {
             Event::RestoreAnkiRecovery if model.anki_recovery == AnkiRecoveryState::Unrestored => {}
-            Event::RetryAnkiRecovery
-                if model.anki_recovery_commit.is_none()
-                    && (!model.anki_live_blocks_recovery()
-                        || matches!(
-                            model.anki_live_progress(),
-                            Some(crate::anki::AnkiLiveProgress::Failed(_))
-                        ))
-                    && (matches!(
-                        model.anki_live_progress(),
-                        Some(crate::anki::AnkiLiveProgress::Failed(_))
-                    ) || model.anki_recovery_read.is_some()
-                        || matches!(model.anki_recovery, AnkiRecoveryState::Failed(_))
-                        || model.anki_recovery_read_error.is_some()
-                        || model.anki_recovery_commit_error.is_some()) => {}
+            Event::RetryAnkiRecovery if model.can_retry_anki_recovery() => {}
             Event::RestoreAnkiRecovery | Event::RetryAnkiRecovery => {
                 return Some(Command::done());
             }

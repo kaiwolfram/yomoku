@@ -178,11 +178,13 @@ Any failure after insertion submission is uncertain, retaining the payload/deck
 and validated returned ID when available. No retry/repair/delete occurs; a note
 may remain in the default deck. Read-only exact-surface reconciliation establishes
 existence, not placement success. The typed live dispatcher now invokes this
-adapter only for a committed native permit. Visible UI remains unfinished; fake
+adapter only for a committed native permit. Visible Add UI remains unfinished; fake
 coverage does not establish installed-provider compatibility or an atomic check-and-add.
 
 App-owned state, durable pending/uncertain journals and typed live dispatch are now
-implemented; settings, authenticated visible actions and recovery projection remain. A process restart must not erase insert
+implemented; configured-deck/permission settings and authenticated live actions
+remain. Settings now projects recovery obligations/errors with explicit read-only
+checks and Retry, remaining hidden on a clean startup. A process restart must not erase insert
 uncertainty or replay an old mutating request. No supported provider completion
 fence for safe retry after empty reconciliation has been established. Verify model
 layout before reuse; never overwrite an existing user model merely by name.

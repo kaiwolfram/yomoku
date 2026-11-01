@@ -91,6 +91,8 @@ pub struct Model {
     anki_recovery_request: Option<u64>,
     anki_recovery_commit: Option<(u64, Box<crate::anki::AnkiRecoveryCommit>)>,
     anki_recovery_commit_error: Option<DocumentError>,
+    /// Keep a completed recovery visible for this session after attention was needed.
+    anki_recovery_notice: bool,
     vocabulary: crate::vocabulary::VocabularyState,
     vocabulary_request: Option<vocabulary::VocabularyRequest>,
     vocabulary_request_sequence: u64,
@@ -406,6 +408,8 @@ pub enum Event {
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
 pub struct ViewModel {
+    /// Settings-only recovery presentation; journal payloads and handles stay native.
+    pub anki_recovery: Option<crate::anki::AnkiRecoveryView>,
     pub vocabulary: crate::vocabulary::VocabularyState,
     pub statistics: crate::statistics::StatisticsState,
     pub destination: Destination,
@@ -481,7 +485,12 @@ impl App for Yomoku {
     type Effect = Effect;
 
     fn update(&self, event: Event, model: &mut Model) -> Command<Effect, Event> {
+        let anki_before = model.anki_recovery_view();
         if let Some(command) = self.update_anki_recovery(&event, model) {
+            model.remember_anki_recovery_attention();
+            if anki_before != model.anki_recovery_view() {
+                return command.and(render::render());
+            }
             return command;
         }
         if let Event::VocabularyBulkFinished(request_id, result) = event {
@@ -1705,6 +1714,7 @@ impl App for Yomoku {
 
     fn view(&self, model: &Model) -> ViewModel {
         ViewModel {
+            anki_recovery: model.anki_recovery_view(),
             vocabulary: model.vocabulary.clone(),
             statistics: model.statistics.clone(),
             destination: model.destination,

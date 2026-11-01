@@ -1,4 +1,24 @@
 <resources>
+    <string name="anki_recovery_title">AnkiDroid recovery</string>
+    <string name="anki_recovery_loading">Loading recovery state…</string>
+    <string name="anki_recovery_ready">No pending AnkiDroid recovery.</string>
+    <string name="anki_recovery_unresolved">An earlier AnkiDroid operation needs checking.</string>
+    <string name="anki_recovery_checking">Checking AnkiDroid…</string>
+    <string name="anki_recovery_saving">Saving recovery result…</string>
+    <string name="anki_recovery_busy">An AnkiDroid operation is in progress.</string>
+    <string name="anki_recovery_failed">AnkiDroid recovery could not finish.</string>
+    <string name="anki_recovery_read_only">Checks only read AnkiDroid. An empty result keeps recovery pending and does not submit again.</string>
+    <string name="anki_recovery_check_note">Check note</string>
+    <string name="anki_recovery_check_model">Check model</string>
+    <string name="anki_error_unavailable">AnkiDroid is unavailable.</string>
+    <string name="anki_error_unsupported">This AnkiDroid provider is unsupported.</string>
+    <string name="anki_error_permission">AnkiDroid access permission is required.</string>
+    <string name="anki_error_collection">The AnkiDroid collection is unavailable.</string>
+    <string name="anki_error_deck">The configured AnkiDroid deck is unavailable.</string>
+    <string name="anki_error_model">The AnkiDroid model does not match the required layout.</string>
+    <string name="anki_error_duplicates">Existing AnkiDroid notes could not be checked.</string>
+    <string name="anki_error_provider">AnkiDroid could not complete the request.</string>
+    <string name="anki_error_response">AnkiDroid returned an invalid response.</string>
     <string name="boundary_select">Edit word boundaries</string>
     <string name="boundary_select_help">Select an original Mode B word, then another to extend the span. Select again to start a new span.</string>
     <string name="boundary_selection_gap">Select consecutive Japanese words without punctuation or spaces between them.</string>

@@ -4813,3 +4813,25 @@ its provider validation/placement, but its late response cannot enter a closed o
 new bridge. Model creation refreshes the frozen surface/deck again immediately
 before submission as well as refreshing host/permission and model conflicts.
 No dependencies, schema, destructive semantics or visible actions are changed.
+
+## 2026-11-01 — Settings recovery presentation before live Add
+
+Expose a compact optional `AnkiRecoveryView` only while Settings is open. Project
+phase, pending note/model flags, separate storage/provider errors and native
+action eligibility; keep frozen payloads, IDs and callback handles native. Share
+the existing read/Retry predicates with presentation so controls cannot imply
+permission to bypass a commit or an active live invocation. Render only when the
+visible projection changes; closed Settings retains the existing reader render
+behavior. Opening/reopening Settings never queries the external provider.
+Hide the panel on a clean startup with no obligations or errors. Once attention
+was needed, retain its completion presentation until the session closes; this
+volatile flag neither installs nor implies availability of the optional provider.
+
+Offer explicit Check note/Check model and Retry using the existing typed read
+events. Retry reloads both SQLite journals and invalidates a lost read; a subsequent
+provider check remains explicit. Empty results keep the obligation visible, and
+only a matching durable commit can show no pending recovery. This message concerns
+journals, not successful note placement or provider availability. Show actionable
+provider errors without prompting for permission in this slice. Add/deck/permission
+and authenticated preparation/begin remain separate continuation work. No schema,
+dependency, destructive semantics or reachable provider mutation is introduced.
