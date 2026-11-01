@@ -2221,14 +2221,19 @@ migration or replacement. `yomoku-backup` now authenticates bounded streams and
 checks the decrypted manifest/exact payload length through Last/EOF before success.
 Only caller-owned private staging receives plaintext; failed outputs are disposable.
 Authentication still establishes neither SQLite/schema validity nor replacement
-authority. Snapshot creation, database validation and replacement are unimplemented.
+authority. Compact application-origin snapshot creation and encrypted full-state
+fixture round trips are implemented in storage. Hardened import validation and
+replacement remain unimplemented.
 
 All existing durable state is included, including original imported bytes/EPUB
 assets, analysis identities, deleted-document provenance, history, pending time,
 custom dictionary, reader/Anki settings, both Anki journals and ID high-water
 marks. Transient routes/callbacks/permits and bundled read-only dictionaries are
-excluded. Planned snapshot vacuum removes deleted free-page content without
-changing the live database. Preserve journals through restore without replaying
+excluded. Bound snapshot vacuum removes deleted free-page content without
+changing the live database. Every schema object/table (including sqlite_sequence)
+is compared in a populated encrypted round trip; each durable table has coverage.
+Pending/uncertain note and model journal variants survive separately and keep
+their normal startup mutation gates closed. Preserve journals through restore without replaying
 writes. User-confirmed policy requires authoritative recovery of the current
 installation's pending/uncertain Anki writes before replacement. No schema,
 runtime, FFI, external-write authority or destructive operation changes here.

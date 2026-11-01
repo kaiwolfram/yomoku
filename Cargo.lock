@@ -1946,6 +1946,7 @@ dependencies = [
  "rusqlite",
  "serde_json",
  "sha2",
+ "yomoku-backup",
  "yomoku-core",
  "yomoku-import",
  "zip",

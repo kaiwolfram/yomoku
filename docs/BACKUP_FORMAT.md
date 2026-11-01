@@ -1,8 +1,9 @@
 # Manual backup format, version 1
 
-Status: design, strict metadata codecs and bounded authenticated snapshot Read/Write
-implemented on 2026-11-01 in `yomoku-backup`. SQLite snapshot creation/validation,
-staging lifecycle, export/import UI and replacement are not implemented. The wire
+Status: strict metadata codecs and bounded authenticated snapshot Read/Write in
+`yomoku-backup`, compact app-owned SQLite snapshots in `yomoku-storage` and complete
+encrypted fixture round trips implemented on 2026-11-01. Hardened import validation,
+crash cleanup/orchestration, export/import UI and replacement are not implemented. The wire
 fixtures define the first format; this is not yet an exported-file compatibility
 or end-to-end security claim.
 
@@ -36,15 +37,39 @@ external file-picker grants, signing keys and build artifacts are excluded. The
 first MVP has no Nostr identity or relay data. A backed-up deck ID is a preference,
 not proof that the destination device has that deck or the same collection.
 
-Snapshot creation will use bound `VACUUM main INTO ?1` on the storage FIFO after
-reader checkpoint drain and while new mutating work is gated. The private output
+`Storage::create_backup_snapshot` uses bound `VACUUM main INTO ?1`. Future runtime
+integration must call it on the storage FIFO after reader checkpoint drain and
+while new mutating work is gated. The private output
 is a compact copy; the source is untouched. This choice also prevents deleted
 records lingering in free pages from leaking into a backup. SQLite documents
 [VACUUM INTO's consistency, deleted-content removal and interruption limits](https://www.sqlite.org/lang_vacuum.html).
 Do not copy a live `.sqlite3`, WAL or journal with ordinary filesystem reads.
 Only a successfully completed, validated snapshot can be encrypted for export.
-Tests must specifically preserve IDs/sequences, source deletion semantics and
-pending durations. No changes to the live database's vacuum/journal policy.
+Tests preserve IDs/sequences, source deletion semantics and pending durations.
+No changes to the live database's vacuum/journal policy.
+
+The caller supplies a new child of an app-private parent excluded from OS backup.
+Snapshot creation refuses existing paths/symlinks, creates a 0700 directory and
+0600 file, checks the completed copy's integrity/foreign keys/exact current migration
+journal/page size/zero freelist, syncs the file and exposes only an owned read-only
+reader plus schema/length. No migrations run. SQL validation opens only the owned
+copy without CREATE and enables `query_only` before schema parsing. The bundled
+SQLite 3.53.2 source (`sqlite3AddCheckConstraint`) omits CHECK expressions for
+read-only B-trees; a read-only handle's integrity check alone missed the corrupt
+settings fixture. The query-only check catches it. This is a structural export
+check, not hardened untrusted-schema/application validation or restore authority.
+[SQLite integrity checks](https://www.sqlite.org/pragma.html#pragma_integrity_check)
+and [query_only](https://www.sqlite.org/pragma.html#pragma_query_only) govern these APIs.
+
+Snapshot `discard` closes the reader and reports removal failures. Drop/error/
+cancellation paths attempt cleanup without recursively deleting unexpected files.
+Process-death cleanup and private-parent lifecycle remain runtime obligations.
+Cancellation is polled between synchronous calls, including before/after VACUUM,
+validation and sync; these calls cannot be interrupted. The reader can rewind for
+fresh encryption attempts and remains frozen after live writes. Normal/WAL source
+byte-preservation and excluded concurrent uncommitted work are tested. Encryption
+is composed in storage tests through a dev dependency only; no production crypto
+edge, worker, core/FFI/Android action or external file publication exists yet.
 
 ## Cryptographic profile and dependency review
 

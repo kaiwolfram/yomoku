@@ -9192,3 +9192,73 @@ trials. Schema-24 phone upgrade/disposable Anki collection trials remain recomme
 Logs: `/tmp/yomoku-backup-stream-{focused,focused-final,workspace,build,build-final,
 clippy,clippy-final,arm64,arm64-final,x86_64,x86_64-final,rustfmt,reference}.log`
 (one per suffix). Initial compiler/focused lint output is in the tool transcript.
+
+## Compact full-state backup snapshots
+
+2026-11-01: added `Storage::create_backup_snapshot` and an owned read-only snapshot
+reader. Bound VACUUM INTO writes only a newly owned private directory/file, purges
+deleted free-page content, checks structure/FKs/current migration journal/compact
+size and syncs before success. Explicit discard reports cleanup errors; failure,
+cancellation and Drop clean best effort without recursive deletion. Runtime crash
+cleanup, checkpoint drain/mutation gating and app actions remain unimplemented.
+`yomoku-backup` is a storage dev dependency only; no production dependency/schema/
+core/runtime/FFI/Kotlin change. Format/architecture/data/decisions/plan/README updated.
+
+```sh
+cargo test -p yomoku-storage --all-features --locked --offline backup_snapshot -- --nocapture
+cargo test --workspace --all-features --locked --offline --quiet
+cargo build --workspace --all-features --locked --offline
+cargo clippy --workspace --all-targets --all-features --locked --offline -- -D warnings
+export CC_aarch64_linux_android=/home/kai/Android/Sdk/ndk/30.0.16248370/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android29-clang
+export AR_aarch64_linux_android=/home/kai/Android/Sdk/ndk/30.0.16248370/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-ar
+cargo build -p yomoku-storage --target aarch64-linux-android --locked --offline
+export CC_x86_64_linux_android=/home/kai/Android/Sdk/ndk/30.0.16248370/toolchains/llvm/prebuilt/linux-x86_64/bin/x86_64-linux-android29-clang
+export AR_x86_64_linux_android=/home/kai/Android/Sdk/ndk/30.0.16248370/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-ar
+cargo build -p yomoku-storage --target x86_64-linux-android --locked --offline
+cargo fmt --all -- --check
+git diff --check
+```
+
+PASS: nine new snapshot cases. Complete real-password encrypted fixtures compare
+every schema object/table with every durable table populated, including all three
+file formats, images/ruby/cues, analysis/overrides, five statuses, completed and
+reserved commands, deleted-document provenance, exact pending time/positions,
+permanent finish state, settings/custom records, both Anki journals and sequences
+beyond 2^53. Reopening the known fixture retains Library/statistics/recovery and
+allocates fresh source/chapter/document/analysis/completion IDs above high-water.
+Four additional round-trip variants retain pending/uncertain note/model obligations
+and reject new writes without replay. Snapshot readers remain frozen after live
+changes. WAL committed content is included, concurrent uncommitted changes are
+excluded and main/WAL bytes remain unchanged. Deleted body markers remain in the
+source's freed pages but are absent from the compact copy. Existing paths/symlinks
+are refused, modes are private, all six cancellation boundaries clean staging,
+validation/VACUUM/I/O/cleanup failures preserve source and wrong-password/late-tag/
+output-write failures leave live data intact. Cleanup never recursively deletes
+unexpected files; an explicit discard failure is observable.
+
+Initial compile API fixes (pragma schema argument/integer types, fixture imports/
+position), EPUB relative-image/paste-dedup fixture corrections and CHECK validation
+failure were resolved. The latter reproduced SQLite 3.53.2's omission of CHECK
+expressions for read-only B-trees (`sqlite3AddCheckConstraint` in bundled source).
+The private copy now opens READ_WRITE without CREATE and enables query_only before
+schema parsing; the corrupt-settings test passes. This is an export structural
+check of app-owned data, not hardened untrusted import/application validation.
+No new library/version was adopted; existing SQLite/rusqlite APIs were checked
+against primary docs/source (links in BACKUP_FORMAT.md).
+
+PASS: final 1049 workspace tests, zero failures, 17 existing opt-in ignored;
+all-feature workspace build, strict all-target/all-feature Clippy, Rustfmt, both
+Android storage target library builds, local doc links and diff checks. All checks
+offline; no dependency downloads. Final full suite includes the fixed query-only
+validation and stricter expected-error assertions. Earlier failing runs remain in
+logs for context. No APK/lint/JNI/codegen/emulator/release/device/resource trials run.
+No implementation/verification steps or blockers remain for this snapshot slice.
+Next: hardened private schema/application validation and migration, then runtime
+staging/secret-safe export. Schema-24 phone upgrade retaining Library/history and
+disposable real Anki collection/permission/browser/Back trial remain recommended.
+
+Logs: `/tmp/yomoku-snapshot-{focused,focused-final,focused-verified,full-state,
+validation,validation-final,workspace,workspace-final,build,build-final,clippy,
+clippy-final,arm64,x86_64}.log` (one per suffix). Final focused log is
+`focused-verified`; final workspace/build/Clippy logs have `-final`. Final format/
+doc-link/diff results are in the session transcript.

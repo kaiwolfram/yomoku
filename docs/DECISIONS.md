@@ -5120,3 +5120,33 @@ Argon2/libsodium fixtures alongside adversarial stream tests. Optional reference
 reproduction tooling uses public fixed test inputs and adds no application native
 dependency. Keep full-state SQLite snapshots/validation, private staging lifecycle,
 secret FFI transfer, app UI and confirmed activation as separate required slices.
+
+## 2026-11-01 — Compact app-owned snapshots before restore validation
+
+Implement `Storage::create_backup_snapshot` with bound `VACUUM main INTO ?1`,
+keeping the live database and its journal/vacuum settings untouched. Require a
+new child directory under a caller-owned app-private parent excluded from OS
+backup; refuse existing paths and create 0700/0600 staging. Canonical absolute
+output paths avoid SQLite file-URI interpretation and bind quotes/Unicode as data.
+Check the owned copy's integrity, foreign keys, exact current migration journal,
+zero freelist and exact page/file length, then sync before exposing a read-only
+reader with schema/length. Explicit discard reports cleanup failures; Drop and
+error/cancel paths clean best effort without recursively removing unexpected files.
+
+The bundled SQLite 3.53.2 `sqlite3AddCheckConstraint` deliberately omits CHECK
+expressions for read-only B-trees. A corrupt-settings test demonstrated that a
+read-only connection's integrity check missed the invalid value. Validate only
+this owned copy via READ_WRITE without CREATE, with query_only enabled before
+schema parsing; retain the reader itself read-only. This catches the regression
+without migrating or mutating the copy. It is not a sandbox for untrusted SQL.
+API/source evidence and limits are in BACKUP_FORMAT.md. No production dependency,
+schema, destructive semantics or external-write authority changes.
+
+Compose storage and the independent crypto stream through a dev dependency only.
+Populate every durable table and compare all table/schema data after encryption/
+decryption; preserve deleted provenance, both journal kinds and high-water marks,
+then exercise continued reads/allocations. Leave hardened candidate validation,
+private migration and replacement as separate work. Before app integration the
+runtime must own checkpoint drain/mutation gating and private staging crash
+cleanup; cancellation currently polls only between synchronous calls. No live
+export/import action or serialized password transfer is introduced here.

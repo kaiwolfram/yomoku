@@ -16,16 +16,30 @@ the manifest after authenticated Last, EOF, exact length and flush. Errors may
 leave partial output; callers must discard it, sync/close successful files and
 clean up after crashes. Password ownership bypasses serialization; Rust guards
 clear password/key/KDF scratch/chunk buffers. Cancellation is cooperative between
-synchronous KDF/I/O calls. SQLite validation and replacement remain unimplemented.
+synchronous KDF/I/O calls. Hardened import validation and replacement remain unimplemented.
 
-Subsequent work keeps SQLite snapshot/validation in storage and Rust encryption
+`Storage::create_backup_snapshot` now produces the compact full database using
+bound VACUUM INTO in a newly owned private 0700 directory/0600 file. The app-origin
+copy passes integrity/foreign-key/current-journal/compact-size checks and file sync
+before exposing an owned read-only reader with schema/length. Validation uses a
+no-CREATE connection with query_only before schema parsing so SQLite retains CHECK
+expressions. It never migrates or handles an imported candidate. Explicit discard
+reports cleanup failure; Drop and error/cancel paths clean best effort without
+recursive deletion. The runtime must still own private-parent crash cleanup,
+checkpoint drain and mutation gating before wiring this API to an app action.
+Only storage tests depend on the crypto crate; encrypted fixtures preserve every
+table/schema object and ID sequence, including live and deleted-source history,
+imports/images/analysis, pending time, settings and both Anki journals.
+
+Subsequent work keeps hardened SQLite validation in storage and Rust encryption
 in the backup crate, coordinated by EffectRouter. Pure core owns correlated
 intent/confirmation; Kotlin owns the password UI/file picker. Secret transfer
 must bypass serializable events/views. Validate and migrate a separate private
 candidate before confirmed atomic replacement and session retirement. Current
 pending/uncertain Anki recovery blocks replacement until resolved (user decision);
 restored journal records never confer external mutation permits. No live backup
-or restore action is implemented yet; full-state and failure-path tests remain.
+or restore action is implemented yet; hostile import validation and interrupted
+activation tests remain.
 
 ## Implemented
 `yomoku-core` is a pure Crux 0.20.0 application. It owns Library-default

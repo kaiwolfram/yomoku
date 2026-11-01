@@ -4419,3 +4419,23 @@ and /tmp/yomoku-browser-profile-*. No emulator started.
   tasks remain unchecked. No Android/JNI/emulator/real-crypto/release trials run.
   Recommend the schema-24 physical upgrade retaining Library/history plus a
   disposable real Anki collection/permission/browser/Back trial now.
+
+## 2026-11-01 — Compact full-state SQLite backup snapshots
+
+- Added private bound VACUUM INTO snapshots with structural/journal checks, file
+  sync, a read-only reader, explicit discard and best-effort failure/cancel cleanup.
+  Existing paths/symlinks are refused; live database/vacuum/journal policy is intact.
+- Added storage-only encrypted fixtures via a dev dependency. Every durable table
+  and schema object, deleted provenance, file/image/analysis data, history/time,
+  settings/custom records, both Anki journals and high-water sequences survive;
+  reopened reads/allocations work without replay. No app action/schema/production
+  dependency or restore authority added.
+- Corruption regression caught SQLite's read-only CHECK omission. Validate only
+  the owned copy without CREATE and with query_only before schema parsing; retain
+  the exported reader read-only. Initial API/fixture issues also corrected.
+- PASS: nine new cases; 1049 workspace tests/17 opt-in ignored, all-feature build,
+  strict Clippy/Rustfmt, both Android storage library targets, doc links/diff checks.
+  Commands, limits and logs: DEVELOPMENT.md, Compact full-state backup snapshots.
+  No APK/JNI/emulator/physical/release trial; no remaining steps or blockers for
+  this slice. Next: hardened private validation/migration, runtime staging/secret
+  handoff. Recommend schema-24 phone upgrade and disposable Anki trial now.

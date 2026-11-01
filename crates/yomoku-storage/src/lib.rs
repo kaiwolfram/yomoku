@@ -8,6 +8,7 @@ pub mod anki_live;
 pub mod anki_model;
 mod anki_recovery;
 mod anki_settings;
+mod backup_snapshot;
 mod completions;
 pub mod custom_dictionary;
 pub mod dictionary;
@@ -32,6 +33,7 @@ mod txt;
 mod vocabulary;
 mod vocabulary_browser;
 
+pub use backup_snapshot::{BackupSnapshot, SnapshotError};
 pub use epub::{
     AnalyzedEpub, EpubImportError, EpubImportOutcome, StoredEpubChapter, StoredEpubDocument,
 };

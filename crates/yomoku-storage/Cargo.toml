@@ -12,4 +12,5 @@ yomoku-core = { path = "../yomoku-core" }
 yomoku-import = { path = "../yomoku-import" }
 
 [dev-dependencies]
+yomoku-backup = { path = "../yomoku-backup" }
 zip = { version = "=8.6.0", default-features = false, features = ["deflate-flate2"] }

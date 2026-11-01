@@ -15,28 +15,27 @@ Commit guidance: concise subject/explanatory body; keep verification in docs.
   PRODUCT_SPEC.md §7 and BACKUP_FORMAT.md govern; no replacement exists yet.
 
 ## Current backup boundary
-- Version-1 format: docs/BACKUP_FORMAT.md. Independent `yomoku-backup` leaf crate
-  now has strict metadata and bounded authenticated snapshot Read/Write APIs.
-- Pinned Argon2id 0.5.3 (v1.3, 64 MiB/3 passes/4 lanes → 32-byte key),
-  chacha20poly1305 0.11.0, aead-stream 0.6.0, getrandom 0.4.3, zeroize 1.9.0.
-  Fresh independent 16-byte salt/19-byte nonce on every export attempt. Defaults
-  off for crypto; explicit zeroize/alloc features. No independent audit claim.
-- Fixed 64-KiB chunks, exact envelope/frame AAD, mandatory authenticated Last/EOF,
-  checked totals/counters, encrypted manifest and exact SQLite length. No bulk
-  allocation from metadata. Wrong password/failed tags share Authentication.
-- Owned non-Debug/nonserialized Password consumed after KDF. Password/key/scratch/
-  chunk guards clear Rust-owned buffers. Cancellation is cooperative around KDF/
-  bounded calls/flush; blocking calls cannot be interrupted. Caller copies remain.
-- No paths/files opened or managed. Encrypt requires coherent validated snapshot.
-  Decrypt writes only to caller-owned new private staging, returning Manifest after
-  full authentication/length/EOF/flush. Late errors may leave prior plaintext;
-  caller must discard failures, clean up after crashes and sync/close successes.
-- No SQL/schema validation/restore authority, runtime/core/FFI/Android dependency
-  or action. Secret handoff must bypass serialized events/views. Full compact
-  snapshot, hardened validation/private migration and activation remain undone.
-- Preserve all imports/images/analysis/history/deleted provenance/pending time/
-  settings/custom records/both Anki journals/ID sequences. Planned VACUUM INTO
-  purges deleted free-page content; never copy a live SQLite/WAL file normally.
+- Version-1 format/profile: BACKUP_FORMAT.md. Independent `yomoku-backup` owns
+  bounded authenticated streams; fixed Argon2id/STREAM BE32/XChaCha20Poly1305,
+  fresh salt/nonce, exact lengths/AAD and mandatory Last/EOF. Secrets bypass
+  serialization; guarded Rust buffers cannot clear caller/JVM copies.
+- `Storage::create_backup_snapshot` now uses bound VACUUM INTO in a NEW private
+  0700 directory/0600 file. Checks integrity/FKs/current migration journal/zero
+  freelist/page length, syncs, exposes only a read-only reader plus schema/length.
+  Explicit discard reports cleanup errors; Drop/error/cancel clean best effort.
+- SQLite 3.53.2 read-only B-trees omit CHECK expressions. Validate only the owned
+  copy through READ_WRITE without CREATE and query_only before schema parsing.
+  Corrupt-settings regression covers this. This is not hardened import validation.
+- Full encrypted fixtures populate/compare every durable table/schema object and
+  sequence, preserving deleted provenance, imports/images/analysis/history/time/
+  settings/custom records/both Anki journals; reads and allocations remain usable.
+  Crypto is a storage dev dependency only; no new production dependency/schema.
+- Runtime must still own checkpoint drain/mutation gating and private-parent crash
+  cleanup. Cancellation polls between synchronous calls, not inside VACUUM/KDF/
+  validation/sync. Never copy live SQLite/WAL bytes for backups.
+- Decrypt only into new private disposable staging; late failure can leave prior
+  plaintext. Full authentication/length/EOF/flush is not schema/restore authority.
+  Hardened validation/private migration, activation and secret FFI/UI remain undone.
 
 ## Existing Anki boundary
 - Exact original/effective preparation needs Ready acknowledged configured deck
@@ -49,23 +48,21 @@ Commit guidance: concise subject/explanatory body; keep verification in docs.
 - Details: ARCHITECTURE.md, DATA_MODEL.md, ANKIDROID_API.md and DECISIONS.md.
 
 ## Next tasks (ordered)
-1. Implement compact full-state SQLite snapshots and complete encrypted round
-   trips, including deleted records, pending time/journals and sequence marks.
-2. Implement hardened private SQLite/schema/application validation and supported
+1. Implement hardened private SQLite/schema/application validation and supported
    migration before any restore confirmation; hostile schema/failure tests.
+2. Add runtime export sequencing/checkpoint drain/mutation gating and private
+   staging crash cleanup; design nonserialized secret handoff before FFI/UI.
 3. Real phone schema-24 upgrade and disposable Anki collection/permission/browser/
    Back/lifecycle trial. Anki umbrella remains unchecked pending this validation.
 
 ## Verification / blockers
-- PASS: 18 new stream + nine metadata tests; 1040 workspace tests/17 opt-in ignored,
-  all-feature build, strict Clippy/Rustfmt, independent reference vectors, both
-  Android target library builds, local doc links and diff checks. Initial compile/
-  helper-lint adjustments fixed; final focused/build/lint/target reruns pass.
-- Commands/logs: DEVELOPMENT.md, Bounded authenticated backup stream prerequisite.
-  Initial fetch downloaded new dependencies; remaining checks offline. No blockers
-  or implementation/verification steps remain for this stream prerequisite.
-- No snapshot/full-state SQL validation/replacement, APK/lint/JNI/codegen/emulator,
-  physical phone/resource trial or optimized release run for this isolated crate.
+- PASS: nine new snapshot cases; 1049 workspace tests/17 opt-in ignored, all-feature
+  build, strict Clippy/Rustfmt, both Android storage target library builds, local
+  doc links and diff checks. Initial API/fixture/CHECK-validation issues corrected.
+- Commands/logs: DEVELOPMENT.md, Compact full-state backup snapshots. Checks offline.
+  No blockers or implementation/verification steps remain for this snapshot slice.
+- No hardened import validation/replacement, APK/lint/JNI/codegen/emulator, physical
+  phone/resource trial or optimized release run for this storage-only slice.
 
 ## Latest release checkpoint
 - Source 0ddb81d: `target/releases/yomoku-0.1.0-0ddb81d-release.apk` (~242.3 MiB).
