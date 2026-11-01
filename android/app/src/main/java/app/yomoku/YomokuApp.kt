@@ -60,6 +60,9 @@ internal fun YomokuApp(
     imageLoader: EpubImageLoader? = null,
     coverLoader: EpubCoverLoader? = null,
     libraryActionsEnabled: Boolean = true,
+    ankiDecks: AnkiDeckDiscoveryState = AnkiDeckDiscoveryState.Unchecked,
+    checkAnkiProvider: () -> Unit = {},
+    requestAnkiPermission: () -> Unit = {},
     onImportFiles: (() -> Unit)? = null,
 ) {
     val context = LocalContext.current
@@ -166,7 +169,14 @@ internal fun YomokuApp(
                     contentAlignment = Alignment.TopCenter,
                 ) {
                     when {
-                        view.settingsOpen -> SettingsScreen(view, dispatch)
+                        view.settingsOpen ->
+                            SettingsScreen(
+                                view,
+                                dispatch,
+                                ankiDecks,
+                                checkAnkiProvider,
+                                requestAnkiPermission,
+                            )
                         view.contentRoute == ContentRoute.PASTE ->
                             PasteScreen(view, pasteText, { pasteText = it }, dispatch)
                         view.contentRoute == ContentRoute.READER ->

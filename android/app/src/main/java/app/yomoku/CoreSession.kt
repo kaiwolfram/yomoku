@@ -82,6 +82,9 @@ internal class CoreSession(
     private val invokeAnkiLive: (AnkiLiveOperation) -> AnkiLiveResult = {
         AnkiLiveResult.NoSubmission
     },
+    readAnkiDecks: () -> AnkiReadResult<List<AnkiProviderDeck>> = {
+        AnkiReadResult.Failed(AnkiReadError.ProviderUnavailable)
+    },
 ) : AutoCloseable {
     // Retained with this handle across Activity recreation; never restored into a new handle.
     val sessionKey: String = UUID.randomUUID().toString()
@@ -163,6 +166,13 @@ internal class CoreSession(
 
     var view: ViewModel by mutableStateOf(ViewModel.bincodeDeserialize(bridge.view()))
         private set
+
+    val ankiDecks = AnkiDeckDiscovery(ankiExecutor, readAnkiDecks)
+
+    fun checkAnkiDecks() {
+        requireMainThread()
+        if (!closing && !isClosed && view.settingsOpen) ankiDecks.check()
+    }
 
     // Platform import sequencing observes committed core outcomes, on the main thread.
     var onViewChanged: (() -> Unit)? = null
@@ -490,6 +500,7 @@ internal class CoreSession(
             images.close()
             pauseClock()
             closing = true
+            ankiDecks.close()
             ankiLiveWorker.close()
             readerActive = false
             driveReaderClock()

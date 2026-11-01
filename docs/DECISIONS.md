@@ -4938,3 +4938,30 @@ generation and require that read before any subsequent save. Never repeat the
 old update. This also handles an unknown commit outcome without assuming whether
 it persisted. Corrupt/missing rows remain errors with no repair. No dependency,
 schema, provider API, destructive semantics or native-export ABI change.
+
+## 2026-11-01 — Explicit Anki configuration in Settings
+
+Keep local preference loading and provider discovery as separate explicit actions.
+Settings composition and navigation initiate neither. The existing native state
+owns load/save/clear/read-only Retry and last acknowledged values; show unloaded
+separately from acknowledged no-deck and enable preference edits only in Ready.
+Discovery runs the already reviewed `AnkiProviderReader.decks()` on the existing
+provider FIFO and retains only a platform observation in CoreSession. It cannot
+grant a native export permit, change a frozen target or resolve a journal.
+
+Display only regular decks as choices, distinguish equal names with exact long
+IDs and retain a missing/filtered saved ID until an explicit replacement/clear.
+No deck is inferred, created or selected automatically. Snapshot availability is
+not a lease; preflight/live dispatch still refresh all provider gates. Coalesce
+pending discovery and retain its snapshot across Activity recreation, but cancel
+queued reads/drop late results on close and start Unchecked in a new session.
+
+Use the already installed AndroidX RequestPermission contract for the declared
+AnkiDroid database permission, following the primary
+[Android permission workflow](https://developer.android.com/training/permissions/requesting)
+(reviewed 2026-11-01). Only an explicit action after PermissionDenied opens the
+prompt; explain database access and that reading works without it. Grant rechecks
+discovery if Settings is still open; denial leaves the error with no automatic
+prompt/retry. Do not open system Settings or a collection automatically. A
+disposable real collection/permission trial remains required before compatibility
+claims. No dependency, provider API, schema, codec or destructive-semantics change.

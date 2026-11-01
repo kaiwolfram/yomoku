@@ -8807,3 +8807,53 @@ format-check,host-format,host-format-check,typegen,codegen-diff,
 android-codegen-diff,android}.log` (one path per suffix). The initial focused FIFO
 fixture failure is in `/tmp/yomoku-anki-retained-fifo.log`; the final workspace
 log records all four FIFO cases passing.
+
+## Explicit Anki configuration in Settings
+
+2026-11-01: Kotlin/Compose only; no Rust, schema, codec, native-export ABI,
+provider API or dependency changes. Reused the packaged both-ABI native libraries.
+Use the pinned offline toolchains and existing isolated statistics-ui-avd image
+without wiping it. The permission contract was checked against Android's primary
+documentation linked in DECISIONS.md.
+
+```sh
+export PATH=/home/kai/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin:$PATH
+export JAVA_HOME="$PWD/.local/jdk-17/jdk-17.0.21+9"
+export JAVA_BIN="$JAVA_HOME/bin/java"
+export GRADLE_USER_HOME="$PWD/.local/gradle"
+export ANDROID_HOME=/home/kai/Android/Sdk
+tools/format-kotlin.sh --check
+./android/gradlew -p android :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=app.yomoku.AnkiSettingsPanelTest,app.yomoku.AnkiDeckDiscoveryTest,app.yomoku.AnkiSettingsSessionTest,app.yomoku.AnkiSettingsActivityTest,app.yomoku.AnkiExportPanelTest,app.yomoku.AnkiExportSessionTest,app.yomoku.AnkiRecoveryPanelTest,app.yomoku.CoreSessionTest,app.yomoku.NavigationTest --offline --console=plain
+git diff --check
+```
+
+PASS: all 22 selected API-36 x86_64 emulator cases, zero failures/errors/skips;
+debug/test APK builds, strict lintDebug, Kotlin formatting and diff checks.
+Eight new cases cover explicit-only load/discovery/permission actions, every
+provider error, regular versus filtered/missing decks, duplicate deck names and
+exact IDs through Long.MAX_VALUE, acknowledged-only editing/clear, read-only
+reload during Saving/Failed, worker-only coalescing/retries/exceptions,
+queued/in-flight close gates, actual CoreSession/JNI/SQLite save/reopen/clear,
+failed-save rollback/readback without repeated update, and actual MainActivity
+recreation retaining discovery and native settings without extra I/O. Existing
+export/recovery panels, live CoreSession export, native handle and navigation
+regressions pass. New persistence tests use isolated databases/fake read-only
+discovery; the real Activity case performs explicit local/provider reads only.
+
+The initial sandboxed Gradle invocation could not bind its local lock socket;
+the normal local-socket escalation succeeded. The initial emulator invocation
+used an incorrect AVD name; corrected it to the documented medium_phone while
+keeping the isolated userdata image. No implementation/test failures occurred.
+
+No implementation/verification steps or blockers remain for this configuration
+slice. Full host Rust/Clippy/JNI and code generation were not rerun for these
+Kotlin-only changes; emulator cases exercised actual packaged JNI/SQLite. Actual
+AnkiDroid permission dialogs, real collection/browser, tablet, optimized release
+and physical phone trials were not run. Recommend the schema-24 phone upgrade
+with existing Library/history before the full visible Add flow, then a disposable
+real collection/permission/browser trial before compatibility claims.
+
+Next: app-owned preparation from the saved deck and dictionary Add presentation,
+followed by existing-note browser/return handling. Logs:
+`/tmp/yomoku-anki-config-{format,format-check,android,emulator,emulator-boot}.log`.
+XML: `android/app/build/outputs/androidTest-results/connected/debug/`.

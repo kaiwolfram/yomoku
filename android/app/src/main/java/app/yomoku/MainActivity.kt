@@ -31,6 +31,10 @@ class MainActivity : ComponentActivity() {
         registerForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
             fileImports.start(uris)
         }
+    private val ankiPermissionRequest =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+            if (granted) core.checkAnkiDecks()
+        }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -62,6 +66,17 @@ class MainActivity : ComponentActivity() {
                     core.images,
                     core.covers,
                     libraryActionsEnabled = !fileImports.active,
+                    ankiDecks = core.ankiDecks.state,
+                    checkAnkiProvider = core::checkAnkiDecks,
+                    requestAnkiPermission = {
+                        if (
+                            core.view.settingsOpen &&
+                                core.ankiDecks.state ==
+                                    AnkiDeckDiscoveryState.Failed(AnkiReadError.PermissionDenied)
+                        ) {
+                            ankiPermissionRequest.launch(AnkiProviderReader.PERMISSION)
+                        }
+                    },
                 ) {
                     // Providers frequently label SRT as text/plain or application/octet-stream.
                     // Validate the literal display-name extension in FileImports.

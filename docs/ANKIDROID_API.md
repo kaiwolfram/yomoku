@@ -110,8 +110,9 @@ The read-only Android prerequisite is now `AnkiProviderReader`. It checks curren
 provider metadata/spec >=2, enabled/exported state and permission before every
 operation, enumerates decks without selecting/creating one, queries exact-surface
 duplicates and reconciles read-only. Shell-local results translate to the typed core recovery protocol. The manifest
-declares only the known provider visibility query and database permission; no
-permission prompt or automatic provider read is enabled. Explicit recovery reads
+declares only the known provider visibility query and database permission;
+explicit permission controls are described below and automatic provider reads
+remain disabled. Explicit recovery reads
 now dispatch through CoreSession; live dispatch requires a committed native permit,
 and visible actions remain gated.
 
@@ -182,7 +183,7 @@ adapter only for a committed native permit. Visible Add UI remains unfinished; f
 coverage does not establish installed-provider compatibility or an atomic check-and-add.
 
 App-owned state, durable pending/uncertain journals and typed live dispatch are now
-implemented; configured-deck/permission settings and authenticated live actions
+implemented; configured-deck reader preparation and dictionary Add/browser actions
 remain. Settings now projects recovery obligations/errors with explicit read-only
 checks and Retry, remaining hidden on a clean startup. A process restart must not erase insert
 uncertainty or replay an old mutating request. No supported provider completion
@@ -227,5 +228,17 @@ It supplies no note fields, native handles or journal callbacks. This reuses the
 provider operations above without changing their API assumptions. CoreSession
 now dispatches a rendered Ready generation once, with close/phase/owner rechecks;
 Settings consumes the frozen export projection through explicit typed controls.
-Deck/permission/dictionary Add/browser UI and disposable real-provider validation
-remain unfinished. No new provider operation or compatibility claim is adopted.
+Dictionary Add/browser UI and disposable real-provider validation remain
+unfinished. Deck/permission controls are below. No new provider operation or
+compatibility claim is adopted.
+
+Settings now exposes explicit local preference load/readback/save/clear and a
+separate Check AnkiDroid action through the existing read-only deck adapter. Only
+regular decks are offered; a missing/filtered saved ID is retained without
+substitution. Discovery is a retained platform observation, never export authority.
+PermissionDenied offers an explicit RequestPermission action with an in-context
+rationale, using the declared database permission and the reviewed Android
+workflow above. Grant rechecks discovery while Settings is open; denial does
+not retry/prompt automatically. No new provider API or permission declaration.
+Actual permission-dialog and disposable collection/browser behavior remain unrun;
+dictionary Add/configured-deck preparation and existing-note launch are still next.

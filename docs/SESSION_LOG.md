@@ -4262,3 +4262,24 @@ and /tmp/yomoku-browser-profile-*. No emulator started.
   dependencies/schema/provider API/native-export ABI. No emulator, physical phone,
   real collection/browser or optimized release trial run. Recommend a schema-24
   phone upgrade with existing Library/history before the full visible Add flow.
+
+## 2026-11-01 — Explicit Anki configuration in Settings
+
+- Added native settings load/readback/select/clear controls and separate read-only
+  provider/deck discovery on CoreSession's retained provider FIFO. Keep exact
+  long IDs, filter dynamic decks and preserve missing saved IDs without guessing.
+- Added an explicit permission action/rationale after PermissionDenied using
+  AndroidX RequestPermission. Grant rechecks while Settings remains open; denial
+  leaves the error. Discovery coalesces, survives recreation and skips queued/
+  drops late reads after close. Configuration grants no export authority.
+- PASS: eight new Android cases and all 22 selected API-36 x86_64 cases, zero
+  failures/errors/skips; debug/test APKs, strict lintDebug, Kotlin formatting and
+  diff checks. Details/commands/tooling setup corrections: DEVELOPMENT.md.
+- No implementation/verification steps or blockers remain for this slice. No
+  Rust/schema/codec/dependency/provider API changes. Host Rust/Clippy/JNI were
+  not rerun; emulator persistence cases exercise real JNI/FIFO/SQLite.
+- Next: configured-deck dictionary preparation/Add, existing-note browser/return
+  and real collection/permission validation. Recommend the phone schema-24 upgrade
+  with existing Library/history before the full visible Add flow. Actual provider
+  permission dialogs, real collection/browser, optimized release and physical
+  phone trials remain unrun; no compatibility claim is made.

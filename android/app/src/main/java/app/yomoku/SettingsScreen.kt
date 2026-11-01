@@ -36,7 +36,13 @@ import app.yomoku.shared.ReaderLineSpacing
 import app.yomoku.shared.ViewModel
 
 @Composable
-internal fun SettingsScreen(view: ViewModel, dispatch: (Event) -> Unit) {
+internal fun SettingsScreen(
+    view: ViewModel,
+    dispatch: (Event) -> Unit,
+    ankiDecks: AnkiDeckDiscoveryState = AnkiDeckDiscoveryState.Unchecked,
+    checkAnkiProvider: () -> Unit = {},
+    requestAnkiPermission: () -> Unit = {},
+) {
     var showNotices by rememberSaveable { mutableStateOf(false) }
     var showWordNotices by rememberSaveable { mutableStateOf(false) }
     var showSvgNotices by rememberSaveable { mutableStateOf(false) }
@@ -63,6 +69,13 @@ internal fun SettingsScreen(view: ViewModel, dispatch: (Event) -> Unit) {
     ) {
         StorageStatus(view)
         ReaderSaveRetry(view, dispatch)
+        AnkiSettingsPanel(
+            view.ankiSettings,
+            ankiDecks,
+            dispatch,
+            checkAnkiProvider,
+            requestAnkiPermission,
+        )
         view.ankiExport?.let { AnkiExportPanel(it, dispatch) }
         view.ankiRecovery?.let { AnkiRecoveryPanel(it, dispatch) }
         val typography = view.readerTypography

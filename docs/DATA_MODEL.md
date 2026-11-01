@@ -2195,7 +2195,9 @@ explicit readback before another save; Retry queues a read behind any accepted
 save without repeating it. These are session-only correlation/phase fields, with
 no additional schema or durable journal. A restart begins Unloaded.
 
-Visible controls and configured-deck preparation remain unfinished. Future
-preparation must resolve the persisted preference, keep its own frozen deck and
+Visible Settings controls now use these events, with read-only Android deck
+discovery kept only in the retained session. Deck names, availability and
+permission are never persisted. Configured-deck preparation remains unfinished.
+Future preparation must resolve the persisted preference, keep its own frozen deck and
 revalidate current provider/spec/permission/nonfiltered-deck state before export.
 A stored ID alone never permits provider dispatch or write retries.

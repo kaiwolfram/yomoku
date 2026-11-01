@@ -2253,8 +2253,8 @@ and Add send the projected preparation generation and phase through the native
 begin gate. Model success starts no follow-on note insertion. Dismiss is absent
 while live work is active/failed; uncertainty directs the user to the separate
 read-only recovery controls. Composition and opening Settings dispatch nothing.
-The dictionary Add entry, deck/permission configuration and browser actions
-remain unfinished, so this is not yet a complete visible export workflow.
+The dictionary Add entry and browser actions remain unfinished, so this is not
+yet a complete visible export workflow. Deck/permission configuration is below.
 
 ### Configured Anki default deck storage
 
@@ -2280,8 +2280,8 @@ loads coalesce and neither navigation nor composition initiates I/O. Native
 `AnkiSettingsView` retains Loading/Ready/Saving/Failed, the last acknowledged ID
 and a separate storage error. The compact presentation remains available across
 navigation for future reader consumers. It contains no provider availability or
-permission evidence. No visible settings or dictionary control dispatches these
-events yet.
+permission evidence. Explicit Settings controls now dispatch these events; the
+dictionary entry and configured-deck preparation remain future work.
 
 The app validates positive signed-64 IDs and owns an independent checked request
 sequence. Saves require Ready and publish the exact requested value only after
@@ -2296,6 +2296,36 @@ save response is lost. The read queues behind the old operation on the same FIFO
 and invalidates its callback generation. Another save requires the authoritative
 read acknowledgement; Retry never repeats a write or queries the provider. A
 new session begins Unloaded and restores the preference only by reading SQLite.
-Provider discovery, permission/deck UI, configured-deck preparation, dictionary
-Add and browser/return behavior remain unfinished. Schema/dependencies and the
-native-export ABI are unchanged; generated Event/ViewModel codecs change.
+Configured-deck preparation, dictionary Add and browser/return behavior remain
+unfinished. Schema/dependencies and the native-export ABI are unchanged;
+generated Event/ViewModel codecs changed in this retained-settings slice.
+
+### Explicit Android Anki configuration
+
+`AnkiSettingsPanel` offers explicit local load/readback, default-deck selection
+and clear. It renders the last acknowledged ID while saving/failed and allows
+changes only in native Ready. Failed or lost saves use read-only native Retry;
+the UI does not repeat the old update. Unloaded is never presented as unconfigured.
+
+`CoreSession` separately owns `AnkiDeckDiscovery`, a platform-only observation
+with Unchecked/Loading/Ready/Failed states. Explicit Check AnkiDroid is accepted
+only while Settings is open and runs the existing read-only `decks()` adapter
+on the provider FIFO. Repeated checks coalesce while loading. Provider discovery
+never loads local preferences, changes a journal or prepares an export. Only
+regular decks are selectable; a missing/filtered saved ID stays visible without
+substitution or automatic clearing. Names are presentation, IDs remain exact
+positive signed-64 values, including duplicate-name decks.
+
+Activity recreation retains both observations and the native settings state;
+composition/navigation initiates no reads. Session close cancels queued discovery
+and drops late results; a new session starts Unchecked/Unloaded. The snapshot
+grants no provider authority: existing preflight/live paths still recheck current
+provider/spec/permission/deck before any external write.
+
+Only a PermissionDenied discovery result offers Allow AnkiDroid access, with an
+in-context rationale explaining database use and optionality. MainActivity uses
+the already-declared permission and AndroidX RequestPermission contract. A grant
+triggers another explicit-flow read if Settings remains open; denial leaves the
+error and does not prompt/retry automatically. No launch, model creation or note
+insertion occurs in this configuration flow. Real collection/permission/browser
+compatibility remains unverified. No schema, dependency or codec change here.
