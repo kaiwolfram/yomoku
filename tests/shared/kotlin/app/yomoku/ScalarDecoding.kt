@@ -148,6 +148,7 @@ internal fun scalarIds(size: Int): List<VocabularyId> =
 
 internal fun frozenScalarView(ids: List<VocabularyId>): ViewModel =
     ViewModel(
+        ankiSettings = AnkiSettingsView(AnkiSettingsPhase.UNLOADED, null, null),
         vocabulary =
             VocabularyState(
                 query =

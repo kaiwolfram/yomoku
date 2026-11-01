@@ -35,6 +35,8 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import app.yomoku.shared.AnkiSettingsPhase
+import app.yomoku.shared.AnkiSettingsView
 import app.yomoku.shared.ContentRoute
 import app.yomoku.shared.Destination
 import app.yomoku.shared.Event
@@ -258,6 +260,7 @@ private fun YomokuPreview() {
     YomokuTheme {
         YomokuApp(
             ViewModel(
+                ankiSettings = AnkiSettingsView(AnkiSettingsPhase.UNLOADED, null, null),
                 vocabulary =
                     VocabularyState(
                         VocabularyQuery(

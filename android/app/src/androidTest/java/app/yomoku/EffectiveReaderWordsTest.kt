@@ -78,6 +78,7 @@ class EffectiveReaderWordsTest {
                 )
             }
         return ViewModel(
+            ankiSettings = AnkiSettingsView(AnkiSettingsPhase.UNLOADED, null, null),
             vocabulary =
                 VocabularyState(
                     VocabularyQuery("", VocabularyStatus.entries.toList(), VocabularySort.NEWEST),

@@ -81,6 +81,9 @@ pub struct ImportSummary {
 
 #[derive(Default)]
 pub struct Model {
+    anki_settings: crate::anki::AnkiSettingsView,
+    anki_settings_sequence: u64,
+    anki_settings_request: Option<(u64, anki::settings::SettingsRequest)>,
     prepared_anki_export: Option<crate::anki::AnkiExport>,
     anki_preparation_sequence: u64,
     anki_live: Option<crate::anki::AnkiLiveState>,
@@ -317,6 +320,15 @@ pub enum Event {
     ClearAnkiExport {
         preparation_id: u64,
     },
+    /// Lazy local preference read in Settings; never queries the provider.
+    LoadAnkiSettings,
+    /// Save a positive signed-64 deck preference, or explicitly clear it.
+    SetAnkiDefaultDeck(Option<i64>),
+    /// Read back authoritative local settings after failure or a lost response.
+    RetryAnkiSettings,
+    #[serde(skip)]
+    #[cfg_attr(feature = "facet_typegen", facet(skip))]
+    AnkiSettingsFinished(u64, StorageResult),
     #[serde(skip)]
     #[cfg_attr(feature = "facet_typegen", facet(skip))]
     EffectiveStorageFinished(
@@ -423,6 +435,7 @@ pub enum Event {
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
 pub struct ViewModel {
+    pub anki_settings: crate::anki::AnkiSettingsView,
     /// Settings-only recovery presentation; journal payloads and handles stay native.
     pub anki_recovery: Option<crate::anki::AnkiRecoveryView>,
     /// Session-owned frozen export status; observed IDs carry no callback authority.
@@ -502,6 +515,9 @@ impl App for Yomoku {
     type Effect = Effect;
 
     fn update(&self, event: Event, model: &mut Model) -> Command<Effect, Event> {
+        if let Some(command) = self.update_anki_settings(&event, model) {
+            return command;
+        }
         let anki_before = (model.anki_recovery_view(), model.anki_export_view());
         if let Some(command) = self.update_anki_recovery(&event, model) {
             model.remember_anki_recovery_attention();
@@ -1376,7 +1392,9 @@ impl App for Yomoku {
                     | StorageResult::AnkiRecoveryLoaded(_)
                     | StorageResult::AnkiRecoveryCommitted(_)
                     | StorageResult::AnkiLiveBegun(_)
-                    | StorageResult::AnkiLiveFinished(_) => {
+                    | StorageResult::AnkiLiveFinished(_)
+                    | StorageResult::AnkiSettingsLoaded(_)
+                    | StorageResult::AnkiDefaultDeckSaved(_) => {
                         model.document_error = Some(DocumentError::InvalidDocument);
                     }
                     StorageResult::ImportCancelled => {}
@@ -1705,6 +1723,10 @@ impl App for Yomoku {
             | Event::SetStatisticsTimeframe { .. }
             | Event::RetryStatistics
             | Event::StatisticsFinished(..)
+            | Event::LoadAnkiSettings
+            | Event::SetAnkiDefaultDeck(_)
+            | Event::RetryAnkiSettings
+            | Event::AnkiSettingsFinished(..)
             | Event::RestoreAnkiRecovery
             | Event::BeginAnkiLive
             | Event::DispatchAnkiLive
@@ -1734,6 +1756,7 @@ impl App for Yomoku {
 
     fn view(&self, model: &Model) -> ViewModel {
         ViewModel {
+            anki_settings: model.anki_settings.clone(),
             anki_recovery: model.anki_recovery_view(),
             anki_export: model.anki_export_view(),
             vocabulary: model.vocabulary.clone(),

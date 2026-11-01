@@ -2187,7 +2187,15 @@ only after commit. Failed statements/readback/COMMIT retain the previous value;
 missing/corrupt settings are never silently repaired. Replacing/clearing the
 preference cannot update a frozen journal payload or resolve any obligation.
 
-This repository is not yet connected to app events, FIFO/FFI or visible controls.
-Future preparation must resolve the persisted preference, keep its own frozen
-deck and revalidate current provider/spec/permission/nonfiltered-deck state before
-export. A stored ID alone never permits provider dispatch or write retries.
+Typed app events now read/save this preference through the existing native FIFO.
+`AnkiSettingsView` separates an unloaded preference from acknowledged NULL and
+retains the last acknowledged ID during Saving/Failed. An exact matching save
+acknowledgement publishes only after commit. Failure or a lost response requires
+explicit readback before another save; Retry queues a read behind any accepted
+save without repeating it. These are session-only correlation/phase fields, with
+no additional schema or durable journal. A restart begins Unloaded.
+
+Visible controls and configured-deck preparation remain unfinished. Future
+preparation must resolve the persisted preference, keep its own frozen deck and
+revalidate current provider/spec/permission/nonfiltered-deck state before export.
+A stored ID alone never permits provider dispatch or write retries.

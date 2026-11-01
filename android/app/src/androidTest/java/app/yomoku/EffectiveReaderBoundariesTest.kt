@@ -50,6 +50,7 @@ class EffectiveReaderBoundariesTest {
                 ReaderTokenKey(page.documentId, page.anchor, analysis),
             )
         return ViewModel(
+            ankiSettings = AnkiSettingsView(AnkiSettingsPhase.UNLOADED, null, null),
             vocabulary =
                 VocabularyState(
                     VocabularyQuery("", VocabularyStatus.entries.toList(), VocabularySort.NEWEST),

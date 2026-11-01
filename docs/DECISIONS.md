@@ -4919,3 +4919,22 @@ deck selection applies to future preparations; submitted work retains its frozen
 deck and existing recovery gates. Keep the storage prerequisite independently
 testable before adding retained events, provider/deck/permission UI and Add wiring.
 No dependency, FFI, external provider API or destructive semantics change.
+
+## 2026-11-01 — Retain configured Anki settings independently of reader work
+
+Connect the existing repository with typed Settings-only load/set/Retry events
+and a compact retained view. Unloaded differs from acknowledged no-deck; retain
+the old acknowledged preference while saving, but accept another set only when
+Ready. Validate signed-64 input before making a typed `AnkiDeckId`. Keep local
+settings callbacks/results native and match a checked session-local sequence plus
+the exact expected save value before publishing. Navigation retains state and
+does not initiate reads; visible controls/provider discovery remain later work.
+
+Use a separate app request slot on the existing SQLite FIFO, preserving reader
+busy/errors and every frozen export/journal/live gate. Explicit Retry is always
+an authoritative local read. It may abandon a lost load/save response because
+the read queues behind the old operation on the same FIFO; invalidate the old
+generation and require that read before any subsequent save. Never repeat the
+old update. This also handles an unknown commit outcome without assuming whether
+it persisted. Corrupt/missing rows remain errors with no repair. No dependency,
+schema, provider API, destructive semantics or native-export ABI change.

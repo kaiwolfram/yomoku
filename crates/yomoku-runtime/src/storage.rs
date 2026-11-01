@@ -441,6 +441,14 @@ fn execute(
                 )
             })
             .map_err(map_error),
+        StorageOperation::LoadAnkiSettings => storage
+            .anki_default_deck()
+            .map(StorageResult::AnkiSettingsLoaded)
+            .map_err(map_error),
+        StorageOperation::SaveAnkiDefaultDeck(deck) => storage
+            .save_anki_default_deck(deck)
+            .map(StorageResult::AnkiDefaultDeckSaved)
+            .map_err(map_error),
         StorageOperation::SaveReaderTypography(typography) => storage
             .save_reader_typography(typography)
             .map(StorageResult::ReaderTypographySaved)

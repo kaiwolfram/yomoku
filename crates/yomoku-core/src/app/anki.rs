@@ -10,6 +10,7 @@ mod preflight;
 mod preparation;
 mod reads;
 mod reconciliation;
+pub(super) mod settings;
 #[cfg(test)]
 mod test_support;
 mod view;

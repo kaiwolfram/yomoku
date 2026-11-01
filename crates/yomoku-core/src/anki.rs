@@ -22,8 +22,10 @@ mod recovery_view;
 pub use recovery_view::*;
 mod recovery_read;
 pub use recovery_read::*;
+mod settings;
 mod submission;
 pub use export::*;
+pub use settings::*;
 pub use submission::*;
 
 /// One forward card, with the exact written surface as its first field.

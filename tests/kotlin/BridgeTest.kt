@@ -50,6 +50,7 @@ fun main(args: Array<String>) {
     verifyStatisticsCodecs(args.single())
     verifyStatisticsBridge()
     verifyAnkiRecoveryBridge(args.single())
+    verifyAnkiSettingsBridge(args.single())
     verifyReaderBoundaryDraft()
     verifyEffectiveReaderDisplay()
     verifyTextBoundaries(args.single())

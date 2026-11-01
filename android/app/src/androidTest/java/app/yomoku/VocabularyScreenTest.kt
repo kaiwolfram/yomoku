@@ -357,6 +357,7 @@ private fun vocabularyRow(id: Long) =
 
 private fun vocabularyView() =
     ViewModel(
+        ankiSettings = AnkiSettingsView(AnkiSettingsPhase.UNLOADED, null, null),
         vocabulary =
             VocabularyState(
                 VocabularyQuery("", VocabularyStatus.entries.toList(), VocabularySort.NEWEST),

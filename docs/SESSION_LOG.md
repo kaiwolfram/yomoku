@@ -4243,3 +4243,22 @@ and /tmp/yomoku-browser-profile-*. No emulator started.
   browser/return and disposable real collection validation. No schema/dependency/
   provider API/native-export ABI change. Physical schema-23 Library/history upgrade
   remains recommended before the full visible flow; no release/device trial run.
+
+
+## 2026-11-01 — Retained configured Anki deck through core/FIFO/FFI
+
+- Connected the migration-0024 preference to typed Settings-only load/set/Retry
+  events, retained unloaded/ready/saving/error presentation and the native FIFO.
+  Keep exact long IDs, old acknowledged values until commit and native callback
+  correlation; failed/lost-response Retry reads back without repeating updates.
+- Preserved reader busy/errors, both selection kinds, frozen exports and note/
+  model recovery journals. Navigation starts no settings/provider operation;
+  visible controls, configured-deck preparation and Add remain unfinished.
+- PASS: 11 new Rust cases; all 1007 workspace tests/17 opt-in ignored, strict
+  Clippy/Rustfmt/Kotlin formatting, full host JNI, identical independent/Android
+  Kotlin generation, both-ABI debug/test APKs and strict lintDebug. Initial compile
+  and lost-response completion-signal fixture corrections are in DEVELOPMENT.md.
+- No implementation/verification work or blocker remains for this slice. No new
+  dependencies/schema/provider API/native-export ABI. No emulator, physical phone,
+  real collection/browser or optimized release trial run. Recommend a schema-24
+  phone upgrade with existing Library/history before the full visible Add flow.

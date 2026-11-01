@@ -8742,3 +8742,68 @@ before compatibility claims. Older phone APK remains source 0374365.
 
 Logs: `/tmp/yomoku-anki-settings-{focused,workspace,workspace-final,clippy,rustfmt,
 jni,android,diff}.log` (one file per suffix).
+
+## Retained configured Anki deck through core/FIFO/FFI
+
+2026-11-01: no dependency/schema/provider API/native-export ABI change. Typed
+Event/ViewModel codecs now carry local settings actions and compact phases.
+Use the pinned offline toolchains; keep host JNI sequential with Android native
+packaging. No visible control dispatches the new settings actions yet.
+
+```sh
+export PATH=/home/kai/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin:$PATH
+export JAVA_HOME="$PWD/.local/jdk-17/jdk-17.0.21+9"
+export JAVA_BIN="$JAVA_HOME/bin/java"
+export GRADLE_USER_HOME="$PWD/.local/gradle"
+export ANDROID_HOME=/home/kai/Android/Sdk
+cargo test -p yomoku-core anki_settings --all-features --locked --offline
+cargo test --workspace --all-features --locked --offline --quiet
+cargo clippy --workspace --all-targets --all-features --locked --offline -- -D warnings
+cargo fmt --all -- --check
+tools/test-kotlin-bridge.sh
+tools/format-kotlin.sh --check
+"$JAVA_BIN" -jar .local/ktfmt-0.64.jar --kotlinlang-style --dry-run --set-exit-if-changed tests/kotlin/AnkiSettingsBridgeTest.kt
+cargo run -p yomoku-ffi --bin generate-kotlin --features facet_typegen --locked --offline -- /tmp/yomoku-anki-retained-kotlin
+diff -r target/generated/kotlin /tmp/yomoku-anki-retained-kotlin
+./android/gradlew -p android :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug --offline --console=plain
+git diff --check
+```
+
+PASS: 11 new Rust cases (six core, four real FIFO/SQLite and one native
+codec boundary); all 1007 workspace tests/17 opt-in ignored, strict Clippy,
+Rustfmt/Kotlin formatting and independent identical generation. Core cases cover
+Settings visibility/lazy load/coalescing, unconfigured versus unloaded, positive
+signed-64 boundaries/clear, matching committed acknowledgements, invalid/wrong-kind/
+stale callbacks, read-only lost-response recovery, checked sequence exhaustion,
+navigation retention and unchanged original/effective reader/frozen export state.
+FIFO cases cover pending note/model independence, reopen/clear, statement and
+COMMIT rollback, missing/corrupt settings without repair, worker-only execution
+without dictionary/analyzer loading, and an actually committed lost response with
+one update observed before and after Retry. Rust/Kotlin exchanges cover every
+phase and all actions, exact long IDs and invalid input; JNI drives real native
+storage, invalid IDs, both pending journal kinds and close/reopen persistence.
+
+Initial compilation required exhaustive app match arms and renaming a shadowed
+test binding. The initial focused FIFO run passed three of four: its lost-response
+fixture discarded both the core response and completion signal. A test-only render
+now signals completion while the response remains discarded and Saving retained;
+production behavior is unchanged. The full workspace rerun passes all four.
+PASS: full host Kotlin/JNI suite, including workspace build and all-phase Rust/
+Kotlin exchange, settings persistence/invalid input/reopen, and the existing Anki,
+reader/import/navigation/handle-lifecycle regressions.
+
+PASS: both-ABI Android native packaging, debug/test APK builds, strict lintDebug,
+identical Android-generated Kotlin and diff checks. Offline Gradle required normal
+local-socket sandbox escalation; no dependency downloads were needed. No open
+implementation/verification work or blocker remains for this slice. Emulator/
+physical-device, real AnkiDroid collection/browser and optimized APK trials were
+not run. Recommend the phone schema-24 upgrade with existing Library/history
+before the full visible Add flow, then a disposable real collection before any
+compatibility claim. Next: explicit provider/deck/permission controls consuming
+retained settings, configured-deck preparation and dictionary Add presentation.
+
+Logs: `/tmp/yomoku-anki-retained-{core,workspace,clippy,rustfmt,jni,format,
+format-check,host-format,host-format-check,typegen,codegen-diff,
+android-codegen-diff,android}.log` (one path per suffix). The initial focused FIFO
+fixture failure is in `/tmp/yomoku-anki-retained-fifo.log`; the final workspace
+log records all four FIFO cases passing.

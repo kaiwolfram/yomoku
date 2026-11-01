@@ -132,6 +132,7 @@ fn refresh(router: &Router) -> (ViewModel, AnkiRecoveryState) {
 
 mod reads;
 mod reconciliation;
+mod settings;
 
 fn submission() -> AnkiSubmission {
     let surface = Surface::new("𠮷猫").unwrap();

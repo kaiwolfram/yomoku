@@ -162,6 +162,7 @@ class StatisticsScreenTest {
 private fun statisticsView(): ViewModel {
     val data = statisticsFixture()
     return ViewModel(
+        ankiSettings = AnkiSettingsView(AnkiSettingsPhase.UNLOADED, null, null),
         vocabulary =
             VocabularyState(
                 VocabularyQuery("", VocabularyStatus.entries.toList(), VocabularySort.NEWEST),

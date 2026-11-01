@@ -106,6 +106,14 @@ pub enum StorageOperation {
     FinishAnkiLive(
         #[cfg_attr(feature = "facet_typegen", facet(opaque))] Box<crate::anki::AnkiLiveCallback>,
     ),
+    #[serde(skip)]
+    #[cfg_attr(feature = "facet_typegen", facet(skip))]
+    LoadAnkiSettings,
+    #[serde(skip)]
+    #[cfg_attr(feature = "facet_typegen", facet(skip))]
+    SaveAnkiDefaultDeck(
+        #[cfg_attr(feature = "facet_typegen", facet(opaque))] Option<crate::anki::AnkiDeckId>,
+    ),
 }
 
 impl StorageOperation {
@@ -212,6 +220,16 @@ pub enum StorageResult {
     AnkiLiveFinished(
         #[cfg_attr(feature = "facet_typegen", facet(opaque))]
         Box<crate::anki::AnkiRecoverySnapshot>,
+    ),
+    #[serde(skip)]
+    #[cfg_attr(feature = "facet_typegen", facet(skip))]
+    AnkiSettingsLoaded(
+        #[cfg_attr(feature = "facet_typegen", facet(opaque))] Option<crate::anki::AnkiDeckId>,
+    ),
+    #[serde(skip)]
+    #[cfg_attr(feature = "facet_typegen", facet(skip))]
+    AnkiDefaultDeckSaved(
+        #[cfg_attr(feature = "facet_typegen", facet(opaque))] Option<crate::anki::AnkiDeckId>,
     ),
 }
 

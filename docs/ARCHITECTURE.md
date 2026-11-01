@@ -2268,6 +2268,34 @@ future preference changes.
 
 Fresh installs and upgrades remain unconfigured. The stored external ID is not
 availability/permission evidence and does not change frozen export targets or
-live invocation gates. Retained settings events/FIFO/FFI, provider discovery,
-permission/deck controls and dictionary Add presentation remain to be connected.
-No dependency, generated codec or native-export ABI changes in this storage slice.
+live invocation gates. No dependency, generated codec or native-export ABI changes
+in this storage slice. The retained connection is described below.
+
+### Retained configured-deck settings through the native FIFO
+
+`LoadAnkiSettings`, `SetAnkiDefaultDeck(Option<i64>)` and `RetryAnkiSettings`
+are typed shell events, accepted only while Settings is open. The lazy load
+distinguishes Unloaded from Ready with no configured deck; repeated ordinary
+loads coalesce and neither navigation nor composition initiates I/O. Native
+`AnkiSettingsView` retains Loading/Ready/Saving/Failed, the last acknowledged ID
+and a separate storage error. The compact presentation remains available across
+navigation for future reader consumers. It contains no provider availability or
+permission evidence. No visible settings or dictionary control dispatches these
+events yet.
+
+The app validates positive signed-64 IDs and owns an independent checked request
+sequence. Saves require Ready and publish the exact requested value only after
+the matching committed result. Native-only storage operations/results and the
+response closure run on the existing SQLite FIFO; the shell cannot forge a
+completion. Wrong-kind/mismatched results fail closed and stale callbacks do
+nothing. Reader busy/errors, pending operations, frozen Anki exports, preflight,
+live permits and both journal gates remain independent.
+
+Explicit Retry always enqueues a local read, including while a previous load or
+save response is lost. The read queues behind the old operation on the same FIFO
+and invalidates its callback generation. Another save requires the authoritative
+read acknowledgement; Retry never repeats a write or queries the provider. A
+new session begins Unloaded and restores the preference only by reading SQLite.
+Provider discovery, permission/deck UI, configured-deck preparation, dictionary
+Add and browser/return behavior remain unfinished. Schema/dependencies and the
+native-export ABI are unchanged; generated Event/ViewModel codecs change.
