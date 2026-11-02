@@ -429,8 +429,231 @@ fn backup_candidate_effective_preserves_alternate_metadata_and_non_japanese_excl
             .iter()
             .any(|token| token.surface == "た"));
         storage.record_effective_page_completion(&frozen).unwrap();
+        accept_unchanged(&database, 24);
+        storage.connection.execute(
+            "UPDATE analyzed_tokens SET reading = 'wrong-but-valid' WHERE analysis_id = ?1 AND token_index = 0",
+            [i64::from(alternate_id)],
+        ).unwrap();
+        check_rejected(&database, 24, CandidateError::InvalidData);
+        storage.connection.execute(
+            "UPDATE analyzed_tokens SET reading = ?1 WHERE analysis_id = ?2 AND token_index = 0",
+            (&alternate.tokens[0].reading, i64::from(alternate_id)),
+        ).unwrap();
+        storage
+            .connection
+            .execute(
+                "DELETE FROM analyzed_tokens WHERE analysis_id = ?1",
+                [i64::from(alternate_id)],
+            )
+            .unwrap();
+        storage
+            .connection
+            .execute(
+                "DELETE FROM chapter_analyses WHERE id = ?1",
+                [i64::from(alternate_id)],
+            )
+            .unwrap();
+        check_rejected(&database, 24, CandidateError::InvalidData);
         storage.delete_document(c.document_id).unwrap();
         accept_unchanged(&database, 24);
+    }
+}
+
+#[test]
+fn backup_candidate_effective_requires_surviving_original_header_and_exact_token_metadata() {
+    for version in [18, 23, 24] {
+        for sql in [
+            "DELETE FROM analyzed_tokens; DELETE FROM chapter_analyses",
+            "UPDATE chapter_analyses SET engine_revision = 'other'",
+            "UPDATE chapter_analyses SET dictionary_revision = 'other'",
+            "UPDATE chapter_analyses SET split_mode = 'a'",
+            "UPDATE analyzed_tokens SET reading = 'valid-but-different'",
+            "UPDATE analyzed_tokens SET dictionary_form = 'valid-but-different'",
+            "UPDATE analyzed_tokens SET is_japanese = 1 - is_japanese",
+        ] {
+            let (database, storage, _) = setup(version, false);
+            storage.connection.execute_batch(sql).unwrap();
+            check_rejected(&database, version as u32, CandidateError::InvalidData);
+        }
+    }
+}
+
+#[test]
+fn backup_candidate_effective_rejects_another_chapters_analysis_even_with_identical_text() {
+    for deleted in [false, true] {
+        let (database, mut storage, frozen) = setup(24, false);
+        let original = frozen.key().segmentation.original_analysis_id;
+        let text = storage
+            .load_paste(frozen.completion().document_id)
+            .unwrap()
+            .unwrap()
+            .chapter
+            .text;
+        let other = storage
+            .create_paste(&PasteText::new(text).unwrap())
+            .unwrap();
+        let mut analysis = storage.chapter_analysis(original).unwrap().unwrap();
+        for token in &mut analysis.tokens {
+            token.anchor.source_id = other.chapter.source_id;
+            token.anchor.chapter_id = other.chapter.chapter_id;
+        }
+        let other_id = storage
+            .store_chapter_analysis(other.chapter.chapter_id, &analysis)
+            .unwrap();
+        let mut value = serde_json::to_value(&frozen).unwrap();
+        value["key"]["segmentation"]["original_analysis_id"] = json!(i64::from(other_id));
+        for segment in value["key"]["segmentation"]["segments"]
+            .as_array_mut()
+            .unwrap()
+        {
+            if !segment["metadata"].is_null() {
+                segment["metadata"]["analysis_id"] = json!(i64::from(other_id));
+            }
+        }
+        for token in value["occurrences"].as_array_mut().unwrap() {
+            if !token["metadata"].is_null() {
+                token["metadata"]["analysis_id"] = json!(i64::from(other_id));
+            }
+        }
+        replace(&storage, &value.to_string());
+        if deleted {
+            storage
+                .delete_document(frozen.completion().document_id)
+                .unwrap();
+        }
+        check_rejected(&database, 24, CandidateError::InvalidData);
+    }
+}
+
+#[test]
+fn backup_candidate_effective_checks_complete_exact_text_without_requiring_current_rules() {
+    for mutation in [0, 1, 2] {
+        let (database, storage, frozen) = setup(24, false);
+        let mut value = serde_json::to_value(&frozen).unwrap();
+        match mutation {
+            0 => {
+                // Keep the detached segment/projection consistent while forging
+                // a manual part of the same UTF-8 byte length.
+                value["key"]["segmentation"]["segments"][0]["boundary"]["surface"] = json!("飲む");
+                value["occurrences"][0]["surface"] = json!("飲む");
+            }
+            1 => {
+                let last = value["key"]["segmentation"]["segments"]
+                    .as_array_mut()
+                    .unwrap()
+                    .pop()
+                    .unwrap();
+                let start = last["boundary"]["anchor"]["range"]["start"].clone();
+                value["occurrences"]
+                    .as_array_mut()
+                    .unwrap()
+                    .retain(|token| token["anchor"]["range"]["start"] != start);
+            }
+            _ => {
+                value["key"]["segmentation"]["segments"] = json!([]);
+                value["occurrences"] = json!([]);
+            }
+        }
+        replace(&storage, &value.to_string());
+        check_rejected(&database, 24, CandidateError::InvalidData);
+    }
+    let (database, mut storage, _) = setup(24, true);
+    storage
+        .reverse_segmentation_override(1.try_into().unwrap())
+        .unwrap();
+    accept_unchanged(&database, 24);
+}
+
+#[test]
+fn backup_candidate_effective_rederives_frozen_logical_pages_from_their_own_preset() {
+    let text = format!("食べた {}", "猫。".repeat(1_100));
+    let (database, storage, frozen) = setup_text(24, false, &text, 0);
+    // Current settings can change after a reservation; use its frozen preset.
+    storage
+        .connection
+        .execute_batch("UPDATE reader_settings SET page_length = 250")
+        .unwrap();
+    accept_unchanged(&database, 24);
+    let mut value = serde_json::to_value(&frozen).unwrap();
+    value["completion"]["page_length"] = json!("Characters250");
+    replace(&storage, &value.to_string());
+    check_rejected(&database, 24, CandidateError::InvalidData);
+    let mut value = serde_json::to_value(&frozen).unwrap();
+    value["completion"]["departing_position"]["offset"] =
+        json!(i64::from(frozen.completion().page.range.end));
+    replace(&storage, &value.to_string());
+    // An interior page boundary belongs to the following page; chapter EOF is
+    // still valid and is covered by the crossing-token/EOF preservation case.
+    check_rejected(&database, 24, CandidateError::InvalidData);
+}
+
+#[test]
+fn backup_candidate_effective_cancels_every_surviving_text_and_analysis_poll() {
+    let (database, _storage, _) = setup(18, true);
+    let bytes = fs::read(database.path()).unwrap();
+    let mut polls = 0;
+    candidate(&database.0.join("count"), &bytes)
+        .check_schema(18, bytes.len() as u64, || {
+            polls += 1;
+            false
+        })
+        .unwrap()
+        .discard()
+        .unwrap();
+    for stop in 1..=polls {
+        let directory = database.0.join("cancel");
+        let mut calls = 0;
+        assert!(matches!(
+            candidate(&directory, &bytes).check_schema(18, bytes.len() as u64, || {
+                calls += 1;
+                calls == stop
+            },),
+            Err(CandidateError::Cancelled)
+        ));
+        assert!(!directory.exists());
+        assert_eq!(fs::read(database.path()).unwrap(), bytes);
+    }
+}
+
+#[test]
+fn backup_candidate_effective_migrates_live_history_and_reservations_without_reinterpretation() {
+    for version in 18..=24 {
+        for completed in [false, true] {
+            let (database, mut storage, frozen) = setup(version, completed);
+            storage
+                .reverse_segmentation_override(1.try_into().unwrap())
+                .unwrap();
+            let bytes = fs::read(database.path()).unwrap();
+            let directory = database.0.join("live-upgrade");
+            let checked = candidate(&directory, &bytes)
+                .check_schema(version as u32, bytes.len() as u64, || false)
+                .unwrap();
+            let copy = Connection::open(directory.join("snapshot.sqlite3")).unwrap();
+            let payload: String = copy
+                .query_row(
+                    "SELECT payload FROM effective_completion_commands",
+                    [],
+                    |r| r.get(0),
+                )
+                .unwrap();
+            assert_eq!(payload, serde_json::to_string(&frozen).unwrap());
+            let original = crate::analysis::read_analysis(
+                &copy,
+                frozen.key().segmentation.original_analysis_id,
+            )
+            .unwrap()
+            .unwrap();
+            assert_eq!(
+                original,
+                storage
+                    .chapter_analysis(frozen.key().segmentation.original_analysis_id)
+                    .unwrap()
+                    .unwrap()
+            );
+            drop(copy);
+            checked.discard().unwrap();
+            assert_eq!(fs::read(database.path()).unwrap(), bytes);
+        }
     }
 }
 

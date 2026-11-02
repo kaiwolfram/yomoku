@@ -2264,8 +2264,14 @@ deleted-source provenance without text. Every saved position/pending-time anchor
 checks document/source ownership and scalar boundaries including EOF; missing
 legacy positions, literal/empty original titles and zero-time revision tombstones
 remain valid. These checks run before/after private migration without repairs.
-Format records/hashes/annotations/assets, frozen logical pages/original and
-alternate analysis associations, other historical anchors and counter references
-remain unchecked. [RESTORE_VALIDATION.md](RESTORE_VALIDATION.md)
+Retained analysis headers/token rows now pass the existing full-coverage contract
+using borrowed exact text: contiguous indices, scalar ranges/surfaces, whitespace
+gaps/tail and literal metadata/classification domains. Frozen effective records
+match surviving canonical bytes, logical pages derived from their frozen preset/
+position and exact original B/alternate A/C headers/tokens. Live text requires
+referenced analyses; legacy absence and erased-content history remain valid without
+reanalysis or current-rule resolution. Format records/hashes/annotations/assets,
+override provenance, other historical anchors and counter references remain
+unchecked. [RESTORE_VALIDATION.md](RESTORE_VALIDATION.md)
 lists all current table groups and precise boundaries. No restore-ready authority
 or schema migration is added.

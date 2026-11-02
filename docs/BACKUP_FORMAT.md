@@ -292,9 +292,10 @@ required/nullable fields and rejected unknown/duplicate fields. Validate interna
 command/page/position/segment/metadata/occurrence consistency, surviving issued-ID
 bounds and any completed receipt/header/surviving encounters. Preserve unfinished
 reservations and deleted-content/vocabulary history without replay or current-rule
-requirements. Frozen segments against canonical text, logical pages and surviving
-original/alternate analysis associations still need checks; missing historical whitespace/analysis
-cannot be reconstructed from frozen segments. See RESTORE_VALIDATION.md.
+requirements. Frozen segments now match surviving canonical text, logical pages
+derived with their own preset/position and exact original B/alternate A/C headers
+and token metadata. Missing historical text/analysis cannot be reconstructed from
+frozen segments. See RESTORE_VALIDATION.md.
 
 Canonical source/chapter/text checks now enforce complete zero-based chapter order,
 single-text format shape, positive typed identities, UTF-8 titles/live nonblank
@@ -303,18 +304,23 @@ positions and every pending-time anchor validate document/source ownership and
 scalar boundaries/range, including EOF. Preserve empty original titles, legacy
 missing positions, exact canonical bytes and zero-time/max-revision tombstones.
 Run before/after private migration without format parsing, writes or repair.
-Format-specific record presence/hash/annotation/asset and frozen analysis/history
-relations remain separate unchecked groups.
+Retained analyses now pass borrowed-row coverage/index/scalar/surface/profile and
+metadata domains from the existing analysis contract. Preserve whitespace gaps,
+explicit legacy absence and retained classification without analyzer reruns.
+Format-specific record presence/hash/annotation/asset, override provenance and
+other history relations remain separate unchecked groups.
 
 The opaque `SchemaCheckedBackup` exposes only schema versions and discard. It has
 no SQL/path/reader/confirmation/activation API. **Other application invariants
-remain unchecked**, including format records, frozen page/analysis/history-anchor
-relations and other history consistency. [RESTORE_VALIDATION.md](RESTORE_VALIDATION.md)
+remain unchecked**, including format records, override provenance, other historical
+page/anchor relations and history consistency. [RESTORE_VALIDATION.md](RESTORE_VALIDATION.md)
 inventories checked/remaining table groups and limits, including unverifiable
 erased allocation history. Do not pass this result to replacement confirmation
 or ordinary `Storage::open`. Further validation is required before a restore-ready
 handle. Both Anki journals survive unchanged without mutation permits.
-Cancellation polls between synchronous operations/rows, not inside SQL/JSON/sync.
+Cancellation polls between synchronous operations/rows and around frozen page
+derivation, not inside SQL/JSON/UTF-8 scans/pagination/sync. Frozen page checks own
+one chapter and its page ranges; there is no total resource budget.
 
 API/security evidence: [SQLite untrusted-input guidance](https://www.sqlite.org/security.html),
 [connection configuration](https://www.sqlite.org/c3ref/c_dbconfig_defensive.html),

@@ -5,6 +5,7 @@ use yomoku_backup::{decrypt_snapshot, encrypt_snapshot, Manifest, Password};
 use super::*;
 use crate::{BackupCandidate, CandidateError};
 
+mod analyses;
 mod controls;
 mod documents;
 mod effective;

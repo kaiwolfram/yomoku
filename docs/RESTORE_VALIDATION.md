@@ -15,10 +15,14 @@ type can exist. Do not invent stricter product rules while filling these gaps.
   status-event/history relations remain a separate unchecked group.
 - [x] Decode detached effective records and validate internal domains/projections,
   historical issued-ID bounds and matching receipts before/after migration.
-  Surviving text/analysis relations remain in the unchecked groups below.
+  Surviving text/page/analysis relations are implemented below; rule provenance
+  and other history/status chains remain separate groups.
 - [x] Validate canonical source/chapter/text ownership and order, saved positions
   and every pending-time anchor before/after private migration. Format metadata,
-  analysis and historical anchor associations remain separate unchecked groups.
+  analysis and historical anchor associations are addressed separately below.
+- [x] Validate every retained analysis against exact canonical text and check
+  frozen effective text/page/original and alternate analysis associations before
+  and after private migration. Preserve legacy absence/deleted-content history.
 - [ ] Validate every remaining group below, including cross-group relations and
   legacy/deleted-content cases; only then design an opaque restore-ready result.
 
@@ -86,7 +90,8 @@ records/segments/occurrences, not inside decoding or SQL. Saved segmentation can
 whitespace gaps and deleted documents lose their original analyses: detached success
 cannot establish original coverage or reconstruct missing bytes. Checking frozen
 records against surviving canonical text, logical page derivation and analysis associations
-remains required below; so do the other history/status chains. No restore authority.
+is implemented below; rule provenance and other history/status chains remain.
+No restore authority.
 
 ## Implemented canonical text and live anchors
 
@@ -107,9 +112,36 @@ unrelated pages. Poll cancellation between sources/chapters/position/time rows;
 SQL/UTF-8 validation remains synchronous. No normalization, identity allocation or repair.
 
 Format-specific record presence/ownership, original-byte/hash/annotation/asset
-relations, analysis coverage and frozen/historical page/anchor associations remain
-unchecked below. These live checks do not complete those groups or grant restore
-authority.
+relations and other historical page/anchor associations remain unchecked below.
+These live checks do not complete those groups or grant restore authority.
+
+## Implemented analysis and frozen effective associations
+
+Every retained `chapter_analyses`/`analyzed_tokens` snapshot uses the existing
+`ChapterAnalysis::validate` contract as borrowed-row checks: positive typed ID,
+version 1/nonblank UTF-8 revisions/A/B/C mode, contiguous zero-based token indices,
+ordered nonempty scalar ranges with exact canonical surfaces, only whitespace
+in omitted gaps/tail, existing Japanese Surface and optional reading/dictionary-form
+domains. Retained flags are validated, never reclassified. All applicable schema
+prefixes from 7 are checked before migration and again afterward. Explicit legacy
+analysis absence is valid; no analyzer rerun or repair.
+
+For each frozen effective record from schema 18, retained canonical text must match
+every segment and permit only whitespace gaps/tail. Derive the departing logical
+page with the existing core paginator using its frozen preset and position, including
+EOF ownership. Require surviving original B and referenced A/C analysis headers to
+match the exact chapter/profile/mode and every referenced token's index/range/surface/
+classification/reading/form. Live text requires those analyses; after deletion absent
+analyses stay valid, but a surviving foreign analysis cannot impersonate erased history.
+Old profiles, settings changes, reversed rules and later alternate analyses do not
+reinterpret frozen records. No current-rule resolution or live command construction.
+
+Analysis scans borrow row-local text and do not collect token vectors. Frozen page
+derivation owns one chapter and its page ranges at a time. Cancellation polls between
+headers/tokens/records/segments and around page derivation, not inside SQL/JSON/UTF-8
+scans or pagination; no total resource budget or real-device resource claim. These
+checks do not validate override provenance, historical completion/status chains or
+erase the separate format/annotation groups. The result still grants no restore authority.
 
 ## Required remaining groups
 
@@ -119,10 +151,9 @@ authority.
 | `source_ruby`, `subtitle_cues` | Contiguous indices, ordered UTF-8 ranges/reading domains and relation to source text and format. |
 | `epub_documents`, `epub_assets`, `epub_chapters` | Counts, ownership, canonical paths/media/cover references, asset/text SHA-256 and existing size limits. No extraction or external URL resolution. |
 | `epub_spans`, `epub_inline_images` | Contiguous indices, UTF-8 anchors, kind/target/link policy and image placeholder/path/asset relations through the existing domain contracts. |
-| `chapter_analyses`, `analyzed_tokens` | Version/identity/revision domains, contiguous indices, complete ordered original analysis coverage, exact anchored surfaces/metadata and Japanese flags. Preserve explicit legacy analysis absence; no analyzer rerun. |
 | `segmentation_overrides`, `segmentation_override_parts` | Exact anchored surfaces, scope/provenance, ordered parts reconstructing the selection, domain split/merge constraints and active-rule consistency. Deleted originating text must not invalidate retained global rules. |
 | `completion_commands`, `reading_completions`, `completion_analyses`, `reading_occurrences` | Historical ownership, immutable ranges/analysis identities and occurrence membership/surfaces, page/time semantics and surviving counter lower bounds. Account for vocabulary deletion removing encounters and document deletion removing live text/analysis. Legacy unanalyzed completions remain valid. |
-| `effective_completion_commands` | Detached typed payload/internal projection/issued bounds/receipt checks implemented above. Still check surviving canonical text, logical pages and original/alternate analysis associations with the text/analysis groups. Preserve deleted-content records and old frozen rules without current override/vocabulary requirements. Never replay reservations. |
+| `effective_completion_commands` | Detached payload/projection/issued bounds/receipts plus surviving text/page/original and alternate analysis checks implemented above. Historical edit provenance and cross-group relations remain with override/completion history validation. Preserve deleted-content records and old frozen rules without current override/vocabulary requirements. Never replay reservations. |
 | `vocabulary_status_events` | Registration/transition chain and final retained status, cause/completion ownership/date relations using existing event-order rules. Vocabulary deletion legitimately removes its events/occurrences. |
 | `documents.finished_at_least_once` | Permanent marker/history consistency under existing completion and legacy migration semantics; backward position/reflow do not clear it. |
 

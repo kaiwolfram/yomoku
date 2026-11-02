@@ -4491,3 +4491,21 @@ and /tmp/yomoku-browser-profile-*. No emulator started.
   coverage/frozen text/page associations; format/hash/annotations and other
   history/status groups remain. Recommend schema-24 phone upgrade preserving
   Library/history and disposable real Anki collection/permission/browser/Back trial.
+
+## 2026-11-02 — Restore analyses and frozen effective associations
+
+- Added borrowed-row retained-analysis coverage/index/scalar/surface/profile/
+  metadata checks and surviving frozen effective text/page/original B/alternate
+  A/C header/token associations before/after private migration. Preserve legacy
+  absence, erased content, old rules/profiles and reservations without reanalysis,
+  repair, replay or restore authority. No schema/platform/dependency changes.
+- PASS: twelve new/all 59 candidate cases, 1108 workspace tests/17 opt-in ignored,
+  all-feature build, strict Clippy/Rustfmt, both Android storage builds, local
+  Markdown targets/diff. Initial test-module path typo corrected; no outstanding
+  failures/blockers. Commands/logs/limits: DEVELOPMENT.md, Restore candidate
+  analyses and frozen associations. No APK/device/resource trial.
+- Updated inventory/format/architecture/data/decisions/plan/handoff. No remaining
+  implementation/verification steps for this slice. Next: format/hash/annotations/
+  assets and override provenance, then other historical anchor/status chains.
+  Restore umbrellas remain unchecked. Recommend schema-24 phone upgrade retaining
+  Library/history and disposable real Anki collection/permission/browser/Back trial.

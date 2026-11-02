@@ -5283,3 +5283,29 @@ EOF or sum pending time across unrelated pages. Validate UTF-8/ownership without
 constructing whole-document format projections, normalizing text, creating IDs or
 repairing records. Cancellation polls between rows, not during SQL/UTF-8 scans.
 No schema/dependency/core/runtime/FFI/Android/destructive semantics change.
+
+## 2026-11-02 — Analysis and frozen effective restore associations
+
+Continue the existing semantic inventory with a streaming storage equivalent of
+`ChapterAnalysis::validate`: exact canonical surfaces/scalar ranges, contiguous
+indices, ordered coverage with whitespace-only gaps/tail, profile and metadata
+domains. Borrow row-local text rather than allocating complete token vectors.
+Preserve supplied Japanese classification and explicit legacy analysis absence;
+do not tokenize, normalize or repair candidate data. Check applicable prefixes
+from schema 7 before migration and again afterward.
+
+Frozen effective records also require complete exact text coverage while text
+survives. Use the existing pure paginator with the record's own preset/position,
+owning only one chapter and its page ranges, without consulting current settings
+or resolving current rules. Match surviving original B and referenced A/C headers
+to exact chapter/profile/mode and their indexed token metadata. Live text requires
+those analyses; erased analyses remain acceptable after document deletion, while
+a surviving foreign analysis cannot stand in for a historical identity. Retain old
+profiles, reversed rules, crossing tokens, EOF and unfinished reservations without
+live command construction or replay. Poll around pagination and between rows/
+segments, not inside synchronous SQL/JSON/UTF-8/pagination; no total resource budget.
+
+This closes the retained-analysis and frozen text/page/analysis associations only.
+Format/hash/annotation/asset, override provenance and other history/status groups
+still precede restore-ready authority. No schema/dependency/core/runtime/FFI/
+Android changes or replacement permission is introduced.

@@ -9537,3 +9537,63 @@ now while independent local backup work continues. No APK rebuild was requested.
 
 Logs: `/tmp/yomoku-candidate-documents-{new,focused,workspace,build,clippy,android}.log`.
 Formatting/local-link/diff checks are in the session transcript.
+
+## Restore candidate analyses and frozen associations
+
+2026-11-02: added storage-only retained-analysis validation using the existing
+coverage contract as borrowed-row checks. Validate every header/token's domains,
+indices, exact scalar ranges/surfaces and complete coverage with whitespace-only
+gaps/tail, preserving literal metadata/classification and legacy absence. Frozen
+effective records now match surviving canonical text, their own preset/position's
+logical page and exact original B/alternate A/C headers/indexed token metadata.
+Require referenced analyses while text lives; preserve absent erased analyses and
+old profiles/reversed rules without resolving rules, rerunning analysis or building
+live commands. Apply before/after supported private migration. No schema,
+dependency, core/runtime/FFI or Android source changes.
+
+```sh
+cargo test -p yomoku-storage --locked --offline candidate --quiet
+cargo test --workspace --all-features --locked --offline --quiet
+cargo build --workspace --all-features --locked --offline
+cargo clippy --workspace --all-targets --all-features --locked --offline -- -D warnings
+export CC_aarch64_linux_android=/home/kai/Android/Sdk/ndk/30.0.16248370/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android29-clang
+export AR_aarch64_linux_android=/home/kai/Android/Sdk/ndk/30.0.16248370/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-ar
+export CC_x86_64_linux_android=/home/kai/Android/Sdk/ndk/30.0.16248370/toolchains/llvm/prebuilt/linux-x86_64/bin/x86_64-linux-android29-clang
+export AR_x86_64_linux_android=/home/kai/Android/Sdk/ndk/30.0.16248370/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-ar
+cargo build -p yomoku-storage --target aarch64-linux-android --target x86_64-linux-android --locked --offline
+cargo fmt --all -- --check
+git diff --check
+```
+
+PASS: twelve new cases/all 59 candidate cases and 1108 workspace tests, zero
+failures, 17 existing opt-in ignored. Cases cover all populated analysis prefixes
+7–24 and live effective prefixes 18–24, missing/gapped/overlapping/out-of-range/
+mid-scalar coverage, exact surfaces, invalid UTF-8/blank profiles/metadata, all
+three modes, retained classification/whitespace tokens, literal Unicode/NUL
+metadata and full i64 IDs. Frozen cases check foreign/deleted analysis identities,
+missing original/alternate analyses, different token metadata, forged manual text,
+missing tail/segments, frozen presets across settings changes and interior-boundary
+versus EOF ownership. Existing deleted-history, crossing-token, erased-vocabulary
+and encrypted full-state fixtures pass. Every populated pre/post-migration
+cancellation poll cleans private copies and preserves original bytes. Final focused
+run: 73.74 seconds; cancellation cases may emit the standard over-60-seconds notice.
+
+All-feature workspace build, strict Clippy, Rustfmt, both Android storage library
+targets, local Markdown targets and diff pass offline. An initial test-only module
+path typo was corrected; no outstanding failures/blockers. Updated semantic
+inventory, format/architecture/data/decisions/plan/handoff and session docs.
+No APK/lint/JNI/codegen/emulator/release/phone/resource trial was run.
+
+No implementation/verification steps remain for this bounded slice. Next:
+format/hash/annotation/asset and override provenance groups, then other historical
+page/anchor/status chains before restore-ready authority. Runtime drain/gating/
+crash cleanup, secrets/UI and atomic replacement remain separate work. Analysis
+scans borrow rows; frozen pagination owns one chapter/page list, without a total
+resource budget. Cancellation is between rows/segments and around pagination,
+not inside SQL/JSON/UTF-8 scans/pagination/sync. A schema-24 phone upgrade retaining
+Library/history and a disposable real Anki collection/permission/browser/Back trial
+would provide more integration evidence than the next host-only validator;
+recommend it while independent local backup work continues. No APK rebuild requested.
+
+Logs: `/tmp/yomoku-candidate-analyses-{initial,new,focused,final,workspace,build,clippy,android}.log`.
+Formatting/local-link/diff checks are in the session transcript.

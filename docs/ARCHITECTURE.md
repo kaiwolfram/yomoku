@@ -49,8 +49,13 @@ unfinished reservations survive deleted content/rules/vocabulary without replay.
 Canonical source/chapter order and live-text ownership, saved position and every
 pending-time anchor now pass borrowed-row checks before/after migration. Preserve
 literal/empty original titles, EOF/legacy absent positions, deleted provenance and
-zero-time revision tombstones. Format metadata/hash/annotation checks and frozen
-page/analysis relations and status-event/final-status/history checks
+zero-time revision tombstones. Retained analyses now pass borrowed-row exact
+coverage/index/metadata checks. Frozen effective records match surviving chapter
+text, logical pages derived with their own preset/position and exact original B/
+alternate A/C headers/tokens. Missing analyses remain valid for legacy/deleted
+content; old rules are never resolved again. Page derivation owns one chapter,
+without whole-book loading or analyzer work. Format metadata/hash/annotation,
+override provenance and status-event/final-status/history checks
 remain incomplete and are inventoried in
 [RESTORE_VALIDATION.md](RESTORE_VALIDATION.md). Cleanup shares the
 snapshot's fixed-file lifecycle, now also removing known SQLite sidecars, without

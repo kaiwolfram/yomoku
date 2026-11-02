@@ -9,10 +9,11 @@ use yomoku_core::{
     active_time::PendingReadingTime,
     analysis::SplitMode,
     document::{
-        AnalysisId, ChapterId, CompletionCommandId, DocumentId, OverrideId, SourceId, TextOffset,
+        AnalysisId, ChapterId, ChapterText, CompletionCommandId, DocumentId, OverrideId, SourceId,
+        TextAnchor, TextOffset, TextRange,
     },
     effective_reader::EffectiveTokenEligibility,
-    pagination::PageLength,
+    pagination::{LogicalPages, PageLength, ReadingPosition},
     vocabulary::Surface,
 };
 
@@ -158,6 +159,7 @@ pub(super) fn check(
         require(row.get::<_, i64>(1)? == 1)?;
         require(i64::from(record.completion.command_id) == row.get::<_, i64>(0)?)?;
         check_record(connection, &issued_ids, &record, cancelled)?;
+        check_surviving_content(connection, &record, cancelled)?;
         check_receipt(connection, &record, cancelled)?;
     }
     check_cancelled(cancelled)
@@ -323,6 +325,152 @@ fn check_record(
         }
     }
     require(occurrences.next().is_none())
+}
+
+fn check_surviving_content(
+    connection: &Connection,
+    record: &Record,
+    cancelled: &mut impl FnMut() -> bool,
+) -> Result<(), CandidateError> {
+    check_cancelled(cancelled)?;
+    let c = &record.completion;
+    let segmentation = &record.key.segmentation;
+    // One chapter only, never load/reimport a whole book or resolve today's rules.
+    let canonical: Option<String> = connection
+        .query_row(
+            "SELECT text FROM main.chapter_texts WHERE chapter_id = ?1",
+            [i64::from(c.page.chapter_id)],
+            |row| row.get(0),
+        )
+        .optional()?;
+    let chapter = canonical.map(|text| ChapterText {
+        source_id: c.page.source_id,
+        chapter_id: c.page.chapter_id,
+        text,
+    });
+    let canonical = chapter.as_ref().map(|chapter| chapter.text.as_str());
+    let live = chapter.is_some();
+    check_analysis_header(
+        connection,
+        segmentation.original_analysis_id,
+        SplitMode::B,
+        c.page.chapter_id,
+        &segmentation.profile,
+        live,
+    )?;
+    if let Some(chapter) = &chapter {
+        let pages = LogicalPages::new(std::slice::from_ref(chapter), c.page_length)
+            .map_err(|_| CandidateError::InvalidData)?;
+        let index = pages
+            .page_at(ReadingPosition {
+                source_id: c.departing_position.source_id,
+                chapter_id: c.departing_position.chapter_id,
+                offset: c.departing_position.offset,
+            })
+            .map_err(|_| CandidateError::InvalidData)?;
+        require(
+            pages.pages()[index]
+                == TextAnchor {
+                    source_id: c.page.source_id,
+                    chapter_id: c.page.chapter_id,
+                    range: TextRange {
+                        start: c.page.range.start,
+                        end: c.page.range.end,
+                    },
+                },
+        )?;
+    }
+    check_cancelled(cancelled)?;
+    let mut checked_headers = BTreeMap::new();
+    let mut previous_end = 0;
+    let mut tokens = connection.prepare(
+        "SELECT start_byte, end_byte, surface, is_japanese, reading, dictionary_form
+         FROM main.analyzed_tokens WHERE analysis_id = ?1 AND token_index = ?2",
+    )?;
+    for segment in &segmentation.segments {
+        check_cancelled(cancelled)?;
+        let boundary = &segment.boundary;
+        let start = i64::from(boundary.anchor.range.start);
+        let end = i64::from(boundary.anchor.range.end);
+        if let Some(canonical) = &canonical {
+            require(super::analyses::slice(canonical, start, end)? == boundary.surface)?;
+            require(
+                super::analyses::slice(canonical, previous_end, start)?
+                    .chars()
+                    .all(char::is_whitespace),
+            )?;
+        }
+        previous_end = end;
+        let Some(metadata) = &segment.metadata else {
+            continue;
+        };
+        let id = i64::from(metadata.analysis_id);
+        let exists = if let Some(exists) = checked_headers.get(&id) {
+            *exists
+        } else {
+            let exists = check_analysis_header(
+                connection,
+                metadata.analysis_id,
+                metadata.mode,
+                c.page.chapter_id,
+                &segmentation.profile,
+                live,
+            )?;
+            checked_headers.insert(id, exists);
+            exists
+        };
+        if exists {
+            let matches = tokens
+                .query_row((id, metadata.token_index as i64), |row| {
+                    Ok(row.get::<_, i64>(0)? == start
+                        && row.get::<_, i64>(1)? == end
+                        && row.get::<_, String>(2)? == boundary.surface
+                        && row.get::<_, bool>(3)? == metadata.is_japanese
+                        && row.get::<_, Option<String>>(4)? == metadata.reading
+                        && row.get::<_, Option<String>>(5)? == metadata.dictionary_form)
+                })
+                .optional()?;
+            require(matches == Some(true))?;
+        }
+    }
+    if let Some(canonical) = &canonical {
+        require(
+            super::analyses::slice(canonical, previous_end, canonical.len() as i64)?
+                .chars()
+                .all(char::is_whitespace),
+        )?;
+    }
+    Ok(())
+}
+
+fn check_analysis_header(
+    connection: &Connection,
+    id: AnalysisId,
+    mode: SplitMode,
+    chapter: ChapterId,
+    profile: &Profile,
+    required: bool,
+) -> Result<bool, CandidateError> {
+    let mode = match mode {
+        SplitMode::A => "a",
+        SplitMode::B => "b",
+        SplitMode::C => "c",
+    };
+    let matches = connection
+        .query_row(
+            "SELECT chapter_id, engine_revision, dictionary_revision, split_mode
+             FROM main.chapter_analyses WHERE id = ?1",
+            [i64::from(id)],
+            |row| {
+                Ok(row.get::<_, i64>(0)? == i64::from(chapter)
+                    && row.get::<_, String>(1)? == profile.engine_revision
+                    && row.get::<_, String>(2)? == profile.dictionary_revision
+                    && row.get::<_, String>(3)? == mode)
+            },
+        )
+        .optional()?;
+    require(matches == Some(true) || !required && matches.is_none())?;
+    Ok(matches.is_some())
 }
 
 fn check_receipt(

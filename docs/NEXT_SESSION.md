@@ -1,10 +1,7 @@
 # Resume here
 Updated: 2026-11-02. First MVP excludes Nostr and Known forms statistics.
-Commit guidance: concise subject/explanatory body; keep verification in docs.
 
 ## User checkpoints
-- Announce when no slice steps remain; ask about product ambiguities. Recommend
-  physical testing when it provides more value than the next implementation step.
 - User's phone trial was acceptable; detailed matrix remains unchecked. Recommend
   a schema-24 phone upgrade retaining Library/history and disposable real Anki
   collection/permission/browser/Back trial now. Rebuild release only if requested.
@@ -38,14 +35,17 @@ Commit guidance: concise subject/explanatory body; keep verification in docs.
   projection/issued-ID bounds and receipts/headers/surviving encounters. No live
   command construction. Preserve unfinished reservations, old rules and erased
   content/vocabulary without replay. Saved segments can omit whitespace gaps.
-- Opaque SchemaCheckedBackup exposes versions/discard ONLY. Format records/hashes/
-  annotations, frozen text/page/analysis and other historical anchor/status checks
-  remain incomplete: RESTORE_VALIDATION.md inventories precise continuation points.
-  Cannot reconstruct erased high-water history. No confirmation/restore authority.
+- Retained analyses now validate exact coverage/indices/metadata against text;
+  frozen effective records match live text, pages from their saved preset and exact
+  original B/alternate A/C headers/tokens. Legacy absence/deleted history survives.
+- Opaque SchemaCheckedBackup exposes versions/discard ONLY. Format/hash/annotation/
+  asset, override provenance and history/status checks remain: RESTORE_VALIDATION.md.
+  Cannot reconstruct erased history. No confirmation/restore authority.
 - Fixed-file/SQLite-sidecar cleanup preserves unexpected files; explicit discard
   reports errors, Drop/error/cancel best effort. Crash cleanup remains undone.
-  Cancellation between calls/rows/segments, not inside SQL/JSON/KDF/sync; no total
-  resource budget. Runtime drain/gating, secrets/descriptors/UI/activation undone.
+  Cancellation between calls/rows/segments, not inside SQL/JSON/KDF/pagination/sync;
+  one-chapter page derivation, no total resource budget. Runtime drain/gating,
+  secrets/descriptors/UI/activation undone.
 
 ## Existing Anki boundary
 - Ready acknowledged configured deck + retained regular-deck discovery required.
@@ -57,24 +57,23 @@ Commit guidance: concise subject/explanatory body; keep verification in docs.
   late work. No return/recreation replay. Architecture/data/API/decisions have detail.
 
 ## Next tasks (ordered)
-1. Continue RESTORE_VALIDATION.md: analysis coverage and surviving effective text/
-   page/analysis associations; format/hash/annotation and other history/status
-   groups also remain before restore-ready. No confirmation/replacement authority.
+1. Continue RESTORE_VALIDATION.md: format/hash/annotation/asset and override
+   provenance groups, then other historical page/anchor/status chains before
+   restore-ready. No confirmation/replacement authority.
 2. Runtime export sequencing/checkpoint drain/mutation gating and private staging
    crash cleanup; design nonserialized secret handoff before FFI/UI.
 3. Real phone schema-24 upgrade and disposable Anki collection/permission/browser/
    Back/lifecycle trial. Anki umbrella remains unchecked pending this validation.
 
 ## Verification / blockers
-- PASS: 10 new/47 candidate cases; 1096 workspace tests/17 opt-in ignored,
+- PASS: 12 new/59 candidate cases; 1108 workspace tests/17 opt-in ignored,
   all-feature build, strict Clippy/Rustfmt, both Android storage builds, links/diff.
-- Commands/logs: DEVELOPMENT.md, Restore candidate canonical text and live anchors.
-  Checks offline; no failed checks, blockers or remaining
-  implementation/verification steps for this slice. No APK/lint/JNI/codegen/emulator/
-  release/phone/resource trial run.
+- Commands/logs: DEVELOPMENT.md, Restore candidate analyses and frozen associations.
+  Offline; initial test-module path typo fixed, no outstanding failures/blockers
+  or slice steps. No APK/lint/JNI/codegen/emulator/release/phone/resource trial run.
 
 ## Latest release checkpoint
 - Source 0ddb81d: `target/releases/yomoku-0.1.0-0ddb81d-release.apk` (~242.3 MiB).
 - Optimized ABIs/lint/signature/16-KiB alignment/assets verified; same certificate
-  as earlier 0374365 phone APK. Checksum beside APK. No publishing/runtime trial;
-  browser/backup changes absent. DEVELOPMENT.md has the release log.
+  as 0374365. Checksum beside APK. No publishing/runtime trial; browser/backup
+  changes absent. DEVELOPMENT.md has the release log.
