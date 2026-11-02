@@ -88,7 +88,7 @@ internal fun YomokuApp(
             (view.vocabulary.selectingAll ||
                 view.vocabulary.confirmation != null ||
                 view.vocabulary.bulkError != null)
-    val showNavigation = !view.settingsOpen && mainContent
+    val showNavigation = mainContent
     BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
         val useRail = maxWidth >= 600.dp
         Scaffold(
@@ -121,16 +121,6 @@ internal fun YomokuApp(
                             }
                         }
                     },
-                    actions = {
-                        if (!view.settingsOpen) {
-                            TextButton(
-                                onClick = { dispatch(Event.OpenSettings) },
-                                enabled = !vocabularyLocked,
-                            ) {
-                                Text(stringResource(R.string.settings_title))
-                            }
-                        }
-                    },
                 )
             },
             bottomBar = {
@@ -139,12 +129,20 @@ internal fun YomokuApp(
                         for (destination in navigationDestinations) {
                             NavigationBarItem(
                                 enabled = !vocabularyLocked,
-                                selected = view.destination == destination,
+                                selected = !view.settingsOpen && view.destination == destination,
                                 onClick = { dispatch(Event.SelectDestination(destination)) },
                                 icon = { DestinationIcon(destination) },
                                 label = { Text(stringResource(destination.titleResource())) },
                             )
                         }
+                        NavigationBarItem(
+                            enabled = !vocabularyLocked,
+                            selected = view.settingsOpen,
+                            onClick = { dispatch(Event.OpenSettings) },
+                            icon = { SettingsIcon() },
+                            label = { Text(stringResource(R.string.settings_title)) },
+                            modifier = Modifier.testTag("navigation_settings"),
+                        )
                     }
                 }
             },
@@ -160,12 +158,20 @@ internal fun YomokuApp(
                         for (destination in navigationDestinations) {
                             NavigationRailItem(
                                 enabled = !vocabularyLocked,
-                                selected = view.destination == destination,
+                                selected = !view.settingsOpen && view.destination == destination,
                                 onClick = { dispatch(Event.SelectDestination(destination)) },
                                 icon = { DestinationIcon(destination) },
                                 label = { Text(stringResource(destination.titleResource())) },
                             )
                         }
+                        NavigationRailItem(
+                            enabled = !vocabularyLocked,
+                            selected = view.settingsOpen,
+                            onClick = { dispatch(Event.OpenSettings) },
+                            icon = { SettingsIcon() },
+                            label = { Text(stringResource(R.string.settings_title)) },
+                            modifier = Modifier.testTag("navigation_settings"),
+                        )
                     }
                 }
                 Box(
@@ -240,6 +246,11 @@ internal fun ReaderCompletionToast(
             if (notice.newlyKnown > 0UL) show(message)
         }
     }
+}
+
+@Composable
+private fun SettingsIcon() {
+    Icon(painterResource(R.drawable.ic_settings), contentDescription = null)
 }
 
 @Composable

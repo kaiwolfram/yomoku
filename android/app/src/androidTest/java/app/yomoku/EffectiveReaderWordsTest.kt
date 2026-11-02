@@ -237,8 +237,7 @@ class EffectiveReaderWordsTest {
         val before = events.size
         compose.waitForIdle()
         assertEquals(before, events.size)
-        click("word_anki_settings")
-        assertEquals(Event.OpenSettings, events.last())
+        compose.onNodeWithTag("word_anki_settings").assertDoesNotExist()
         assertTrue(
             events.none { it is Event.SetEffectiveReaderStatus || it is Event.SetReaderStatus }
         )

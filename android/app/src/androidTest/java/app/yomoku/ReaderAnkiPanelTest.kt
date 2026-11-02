@@ -82,12 +82,9 @@ class ReaderAnkiPanelTest {
         }
         compose.runOnUiThread { enabled.value = false }
         compose.onNodeWithTag("word_anki_add").assertIsNotEnabled()
-        compose.onNodeWithTag("word_anki_settings").assertIsNotEnabled()
-        compose.runOnUiThread { enabled.value = true }
-        click("word_anki_settings")
-        assertEquals(Event.OpenSettings, events.last())
-        assertEquals(3, interactions)
-        assertEquals(3, events.size)
+        compose.onNodeWithTag("word_anki_settings").assertDoesNotExist()
+        assertEquals(2, interactions)
+        assertEquals(2, events.size)
     }
 
     @Test
@@ -118,12 +115,10 @@ class ReaderAnkiPanelTest {
         for (value in observations) {
             compose.runOnUiThread { discovery.value = value }
             compose.onNodeWithTag("word_anki_add").assertDoesNotExist()
-            compose.onNodeWithTag("word_anki_settings").assertExists()
+            compose.onNodeWithTag("word_anki_settings").assertDoesNotExist()
         }
         assertTrue(events.isEmpty())
         assertEquals(0, interactions)
-        click("word_anki_settings")
-        assertEquals(listOf(Event.OpenSettings), events)
     }
 
     @Test
@@ -152,10 +147,9 @@ class ReaderAnkiPanelTest {
         }
         compose.onNodeWithTag("anki_export_begin").assertDoesNotExist()
         compose.onNodeWithTag("anki_export_check").assertDoesNotExist()
-        click("word_anki_settings")
-        assertEquals(Event.OpenSettings, events.last())
+        compose.onNodeWithTag("word_anki_settings").assertDoesNotExist()
         click("anki_export_dismiss")
         assertEquals(Event.ClearAnkiExport(42UL), events.last())
-        assertEquals(5, events.size)
+        assertEquals(4, events.size)
     }
 }

@@ -2,6 +2,7 @@ package app.yomoku
 
 import android.database.sqlite.SQLiteDatabase
 import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsSelected
@@ -50,6 +51,23 @@ class PasteReaderTest {
         assertEquals(0f, range.value(), 0f)
     }
 
+    private fun assertReaderText(expected: String) {
+        // Long pages render as several bounded text blocks.
+        val fragments =
+            compose
+                .onAllNodes(
+                    SemanticsMatcher("reader text blocks") {
+                        val tag = it.config.getOrElse(SemanticsProperties.TestTag) { "" }
+                        tag == "reader_text" || tag.startsWith("reader_text_block_")
+                    }
+                )
+                .fetchSemanticsNodes()
+        assertEquals(
+            expected,
+            fragments.joinToString("") { it.config[SemanticsProperties.Text].single().text },
+        )
+    }
+
     private fun awaitDictionaryMapping(expected: Boolean) {
         val deadline = System.nanoTime() + 30_000_000_000L
         while (File("/proc/self/maps").readText().contains("/sudachi/full-") != expected) {
@@ -58,6 +76,7 @@ class PasteReaderTest {
         }
     }
 
+    // Exercise native Settings transitions directly where reader UI no longer exposes them.
     @Test
     fun readerClockPausesInBackgroundAndRetainsDurationsThroughRecreation() {
         awaitStorage()
@@ -95,7 +114,7 @@ class PasteReaderTest {
         compose.activityRule.scenario.recreate()
         assertSame(retained, core())
         Thread.sleep(150)
-        compose.onNodeWithText("Settings").performClick()
+        compose.runOnUiThread { core().dispatch(Event.OpenSettings) }
         awaitStorage()
         val after = core().view.readerTime!!.pending.value
         assertTrue(after >= paused + 150L)
@@ -133,7 +152,7 @@ class PasteReaderTest {
                     "CREATE TRIGGER fail_clock_save BEFORE UPDATE ON pending_reading_time BEGIN SELECT RAISE(ABORT, 'test save'); END"
                 )
                 Thread.sleep(100)
-                compose.onNodeWithText("Settings").performClick()
+                compose.runOnUiThread { core().dispatch(Event.OpenSettings) }
                 compose.waitUntil(30_000) {
                     !core().view.storageBusy && core().view.documentError != null
                 }
@@ -191,7 +210,7 @@ class PasteReaderTest {
             val progress = core().view.documents.single { it.documentId == id }.progressPercent
             assertEquals(1UL, core().view.reader!!.pageNumber)
             compose.onNodeWithTag("page_counter").performScrollTo()
-            compose.onNodeWithText("Settings").performClick()
+            compose.runOnUiThread { core().dispatch(Event.OpenSettings) }
             compose.onNodeWithTag("page_length_250").performScrollTo().performClick()
             awaitStorage()
             compose.onNodeWithTag("page_length_250").assertIsSelected()
@@ -203,13 +222,13 @@ class PasteReaderTest {
             compose.onNodeWithTag("reader_text").assertTextEquals(paragraph)
             assertReaderAtTop()
 
-            compose.onNodeWithText("Settings").performClick()
+            compose.runOnUiThread { core().dispatch(Event.OpenSettings) }
             compose.onNodeWithTag("page_length_1500").performScrollTo().performClick()
             awaitStorage()
             compose.onNodeWithText("Back").performClick()
             assertEquals(position, core().view.reader!!.position)
             assertEquals(1UL, core().view.reader!!.pageNumber)
-            compose.onNodeWithTag("reader_text").assertTextEquals("$title\n" + paragraph.repeat(6))
+            assertReaderText("$title\n" + paragraph.repeat(6))
             assertReaderAtTop()
             assertEquals(
                 progress,
@@ -255,7 +274,7 @@ class PasteReaderTest {
             start.copy(offset = TextOffset(first.toByteArray(Charsets.UTF_8).size.toLong() + 3))
         compose.runOnUiThread { core().dispatch(Event.SaveReadingPosition(position)) }
         awaitStorage()
-        compose.onNodeWithTag("reader_text").assertTextEquals(second)
+        assertReaderText(second)
         assertReaderAtTop()
         val percent = core().view.documents.single { it.documentId == id }.progressPercent
         compose.onNodeWithText("Back").performClick()
@@ -272,7 +291,7 @@ class PasteReaderTest {
         assertReaderAtTop()
         compose.runOnUiThread { core().dispatch(Event.SaveReadingPosition(start)) }
         awaitStorage()
-        compose.onNodeWithTag("reader_text").assertTextEquals(first)
+        assertReaderText(first)
         assertReaderAtTop()
         compose.onNodeWithText("Back").performClick()
         compose.onNodeWithTag("library_documents").performScrollToKey(id.value)
@@ -290,9 +309,9 @@ class PasteReaderTest {
         compose.onNodeWithText("Save to Library").assertIsNotEnabled()
         compose.onNodeWithTag("paste_text").performTextReplacement(text)
 
-        // Retain an unsaved draft through Settings and Activity recreation.
-        compose.onNodeWithText("Settings").performClick()
-        compose.onNodeWithText("Back").performClick()
+        // Pasting has no Settings shortcut; retain the draft across recreation.
+        compose.onNodeWithText("Settings").assertDoesNotExist()
+        compose.onNodeWithTag("navigation_settings").assertDoesNotExist()
         compose.activityRule.scenario.recreate()
         compose.onNodeWithTag("paste_text").assertTextEquals("Text to import", text)
 
@@ -356,8 +375,8 @@ class PasteReaderTest {
         compose.activityRule.scenario.recreate()
         compose.onNodeWithTag("reader_text").assertTextEquals(firstPage)
         compose.runOnUiThread { assertNotNull(core().view.reader) }
-        compose.onNodeWithText("Settings").performClick()
-        compose.onNodeWithText("Back").performClick()
+        compose.onNodeWithText("Settings").assertDoesNotExist()
+        compose.onNodeWithTag("navigation_settings").assertDoesNotExist()
         compose.onNodeWithTag("screen_title").assertTextEquals(title)
         compose.waitForIdle()
         compose.runOnUiThread { compose.activity.onBackPressedDispatcher.onBackPressed() }

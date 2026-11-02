@@ -54,7 +54,7 @@ internal fun ReaderAnkiPanel(
                 Text(stringResource(R.string.anki_export_add))
             }
             // Preparation is synchronous and performs no I/O. A rejected selection/gate grants
-            // no export projection; leave configuration/recovery reachable without retrying.
+            // no export projection; explain the rejection without retrying.
             if (attempted) {
                 Text(
                     stringResource(R.string.word_anki_not_prepared),
@@ -64,12 +64,5 @@ internal fun ReaderAnkiPanel(
         } else {
             Text(stringResource(R.string.word_anki_setup), Modifier.testTag("word_anki_setup"))
         }
-    }
-    TextButton(
-        onClick = { interact(Event.OpenSettings) },
-        enabled = enabled,
-        modifier = Modifier.testTag("word_anki_settings"),
-    ) {
-        Text(stringResource(R.string.word_anki_settings))
     }
 }

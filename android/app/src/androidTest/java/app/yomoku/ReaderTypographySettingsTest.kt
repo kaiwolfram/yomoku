@@ -68,6 +68,17 @@ class ReaderTypographySettingsTest {
         return result.single()
     }
 
+    private fun readerLayouts(): List<TextLayoutResult> =
+        compose
+            .onAllNodes(
+                SemanticsMatcher("reader text blocks") {
+                    val tag = it.config.getOrElse(SemanticsProperties.TestTag) { "" }
+                    tag == "reader_text" || tag.startsWith("reader_text_block_")
+                }
+            )
+            .fetchSemanticsNodes()
+            .map { layout(it.config[SemanticsProperties.TestTag]) }
+
     @Test
     fun controlsCommitRetryPreserveExactOffsetAndPersistAcrossRecreationAndDocuments() {
         awaitSaved()
@@ -90,9 +101,9 @@ class ReaderTypographySettingsTest {
             compose.runOnUiThread { core().dispatch(Event.SaveReadingPosition(position)) }
             awaitReader()
             val page = core().view.reader!!
-            val oldLines = layout("reader_text").lineCount
+            val oldLines = readerLayouts().sumOf { it.lineCount }
             val tokens = core().view.effectiveReaderTokens
-            compose.onNodeWithText("Settings").performClick()
+            compose.runOnUiThread { core().dispatch(Event.OpenSettings) }
             awaitSaved()
             val database = File(compose.activity.filesDir, "yomoku.sqlite3")
             SQLiteDatabase.openDatabase(database.path, null, SQLiteDatabase.OPEN_READWRITE).use { db
@@ -130,12 +141,14 @@ class ReaderTypographySettingsTest {
             awaitReader()
             assertEquals(page, core().view.reader)
             assertEquals(tokens, core().view.effectiveReaderTokens)
-            val layout = layout("reader_text")
-            assertEquals(20.sp, layout.layoutInput.style.fontSize)
-            assertTrue(layout.layoutInput.style.lineHeight.value >= 35f)
-            assertEquals(page.text, layout.layoutInput.text.text)
-            assertTrue(layout.lineCount > oldLines)
-            assertFalse(layout.didOverflowWidth)
+            val layouts = readerLayouts()
+            assertEquals(page.text, layouts.joinToString("") { it.layoutInput.text.text })
+            assertTrue(layouts.sumOf { it.lineCount } > oldLines)
+            for (layout in layouts) {
+                assertEquals(20.sp, layout.layoutInput.style.fontSize)
+                assertTrue(layout.layoutInput.style.lineHeight.value >= 35f)
+                assertFalse(layout.didOverflowWidth)
+            }
             compose.activityRule.scenario.recreate()
             awaitReader()
             assertEquals(page, core().view.reader)

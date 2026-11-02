@@ -299,7 +299,7 @@ class AnkiExportSessionTest {
                 .performScrollTo()
                 .assertTextEquals("AnkiDroid is unavailable.")
             compose.onNodeWithTag("anki_export_begin").assertDoesNotExist()
-            compose.onNodeWithTag("word_anki_settings").assertExists()
+            compose.onNodeWithTag("word_anki_settings").assertDoesNotExist()
             preflightFailure = null
             duplicates = listOf(Long.MAX_VALUE, 9007199254740993L)
             click("anki_export_check")
