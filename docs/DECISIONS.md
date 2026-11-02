@@ -5309,3 +5309,28 @@ This closes the retained-analysis and frozen text/page/analysis associations onl
 Format/hash/annotation/asset, override provenance and other history/status groups
 still precede restore-ready authority. No schema/dependency/core/runtime/FFI/
 Android changes or replacement permission is introduced.
+
+## 2026-11-02 — Restore file identity and text annotations
+
+Continue semantic preflight with exact SHA-256 over canonical paste bytes and
+original file BLOBs. Require one file record for each live TXT/SRT/EPUB, matching
+format/encoding and EPUB-header ownership; forbid file records on pastes and
+EPUB headers on other kinds. Preserve optional lazy paste hashes, duplicate
+legacy pastes, renamed titles, exact originals and deleted-file provenance.
+
+Use existing pure TXT/SRT adapters with the saved explicit encoding to derive
+expected text/complete ruby or cue lists, then compare without repository imports,
+dedup, analysis, new IDs or repairs. This validates the current deterministic
+adapter contracts; future parser changes must preserve previously saved text and
+annotations. All source ruby also uses the existing ordered scalar-range/nonempty
+UTF-8 reading contract, including literal whitespace/NUL readings for EPUB. Do not
+impose vocabulary reading restrictions on source annotations. EPUB chapter/ruby
+counts, metadata/assets/text hashes/spans/images remain separate semantic work;
+do not extract the container or resolve external references here.
+
+Apply each supported prefix before and after migration. Hash borrowed row bytes
+in 1-MiB chunks with cancellation polls. Text derivation owns one decoded file and
+annotation vectors; poll around synchronous decode/parse and between rows, without
+claiming a total resource budget or real-device measurements. No schema, dependency,
+core/runtime/FFI/Android or destructive-semantic change; opaque schema results
+still grant no confirmation/replacement authority.

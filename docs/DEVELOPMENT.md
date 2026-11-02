@@ -9597,3 +9597,64 @@ recommend it while independent local backup work continues. No APK rebuild reque
 
 Logs: `/tmp/yomoku-candidate-analyses-{initial,new,focused,final,workspace,build,clippy,android}.log`.
 Formatting/local-link/diff checks are in the session transcript.
+
+## Restore candidate file identity and text annotations
+
+2026-11-02: added storage-only exact SHA-256 checks for canonical paste bytes and
+original file BLOBs, required format/encoding/EPUB-header ownership, pure TXT/SRT
+text/complete-annotation derivation using saved explicit encodings, and every
+source ruby's existing ordered scalar-range/UTF-8 reading domains. Preserve lazy
+legacy paste hashes/duplicates, exact originals, renamed titles, literal Unicode/
+NULs/line endings, explicit ambiguous encodings and deleted-file provenance.
+No repository imports, dedup, analyzer, identity allocation, repair, EPUB extraction,
+external resolution or restore authority. No schema/dependency/core/runtime/FFI/
+Android source changes.
+
+```sh
+cargo test -p yomoku-storage --locked --offline backup_candidate_formats -- --nocapture
+cargo test --workspace --all-features --locked --offline --quiet
+cargo build --workspace --all-features --locked --offline
+cargo clippy --workspace --all-targets --all-features --locked --offline -- -D warnings
+export CC_aarch64_linux_android=/home/kai/Android/Sdk/ndk/30.0.16248370/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android29-clang
+export AR_aarch64_linux_android=/home/kai/Android/Sdk/ndk/30.0.16248370/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-ar
+export CC_x86_64_linux_android=/home/kai/Android/Sdk/ndk/30.0.16248370/toolchains/llvm/prebuilt/linux-x86_64/bin/x86_64-linux-android29-clang
+export AR_x86_64_linux_android=/home/kai/Android/Sdk/ndk/30.0.16248370/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-ar
+cargo build -p yomoku-storage --target aarch64-linux-android --target x86_64-linux-android --locked --offline
+cargo fmt --all -- --check
+git diff --check
+```
+
+PASS: nine new cases/all 68 candidate cases included in 1117 workspace tests,
+zero failures, 17 existing opt-in ignored. Populated prefixes 8–24 compare every
+durable table/schema/high-water mark against a trusted migrated copy; originals
+stay byte-for-byte unchanged. Cases reject wrong digests/ownership/encoding,
+missing required files/EPUB headers, rehashed undecodable or different text,
+missing/extra/changed/foreign ruby/cues, invalid UTF-8 readings, overlaps and
+mid-scalar/out-of-range anchors. Preserve selected Shift-JIS including ambiguous
+ASCII, source ruby whitespace/NUL readings permitted by existing EPUB contracts,
+renames and deleted TXT/SRT/EPUB provenance. Every populated schema-13/current
+pre/post-migration poll cancels and cleans private staging, including multiple
+1-MiB hash chunks. Existing encrypted full-state/history fixtures also pass.
+Focused run: 41.20 seconds. Final all-feature workspace storage suite: 147.05
+seconds; exhaustive cancellation cases emit the standard over-60-seconds notices.
+
+All-feature build, strict workspace Clippy, Rustfmt, both Android storage library
+targets, local Markdown file targets and diff pass offline. Initial test-only
+fixture module path corrected; no outstanding failures/blockers. Updated semantic
+inventory, format/architecture/data/decisions/plan/handoff and session log.
+No APK/lint/JNI/codegen/emulator/release/physical-phone/resource trial was run.
+
+No implementation/verification steps remain for this bounded slice. EPUB metadata/
+assets/chapter hashes/spans/images, override provenance and historical page/anchor/
+status chains remain before restore-ready authority. Runtime drain/gating/crash
+cleanup, secret handoff/UI and atomic replacement remain separate work. Hashing
+borrows rows; text derivation owns one decoded file and annotation vectors, with
+cancellation around synchronous decode/parse and between rows/chunks, no total
+resource budget. Future adapter changes must preserve compatibility with saved
+text/annotations. A schema-24 phone upgrade retaining Library/history and a
+disposable real Anki collection/permission/browser/Back trial would provide more
+integration evidence than the next host-only validator; recommend it now while
+independent local backup work continues. No APK rebuild requested.
+
+Logs: `/tmp/yomoku-candidate-formats-{new,workspace,build,clippy,android}.log`.
+Formatting/local-file-target/diff checks are in the session transcript.

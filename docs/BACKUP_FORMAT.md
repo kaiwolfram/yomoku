@@ -303,24 +303,34 @@ text, deleted-source text absence and representable document byte totals. Saved
 positions and every pending-time anchor validate document/source ownership and
 scalar boundaries/range, including EOF. Preserve empty original titles, legacy
 missing positions, exact canonical bytes and zero-time/max-revision tombstones.
-Run before/after private migration without format parsing, writes or repair.
+These ownership/anchor checks run before/after private migration without format
+parsing, writes or repair.
 Retained analyses now pass borrowed-row coverage/index/scalar/surface/profile and
 metadata domains from the existing analysis contract. Preserve whitespace gaps,
 explicit legacy absence and retained classification without analyzer reruns.
-Format-specific record presence/hash/annotation/asset, override provenance and
-other history relations remain separate unchecked groups.
+Exact paste/file SHA-256 now matches canonical/original bytes respectively, with
+required file/encoding/EPUB-header format ownership. Pure TXT/SRT adapters derive
+exact canonical text and complete annotations using the saved explicit encoding;
+all ruby rows pass existing format/index/scalar/reading domains. Preserve lazy
+legacy paste hashes, duplicate pastes, exact originals, renamed titles and deleted
+file provenance without repository imports, new IDs, analysis or EPUB extraction.
+EPUB metadata/assets/chapter hashes/spans/images, override provenance and other
+history relations remain separate unchecked groups.
 
 The opaque `SchemaCheckedBackup` exposes only schema versions and discard. It has
 no SQL/path/reader/confirmation/activation API. **Other application invariants
-remain unchecked**, including format records, override provenance, other historical
-page/anchor relations and history consistency. [RESTORE_VALIDATION.md](RESTORE_VALIDATION.md)
+remain unchecked**, including EPUB metadata/assets/format associations, override
+provenance, other historical page/anchor relations and history consistency.
+[RESTORE_VALIDATION.md](RESTORE_VALIDATION.md)
 inventories checked/remaining table groups and limits, including unverifiable
 erased allocation history. Do not pass this result to replacement confirmation
 or ordinary `Storage::open`. Further validation is required before a restore-ready
 handle. Both Anki journals survive unchanged without mutation permits.
-Cancellation polls between synchronous operations/rows and around frozen page
-derivation, not inside SQL/JSON/UTF-8 scans/pagination/sync. Frozen page checks own
-one chapter and its page ranges; there is no total resource budget.
+Cancellation polls between synchronous operations/rows, 1-MiB hash chunks and
+around text decoding/parsing and frozen page derivation, not inside SQL/JSON/
+UTF-8 scans/decoding/parsing/pagination/sync. Text derivation owns one file and
+annotation vectors; frozen page checks own one chapter and its page ranges.
+There is no total resource budget.
 
 API/security evidence: [SQLite untrusted-input guidance](https://www.sqlite.org/security.html),
 [connection configuration](https://www.sqlite.org/c3ref/c_dbconfig_defensive.html),

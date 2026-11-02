@@ -54,9 +54,14 @@ coverage/index/metadata checks. Frozen effective records match surviving chapter
 text, logical pages derived with their own preset/position and exact original B/
 alternate A/C headers/tokens. Missing analyses remain valid for legacy/deleted
 content; old rules are never resolved again. Page derivation owns one chapter,
-without whole-book loading or analyzer work. Format metadata/hash/annotation,
-override provenance and status-event/final-status/history checks
-remain incomplete and are inventoried in
+without whole-book loading or analyzer work. Exact paste/original-file hashes and
+required format/encoding/EPUB-header ownership now pass checks. Pure TXT/SRT
+adapters derive exact text and complete annotation lists with the saved encoding;
+all ruby domains/anchors use existing repository semantics. No import/ID allocation
+or EPUB extraction runs. Hashing borrows rows and polls between 1-MiB chunks;
+text derivation owns one decoded file/annotation list and polls around parsing.
+EPUB metadata/assets/spans/images, override provenance and status-event/final-status/
+history checks remain incomplete and are inventoried in
 [RESTORE_VALIDATION.md](RESTORE_VALIDATION.md). Cleanup shares the
 snapshot's fixed-file lifecycle, now also removing known SQLite sidecars, without
 recursive deletion. See BACKUP_FORMAT.md for exact checks and resource limits.

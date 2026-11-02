@@ -23,6 +23,10 @@ type can exist. Do not invent stricter product rules while filling these gaps.
 - [x] Validate every retained analysis against exact canonical text and check
   frozen effective text/page/original and alternate analysis associations before
   and after private migration. Preserve legacy absence/deleted-content history.
+- [x] Validate exact paste/file hashes, required file/EPUB-header format ownership,
+  TXT/SRT canonical text and complete annotations against saved original bytes,
+  plus all ruby domains before/after migration. EPUB asset/chapter/span/image
+  associations remain below; preserve legacy optional paste hashes/deleted files.
 - [ ] Validate every remaining group below, including cross-group relations and
   legacy/deleted-content cases; only then design an opaque restore-ready result.
 
@@ -111,8 +115,8 @@ provenance. Do not infer finish history from EOF or sum pending durations across
 unrelated pages. Poll cancellation between sources/chapters/position/time rows;
 SQL/UTF-8 validation remains synchronous. No normalization, identity allocation or repair.
 
-Format-specific record presence/ownership, original-byte/hash/annotation/asset
-relations and other historical page/anchor associations remain unchecked below.
+Format identity and TXT/SRT annotations are implemented below; EPUB metadata/
+asset relations and other historical page/anchor associations remain unchecked.
 These live checks do not complete those groups or grant restore authority.
 
 ## Implemented analysis and frozen effective associations
@@ -141,14 +145,39 @@ derivation owns one chapter and its page ranges at a time. Cancellation polls be
 headers/tokens/records/segments and around page derivation, not inside SQL/JSON/UTF-8
 scans or pagination; no total resource budget or real-device resource claim. These
 checks do not validate override provenance, historical completion/status chains or
-erase the separate format/annotation groups. The result still grants no restore authority.
+the separate EPUB groups. The result still grants no restore authority.
+
+## Implemented file identity and text annotations
+
+| Tables | Checks beyond schema/integrity/FKs |
+| --- | --- |
+| `paste_content_hashes` | Only live paste owners; SHA-256 matches exact canonical UTF-8 bytes. Legacy absence and duplicate paste documents remain valid; no lazy indexing during validation. |
+| `imported_files` | Required for every live TXT/SRT/EPUB, absent for paste; SHA-256 matches exact original BLOB; saved UTF-8/Shift-JIS encoding for TXT/SRT, `epub` only for EPUB. Live EPUB also requires its own `epub_documents` header, forbidden on other formats. Deleted sources need no file/header records. |
+| TXT `chapter_texts`/`source_ruby` | Existing pure TXT adapter with the saved explicit encoding derives exact canonical text and the complete indexed ruby list; compare every range/reading with no writes or new identities. |
+| SRT `chapter_texts`/`subtitle_cues` | Existing strict decoder/tolerant SRT adapter with saved encoding derives exact canonical text and complete indexed cue ranges. Reject missing/extra/foreign cues, retaining the existing format/whitespace/UTF-8 contract. |
+| All `source_ruby` | Only TXT/EPUB chapters; contiguous zero-based indices, ordered nonempty scalar ranges in retained canonical text and nonempty UTF-8 readings using existing `validate_ruby` semantics. Literal whitespace/NUL readings remain valid for EPUB; EPUB chapter/ruby count associations remain below. |
+
+Applicable prefixes from schema 8/12/13/14 run before and after migration. Preserve
+exact originals, BOMs, hard breaks, literal Unicode/NULs, explicit ambiguous encoding
+choices, renamed titles, duplicate legacy pastes and deleted-file provenance.
+Pure text derivation is validation only: no repository import, dedup, analyzer,
+identity allocation, repair or EPUB extraction/external URL resolution. These are
+the existing deterministic text-adapter contracts; future adapter changes must
+retain compatibility with previously saved canonical text/annotations.
+
+Hashes borrow SQLite BLOB/text rows and poll cancellation between 1-MiB chunks.
+TXT/SRT derivation owns one decoded file and its annotation vectors at a time;
+cancellation polls around synchronous decode/parse and between annotation rows,
+not inside SQL/UTF-8 scans/decoding/parsing. There is no total resource budget or
+real-device resource claim. EPUB container structure/size/metadata/assets/text
+hashes/spans/images and remaining historical chains still precede restore-ready
+authority. No candidate row is normalized, rewritten or replayed.
 
 ## Required remaining groups
 
 | Tables | Required semantic review/checks using existing contracts |
 | --- | --- |
-| `paste_content_hashes`, `imported_files` | Hashes versus exact canonical/original bytes, source-format/encoding/metadata ownership and required format record presence; preserve exact original bytes and legacy optional paste hashes. Validation must not reimport or allocate new identities. |
-| `source_ruby`, `subtitle_cues` | Contiguous indices, ordered UTF-8 ranges/reading domains and relation to source text and format. |
+| EPUB `source_ruby` associations | Domains/format/text anchors implemented above; match chapter ruby counts and EPUB metadata ownership with the remaining EPUB groups. |
 | `epub_documents`, `epub_assets`, `epub_chapters` | Counts, ownership, canonical paths/media/cover references, asset/text SHA-256 and existing size limits. No extraction or external URL resolution. |
 | `epub_spans`, `epub_inline_images` | Contiguous indices, UTF-8 anchors, kind/target/link policy and image placeholder/path/asset relations through the existing domain contracts. |
 | `segmentation_overrides`, `segmentation_override_parts` | Exact anchored surfaces, scope/provenance, ordered parts reconstructing the selection, domain split/merge constraints and active-rule consistency. Deleted originating text must not invalidate retained global rules. |

@@ -9,6 +9,7 @@ mod analyses;
 mod controls;
 mod documents;
 mod effective;
+mod formats;
 mod vocabulary;
 
 fn accept_unchanged(database: &TestDatabase, version: u32) {

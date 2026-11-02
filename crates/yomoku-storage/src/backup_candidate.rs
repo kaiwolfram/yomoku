@@ -16,6 +16,7 @@ mod analyses;
 mod controls;
 mod documents;
 mod effective;
+mod formats;
 mod vocabulary;
 
 /// Fixed diagnostics: never include candidate SQL, paths or user content.
@@ -97,7 +98,9 @@ impl BackupCandidate {
     /// entry domains, plus detached effective payloads and their receipts.
     /// Also checks canonical text ownership/order and saved position/time anchors.
     /// Validates retained analysis coverage and frozen effective text/page/analysis
-    /// associations. Format, rule provenance and other history checks are incomplete.
+    /// associations, exact paste/file hashes and format ownership, and TXT/SRT
+    /// text/annotations derived from saved bytes. EPUB metadata/assets, rule
+    /// provenance and other history checks are incomplete.
     /// Other application invariants are NOT yet validated: this cannot authorize
     /// confirmation, replacement, reads through Storage, or external Anki writes.
     /// Cancellation polls between synchronous calls, not inside SQL or sync.
@@ -159,8 +162,8 @@ impl Write for BackupCandidate {
 /// Structural preflight result only. Intentionally exposes neither a path nor a
 /// connection/reader nor activation/confirmation authority. Application-level
 /// validation beyond journals/control records/saved entries/detached effective
-/// records/canonical text/live anchors/analysis associations is required before
-/// restore-ready.
+/// records/canonical text/live anchors/analysis associations/file identity and
+/// TXT/SRT annotations is required before restore-ready.
 pub struct SchemaCheckedBackup {
     staging: StagingDirectory,
     original_schema: u32,
@@ -319,6 +322,7 @@ fn check_schema_and_data(
     controls::check(connection, &reference, version, cancelled)?;
     vocabulary::check(connection, version, cancelled)?;
     documents::check(connection, version, cancelled)?;
+    formats::check(connection, version, cancelled)?;
     analyses::check(connection, version, cancelled)?;
     effective::check(connection, version, cancelled)
 }

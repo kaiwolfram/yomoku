@@ -4509,3 +4509,21 @@ and /tmp/yomoku-browser-profile-*. No emulator started.
   assets and override provenance, then other historical anchor/status chains.
   Restore umbrellas remain unchecked. Recommend schema-24 phone upgrade retaining
   Library/history and disposable real Anki collection/permission/browser/Back trial.
+
+## 2026-11-02 — Restore file identity and text annotations
+
+- Added exact paste/original-file hashes and required format/encoding/EPUB-header
+  ownership, TXT/SRT text/complete ruby/cue comparisons using saved encodings,
+  and existing ruby domains/anchors before/after private migration. Preserve
+  optional lazy hashes, duplicates, exact originals, renames, explicit ambiguous
+  encodings and deleted-file provenance without imports/new IDs/replay/authority.
+- PASS: nine new/all 68 candidate cases, 1117 workspace tests/17 opt-in ignored,
+  all-feature build, strict Clippy/Rustfmt, both Android storage builds, local
+  Markdown file targets/diff. Initial test-only fixture path corrected; no open
+  failures/blockers. DEVELOPMENT.md records commands/logs/resource limits.
+  No APK/device/resource trial or schema/platform/dependency changes.
+- Updated inventory/format/architecture/data/decisions/plan/handoff. No remaining
+  implementation/verification steps for this slice. Next: EPUB metadata/assets/
+  chapter hashes/spans/images, override provenance and historical anchor/status
+  chains; restore umbrellas remain unchecked. Recommend schema-24 phone upgrade
+  preserving Library/history and disposable real Anki collection/browser/Back trial.

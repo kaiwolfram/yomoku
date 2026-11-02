@@ -2270,8 +2270,16 @@ gaps/tail and literal metadata/classification domains. Frozen effective records
 match surviving canonical bytes, logical pages derived from their frozen preset/
 position and exact original B/alternate A/C headers/tokens. Live text requires
 referenced analyses; legacy absence and erased-content history remain valid without
-reanalysis or current-rule resolution. Format records/hashes/annotations/assets,
-override provenance, other historical anchors and counter references remain
-unchecked. [RESTORE_VALIDATION.md](RESTORE_VALIDATION.md)
+reanalysis or current-rule resolution. Paste hashes now match exact canonical bytes;
+file hashes match exact original bytes, with required format/encoding/EPUB-header
+ownership. TXT/SRT canonical text and all annotations match existing pure adapters
+using the saved explicit encoding. All ruby rows validate their format, complete
+indices, ordered scalar ranges and literal nonempty UTF-8 readings. Optional
+legacy paste hashes, duplicate pastes, exact originals, renames and deleted-file
+provenance remain intact. Hashes borrow rows; text derivation owns one file and
+annotation vectors without repository imports, analysis, IDs or EPUB extraction.
+EPUB metadata/assets/chapter hashes/spans/images, override provenance, other
+historical anchors and counter references remain unchecked.
+[RESTORE_VALIDATION.md](RESTORE_VALIDATION.md)
 lists all current table groups and precise boundaries. No restore-ready authority
 or schema migration is added.
