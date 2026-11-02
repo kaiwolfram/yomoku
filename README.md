@@ -148,8 +148,7 @@ Cancel and completion summaries. Imports return to Library without opening a rea
 Planned v1 features include custom missing-word definitions,
 reading statistics, optional AnkiDroid integration and
 manual encrypted backups. See the [product specification](docs/PRODUCT_SPEC.md)
-for scope and the [implementation checklist](docs/IMPLEMENTATION_PLAN.md) for
-verified progress.
+for scope. Development focuses on issues reported from personal use.
 
 The [manual backup format](docs/BACKUP_FORMAT.md) specifies the full-state snapshot
 and encryption profile. The isolated Rust backup crate implements strict metadata
@@ -185,7 +184,7 @@ remain, and unfinished files require a new explicit selection.
 | `third_party/sudachi/` | Pinned engine source, Android patch and license records |
 | `third_party/dictionaries/` | JMdict/JMnedict source lock, attribution and index contract |
 | `tools/` | CLI build, formatting, data preparation and verification scripts |
-| `docs/` | Product requirements, architecture, development guide and handoff |
+| `docs/` | Product requirements, architecture, development guide and technical references |
 
 SQL and platform I/O stay outside the pure core. Android sends typed events
 through generated bindings; Rust executes effects and returns render state.
@@ -361,10 +360,10 @@ deletes the local Library, vocabulary and history.
 
 ## Contributing
 
-Start with [AGENTS.md](AGENTS.md) and the [current handoff](docs/NEXT_SESSION.md),
-then follow the relevant unchecked implementation tasks. The product
-specification is the source of truth; record routine technical choices in
-[decisions](docs/DECISIONS.md).
+Start with the reported issue and [AGENTS.md](AGENTS.md). Consult the relevant
+product requirements and technical references as needed. Keep fixes focused,
+run checks appropriate to the affected code and record consequential technical
+choices in [decisions](docs/DECISIONS.md).
 
 ## License
 

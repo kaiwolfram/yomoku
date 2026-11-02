@@ -9,10 +9,8 @@ This is the authoritative product scope, behavior and required architecture.
 It describes requirements, not implementation status. Confirmed requirements
 must not change without user approval.
 
-- [Implementation plan](IMPLEMENTATION_PLAN.md): ordered tasks, verification and acceptance coverage.
-- [Next session](NEXT_SESSION.md): current progress, next tasks, commands and blockers.
 - [Architecture](ARCHITECTURE.md) and [data model](DATA_MODEL.md): implemented design and remaining boundaries.
-- [Decisions](DECISIONS.md): routine technical choices and dependency evidence.
+- [Decisions](DECISIONS.md): technical decisions and dependency evidence.
 - [Development](DEVELOPMENT.md): CLI setup and verified commands.
 - [Agent workflow](../AGENTS.md): coding-session instructions.
 
