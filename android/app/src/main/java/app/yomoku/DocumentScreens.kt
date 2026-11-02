@@ -16,10 +16,10 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
-import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -39,8 +39,6 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.selected
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import app.yomoku.shared.DocumentError
 import app.yomoku.shared.Event
@@ -54,7 +52,6 @@ import app.yomoku.shared.ViewModel
 internal fun LibraryScreen(
     view: ViewModel,
     dispatch: (Event) -> Unit,
-    onImportFiles: (() -> Unit)? = null,
     coverLoader: EpubCoverLoader? = null,
     libraryActionsEnabled: Boolean = true,
 ) {
@@ -81,34 +78,15 @@ internal fun LibraryScreen(
         remember(view.libraryWordDistributions) {
             view.libraryWordDistributions?.associateBy { it.documentId }
         }
-    val selection = view.librarySelection
-    val canSelect =
+    val canAct =
         libraryActionsEnabled &&
             !view.storageBusy &&
             !view.readingTimeSavePending &&
             !view.completionSavePending
-    val selectLabel = stringResource(R.string.library_select_document)
+    val actionsLabel = stringResource(R.string.library_document_actions)
     LibraryDeleteDialog(view, dispatch, enabled = libraryActionsEnabled)
     LibraryRenameDialog(view, dispatch, enabled = libraryActionsEnabled)
     Column(Modifier.fillMaxSize().padding(16.dp)) {
-        if (selection == null) {
-            Button(onClick = { dispatch(Event.OpenPaste) }, enabled = !view.storageBusy) {
-                Text(stringResource(R.string.paste_title))
-            }
-            if (onImportFiles != null) {
-                Button(
-                    onClick = onImportFiles,
-                    enabled =
-                        !view.storageBusy &&
-                            !view.readingTimeSavePending &&
-                            !view.completionSavePending,
-                ) {
-                    Text(stringResource(R.string.import_files))
-                }
-            }
-        } else {
-            LibrarySelectionActions(view, dispatch, libraryActionsEnabled)
-        }
         StorageStatus(view)
         if (view.libraryWordError != null) {
             Text(stringResource(R.string.library_words_error))
@@ -171,103 +149,80 @@ internal fun LibraryScreen(
         }
         LazyColumn(modifier = Modifier.weight(1f).testTag("library_documents")) {
             items(view.documents, key = { it.documentId.value }) { document ->
-                val isSelected = selection?.contains(document.documentId) == true
-                Row(
-                    modifier =
-                        Modifier.fillMaxWidth()
-                            .combinedClickable(
-                                enabled = if (selection == null) !view.storageBusy else canSelect,
-                                onLongClickLabel = selectLabel,
-                                onLongClick = {
-                                    if (canSelect)
-                                        dispatch(
-                                            Event.ToggleLibraryDocumentSelection(
-                                                document.documentId
-                                            )
-                                        )
-                                },
-                                onClick = {
-                                    dispatch(
-                                        if (selection == null) Event.OpenReader(document.documentId)
-                                        else
-                                            Event.ToggleLibraryDocumentSelection(
-                                                document.documentId
-                                            )
-                                    )
-                                },
-                            )
-                            .semantics { if (selection != null) selected = isSelected }
-                            .padding(vertical = 8.dp)
-                            .testTag("document_${document.documentId.value}"),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    if (selection != null) Checkbox(checked = isSelected, onCheckedChange = null)
-                    LibraryCover(document.documentId.value, coverLoader)
-                    Column(Modifier.weight(1f)) {
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Text(
-                                document.title,
-                                style = MaterialTheme.typography.titleMedium,
-                                modifier = Modifier.weight(1f),
-                            )
-                            if (document.finishedAtLeastOnce) {
-                                FinishedCheckmark(
-                                    Modifier.testTag("finished_${document.documentId.value}")
+                var menuExpanded by
+                    remember(view.libraryTitleQuery, view.librarySort, canAct) {
+                        mutableStateOf(false)
+                    }
+                Box {
+                    Row(
+                        modifier =
+                            Modifier.fillMaxWidth()
+                                .combinedClickable(
+                                    enabled = !view.storageBusy,
+                                    onLongClickLabel = actionsLabel,
+                                    onLongClick = { if (canAct) menuExpanded = true },
+                                    onClick = { dispatch(Event.OpenReader(document.documentId)) },
                                 )
+                                .padding(vertical = 8.dp)
+                                .testTag("document_${document.documentId.value}"),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        LibraryCover(document.documentId.value, coverLoader)
+                        Column(Modifier.weight(1f)) {
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Text(
+                                    document.title,
+                                    style = MaterialTheme.typography.titleMedium,
+                                    modifier = Modifier.weight(1f),
+                                )
+                                if (document.finishedAtLeastOnce) {
+                                    FinishedCheckmark(
+                                        Modifier.testTag("finished_${document.documentId.value}")
+                                    )
+                                }
                             }
+                            Text(
+                                stringResource(
+                                    R.string.reading_progress,
+                                    document.progressPercent.toLong(),
+                                ),
+                                modifier =
+                                    Modifier.testTag("progress_${document.documentId.value}"),
+                            )
+                            LibraryWordBar(
+                                distributions?.get(document.documentId)?.counts,
+                                loading = distributions == null && view.libraryWordError == null,
+                                documentId = document.documentId.value,
+                            )
                         }
-                        Text(
-                            stringResource(
-                                R.string.reading_progress,
-                                document.progressPercent.toLong(),
-                            ),
-                            modifier = Modifier.testTag("progress_${document.documentId.value}"),
+                    }
+                    DropdownMenu(
+                        expanded = menuExpanded && canAct,
+                        onDismissRequest = { menuExpanded = false },
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.library_rename)) },
+                            onClick = {
+                                menuExpanded = false
+                                dispatch(Event.RequestDocumentRename(document.documentId))
+                            },
+                            modifier =
+                                Modifier.testTag("rename_document_${document.documentId.value}"),
                         )
-                        LibraryWordBar(
-                            distributions?.get(document.documentId)?.counts,
-                            loading = distributions == null && view.libraryWordError == null,
-                            documentId = document.documentId.value,
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.library_delete)) },
+                            onClick = {
+                                menuExpanded = false
+                                dispatch(Event.RequestDocumentDeletion(document.documentId))
+                            },
+                            modifier =
+                                Modifier.testTag("delete_document_${document.documentId.value}"),
                         )
                     }
-                    if (selection == null)
-                        Column {
-                            TextButton(
-                                onClick = {
-                                    dispatch(Event.RequestDocumentRename(document.documentId))
-                                },
-                                enabled =
-                                    libraryActionsEnabled &&
-                                        !view.storageBusy &&
-                                        !view.readingTimeSavePending &&
-                                        !view.completionSavePending,
-                                modifier =
-                                    Modifier.testTag(
-                                        "rename_document_${document.documentId.value}"
-                                    ),
-                            ) {
-                                Text(stringResource(R.string.library_rename))
-                            }
-                            TextButton(
-                                onClick = {
-                                    dispatch(Event.RequestDocumentDeletion(document.documentId))
-                                },
-                                enabled =
-                                    libraryActionsEnabled &&
-                                        !view.storageBusy &&
-                                        !view.readingTimeSavePending &&
-                                        !view.completionSavePending,
-                                modifier =
-                                    Modifier.testTag(
-                                        "delete_document_${document.documentId.value}"
-                                    ),
-                            ) {
-                                Text(stringResource(R.string.library_delete))
-                            }
-                        }
                 }
             }
         }
@@ -283,24 +238,66 @@ private fun LibrarySortMenu(sort: LibrarySort, onSort: (LibrarySort) -> Unit) {
             LibrarySort.TITLE to R.string.library_sort_title,
             LibrarySort.IMPORTDATE to R.string.library_sort_import_date,
         )
-    Box {
-        TextButton(
-            onClick = { expanded = true },
-            modifier = Modifier.testTag("library_sort"),
-        ) {
-            Text(stringResource(R.string.library_sort, stringResource(labels.getValue(sort))))
+    val reverseSort =
+        when (sort) {
+            LibrarySort.LASTREAD -> LibrarySort.LASTREADASCENDING
+            LibrarySort.LASTREADASCENDING -> LibrarySort.LASTREAD
+            LibrarySort.TITLE -> LibrarySort.TITLEDESCENDING
+            LibrarySort.TITLEDESCENDING -> LibrarySort.TITLE
+            LibrarySort.IMPORTDATE -> LibrarySort.IMPORTDATEASCENDING
+            LibrarySort.IMPORTDATEASCENDING -> LibrarySort.IMPORTDATE
         }
-        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-            labels.forEach { (option, label) ->
-                DropdownMenuItem(
-                    text = { Text(stringResource(label)) },
-                    onClick = {
-                        expanded = false
-                        onSort(option)
-                    },
-                    modifier = Modifier.testTag("library_sort_${option.name}"),
+    val baseSort =
+        when (sort) {
+            LibrarySort.LASTREADASCENDING -> LibrarySort.LASTREAD
+            LibrarySort.TITLEDESCENDING -> LibrarySort.TITLE
+            LibrarySort.IMPORTDATEASCENDING -> LibrarySort.IMPORTDATE
+            else -> sort
+        }
+    val ascending =
+        sort in
+            listOf(
+                LibrarySort.TITLE,
+                LibrarySort.LASTREADASCENDING,
+                LibrarySort.IMPORTDATEASCENDING,
+            )
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Box {
+            TextButton(
+                onClick = { expanded = true },
+                modifier = Modifier.testTag("library_sort"),
+            ) {
+                Text(
+                    stringResource(R.string.library_sort, stringResource(labels.getValue(baseSort)))
                 )
             }
+            DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+                labels.forEach { (option, label) ->
+                    DropdownMenuItem(
+                        text = { Text(stringResource(label)) },
+                        onClick = {
+                            expanded = false
+                            onSort(option)
+                        },
+                        modifier = Modifier.testTag("library_sort_${option.name}"),
+                    )
+                }
+            }
+        }
+        IconButton(
+            onClick = { onSort(reverseSort) },
+            modifier = Modifier.testTag("library_reverse_sort"),
+        ) {
+            Icon(
+                painterResource(
+                    if (ascending) R.drawable.ic_arrow_up else R.drawable.ic_arrow_down
+                ),
+                contentDescription =
+                    stringResource(
+                        if (ascending) R.string.library_sort_ascending
+                        else R.string.library_sort_descending
+                    ),
+            )
         }
     }
 }

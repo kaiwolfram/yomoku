@@ -182,6 +182,7 @@ class TxtPickerTest {
                     it.readBytes()
                 },
             )
+            compose.onNodeWithTag("library_add").performClick()
             compose.onNodeWithText("Import files").performClick()
             try {
                 compose.waitUntil(90_000) { owner().fileImports.choosingEncoding }
@@ -361,6 +362,7 @@ class TxtPickerTest {
                 true,
             )
         try {
+            compose.onNodeWithTag("library_add").performClick()
             compose.onNodeWithText("Import files").performClick()
             compose.waitForIdle()
             assertEquals(1, monitor.hits)

@@ -71,6 +71,7 @@ class MixedFilePickerTest {
                 true,
             )
         try {
+            compose.onNodeWithTag("library_add").performClick()
             compose.onNodeWithText("Import files").performClick()
             compose.waitUntil(90_000) { owner().fileImports.choosingEncoding }
             assertEquals(1, monitor.hits)

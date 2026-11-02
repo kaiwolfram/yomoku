@@ -29,6 +29,24 @@ class LibrarySortTest {
         compose.waitUntil { core().view.librarySort == sort }
     }
 
+    private fun reverseSort(sort: LibrarySort, expected: List<DocumentId>) {
+        compose.onNodeWithTag("library_reverse_sort").performClick()
+        compose.waitUntil { core().view.librarySort == sort }
+        val ascending =
+            sort in
+                listOf(
+                    LibrarySort.TITLE,
+                    LibrarySort.LASTREADASCENDING,
+                    LibrarySort.IMPORTDATEASCENDING,
+                )
+        compose
+            .onNodeWithTag("library_reverse_sort")
+            .assertContentDescriptionEquals(
+                if (ascending) "Ascending. Reverse sort order" else "Descending. Reverse sort order"
+            )
+        assertOrder(expected)
+    }
+
     private fun assertOrder(expected: List<DocumentId>) {
         assertEquals(expected, core().view.documents.map { it.documentId })
         // Verify the projected order reaches Compose's actual row placement.
@@ -65,17 +83,24 @@ class LibrarySortTest {
         compose.onNodeWithTag("library_title_search").performTextReplacement(prefix)
         compose.waitUntil { core().view.libraryTitleQuery == prefix }
         assertOrder(ids.reversed())
+        reverseSort(LibrarySort.LASTREADASCENDING, ids)
+        reverseSort(LibrarySort.LASTREAD, ids.reversed())
         sort(LibrarySort.TITLE)
         assertOrder(listOf(ids[2], ids[1], ids[0]))
         compose.onNodeWithTag("library_sort").assertTextContains("Sort: Title")
+        reverseSort(LibrarySort.TITLEDESCENDING, listOf(ids[0], ids[1], ids[2]))
         val session = core()
         compose.activityRule.scenario.recreate()
         compose.waitForIdle()
         assertSame(session, core())
         compose.onNodeWithTag("library_sort").assertTextContains("Sort: Title")
-        assertOrder(listOf(ids[2], ids[1], ids[0]))
+        assertOrder(listOf(ids[0], ids[1], ids[2]))
+        assertEquals(LibrarySort.TITLEDESCENDING, core().view.librarySort)
+        reverseSort(LibrarySort.TITLE, listOf(ids[2], ids[1], ids[0]))
         sort(LibrarySort.IMPORTDATE)
         assertOrder(ids.reversed())
+        reverseSort(LibrarySort.IMPORTDATEASCENDING, ids)
+        reverseSort(LibrarySort.IMPORTDATE, ids.reversed())
         compose.onNodeWithTag("library_documents").performScrollToKey(ids[0].value)
         compose.onNodeWithTag("document_${ids[0].value}").performClick()
         idle()

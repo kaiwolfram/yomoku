@@ -184,6 +184,10 @@
     <string name="image_viewer_reset">Reset</string>
     <string name="image_viewer_zoom">%1$d%%</string>
     <string name="library_sort">Sort: %1$s</string>
+    <string name="library_add">Add to Library</string>
+    <string name="library_document_actions">Document actions</string>
+    <string name="library_sort_ascending">Ascending. Reverse sort order</string>
+    <string name="library_sort_descending">Descending. Reverse sort order</string>
     <string name="library_sort_last_read">Last read</string>
     <string name="library_sort_title">Title</string>
     <string name="library_sort_import_date">Import date</string>
@@ -200,12 +204,6 @@
     <string name="library_delete_title">Delete document?</string>
     <string name="library_delete_confirmation">Delete “%1$s” from your Library? This removes its content and reading progress. Your vocabulary and reading history are kept. This cannot be undone.</string>
     <string name="library_delete_error">Could not delete this document. Retry or cancel.</string>
-    <string name="library_select_document">Select document</string>
-    <plurals name="library_selected_count">
-        <item quantity="one">%1$d selected</item>
-        <item quantity="other">%1$d selected</item>
-    </plurals>
-    <string name="library_select_all">Select All</string>
     <string name="library_delete_selected">Delete selected</string>
     <plurals name="library_bulk_delete_title">
         <item quantity="one">Delete %1$d document?</item>

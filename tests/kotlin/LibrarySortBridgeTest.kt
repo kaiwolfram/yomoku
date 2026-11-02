@@ -42,6 +42,15 @@ internal fun verifyLibrarySortBridge() {
             val before = database.readBytes()
             check(ViewModel.bincodeDeserialize(bridge.view()).librarySort == LibrarySort.LASTREAD)
             check(ViewModel.bincodeDeserialize(bridge.view()).documents == imported.reversed())
+            for ((sort, expected) in
+                listOf(
+                    LibrarySort.LASTREADASCENDING to imported,
+                    LibrarySort.TITLEDESCENDING to listOf(imported[0], imported[1], imported[2]),
+                    LibrarySort.IMPORTDATEASCENDING to imported,
+                )) {
+                val view = dispatch(Event.SortLibrary(sort))
+                check(view.librarySort == sort && view.documents == expected)
+            }
             check(
                 dispatch(Event.SortLibrary(LibrarySort.TITLE)).documents ==
                     listOf(imported[2], imported[1], imported[0])

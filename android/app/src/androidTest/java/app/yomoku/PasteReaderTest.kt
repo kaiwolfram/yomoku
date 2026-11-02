@@ -1,6 +1,7 @@
 package app.yomoku
 
 import android.database.sqlite.SQLiteDatabase
+import android.view.KeyEvent
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertIsDisplayed
@@ -17,6 +18,7 @@ import androidx.compose.ui.test.performTextReplacement
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.ViewModelProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.platform.app.InstrumentationRegistry
 import app.yomoku.shared.ContentRoute
 import app.yomoku.shared.Event
 import app.yomoku.shared.PageLength
@@ -304,6 +306,14 @@ class PasteReaderTest {
         val title = "題𠮷 ${System.nanoTime()}"
         val firstPage = "$title\n${"𠮷".repeat(500)}\n"
         val text = firstPage + "次の段落。"
+        compose.onNodeWithText("Paste text").assertDoesNotExist()
+        compose.onNodeWithText("Import files").assertDoesNotExist()
+        compose.onNodeWithTag("library_add").performClick()
+        compose.onNodeWithText("Paste text").assertIsDisplayed()
+        compose.onNodeWithText("Import files").assertIsDisplayed()
+        InstrumentationRegistry.getInstrumentation().sendKeyDownUpSync(KeyEvent.KEYCODE_BACK)
+        compose.onNodeWithText("Paste text").assertDoesNotExist()
+        compose.onNodeWithTag("library_add").performClick()
         compose.onNodeWithText("Paste text").performClick()
         compose.onNodeWithTag("screen_title").assertTextEquals("Paste text")
         compose.onNodeWithText("Save to Library").assertIsNotEnabled()
@@ -333,6 +343,7 @@ class PasteReaderTest {
         compose.activityRule.scenario.moveToState(Lifecycle.State.RESUMED)
         awaitDictionaryMapping(false) // returning to Library never eagerly loads Full
         // Reimport through the actual form: same row, visible duplicate result, no reader.
+        compose.onNodeWithTag("library_add").performClick()
         compose.onNodeWithText("Paste text").performClick()
         compose.onNodeWithTag("paste_text").performTextReplacement(text)
         compose.onNodeWithText("Save to Library").performClick()

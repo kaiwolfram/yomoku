@@ -60,6 +60,9 @@ fn sort_orders_recent_readers_then_newest_unopened_and_has_stable_unicode_title_
         (LibrarySort::LastRead, vec![2, 3, 4, 1]),
         (LibrarySort::Title, vec![3, 2, 1, 4]),
         (LibrarySort::ImportDate, vec![4, 3, 2, 1]),
+        (LibrarySort::LastReadAscending, vec![1, 4, 3, 2]),
+        (LibrarySort::TitleDescending, vec![4, 1, 2, 3]),
+        (LibrarySort::ImportDateAscending, vec![1, 2, 3, 4]),
     ] {
         let projected = sort.project(&documents, "");
         assert_eq!(ids(&projected), expected);
@@ -74,7 +77,9 @@ fn sort_orders_recent_readers_then_newest_unopened_and_has_stable_unicode_title_
         assert_eq!(
             ids(&sort.project(&documents, "AlPhA")),
             match sort {
-                LibrarySort::LastRead => vec![2, 3],
+                LibrarySort::LastRead
+                | LibrarySort::TitleDescending
+                | LibrarySort::ImportDateAscending => vec![2, 3],
                 _ => vec![3, 2],
             }
         );
@@ -96,7 +101,7 @@ fn sort_is_read_only_retained_with_search_across_refresh_errors_navigation_and_r
     load(&core);
     assert_eq!(core.view().library_sort, LibrarySort::LastRead);
     let mut effects = core.process_event(Event::RefreshLibrary);
-    let sorting = core.process_event(Event::SortLibrary(LibrarySort::Title));
+    let sorting = core.process_event(Event::SortLibrary(LibrarySort::TitleDescending));
     assert!(matches!(sorting.as_slice(), [Effect::Render(_)]));
     assert!(core.view().storage_busy);
     finish(
@@ -105,7 +110,7 @@ fn sort_is_read_only_retained_with_search_across_refresh_errors_navigation_and_r
         StorageResult::Failed(DocumentError::Unavailable),
     );
     core.process_event(Event::SearchLibraryTitles("alpha".into()));
-    assert_eq!(ids(&core.view().documents), vec![3, 2]);
+    assert_eq!(ids(&core.view().documents), vec![2, 3]);
     assert_eq!(core.view().document_error, Some(DocumentError::Unavailable));
     for event in [
         Event::OpenSettings,
@@ -116,11 +121,11 @@ fn sort_is_read_only_retained_with_search_across_refresh_errors_navigation_and_r
         Event::CloseDocument,
     ] {
         core.process_event(event);
-        assert_eq!(core.view().library_sort, LibrarySort::Title);
+        assert_eq!(core.view().library_sort, LibrarySort::TitleDescending);
         assert_eq!(core.view().library_title_query, "alpha");
     }
     load(&core);
-    assert_eq!(ids(&core.view().documents), vec![3, 2]);
+    assert_eq!(ids(&core.view().documents), vec![2, 3]);
     assert_eq!(
         Core::<Yomoku>::new().view().library_sort,
         LibrarySort::LastRead
@@ -132,6 +137,7 @@ fn hidden_sort_callbacks_cannot_change_session_sort() {
     let core = Core::<Yomoku>::new();
     load(&core);
     core.process_event(Event::SortLibrary(LibrarySort::Title));
+    core.process_event(Event::SortLibrary(LibrarySort::TitleDescending));
     for event in [
         Event::OpenSettings,
         Event::SelectDestination(Destination::Nostr),
@@ -142,7 +148,7 @@ fn hidden_sort_callbacks_cannot_change_session_sort() {
         assert!(core
             .process_event(Event::SortLibrary(LibrarySort::ImportDate))
             .is_empty());
-        assert_eq!(core.view().library_sort, LibrarySort::Title);
+        assert_eq!(core.view().library_sort, LibrarySort::TitleDescending);
     }
 }
 

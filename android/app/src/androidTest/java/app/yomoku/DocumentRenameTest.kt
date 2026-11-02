@@ -84,6 +84,7 @@ class DocumentRenameTest {
         assertTrue(before.finishedAtLeastOnce)
         assertEquals("1", history[2])
         val title = "  改題𠮷 か\u3099  "
+        compose.onNodeWithTag("document_${id.value}").performTouchInput { longClick() }
         compose.onNodeWithTag("rename_document_${id.value}").performClick()
         compose.onNodeWithTag("document_title_draft").assertTextContains(originalTitle)
         compose.onNodeWithTag("document_title_draft").performTextReplacement(" \n\t")
@@ -104,6 +105,7 @@ class DocumentRenameTest {
             )
         }
         try {
+            compose.onNodeWithTag("document_${id.value}").performTouchInput { longClick() }
             compose.onNodeWithTag("rename_document_${id.value}").performClick()
             compose.onNodeWithTag("document_title_draft").performTextReplacement(title)
             compose.onNodeWithTag("save_document_title").performClick()

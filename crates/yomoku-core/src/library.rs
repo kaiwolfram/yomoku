@@ -40,11 +40,16 @@ pub struct LibraryWordDistribution {
 #[derive(Clone, Copy, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
 #[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
 #[repr(C)]
+// Default directions are newest first for dates/recency and ascending for titles.
+// Reverse variants reverse the full stable order, including document-ID ties.
 pub enum LibrarySort {
     #[default]
     LastRead,
     Title,
     ImportDate,
+    LastReadAscending,
+    TitleDescending,
+    ImportDateAscending,
 }
 
 impl LibrarySort {
@@ -60,12 +65,20 @@ impl LibrarySort {
             .collect();
         matching.sort_by(|(left, left_title), (right, right_title)| {
             match self {
-                Self::LastRead => right.last_read_sequence.cmp(&left.last_read_sequence),
-                Self::Title => left_title.cmp(right_title),
-                Self::ImportDate => std::cmp::Ordering::Equal,
+                Self::LastRead | Self::LastReadAscending => {
+                    right.last_read_sequence.cmp(&left.last_read_sequence)
+                }
+                Self::Title | Self::TitleDescending => left_title.cmp(right_title),
+                Self::ImportDate | Self::ImportDateAscending => std::cmp::Ordering::Equal,
             }
             .then_with(|| right.document_id.cmp(&left.document_id))
         });
+        if matches!(
+            self,
+            Self::LastReadAscending | Self::TitleDescending | Self::ImportDateAscending
+        ) {
+            matching.reverse();
+        }
         matching
             .into_iter()
             .map(|(document, _)| document.clone())

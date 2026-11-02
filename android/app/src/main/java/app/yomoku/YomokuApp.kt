@@ -107,6 +107,15 @@ internal fun YomokuApp(
                             modifier = Modifier.testTag("screen_title"),
                         )
                     },
+                    actions = {
+                        if (
+                            mainContent &&
+                                !view.settingsOpen &&
+                                view.destination == Destination.LIBRARY
+                        ) {
+                            LibraryAddMenu(view, dispatch, onImportFiles, libraryActionsEnabled)
+                        }
+                    },
                     navigationIcon = {
                         if (view.settingsOpen || !mainContent) {
                             TextButton(
@@ -204,7 +213,6 @@ internal fun YomokuApp(
                             LibraryScreen(
                                 view,
                                 dispatch,
-                                onImportFiles,
                                 coverLoader,
                                 libraryActionsEnabled,
                             )
