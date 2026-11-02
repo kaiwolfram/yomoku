@@ -6,6 +6,7 @@ use super::*;
 use crate::{BackupCandidate, CandidateError};
 
 mod controls;
+mod documents;
 mod effective;
 mod vocabulary;
 

@@ -2258,8 +2258,14 @@ command/page/position/segment/metadata/occurrence consistency, historical issued
 bounds and completed receipts/headers/surviving encounters. No live command can be
 constructed from these decoded records. Unfinished reservations, deleted-content
 history and erased/re-registered vocabulary remain valid without replay.
-Surviving canonical text/logical pages/original and alternate analysis associations,
-other relational text/anchor/history semantics and their counter references remain
-unchecked. [RESTORE_VALIDATION.md](RESTORE_VALIDATION.md)
+Canonical sources now require complete contiguous chapters (one for paste/TXT/SRT),
+live nonblank UTF-8 text and a representable document byte total, or retained
+deleted-source provenance without text. Every saved position/pending-time anchor
+checks document/source ownership and scalar boundaries including EOF; missing
+legacy positions, literal/empty original titles and zero-time revision tombstones
+remain valid. These checks run before/after private migration without repairs.
+Format records/hashes/annotations/assets, frozen logical pages/original and
+alternate analysis associations, other historical anchors and counter references
+remain unchecked. [RESTORE_VALIDATION.md](RESTORE_VALIDATION.md)
 lists all current table groups and precise boundaries. No restore-ready authority
 or schema migration is added.

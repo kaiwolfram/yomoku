@@ -13,6 +13,7 @@ use rusqlite::{config::DbConfig, limits::Limit, Connection, OpenFlags};
 use crate::{backup_snapshot::StagingDirectory, migrate, SnapshotError, MIGRATIONS};
 
 mod controls;
+mod documents;
 mod effective;
 mod vocabulary;
 
@@ -93,7 +94,8 @@ impl BackupCandidate {
     /// Recheck after migrating and sync/close before returning an opaque result.
     /// Checks journal payloads, singletons, counters and saved vocabulary/custom
     /// entry domains, plus detached effective payloads and their receipts.
-    /// Live text/analysis relations and other history checks remain incomplete.
+    /// Also checks canonical text ownership/order and saved position/time anchors.
+    /// Format/analysis relations and other history checks remain incomplete.
     /// Other application invariants are NOT yet validated: this cannot authorize
     /// confirmation, replacement, reads through Storage, or external Anki writes.
     /// Cancellation polls between synchronous calls, not inside SQL or sync.
@@ -155,7 +157,7 @@ impl Write for BackupCandidate {
 /// Structural preflight result only. Intentionally exposes neither a path nor a
 /// connection/reader nor activation/confirmation authority. Application-level
 /// validation beyond journals/control records/saved entries/detached effective
-/// records is required before restore-ready.
+/// records/canonical text/live anchors is required before restore-ready.
 pub struct SchemaCheckedBackup {
     staging: StagingDirectory,
     original_schema: u32,
@@ -313,6 +315,7 @@ fn check_schema_and_data(
     }
     controls::check(connection, &reference, version, cancelled)?;
     vocabulary::check(connection, version, cancelled)?;
+    documents::check(connection, version, cancelled)?;
     effective::check(connection, version, cancelled)
 }
 

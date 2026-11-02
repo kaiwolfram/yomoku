@@ -292,14 +292,24 @@ required/nullable fields and rejected unknown/duplicate fields. Validate interna
 command/page/position/segment/metadata/occurrence consistency, surviving issued-ID
 bounds and any completed receipt/header/surviving encounters. Preserve unfinished
 reservations and deleted-content/vocabulary history without replay or current-rule
-requirements. Canonical text, logical pages and surviving original/alternate
-analysis associations still need checks; missing historical whitespace/analysis
+requirements. Frozen segments against canonical text, logical pages and surviving
+original/alternate analysis associations still need checks; missing historical whitespace/analysis
 cannot be reconstructed from frozen segments. See RESTORE_VALIDATION.md.
+
+Canonical source/chapter/text checks now enforce complete zero-based chapter order,
+single-text format shape, positive typed identities, UTF-8 titles/live nonblank
+text, deleted-source text absence and representable document byte totals. Saved
+positions and every pending-time anchor validate document/source ownership and
+scalar boundaries/range, including EOF. Preserve empty original titles, legacy
+missing positions, exact canonical bytes and zero-time/max-revision tombstones.
+Run before/after private migration without format parsing, writes or repair.
+Format-specific record presence/hash/annotation/asset and frozen analysis/history
+relations remain separate unchecked groups.
 
 The opaque `SchemaCheckedBackup` exposes only schema versions and discard. It has
 no SQL/path/reader/confirmation/activation API. **Other application invariants
-remain unchecked**, including surviving text/page/analysis/anchor relations and
-other history consistency. [RESTORE_VALIDATION.md](RESTORE_VALIDATION.md)
+remain unchecked**, including format records, frozen page/analysis/history-anchor
+relations and other history consistency. [RESTORE_VALIDATION.md](RESTORE_VALIDATION.md)
 inventories checked/remaining table groups and limits, including unverifiable
 erased allocation history. Do not pass this result to replacement confirmation
 or ordinary `Storage::open`. Further validation is required before a restore-ready

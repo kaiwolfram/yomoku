@@ -1,5 +1,5 @@
 # Resume here
-Updated: 2026-11-01. First MVP excludes Nostr and Known forms statistics.
+Updated: 2026-11-02. First MVP excludes Nostr and Known forms statistics.
 Commit guidance: concise subject/explanatory body; keep verification in docs.
 
 ## User checkpoints
@@ -31,12 +31,15 @@ Commit guidance: concise subject/explanatory body; keep verification in docs.
 - Partial checks before/after migration: required singleton rows, Library ordinals/
   clock, trusted AUTOINCREMENT counters, all Anki payloads/IDs, saved vocabulary/
   custom-entry domains. Preserve exact text/historical layouts/deleted counters.
+- Canonical checks: complete chapter order/live text/deleted provenance, UTF-8
+  titles, every position/pending-time anchor's ownership/scalar bounds. Preserve
+  empty original titles, absent legacy positions, EOF and zero-time tombstones.
 - Private typed effective records now validate detached command/segment/metadata/
   projection/issued-ID bounds and receipts/headers/surviving encounters. No live
   command construction. Preserve unfinished reservations, old rules and erased
   content/vocabulary without replay. Saved segments can omit whitespace gaps.
-- Opaque SchemaCheckedBackup exposes versions/discard ONLY. Surviving canonical
-  text/logical pages/analysis associations and other anchor/history/status checks
+- Opaque SchemaCheckedBackup exposes versions/discard ONLY. Format records/hashes/
+  annotations, frozen text/page/analysis and other historical anchor/status checks
   remain incomplete: RESTORE_VALIDATION.md inventories precise continuation points.
   Cannot reconstruct erased high-water history. No confirmation/restore authority.
 - Fixed-file/SQLite-sidecar cleanup preserves unexpected files; explicit discard
@@ -54,19 +57,19 @@ Commit guidance: concise subject/explanatory body; keep verification in docs.
   late work. No return/recreation replay. Architecture/data/API/decisions have detail.
 
 ## Next tasks (ordered)
-1. Continue RESTORE_VALIDATION.md: surviving text/page/analysis associations and
-   other anchor/history/status semantics; hostile-data tests before restore-ready.
-   Detached effective checks complete; no confirmation/replacement authority yet.
+1. Continue RESTORE_VALIDATION.md: analysis coverage and surviving effective text/
+   page/analysis associations; format/hash/annotation and other history/status
+   groups also remain before restore-ready. No confirmation/replacement authority.
 2. Runtime export sequencing/checkpoint drain/mutation gating and private staging
    crash cleanup; design nonserialized secret handoff before FFI/UI.
 3. Real phone schema-24 upgrade and disposable Anki collection/permission/browser/
    Back/lifecycle trial. Anki umbrella remains unchecked pending this validation.
 
 ## Verification / blockers
-- PASS: 9 new/37 candidate cases; 1086 workspace tests/17 opt-in ignored,
+- PASS: 10 new/47 candidate cases; 1096 workspace tests/17 opt-in ignored,
   all-feature build, strict Clippy/Rustfmt, both Android storage builds, links/diff.
-- Commands/logs: DEVELOPMENT.md, Restore candidate detached effective records.
-  Initial decoder/fixture issues corrected. Checks offline; no blockers or remaining
+- Commands/logs: DEVELOPMENT.md, Restore candidate canonical text and live anchors.
+  Checks offline; no failed checks, blockers or remaining
   implementation/verification steps for this slice. No APK/lint/JNI/codegen/emulator/
   release/phone/resource trial run.
 

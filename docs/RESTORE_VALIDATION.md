@@ -16,6 +16,9 @@ type can exist. Do not invent stricter product rules while filling these gaps.
 - [x] Decode detached effective records and validate internal domains/projections,
   historical issued-ID bounds and matching receipts before/after migration.
   Surviving text/analysis relations remain in the unchecked groups below.
+- [x] Validate canonical source/chapter/text ownership and order, saved positions
+  and every pending-time anchor before/after private migration. Format metadata,
+  analysis and historical anchor associations remain separate unchecked groups.
 - [ ] Validate every remaining group below, including cross-group relations and
   legacy/deleted-content cases; only then design an opaque restore-ready result.
 
@@ -81,17 +84,38 @@ literal metadata, clock rollback, full signed-64 identities/durations, deleted d
 crossing tokens and pages without start-owned occurrences. Cancellation polls between
 records/segments/occurrences, not inside decoding or SQL. Saved segmentation can omit
 whitespace gaps and deleted documents lose their original analyses: detached success
-cannot establish original coverage or reconstruct missing bytes. Checking surviving
-canonical text, logical page derivation and original/alternate analysis associations
+cannot establish original coverage or reconstruct missing bytes. Checking frozen
+records against surviving canonical text, logical page derivation and analysis associations
 remains required below; so do the other history/status chains. No restore authority.
+
+## Implemented canonical text and live anchors
+
+| Tables | Checks beyond schema/integrity/FKs |
+| --- | --- |
+| `sources`, `chapters`, `documents`, `chapter_texts` | Positive typed identities, valid UTF-8 original/live titles and kind, nonempty contiguous zero-based chapter order for every source; exactly one chapter for paste/TXT/SRT. Every live chapter requires exact nonblank UTF-8 canonical text and a representable document byte total. Deleted sources retain chapter identities/order without text or a Library entry. |
+| `reading_positions` | Every saved chapter belongs to its document's source and retains text; offset is a valid scalar boundary within that exact text, including EOF. A missing saved position is valid for unopened/legacy documents and is not repaired. |
+| `pending_reading_time` | Every anchor independently obeys the same ownership/scalar/range checks; existing duration domain and positive revision. Preserve anchors unrelated to the current position, zero-duration tombstones, full i64 durations/revisions and exhausted revisions without checkpoint replay. |
+
+Apply applicable checks to each supported prefix from schema 2 before migration,
+then again after migration. Borrow row-local text rather than building whole-book
+projections or invoking format loaders. Original and renamed titles are independent:
+the literal first line of a paste may be empty/blank, so do not apply newer rename
+input restrictions to persisted titles. Preserve Unicode/grapheme-splitting scalar
+boundaries, NULs, exact whitespace/line endings and deleted multi-chapter EPUB
+provenance. Do not infer finish history from EOF or sum pending durations across
+unrelated pages. Poll cancellation between sources/chapters/position/time rows;
+SQL/UTF-8 validation remains synchronous. No normalization, identity allocation or repair.
+
+Format-specific record presence/ownership, original-byte/hash/annotation/asset
+relations, analysis coverage and frozen/historical page/anchor associations remain
+unchecked below. These live checks do not complete those groups or grant restore
+authority.
 
 ## Required remaining groups
 
 | Tables | Required semantic review/checks using existing contracts |
 | --- | --- |
-| `sources`, `chapters`, `documents`, `chapter_texts` | Text/identifier types and domain values; document/source/chapter ownership; contiguous chapter order; required live text/position/format records. Retained deleted-source provenance is valid without live text/documents. Original titles and renamed titles remain distinct. |
-| `reading_positions`, `pending_reading_time` | Document/source/chapter ownership, valid UTF-8 byte boundaries/range, accepted EOF/legacy positions and duration/revision domains; preserve zero-duration revision tombstones. |
-| `paste_content_hashes`, `imported_files` | Hashes versus exact canonical/original bytes, source-format/encoding/metadata ownership and record presence; preserve exact original bytes. Validation must not reimport or allocate new identities. |
+| `paste_content_hashes`, `imported_files` | Hashes versus exact canonical/original bytes, source-format/encoding/metadata ownership and required format record presence; preserve exact original bytes and legacy optional paste hashes. Validation must not reimport or allocate new identities. |
 | `source_ruby`, `subtitle_cues` | Contiguous indices, ordered UTF-8 ranges/reading domains and relation to source text and format. |
 | `epub_documents`, `epub_assets`, `epub_chapters` | Counts, ownership, canonical paths/media/cover references, asset/text SHA-256 and existing size limits. No extraction or external URL resolution. |
 | `epub_spans`, `epub_inline_images` | Contiguous indices, UTF-8 anchors, kind/target/link policy and image placeholder/path/asset relations through the existing domain contracts. |

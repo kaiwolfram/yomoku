@@ -5262,3 +5262,24 @@ status chains remain required by RESTORE_VALIDATION.md. Opaque schema results
 still expose only versions/discard. No schema/core/runtime/FFI/UI/destructive
 semantics change. Cancellation polls between records/segments/encounters; JSON,
 SQL and sync remain synchronous with no total resource budget.
+
+## 2026-11-02 — Canonical text and live-anchor restore validation
+
+Continue the semantic inventory with borrowed-row checks for sources, complete
+contiguous chapter order and live canonical text, plus every saved position and
+pending-time anchor. Use existing typed identity/offset/duration domains, SQLite
+FK ownership and the canonical shapes already required by import/reader/deletion
+repositories. Apply the applicable checks before private migration can hide an
+invalid historical state and again afterward. Format parsing, original-byte/hash
+and annotation/asset validation, analyses and historical page relations remain
+separate groups; do not claim restore-ready authority.
+
+Preserve the literal empty/blank first-line titles permitted by paste creation;
+the newer rename-input validator does not govern all persisted titles. Keep exact
+text, scalar boundaries within graphemes, EOF and absent legacy positions,
+deleted-source/chapter provenance, independent pending anchors and zero-duration
+revision tombstones, including exhausted revisions. Never infer completion from
+EOF or sum pending time across unrelated pages. Validate UTF-8/ownership without
+constructing whole-document format projections, normalizing text, creating IDs or
+repairing records. Cancellation polls between rows, not during SQL/UTF-8 scans.
+No schema/dependency/core/runtime/FFI/Android/destructive semantics change.

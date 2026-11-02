@@ -4473,3 +4473,21 @@ and /tmp/yomoku-browser-profile-*. No emulator started.
   text/page/analysis associations and other history/status semantics, then runtime
   staging/secret handoff. Restore umbrellas remain unchecked. No APK/device trial;
   recommend the schema-24 phone upgrade and disposable real Anki browser/Back trial.
+
+## 2026-11-02 — Canonical text and live-anchor restore validation
+
+- Added borrowed-row source/chapter/text ownership/order/UTF-8 checks and every
+  saved position/pending-time anchor's document/source/scalar/range checks before
+  and after private migration. Preserve empty original titles, exact text, absent
+  legacy positions, EOF, deleted provenance and zero-duration revision tombstones;
+  no repair/replay, format parsing or restore authority.
+- PASS: ten new cases/all 47 candidate cases, 1096 workspace tests/17 opt-in
+  ignored, all-feature build, strict Clippy/Rustfmt, both Android storage builds,
+  local links/diff. All checks offline; no failures/blockers. Commands/limits/logs:
+  DEVELOPMENT.md, Restore candidate canonical text and live anchors. No APK/device
+  trial or schema/platform/dependency changes.
+- Updated semantic inventory, format/architecture/data/decisions/plan/handoff.
+  No implementation/verification steps remain for this slice. Next: analysis
+  coverage/frozen text/page associations; format/hash/annotations and other
+  history/status groups remain. Recommend schema-24 phone upgrade preserving
+  Library/history and disposable real Anki collection/permission/browser/Back trial.
