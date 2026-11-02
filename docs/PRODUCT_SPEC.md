@@ -16,12 +16,12 @@ must not change without user approval.
 
 ## 1. Product scope and priorities
 
-**v1 includes:** native Android app; native Japanese reader; local library of imported EPUB/TXT/SRT and pasted text; offline word segmentation and dictionaries; vocabulary status workflows; historical reading/vocabulary statistics; optional AnkiDroid integration; a Feed placeholder; secure manual encrypted backups; configurable settings; release tooling.
+**v1 includes:** native Android app; native Japanese reader; local library of imported EPUB/TXT/SRT and pasted text; offline word segmentation and dictionaries; vocabulary status workflows; historical reading/vocabulary statistics; optional AnkiDroid integration; secure manual encrypted backups; configurable settings; release tooling.
 
 **Important late scope changes that override earlier brainstorming:**
 
 - **Remove Known forms statistics** (user scope reduction, 2026-10-31): no separate Known surface/dictionary-form chart or dedicated dictionary-form aggregation storage. The five-status vocabulary chart still includes Known.
-- **No Nostr integration in the first MVP** (user phone-trial scope reduction, 2026-10-31). Rename its navigation destination to **Feed**; the view shows only **`Coming Soon! 🌱`**. No relay configuration/networking, post reading, signing identity, reactions or forwarding in this release. The Nostr requirements in section 5 are deferred beyond the first MVP.
+- **Feed/Nostr is no longer planned** (user scope reduction, 2026-11-02). Remove the Feed placeholder from phone bottom navigation and the tablet rail. No relay configuration/networking, post reading, signing identity, reactions or forwarding. Section 5 retains historical requirements only.
 - **No in-app AI features in v1**, including BYOK API keys/provider/model settings, AI-generated definitions or translations, and AI regeneration. Do not scaffold AI merely because older design notes might mention it.
 - **Only EPUB, TXT, SRT, and pasted text**. No WebVTT `.vtt`, no ASS/SSA `.ass`, no PDF, no NHK integration, and no Android Share-intent import in v1.
 - **No Nostr multi-device sync or Blossom cloud backups in v1.** Secure **manual encrypted export/import** remains.
@@ -48,7 +48,7 @@ If a chosen library does not support a required capability or architecture in cu
 
 ### 3.1 Documents and pagination
 
-- App opens on **Library**. Four top-level destinations: **Library, Feed, Statistics, Vocabulary**; Settings accessed via toolbar. Use bottom navigation on phones, rail on tablets; hide main navigation while actively reading.
+- App opens on **Library**. Three top-level destinations: **Library, Statistics, Vocabulary**; Settings accessed via toolbar. Use bottom navigation on phones, rail on tablets; hide main navigation while actively reading.
 - Reader is **horizontal text only**, single centered column even on landscape tablets; comfortable maximum text width, tablet margins. Dictionary panel on wide displays, bottom sheet on phones. Both portrait and landscape supported.
 - Logical page length setting has **presets 250 / 500 / 750 / 1,000 / 1,500 characters**, default **500**. Count all non-whitespace Unicode characters, including punctuation and Latin text (user clarification 2026-10-22); supplementary characters count once. Split at a paragraph boundary after reaching the threshold; if a paragraph is extremely long, split after an appropriate following sentence. **Never cross an EPUB chapter boundary** when forming a logical page. TXT has no automatically inferred chapter boundaries.
 - Logical pages may **scroll vertically**, e.g. for long text or images. **Never persist vertical scroll positions**: navigating forward or backward, or reopening a document, starts at the top of the destination page. Page boundaries don't depend on screen dimensions. Page-length changes reflow pages while preserving the exact underlying reading text offset.
@@ -107,13 +107,13 @@ If a chosen library does not support a required capability or architecture in cu
 - Filter by five statuses; show total matching count; query 100 at a time with infinite scroll.
 - Select All targets **every matching row, including results not loaded on screen**. Bulk change status or permanently delete with confirmation. Record status change events; enforce delete/history semantics above.
 
-## 5. Feed placeholder and deferred Nostr reading
+## 5. Historical Feed/Nostr requirements (no longer planned)
 
-The first MVP exposes **Feed** in the phone bottom bar and tablet rail, with a
-**Feed** toolbar title and only **`Coming Soon! 🌱`** as its content.
+Feed/Nostr is no longer planned. Neither phone bottom navigation nor the tablet
+rail exposes a Feed placeholder.
 
-The following Nostr requirements are retained for future scope discussions only;
-they are **outside the first MVP** and must not drive first-release implementation.
+The following Nostr requirements are retained as historical reference only;
+they must not drive implementation unless the user explicitly reopens this scope.
 
 - Use Rust `nostr-sdk`. Fetch only **kind-1** text events from **explicitly enabled/curated author npubs** across enabled relays, with editable lists and add-custom options. **Never sample arbitrary relay authors**. Filter candidate post text **locally** for Japanese with lightweight hiragana/katakana + kanji heuristics; accept occasional inaccuracies. Hardcoded starter author/relay lists are a product-data decision: **do not invent accounts or relay endpoints; ask if no actual curated list is supplied**, or use a clearly empty/configurable list initially.
 - One full post at a time; no social feed, no long-form kind 30023, no repost kind 6. Replies posted by curated authors may appear with reply indicator. Offer **View Parent** for immediate reply parent (fetch parent on demand if needed); deeper navigation is on demand. Just viewing parents must not create reading stats.

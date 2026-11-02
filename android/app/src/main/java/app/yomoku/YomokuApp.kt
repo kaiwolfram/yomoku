@@ -50,6 +50,9 @@ import app.yomoku.shared.VocabularyState
 import app.yomoku.shared.VocabularyStatus
 import app.yomoku.theme.YomokuTheme
 
+private val navigationDestinations =
+    listOf(Destination.LIBRARY, Destination.STATISTICS, Destination.VOCABULARY)
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun YomokuApp(
@@ -133,7 +136,7 @@ internal fun YomokuApp(
             bottomBar = {
                 if (showNavigation && !useRail) {
                     NavigationBar(modifier = Modifier.testTag("bottom_navigation")) {
-                        for (destination in Destination.entries) {
+                        for (destination in navigationDestinations) {
                             NavigationBarItem(
                                 enabled = !vocabularyLocked,
                                 selected = view.destination == destination,
@@ -154,7 +157,7 @@ internal fun YomokuApp(
                                 .fillMaxHeight()
                                 .verticalScroll(rememberScrollState())
                     ) {
-                        for (destination in Destination.entries) {
+                        for (destination in navigationDestinations) {
                             NavigationRailItem(
                                 enabled = !vocabularyLocked,
                                 selected = view.destination == destination,
