@@ -362,7 +362,7 @@ fn epub_analysis_failure_in_later_chapter_and_invalid_input_discard_only_current
                 let mut analysis = fixture(chapter).unwrap();
                 if calls == 2 {
                     match invalid {
-                        0 => analysis.mode = SplitMode::C,
+                        0 => analysis.mode = SplitMode::B,
                         1 => analysis.tokens.clear(),
                         _ => analysis.tokens[0].surface = "wrong".into(),
                     }

@@ -5,8 +5,7 @@ use yomoku_core::{
     analysis::{AnalysisProfile, AnalyzedToken, ChapterAnalysis, SplitMode},
     document::{ChapterText, PastedDocument, TextAnchor, TextOffset, TextRange},
     effective_reader::{
-        original_boundaries_on_page, EffectiveReaderChapter, EffectiveReaderTokenKey,
-        EffectiveReaderTokenSnapshot,
+        EffectiveReaderChapter, EffectiveReaderTokenKey, EffectiveReaderTokenSnapshot,
     },
     effective_session::{EffectiveReaderSelection, EffectiveReaderSession},
     pagination::PageLength,
@@ -48,12 +47,11 @@ fn main() {
                 engine_revision: "synthetic-engine@1".into(),
                 dictionary_revision: "synthetic-full@1".into(),
             },
-            mode: SplitMode::B,
+            mode: SplitMode::C,
             tokens,
         };
         let projection =
-            EffectiveReaderChapter::resolve(&chapter, 10.try_into().unwrap(), &original, &[], &[])
-                .unwrap();
+            EffectiveReaderChapter::resolve(&chapter, 10.try_into().unwrap(), &original).unwrap();
         let document = PastedDocument {
             document_id: 1.try_into().unwrap(),
             title: "Synthetic payload fixture".into(),
@@ -79,8 +77,6 @@ fn main() {
         assert!(session.accept(
             request,
             EffectiveReaderTokenSnapshot {
-                original_boundaries: original_boundaries_on_page(&chapter, &original, page.anchor)
-                    .unwrap(),
                 document_id: document.document_id,
                 page: page.anchor,
                 segmentation: Some(key.segmentation.clone()),

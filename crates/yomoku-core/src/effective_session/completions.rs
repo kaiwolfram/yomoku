@@ -89,7 +89,6 @@ impl EffectiveReaderSession {
         intent: PageCompletionIntent,
     ) -> bool {
         if self.completion.pending.is_some()
-            || self.overrides.blocks_reader()
             || self.words.blocks_completion()
             || self.status_state().pending
             || intent.document_id != identity.base.document_id

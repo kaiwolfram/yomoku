@@ -120,7 +120,7 @@ placements. `epub_inline_images` stores ordered placeholder ranges/alt/path with
 chapter/document and asset ownership FKs. No bitmap decoding/dimensions/cache yet.
 
 The ready analyzer runs once per canonical chapter inside that same transaction.
-Each original Mode B snapshot and all unique Japanese surface registrations commit
+Each original Mode C snapshot and all unique Japanese surface registrations commit
 together, preserving existing statuses and creating no encounters/time/position.
 Cancellation checkpoints surround parsing, assets, chapters and analysis; use the
 existing final commit gate outside FIFO/off main. Cancellation or any later-chapter,
@@ -165,7 +165,7 @@ then advances to the next page's chapter/start or the final chapter EOF.
 
 `load_document_reader_snapshot` atomically returns `DocumentReaderSnapshot` with
 the document, global preset and ordered `ReaderChapterAnalysis` identities. Each
-identity explicitly includes its chapter ID and original Mode B or Missing; no
+identity explicitly includes its chapter ID and original Mode C or Missing; no
 analyzer, source parsing, token rescan or registration runs. The text projection
 omits source bytes/image payloads, while its EPUB loader still verifies all saved
 content/digests/annotations/assets. This repeats on each reader repository operation;
@@ -306,7 +306,7 @@ reuse strict UTF-8/Shift-JIS decoding (`txt::decode`), including BOM handling,
 explicit selection for uncertain bytes and rejection without replacement. They
 never apply Aozora rules to subtitle dialogue. Filename supplies the literal title.
 One immediate transaction checks shared original-file SHA-256 identity, then saves
-original bytes/encoding, one canonical chapter, cue ranges, Mode B analysis and
+original bytes/encoding, one canonical chapter, cue ranges, Mode C analysis and
 unique Japanese registrations. No encounters, reading time or position are added.
 Exact duplicates (including a previously imported TXT with the same bytes) reference
 the first live interpretation before decoding/analyzing, preserving title/progress/
@@ -343,7 +343,7 @@ scalars are preserved; ruby readings do not enter analyzed text. Common layout
 directives do not create chapter boundaries. Unsupported notation stays visible.
 `import_analyzed_txt` hashes original bytes before its immediate transaction, then
 references the live exact match without parsing or analysis, or commits filename
-title, original bytes/selected encoding, canonical text/ruby, original Mode B and
+title, original bytes/selected encoding, canonical text/ruby, original Mode C and
 unique Japanese registrations together. It returns Created/Existing only after
 commit; failures discard this file and preserve earlier imports. Duplicate titles,
 selection changes or equal canonical text do not change original-byte identity.
@@ -446,7 +446,7 @@ Only explicit custom-entry deletion removes it through this repository.
 `load_reader_custom_entry`, `save_reader_custom_entry` and
 `delete_reader_custom_entry` take the original `ReaderTokenKey` plus token index,
 reuse selected-word ownership/whole-chapter validation, and derive surface/base
-from stored original Mode B. Every operation queries the separate read-only index:
+from stored original Mode C. Every operation queries the separate read-only index:
 any JMdict/JMnedict surface/base candidate returns `BuiltInMatch`; dictionary errors
 never count as missing matches. No custom base-form fallback is applied. Missing
 documents return None/false; stale/non-Japanese/out-of-page selections fail.
@@ -515,169 +515,25 @@ Migration 0010 adds completion-driven New→Known events with command provenance
 in the occurrences/time/position transaction, without calling manual selection.
 Existing document imports are not rescanned by this migration or by lookup.
 
-## Analysis anchors and reversible boundaries (migration 0007)
-`AnalysisId` and `OverrideId` are distinct positive i64 identities, allocated by
-AUTOINCREMENT. No analysis token refers to a vocabulary ID: vocabulary deletion
-must not erase source analysis or cause lookup to recreate a deleted entry.
+## Immutable analysis anchors (migration 0007)
 
-`ChapterAnalysis` carries exact engine/dictionary revision identifiers, A/B/C mode
-(default B), and ordered `AnalyzedToken`s. Each token has a source/chapter UTF-8
-anchor, exact original surface, analyzer-supplied Japanese classification and optional
-reading/dictionary form. Dictionary forms never replace the surface identity;
-unresolved forms stay absent. Validation rejects empty/overlapping/out-of-order
-spans, wrong ownership, split scalars, normalized/substituted surfaces, blank
-metadata and omitted non-whitespace text. Whitespace gaps and empty analyses of
-empty/whitespace text are allowed. The pure core module does not tokenize or
-classify text. The separate `yomoku-analysis` adapter supplies real Sudachi output. Its profile pins engine
-commit + android-loader-v1 source patch + adapter-v1/embedded-defaults and
-Full 20261015 + dictionary SHA-256. The loader patch does not change tokenization;
-its explicit profile identity keeps patched snapshots distinguishable.
-Classification uses original Japanese script and analyzer POS, including OOV rare
-kanji. OOV readings/dictionary forms are absent; original surfaces never become
-normalized identity. Normalization-generated empty original spans are omitted,
-and the complete result must still pass canonical coverage/nonoverlap validation.
-Real A/B/C output survives repository saves and reopen without a schema change.
-Production paste imports atomically persist Mode B analysis and registration
-through the verified-descriptor native worker. Existing pastes are not rescanned.
+`chapter_analyses` and `analyzed_tokens` retain exact source anchors, engine and
+dictionary profiles, split mode and analyzer metadata. Mode C is the pinned reader
+base and supplies imported vocabulary and completed-reading occurrences.
+There are no segmentation override tables or boundary editing repositories.
+`ResolvedSegment` projects each original C token with its original token index and
+exact metadata. A/B snapshots are used only for dictionary component lookup.
 
-`chapter_analyses` stores semantics version 1, chapter ownership, engine/dictionary
-revision and explicit `a`/`b`/`c` mode. Its unique chapter/revisions/mode key identifies
-one immutable output: identical retries return its ID; changed output under the
-same key errors. The revision identity must include the adapter/configuration and
-exact dictionary artifact when the real analyzer is integrated. `analyzed_tokens`
-stores contiguous token indices, byte spans, exact surfaces, Japanese flags and
-nullable readings/dictionary forms. Load revalidates indices and canonical anchors.
-Analysis references live chapter text with cascading deletion of snapshots/tokens;
-historical completion occurrences must retain their own anchors and vocabulary IDs.
+The runtime generates missing A/B snapshots on the FIFO worker using the selected
+chapter's pinned profile. Component lookup includes only Japanese tokens wholly
+inside the selected C token. Full surface/base results precede components ordered
+by descending span length and source position. Results deduplicate source/entry
+IDs and preserve matched forms and applicable readings/senses. This read does not
+register component vocabulary or record encounters. Reader selection identities
+remain stable when component snapshots are stored.
 
-`SegmentationOverride` stores a selected exact Surface/TextAnchor and a nonempty
-ordered partition into exact Surface parts. One part is a merge; multiple parts
-are a split. Concatenation must equal the selected original bytes. The pure helper
-projects checked replacement anchors for the selected occurrence. No user-supplied
-reading/lemma is accepted; manual edits do not alter analyzer metadata or history.
-
-`segmentation_overrides` and ordered `segmentation_override_parts` store semantics
-version 1, retained source/chapter provenance, the original span/surface, scope and
-active flag. Scope defaults to AllOccurrences (`all`), keyed by exact BINARY surface;
-ThisOccurrence (`this`) is keyed by source/chapter/start/end. Partial unique indexes
-permit one active edit per exact key. Saving the same partition is a no-op (a global
-rule retains its original provenance even when saved from another source). A changed
-partition atomically deactivates the prior edit and inserts a fresh ID/parts.
-Reversal disables only the supplied active ID, never resurrecting a superseded edit.
-Missing/already inactive IDs are no-ops. Statements and commit failure roll back
-replacement/reversal together. No override API edits text, statuses or past events.
-
-Original selected bytes and source/chapter metadata survive content deletion, so
-global edits remain inspectable/reversible. Load validates their shape/ownership
-and, while canonical text exists, their exact source span. Confirmed document deletion
-retains these rules. Existing documents are not analyzed/rescanned by migration.
-Real analyzer output and atomic paste registration are implemented separately.
-The pure `segmentation` module now derives effective boundaries without modifying
-these snapshots. `segmentation_from_snapshot` creates an exact partition from
-A/B/C output only when the engine/dictionary profile matches original B and both
-ends align with complete, adjacent Japanese tokens in both snapshots. Existing
-manual partitions use the same exact-source anchors/parts representation.
-
-`resolve_segmentation` matches global rules against complete, adjacent Japanese
-original B tokens. It never replaces a substring within a different B word, crosses
-whitespace gaps/non-Japanese tokens or normalizes spelling. Local rules apply only
-to their exact source/chapter/range and must cover the same eligible B spans.
-Local rules take precedence over overlapping globals; within a scope the newest
-OverrideId takes precedence. Repeated self-overlapping matches of one global rule
-choose the leftmost nonoverlapping matches. A losing overlapping rule stays active
-and may reappear after the winner is reversed; superseded same-key rules stay
-inactive. Resolution is independent of page length and input rule order.
-
-`ResolvedSegment` carries exact surface/anchor, the applied OverrideId when present,
-and an original token index only for an exact unchanged B token span. Changed
-boundaries supply no invented reading or dictionary form. `ChapterSegmentation`
-retains the pinned original AnalysisId. `Storage::load_chapter_segmentation` reads
-the original B plus active global/relevant local rules in one deferred transaction;
-missing B returns None, invalid canonical content/rules fail without repair.
-Origin-deleted globals still resolve from retained provenance and exact parts.
-
-`EffectiveChapterSegmentation` additionally retains the original profile and wraps
-each boundary with optional `SegmentMetadata`: source AnalysisId, A/B/C mode,
-whole-chapter token index, Japanese classification, reading and dictionary form.
-The pure resolver matches exact source spans, preferring original B, then A, then
-C; input order does not affect the result. Repeated spellings retain their own
-occurrence's metadata. A known token with no reading/lemma is distinct from an
-unresolved manual boundary, which has no metadata (including classification).
-Never infer metadata by joining or truncating adjacent analyzer tokens.
-`load_effective_chapter_segmentation` reads original B, stored A/C with exactly the
-same engine/dictionary profile and active rules in one deferred transaction. Entire
-eligible snapshots are validated; corrupt matching output fails without partial
-results/repair. Missing B stays missing; later profiles are excluded. This adds no
-table or migration and creates no alternate snapshots automatically.
-
-`EffectiveReaderChapter` privately retains validated resolution and borrows canonical
-chapter text. Its page tokens carry whole effective-chapter segment indices, exact
-surfaces/anchors, page-local UTF-8 display ranges, optional exact metadata and explicit
-reading eligibility. Analyzer Japanese tokens are eligible; exact non-Japanese tokens
-are excluded. An unresolved manual partition inherits eligibility from the Japanese B
-span that made the edit valid (`ManualJapaneseSpan`), without gaining analyzer
-classification, reading or lemma. Visibility includes crossings on both pages;
-completion projection assigns each whole occurrence only to its start page.
-
-`EffectiveReaderChapter::furigana_on_page(page, source)` independently projects ruby
-from the same validated boundaries/metadata. Optional chapter source ruby is wholly
-validated (including off-page spans) and owns every overlapping fallback base.
-Exact Japanese B/A/C metadata supplies readings, preserving each occurrence's
-provenance; unresolved manual parts and exact non-Japanese parts supply none.
-Clipped bases keep full literal readings across every page preset. Canonical text,
-snapshots, rules and vocabulary remain untouched. This pure API is a prerequisite
-for the coordinated live switch, not a separate live reader identity.
-
-`load_effective_reader_tokens` reads document ownership, resolution and live global
-statuses together. It returns the complete effective segmentation alongside tokens;
-distinct visible surfaces use indexed vocabulary lookups, sharing results for repeats.
-New split/merged spellings and deleted entries stay absent until an explicit future
-registration path. A missing live document returns None; missing original B returns
-a snapshot with absent segmentation and no tokens. Malformed pages/snapshots fail.
-Query-only/reopen tests preserve database bytes and stored row values.
-
-`EffectiveReaderTokenKey` freezes document/page and complete effective segmentation,
-including original B, applied rule IDs and metadata provenance. It excludes live
-vocabulary/status/count/custom-entry data; Missing B has no key. The separate
-`load_effective_reader_word(dictionary, key, segment_index)` transaction validates
-current resolution equality before selecting a visible eligible segment, including
-crossing-page fragments. Caller-provided surfaces/base forms never drive lookup.
-Whole-chapter validation still rejects off-page corruption. Changed resolution is
-InvalidSelection; deleted document is None. No revision table or migration is needed.
-
-Selected details share the original reader's indexed lifetime exact-surface count,
-complete applicable word/name candidates and exact-surface custom fallback. Built-in
-matches suppress custom entries. Only exact analyzer metadata provides a base form;
-manual spans use surface-only lookup without guessed metadata. Deleted/unregistered
-vocabulary stays absent with count zero. Query-only bytes/reopen, literal Unicode,
-all presets, reversal/replacement, metadata arrival and retry tests cover this path.
-
-`load_effective_reader_custom_entry`, `save_effective_reader_custom_entry` and
-`delete_effective_reader_custom_entry` use the same frozen key and effective segment
-index. Shared selection validation re-resolves the complete chapter in the operation's
-transaction. Reads stay query-only compatible; saves/deletes use an immediate
-transaction so resolution cannot change between validation and mutation. Exact
-metadata supplies the only allowed base form; unresolved manual spans use surface
-alone. Either word or name matches reject all three operations, including base-only
-matches. Dictionary failures never grant fallback permission. Stale selections fail;
-deleted documents return None/false. Shared original/effective mutation helpers keep
-literal fields, corrupt-entry rejection, write-free identical retries and atomic
-rollback semantics. Entries remain global by exact spelling, independently of live
-or deleted vocabulary; these APIs never register it or rewrite readings/history.
-No migration is added.
-
-These remain separate domain/repository APIs: live reader token/word/furigana and
-completion commands still use original B. Read projections never register vocabulary,
-reset position or rewrite history. Effective completion and override-time registration storage
-are described below. Native FIFO transport is implemented; live app core/FFI integration
-and segmentation UI remain pending.
-
-The [payload review](EFFECTIVE_READER_PAYLOAD.md) records reproducible synthetic
-full-key/page-token JSON sizes. Current complete chapter keys are deliberately
-internal. Compact bridge identity/lifecycle and shared immutable Rust command keys are
-implemented; live reader event/view integration still needs the coordinated switch.
-The native-only effective storage protocol delegates to these same transactions and
-migration 0018 below. It introduces no schema change or alternate history semantics.
+Boundary editing data and commands are removed for fresh development installs.
+No compatibility migration or conversion of saved edits is supplied.
 
 ## Frozen effective completions (migration 0018)
 
@@ -722,53 +578,10 @@ writes. Completion acceptance/reservation alone records no encounters. These are
 in-process lifecycle values, with no new persistence schema or shell codec and
 no automatic process-restart replay. Live app integration remains pending.
 
-## Atomic segmentation-override registration
-
-`save_registered_segmentation_override(edit, timestamp)` uses existing migration-0007
-rule/part rows and vocabulary/status-event tables, with no schema change. One immediate
-transaction validates live text, the selected contiguous Japanese original-B span and
-whole effective snapshots/rules, saves/replaces the rule and registers its eligible
-winning segments within the selected occurrence. Exact non-Japanese analyzer matches
-are excluded; unresolved manual parts gain no fabricated analyzer metadata. Repeated
-parts register once, existing statuses survive and new rows receive dated New events.
-Other occurrences/documents are not rescanned for registration, even for global rules.
-
-The rule ID and distinct registration count are returned together. Identical active
-rule retries reuse the ID with zero writes/registration, including after vocabulary
-deletion and SQLite reopen. Reversal preserves registered entries and past history;
-a new explicit save after reversal can register missing spellings again. Rule/part,
-replacement deactivation, vocabulary and event failures (including deferred COMMIT)
-roll back together. Reading encounters/time/position/finish and immutable B/A/C remain
-unchanged. The original analysis-only save API retains its prerequisite semantics.
-Rendered-key validation and retry protection after intervening changes belong to the
-future typed control workflow; this raw storage API is not exposed to Android.
-
-Effective selected-word presentation is now a separate compact core value:
-`EffectiveWordDetails` contains the session selection, visible token, live count,
-word/name candidates and optional exact-surface custom entry. Full chapter keys
-remain in native accepted commands/results and are dropped during compaction.
-The session retains literal pending custom command values for exact explicit
-retry; a fresh native callback attempt distinguishes each retry delivery. This is
-transient process state, not a durable queue. Dismissal/page invalidation cannot
-retarget accepted writes. Successful writes update the displayed committed entry
-only if that selection is still current; failure preserves it. Explicit Cancel can
-discard a failed retry without database writes. No migration or historical data
-semantics change; a new explicit load/edit may supersede the failed retry. Live
-app integration remains pending.
-
-
-Effective manual status changes add no tables or event semantics. Full rendered
-resolution, eligible visible segment and live exact-surface vocabulary ID validate
-inside the same immediate transaction as the shared manual update/event helper.
-Same-status retries add no events. A missing vocabulary entry remains absent; an
-old ID cannot update a newly registered replacement. Reversed/stale partitions
-and off-page selections fail before mutation. The native retained request freezes
-choice/timestamp/key across explicit retries and never auto-replays after restart.
-
 ## Read-only reader token/status projection
 
 `load_reader_tokens(document_id, page)` reads live immutable text, the original
-Mode B identity and visible Japanese tokens with current exact-surface vocabulary
+Mode C identity and visible Japanese tokens with current exact-surface vocabulary
 statuses in one deferred read transaction. None means no live document. Missing
 analysis returns `ReaderAnalysis::Missing` and no tokens; it never substitutes A/C,
 another chapter or a later B snapshot. Existing analysis is fully revalidated;
@@ -969,7 +782,7 @@ text, then supplies that canonical `ChapterText` to a caller-provided analyzer.
 The caller must preload/reuse the analyzer before entering this method; the
 callback holds the SQLite write transaction and must not do database work or
 publish provisional identities. Validate complete source coverage/anchors and
-require default Mode B, then store the immutable analysis and register every
+require default Mode C, then store the immutable analysis and register every
 distinct token surface marked Japanese. Non-Japanese tokens remain in the
 snapshot but create no vocabulary. Use exact surfaces, including OOV Japanese;
 do not register lemmas or normalize source text.
@@ -1008,7 +821,7 @@ Legacy hash backfill is the only possible write on this branch; fully indexed
 duplicates perform no writes. Backfill may hold the write lock across a large
 legacy Library and is not performed on app startup.
 
-For a new document it composes the raw Mode B import and hash insertion in the
+For a new document it composes the raw Mode C import and hash insertion in the
 same transaction, returning `Created(AnalyzedPaste)` only after commit. The
 callback follows the same ready/reused analyzer and provisional-ID constraints
 as raw creation. Concurrent imports serialize lookup and allocation, so only
@@ -1100,7 +913,7 @@ can be repeated. Typography never changes logical pagination or anchors and
 produces no position, encounter, vocabulary or completion writes.
 `ViewModel.reader_furigana` is a transient, derived `Vec<ReaderRuby>`, empty when
 disabled or no reader is open. Enabled projection retains validated page source
-ruby and appends original Mode B token readings only for tokens whose clipped
+ruby and appends original Mode C token readings only for tokens whose clipped
 base has no source overlap. Any source overlap suppresses that whole analyzer
 reading: no mapping of part of a compound reading to uncovered characters is
 invented. Keep literal readings (including analyzer katakana), sorted by base.
@@ -1122,10 +935,10 @@ no proportional reading split, schema or persistence change is introduced.
 
 ## Reader analysis restoration (no schema change)
 `load_reader_snapshot` reads canonical paste content/current position, persisted
-page length and the earliest stored Mode B analysis header in one transaction.
+page length and the earliest stored Mode C analysis header in one transaction.
 The historical `ReaderSnapshot` returns these together; the FIFO now uses the
 ordered `DocumentReaderSnapshot` and one identity per chapter. `ReaderAnalysis` is
-Available(AnalysisId) or Missing; no Mode B base means legacy absence, never an
+Available(AnalysisId) or Missing; no Mode C base means legacy absence, never an
 A/C or foreign-chapter substitution. Later profiles do not replace the original
 base. Invalid metadata/settings fail without fallback/repair. No token scan,
 analyzer load or vocabulary registration is performed. Explicit reader entry uses
@@ -1230,7 +1043,7 @@ The pure `japanese_tokens_on_page` helper assigns each Japanese token to the pag
 containing its start, retaining its entire original span if a boundary crosses it.
 A token starting at a page boundary belongs to the following page. Repetitions
 stay separate; punctuation/non-Japanese tokens never count. This selects the
-frozen base analysis only; segmentation-override resolution remains future work.
+frozen Mode C analysis only.
 
 `reading_occurrences` stores command/original token index, VocabularyId, full byte
 range, exact surface and optional reading/dictionary form. Command provenance
@@ -1601,78 +1414,6 @@ exact migration retry, integrity and foreign-key checks.
 
 Refine schema with executable migration/transaction tests before claiming storage
 or accurate historical statistics are complete.
-## Guarded effective override contexts
-
-The new `load_effective_override_context` repository atomically compares a rendered
-effective key, validates a whole contiguous Japanese original-B selection with no
-wholly off-page edge token, and reads stored exact same-profile A/B/C partitions
-and active winning rules. It returns an opaque native context sharing the key;
-missing alternates are not analyzed or guessed. Literal supplementary/combining/NUL
-text, whole crossing tokens, both override scopes and deleted-origin global rules
-retain the existing anchor semantics.
-
-The context freezes `(MAX(segmentation_overrides.id), inactive row count)` as an
-intervening-edit guard. Supported repositories never remove/rewrite/reactivate rule
-rows: replacement appends a new ID and disables the old rule; reversal only disables.
-Document deletion retains those rows. Therefore the pair changes on every supported
-rule mutation, including split/reversal restoring identical B provenance. It is
-database scoped, not a backup/durable authorization ID. An edit anywhere retires
-older contexts conservatively; this aggregate currently scans the rule table.
-
-`save_effective_override` and `reverse_effective_override` compare that guard and the
-full rendered resolution inside their write transaction. Save shares existing rule
-replacement and winning-parts registration; reverse must name a winning ID shown
-in the context. History/time/position/finish remain unchanged. Rollback permits
-explicit retry; a committed mutation makes the old context stale and requires
-explicit reload even if its success response was lost. Same-rule no-ops under a
-fresh context stay write-free after vocabulary deletion. No migration or shell
-codec is added.
-
-The retained native session now owns read/stored-choice/manual-save/reverse attempts
-on the existing FIFO. Each dispatch/retry has a fresh checked attempt; writes retain
-the same shared context, scope, literal parts and registration timestamp across
-invalidation/reopen retries. Successful writes, stale contexts and failed-write
-Cancel retire rendered state and require explicit reload. Stale before-images are
-discarded rather than rebased, including after lost-success responses; deleted
-vocabulary is never recreated by replaying that old prompt. Pending edits mutually
-gate word/custom/status/completion obligations. No new durable command, automatic
-replay, migration or shell codec. Live UI adoption remains.
-
-On-demand A/C fills existing immutable `chapter_analyses`/`analyzed_tokens` rows
-only. A guarded read checks the rendered context and reuses the exact original
-profile/mode when stored; otherwise whole-chapter analysis runs outside SQLite's
-transaction. The final immediate transaction rechecks both full provenance and
-the intervening-rule guard before storing validated same-profile output. Existing
-identity conflicts keep their rejection semantics. Failed SQL/commit rolls back
-all analysis rows; retry retains canonical chapter/mode/profile/context. Successful
-storage can resolve previously unknown metadata without changing boundaries, so
-the retained core requires explicit page/context reload. History, frozen completion
-reservations, pending time, progress, rules and vocabulary remain intact. There is
-no registration/rescan or automatic restart replay.
-
-Compact override prompt/action codecs now expose selected-span choices and winning
-rule display facts without serializing the context's full chapter or rule-table
-revision. A session-only prompt revision plus compact page identity authenticates
-actions, including same-span reopen and frozen retry/Cancel. These values never
-enter SQLite or replace transaction-local provenance/rule validation. No migration,
-history rewrite, new durable command or automatic replay; live Android adoption
-remains pending.
-
-The isolated Android boundary editor saves only draft cuts/scope, guarded by the
-retained native session key, complete compact prompt identity and literal surface.
-These UI drafts are not accepted overrides or write reservations. Exact pending
-writes/retries and provenance remain native; no SQLite/schema change is involved.
-
-The production Android reader opens that editor from validated original-B span
-selection. `EffectiveReaderPage.original_boundaries` carries page-only Japanese B
-anchors/surfaces/display ranges from the same read transaction as effective tokens.
-The two endpoint indices saved by the selector are presentation drafts scoped to
-the retained native session and full page identity; they never become vocabulary
-or effective segment IDs. Storage still validates original-B contiguity and full
-effective provenance when opening/mutating the prompt. No historical/durable format
-changes; production activation remains pending.
-
-
 ## Library read order (migration 0019)
 
 `documents.last_read_sequence` is nullable, otherwise a positive signed 64-bit
@@ -1775,22 +1516,6 @@ Accepted
 completion/time obligations are ephemeral model state backed by the existing
 version-1 durable reservations and exact replay semantics; new sessions never
 resume unfinished work automatically. No data/migration/destructive change.
-
-The app now also exposes `EffectiveReaderOverride` and optional
-`effective_reader_override` with the existing compact action/prompt/state schema.
-Every post-open action includes its retained prompt identity; full chapter keys,
-rule revisions and exact write retry payloads remain native. Accepted override
-save/reverse/generation participates in the shared pending-write gate and retires
-the rendered page immediately. Explicit reload follows success or stale context.
-Registration/history/rollback semantics remain those of the existing guarded
-repositories; no migration, history rewrite or automatic restart replay is added.
-
-The override reload requirement is ephemeral page presentation state, not durable
-edit provenance. It clears on normal page invalidation and explicit token loads;
-accepted override outcomes mark their retired before-image again. Pending writes
-and exact native retry payloads remain independent. A close/reopen must not carry
-an earlier edit's reload requirement onto the new reader page. No data change.
-
 
 ## Statistics application payloads (no migration)
 
@@ -2278,7 +2003,7 @@ indices, ordered scalar ranges and literal nonempty UTF-8 readings. Optional
 legacy paste hashes, duplicate pastes, exact originals, renames and deleted-file
 provenance remain intact. Hashes borrow rows; text derivation owns one file and
 annotation vectors without repository imports, analysis, IDs or EPUB extraction.
-EPUB metadata/assets/chapter hashes/spans/images, override provenance, other
+EPUB metadata/assets/chapter hashes/spans/images, other
 historical anchors and counter references remain unchecked.
 [RESTORE_VALIDATION.md](RESTORE_VALIDATION.md)
 lists all current table groups and precise boundaries. No restore-ready authority

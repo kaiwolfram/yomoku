@@ -1,5 +1,10 @@
 # CLI development
 
+The current reader uses Mode C and A/B dictionary components. Boundary-editor
+commands and override benchmarks below are historical; their editing APIs and
+`measure_effective_reader` executable have been removed. See [the product spec](PRODUCT_SPEC.md#32-vocabulary-model-and-dictionary-panel).
+
+
 Run from the repository root. Dependencies are pinned by Cargo.lock; on a fresh
 workstation run `cargo fetch --locked` with network access before offline checks.
 The agent sandbox required escalation for downloads into the Cargo cache.

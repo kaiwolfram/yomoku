@@ -34,7 +34,6 @@ fn effective_worker_protocol_has_no_shell_codec() {
     let result = StorageResult::Effective(EffectiveStorageResult::TokensLoaded(
         request,
         EffectiveReaderTokenSnapshot {
-            original_boundaries: vec![],
             document_id: base.document_id,
             page: base.page,
             segmentation: None,

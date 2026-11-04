@@ -26,7 +26,10 @@ fn details(f: &Fixture, selection: EffectiveReaderSelection) -> EffectiveReaderW
         key: f.snapshot().key().unwrap(),
         candidates: DictionaryCandidates {
             surface: token.surface.clone(),
-            dictionary_form: None,
+            dictionary_form: token
+                .metadata
+                .as_ref()
+                .and_then(|m| m.dictionary_form.as_ref().map(|f| f.as_str().to_owned())),
             words: vec![],
             names: vec![],
         },
@@ -150,7 +153,7 @@ fn compact_lookup_requires_current_visible_selection_and_explicit_retry_after_ba
         .details
         .unwrap();
     assert_eq!(word.token.surface, "猫");
-    assert!(word.token.reading.is_none() && word.token.dictionary_form.is_none());
+    assert!(word.token.reading.is_some() && word.token.dictionary_form.is_some());
     assert_eq!(word.encountered, 7);
     assert!(f.core.view().reader_word.is_none());
     f.load();

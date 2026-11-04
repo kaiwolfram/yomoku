@@ -77,7 +77,7 @@ impl Storage {
     }
 
     /// Create or replace one exact spelling's meaning/reading atomically. The
-    /// selected original Mode B token supplies surface/base identity. Both fields
+    /// selected original Mode C token supplies surface/base identity. Both fields
     /// must be nonblank; literal Unicode is preserved. None means deleted document.
     /// Does not edit analyzer metadata, built-ins, vocabulary, time or encounters.
     pub fn save_reader_custom_entry(

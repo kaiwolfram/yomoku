@@ -51,7 +51,6 @@ fun main(args: Array<String>) {
     verifyStatisticsBridge()
     verifyAnkiRecoveryBridge(args.single())
     verifyAnkiSettingsBridge(args.single())
-    verifyReaderBoundaryDraft()
     verifyEffectiveReaderDisplay()
     verifyTextBoundaries(args.single())
     verifyDocumentBridge()

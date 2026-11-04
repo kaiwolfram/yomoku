@@ -44,7 +44,7 @@ pub(super) fn fixture(effective: bool) -> (Model, AnkiSelection) {
             engine_revision: "test@1".into(),
             dictionary_revision: "test@1".into(),
         },
-        mode: SplitMode::B,
+        mode: SplitMode::C,
         tokens: vec![
             AnalyzedToken {
                 anchor: TextAnchor {
@@ -118,8 +118,7 @@ pub(super) fn fixture(effective: bool) -> (Model, AnkiSelection) {
                 analysis: ReaderAnalysis::Available(analysis_id),
             })
             .unwrap();
-        let resolved =
-            EffectiveReaderChapter::resolve(&chapter, analysis_id, &original, &[], &[]).unwrap();
+        let resolved = EffectiveReaderChapter::resolve(&chapter, analysis_id, &original).unwrap();
         let mut tokens = resolved.tokens_on_page(page.anchor).unwrap();
         tokens[1].vocabulary = vocabulary;
         let snapshot = EffectiveReaderTokenSnapshot {
@@ -127,7 +126,6 @@ pub(super) fn fixture(effective: bool) -> (Model, AnkiSelection) {
             page: page.anchor,
             segmentation: Some(resolved.into_segmentation()),
             tokens,
-            original_boundaries: vec![],
         };
         let details = EffectiveReaderWordDetails {
             key: snapshot.key().unwrap(),

@@ -229,7 +229,7 @@ fn loader_and_later_chapter_analysis_failures_roll_back_then_next_file_and_retry
                         return Err(DocumentError::Unavailable);
                     }
                     let mut analysis = fixture(chapter);
-                    analysis.mode = SplitMode::C;
+                    analysis.mode = SplitMode::B;
                     return Ok(analysis);
                 }
                 Ok(fixture(chapter))

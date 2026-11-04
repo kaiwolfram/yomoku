@@ -54,7 +54,10 @@ internal fun verifyReaderWordBridge() {
                 form.matches.all { match -> match.senseIndices.all { it.toInt() < candidate.entry.senses.size } }
             } })
             check(ViewModel.bincodeDeserialize(loaded.bincodeSerialize()) == loaded)
-            check(before.contentEquals(database.readBytes()))
+            check(!before.contentEquals(database.readBytes())) // First lookup caches A/B analysis.
+            val cached = database.readBytes()
+            dispatch(bridge, Event.LoadEffectiveReaderWord(selection))
+            check(cached.contentEquals(database.readBytes()))
             check(loaded.reader == page && loaded.readerTime == null && loaded.completionNotice == null)
             check(provider.wordCalls.get() == 2)
             check(provider.wordThreads.all { it != Thread.currentThread() })

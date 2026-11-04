@@ -1,8 +1,5 @@
 use yomoku_core::{
-    analysis::{
-        AnalysisProfile, AnalyzedToken, ChapterAnalysis, OverrideScope, SegmentationOverride,
-        SplitMode,
-    },
+    analysis::{AnalysisProfile, AnalyzedToken, ChapterAnalysis, SplitMode},
     document::{ChapterText, TextAnchor, TextOffset, TextRange},
     vocabulary::Surface,
 };
@@ -112,7 +109,7 @@ fn exact_original_unicode_surface_and_metadata_are_separate() {
     let mut analysis = analysis(&chapter);
     analysis.tokens[0].dictionary_form = Some(Surface::new("食べる").unwrap());
     analysis.tokens[0].reading = Some("タベタ".into());
-    assert_eq!(analysis.mode, SplitMode::B);
+    assert_eq!(analysis.mode, SplitMode::C);
     assert!(analysis.validate(&chapter).is_ok());
     assert_eq!(
         analysis.tokens[0].anchor.slice(&chapter).unwrap(),
@@ -167,62 +164,4 @@ fn whitespace_gaps_are_allowed_but_punctuation_and_latin_cannot_disappear() {
         missing.tokens[0].surface = "日本語".into();
         assert!(missing.validate(&chapter).is_err());
     }
-}
-
-#[test]
-fn split_and_merge_partition_exact_source_without_mutating_base_analysis() {
-    let chapter = chapter("📖𠮷野家で食べた。");
-    let base = analysis(&chapter);
-    let selected = "𠮷野家で食べた";
-    let anchor = anchor(&chapter, 4, 4 + selected.len());
-    let mut edit = SegmentationOverride {
-        scope: OverrideScope::default(),
-        anchor,
-        surface: Surface::new(selected).unwrap(),
-        parts: ["𠮷野家", "で", "食べた"]
-            .map(|s| Surface::new(s).unwrap())
-            .to_vec(),
-    };
-    assert_eq!(edit.scope, OverrideScope::AllOccurrences);
-    let parts = edit.replacement_anchors(&chapter).unwrap();
-    assert_eq!(
-        parts
-            .iter()
-            .map(|a| a.slice(&chapter).unwrap())
-            .collect::<Vec<_>>(),
-        ["𠮷野家", "で", "食べた"]
-    );
-    assert_eq!(parts[0].range.start, anchor.range.start);
-    assert_eq!(parts.last().unwrap().range.end, anchor.range.end);
-    edit.scope = OverrideScope::ThisOccurrence;
-    edit.parts = vec![edit.surface.clone()];
-    assert_eq!(edit.replacement_anchors(&chapter).unwrap(), [anchor]);
-    assert_eq!(base, analysis(&chapter));
-    assert!(base.validate(&chapter).is_ok());
-}
-
-#[test]
-fn overrides_reject_normalization_missing_parts_bad_ranges_and_wrong_source() {
-    let chapter = chapter("が𠮷\0食べた");
-    let original = SegmentationOverride {
-        scope: OverrideScope::ThisOccurrence,
-        anchor: anchor(&chapter, 0, chapter.text.len()),
-        surface: Surface::new(&chapter.text).unwrap(),
-        parts: ["が", "𠮷\0", "食べた"]
-            .map(|s| Surface::new(s).unwrap())
-            .to_vec(),
-    };
-    assert!(original.replacement_anchors(&chapter).is_ok());
-    let mut bad = original.clone();
-    bad.parts[0] = Surface::new("か\u{3099}").unwrap();
-    assert!(bad.replacement_anchors(&chapter).is_err());
-    bad = original.clone();
-    bad.parts.clear();
-    assert!(bad.replacement_anchors(&chapter).is_err());
-    bad = original.clone();
-    bad.anchor.range.end = TextOffset::START;
-    assert!(bad.replacement_anchors(&chapter).is_err());
-    bad = original;
-    bad.anchor.chapter_id = 99.try_into().unwrap();
-    assert!(bad.replacement_anchors(&chapter).is_err());
 }

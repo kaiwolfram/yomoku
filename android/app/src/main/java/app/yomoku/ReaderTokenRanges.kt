@@ -4,8 +4,6 @@ import app.yomoku.shared.EffectivePageIdentity
 import app.yomoku.shared.EffectivePageToken
 import app.yomoku.shared.EffectiveReaderPage
 import app.yomoku.shared.EffectiveReaderSelection
-import app.yomoku.shared.EffectiveTokenEligibility
-import app.yomoku.shared.OriginalBoundaryToken
 import app.yomoku.shared.ReaderAnalysis
 import app.yomoku.shared.ReaderPage
 import app.yomoku.shared.ReaderToken
@@ -85,66 +83,6 @@ internal data class EffectiveDisplayToken(
     val end: Int,
 )
 
-internal data class OriginalDisplayBoundary(
-    val token: OriginalBoundaryToken,
-    val start: Int,
-    val end: Int,
-)
-
-/** Editing always uses original B, including whole tokens crossing a page edge. */
-internal fun originalDisplayBoundaries(
-    page: ReaderPage,
-    identity: EffectivePageIdentity,
-    snapshot: EffectiveReaderPage,
-): List<OriginalDisplayBoundary>? {
-    if (
-        snapshot.identity != identity ||
-            page.documentId != identity.base.documentId ||
-            page.anchor != identity.base.page ||
-            (identity.base.analysis is ReaderAnalysis.Missing &&
-                snapshot.originalBoundaries.isNotEmpty())
-    )
-        return null
-    val projection = ReaderTokenRanges.create(page) ?: return null
-    var previousEnd = 0
-    return snapshot.originalBoundaries.map { token ->
-        val range =
-            projection.displayRange(token.anchor, token.displayRange, token.surface) ?: return null
-        if (range.first < previousEnd) return null
-        previousEnd = range.last + 1
-        OriginalDisplayBoundary(token, range.first, range.last + 1)
-    }
-}
-
-/** Punctuation, whitespace and non-Japanese gaps cannot be merged into an edit. */
-internal fun originalBoundaryAnchor(
-    tokens: List<OriginalDisplayBoundary>,
-    first: Int,
-    last: Int,
-): TextAnchor? {
-    if (first !in tokens.indices || last !in tokens.indices) return null
-    val selected = tokens.subList(minOf(first, last), maxOf(first, last) + 1)
-    if (
-        selected.zipWithNext().any { (left, right) ->
-            left.token.anchor.sourceId != right.token.anchor.sourceId ||
-                left.token.anchor.chapterId != right.token.anchor.chapterId ||
-                left.token.anchor.range.end != right.token.anchor.range.start
-        }
-    )
-        return null
-    return selected
-        .first()
-        .token
-        .anchor
-        .copy(
-            range =
-                TextRange(
-                    selected.first().token.anchor.range.start,
-                    selected.last().token.anchor.range.end,
-                )
-        )
-}
-
 /** Keep the effective segment/revision on every tap, including crossing/manual words. */
 internal fun effectiveDisplayTokens(
     page: ReaderPage,
@@ -167,8 +105,6 @@ internal fun effectiveDisplayTokens(
         if (
             range.first < previousEnd ||
                 (previousIndex != null && token.segmentIndex <= previousIndex) ||
-                (token.eligibility == EffectiveTokenEligibility.MANUALJAPANESESPAN &&
-                    (token.reading != null || token.dictionaryForm != null)) ||
                 listOfNotNull(token.reading, token.dictionaryForm).any {
                     it.isBlank() || utf8Boundaries(it) == null
                 }

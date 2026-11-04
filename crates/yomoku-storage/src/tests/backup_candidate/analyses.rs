@@ -105,7 +105,7 @@ fn backup_candidate_analyses_preserve_every_populated_prefix_all_modes_and_liter
         analysis.tokens[0].dictionary_form = Some(Surface::new(" 猫\0𠮷 ").unwrap());
         // Preserve supplied classification, even for Latin text; do not rerun heuristics.
         analysis.tokens[3].is_japanese = true;
-        for mode in [SplitMode::A, SplitMode::B, SplitMode::C] {
+        for mode in [SplitMode::A, SplitMode::C, SplitMode::B] {
             analysis.mode = mode;
             storage
                 .store_chapter_analysis(1.try_into().unwrap(), &analysis)
@@ -142,7 +142,7 @@ fn backup_candidate_analyses_preserve_full_i64_ids_and_legacy_absence() {
             .chapter_analysis(1.try_into().unwrap())
             .unwrap()
             .unwrap();
-        analysis.mode = SplitMode::C;
+        analysis.mode = SplitMode::B;
         storage
             .connection
             .execute(

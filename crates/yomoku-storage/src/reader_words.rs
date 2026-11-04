@@ -63,7 +63,7 @@ impl From<DictionaryError> for ReaderWordError {
 }
 
 impl Storage {
-    /// Resolve a selected original Mode B token, live status and lifetime count
+    /// Resolve a selected original Mode C token, live status and lifetime count
     /// from one consistent user-state read transaction. Surface/base forms come
     /// from validated stored analysis, never from caller-supplied text. Includes
     /// crossing-page fragments under their full original token identity.
@@ -88,6 +88,7 @@ impl Storage {
             &token.surface,
             token.dictionary_form.as_deref(),
             token.vocabulary,
+            &[],
         )?;
         transaction.commit().map_err(StorageError::from)?;
         Ok(Some(ReaderWordDetails {
@@ -100,8 +101,8 @@ impl Storage {
     }
 
     /// Read a currently resolved effective Japanese segment. The whole frozen
-    /// resolution is compared before using its index: an override replacement,
-    /// reversal or metadata change cannot silently select a different word.
+    /// resolution is compared before using its index, so metadata changes cannot
+    /// silently select a different word.
     /// Status/count/custom-entry reads remain live and never register vocabulary.
     /// Only exact analyzer metadata may supply a base form for dictionary lookup.
     pub fn load_effective_reader_word(
@@ -114,6 +115,7 @@ impl Storage {
         let Some(token) = selected_effective_token_in(&transaction, key, segment_index)? else {
             return Ok(None);
         };
+        let components = component_forms_in(&transaction, key, token.anchor)?;
         let (encountered, candidates, custom_entry) = word_details_in(
             &transaction,
             dictionary,
@@ -123,6 +125,7 @@ impl Storage {
                 .as_ref()
                 .and_then(|metadata| metadata.dictionary_form.as_ref().map(|form| form.as_str())),
             token.vocabulary,
+            &components,
         )?;
         transaction.commit().map_err(StorageError::from)?;
         Ok(Some(EffectiveReaderWordDetails {
@@ -184,6 +187,7 @@ fn word_details_in(
     surface: &str,
     dictionary_form: Option<&str>,
     vocabulary: Option<ReaderVocabulary>,
+    components: &[String],
 ) -> Result<(u64, DictionaryCandidates, Option<ReaderCustomEntry>), ReaderWordError> {
     let encountered = match vocabulary {
         Some(entry) => {
@@ -194,7 +198,7 @@ fn word_details_in(
         }
         None => 0,
     };
-    let candidates = dictionary.lookup(surface, dictionary_form)?;
+    let candidates = dictionary.lookup_forms(surface, dictionary_form, components)?;
     let custom_entry = if candidates.words.is_empty() && candidates.names.is_empty() {
         crate::custom_dictionary::read_entry_in(
             connection,
@@ -212,6 +216,58 @@ fn word_details_in(
         None
     };
     Ok((encountered, candidates, custom_entry))
+}
+
+fn component_forms_in(
+    connection: &Connection,
+    key: &EffectiveReaderTokenKey,
+    anchor: yomoku_core::document::TextAnchor,
+) -> Result<Vec<String>, ReaderWordError> {
+    let chapter = crate::analysis::read_chapter(connection, anchor.chapter_id)?;
+    let mut statement = connection.prepare("SELECT id FROM chapter_analyses WHERE chapter_id = ?1 AND engine_revision = ?2 AND dictionary_revision = ?3 AND split_mode IN ('a','b') ORDER BY split_mode").map_err(StorageError::from)?;
+    let ids = statement
+        .query_map(
+            (
+                i64::from(anchor.chapter_id),
+                &key.segmentation.profile.engine_revision,
+                &key.segmentation.profile.dictionary_revision,
+            ),
+            |row| row.get::<_, i64>(0),
+        )
+        .map_err(StorageError::from)?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(StorageError::from)?;
+    let mut components = Vec::new();
+    for id in ids {
+        let id = id.try_into().map_err(|_| StorageError::InvalidAnalysis)?;
+        let analysis =
+            crate::analysis::read_analysis(connection, id)?.ok_or(StorageError::InvalidAnalysis)?;
+        analysis
+            .validate(&chapter)
+            .map_err(|_| StorageError::InvalidAnalysis)?;
+        components.extend(analysis.tokens.into_iter().filter(|t| {
+            t.is_japanese
+                && t.anchor.range.start >= anchor.range.start
+                && t.anchor.range.end <= anchor.range.end
+        }));
+    }
+    components.sort_by_key(|t| {
+        (
+            std::cmp::Reverse(t.surface.chars().count()),
+            t.anchor.range.start,
+        )
+    });
+    let mut forms = Vec::new();
+    for token in components {
+        for form in std::iter::once(token.surface)
+            .chain(token.dictionary_form.map(|f| f.as_str().to_owned()))
+        {
+            if !forms.contains(&form) {
+                forms.push(form);
+            }
+        }
+    }
+    Ok(forms)
 }
 
 #[cfg(test)]

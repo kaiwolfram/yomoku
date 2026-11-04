@@ -1,9 +1,8 @@
 use super::*;
 use yomoku_core::{
-    effective_overrides::EffectiveOverrideFailure,
     effective_session::{
-        EffectiveCompletionProgress, EffectiveOverrideProgress,
-        EffectiveReaderProgress as Progress, EffectiveReaderRequest as Request,
+        EffectiveCompletionProgress, EffectiveReaderProgress as Progress,
+        EffectiveReaderRequest as Request,
     },
     effective_storage::EffectiveStorageResult as Output,
     storage::{DocumentError, StorageResult},
@@ -51,49 +50,6 @@ fn token_callbacks_use_captured_attempts_and_require_explicit_retry_after_bad_re
         None
     );
     assert!(session.page().is_some());
-}
-
-#[test]
-fn token_failures_and_wrong_envelopes_consume_only_their_outstanding_read() {
-    for (result, error) in [
-        (
-            StorageResult::Failed(DocumentError::Unavailable),
-            DocumentError::Unavailable,
-        ),
-        (
-            StorageResult::ImportCancelled,
-            DocumentError::InvalidDocument,
-        ),
-        (
-            StorageResult::Effective(Output::OverrideFailed(
-                EffectiveOverrideFailure::StaleContext,
-            )),
-            DocumentError::InvalidDocument,
-        ),
-    ] {
-        let snapshot = snapshot();
-        let mut session = EffectiveReaderSession::default();
-        let request = Request::Tokens(session.begin_load(base(&snapshot)).unwrap());
-        assert_eq!(
-            session.finish_request(&request, result.clone()),
-            Some(Progress::TokensFailed(error))
-        );
-        assert_eq!(session.finish_request(&request, result), None);
-        assert!(session.page().is_none());
-    }
-    let snapshot = snapshot();
-    let mut session = EffectiveReaderSession::default();
-    let request = session.begin_load(base(&snapshot)).unwrap();
-    let mut foreign = snapshot.clone();
-    foreign.document_id = 99.try_into().unwrap();
-    assert_eq!(
-        session.finish_request(
-            &Request::Tokens(request),
-            StorageResult::Effective(Output::TokensLoaded(request, foreign)),
-        ),
-        Some(Progress::TokensFailed(DocumentError::InvalidDocument))
-    );
-    assert!(!session.accept(request, snapshot));
 }
 
 #[test]
@@ -225,43 +181,4 @@ fn completion_failures_do_not_dispatch_followups_or_lose_the_frozen_intent() {
     );
     assert!(session.completion_state().pending);
     assert!(!session.completion_state().busy);
-}
-
-#[test]
-fn override_callbacks_keep_typed_failures_and_reject_foreign_envelopes() {
-    let (mut session, selection, _) = words::loaded(true);
-    let anchor = session
-        .resolve(selection.page)
-        .unwrap()
-        .segmentation
-        .segments[2]
-        .boundary
-        .anchor;
-    for result in [
-        StorageResult::Effective(Output::OverrideFailed(
-            EffectiveOverrideFailure::StaleContext,
-        )),
-        StorageResult::Failed(DocumentError::Unavailable),
-        StorageResult::ImportCancelled,
-    ] {
-        // Invalid/stale prompts require a fresh retained page/context.
-        let snapshot = snapshot_with_manual_split(true);
-        let load = session.begin_load(base(&snapshot)).unwrap();
-        assert!(session.accept(load, snapshot));
-        let page = session.page().unwrap().identity;
-        let request = Request::Override(session.begin_override_load(page, anchor).unwrap());
-        let failure = match result {
-            StorageResult::Effective(_) => EffectiveOverrideFailure::StaleContext,
-            StorageResult::Failed(error) => EffectiveOverrideFailure::Storage(error),
-            _ => EffectiveOverrideFailure::Storage(DocumentError::InvalidDocument),
-        };
-        assert_eq!(
-            session.finish_request(&request, result.clone()),
-            Some(Progress::Override(EffectiveOverrideProgress::Failed(
-                failure
-            )))
-        );
-        assert_eq!(session.finish_request(&request, result), None);
-        assert!(!session.override_state().busy);
-    }
 }

@@ -3,9 +3,8 @@
 use crux_core::Command;
 
 use super::{
-    EffectiveCompletionProgress, EffectiveCompletionRequest, EffectiveOverrideProgress,
-    EffectiveOverrideRequest, EffectivePageRequest, EffectiveReaderSession, EffectiveStatusRequest,
-    EffectiveWordRequest,
+    EffectiveCompletionProgress, EffectiveCompletionRequest, EffectivePageRequest,
+    EffectiveReaderSession, EffectiveStatusRequest, EffectiveWordRequest,
 };
 use crate::{
     app::Effect,
@@ -21,7 +20,6 @@ pub enum EffectiveReaderRequest {
     Word(EffectiveWordRequest),
     Status(EffectiveStatusRequest),
     Completion(EffectiveCompletionRequest),
-    Override(EffectiveOverrideRequest),
 }
 
 /// A consumed callback, including failures. None from `finish_request` means a
@@ -33,7 +31,6 @@ pub enum EffectiveReaderProgress {
     WordFinished,
     StatusFinished,
     Completion(EffectiveCompletionProgress),
-    Override(EffectiveOverrideProgress),
 }
 
 impl EffectiveReaderRequest {
@@ -43,7 +40,6 @@ impl EffectiveReaderRequest {
             Self::Word(request) => request.operation(),
             Self::Status(request) => request.operation(),
             Self::Completion(request) => request.operation(),
-            Self::Override(request) => request.operation(),
         })
     }
 
@@ -101,9 +97,6 @@ impl EffectiveReaderSession {
             EffectiveReaderRequest::Completion(request) => self
                 .finish_completion_request(request, result)
                 .map(EffectiveReaderProgress::Completion),
-            EffectiveReaderRequest::Override(request) => self
-                .finish_override_request(request, result)
-                .map(EffectiveReaderProgress::Override),
         }
     }
 }

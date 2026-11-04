@@ -1,8 +1,7 @@
 use yomoku_core::{
     active_time::PendingReadingTime,
-    analysis::{OverrideScope, SegmentationOverride},
     completion::{AnalyzedCompletionOutcome, PageCompletionIntent},
-    document::{PasteText, TextAnchor, TextOffset, TextRange},
+    document::PasteText,
     effective_reader::EffectivePageCompletion,
     reader::ReaderPage,
     statistics::LifetimeReadingTotals,
@@ -173,52 +172,6 @@ fn original_and_effective_completions_keep_repetitions_rereads_statuses_and_exac
         .unwrap();
     assert_totals(&storage, 14, 3234);
     assert_eq!(fs::read(database.path()).unwrap(), before);
-}
-
-#[test]
-fn unresolved_effective_segments_count_and_zero_japanese_pages_keep_their_time_once() {
-    let database = TestDatabase::new();
-    let mut storage = Storage::open(database.path()).unwrap();
-    let imported = import(&mut storage, "食べた 食べた 猫");
-    let chapter = &imported.document.chapter;
-    storage
-        .save_segmentation_override(&SegmentationOverride {
-            scope: OverrideScope::AllOccurrences,
-            anchor: TextAnchor {
-                source_id: chapter.source_id,
-                chapter_id: chapter.chapter_id,
-                range: TextRange {
-                    start: TextOffset::START,
-                    end: TextOffset::at(&chapter.text, "食べた".len()).unwrap(),
-                },
-            },
-            surface: Surface::new("食べた").unwrap(),
-            parts: vec![Surface::new("食べ").unwrap(), Surface::new("た").unwrap()],
-        })
-        .unwrap();
-    save_time(&mut storage, &imported, 111);
-    let completion = prepare(&mut storage, &imported);
-    assert_eq!(completion.occurrences().len(), 5);
-    assert!(completion.occurrences()[..4]
-        .iter()
-        .all(|token| token.metadata.is_none()));
-    storage
-        .record_effective_page_completion(&completion)
-        .unwrap();
-    assert_totals(&storage, 5, 111);
-    let non_japanese = import(&mut storage, "English 。 📖");
-    save_time(&mut storage, &non_japanese, 222);
-    let empty = prepare(&mut storage, &non_japanese);
-    assert!(empty.occurrences().is_empty());
-    storage.record_effective_page_completion(&empty).unwrap();
-    assert_totals(&storage, 5, 333);
-    // A zero-time Japanese page still contributes every occurrence.
-    let zero_time = import(&mut storage, "犬 犬");
-    let zero_time = prepare(&mut storage, &zero_time);
-    storage
-        .record_effective_page_completion(&zero_time)
-        .unwrap();
-    assert_totals(&storage, 7, 333);
 }
 
 #[test]

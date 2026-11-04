@@ -94,6 +94,17 @@ impl Dictionary {
         surface: &str,
         dictionary_form: Option<&str>,
     ) -> Result<DictionaryCandidates, DictionaryError> {
+        self.lookup_forms(surface, dictionary_form, &[])
+    }
+
+    /// Search surface/base first, followed by ordered component forms. Retain
+    /// applicable per-form matches, deduplicate entries and rank by first match.
+    pub fn lookup_forms(
+        &self,
+        surface: &str,
+        dictionary_form: Option<&str>,
+        components: &[String],
+    ) -> Result<DictionaryCandidates, DictionaryError> {
         if surface.trim().is_empty() || dictionary_form.is_some_and(|s| s.trim().is_empty()) {
             return Err(DictionaryError::InvalidQuery);
         }
@@ -103,6 +114,12 @@ impl Dictionary {
         if let Some(base) = dictionary_form.filter(|s| *s != surface) {
             forms.push(base);
         }
+        for component in components {
+            if !component.trim().is_empty() && !forms.contains(&component.as_str()) {
+                forms.push(component);
+            }
+        }
+        let query_order = forms.clone();
         let mut statement = self.connection.prepare(LOOKUP_SQL)?;
         for form in forms {
             let mut rows = statement.query([form])?;
@@ -152,11 +169,31 @@ impl Dictionary {
                 }
             }
         }
+        let rank = |form: &str| {
+            query_order
+                .iter()
+                .position(|query| *query == form)
+                .unwrap_or(usize::MAX)
+        };
+        let mut words: Vec<_> = words.into_values().collect();
+        let mut names: Vec<_> = names.into_values().collect();
+        words.sort_by_key(|entry| {
+            (
+                entry.forms.iter().map(|form| rank(&form.form)).min(),
+                entry.entry_id,
+            )
+        });
+        names.sort_by_key(|entry| {
+            (
+                entry.forms.iter().map(|form| rank(&form.form)).min(),
+                entry.entry_id,
+            )
+        });
         Ok(DictionaryCandidates {
             surface: surface.to_owned(),
             dictionary_form: dictionary_form.map(str::to_owned),
-            words: words.into_values().collect(),
-            names: names.into_values().collect(),
+            words,
+            names,
         })
     }
 }

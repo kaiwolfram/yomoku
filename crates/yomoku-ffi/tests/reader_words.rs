@@ -51,7 +51,7 @@ impl Fixture {
                             engine_revision: "fixture@1".into(),
                             dictionary_revision: "fixture@1".into(),
                         },
-                        mode: SplitMode::B,
+                        mode: SplitMode::C,
                         tokens: chapter
                             .text
                             .split_whitespace()

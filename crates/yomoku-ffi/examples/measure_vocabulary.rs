@@ -147,7 +147,7 @@ fn analysis(chapter: &ChapterText) -> Result<ChapterAnalysis, Infallible> {
             engine_revision: "synthetic-vocabulary-measure@1".into(),
             dictionary_revision: "synthetic-vocabulary-measure@1".into(),
         },
-        mode: SplitMode::B,
+        mode: SplitMode::C,
         tokens,
     })
 }

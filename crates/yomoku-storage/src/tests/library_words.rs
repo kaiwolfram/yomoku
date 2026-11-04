@@ -106,7 +106,7 @@ fn library_words_pin_original_b_and_deduplicate_across_epub_chapters() {
         for token in &mut later.tokens {
             token.is_japanese = false;
         }
-        for mode in [SplitMode::A, SplitMode::B, SplitMode::C] {
+        for mode in [SplitMode::A, SplitMode::C, SplitMode::B] {
             later.mode = mode;
             storage
                 .store_chapter_analysis(chapter.chapter_id, &later)

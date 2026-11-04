@@ -4,10 +4,8 @@
 use std::sync::Arc;
 
 use crate::{
-    analysis::{OverrideScope, SplitMode},
     completion::{AnalyzedCompletionOutcome, PageCompletionIntent},
-    document::{OverrideId, ReaderDocument, TextAnchor, VocabularyId},
-    effective_overrides::{EffectiveOverrideContext, EffectiveOverrideFailure},
+    document::{ReaderDocument, VocabularyId},
     effective_reader::{
         EffectivePageCompletion, EffectiveReaderTokenSnapshot, EffectiveReaderWordDetails,
     },
@@ -16,30 +14,12 @@ use crate::{
         EffectiveSelectionCommand,
     },
     reader::{ReaderCustomEntry, ReaderVocabulary},
-    vocabulary::{Surface, VocabularyStatus},
+    vocabulary::VocabularyStatus,
 };
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum EffectiveStorageOperation {
     LoadTokens(EffectivePageRequest),
-    LoadOverrideContext {
-        command: EffectivePageCommand,
-        anchor: TextAnchor,
-    },
-    GenerateOverrideAnalysis {
-        context: Arc<EffectiveOverrideContext>,
-        mode: SplitMode,
-    },
-    SaveOverride {
-        context: Arc<EffectiveOverrideContext>,
-        scope: OverrideScope,
-        parts: Vec<Surface>,
-        registered_at_unix_ms: i64,
-    },
-    ReverseOverride {
-        context: Arc<EffectiveOverrideContext>,
-        id: OverrideId,
-    },
     LoadWord(EffectiveSelectionCommand),
     SetStatus {
         command: EffectiveSelectionCommand,
@@ -66,11 +46,6 @@ pub enum EffectiveStorageOperation {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum EffectiveStorageResult {
     TokensLoaded(EffectivePageRequest, EffectiveReaderTokenSnapshot),
-    OverrideContextLoaded(Arc<EffectiveOverrideContext>),
-    OverrideAnalysisStored(SplitMode),
-    OverrideSaved { id: OverrideId, registered: usize },
-    OverrideReversed(OverrideId),
-    OverrideFailed(EffectiveOverrideFailure),
     WordLoaded(EffectiveReaderSelection, Box<EffectiveReaderWordDetails>),
     StatusChanged(EffectiveReaderSelection, Option<ReaderVocabulary>),
     CustomEntryChanged(EffectiveReaderSelection, Option<ReaderCustomEntry>),

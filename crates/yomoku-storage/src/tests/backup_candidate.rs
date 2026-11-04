@@ -8,7 +8,6 @@ use crate::{BackupCandidate, CandidateError};
 mod analyses;
 mod controls;
 mod documents;
-mod effective;
 mod formats;
 mod vocabulary;
 

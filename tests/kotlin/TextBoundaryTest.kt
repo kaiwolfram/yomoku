@@ -22,7 +22,6 @@ import java.io.File
 // document path will be exercised when real document commands are implemented.
 fun verifyTextBoundaries(directory: String) {
     val dir = File(directory)
-    verifyEffectiveOverrideCodecs(dir)
     val document = DocumentId.bincodeDeserialize(File(dir, "document.bin").readBytes())
     check(document.value == Long.MAX_VALUE)
     File(dir, "document-return.bin").writeBytes(document.bincodeSerialize())
@@ -85,13 +84,11 @@ fun verifyTextBoundaries(directory: String) {
     check(effective.identity.base.page == illustratedPage.anchor)
     check(effective.tokens.map { it.segmentIndex } == listOf(0uL, 1uL))
     check(effective.tokens.all { it.surface == illustratedPage.text })
-    check(effective.originalBoundaries.single().surface == illustratedPage.text)
-    check(effective.originalBoundaries.single().anchor == illustratedPage.anchor)
     check(effective.tokens[0].eligibility == EffectiveTokenEligibility.ANALYZERJAPANESE)
     check(effective.tokens[0].reading == "読み𠮷か\u3099\u0000")
     check(effective.tokens[0].dictionaryForm == "原形𠮷か\u3099\u0000")
     check(effective.tokens[0].vocabulary?.status == VocabularyStatus.KNOWN)
-    check(effective.tokens[1].eligibility == EffectiveTokenEligibility.MANUALJAPANESESPAN)
+    check(effective.tokens[1].eligibility == EffectiveTokenEligibility.ANALYZERJAPANESE)
     check(effective.tokens[1].reading == null && effective.tokens[1].dictionaryForm == null)
     check(effective.tokens[1].vocabulary == null)
     check(effective.identity.bincodeSerialize().size == 60)

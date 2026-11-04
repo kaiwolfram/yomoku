@@ -3,7 +3,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    analysis::{ChapterAnalysis, InvalidAnalysis, SplitMode, StoredOverride},
+    analysis::{ChapterAnalysis, InvalidAnalysis},
     completion::PageCompletion,
     dictionary::DictionaryCandidates,
     document::{
@@ -17,15 +17,12 @@ use crate::{
     },
 };
 
-/// Reading eligibility is distinct from analyzer metadata. A manual partition
-/// inherits the editable Japanese B span; it does not acquire an analyzer lemma,
-/// reading or classification. Exact analyzer output, when available, takes priority.
+/// Eligibility is supplied by the validated analyzer snapshot.
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
 #[repr(C)]
 pub enum EffectiveTokenEligibility {
     AnalyzerJapanese,
-    ManualJapaneseSpan,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
@@ -43,61 +40,13 @@ pub struct EffectiveReaderToken {
 
 /// A separate repository projection until live selection/completion commands can
 /// freeze and validate effective identities together. None segmentation means
-/// missing original B; it never requests analysis or creates vocabulary.
+/// missing original C; it never requests analysis or creates vocabulary.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct EffectiveReaderTokenSnapshot {
     pub document_id: DocumentId,
     pub page: TextAnchor,
     pub segmentation: Option<EffectiveChapterSegmentation>,
     pub tokens: Vec<EffectiveReaderToken>,
-    pub original_boundaries: Vec<OriginalBoundaryToken>,
-}
-
-/// Original Japanese B spans for editing, independent of the effective partition.
-/// Full edge tokens are retained; only their display range is clipped to the page.
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
-#[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
-pub struct OriginalBoundaryToken {
-    pub anchor: TextAnchor,
-    pub display_range: TextRange,
-    pub surface: String,
-}
-
-pub fn original_boundaries_on_page(
-    chapter: &ChapterText,
-    original: &ChapterAnalysis,
-    page: TextAnchor,
-) -> Result<Vec<OriginalBoundaryToken>, InvalidAnalysis> {
-    original.validate(chapter)?;
-    if original.mode != SplitMode::B || page.slice(chapter).map_err(|_| InvalidAnalysis)?.is_empty()
-    {
-        return Err(InvalidAnalysis);
-    }
-    original
-        .tokens
-        .iter()
-        .filter(|token| {
-            token.is_japanese
-                && token.anchor.range.start < page.range.end
-                && token.anchor.range.end > page.range.start
-        })
-        .map(|token| {
-            Ok(OriginalBoundaryToken {
-                anchor: token.anchor,
-                display_range: TextRange {
-                    start: (i64::from(token.anchor.range.start.max(page.range.start))
-                        - i64::from(page.range.start))
-                    .try_into()
-                    .map_err(|_| InvalidAnalysis)?,
-                    end: (i64::from(token.anchor.range.end.min(page.range.end))
-                        - i64::from(page.range.start))
-                    .try_into()
-                    .map_err(|_| InvalidAnalysis)?,
-                },
-                surface: token.surface.clone(),
-            })
-        })
-        .collect()
 }
 
 /// Frozen page and complete resolved provenance, deliberately separate from an
@@ -111,7 +60,7 @@ pub struct EffectiveReaderTokenKey {
 }
 
 impl EffectiveReaderTokenSnapshot {
-    /// Missing original B cannot produce a selectable effective identity.
+    /// Missing original C cannot produce a selectable effective identity.
     pub fn key(&self) -> Option<EffectiveReaderTokenKey> {
         self.segmentation
             .as_ref()
@@ -133,7 +82,7 @@ pub struct EffectiveReaderWordDetails {
     pub custom_entry: Option<ReaderCustomEntry>,
 }
 
-/// Construction validates entire snapshots/rules before any page is projected.
+/// Construction validates the entire snapshot before any page is projected.
 /// Private fields prevent callers from replacing validated boundaries/metadata.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct EffectiveReaderChapter<'a> {
@@ -146,17 +95,9 @@ impl<'a> EffectiveReaderChapter<'a> {
         chapter: &'a ChapterText,
         original_id: AnalysisId,
         original: &ChapterAnalysis,
-        alternates: &[(AnalysisId, ChapterAnalysis)],
-        rules: &[StoredOverride],
     ) -> Result<Self, InvalidAnalysis> {
         Ok(Self {
-            segmentation: resolve_effective_segmentation(
-                chapter,
-                original_id,
-                original,
-                alternates,
-                rules,
-            )?,
+            segmentation: resolve_effective_segmentation(chapter, original_id, original)?,
             chapter,
         })
     }
@@ -196,8 +137,7 @@ impl<'a> EffectiveReaderChapter<'a> {
         self.project(page, true)
     }
 
-    /// Source ruby wins over exact-span effective analyzer readings. Unresolved
-    /// manual parts have no reading fallback; never reuse their old B readings.
+    /// Source ruby wins over exact-span analyzer readings.
     /// The validated chapter owns metadata, independently of live vocabulary.
     /// Crossing bases retain the complete reading on every intersecting page.
     pub fn furigana_on_page(
@@ -274,9 +214,6 @@ fn segment_eligibility(segment: &EffectiveSegment) -> Option<EffectiveTokenEligi
     match &segment.metadata {
         Some(metadata) if metadata.is_japanese => Some(EffectiveTokenEligibility::AnalyzerJapanese),
         Some(_) => None,
-        None if segment.boundary.override_id.is_some() => {
-            Some(EffectiveTokenEligibility::ManualJapaneseSpan)
-        }
         None => None,
     }
 }

@@ -1,8 +1,6 @@
 package app.yomoku.tests
 
 import app.yomoku.effectiveDisplayTokens
-import app.yomoku.originalBoundaryAnchor
-import app.yomoku.originalDisplayBoundaries
 import app.yomoku.readerDisplayTokens
 import app.yomoku.shared.*
 import app.yomoku.utf8Boundaries
@@ -50,17 +48,15 @@ private fun snapshot(page: ReaderPage) =
                 anchor(20, 23),
                 TextRange(TextOffset(16), TextOffset(19)),
                 "猫",
-                EffectiveTokenEligibility.MANUALJAPANESESPAN,
+                EffectiveTokenEligibility.ANALYZERJAPANESE,
                 null,
                 null,
                 null,
             ),
         ),
-        emptyList(),
     )
 
 fun verifyEffectiveReaderDisplay() {
-    verifyOriginalBoundarySelection()
     val page = page()
     val snapshot = snapshot(page)
     val identity = snapshot.identity
@@ -118,7 +114,7 @@ fun verifyEffectiveReaderDisplay() {
                     effectiveDisplayTokens(
                         clipped,
                         fresh,
-                        EffectiveReaderPage(fresh, listOf(token), emptyList()),
+                        EffectiveReaderPage(fresh, listOf(token)),
                     )
                 )
                 .single()
@@ -128,7 +124,7 @@ fun verifyEffectiveReaderDisplay() {
             effectiveDisplayTokens(
                 clipped,
                 identity,
-                EffectiveReaderPage(fresh, listOf(token), emptyList()),
+                EffectiveReaderPage(fresh, listOf(token)),
             ) == null
         )
     }
@@ -147,9 +143,6 @@ fun verifyEffectiveReaderDisplay() {
             token.copy(reading = " \t　"),
             token.copy(dictionaryForm = "\uD800"),
             token.copy(dictionaryForm = ""),
-            token.copy(eligibility = EffectiveTokenEligibility.MANUALJAPANESESPAN),
-            snapshot.tokens.last().copy(reading = "invented"),
-            snapshot.tokens.last().copy(dictionaryForm = "invented"),
         ) +
             listOf(
                     -1L to 15L,
@@ -202,7 +195,7 @@ fun verifyEffectiveReaderDisplay() {
         effectiveDisplayTokens(
             page,
             missing,
-            EffectiveReaderPage(missing, emptyList(), emptyList()),
+            EffectiveReaderPage(missing, emptyList()),
         ) == emptyList<Any>()
     )
     check(effectiveDisplayTokens(page, missing, snapshot.copy(identity = missing)) == null)
@@ -215,7 +208,7 @@ fun verifyEffectiveReaderDisplay() {
         effectiveDisplayTokens(
             page.copy(text = "\uD800"),
             missing,
-            EffectiveReaderPage(missing, emptyList(), emptyList()),
+            EffectiveReaderPage(missing, emptyList()),
         ) == null
     )
     for (text in listOf("\uD800", "\uDC00", "x\uD800x")) check(utf8Boundaries(text) == null)
@@ -242,67 +235,9 @@ fun verifyEffectiveReaderDisplay() {
             effectiveDisplayTokens(
                 repeated,
                 repeatedIdentity,
-                EffectiveReaderPage(repeatedIdentity, repeats, emptyList()),
+                EffectiveReaderPage(repeatedIdentity, repeats),
             )
         )
     check(spans.map { it.token.reading } == listOf("よみ0", "よみ1"))
     check(spans[0].selection != spans[1].selection)
-}
-
-private fun verifyOriginalBoundarySelection() {
-    val page = page("𠮷か\u3099\u0000猫。犬", 4)
-    val id = identity(page)
-    val originals =
-        listOf(
-            OriginalBoundaryToken(
-                anchor(0, 14),
-                TextRange(TextOffset(0), TextOffset(10)),
-                "😀𠮷か\u3099",
-            ),
-            OriginalBoundaryToken(
-                anchor(14, 18),
-                TextRange(TextOffset(10), TextOffset(14)),
-                "\u0000猫",
-            ),
-            OriginalBoundaryToken(anchor(21, 27), TextRange(TextOffset(17), TextOffset(20)), "犬猫"),
-        )
-    val snapshot = EffectiveReaderPage(id, emptyList(), originals)
-    val tokens = checkNotNull(originalDisplayBoundaries(page, id, snapshot))
-    check(tokens.map { it.start to it.end } == listOf(0 to 4, 4 to 6, 7 to 8))
-    check(originalBoundaryAnchor(tokens, 0, 1) == anchor(0, 18))
-    check(originalBoundaryAnchor(tokens, 1, 0) == anchor(0, 18))
-    check(originalBoundaryAnchor(tokens, 2, 2) == anchor(21, 27))
-    check(originalBoundaryAnchor(tokens, 0, 2) == null)
-    check(originalBoundaryAnchor(tokens, -1, 0) == null)
-    check(originalBoundaryAnchor(tokens, 0, 3) == null)
-    // Effective splits and unresolved metadata never replace B edit boundaries.
-    check(snapshot.tokens.isEmpty() && tokens.size == 3)
-    for (bad in
-        listOf(
-            originals.first().copy(surface = "違う"),
-            originals.first().copy(surface = "\uD800"),
-            originals.first().copy(displayRange = TextRange(TextOffset(1), TextOffset(10))),
-            originals.first().copy(anchor = anchor(0, 13)),
-            originals.first().copy(anchor = originals.first().anchor.copy(sourceId = SourceId(99))),
-        )) check(
-        originalDisplayBoundaries(page, id, snapshot.copy(originalBoundaries = listOf(bad))) == null
-    )
-    check(
-        originalDisplayBoundaries(
-            page,
-            id,
-            snapshot.copy(originalBoundaries = originals.reversed()),
-        ) == null
-    )
-    check(originalDisplayBoundaries(page, id.copy(revision = 1UL), snapshot) == null)
-    val missing = id.copy(base = id.base.copy(analysis = ReaderAnalysis.Missing))
-    check(originalDisplayBoundaries(page, missing, snapshot.copy(identity = missing)) == null)
-    check(
-        originalDisplayBoundaries(
-                page,
-                missing,
-                EffectiveReaderPage(missing, emptyList(), emptyList()),
-            )!!
-            .isEmpty()
-    )
 }

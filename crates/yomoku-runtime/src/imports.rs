@@ -28,9 +28,9 @@ use crate::storage::{map_error, Job};
 pub trait PasteAnalyzer {
     fn analyze(&mut self, chapter: &ChapterText) -> Result<ChapterAnalysis, DocumentError>;
 
-    /// Explicit alternate generation only. Implementations must honor the pinned
+    /// Dictionary component analysis only. Implementations must honor the pinned
     /// import profile; a newer engine/dictionary cannot reinterpret old content.
-    /// Existing import-only factories remain valid and reject this capability.
+    /// Import-only test factories may reject this capability.
     fn analyze_mode(
         &mut self,
         _chapter: &ChapterText,
@@ -171,10 +171,6 @@ impl Imports {
             self.analyzer = None;
         }
         result
-    }
-
-    pub(crate) fn discard_analyzer(&mut self) {
-        self.analyzer = None;
     }
 
     pub(crate) fn import_txt(

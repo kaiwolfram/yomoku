@@ -56,7 +56,7 @@ class EffectiveReaderNavigationTest {
                 anchor,
                 TextRange(TextOffset(0), TextOffset(3)),
                 "猫",
-                EffectiveTokenEligibility.MANUALJAPANESESPAN,
+                EffectiveTokenEligibility.ANALYZERJAPANESE,
                 null,
                 null,
                 null,
@@ -84,12 +84,10 @@ class EffectiveReaderNavigationTest {
             readerTime = ReadingTimeUpdate(page.documentId, page.position, PendingReadingTime(0)),
             readingTimeSavePending = false,
             completionSavePending = false,
-            effectiveReaderTokens = EffectiveReaderPage(identity, listOf(token), emptyList()),
+            effectiveReaderTokens = EffectiveReaderPage(identity, listOf(token)),
             effectiveReaderWord =
                 EffectiveReaderWordState(busy = false, customEntryPending = false),
             effectiveReaderStatus = EffectiveStatusState(pending = false, busy = false),
-            effectiveReaderOverride =
-                EffectiveReaderOverrideState(pending = false, busy = false, reloadRequired = false),
             readerFurigana = emptyList(),
         )
     }
@@ -171,12 +169,6 @@ class EffectiveReaderNavigationTest {
                 ready.copy(
                     effectiveReaderStatus = EffectiveStatusState(pending = false, busy = true)
                 ),
-                ready.copy(
-                    effectiveReaderOverride = ready.effectiveReaderOverride!!.copy(pending = true)
-                ),
-                ready.copy(
-                    effectiveReaderOverride = ready.effectiveReaderOverride.copy(busy = true)
-                ),
             )
         for (view in blocked) {
             compose.runOnUiThread { frame.value = view }
@@ -203,11 +195,7 @@ class EffectiveReaderNavigationTest {
         val invalid =
             listOf(
                 ready.copy(effectiveReaderTokens = null, documentError = DocumentError.UNAVAILABLE),
-                ready.copy(
-                    effectiveReaderTokens = null,
-                    effectiveReaderOverride =
-                        ready.effectiveReaderOverride!!.copy(reloadRequired = true),
-                ),
+                ready.copy(effectiveReaderTokens = null),
                 ready.copy(
                     readerAnalysis = ReaderAnalysis.Missing,
                     effectiveReaderTokens =

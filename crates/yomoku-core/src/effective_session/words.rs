@@ -97,9 +97,7 @@ impl WordState {
 impl EffectiveReaderSession {
     /// Accepted writes survive dismissal/invalidation until success or Cancel.
     pub fn mutation_pending(&self) -> bool {
-        self.status_state().pending
-            || self.custom_entry_pending()
-            || self.overrides.mutation_pending()
+        self.status_state().pending || self.custom_entry_pending()
     }
 
     fn custom_entry_pending(&self) -> bool {
@@ -155,11 +153,7 @@ impl EffectiveReaderSession {
         &mut self,
         selection: EffectiveReaderSelection,
     ) -> Option<EffectiveWordRequest> {
-        if self.words.in_flight
-            || self.completion_state().pending
-            || self.status_state().pending
-            || self.overrides.blocks_reader()
-        {
+        if self.words.in_flight || self.completion_state().pending || self.status_state().pending {
             return None;
         }
         let command = self.freeze_selection(selection)?;
@@ -209,11 +203,7 @@ impl EffectiveReaderSession {
     /// Retry the accepted key and literal values, even after UI invalidation.
     /// Storage revalidates provenance; it never substitutes the new visible word.
     pub fn retry_custom_entry(&mut self) -> Option<EffectiveWordRequest> {
-        if self.words.in_flight
-            || self.completion_state().pending
-            || self.status_state().pending
-            || self.overrides.blocks_reader()
-        {
+        if self.words.in_flight || self.completion_state().pending || self.status_state().pending {
             return None;
         }
         let pending = self.words.pending.as_ref()?;
@@ -411,7 +401,6 @@ impl EffectiveReaderSession {
         if self.words.in_flight
             || self.completion_state().pending
             || self.status_state().pending
-            || self.overrides.blocks_reader()
             || self.words.selection != Some(selection)
         {
             return None;

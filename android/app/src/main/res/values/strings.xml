@@ -22,9 +22,6 @@
     <string name="anki_error_duplicates">Existing AnkiDroid notes could not be checked.</string>
     <string name="anki_error_provider">AnkiDroid could not complete the request.</string>
     <string name="anki_error_response">AnkiDroid returned an invalid response.</string>
-    <string name="boundary_select">Edit word boundaries</string>
-    <string name="boundary_select_help">Select an original Mode B word, then another to extend the span. Select again to start a new span.</string>
-    <string name="boundary_selection_gap">Select consecutive Japanese words without punctuation or spaces between them.</string>
     <string name="reader_font_notices_title">Reader font credits</string>
     <string name="reader_font_attribution">Noto Serif JP, licensed under the SIL Open Font License 1.1. Complete attribution and license follow.</string>
     <string name="svg_notices_title">SVG renderer credits</string>
@@ -214,25 +211,6 @@
         <item quantity="other">Delete these %1$d documents from your Library? This removes their content and reading progress. Your vocabulary and reading history are kept. This cannot be undone.</item>
     </plurals>
     <string name="library_bulk_delete_error">Could not delete these documents. Retry or cancel.</string>
-    <string name="boundary_title">Word boundaries</string>
-    <string name="boundary_all">All occurrences</string>
-    <string name="boundary_this">This occurrence</string>
-    <string name="boundary_use_mode">Use Mode %1$s</string>
-    <string name="boundary_load_mode">Load Mode %1$s</string>
-    <string name="boundary_unavailable_mode">Mode %1$s unavailable</string>
-    <string name="boundary_manual_help">Tap a character to split or join after it. The text stays the same.</string>
-    <string name="boundary_split_after">Split after character %1$d</string>
-    <string name="boundary_merge_after">Join after character %1$d</string>
-    <string name="boundary_invalid_parts">Each part must contain a non-whitespace character.</string>
-    <string name="boundary_merge_all">Join all</string>
-    <string name="boundary_save">Save boundaries</string>
-    <string name="boundary_rule">%1$s → %2$s (%3$s)</string>
-    <string name="boundary_reverse">Reverse override</string>
-    <string name="boundary_busy">Updating word boundaries…</string>
-    <string name="boundary_write_failed">Could not update word boundaries. Retry or cancel.</string>
-    <string name="boundary_read_failed">Could not load word boundaries. Reload to try again.</string>
-    <string name="boundary_reload_required">Reload the page before editing word boundaries.</string>
-    <string name="boundary_reload">Reload</string>
     <string name="word_custom_pending_failed">Custom entry change failed. Retry or cancel the pending change.</string>
     <string name="word_status_pending_failed">Status change failed. Retry or cancel the pending change.</string>
     <string name="anki_export_title">AnkiDroid export</string>

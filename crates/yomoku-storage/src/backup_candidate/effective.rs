@@ -9,8 +9,8 @@ use yomoku_core::{
     active_time::PendingReadingTime,
     analysis::SplitMode,
     document::{
-        AnalysisId, ChapterId, ChapterText, CompletionCommandId, DocumentId, OverrideId, SourceId,
-        TextAnchor, TextOffset, TextRange,
+        AnalysisId, ChapterId, ChapterText, CompletionCommandId, DocumentId, SourceId, TextAnchor,
+        TextOffset, TextRange,
     },
     effective_reader::EffectiveTokenEligibility,
     pagination::{LogicalPages, PageLength, ReadingPosition},
@@ -80,8 +80,6 @@ struct Boundary {
     surface: String,
     #[serde(deserialize_with = "present_option")]
     original_token_index: Option<usize>,
-    #[serde(deserialize_with = "present_option")]
-    override_id: Option<OverrideId>,
 }
 
 #[derive(Deserialize, Eq, PartialEq)]
@@ -144,7 +142,7 @@ pub(super) fn check(
         return check_cancelled(cancelled);
     }
     let issued_ids: BTreeMap<String, i64> = connection
-        .prepare("SELECT name, seq FROM main.sqlite_sequence WHERE name IN ('documents', 'chapter_analyses', 'segmentation_overrides')")?
+        .prepare("SELECT name, seq FROM main.sqlite_sequence WHERE name IN ('documents', 'chapter_analyses')")?
         .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))?
         .collect::<Result<_, _>>()?;
     let mut statement = connection.prepare(
@@ -238,9 +236,7 @@ fn check_record(
                 require(boundary.surface.is_char_boundary(relative))?;
             }
         }
-        if let Some(id) = boundary.override_id {
-            issued(issued_ids, "segmentation_overrides", i64::from(id))?;
-        }
+
         if let Some(index) = boundary.original_token_index {
             require(original_index.is_none_or(|previous| index > previous))?;
             original_index = Some(index);
@@ -250,17 +246,11 @@ fn check_record(
                 .ok_or(CandidateError::InvalidData)?;
             require(
                 metadata.analysis_id == segmentation.original_analysis_id
-                    && metadata.mode == SplitMode::B
+                    && metadata.mode == SplitMode::C
                     && metadata.token_index == index,
             )?;
         } else {
-            require(boundary.override_id.is_some())?;
-            require(
-                segment
-                    .metadata
-                    .as_ref()
-                    .is_none_or(|m| m.mode != SplitMode::B),
-            )?;
+            return Err(CandidateError::InvalidData);
         }
         if let Some(metadata) = &segment.metadata {
             require(i64::try_from(metadata.token_index).is_ok())?;
@@ -283,7 +273,7 @@ fn check_record(
                 SplitMode::B => 1,
                 SplitMode::C => 2,
             };
-            require((metadata.analysis_id == segmentation.original_analysis_id) == (mode == 1))?;
+            require((metadata.analysis_id == segmentation.original_analysis_id) == (mode == 2))?;
             if let Some((id, previous)) =
                 metadata_sources.insert(mode, (metadata.analysis_id, metadata.token_index))
             {
@@ -300,7 +290,7 @@ fn check_record(
                 Some(EffectiveTokenEligibility::AnalyzerJapanese)
             }
             Some(_) => None,
-            None => Some(EffectiveTokenEligibility::ManualJapaneseSpan),
+            None => None,
         };
         if eligibility.is_some() {
             Surface::new(&boundary.surface).map_err(|_| CandidateError::InvalidData)?;
@@ -353,7 +343,7 @@ fn check_surviving_content(
     check_analysis_header(
         connection,
         segmentation.original_analysis_id,
-        SplitMode::B,
+        SplitMode::C,
         c.page.chapter_id,
         &segmentation.profile,
         live,

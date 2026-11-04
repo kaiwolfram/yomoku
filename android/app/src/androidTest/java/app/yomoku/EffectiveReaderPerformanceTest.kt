@@ -56,7 +56,6 @@ class EffectiveReaderPerformanceTest {
                 instrumentation.runOnMainSync { core.onViewChanged = null }
             }
         assertNull(view.documentError)
-        assertNull(view.effectiveReaderOverride?.error)
         assertFalse(view.readingTimeSavePending)
         assertFalse(view.completionSavePending)
         return Sample(view, (end - start) / 1e6, mainMs)
@@ -111,26 +110,6 @@ class EffectiveReaderPerformanceTest {
             assertTrue(page.tokens.isNotEmpty())
             assertNull(it.view.readerTokens)
         }
-    }
-
-    private fun openEditor(core: CoreSession): EffectiveOverrideIdentity {
-        val page = checkNotNull(loadTokens(core).view.effectiveReaderTokens)
-        val anchor =
-            page.originalBoundaries
-                .first { it.surface.codePointCount(0, it.surface.length) > 1 }
-                .anchor
-        return checkNotNull(
-                command(
-                        core,
-                        Event.EffectiveReaderOverride(
-                            EffectiveOverrideAction.Open(page.identity, anchor)
-                        ),
-                    )
-                    .view
-                    .effectiveReaderOverride
-                    ?.prompt
-            )
-            .identity
     }
 
     private fun phase(
@@ -258,48 +237,8 @@ class EffectiveReaderPerformanceTest {
                 "FIXTURE,$name,bytes=${bytes.size},sha256=${MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }},chapters=${document.chapters.size},characters=${document.chapters.sumOf { it.text.codePointCount(0, it.text.length) }},largest_characters=${chapter.text.codePointCount(0, chapter.text.length)},database_bytes=${database.length()}"
             )
             val fullCalls = dictionaryCalls.get()
-            phase(core, database, name, "b_only", iterations, id)
+            phase(core, database, name, "mode_c", iterations, id)
             assertEquals(fullCalls, dictionaryCalls.get())
-            for (mode in listOf(SplitMode.A, SplitMode.C)) {
-                val identity = openEditor(core)
-                val generated =
-                    command(
-                        core,
-                        Event.EffectiveReaderOverride(
-                            EffectiveOverrideAction.Generate(identity, mode)
-                        ),
-                    )
-                report(name, "setup", "generate_$mode", listOf(generated))
-                assertTrue(generated.view.effectiveReaderOverride!!.reloadRequired)
-                // C can cross this B selection, so successful storage need not offer a choice.
-                SQLiteDatabase.openDatabase(database.path, null, SQLiteDatabase.OPEN_READONLY)
-                    .use { db ->
-                        db.rawQuery(
-                                "SELECT count(*) FROM chapter_analyses WHERE chapter_id=? AND split_mode=?",
-                                arrayOf(
-                                    chapter.chapterId.value.toString(),
-                                    mode.name.lowercase(Locale.ROOT),
-                                ),
-                            )
-                            .use { rows ->
-                                assertTrue(rows.moveToFirst())
-                                assertEquals(1L, rows.getLong(0))
-                            }
-                    }
-            }
-            phase(core, database, name, "largest_chapter_abc", iterations, id)
-            // A literal manual split works even when the selected token has identical A/B/C.
-            val identity = openEditor(core)
-            val surface = core.view.effectiveReaderOverride!!.prompt!!.surface
-            val cut = surface.offsetByCodePoints(0, 1)
-            val parts = listOf(surface.substring(0, cut), surface.substring(cut))
-            command(
-                core,
-                Event.EffectiveReaderOverride(
-                    EffectiveOverrideAction.Save(identity, OverrideScope.ALLOCCURRENCES, parts, 1L)
-                ),
-            )
-            phase(core, database, name, "global_rule", iterations, id)
             SQLiteDatabase.openDatabase(database.path, null, SQLiteDatabase.OPEN_READONLY).use { db
                 ->
                 for (table in

@@ -32,7 +32,7 @@ fn analysis(chapter: &ChapterText) -> ChapterAnalysis {
             engine_revision: "reader-fixture@1".into(),
             dictionary_revision: "reader-fixture-full@1".into(),
         },
-        mode: SplitMode::B,
+        mode: SplitMode::C,
         tokens: chapter
             .text
             .split_whitespace()
@@ -174,7 +174,7 @@ fn rejects_foreign_empty_reversed_split_scalar_and_non_b_or_corrupt_analysis() {
     for page in invalid {
         assert!(reader_tokens_on_page(&chapter, &analysis, page).is_err());
     }
-    for mode in [SplitMode::A, SplitMode::C] {
+    for mode in [SplitMode::A, SplitMode::B] {
         let mut bad = analysis.clone();
         bad.mode = mode;
         assert!(reader_tokens_on_page(&chapter, &bad, page).is_err());

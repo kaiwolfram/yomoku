@@ -110,7 +110,7 @@ impl PasteAnalyzer for FakeAnalyzer {
             1 => Err(DocumentError::Unavailable),
             2 => {
                 let mut analysis = fixture(chapter);
-                analysis.mode = SplitMode::C;
+                analysis.mode = SplitMode::B;
                 Ok(analysis)
             }
             _ => Ok(fixture(chapter)),
@@ -153,7 +153,7 @@ fn fixture(chapter: &ChapterText) -> ChapterAnalysis {
             engine_revision: "worker-fixture@1".into(),
             dictionary_revision: "worker-fixture-full@1".into(),
         },
-        mode: SplitMode::B,
+        mode: SplitMode::C,
         tokens,
     }
 }
@@ -1360,7 +1360,7 @@ fn real_full_worker_import_and_lazy_reopen_preserve_mode_b_unicode_and_vocabular
         .unwrap()
         .unwrap();
     analysis.validate(&document.chapter).unwrap();
-    assert_eq!(analysis.mode, SplitMode::B);
+    assert_eq!(analysis.mode, SplitMode::C);
     assert_eq!(
         analysis.profile.engine_revision,
         yomoku_analysis::ENGINE_REVISION
@@ -1374,7 +1374,7 @@ fn real_full_worker_import_and_lazy_reopen_preserve_mode_b_unicode_and_vocabular
         .iter()
         .map(|token| token.surface.as_str())
         .collect();
-    assert_eq!(&surfaces[..2], &["国家", "公務員"]);
+    assert_eq!(surfaces[0], "国家公務員");
     assert!(surfaces.iter().filter(|surface| **surface == "猫").count() >= 3);
     for token in &analysis.tokens {
         let entry = storage

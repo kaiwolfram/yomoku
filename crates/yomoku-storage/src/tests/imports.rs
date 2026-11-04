@@ -38,7 +38,7 @@ pub(super) fn fixture(chapter: &ChapterText) -> Result<ChapterAnalysis, Infallib
             engine_revision: "import-fixture@1".into(),
             dictionary_revision: "import-fixture-full@1".into(),
         },
-        mode: SplitMode::B,
+        mode: SplitMode::C,
         tokens,
     })
 }
@@ -65,7 +65,6 @@ fn totals(storage: &Storage) -> Vec<i64> {
         "reading_positions",
         "reading_completions",
         "completion_commands",
-        "segmentation_overrides",
     ]
     .map(|table| count(storage, table))
     .to_vec()
@@ -80,7 +79,7 @@ fn analyzed_import_registers_unique_japanese_surfaces_and_reopens_exact_snapshot
     let imported = storage
         .create_analyzed_paste(&text, 123, |chapter| {
             // Another connection cannot see any partial document or registration.
-            assert_eq!(totals(&observer), vec![0; 12]);
+            assert_eq!(totals(&observer), vec![0; 11]);
             assert_eq!(chapter.text, text.as_str());
             fixture(chapter)
         })
@@ -177,7 +176,7 @@ fn analyzer_errors_invalid_output_and_invalid_dates_leave_no_partial_import() {
             let mut analysis = fixture(chapter).unwrap();
             match variant {
                 0 => analysis.mode = SplitMode::A,
-                1 => analysis.mode = SplitMode::C,
+                1 => analysis.mode = SplitMode::B,
                 2 => analysis.tokens[0].anchor.source_id = i64::MAX.try_into().unwrap(),
                 3 => analysis.tokens[1].anchor.range.end = 1.try_into().unwrap(),
                 4 => analysis.tokens[0].surface = "別".into(),

@@ -14,7 +14,6 @@ mod completions;
 pub mod custom_dictionary;
 pub mod dictionary;
 mod documents;
-pub mod effective_overrides;
 mod effective_status;
 mod encounters;
 mod epub;

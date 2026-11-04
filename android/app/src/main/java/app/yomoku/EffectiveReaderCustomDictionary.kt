@@ -154,3 +154,18 @@ internal fun EffectiveReaderCustomDictionary(
 
 private fun validCustomField(value: String): Boolean =
     utf8Boundaries(value) != null && value.any { !rustWhitespace(it) }
+
+// Match Rust str::trim/Surface::new (Unicode White_Space). Kotlin's isBlank also
+// includes U+001C..U+001F and omits U+0085 on the JVM, changing valid literal parts.
+internal fun rustWhitespace(char: Char): Boolean =
+    char in '\u0009'..'\u000D' ||
+        char == '\u0020' ||
+        char == '\u0085' ||
+        char == '\u00A0' ||
+        char == '\u1680' ||
+        char in '\u2000'..'\u200A' ||
+        char == '\u2028' ||
+        char == '\u2029' ||
+        char == '\u202F' ||
+        char == '\u205F' ||
+        char == '\u3000'

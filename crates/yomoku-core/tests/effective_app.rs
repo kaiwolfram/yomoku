@@ -3,10 +3,7 @@ use std::sync::Arc;
 use crux_core::Core;
 use yomoku_core::{
     active_time::{PendingReadingTime, ReaderClockAction, ReaderClockSample, SavedReadingTime},
-    analysis::{
-        AnalysisProfile, AnalyzedToken, ChapterAnalysis, OverrideScope, SegmentationOverride,
-        SplitMode, StoredOverride,
-    },
+    analysis::{AnalysisProfile, AnalyzedToken, ChapterAnalysis, SplitMode},
     app::{ContentRoute, Destination, Effect, Event, Model, Yomoku},
     completion::{AnalyzedCompletionOutcome, PageCompletion},
     document::{ChapterText, ReaderDocument, TextAnchor, TextOffset, TextRange},
@@ -21,8 +18,6 @@ use yomoku_core::{
     vocabulary::Surface,
 };
 
-#[path = "effective_app/overrides.rs"]
-mod overrides;
 #[path = "effective_app/words.rs"]
 mod words;
 
@@ -30,7 +25,6 @@ struct Fixture {
     core: Core<Yomoku>,
     document: ReaderDocument,
     original: ChapterAnalysis,
-    rules: Vec<StoredOverride>,
 }
 
 impl Fixture {
@@ -43,7 +37,7 @@ impl Fixture {
         let mut tokens = Vec::new();
         let mut start = 0;
         while start < chapter.text.len() {
-            for surface in ["猫犬", "𠮷か\u{3099}\0", "。"] {
+            for surface in ["猫", "犬", "𠮷か\u{3099}\0", "。"] {
                 let end = start + surface.len();
                 tokens.push(AnalyzedToken {
                     anchor: TextAnchor {
@@ -60,22 +54,12 @@ impl Fixture {
             }
             start += 1; // newline is canonical whitespace, not a word
         }
-        let rules = vec![StoredOverride {
-            id: 5.try_into().unwrap(),
-            active: true,
-            edit: SegmentationOverride {
-                scope: OverrideScope::AllOccurrences,
-                anchor: tokens[0].anchor,
-                surface: Surface::new("猫犬").unwrap(),
-                parts: ["猫", "犬"].map(|s| Surface::new(s).unwrap()).into(),
-            },
-        }];
         let original = ChapterAnalysis {
             profile: AnalysisProfile {
                 engine_revision: "app@1".into(),
                 dictionary_revision: "full@1".into(),
             },
-            mode: SplitMode::B,
+            mode: SplitMode::C,
             tokens,
         };
         let document = ReaderDocument {
@@ -115,7 +99,6 @@ impl Fixture {
             core,
             document,
             original,
-            rules,
         }
     }
 
@@ -132,7 +115,6 @@ impl Fixture {
     fn snapshot(&self) -> EffectiveReaderTokenSnapshot {
         let resolved = self.resolved();
         EffectiveReaderTokenSnapshot {
-            original_boundaries: vec![],
             document_id: self.document.document_id,
             page: self.base().page,
             tokens: resolved.tokens_on_page(self.base().page).unwrap(),
@@ -145,8 +127,6 @@ impl Fixture {
             &self.document.chapters[0],
             4.try_into().unwrap(),
             &self.original,
-            &[],
-            &self.rules,
         )
         .unwrap()
     }
@@ -323,8 +303,8 @@ fn effective_application_loads_compact_page_and_uses_exact_furigana_without_lega
             .collect::<Vec<_>>(),
         ["猫", "犬", "𠮷か\u{3099}\0"]
     );
-    assert!(tokens[0].reading.is_none() && tokens[1].reading.is_none());
-    assert_eq!(view.reader_furigana.len(), 1); // exact analyzed word, never borrowed B for 猫/犬
+    assert!(tokens[0].reading.is_some() && tokens[1].reading.is_some());
+    assert_eq!(view.reader_furigana.len(), 3); // exact analyzed word, never borrowed B for 猫/犬
     let page = view.reader.unwrap();
     assert!(f
         .core
@@ -600,7 +580,6 @@ fn missing_analysis_stays_plain_and_cannot_complete_or_rescan() {
         StorageResult::Effective(Output::TokensLoaded(
             request,
             EffectiveReaderTokenSnapshot {
-                original_boundaries: vec![],
                 document_id: f.document.document_id,
                 page: f.base().page,
                 segmentation: None,

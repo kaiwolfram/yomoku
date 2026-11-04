@@ -23,7 +23,7 @@ use crate::{
 
 impl Storage {
     /// Read all canonical chapters, exact position, preset and original per-chapter
-    /// Mode B identities atomically. Never parses source bytes or loads Full.
+    /// Mode C identities atomically. Never parses source bytes or loads Full.
     pub fn load_document_reader_snapshot(
         &mut self,
         document_id: DocumentId,

@@ -1,5 +1,10 @@
 # Effective reader measurements
 
+The current reader uses Mode C and A/B dictionary components. Boundary-editor
+commands and override benchmarks below are historical; their editing APIs and
+`measure_effective_reader` executable have been removed. See [the product spec](PRODUCT_SPEC.md#32-vocabulary-model-and-dictionary-panel).
+
+
 Measured 2026-10-28 with the opt-in `yomoku-analysis` example
 `measure_effective_reader`. It accepts existing TXT/EPUB files, imports through
 production repositories into a newly created temporary SQLite database, and removes

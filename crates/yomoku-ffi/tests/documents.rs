@@ -222,7 +222,7 @@ fn token_reads_and_manual_choices_preserve_metadata_and_global_status_semantics(
                         engine_revision: "fixture-engine@1".into(),
                         dictionary_revision: "fixture-full@1".into(),
                     },
-                    mode: SplitMode::B,
+                    mode: SplitMode::C,
                     tokens,
                 })
             },
@@ -884,7 +884,7 @@ fn analyzed_completion_flushes_freezes_retries_and_rereads_through_async_ffi() {
                         engine_revision: "fixture-engine".into(),
                         dictionary_revision: "fixture-dictionary".into(),
                     },
-                    mode: SplitMode::B,
+                    mode: SplitMode::C,
                     tokens,
                 })
             },

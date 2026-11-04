@@ -39,7 +39,7 @@ impl Fixture {
         std::fs::create_dir(&directory).unwrap();
         let fixture = Self(directory);
         let mut storage = Storage::open(fixture.path()).unwrap();
-        storage
+        let imported = storage
             .create_analyzed_paste(
                 &PasteText::new("𠮷猫。".into()).unwrap(),
                 100,
@@ -50,7 +50,7 @@ impl Fixture {
                             engine_revision: "test@1".into(),
                             dictionary_revision: "test@1".into(),
                         },
-                        mode: SplitMode::B,
+                        mode: SplitMode::C,
                         tokens: vec![
                             AnalyzedToken {
                                 anchor: TextAnchor {
@@ -86,6 +86,22 @@ impl Fixture {
                 },
             )
             .unwrap();
+        let document = imported.document.document_id;
+        let snapshot = storage
+            .load_document_reader_snapshot(document)
+            .unwrap()
+            .unwrap();
+        let yomoku_core::reader::ReaderAnalysis::Available(id) = snapshot.analyses[0].analysis
+        else {
+            panic!("analysis");
+        };
+        let mut analysis = storage.chapter_analysis(id).unwrap().unwrap();
+        for mode in [SplitMode::A, SplitMode::B] {
+            analysis.mode = mode;
+            storage
+                .store_chapter_analysis(snapshot.document.chapters[0].chapter_id, &analysis)
+                .unwrap();
+        }
         Connection::open(fixture.index()).unwrap().execute_batch("PRAGMA application_id = 0x594f4449; PRAGMA user_version = 1;
             CREATE TABLE entries (source TEXT, entry_id INTEGER, payload TEXT, PRIMARY KEY(source, entry_id)) WITHOUT ROWID;
             CREATE TABLE forms (surface TEXT COLLATE BINARY, source TEXT, entry_id INTEGER, PRIMARY KEY(surface, source, entry_id)) WITHOUT ROWID;").unwrap();

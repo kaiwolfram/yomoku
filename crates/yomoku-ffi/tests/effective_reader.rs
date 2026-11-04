@@ -13,19 +13,16 @@ use std::{
     time::Duration,
 };
 use yomoku_core::{
-    active_time::PendingReadingTime,
-    analysis::{AnalysisProfile, AnalyzedToken, ChapterAnalysis, OverrideScope, SplitMode},
-    app::{ContentRoute, Event, ViewModel},
+    analysis::{AnalysisProfile, AnalyzedToken, ChapterAnalysis, SplitMode},
+    app::{Event, ViewModel},
     document::{ChapterText, DocumentId, PasteText, TextAnchor, TextOffset, TextRange},
-    effective_session::{EffectiveOverrideAction as Action, EffectiveReaderSelection},
-    library::WordStatusCounts,
+    effective_session::EffectiveReaderSelection,
     reader::ReaderTokenKey,
     storage::DocumentError,
-    typography::ReaderTypography,
     vocabulary::{Surface, VocabularyStatus},
 };
 use yomoku_ffi::{FfiError, YomokuBridge};
-use yomoku_runtime::{AnalyzerLifecycle, AnalyzerLoader, PasteAnalyzer, ShellEffectFfi};
+use yomoku_runtime::{AnalyzerLifecycle, AnalyzerLoader, ShellEffectFfi};
 use yomoku_storage::Storage;
 
 const TIMEOUT: Duration = Duration::from_secs(10);
@@ -44,7 +41,7 @@ fn analysis(chapter: &ChapterText) -> Result<ChapterAnalysis, Infallible> {
             engine_revision: "ffi@1".into(),
             dictionary_revision: "full@1".into(),
         },
-        mode: SplitMode::B,
+        mode: SplitMode::C,
         tokens: chapter
             .text
             .split_whitespace()
@@ -89,6 +86,19 @@ impl Fixture {
             .unwrap()
             .document
             .document_id;
+        let mut storage = Storage::open(directory.join("user.sqlite3")).unwrap();
+        let document = storage
+            .load_document_reader_snapshot(id)
+            .unwrap()
+            .unwrap()
+            .document;
+        for mode in [SplitMode::A, SplitMode::B] {
+            let mut component = analysis(&document.chapters[0]).unwrap();
+            component.mode = mode;
+            storage
+                .store_chapter_analysis(document.chapters[0].chapter_id, &component)
+                .unwrap();
+        }
         let index = Connection::open(directory.join("words.sqlite3")).unwrap();
         index.execute_batch("PRAGMA application_id=0x594f4449; PRAGMA user_version=1;
             CREATE TABLE entries(source TEXT,entry_id INTEGER,payload TEXT,PRIMARY KEY(source,entry_id)) WITHOUT ROWID;
@@ -202,14 +212,6 @@ impl Harness {
             analysis: view.reader_analysis.unwrap(),
         }))
     }
-
-    fn open_edit(&self, view: &ViewModel) -> ViewModel {
-        let page = view.effective_reader_tokens.as_ref().unwrap();
-        self.dispatch(Event::EffectiveReaderOverride(Action::Open {
-            page: page.identity,
-            anchor: page.original_boundaries[0].anchor,
-        }))
-    }
 }
 
 fn selection(view: &ViewModel, surface: &str) -> EffectiveReaderSelection {
@@ -223,107 +225,6 @@ fn selection(view: &ViewModel, surface: &str) -> EffectiveReaderSelection {
             .unwrap()
             .segment_index,
     }
-}
-
-fn counts(h: &Harness) -> WordStatusCounts {
-    h.dispatch(Event::LoadLibraryWordDistributions)
-        .library_word_distributions
-        .unwrap()[0]
-        .counts
-        .unwrap()
-}
-
-#[test]
-fn serialized_edits_reopen_reverse_and_library_use_effective_membership() {
-    let f = Fixture::new();
-    let h = f.bridge();
-    let loaded = h.load(f.id);
-    assert!(loaded.reader_tokens.is_none());
-    let original = loaded
-        .effective_reader_tokens
-        .as_ref()
-        .unwrap()
-        .original_boundaries
-        .clone();
-    let before = std::fs::read(f.path()).unwrap();
-    let opened = h.open_edit(&loaded);
-    assert_eq!(std::fs::read(f.path()).unwrap(), before);
-    let prompt = opened.effective_reader_override.unwrap().prompt.unwrap();
-    assert_eq!(prompt.default_scope, OverrideScope::AllOccurrences);
-    assert_eq!(prompt.choices[0].mode, SplitMode::B);
-    let saved = h.dispatch(Event::EffectiveReaderOverride(Action::Save {
-        identity: prompt.identity,
-        scope: OverrideScope::AllOccurrences,
-        parts: vec!["東".into(), "京".into()],
-        registered_at_unix_ms: 200,
-    }));
-    assert!(saved.effective_reader_tokens.is_none());
-    assert!(
-        saved
-            .effective_reader_override
-            .as_ref()
-            .unwrap()
-            .reload_required
-    );
-    let split = h.reload(&saved);
-    let page = split.effective_reader_tokens.as_ref().unwrap();
-    assert_eq!(page.original_boundaries, original);
-    assert_eq!(
-        page.tokens
-            .iter()
-            .map(|t| t.surface.as_str())
-            .collect::<Vec<_>>(),
-        ["東", "京", "東", "京", "ヌヌ𠮷か\u{3099}\0"]
-    );
-    assert!(page.tokens[..4]
-        .iter()
-        .all(|t| t.reading.is_none() && t.dictionary_form.is_none()));
-    h.send(Event::CloseDocument);
-    let before = std::fs::read(f.path()).unwrap();
-    assert_eq!(
-        counts(&h),
-        WordStatusCounts {
-            new: 3,
-            ..Default::default()
-        }
-    );
-    assert_eq!(std::fs::read(f.path()).unwrap(), before);
-    drop(h);
-
-    let h = f.bridge();
-    let split = h.load(f.id);
-    assert_eq!(
-        split.effective_reader_tokens.as_ref().unwrap().tokens[0].surface,
-        "東"
-    );
-    let opened = h.open_edit(&split);
-    let prompt = opened.effective_reader_override.unwrap().prompt.unwrap();
-    let rule = prompt.winning_rules[0].id;
-    let reversed = h.dispatch(Event::EffectiveReaderOverride(Action::Reverse {
-        identity: prompt.identity,
-        id: rule,
-    }));
-    let restored = h.reload(&reversed);
-    assert_eq!(
-        restored.effective_reader_tokens.as_ref().unwrap().tokens[0].surface,
-        "東京"
-    );
-    h.send(Event::CloseDocument);
-    assert_eq!(
-        counts(&h),
-        WordStatusCounts {
-            new: 2,
-            ..Default::default()
-        }
-    );
-    assert_eq!(f.count("reading_completions"), 0);
-    assert_eq!(f.count("reading_occurrences"), 0);
-    // Reversal also survives an independent serialized bridge.
-    let fresh = f.bridge();
-    assert_eq!(
-        fresh.load(f.id).effective_reader_tokens.unwrap().tokens[0].surface,
-        "東京"
-    );
 }
 
 #[test]
@@ -424,201 +325,6 @@ fn serialized_word_status_custom_retry_unicode_reopen_and_stale_guards() {
 }
 
 #[test]
-fn serialized_completion_freezes_partition_time_and_retry_across_reversal() {
-    let f = Fixture::new();
-    let h = f.bridge();
-    let loaded = h.load(f.id);
-    let opened = h.open_edit(&loaded);
-    let prompt = opened.effective_reader_override.unwrap().prompt.unwrap();
-    let saved = h.dispatch(Event::EffectiveReaderOverride(Action::Save {
-        identity: prompt.identity,
-        scope: OverrideScope::AllOccurrences,
-        parts: vec!["東".into(), "京".into()],
-        registered_at_unix_ms: 200,
-    }));
-    let split = h.reload(&saved);
-    h.send(Event::OpenSettings);
-    h.dispatch(Event::SetReaderTypography(ReaderTypography {
-        furigana: true,
-        ..Default::default()
-    }));
-    h.send(Event::CloseSettings);
-    let split = h.reload(&split);
-    // Manual parts have no fabricated readings; the untouched exact B token does.
-    assert_eq!(split.reader_furigana.len(), 1);
-    let time = h.dispatch(Event::RestoreReadingTime).reader_time.unwrap();
-    h.dispatch(Event::CheckpointReadingTime(
-        yomoku_core::active_time::ReadingTimeUpdate {
-            pending: PendingReadingTime::try_from(321).unwrap(),
-            ..time
-        },
-    ));
-    f.sql().execute_batch("CREATE TRIGGER fail_completion BEFORE INSERT ON reading_completions BEGIN SELECT RAISE(ABORT,'fixture'); END;").unwrap();
-    let page = split.reader.as_ref().unwrap();
-    let identity = split.effective_reader_tokens.as_ref().unwrap().identity;
-    let failed = h.dispatch_n(
-        Event::CompleteEffectiveReaderPage {
-            identity,
-            position: page.position,
-            completed_at_unix_ms: 500,
-        },
-        2,
-    );
-    assert!(failed.completion_save_pending && failed.document_error.is_some());
-    assert_eq!(f.count("effective_completion_commands"), 1);
-    assert_eq!(f.count("reading_occurrences"), 0);
-    // An independent connection changes the rule after reservation. Retry must
-    // commit the frozen five occurrences and duration, not today's B partition.
-    f.sql()
-        .execute_batch("UPDATE segmentation_overrides SET active=0; DROP TRIGGER fail_completion;")
-        .unwrap();
-    let completed = h.dispatch(Event::RetryReaderCompletion);
-    assert_eq!(completed.content_route, ContentRoute::Main);
-    assert!(!completed.completion_save_pending);
-    assert_eq!(completed.completion_notice.unwrap().newly_known, 3);
-    assert!(completed.book_completion_notice.is_some());
-    assert_eq!(f.count("reading_occurrences"), 5);
-    assert_eq!(f.count("reading_completions"), 1);
-    assert_eq!(
-        f.sql()
-            .query_row("SELECT active_time_ms FROM reading_completions", [], |r| {
-                r.get::<_, i64>(0)
-            })
-            .unwrap(),
-        321
-    );
-    h.send(Event::RetryReaderCompletion);
-    assert!(h.callbacks.try_recv().is_err());
-    drop(h);
-    let h = f.bridge();
-    let reopened = h.load(f.id);
-    assert_eq!(
-        reopened.reader.as_ref().unwrap().position.offset,
-        TextOffset::START
-    );
-    assert_eq!(
-        reopened.effective_reader_tokens.as_ref().unwrap().tokens[0].surface,
-        "東京"
-    );
-    assert_eq!(f.count("reading_completions"), 1);
-}
-
-struct AlternateAnalyzer(mpsc::Sender<(SplitMode, thread::ThreadId)>);
-
-impl PasteAnalyzer for AlternateAnalyzer {
-    fn analyze(&mut self, _: &ChapterText) -> Result<ChapterAnalysis, DocumentError> {
-        panic!("alternate generation must explicitly request a mode")
-    }
-
-    fn analyze_mode(
-        &mut self,
-        chapter: &ChapterText,
-        mode: SplitMode,
-        profile: &AnalysisProfile,
-    ) -> Result<ChapterAnalysis, DocumentError> {
-        self.0.send((mode, thread::current().id())).unwrap();
-        assert_eq!(chapter.text, "東京 東京 ヌヌ𠮷か\u{3099}\0");
-        let mut output = analysis(chapter).unwrap();
-        assert_eq!(&output.profile, profile);
-        output.mode = mode;
-        if mode == SplitMode::A {
-            output.tokens = output
-                .tokens
-                .into_iter()
-                .flat_map(|token| {
-                    if token.surface != "東京" {
-                        return vec![token];
-                    }
-                    let start = token.anchor.range.start.byte_index(&chapter.text).unwrap();
-                    ["東", "京"]
-                        .into_iter()
-                        .enumerate()
-                        .map(|(index, surface)| {
-                            let start = start + index * surface.len();
-                            AnalyzedToken {
-                                anchor: TextAnchor {
-                                    range: TextRange {
-                                        start: TextOffset::at(&chapter.text, start).unwrap(),
-                                        end: TextOffset::at(&chapter.text, start + surface.len())
-                                            .unwrap(),
-                                    },
-                                    ..token.anchor
-                                },
-                                surface: surface.into(),
-                                reading: Some(format!("A{surface}")),
-                                dictionary_form: Some(Surface::new(surface).unwrap()),
-                                is_japanese: true,
-                            }
-                        })
-                        .collect()
-                })
-                .collect();
-        }
-        Ok(output)
-    }
-}
-
-#[test]
-fn serialized_alternate_generation_choose_local_scope_and_stored_reuse() {
-    let f = Fixture::new();
-    let (tx, trace) = mpsc::channel();
-    let h = f.bridge_with_loader(Box::new(move || {
-        Ok(Box::new(AlternateAnalyzer(tx.clone())))
-    }));
-    let loaded = h.load(f.id);
-    assert!(trace.try_recv().is_err());
-    let mut current = loaded;
-    for mode in [SplitMode::A, SplitMode::C] {
-        let opened = h.open_edit(&current);
-        let identity = opened.effective_reader_override.unwrap().identity.unwrap();
-        let generated = h.dispatch(Event::EffectiveReaderOverride(Action::Generate {
-            identity,
-            mode,
-        }));
-        assert!(
-            generated
-                .effective_reader_override
-                .as_ref()
-                .unwrap()
-                .reload_required
-        );
-        let (requested, worker) = trace.recv_timeout(TIMEOUT).unwrap();
-        assert_eq!(requested, mode);
-        assert_ne!(worker, thread::current().id());
-        current = h.reload(&generated);
-    }
-    drop(h);
-    // No analyzer is available in this new bridge. Both choices must be stored.
-    let h = f.bridge();
-    let loaded = h.load(f.id);
-    let opened = h.open_edit(&loaded);
-    let prompt = opened.effective_reader_override.unwrap().prompt.unwrap();
-    assert_eq!(
-        prompt.choices.iter().map(|c| c.mode).collect::<Vec<_>>(),
-        [SplitMode::A, SplitMode::B, SplitMode::C]
-    );
-    let chosen = h.dispatch(Event::EffectiveReaderOverride(Action::Choose {
-        identity: prompt.identity,
-        mode: SplitMode::A,
-        scope: OverrideScope::ThisOccurrence,
-        registered_at_unix_ms: 600,
-    }));
-    let resolved = h.reload(&chosen);
-    let tokens = &resolved.effective_reader_tokens.as_ref().unwrap().tokens;
-    assert_eq!(
-        tokens
-            .iter()
-            .map(|t| t.surface.as_str())
-            .collect::<Vec<_>>(),
-        ["東", "京", "東京", "ヌヌ𠮷か\u{3099}\0"]
-    );
-    assert_eq!(tokens[0].reading.as_deref(), Some("A東"));
-    assert_eq!(tokens[1].dictionary_form.as_deref(), Some("京"));
-    assert_eq!(f.count("reading_completions"), 0);
-    assert_eq!(f.count("reading_occurrences"), 0);
-}
-
-#[test]
 fn serialized_missing_analysis_and_legacy_commands_fail_closed() {
     let f = Fixture::new();
     let missing = Storage::open(f.path())
@@ -628,7 +334,7 @@ fn serialized_missing_analysis_and_legacy_commands_fail_closed() {
     let h = f.bridge();
     let loaded = h.load(missing.document_id);
     let page = loaded.effective_reader_tokens.as_ref().unwrap();
-    assert!(page.tokens.is_empty() && page.original_boundaries.is_empty());
+    assert!(page.tokens.is_empty());
     assert!(loaded.reader_tokens.is_none());
     let before = std::fs::read(f.path()).unwrap();
     h.send(Event::CompleteEffectiveReaderPage {

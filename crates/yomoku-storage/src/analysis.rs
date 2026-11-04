@@ -1,84 +1,31 @@
 use rusqlite::{Connection, OptionalExtension, TransactionBehavior};
 use yomoku_core::{
-    analysis::{
-        AnalysisProfile, AnalyzedToken, ChapterAnalysis, OverrideScope, SegmentationOverride,
-        SplitMode, StoredOverride,
-    },
-    document::{
-        AnalysisId, ChapterId, ChapterText, OverrideId, SourceId, TextAnchor, TextOffset, TextRange,
-    },
-    effective_reader::{
-        original_boundaries_on_page, EffectiveReaderChapter, OriginalBoundaryToken,
-    },
+    analysis::{AnalysisProfile, AnalyzedToken, ChapterAnalysis, SplitMode},
+    document::{AnalysisId, ChapterId, ChapterText, SourceId, TextAnchor, TextOffset, TextRange},
+    effective_reader::EffectiveReaderChapter,
     reader::ReaderAnalysis,
-    segmentation::{
-        resolve_segmentation, segmentation_from_snapshot, ChapterSegmentation,
-        EffectiveChapterSegmentation,
-    },
+    segmentation::{resolve_segmentation, ChapterSegmentation, EffectiveChapterSegmentation},
     vocabulary::Surface,
 };
 
-use crate::{vocabulary::register_vocabulary_in, Storage, StorageError};
+use crate::{Storage, StorageError};
 
-/// Shared read transaction for segmentation and effective page/status projections.
+/// Resolve the pinned longest-token snapshot in one transaction.
 pub(crate) fn read_effective_reader_chapter_in<'a>(
     connection: &Connection,
     chapter: &'a ChapterText,
 ) -> Result<Option<EffectiveReaderChapter<'a>>, StorageError> {
-    Ok(
-        read_effective_reader_with_boundaries_in(connection, chapter, None)?
-            .map(|(effective, _)| effective),
-    )
-}
-
-/// Project edit spans while original B is already loaded in the same transaction.
-pub(crate) fn read_effective_reader_with_boundaries_in<'a>(
-    connection: &Connection,
-    chapter: &'a ChapterText,
-    page: Option<TextAnchor>,
-) -> Result<Option<(EffectiveReaderChapter<'a>, Vec<OriginalBoundaryToken>)>, StorageError> {
     let ReaderAnalysis::Available(id) = read_reader_analysis(connection, chapter.chapter_id)?
     else {
         return Ok(None);
     };
     let original = read_analysis(connection, id)?.ok_or(StorageError::InvalidAnalysis)?;
-    let boundaries = page
-        .map(|page| original_boundaries_on_page(chapter, &original, page))
-        .transpose()
-        .map_err(|_| StorageError::InvalidAnalysis)?
-        .unwrap_or_default();
-    let mut statement = connection.prepare(
-        "SELECT id FROM chapter_analyses WHERE chapter_id = ?1
-         AND engine_revision = ?2 AND dictionary_revision = ?3
-         AND split_mode IN ('a', 'c') ORDER BY id",
-    )?;
-    let ids = statement
-        .query_map(
-            (
-                i64::from(chapter.chapter_id),
-                &original.profile.engine_revision,
-                &original.profile.dictionary_revision,
-            ),
-            |row| row.get::<_, i64>(0),
-        )?
-        .collect::<Result<Vec<_>, _>>()?;
-    let alternates = ids
-        .into_iter()
-        .map(|id| {
-            let id = analysis_id(id)?;
-            Ok((
-                id,
-                read_analysis(connection, id)?.ok_or(StorageError::InvalidAnalysis)?,
-            ))
-        })
-        .collect::<Result<Vec<_>, StorageError>>()?;
-    let rules = read_active_rules(connection, chapter)?;
-    EffectiveReaderChapter::resolve(chapter, id, &original, &alternates, &rules)
-        .map(|effective| Some((effective, boundaries)))
+    EffectiveReaderChapter::resolve(chapter, id, &original)
+        .map(Some)
         .map_err(|_| StorageError::InvalidAnalysis)
 }
 
-/// Pin the first persisted Mode B snapshot, including its original profile.
+/// Pin the first persisted Mode C snapshot, including its original profile.
 /// Later engine/dictionary snapshots must not silently replace an import's base.
 /// Full token/anchor validation still happens inside atomic analyzed completion.
 pub(crate) fn read_reader_analysis(
@@ -88,7 +35,7 @@ pub(crate) fn read_reader_analysis(
     let header = connection
         .query_row(
             "SELECT id, semantics_version, engine_revision, dictionary_revision
-             FROM chapter_analyses WHERE chapter_id = ?1 AND split_mode = 'b'
+             FROM chapter_analyses WHERE chapter_id = ?1 AND split_mode = 'c'
              ORDER BY id LIMIT 1",
             [i64::from(chapter_id)],
             |row| {
@@ -111,7 +58,17 @@ pub(crate) fn read_reader_analysis(
 }
 
 impl Storage {
-    /// Read the pinned original Mode B plus active global/relevant local rules
+    pub fn has_component_analysis(
+        &self,
+        chapter: ChapterId,
+        profile: &AnalysisProfile,
+        mode: SplitMode,
+    ) -> Result<bool, StorageError> {
+        Ok(self.connection.query_row("SELECT EXISTS(SELECT 1 FROM chapter_analyses WHERE chapter_id = ?1 AND engine_revision = ?2 AND dictionary_revision = ?3 AND split_mode = ?4)",
+            (i64::from(chapter), &profile.engine_revision, &profile.dictionary_revision, encode_mode(mode)), |row| row.get(0))?)
+    }
+
+    /// Read the pinned original Mode C plus active global/relevant local rules
     /// atomically. Missing B stays missing; this never analyzes, registers words,
     /// changes the reader's current projection or writes completed-reading data.
     pub fn load_chapter_segmentation(
@@ -125,9 +82,8 @@ impl Storage {
             return Ok(None);
         };
         let original = read_analysis(&transaction, id)?.ok_or(StorageError::InvalidAnalysis)?;
-        let rules = read_active_rules(&transaction, &chapter)?;
-        let segments = resolve_segmentation(&chapter, &original, &rules)
-            .map_err(|_| StorageError::InvalidAnalysis)?;
+        let segments =
+            resolve_segmentation(&chapter, &original).map_err(|_| StorageError::InvalidAnalysis)?;
         transaction.commit()?;
         Ok(Some(ChapterSegmentation {
             original_analysis_id: id,
@@ -177,137 +133,6 @@ impl Storage {
         transaction.commit()?;
         Ok(analysis)
     }
-
-    /// Replace the active edit for this exact key, preserving base analysis and
-    /// inactive edits. AllOccurrences is keyed by exact surface; ThisOccurrence
-    /// by source/chapter/range. Overlap/precedence resolution is not performed here.
-    pub fn save_segmentation_override(
-        &mut self,
-        edit: &SegmentationOverride,
-    ) -> Result<OverrideId, StorageError> {
-        let transaction = self
-            .connection
-            .transaction_with_behavior(TransactionBehavior::Immediate)?;
-        let (id, _) = save_segmentation_override_in(&transaction, edit)?;
-        transaction.commit()?;
-        Ok(id)
-    }
-
-    /// Save a user boundary choice and register its newly effective Japanese
-    /// spellings in the same transaction. Only segments owned by the new rule at
-    /// the selected occurrence are registered; other occurrences are not rescanned.
-    /// Existing entries retain status/history. An identical active-rule retry is
-    /// write-free, including after vocabulary deletion. No reading is recorded.
-    /// Returns the rule ID and number of distinct newly registered spellings.
-    /// This storage prerequisite does not yet validate a rendered UI selection.
-    pub fn save_registered_segmentation_override(
-        &mut self,
-        edit: &SegmentationOverride,
-        registered_at_unix_ms: i64,
-    ) -> Result<(OverrideId, usize), StorageError> {
-        if registered_at_unix_ms < 0 {
-            return Err(StorageError::InvalidVocabulary);
-        }
-        let transaction = self
-            .connection
-            .transaction_with_behavior(TransactionBehavior::Immediate)?;
-        let result = save_registered_override_in(&transaction, edit, registered_at_unix_ms)?;
-        transaction.commit()?;
-        Ok(result)
-    }
-
-    pub fn segmentation_override(
-        &mut self,
-        id: OverrideId,
-    ) -> Result<Option<StoredOverride>, StorageError> {
-        let transaction = self.connection.transaction()?;
-        let edit = read_override(&transaction, id)?;
-        transaction.commit()?;
-        Ok(edit)
-    }
-
-    /// Reversal disables this exact edit; it does not resurrect a superseded one,
-    /// delete vocabulary, rescan documents, or rewrite any completed-reading data.
-    pub fn reverse_segmentation_override(&mut self, id: OverrideId) -> Result<bool, StorageError> {
-        let transaction = self
-            .connection
-            .transaction_with_behavior(TransactionBehavior::Immediate)?;
-        let Some(stored) = read_override(&transaction, id)? else {
-            return Ok(false);
-        };
-        if !stored.active {
-            return Ok(false);
-        }
-        transaction.execute(
-            "UPDATE segmentation_overrides SET active = 0 WHERE id = ?1",
-            [i64::from(id)],
-        )?;
-        transaction.commit()?;
-        Ok(true)
-    }
-}
-
-/// Reuse one transaction for rendered-context validation and rule/registration writes.
-pub(crate) fn save_registered_override_in(
-    connection: &Connection,
-    edit: &SegmentationOverride,
-    registered_at_unix_ms: i64,
-) -> Result<(OverrideId, usize), StorageError> {
-    let chapter = read_chapter(connection, edit.anchor.chapter_id)?;
-    let ReaderAnalysis::Available(original_id) =
-        read_reader_analysis(connection, chapter.chapter_id)?
-    else {
-        return Err(StorageError::InvalidAnalysis);
-    };
-    let original = read_analysis(connection, original_id)?.ok_or(StorageError::InvalidAnalysis)?;
-    // Both ends must cover contiguous, complete Japanese original-B tokens.
-    // This also rejects gaps, punctuation and non-Japanese source spans.
-    segmentation_from_snapshot(&chapter, &original, &original, edit.anchor, edit.scope)
-        .map_err(|_| StorageError::InvalidAnalysis)?;
-    read_effective_reader_chapter_in(connection, &chapter)?.ok_or(StorageError::InvalidAnalysis)?;
-    let (id, changed) = save_segmentation_override_in(connection, edit)?;
-    let registered = if changed {
-        let effective = read_effective_reader_chapter_in(connection, &chapter)?
-            .ok_or(StorageError::InvalidAnalysis)?;
-        let tokens = effective
-            .tokens_on_page(edit.anchor)
-            .map_err(|_| StorageError::InvalidAnalysis)?
-            .into_iter()
-            .filter(|token| {
-                effective.segmentation().segments[token.segment_index as usize]
-                    .boundary
-                    .override_id
-                    == Some(id)
-            })
-            .collect::<Vec<_>>();
-        let surfaces = tokens
-            .iter()
-            .map(|token| Surface::new(&token.surface).map_err(|_| StorageError::InvalidAnalysis))
-            .collect::<Result<std::collections::BTreeSet<_>, _>>()?;
-        register_vocabulary_in(connection, &surfaces, registered_at_unix_ms)?
-    } else {
-        0
-    };
-    Ok((id, registered))
-}
-
-fn read_active_rules(
-    connection: &Connection,
-    chapter: &ChapterText,
-) -> Result<Vec<StoredOverride>, StorageError> {
-    let mut statement = connection.prepare(
-        "SELECT id FROM segmentation_overrides WHERE active = 1
-         AND (scope = 'all' OR (source_id = ?1 AND chapter_id = ?2)) ORDER BY id",
-    )?;
-    let ids = statement
-        .query_map(
-            (i64::from(chapter.source_id), i64::from(chapter.chapter_id)),
-            |row| row.get::<_, i64>(0),
-        )?
-        .collect::<Result<Vec<_>, _>>()?;
-    ids.into_iter()
-        .map(|id| read_override(connection, override_id(id)?)?.ok_or(StorageError::InvalidAnalysis))
-        .collect()
 }
 
 pub(crate) fn read_chapter(
@@ -396,93 +221,10 @@ pub(crate) fn read_analysis(
     Ok(Some(analysis))
 }
 
-pub(crate) fn read_override(
-    connection: &Connection,
-    id: OverrideId,
-) -> Result<Option<StoredOverride>, StorageError> {
-    let header = connection
-        .query_row(
-            "SELECT o.semantics_version, o.source_id, o.chapter_id, o.start_byte, o.end_byte,
-         o.surface, o.scope, o.active, c.source_id FROM segmentation_overrides o
-         LEFT JOIN chapters c ON c.id = o.chapter_id WHERE o.id = ?1",
-            [i64::from(id)],
-            |row| {
-                Ok((
-                    row.get::<_, i64>(0)?,
-                    row.get::<_, i64>(1)?,
-                    row.get::<_, i64>(2)?,
-                    row.get::<_, i64>(3)?,
-                    row.get::<_, i64>(4)?,
-                    row.get::<_, String>(5)?,
-                    row.get::<_, String>(6)?,
-                    row.get::<_, i64>(7)?,
-                    row.get::<_, Option<i64>>(8)?,
-                ))
-            },
-        )
-        .optional()?;
-    let Some((version, source, chapter, start, end, surface, scope, active, owner)) = header else {
-        return Ok(None);
-    };
-    if version != 1 || Some(source) != owner {
-        return Err(StorageError::InvalidAnalysis);
-    }
-    let scope = match scope.as_str() {
-        "all" => OverrideScope::AllOccurrences,
-        "this" => OverrideScope::ThisOccurrence,
-        _ => return Err(StorageError::InvalidAnalysis),
-    };
-    let active = match active {
-        0 => false,
-        1 => true,
-        _ => return Err(StorageError::InvalidAnalysis),
-    };
-    let mut statement = connection.prepare("SELECT part_index, surface FROM segmentation_override_parts WHERE override_id = ?1 ORDER BY part_index")?;
-    let mut rows = statement.query([i64::from(id)])?;
-    let mut parts = Vec::new();
-    while let Some(row) = rows.next()? {
-        if row.get::<_, i64>(0)? != index_value(parts.len())? {
-            return Err(StorageError::InvalidAnalysis);
-        }
-        parts.push(
-            Surface::new(row.get::<_, String>(1)?).map_err(|_| StorageError::InvalidAnalysis)?,
-        );
-    }
-    let edit = SegmentationOverride {
-        scope,
-        anchor: TextAnchor {
-            source_id: SourceId::try_from(source).map_err(|_| StorageError::InvalidAnalysis)?,
-            chapter_id: ChapterId::try_from(chapter).map_err(|_| StorageError::InvalidAnalysis)?,
-            range: TextRange {
-                start: offset(start)?,
-                end: offset(end)?,
-            },
-        },
-        surface: Surface::new(surface).map_err(|_| StorageError::InvalidAnalysis)?,
-        parts,
-    };
-    edit.validate_shape()
-        .map_err(|_| StorageError::InvalidAnalysis)?;
-    // Validate against canonical text while it exists; retained global rules can
-    // still be inspected/reversed after their originating content is deleted.
-    let text_exists: bool = connection.query_row(
-        "SELECT EXISTS(SELECT 1 FROM chapter_texts WHERE chapter_id = ?1)",
-        [chapter],
-        |row| row.get(0),
-    )?;
-    if text_exists {
-        edit.replacement_anchors(&read_chapter(connection, edit.anchor.chapter_id)?)
-            .map_err(|_| StorageError::InvalidAnalysis)?;
-    }
-    Ok(Some(StoredOverride { id, edit, active }))
-}
-
 fn analysis_id(value: i64) -> Result<AnalysisId, StorageError> {
     AnalysisId::try_from(value).map_err(|_| StorageError::InvalidAnalysis)
 }
-fn override_id(value: i64) -> Result<OverrideId, StorageError> {
-    OverrideId::try_from(value).map_err(|_| StorageError::InvalidAnalysis)
-}
+
 fn offset(value: i64) -> Result<TextOffset, StorageError> {
     TextOffset::try_from(value).map_err(|_| StorageError::InvalidAnalysis)
 }
@@ -548,60 +290,4 @@ pub(crate) fn store_chapter_analysis_in(
         )?;
     }
     Ok(id)
-}
-
-fn save_segmentation_override_in(
-    connection: &Connection,
-    edit: &SegmentationOverride,
-) -> Result<(OverrideId, bool), StorageError> {
-    let chapter = read_chapter(connection, edit.anchor.chapter_id)?;
-    edit.replacement_anchors(&chapter)
-        .map_err(|_| StorageError::InvalidAnalysis)?;
-    let existing: Option<i64> = match edit.scope {
-        OverrideScope::AllOccurrences => connection.query_row(
-            "SELECT id FROM segmentation_overrides WHERE scope = 'all' AND active = 1 AND surface = ?1",
-            [edit.surface.as_str()], |row| row.get(0),
-        ).optional()?,
-        OverrideScope::ThisOccurrence => connection.query_row(
-            "SELECT id FROM segmentation_overrides WHERE scope = 'this' AND active = 1
-             AND source_id = ?1 AND chapter_id = ?2 AND start_byte = ?3 AND end_byte = ?4",
-            (i64::from(edit.anchor.source_id), i64::from(edit.anchor.chapter_id),
-             i64::from(edit.anchor.range.start), i64::from(edit.anchor.range.end)), |row| row.get(0),
-        ).optional()?,
-    };
-    if let Some(id) = existing {
-        let stored =
-            read_override(connection, override_id(id)?)?.ok_or(StorageError::InvalidAnalysis)?;
-        // A global rule made at a different occurrence has the same meaning.
-        if stored.edit.parts == edit.parts && stored.edit.surface == edit.surface {
-            return Ok((stored.id, false));
-        }
-        connection.execute(
-            "UPDATE segmentation_overrides SET active = 0 WHERE id = ?1",
-            [id],
-        )?;
-    }
-    connection.execute(
-        "INSERT INTO segmentation_overrides (semantics_version, source_id, chapter_id,
-         start_byte, end_byte, surface, scope, active) VALUES (1, ?1, ?2, ?3, ?4, ?5, ?6, 1)",
-        (
-            i64::from(edit.anchor.source_id),
-            i64::from(edit.anchor.chapter_id),
-            i64::from(edit.anchor.range.start),
-            i64::from(edit.anchor.range.end),
-            edit.surface.as_str(),
-            match edit.scope {
-                OverrideScope::AllOccurrences => "all",
-                OverrideScope::ThisOccurrence => "this",
-            },
-        ),
-    )?;
-    let id = override_id(connection.last_insert_rowid())?;
-    for (index, part) in edit.parts.iter().enumerate() {
-        connection.execute(
-            "INSERT INTO segmentation_override_parts (override_id, part_index, surface) VALUES (?1, ?2, ?3)",
-            (i64::from(id), index_value(index)?, part.as_str()),
-        )?;
-    }
-    Ok((id, true))
 }

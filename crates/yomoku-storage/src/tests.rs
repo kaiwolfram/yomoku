@@ -23,9 +23,6 @@ mod custom_dictionary;
 mod document_deletion;
 mod document_rename;
 mod documents;
-mod effective_completions;
-mod effective_overrides;
-mod effective_status;
 mod encounters;
 mod epub;
 #[path = "../../yomoku-import/tests/support/epub.rs"]
@@ -41,8 +38,6 @@ mod reader_documents;
 mod reader_tokens;
 mod reader_words;
 mod reading_time;
-mod registered_overrides;
-mod segmentation;
 mod settings;
 mod srt;
 mod statistics;

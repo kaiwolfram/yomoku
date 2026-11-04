@@ -358,8 +358,7 @@ internal fun ReaderScreen(
         }
     val effectiveIdle =
         view.effectiveReaderWord?.let { !it.busy && !it.customEntryPending } != false &&
-            view.effectiveReaderStatus?.let { !it.busy && !it.pending } != false &&
-            view.effectiveReaderOverride?.let { !it.busy && !it.pending } != false
+            view.effectiveReaderStatus?.let { !it.busy && !it.pending } != false
     val canNavigate =
         page != null &&
             !view.settingsOpen &&

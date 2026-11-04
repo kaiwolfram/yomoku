@@ -1,4 +1,4 @@
-//! Read-only Library distributions for original-B and effective reader membership.
+//! Read-only Library distributions for original-C and effective reader membership.
 
 use std::collections::{btree_map::Entry, BTreeMap, BTreeSet};
 
@@ -17,7 +17,7 @@ use crate::{
 impl Storage {
     /// Resolve all live documents and statuses in one read transaction. This
     /// separate API is ready for the coordinated effective-reader switch; the
-    /// live B reader keeps its matching original-B distribution until then.
+    /// live B reader keeps its matching original-C distribution until then.
     /// Reads canonical chapters/stored analysis/rules, never source/assets or
     /// dictionaries. Missing B stays unavailable; missing vocabulary stays absent.
     pub fn effective_library_word_distributions(
@@ -110,7 +110,7 @@ impl Storage {
                 FROM chapters c
                 LEFT JOIN chapter_analyses a ON a.id = (
                     SELECT MIN(id) FROM chapter_analyses
-                    WHERE chapter_id = c.id AND split_mode = 'b'
+                    WHERE chapter_id = c.id AND split_mode = 'c'
                 )
               ), coverage AS (
                 SELECT source_id, COUNT(*) = COUNT(analysis_id) AS available,

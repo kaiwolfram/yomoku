@@ -182,7 +182,7 @@ unused obfuscated fonts/CSS need not be opened. See DATA_MODEL.md and DECISIONS.
 for the extraction contract and current compatibility limits.
 EPUB's repository adapter now saves original-file SHA-256/bytes, metadata/filename,
 ordered canonical chapters, ruby/formatting/link/image spans and separate image
-bytes in one immediate transaction. Each chapter gets an original validated Mode B
+bytes in one immediate transaction. Each chapter gets an original validated Mode C
 snapshot and globally unique registration through the shared analyzed-chapter
 composition; the whole file rolls back if any chapter fails or cancellation wins.
 Migration 0014 preserves existing source IDs/high-water marks/file identities.
@@ -190,7 +190,7 @@ Read-only multi-chapter loading validates digests, counts, indexes, ownership an
 UTF-8 anchors without parsing or analyzing. Library progress sums earlier chapter
 lengths plus the current chapter offset against total book bytes.
 The pure `ReaderDocument` now retains every canonical chapter in source order.
-`DocumentReaderSnapshot` adds the saved preset, global typography and each chapter's original Mode B
+`DocumentReaderSnapshot` adds the saved preset, global typography and each chapter's original Mode C
 identity. Generic read/open/position repositories use the authoritative saved-content
 loader; ordinary reads never parse/analyze or reset a finished book. Explicit
 opening atomically resets a finished book to its first chapter. Logical page
@@ -242,7 +242,7 @@ persists the constrained furigana boolean in the same atomic preference update;
 font/spacing controls preserve it. The typed preference loads with Library and
 reader snapshots. Pure core projects `ViewModel.reader_furigana` when enabled:
 sorted page-local UTF-8 ruby, preferring source bases over every overlapping
-original Mode B token and using available whole analyzer readings elsewhere.
+original Mode C token and using available whole analyzer readings elsewhere.
 Vocabulary status/absence never filters readings. Full document/page/analysis,
 token ownership, clipped range and canonical surface validation rejects stale or
 malformed analyzer snapshots as a whole while retaining independent source ruby.
@@ -439,7 +439,7 @@ and common HTML formatting, preserving speakers, numeric dialogue, unknown marku
 and damaged metadata. Decode entities once after tag removal. All cues form one
 text unit before analysis/pagination. Its repository adapter now uses the shared
 strict UTF-8/Shift-JIS decoder without Aozora transformation. `import_analyzed_srt[_cancellable]` saves original bytes,
-filename, canonical chapter/cues, original Mode B and unique registrations in one
+filename, canonical chapter/cues, original Mode C and unique registrations in one
 immediate transaction. Shared original-byte identity references an existing TXT/SRT
 before decoding/analysis; duplicates preserve their original interpretation.
 Migration 0013 widens source kinds and adds cascading cue ranges. Read-only source
@@ -464,7 +464,7 @@ notations and preserves every hard break without chapter inference. The parser d
 not allocate durable IDs or perform I/O/analysis/SQL. Storage now consumes it in
 `import_analyzed_txt`: hash original bytes, lock one immediate transaction, reference
 an exact live file or parse/allocate/store original bytes, filename title, canonical
-text/ruby, Mode B analysis and unique registrations together. An existing file skips
+text/ruby, Mode C analysis and unique registrations together. An existing file skips
 decoding/analysis and preserves its chosen encoding/statuses/progress. The analyzer
 callback obeys the same ready-worker/no-I/O/provisional-ID contract as paste. Shared
 legacy single-text repository APIs retain PastedDocument; the application/bridge
@@ -567,14 +567,14 @@ whitespace may be omitted between tokens. Separate global/local boundary edits
 partition a selected exact span; they cannot edit lemmas or source text.
 Application vocabulary commands remain future work.
 
-Pure `reader_tokens_on_page` projects Japanese Mode B occurrences intersecting a
+Pure `reader_tokens_on_page` projects Japanese Mode C occurrences intersecting a
 nonempty page span. Tokens retain full chapter anchors, exact surfaces, readings,
 dictionary forms and original indices; a separate page-local UTF-8 display range
 clips crossing tokens for rendering. Display overlap does not change completion's
 start-based occurrence ownership. `ReaderTokenSnapshot` echoes document/page/base
 analysis identity for asynchronous result validation. Its optional
 `ReaderVocabulary` carries the current global ID and one of five statuses.
-The separate `load_reader_tokens` repository reads original Mode B plus current
+The separate `load_reader_tokens` repository reads original Mode C plus current
 exact-surface statuses in one read transaction, using one visible-token status
 join. It reuses full stored-analysis validation; no analyzer, override application,
 registration, history, position or finish-marker mutation occurs. Legacy analysis
@@ -662,7 +662,7 @@ reader/token opens do not load this index; word lookup never loads an analyzer.
 `Storage::load_reader_word(dictionary, key, token_index)` composes the existing
 page-token validation/status projection with an indexed lifetime occurrence count
 in one deferred user-state read transaction. It selects only a visible original
-Mode B Japanese token and derives surface/base queries from that stored token.
+Mode C Japanese token and derives surface/base queries from that stored token.
 `ReaderWordDetails` echoes the page/base key, full token, count and separate typed
 word/name candidates with applicable views. Missing document returns None;
 stale/missing analysis or invalid token selection errors. Dictionary failures
@@ -869,12 +869,12 @@ the counter sit below content. Settings reflow keeps the exact position and Libr
 only committed values change the preset/page. An independent active-document
 snapshot prevents repository loads from changing the text used for reader reflow.
 Reader snapshots load content/position, permanent finish state, the preset and the
-original stored Mode B AnalysisId together. Plain loads use a read transaction;
+original stored Mode C AnalysisId together. Plain loads use a read transaction;
 explicit reader entry uses an immediate transaction for its finished-book reset.
-The earliest Mode B snapshot is pinned,
+The earliest Mode C snapshot is pinned,
 independent of the installed engine/dictionary or later snapshots. Only its
 header is read; completion still validates tokens and anchors transactionally.
-ReaderAnalysis::Missing explicitly identifies legacy content with no Mode B base;
+ReaderAnalysis::Missing explicitly identifies legacy content with no Mode C base;
 it remains readable without analyzer initialization, rescan or vocabulary writes.
 The optional view field is absent outside an opened reader. Settings/position
 saves/plain loads preserve its identity; reader exit/replacement clears it, and
@@ -943,7 +943,7 @@ only on vocabulary deletion; document deletion preserves entries/history. Paste
 imports now register analyzed surfaces atomically; vocabulary UI remains pending.
 Migration 0017 adds a separate exact-surface custom dictionary table, independent
 of vocabulary/source lifetime. Pure `CustomDictionaryEntry` validates nonblank
-meaning/reading; selected-token storage operations reuse original Mode B ownership
+meaning/reading; selected-token storage operations reuse original Mode C ownership
 validation and recheck surface/base against the read-only word/name index before
 read/create/edit/delete. No built-in, analyzer, reader position/time or history
 mutation occurs. Immediate writes roll back atomically; identical retries do no
@@ -1004,7 +1004,7 @@ settings, vocabulary, analysis anchors and completion history. Base-analysis ide
 repositories have no segmentation UI operations.
 
 Pure `yomoku-core::segmentation` derives effective whole-chapter boundaries from
-original Mode B and active edits. A/B/C choices partition a complete Japanese span
+original Mode C and active edits. A/B/C choices partition a complete Japanese span
 from a validated same-profile snapshot; manual edits share the exact partition
 representation. Global rules match complete adjacent B tokens; local source/range
 rules take precedence, then newer IDs within each scope. Resolution preserves
@@ -1176,7 +1176,7 @@ accepted word/custom/completion obligations gate status. This completes the nati
 status path needed by the coordinated live switch, without adding shell schemas.
 
 `Storage::create_analyzed_paste` composes the existing private transaction helpers
-for document creation, validated Mode B analysis and exact-surface registration.
+for document creation, validated Mode C analysis and exact-surface registration.
 A caller-provided callback receives allocated canonical chapter identities; the
 caller must load/reuse its analyzer before entering the immediate transaction.
 Storage has no analyzer dependency, and core remains free of SQL/platform I/O.
@@ -1308,7 +1308,7 @@ percentages, scroll resets, Settings reflow and persisted preset reopening.
 Automatic Android backup/transfer is excluded. Arm64 execution is unverified.
 
 ## Required boundaries and next work
-Production paste imports now atomically persist Mode B analyses and register all
+Production paste imports now atomically persist Mode C analyses and register all
 unique Japanese surfaces without encounters, deduplicate exact bytes and deliver
 Created/Existing summaries. Native descriptor delivery and retained/background
 lifecycle are connected. TXT parsing, atomic storage and the Android multiple-file
@@ -1339,98 +1339,19 @@ separate tasks. Add analysis/import crates only with
 actual behavior; Sudachi Full defaults to B, JMdict/JMnedict remain offline data,
 and any future Nostr I/O stays in Rust. Nostr is outside the first MVP;
 configuration remains empty.
-## Guarded effective boundary repositories
+## Longest-token reader and component lookup
 
-`yomoku-storage::effective_overrides` adds a native-only read/choice/save/reverse
-slice. `yomoku-core::effective_overrides` owns the I/O-free snapshot types.
-`EffectiveOverrideContext` shares a supplied frozen effective key through
-`Arc`; context/retry clones do not duplicate the chapter. One read transaction
-checks rendered provenance and exact contiguous Japanese original-B bounds whose
-edge tokens intersect the page, then reads existing same-profile A/B/C partitions
-and winning rules. Crossing tokens remain whole; unavailable or unaligned alternate
-choices are omitted. This API never invokes the analyzer or registers vocabulary.
-
-Save and reversal revalidate both the full key and a rule-table revision in one
-immediate transaction. Save reuses the transaction-local registered-override helper,
-preserving winning-parts-only registration and same-rule no-ops. Reversal is limited
-to a winning rule returned by the prompt. The revision observes every supported
-append/deactivation, catching an intervening split/reversal even if the key returns
-to its original B value. Rule changes elsewhere conservatively invalidate prompts;
-live vocabulary and time changes do not. Failed transactions can retry unchanged
-contexts; committed mutations require explicit reload, including lost responses.
-
-`effective_session::overrides` now retains prompt presentation and accepted native
-read/save/reverse requests. Stored choices and manual partitions share the same
-save path; core validates literal partition shape, while storage revalidates full
-provenance and rule revision transactionally. Checked fresh callback attempts reject
-duplicates and previous retries. Dismissed/invalidated reads drain without restoring
-prompts. Accepted writes share an immutable context through `Arc` across invalidation
-and explicit exact retries; in-flight work cannot Cancel. Write acceptance retires
-the rendered page immediately. Successful writes and stale results require explicit
-page/context reload. A lost success retried against its old before-image returns
-stale, without re-registering deleted vocabulary. Failed-write Cancel also retires
-any newer page, since an unknown response can hide a committed edit.
-
-Native `LoadOverrideContext`/`SaveOverride`/`ReverseOverride` effects use the existing
-FIFO/SQLite connection without analyzer or word-dictionary loading. Typed native
-failures distinguish storage errors from invalid selections/stale contexts; no
-shell error enum changes. Pending override I/O/failed writes mutually gate retained
-word/custom/status/completion requests. The live app must also apply its time/FIFO/
-lifecycle gates. Contexts are database/session scoped and must be discarded on
-replacement/restore. Full contexts and requests have no shell codec. Compact
-prototype contracts are described below; live Android controls remain pending
-alongside the coordinated reader switch.
-
-Explicit `GenerateOverrideAnalysis` uses the same FIFO-owned analyzer cache as
-imports. Its retained request freezes mode plus the shared context and gets a fresh
-attempt on retry. Storage validates the before-image in a read transaction and
-reuses existing same-profile A/C snapshots without loading Full. For a missing mode,
-it releases the transaction before whole-chapter analysis, then rechecks the key
-and rule revision under an immediate transaction before storing immutable output.
-The requested mode, original engine/dictionary profile and all canonical anchors
-must match. Competing edits reject the computed result; no automatic rebase occurs.
-The production native adapter supports pinned-profile modes; import-only analyzer
-closures reject alternate requests. Failures discard a bad analyzer, while normal
-reuse/background release follows the existing import lifecycle.
-
-Generation creates no rule, vocabulary, encounter, time or progress writes. New
-exact metadata can nevertheless change effective identity, so acceptance retires
-page callbacks and success requires explicit page/context reload. Failed attempts
-retain their before-image for explicit retry/Cancel; a lost success that changes
-metadata becomes stale. Stored but unaligned alternates remain absent from prompt
-choices and are never regenerated. No new migration or public shell codec.
-
-`EffectiveReaderOverrideState` now projects only the selected literal span, stored
-A/B/C partitions, winning-rule IDs/scopes/parts, default All occurrences and typed
-pending/error/reload facts. Full chapter resolution, rule revision, originating
-rule anchors and retry payloads stay native. `EffectiveOverrideAction` supplies
-Open/Choose/manual Save/Generate/Reverse/Retry/Cancel/Dismiss. Its pure handler
-authenticates prompt identity before delegating to the existing retained lifecycle;
-the live app must still enforce shared time/FIFO/lifecycle gates.
-
-Each opened prompt receives a checked fresh revision alongside its compact page
-identity. Dismiss/reopen of the same span on the same retained page therefore
-rejects old actions. Accepted writes retain that identity across invalidation and
-exact retries; new callback attempts remain separate. Retry/Cancel authenticate
-the accepted obligation, and in-flight writes still drain. Generated Kotlin
-round trips exercise these standalone schemas; live Event/ViewModel adoption is
-pending. No migration, dependency or durable prompt registry.
-
-`ReaderBoundaryEditor` is an independently tested Android renderer for that compact
-state/action contract. It offers stored A/B/C or explicit missing-A/C generation,
-All/This scope, scalar-boundary cut toggles/join, literal partition previews and
-winning-rule reversal. `ReaderBoundaryText` rejects malformed UTF-16 and blank
-parts using Rust's whitespace policy. No source editing or inferred readings.
-Saveable cuts/scope belong above Dialog and authenticate the native session key,
-entire prompt identity and literal text at restoration. The parent must keep the
-session key across rotation and replace it with the native session.
-
-Pending writes expose only native Retry/Cancel; busy writes cannot be dismissed.
-Retired/invalid prompts offer explicit reload, and dictionary-clock interactions
-include dialog scrolling/keys. The owner supplies existing time/FIFO gates and
-reload/close callbacks. The component has no native bridge/session of its own and
-is not exposed in the current B reader: original-B span selection, live app events
-and the coordinated reader/Library switch remain pending.
+The reader uses immutable Sudachi Mode C tokens. Manual boundary editing and its
+UI, native commands, storage repositories and override tables are removed.
+Reader selection revisions, exact source anchors and frozen completion validation
+remain in the native session. A/B snapshots serve dictionary lookup only.
+On word lookup, the FIFO worker generates missing A/B chapter snapshots using the
+pinned analyzer profile, validates them and stores them without registering words.
+Storage searches components wholly inside the selected C anchor. Dictionary
+results retain applicable readings/senses, deduplicate by source/entry ID, and put
+full-token results before components ordered by length and source position.
+Vocabulary actions and completion use the C surface. This change targets fresh
+development installs; no upgrade migration or old-edit conversion is provided.
 
 ## Native effective reader callbacks
 
@@ -1497,20 +1418,7 @@ waits for both time slots and writes. Word reads/status results refresh repeated
 surface observations and invalidate Library bars, including vocabulary deletion.
 Custom CRUD never changes registration/status/history. Built-in protection and
 stale provenance checks remain transaction-local in storage. Only word/custom
-lookup loads the lazy word/name index; no new analyzer access or worker is added.
-
-The app routes `EffectiveReaderOverride(EffectiveOverrideAction)` and
-projects `effective_reader_override` using the existing compact prompt/state.
-Open authenticates the current page revision; subsequent actions authenticate the
-retained prompt. Stored A/B/C choices, literal manual parts, explicit A/C generation
-and winning-rule reversal use the same captured FIFO callback. Reads may be
-dismissed without releasing their I/O slot. Accepted edits/generation invalidate
-the page immediately; storage failures retain exact Retry/Cancel obligations and
-defer movement/reflow/import until resolved. Clock saves coalesce during override
-I/O and both time slots drain before deferred departure. Success/stale outcomes
-require an explicit page/context reload; no automatic rebase/replay is added.
-Override outcomes invalidate Library distribution caches. Full contexts/rule
-revisions remain native; existing transaction-local storage guards still apply.
+lookup loads the lazy word/name index; component analysis uses the existing worker.
 
 ## Production Android effective word consumers
 
@@ -1536,7 +1444,6 @@ Images keep their existing source order. No scroll position is persisted.
 Word lookup/status/custom events use the compact native app lifecycle. Reads wait
 for shared storage/time/completion/mutation gates; failures need explicit Retry.
 Attempt token reads once per base identity; page retirement needs explicit reload.
-Scope the override reload marker to its retired page, allowing later navigation.
 Panel dismissal retires presentation, while pending native status/custom writes
 keep reachable payload-free Retry/Cancel controls. Session replacement/page
 revision changes discard local selections/drafts; retained link callbacks cannot
@@ -1552,32 +1459,10 @@ Storage/time/completion and pending effective mutations gate movement. Navigatio
 callbacks reject retired revisions/sessions, and swipes observe current identities
 even when page geometry stays unchanged. Effective completion samples/pauses the
 platform clock before dispatch through the existing native drain/Retry lifecycle.
-`EffectiveReaderBoundaries` exposes the editor in the production reader.
-The atomic page read projects `original_boundaries` while original B is already
-loaded, without another analyzer or analysis read. Each page-only span retains its
-whole anchor/surface and clipped display range, independently of effective edits.
-Android validates strict UTF-8/UTF-16 projection and lets users select one B token
-or two endpoints of a contiguous Japanese range. Gaps, malformed data and Missing B
-fail closed. Selection is scoped to the native session/page revision; accepted
-prompt/write/retry ownership remains native. Shared time/FIFO/mutation gates apply
-to opening and submitting the editor; pending failures remain reachable after page
-retirement. Reload explicitly retires the old prompt and requests a new page.
-The production core/FFI/Android path uses these controls. The ephemeral page
-wire schema adds only these visible spans; no durable schema/dependency change.
-
-Effective override reload requirements belong only to the retired page. Normal
-page invalidation, close/reopen and explicit token loads clear the presentation
-marker; override success/stale/Cancel outcomes set it after retiring their
-before-image. Accepted writes/errors/retry payloads remain owned independently.
-This permits normal initial token reads on a newly opened reader, including the
-same book after effective completion. Successful edits retire the prompt; the
-reader exposes an explicit Reload action rather than silently reloading.
-
 Android's one-attempt token-read guard includes the exact reading position and
 page-length preset as well as the base page/analysis. A normal same-anchor position
 save or reflow can retire native tokens and must trigger a new read. Error clearing,
-clock saves and typography do not change that ownership or replay a failed read;
-boundary retirement continues to require explicit Reload.
+clock saves and typography do not change that ownership or replay a failed read.
 
 ## Read-only lifetime statistics
 

@@ -205,7 +205,7 @@ impl Storage {
         Ok(document)
     }
 
-    /// Read the exact position, preset and original stored Mode B identity
+    /// Read the exact position, preset and original stored Mode C identity
     /// together. This never invokes an analyzer, scans tokens or writes data.
     pub fn load_reader_snapshot(
         &mut self,

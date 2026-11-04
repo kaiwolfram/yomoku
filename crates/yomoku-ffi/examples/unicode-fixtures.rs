@@ -25,8 +25,6 @@ use yomoku_core::{pagination::ReadingPosition, reader::ReaderAnalysis};
 mod anki;
 #[path = "unicode-fixtures/anki_settings.rs"]
 mod anki_settings;
-#[path = "unicode-fixtures/effective_overrides.rs"]
-mod effective_overrides;
 #[path = "unicode-fixtures/statistics.rs"]
 mod statistics;
 #[path = "unicode-fixtures/vocabulary.rs"]
@@ -189,11 +187,6 @@ fn main() -> Result<(), Box<dyn Error>> {
     // Standalone prerequisite schemas use the actual generated shell codec.
     // Maximum revisions/indices and literal unresolved metadata stay lossless.
     let effective_page = EffectiveReaderPage {
-        original_boundaries: vec![yomoku_core::effective_reader::OriginalBoundaryToken {
-            anchor: illustrated_page.anchor,
-            display_range: illustrated_page.anchor.range,
-            surface: image_text.into(),
-        }],
         identity: EffectivePageIdentity {
             revision: u64::MAX,
             base: yomoku_core::reader::ReaderTokenKey {
@@ -204,7 +197,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         },
         tokens: [
             EffectiveTokenEligibility::AnalyzerJapanese,
-            EffectiveTokenEligibility::ManualJapaneseSpan,
+            EffectiveTokenEligibility::AnalyzerJapanese,
         ]
         .into_iter()
         .enumerate()
@@ -227,7 +220,6 @@ fn main() -> Result<(), Box<dyn Error>> {
         page: effective_page.identity,
         segment_index: u64::MAX,
     };
-    effective_overrides::exchange(dir, writing, effective_page.identity)?;
     let effective_word = EffectiveReaderWordState {
         selection: Some(effective_selection),
         details: Some(EffectiveWordDetails {

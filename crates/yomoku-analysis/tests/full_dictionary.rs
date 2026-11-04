@@ -87,7 +87,7 @@ fn mapped_and_owned_outputs_are_identical_including_profiles_and_anchors() {
         "猫と犬".repeat(8000),
     ] {
         let input = chapter(&text);
-        for mode in [SplitMode::A, SplitMode::B, SplitMode::C] {
+        for mode in [SplitMode::A, SplitMode::C, SplitMode::B] {
             let expected = owned.analyze_mode(&input, mode).unwrap();
             let actual = mapped.analyze_mode(&input, mode).unwrap();
             expected.validate(&input).unwrap();
@@ -99,7 +99,7 @@ fn mapped_and_owned_outputs_are_identical_including_profiles_and_anchors() {
 
 #[test]
 #[ignore = "requires pinned Sudachi Full; run tools/test-sudachi.sh"]
-fn default_b_and_all_three_real_split_modes() {
+fn default_c_and_all_three_real_split_modes() {
     let text = "国家公務員";
     let a = analyze(text, SplitMode::A);
     let b = analyze(text, SplitMode::B);
@@ -107,659 +107,13 @@ fn default_b_and_all_three_real_split_modes() {
     assert_eq!(surfaces(&a), ["国家", "公務", "員"]);
     assert_eq!(surfaces(&b), ["国家", "公務員"]);
     assert_eq!(surfaces(&c), ["国家公務員"]);
-    assert_eq!(analyzer().analyze(&chapter(text)).unwrap(), b);
-}
-
-#[test]
-#[ignore = "requires pinned Sudachi Full; run tools/test-sudachi.sh"]
-fn real_segmentation_choices_resolve_scopes_merges_and_reversal_without_replacing_b() {
-    use yomoku_core::{
-        analysis::{OverrideScope, SegmentationOverride},
-        document::{PasteText, TextAnchor, TextOffset, TextRange},
-        segmentation::segmentation_from_snapshot,
-        vocabulary::Surface,
-    };
-    use yomoku_storage::Storage;
-
-    let directory = std::env::temp_dir().join(format!(
-        "yomoku-real-segmentation-{}-{}",
-        std::process::id(),
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_nanos()
-    ));
-    std::fs::create_dir(&directory).unwrap();
-    let path = directory.join("segmentation.sqlite3");
-    // A separate immutable empty word/name fixture exercises selection without
-    // adding another downloaded-data requirement to the Full analysis suite.
-    let dictionary_path = directory.join("dictionary.sqlite3");
-    let dictionary_writer = rusqlite::Connection::open(&dictionary_path).unwrap();
-    dictionary_writer.execute_batch("PRAGMA application_id = 0x594f4449; PRAGMA user_version = 1;
-        CREATE TABLE entries (source TEXT, entry_id INTEGER, payload TEXT, PRIMARY KEY(source, entry_id)) WITHOUT ROWID;
-        CREATE TABLE forms (surface TEXT COLLATE BINARY, source TEXT, entry_id INTEGER, PRIMARY KEY(surface, source, entry_id)) WITHOUT ROWID;").unwrap();
-    drop(dictionary_writer);
-    let dictionary = yomoku_storage::dictionary::Dictionary::open(&dictionary_path).unwrap();
-    let mut storage = Storage::open(&path).unwrap();
-    let imported = storage
-        .create_analyzed_paste(
-            &PasteText::new("国家公務員。国家公務員。食べた。English 𰻞📖\0".into()).unwrap(),
-            100,
-            |chapter| analyzer().analyze(chapter),
-        )
-        .unwrap();
-    let chapter = &imported.document.chapter;
-    let original = storage
-        .chapter_analysis(imported.analysis_id)
-        .unwrap()
-        .unwrap();
-    let selected = TextAnchor {
-        source_id: chapter.source_id,
-        chapter_id: chapter.chapter_id,
-        range: TextRange {
-            start: TextOffset::START,
-            end: TextOffset::at(&chapter.text, "国家公務員".len()).unwrap(),
-        },
-    };
-    let mut saved = Vec::new();
-    for mode in [SplitMode::A, SplitMode::B, SplitMode::C] {
-        let snapshot = analyzer().analyze_mode(chapter, mode).unwrap();
-        let id = if mode == SplitMode::B {
-            storage
-                .store_chapter_analysis(chapter.chapter_id, &snapshot)
-                .unwrap()
-        } else {
-            let page = TextAnchor {
-                range: TextRange {
-                    start: TextOffset::START,
-                    end: TextOffset::at(&chapter.text, chapter.text.len()).unwrap(),
-                },
-                ..selected
-            };
-            let key = std::sync::Arc::new(
-                storage
-                    .load_effective_reader_tokens(imported.document.document_id, page)
-                    .unwrap()
-                    .unwrap()
-                    .key()
-                    .unwrap(),
-            );
-            let prompt = storage
-                .load_effective_override_context(key, selected)
-                .unwrap();
-            storage
-                .generate_effective_override_analysis(&prompt, mode, |whole, requested, profile| {
-                    assert_eq!(whole, chapter);
-                    assert_eq!(profile, &original.profile);
-                    analyzer().analyze_mode(whole, requested)
-                })
-                .unwrap()
-        };
-        assert_eq!(
-            storage.chapter_analysis(id).unwrap().as_ref(),
-            Some(&snapshot)
-        );
-        saved.push((id, snapshot.clone()));
-        let edit = segmentation_from_snapshot(
-            chapter,
-            &original,
-            &snapshot,
-            selected,
-            OverrideScope::default(),
-        )
-        .unwrap();
-        let override_id = storage.save_segmentation_override(&edit).unwrap();
-        let resolved = storage
-            .load_chapter_segmentation(chapter.chapter_id)
-            .unwrap()
-            .unwrap();
-        let effective = storage
-            .load_effective_chapter_segmentation(chapter.chapter_id)
-            .unwrap()
-            .unwrap();
-        assert_eq!(effective.original_analysis_id, imported.analysis_id);
-        assert_eq!(effective.profile, original.profile);
-        assert_eq!(
-            effective
-                .segments
-                .iter()
-                .map(|s| &s.boundary)
-                .collect::<Vec<_>>(),
-            resolved.segments.iter().collect::<Vec<_>>()
-        );
-        // Every analyzer-backed effective segment retains the exact source
-        // token, including repeated occurrences, OOV and non-Japanese tokens.
-        for segment in &effective.segments {
-            let metadata = segment.metadata.as_ref().unwrap();
-            let snapshot = if metadata.analysis_id == imported.analysis_id {
-                &original
-            } else {
-                &saved
-                    .iter()
-                    .find(|(id, _)| *id == metadata.analysis_id)
-                    .unwrap()
-                    .1
-            };
-            let token = &snapshot.tokens[metadata.token_index];
-            assert_eq!(token.anchor, segment.boundary.anchor);
-            assert_eq!(token.surface, segment.boundary.surface);
-            assert_eq!(token.reading, metadata.reading);
-            assert_eq!(token.dictionary_form, metadata.dictionary_form);
-            assert_eq!(token.is_japanese, metadata.is_japanese);
-            assert_eq!(snapshot.mode, metadata.mode);
-            if segment.boundary.original_token_index.is_some() {
-                assert_eq!(metadata.analysis_id, imported.analysis_id);
-            }
-        }
-        // Furigana uses that same frozen resolution, before any live vocabulary
-        // projection. Original B, alternate readings and source ruby stay distinct.
-        let alternates = saved
-            .iter()
-            .filter(|(_, snapshot)| snapshot.mode != SplitMode::B)
-            .cloned()
-            .collect::<Vec<_>>();
-        let projection = yomoku_core::effective_reader::EffectiveReaderChapter::resolve(
-            chapter,
-            imported.analysis_id,
-            &original,
-            &alternates,
-            &[storage.segmentation_override(override_id).unwrap().unwrap()],
-        )
-        .unwrap();
-        assert_eq!(projection.segmentation(), &effective);
-        let page = TextAnchor {
-            range: TextRange {
-                start: TextOffset::START,
-                end: TextOffset::at(&chapter.text, chapter.text.len()).unwrap(),
-            },
-            ..selected
-        };
-        // Library membership must match this reader projection for every real
-        // A/B/C choice, counting only registered exact surfaces once.
-        let surfaces = projection
-            .tokens_on_page(page)
-            .unwrap()
-            .into_iter()
-            .map(|token| token.surface)
-            .collect::<std::collections::BTreeSet<_>>();
-        let registered = surfaces
-            .iter()
-            .filter(|surface| {
-                storage
-                    .vocabulary_entry(&Surface::new(surface.as_str()).unwrap())
-                    .unwrap()
-                    .is_some()
-            })
-            .count() as u64;
-        assert_eq!(
-            storage.effective_library_word_distributions().unwrap()[0].counts,
-            Some(yomoku_core::library::WordStatusCounts {
-                new: registered,
-                ..Default::default()
-            })
-        );
-        let fallback = projection
-            .tokens_on_page(page)
-            .unwrap()
-            .into_iter()
-            .filter_map(|token| {
-                token
-                    .metadata?
-                    .reading
-                    .map(|reading| yomoku_core::reader_ruby::ReaderRuby {
-                        range: token.display_range,
-                        reading,
-                    })
-            })
-            .collect::<Vec<_>>();
-        assert!(!fallback.is_empty());
-        assert_eq!(projection.furigana_on_page(page, None).unwrap(), fallback);
-        let source = yomoku_core::reader_ruby::ReaderChapterRuby {
-            chapter_id: chapter.chapter_id,
-            ruby: vec![yomoku_core::reader_ruby::ReaderRuby {
-                range: selected.range,
-                reading: "ソース𠮷か\u{3099}\0".into(),
-            }],
-        };
-        let mut expected = source.ruby.clone();
-        expected.extend(
-            fallback
-                .into_iter()
-                .filter(|ruby| ruby.range.start >= selected.range.end),
-        );
-        assert_eq!(
-            projection.furigana_on_page(page, Some(&source)).unwrap(),
-            expected
-        );
-        assert_eq!(resolved.original_analysis_id, imported.analysis_id);
-        let changed = resolved
-            .segments
-            .iter()
-            .filter(|s| s.override_id == Some(override_id))
-            .collect::<Vec<_>>();
-        assert_eq!(changed.len(), edit.parts.len() * 2);
-        for (index, segment) in changed.iter().enumerate() {
-            assert_eq!(
-                segment.surface,
-                edit.parts[index % edit.parts.len()].as_str()
-            );
-            assert_eq!(segment.anchor.slice(chapter).unwrap(), segment.surface);
-        }
-        assert_eq!(
-            storage
-                .chapter_analysis(imported.analysis_id)
-                .unwrap()
-                .unwrap(),
-            original
-        );
-        storage.reverse_segmentation_override(override_id).unwrap();
-    }
-    // Merge the real inflected B sequence 食べ + た into a selectable surface.
-    let start = chapter.text.find("食べた").unwrap();
-    let merged = SegmentationOverride {
-        scope: OverrideScope::AllOccurrences,
-        anchor: TextAnchor {
-            range: TextRange {
-                start: TextOffset::at(&chapter.text, start).unwrap(),
-                end: TextOffset::at(&chapter.text, start + "食べた".len()).unwrap(),
-            },
-            ..selected
-        },
-        surface: Surface::new("食べた").unwrap(),
-        parts: vec![Surface::new("食べた").unwrap()],
-    };
-    let global_id = storage.save_segmentation_override(&merged).unwrap();
-    let local = segmentation_from_snapshot(
-        chapter,
-        &original,
-        &original,
-        merged.anchor,
-        OverrideScope::ThisOccurrence,
-    )
-    .unwrap();
-    let local_id = storage.save_segmentation_override(&local).unwrap();
-    let resolved = storage
-        .load_chapter_segmentation(chapter.chapter_id)
-        .unwrap()
-        .unwrap();
-    assert_eq!(
-        resolved
-            .segments
-            .iter()
-            .filter(|s| s.override_id == Some(local_id))
-            .map(|s| s.surface.as_str())
-            .collect::<Vec<_>>(),
-        ["食べ", "た"]
-    );
-    storage.reverse_segmentation_override(local_id).unwrap();
-    let expected = storage
-        .load_chapter_segmentation(chapter.chapter_id)
-        .unwrap()
-        .unwrap();
-    assert!(expected.segments.iter().any(|s| s.surface == "食べた"
-        && s.override_id == Some(global_id)
-        && s.original_token_index.is_none()));
-    let expected_effective = storage
-        .load_effective_chapter_segmentation(chapter.chapter_id)
-        .unwrap()
-        .unwrap();
-    assert!(expected_effective
-        .segments
-        .iter()
-        .any(|s| s.boundary.surface == "食べた"
-            && s.boundary.override_id == Some(global_id)
-            && s.metadata.is_none()));
-    let page = TextAnchor {
-        range: TextRange {
-            start: TextOffset::START,
-            end: TextOffset::at(&chapter.text, chapter.text.len()).unwrap(),
-        },
-        ..selected
-    };
-    let expected_tokens = storage
-        .load_effective_reader_tokens(imported.document.document_id, page)
-        .unwrap()
-        .unwrap();
-    assert_eq!(
-        expected_tokens.segmentation.as_ref(),
-        Some(&expected_effective)
-    );
-    let manual = expected_tokens
-        .tokens
-        .iter()
-        .find(|t| t.surface == "食べた")
-        .unwrap();
-    assert_eq!(manual.metadata, None);
-    assert_eq!(
-        manual.eligibility,
-        yomoku_core::effective_reader::EffectiveTokenEligibility::ManualJapaneseSpan
-    );
-    assert!(
-        !expected_tokens.tokens.iter().any(|t| t.surface == "English"
-            || t.surface == "。"
-            || t.surface == "📖"
-            || t.surface == "\0")
-    );
-    let frozen_key = expected_tokens.key().unwrap();
-    let bytes_before = std::fs::read(&path).unwrap();
-    let mut expected_words = expected_tokens
-        .tokens
-        .iter()
-        .map(|token| {
-            let details = storage
-                .load_effective_reader_word(&dictionary, &frozen_key, token.segment_index)
-                .unwrap()
-                .unwrap();
-            assert_eq!(details.token, *token);
-            assert_eq!(details.candidates.surface, token.surface);
-            assert_eq!(
-                details.candidates.dictionary_form.as_deref(),
-                token
-                    .metadata
-                    .as_ref()
-                    .and_then(|m| m.dictionary_form.as_ref().map(|f| f.as_str()))
-            );
-            assert_eq!(details.encountered, 0);
-            assert!(details.candidates.words.is_empty() && details.candidates.names.is_empty());
-            details
-        })
-        .collect::<Vec<_>>();
-    assert_eq!(std::fs::read(&path).unwrap(), bytes_before);
-    // Both exact analyzer spans and unresolved manual merges use the same
-    // exact-surface fallback without changing segmentation or registration.
-    for word in &mut expected_words {
-        let entry = storage
-            .save_effective_reader_custom_entry(
-                &dictionary,
-                &frozen_key,
-                word.token.segment_index,
-                format!(" literal meaning for {}\n📖\0 ", word.token.surface),
-                " よみ\u{3099}\0 ".into(),
-            )
-            .unwrap()
-            .unwrap();
-        assert_eq!(entry.surface().as_str(), word.token.surface);
-        assert_eq!(
-            storage
-                .load_effective_reader_custom_entry(
-                    &dictionary,
-                    &frozen_key,
-                    word.token.segment_index
-                )
-                .unwrap(),
-            Some(entry.clone())
-        );
-        word.custom_entry = Some(entry.into());
-    }
-    drop(storage);
-    let mut reopened = Storage::open(&path).unwrap();
-    assert_eq!(
-        reopened
-            .load_chapter_segmentation(chapter.chapter_id)
-            .unwrap()
-            .unwrap(),
-        expected
-    );
-    assert_eq!(
-        reopened
-            .load_effective_chapter_segmentation(chapter.chapter_id)
-            .unwrap()
-            .unwrap(),
-        expected_effective
-    );
-    assert_eq!(
-        reopened
-            .load_effective_reader_tokens(imported.document.document_id, page)
-            .unwrap()
-            .unwrap(),
-        expected_tokens
-    );
-    for expected_word in expected_words {
-        assert_eq!(
-            reopened
-                .load_effective_reader_word(
-                    &dictionary,
-                    &frozen_key,
-                    expected_word.token.segment_index
-                )
-                .unwrap()
-                .unwrap(),
-            expected_word
-        );
-    }
-    for (id, snapshot) in &saved {
-        assert_eq!(
-            reopened.chapter_analysis(*id).unwrap().as_ref(),
-            Some(snapshot)
-        );
-    }
-    assert!(reopened
-        .delete_effective_reader_custom_entry(&dictionary, &frozen_key, manual.segment_index)
-        .unwrap());
-    assert!(!reopened
-        .delete_effective_reader_custom_entry(&dictionary, &frozen_key, manual.segment_index)
-        .unwrap());
-    let frozen_completion = reopened
-        .prepare_effective_page_completion(
-            yomoku_core::completion::PageCompletionIntent {
-                document_id: imported.document.document_id,
-                page,
-                page_length: reopened.page_length().unwrap(),
-                departing_position: yomoku_core::pagination::ReadingPosition {
-                    source_id: chapter.source_id,
-                    chapter_id: chapter.chapter_id,
-                    offset: TextOffset::START,
-                },
-                completed_at_unix_ms: 900,
-                analysis_id: imported.analysis_id,
-            },
-            &frozen_key,
-        )
-        .unwrap();
-    reopened.reverse_segmentation_override(global_id).unwrap();
-    assert!(matches!(
-        reopened.save_effective_reader_custom_entry(
-            &dictionary,
-            &frozen_key,
-            manual.segment_index,
-            "late mutation".into(),
-            "かな".into()
-        ),
-        Err(
-            yomoku_storage::custom_dictionary::CustomDictionaryError::Selection(
-                yomoku_storage::reader_words::ReaderWordError::InvalidSelection
-            )
-        )
-    ));
-    let restored = reopened
-        .load_chapter_segmentation(chapter.chapter_id)
-        .unwrap()
-        .unwrap();
-    assert!(restored.segments.iter().all(|s| s.override_id.is_none()));
-    assert_eq!(
-        restored
-            .segments
-            .iter()
-            .map(|s| s.surface.as_str())
-            .collect::<Vec<_>>(),
-        surfaces(&original)
-    );
-    assert_eq!(
-        reopened
-            .chapter_analysis(imported.analysis_id)
-            .unwrap()
-            .unwrap(),
-        original
-    );
-    let newly_known = frozen_completion
-        .occurrences()
-        .iter()
-        .map(|token| token.surface.as_str())
-        .collect::<std::collections::BTreeSet<_>>()
-        .len() as u64;
-    assert_eq!(
-        reopened
-            .record_effective_page_completion(&frozen_completion)
-            .unwrap(),
-        yomoku_core::completion::AnalyzedCompletionOutcome::Recorded { newly_known }
-    );
-    let observer = rusqlite::Connection::open(&path).unwrap();
-    let recorded = observer.prepare(
-        "SELECT token_index, surface, reading, dictionary_form FROM reading_occurrences WHERE command_id = ?1 ORDER BY token_index"
-    ).unwrap().query_map([i64::from(frozen_completion.completion().command_id)], |row| {
-        Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?, row.get::<_, Option<String>>(2)?, row.get::<_, Option<String>>(3)?))
-    }).unwrap().collect::<Result<Vec<_>, _>>().unwrap();
-    assert_eq!(recorded.len(), frozen_completion.occurrences().len());
-    for (recorded, token) in recorded.iter().zip(frozen_completion.occurrences()) {
-        assert_eq!(u64::try_from(recorded.0).unwrap(), token.segment_index);
-        assert_eq!(recorded.1, token.surface);
-        assert_eq!(
-            recorded.2.as_deref(),
-            token.metadata.as_ref().and_then(|m| m.reading.as_deref())
-        );
-        assert_eq!(
-            recorded.3.as_deref(),
-            token
-                .metadata
-                .as_ref()
-                .and_then(|m| m.dictionary_form.as_ref())
-                .map(Surface::as_str)
-        );
-    }
-    drop(observer);
-    drop(reopened);
-    let mut reopened = Storage::open(&path).unwrap();
-    assert_eq!(
-        reopened
-            .record_effective_page_completion(&frozen_completion)
-            .unwrap(),
-        yomoku_core::completion::AnalyzedCompletionOutcome::AlreadyRecorded
-    );
-    // Actual A/B/C boundary choices atomically register their selected spellings,
-    // preserve the immutable B snapshot and never rewrite the completed page.
-    let observer = rusqlite::Connection::open(&path).unwrap();
-    let history_before: (i64, i64) = observer.query_row(
-        "SELECT (SELECT COUNT(*) FROM reading_completions), (SELECT COUNT(*) FROM reading_occurrences)",
-        [], |row| Ok((row.get(0)?, row.get(1)?)),
-    ).unwrap();
-    for (_, snapshot) in &saved {
-        let edit = segmentation_from_snapshot(
-            chapter,
-            &original,
-            snapshot,
-            selected,
-            OverrideScope::ThisOccurrence,
-        )
-        .unwrap();
-        let (id, _) = reopened
-            .save_registered_segmentation_override(&edit, 1000)
-            .unwrap();
-        assert_eq!(
-            reopened
-                .save_registered_segmentation_override(&edit, 1000)
-                .unwrap(),
-            (id, 0)
-        );
-        for part in &edit.parts {
-            assert!(reopened.vocabulary_entry(part).unwrap().is_some());
-        }
-        assert_eq!(
-            reopened
-                .chapter_analysis(imported.analysis_id)
-                .unwrap()
-                .unwrap(),
-            original
-        );
-        assert_eq!(observer.query_row(
-            "SELECT (SELECT COUNT(*) FROM reading_completions), (SELECT COUNT(*) FROM reading_occurrences)",
-            [], |row| Ok((row.get::<_, i64>(0)?, row.get::<_, i64>(1)?)),
-        ).unwrap(), history_before);
-        reopened.reverse_segmentation_override(id).unwrap();
-        let rendered = std::sync::Arc::new(
-            reopened
-                .load_effective_reader_tokens(imported.document.document_id, page)
-                .unwrap()
-                .unwrap()
-                .key()
-                .unwrap(),
-        );
-        let prompt = reopened
-            .load_effective_override_context(rendered.clone(), selected)
-            .unwrap();
-        assert_eq!(prompt.choices().len(), 3);
-        for choice in prompt.choices() {
-            let snapshot = saved
-                .iter()
-                .find(|(_, snapshot)| snapshot.mode == choice.mode)
-                .unwrap();
-            assert_eq!(
-                choice.parts,
-                segmentation_from_snapshot(
-                    chapter,
-                    &original,
-                    &snapshot.1,
-                    selected,
-                    OverrideScope::default()
-                )
-                .unwrap()
-                .parts
-            );
-        }
-        let (guarded_id, registered) = reopened
-            .save_effective_override(
-                &prompt,
-                OverrideScope::ThisOccurrence,
-                edit.parts.clone(),
-                1100,
-            )
-            .unwrap();
-        assert_eq!(registered, 0); // First pass already registered these parts.
-        let changed = std::sync::Arc::new(
-            reopened
-                .load_effective_reader_tokens(imported.document.document_id, page)
-                .unwrap()
-                .unwrap()
-                .key()
-                .unwrap(),
-        );
-        let reverse = reopened
-            .load_effective_override_context(changed, selected)
-            .unwrap();
-        reopened
-            .reverse_effective_override(&reverse, guarded_id)
-            .unwrap();
-        assert_eq!(
-            &reopened
-                .load_effective_reader_tokens(imported.document.document_id, page)
-                .unwrap()
-                .unwrap()
-                .key()
-                .unwrap(),
-            rendered.as_ref()
-        );
-        assert!(matches!(
-            reopened.save_effective_override(
-                &prompt,
-                OverrideScope::ThisOccurrence,
-                edit.parts.clone(),
-                1200
-            ),
-            Err(yomoku_storage::effective_overrides::EffectiveOverrideError::StaleContext)
-        ));
-        assert_eq!(observer.query_row(
-            "SELECT (SELECT COUNT(*) FROM reading_completions), (SELECT COUNT(*) FROM reading_occurrences)",
-            [], |row| Ok((row.get::<_, i64>(0)?, row.get::<_, i64>(1)?)),
-        ).unwrap(), history_before);
-    }
-    drop(observer);
-    drop(reopened);
-    std::fs::remove_dir_all(directory).unwrap();
+    assert_eq!(analyzer().analyze(&chapter(text)).unwrap(), c);
 }
 
 #[test]
 #[ignore = "requires pinned Sudachi Full; run tools/test-sudachi.sh"]
 fn inflected_surfaces_stay_distinct_from_analyzer_forms() {
-    let result = analyze("食べる。食べた。食べます。", SplitMode::B);
+    let result = analyze("食べる。食べた。食べます。", SplitMode::C);
     assert_eq!(
         surfaces(&result),
         ["食べる", "。", "食べ", "た", "。", "食べ", "ます", "。"]
@@ -778,9 +132,9 @@ fn inflected_surfaces_stay_distinct_from_analyzer_forms() {
 #[test]
 #[ignore = "requires pinned Sudachi Full; run tools/test-sudachi.sh"]
 fn full_dictionary_kanji_only_proper_nouns_are_words() {
-    let result = analyze("東京都と夏目漱石。", SplitMode::B);
-    assert_eq!(surfaces(&result), ["東京都", "と", "夏目", "漱石", "。"]);
-    for token in &result.tokens[..4] {
+    let result = analyze("東京都と夏目漱石。", SplitMode::C);
+    assert_eq!(surfaces(&result), ["東京都", "と", "夏目漱石", "。"]);
+    for token in &result.tokens[..3] {
         assert!(token.is_japanese);
         assert!(token.dictionary_form.is_some());
         assert!(token.reading.is_some());
@@ -791,7 +145,7 @@ fn full_dictionary_kanji_only_proper_nouns_are_words() {
 #[test]
 #[ignore = "requires pinned Sudachi Full; run tools/test-sudachi.sh"]
 fn mixed_scripts_punctuation_and_unknown_kanji() {
-    let result = analyze("English 123 📖 日本語。𰻞", SplitMode::B);
+    let result = analyze("English 123 📖 日本語。𰻞", SplitMode::C);
     for token in &result.tokens {
         if ["English", "123", "📖", "。"].contains(&token.surface.as_str()) {
             assert!(!token.is_japanese, "{}", token.surface);
@@ -808,7 +162,7 @@ fn mixed_scripts_punctuation_and_unknown_kanji() {
 #[test]
 #[ignore = "requires pinned Sudachi Full; run tools/test-sudachi.sh"]
 fn normalization_keeps_original_byte_surfaces_in_every_mode() {
-    for mode in [SplitMode::A, SplitMode::B, SplitMode::C] {
+    for mode in [SplitMode::A, SplitMode::C, SplitMode::B] {
         for text in [
             "ｶﾞｯﾂﾎﾟｰｽﾞ",
             "ＡＢＣと㍿",
@@ -831,7 +185,7 @@ fn normalization_keeps_original_byte_surfaces_in_every_mode() {
 #[test]
 #[ignore = "requires pinned Sudachi Full; run tools/test-sudachi.sh"]
 fn whitespace_empty_input_and_repeated_analysis() {
-    for mode in [SplitMode::A, SplitMode::B, SplitMode::C] {
+    for mode in [SplitMode::A, SplitMode::C, SplitMode::B] {
         assert!(analyze("", mode).tokens.is_empty());
         assert!(analyze(" \t\r\n　", mode).tokens.is_empty());
         let text = "\r\n猫。\r\n　犬。\t";
@@ -846,7 +200,7 @@ fn whitespace_empty_input_and_repeated_analysis() {
 fn long_unbroken_chapter_exceeds_the_engine_input_limit() {
     let text = "猫と犬".repeat(8000);
     assert!(text.len() > 65_535);
-    let result = analyze(&text, SplitMode::B);
+    let result = analyze(&text, SplitMode::C);
     assert_eq!(
         result
             .tokens
@@ -864,7 +218,7 @@ fn long_unbroken_chapter_exceeds_the_engine_input_limit() {
 #[test]
 #[ignore = "requires pinned Sudachi Full; run tools/test-sudachi.sh"]
 fn sentence_boundaries_preserve_dictionary_names_ending_in_punctuation() {
-    let result = analyze("モーニング娘。が好き。猫。犬。", SplitMode::C);
+    let result = analyze("モーニング娘。が好き。猫。犬。", SplitMode::B);
     assert_eq!(result.tokens[0].surface, "モーニング娘。");
     assert!(result.tokens[0].is_japanese);
     assert!(result.tokens.iter().any(|token| token.surface == "猫"));
@@ -893,7 +247,7 @@ fn real_snapshots_persist_all_modes_and_reopen_without_source_changes() {
         .create_paste(&PasteText::new(text.into()).unwrap())
         .unwrap();
     let mut saved = Vec::new();
-    for mode in [SplitMode::A, SplitMode::B, SplitMode::C] {
+    for mode in [SplitMode::A, SplitMode::C, SplitMode::B] {
         let result = analyzer().analyze_mode(&document.chapter, mode).unwrap();
         let id = storage
             .store_chapter_analysis(document.chapter.chapter_id, &result)
@@ -975,7 +329,7 @@ fn real_mode_b_import_and_completion_preserve_surfaces_and_duplicate_identity() 
         panic!("expected a new import")
     };
     let expected = engine.analyze(&imported.document.chapter).unwrap();
-    assert_eq!(expected.mode, SplitMode::B);
+    assert_eq!(expected.mode, SplitMode::C);
     let surfaces: BTreeSet<_> = expected
         .tokens
         .iter()
@@ -1195,7 +549,7 @@ fn real_txt_import_analyzes_only_canonical_text_and_completes_with_original_anch
     };
     let document = &imported.document;
     let expected = engine.analyze(&document.chapter).unwrap();
-    assert_eq!(expected.mode, SplitMode::B);
+    assert_eq!(expected.mode, SplitMode::C);
     assert_eq!(
         storage.chapter_analysis(imported.analysis_id).unwrap(),
         Some(expected.clone())
@@ -1343,7 +697,7 @@ fn real_srt_import_analyzes_only_canonical_text_and_completes_with_original_anch
     };
     let document = &imported.document;
     let expected = engine.analyze(&document.chapter).unwrap();
-    assert_eq!(expected.mode, SplitMode::B);
+    assert_eq!(expected.mode, SplitMode::C);
     assert_eq!(
         storage.chapter_analysis(imported.analysis_id).unwrap(),
         Some(expected.clone())
@@ -1513,7 +867,7 @@ fn real_epub_import_analyzes_every_canonical_chapter_and_reopens_without_rescan(
         .zip(&analyses)
     {
         expected.validate(&chapter.chapter).unwrap();
-        assert_eq!(expected.mode, SplitMode::B);
+        assert_eq!(expected.mode, SplitMode::C);
         assert_eq!(
             storage.chapter_analysis(*id).unwrap(),
             Some(expected.clone())

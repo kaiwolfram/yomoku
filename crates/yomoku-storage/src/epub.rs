@@ -1,4 +1,4 @@
-//! Atomic EPUB container, ordered canonical chapters, assets and Mode B snapshots.
+//! Atomic EPUB container, ordered canonical chapters, assets and Mode C snapshots.
 
 use std::{collections::BTreeMap, error::Error, fmt, ops::Range};
 
@@ -48,7 +48,7 @@ pub struct StoredEpubDocument {
 #[derive(Debug)]
 pub struct AnalyzedEpub {
     pub document: StoredEpubDocument,
-    /// Same order as document.chapters; each is the original stored Mode B.
+    /// Same order as document.chapters; each is the original stored Mode C.
     pub analysis_ids: Vec<AnalysisId>,
     pub registered_surfaces: usize,
 }

@@ -8,7 +8,7 @@ use yomoku_core::{
 };
 
 use crate::{
-    analysis::{read_analysis, read_effective_reader_with_boundaries_in, read_reader_analysis},
+    analysis::{read_analysis, read_effective_reader_chapter_in, read_reader_analysis},
     reader_documents::load_reader_document_in,
     vocabulary::{decode_status, read_entry_by_surface},
     Storage, StorageError,
@@ -18,7 +18,7 @@ impl Storage {
     /// Read effective visible spans, exact metadata and live exact-surface statuses
     /// in one transaction. This separate API does not change live reader commands
     /// or register newly split/merged/deleted surfaces. None means deleted document;
-    /// a snapshot with absent segmentation means missing original Mode B.
+    /// a snapshot with absent segmentation means missing original Mode C.
     pub fn load_effective_reader_tokens(
         &mut self,
         document_id: DocumentId,
@@ -30,7 +30,7 @@ impl Storage {
         Ok(snapshot)
     }
 
-    /// Read original Mode B tokens intersecting a supplied page span and their
+    /// Read original Mode C tokens intersecting a supplied page span and their
     /// exact-surface global statuses in one consistent transaction. This does not
     /// load an analyzer, apply boundary overrides, reset progress, register words
     /// or record encounters. None means the live document no longer exists.
@@ -134,11 +134,7 @@ pub(crate) fn load_effective_reader_tokens_in(
     {
         return Err(StorageError::InvalidAnalysis);
     }
-    let (effective, original_boundaries) =
-        match read_effective_reader_with_boundaries_in(connection, chapter, Some(page))? {
-            Some((effective, boundaries)) => (Some(effective), boundaries),
-            None => (None, Vec::new()),
-        };
+    let effective = read_effective_reader_chapter_in(connection, chapter)?;
     let mut tokens = effective
         .as_ref()
         .map(|effective| effective.tokens_on_page(page))
@@ -168,7 +164,6 @@ pub(crate) fn load_effective_reader_tokens_in(
         page,
         segmentation: effective.map(|chapter| chapter.into_segmentation()),
         tokens,
-        original_boundaries,
     };
     Ok(Some(snapshot))
 }

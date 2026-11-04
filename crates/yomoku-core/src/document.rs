@@ -66,10 +66,6 @@ identity!(
     AnalysisId,
     "An immutable, versioned chapter analysis snapshot."
 );
-identity!(
-    OverrideId,
-    "A reversible segmentation override, independent of vocabulary identity."
-);
 
 /// Validated paste input. Keep the exact text so durable anchors remain valid.
 #[derive(Clone, Debug, Eq, PartialEq)]

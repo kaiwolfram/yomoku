@@ -70,8 +70,7 @@ class EffectiveReaderWordsTest {
                     anchor(4 + start, 4 + end),
                     TextRange(TextOffset(start), TextOffset(end)),
                     surface,
-                    if (index == 0) EffectiveTokenEligibility.MANUALJAPANESESPAN
-                    else EffectiveTokenEligibility.ANALYZERJAPANESE,
+                    EffectiveTokenEligibility.ANALYZERJAPANESE,
                     if (index == 0) null else "ネコ",
                     if (index == 0) null else "猫",
                     ReaderVocabulary(
@@ -103,7 +102,7 @@ class EffectiveReaderWordsTest {
             readerTime = ReadingTimeUpdate(page.documentId, page.position, PendingReadingTime(0)),
             readingTimeSavePending = false,
             completionSavePending = false,
-            effectiveReaderTokens = EffectiveReaderPage(identity, tokens, emptyList()),
+            effectiveReaderTokens = EffectiveReaderPage(identity, tokens),
             effectiveReaderWord =
                 EffectiveReaderWordState(busy = false, customEntryPending = false),
             effectiveReaderStatus = EffectiveStatusState(false, false),
@@ -300,6 +299,7 @@ class EffectiveReaderWordsTest {
     @Test
     fun manualUnicodeSelectionUsesCompactIdentityAndAllFiveStatusesWithoutGuessingMetadata() {
         show()
+        compose.onNodeWithText("Edit word boundaries").assertDoesNotExist()
         tap()
         val selection =
             EffectiveReaderSelection(
@@ -596,7 +596,7 @@ class EffectiveReaderWordsTest {
         frame.value =
             base.copy(
                 reader = page,
-                effectiveReaderTokens = EffectiveReaderPage(identity, listOf(token), emptyList()),
+                effectiveReaderTokens = EffectiveReaderPage(identity, listOf(token)),
             )
         show()
         assertEquals("か\u3099", text().text)
@@ -678,66 +678,6 @@ class EffectiveReaderWordsTest {
         compose.onNodeWithTag("word_custom_meaning_input").assertDoesNotExist()
         compose.onNodeWithTag("word_custom_meaning").performScrollTo().assertTextEquals(meaning)
         compose.onNodeWithTag("word_custom_reading").assertTextEquals("Reading: $reading")
-    }
-
-    @Test
-    fun overrideRetirementNeedsExplicitPageReloadAndPendingWritesBlockWordReads() {
-        val ready = frame.value
-        frame.value =
-            ready.copy(
-                effectiveReaderTokens = null,
-                effectiveReaderOverride =
-                    EffectiveReaderOverrideState(
-                        identity = null,
-                        prompt = null,
-                        busy = false,
-                        pending = false,
-                        error = null,
-                        reloadRequired = true,
-                    ),
-            )
-        show()
-        compose.waitForIdle()
-        assertTrue(events.isEmpty())
-        click("retry_word_lookup")
-        assertEquals(
-            Event.LoadReaderTokens(ready.effectiveReaderTokens!!.identity.base),
-            events.last(),
-        )
-        compose.runOnUiThread {
-            frame.value =
-                ready.copy(
-                    effectiveReaderOverride =
-                        frame.value.effectiveReaderOverride!!.copy(pending = true)
-                )
-        }
-        tap()
-        assertTrue(events.none { it is Event.LoadEffectiveReaderWord })
-        compose.onNodeWithTag("word_status_KNOWN").assertIsNotEnabled()
-        // A successful explicit page reload is usable even before reopening a boundary prompt.
-        compose.runOnUiThread {
-            frame.value =
-                frame.value.copy(
-                    effectiveReaderOverride =
-                        frame.value.effectiveReaderOverride!!.copy(pending = false)
-                )
-        }
-        compose.waitForIdle()
-        assertEquals(1, events.filterIsInstance<Event.LoadEffectiveReaderWord>().size)
-        // The retained reload marker must not block automatic token loads for a new page.
-        compose.runOnUiThread {
-            val page = ready.reader!!
-            frame.value =
-                frame.value.copy(
-                    reader =
-                        page.copy(
-                            anchor = anchor(100, 100 + page.text.toByteArray().size.toLong())
-                        ),
-                    effectiveReaderTokens = null,
-                )
-        }
-        compose.waitForIdle()
-        assertEquals(2, events.filterIsInstance<Event.LoadReaderTokens>().size)
     }
 
     @Test

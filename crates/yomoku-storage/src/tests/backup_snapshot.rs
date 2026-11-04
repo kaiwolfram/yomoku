@@ -7,10 +7,9 @@ use rusqlite::types::Value;
 use yomoku_backup::{decrypt_snapshot, encrypt_snapshot, BackupError, Manifest, Password};
 use yomoku_core::{
     active_time::PendingReadingTime,
-    analysis::{OverrideScope, SegmentationOverride},
     anki::{AnkiModelCreation, AnkiModelLayout},
     completion::PageCompletionIntent,
-    document::{PasteText, TextAnchor, TextOffset, TextRange},
+    document::{PasteText, TextOffset},
     pagination::PageLength,
     reader::ReaderPage,
     typography::{ReaderFontSize, ReaderLineSpacing, ReaderTypography},
@@ -111,24 +110,8 @@ pub(super) fn populate(storage: &mut Storage) {
     let deleted = storage
         .create_analyzed_paste(&PasteText::new("猫 猫 犬 𠮷".into()).unwrap(), 100, fixture)
         .unwrap();
-    let chapter = &deleted.document.chapter;
-    for scope in [OverrideScope::AllOccurrences, OverrideScope::ThisOccurrence] {
-        storage
-            .save_segmentation_override(&SegmentationOverride {
-                scope,
-                anchor: TextAnchor {
-                    source_id: chapter.source_id,
-                    chapter_id: chapter.chapter_id,
-                    range: TextRange {
-                        start: TextOffset::START,
-                        end: TextOffset::at(&chapter.text, "猫".len()).unwrap(),
-                    },
-                },
-                surface: Surface::new("猫").unwrap(),
-                parts: vec![Surface::new("猫").unwrap()],
-            })
-            .unwrap();
-    }
+    let _chapter = &deleted.document.chapter;
+
     complete(storage, &deleted);
     storage
         .delete_document(deleted.document.document_id)

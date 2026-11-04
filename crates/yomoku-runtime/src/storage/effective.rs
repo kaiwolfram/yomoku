@@ -3,12 +3,10 @@
 use std::sync::Arc;
 
 use yomoku_core::{
-    effective_overrides::EffectiveOverrideFailure,
     effective_storage::{EffectiveStorageOperation, EffectiveStorageResult},
     reader::ReaderAnalysis,
     storage::DocumentError,
 };
-use yomoku_storage::effective_overrides::{EffectiveOverrideAnalysisError, EffectiveOverrideError};
 use yomoku_storage::{dictionary::Dictionary, Storage};
 
 use crate::imports::Imports;
@@ -23,58 +21,6 @@ pub(super) fn execute(
     operation: EffectiveStorageOperation,
 ) -> Result<EffectiveStorageResult, DocumentError> {
     match operation {
-        EffectiveStorageOperation::GenerateOverrideAnalysis { context, mode } => {
-            let result = storage.generate_effective_override_analysis(
-                &context,
-                mode,
-                |chapter, mode, profile| {
-                    imports
-                        .as_mut()
-                        .ok_or(DocumentError::Unavailable)?
-                        .analyze_mode(chapter, mode, profile)
-                },
-            );
-            Ok(match result {
-                Ok(_) => EffectiveStorageResult::OverrideAnalysisStored(mode),
-                Err(EffectiveOverrideAnalysisError::Analysis(error)) => {
-                    EffectiveStorageResult::OverrideFailed(EffectiveOverrideFailure::Storage(error))
-                }
-                Err(EffectiveOverrideAnalysisError::Context(EffectiveOverrideError::Storage(
-                    yomoku_storage::StorageError::InvalidAnalysis,
-                ))) => {
-                    if let Some(imports) = imports.as_mut() {
-                        imports.discard_analyzer();
-                    }
-                    EffectiveStorageResult::OverrideFailed(EffectiveOverrideFailure::Storage(
-                        DocumentError::InvalidDocument,
-                    ))
-                }
-                Err(EffectiveOverrideAnalysisError::Context(error)) => override_error(error),
-            })
-        }
-        EffectiveStorageOperation::LoadOverrideContext { command, anchor } => Ok(
-            match storage.load_effective_override_context(command.shared_key(), anchor) {
-                Ok(context) => EffectiveStorageResult::OverrideContextLoaded(Arc::new(context)),
-                Err(error) => override_error(error),
-            },
-        ),
-        EffectiveStorageOperation::SaveOverride {
-            context,
-            scope,
-            parts,
-            registered_at_unix_ms,
-        } => Ok(
-            match storage.save_effective_override(&context, scope, parts, registered_at_unix_ms) {
-                Ok((id, registered)) => EffectiveStorageResult::OverrideSaved { id, registered },
-                Err(error) => override_error(error),
-            },
-        ),
-        EffectiveStorageOperation::ReverseOverride { context, id } => {
-            Ok(match storage.reverse_effective_override(&context, id) {
-                Ok(()) => EffectiveStorageResult::OverrideReversed(id),
-                Err(error) => override_error(error),
-            })
-        }
         EffectiveStorageOperation::LoadTokens(request) => {
             let base = request.base();
             let snapshot = storage
@@ -109,6 +55,45 @@ pub(super) fn execute(
             .map_err(|error| map_word_error(error, dictionary)),
         EffectiveStorageOperation::LoadWord(command) => {
             let selection = command.selection();
+            let key = command.key();
+            let mut component_document = None;
+            for mode in [
+                yomoku_core::analysis::SplitMode::A,
+                yomoku_core::analysis::SplitMode::B,
+            ] {
+                if !storage
+                    .has_component_analysis(key.page.chapter_id, &key.segmentation.profile, mode)
+                    .map_err(map_error)?
+                {
+                    if component_document.is_none() {
+                        component_document = Some(
+                            storage
+                                .load_document_reader_snapshot(key.document_id)
+                                .map_err(map_error)?
+                                .ok_or(DocumentError::NotFound)?
+                                .document,
+                        );
+                    }
+                    let chapter = component_document
+                        .as_ref()
+                        .expect("loaded document")
+                        .chapter(key.page.chapter_id)
+                        .map_err(|_| DocumentError::InvalidDocument)?;
+                    let analysis = imports
+                        .as_mut()
+                        .ok_or(DocumentError::Unavailable)?
+                        .analyze_mode(chapter, mode, &key.segmentation.profile)?;
+                    analysis
+                        .validate(chapter)
+                        .map_err(|_| DocumentError::InvalidDocument)?;
+                    if analysis.mode != mode || analysis.profile != key.segmentation.profile {
+                        return Err(DocumentError::InvalidDocument);
+                    }
+                    storage
+                        .store_chapter_analysis(chapter.chapter_id, &analysis)
+                        .map_err(map_error)?;
+                }
+            }
             let result = storage.load_effective_reader_word(
                 word_dictionary(dictionary, word_loader)?,
                 command.key(),
@@ -171,14 +156,4 @@ pub(super) fn execute(
             Ok(EffectiveStorageResult::PageCompleted(document, outcome))
         }
     }
-}
-
-fn override_error(error: EffectiveOverrideError) -> EffectiveStorageResult {
-    EffectiveStorageResult::OverrideFailed(match error {
-        EffectiveOverrideError::Storage(error) => {
-            EffectiveOverrideFailure::Storage(map_error(error))
-        }
-        EffectiveOverrideError::InvalidSelection => EffectiveOverrideFailure::InvalidSelection,
-        EffectiveOverrideError::StaleContext => EffectiveOverrideFailure::StaleContext,
-    })
 }

@@ -1,9 +1,9 @@
-//! Validated analyzer output and reversible boundary edits, without tokenization or I/O.
+//! Validated analyzer output, without tokenization or I/O.
 
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    document::{ChapterText, OverrideId, TextAnchor, TextOffset, TextRange},
+    document::{ChapterText, TextAnchor, TextOffset, TextRange},
     vocabulary::Surface,
 };
 
@@ -12,8 +12,8 @@ use crate::{
 #[repr(C)]
 pub enum SplitMode {
     A,
-    #[default]
     B,
+    #[default]
     C,
 }
 
@@ -114,93 +114,5 @@ impl ChapterAnalysis {
             return Err(InvalidAnalysis);
         }
         Ok(())
-    }
-}
-
-#[derive(Clone, Copy, Debug, Default, Deserialize, PartialEq, Eq, Serialize)]
-#[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
-#[repr(C)]
-pub enum OverrideScope {
-    #[default]
-    AllOccurrences,
-    ThisOccurrence,
-}
-
-/// A selected exact source span partitioned into one (merge) or more (split)
-/// surfaces. Retaining the analyzer snapshot makes removing this edit reversible.
-/// This carries no user-supplied lemma/reading and never rewrites past encounters.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct SegmentationOverride {
-    pub scope: OverrideScope,
-    pub anchor: TextAnchor,
-    pub surface: Surface,
-    pub parts: Vec<Surface>,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct StoredOverride {
-    pub id: OverrideId,
-    pub edit: SegmentationOverride,
-    pub active: bool,
-}
-
-impl SegmentationOverride {
-    /// Also usable after source text deletion: validate the retained exact span
-    /// length and its partition. Full source ownership is checked by repositories.
-    pub fn validate_shape(&self) -> Result<(), InvalidAnalysis> {
-        let length = i64::from(self.anchor.range.end)
-            .checked_sub(i64::from(self.anchor.range.start))
-            .ok_or(InvalidAnalysis)?;
-        if length <= 0
-            || usize::try_from(length).ok() != Some(self.surface.as_str().len())
-            || self.parts.is_empty()
-        {
-            return Err(InvalidAnalysis);
-        }
-        let mut remaining = self.surface.as_str();
-        for part in &self.parts {
-            remaining = remaining
-                .strip_prefix(part.as_str())
-                .ok_or(InvalidAnalysis)?;
-        }
-        if !remaining.is_empty() {
-            return Err(InvalidAnalysis);
-        }
-        Ok(())
-    }
-
-    /// Return replacement anchors for this selected occurrence only. Applying an
-    /// AllOccurrences rule to other matches is a separate resolution operation.
-    pub fn replacement_anchors(
-        &self,
-        chapter: &ChapterText,
-    ) -> Result<Vec<TextAnchor>, InvalidAnalysis> {
-        self.validate_shape()?;
-        if self.anchor.slice(chapter).map_err(|_| InvalidAnalysis)? != self.surface.as_str() {
-            return Err(InvalidAnalysis);
-        }
-        let mut start = self
-            .anchor
-            .range
-            .start
-            .byte_index(&chapter.text)
-            .map_err(|_| InvalidAnalysis)?;
-        self.parts
-            .iter()
-            .map(|part| {
-                let end = start
-                    .checked_add(part.as_str().len())
-                    .ok_or(InvalidAnalysis)?;
-                let range = TextRange {
-                    start: TextOffset::at(&chapter.text, start).map_err(|_| InvalidAnalysis)?,
-                    end: TextOffset::at(&chapter.text, end).map_err(|_| InvalidAnalysis)?,
-                };
-                start = end;
-                Ok(TextAnchor {
-                    range,
-                    ..self.anchor
-                })
-            })
-            .collect()
     }
 }

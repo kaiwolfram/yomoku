@@ -11,12 +11,6 @@ mod ruby;
 pub use requests::{EffectiveReaderProgress, EffectiveReaderRequest};
 mod statuses;
 pub use statuses::{EffectiveStatusRequest, EffectiveStatusState};
-mod overrides;
-pub use overrides::{
-    EffectiveBoundaryChoice, EffectiveOverrideAction, EffectiveOverrideIdentity,
-    EffectiveOverrideProgress, EffectiveOverridePrompt, EffectiveOverrideRequest,
-    EffectiveOverrideState, EffectiveReaderOverrideState, EffectiveWinningRule,
-};
 mod words;
 pub use words::{EffectiveReaderWordState, EffectiveWordDetails, EffectiveWordRequest};
 mod completions;
@@ -28,7 +22,7 @@ use crate::{
     document::{TextAnchor, TextRange},
     effective_reader::{
         EffectiveReaderToken, EffectiveReaderTokenKey, EffectiveReaderTokenSnapshot,
-        EffectiveTokenEligibility, OriginalBoundaryToken,
+        EffectiveTokenEligibility,
     },
     reader::{ReaderAnalysis, ReaderTokenKey, ReaderVocabulary},
 };
@@ -42,7 +36,7 @@ pub struct EffectivePageIdentity {
     pub base: ReaderTokenKey,
 }
 
-/// An effective whole-chapter segment index, never an original B token index.
+/// An effective whole-chapter segment index, never an original C token index.
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
 pub struct EffectiveReaderSelection {
@@ -96,7 +90,6 @@ impl From<EffectiveReaderToken> for EffectivePageToken {
 pub struct EffectiveReaderPage {
     pub identity: EffectivePageIdentity,
     pub tokens: Vec<EffectivePageToken>,
-    pub original_boundaries: Vec<OriginalBoundaryToken>,
 }
 
 /// Rust-only attempt token, issued before dispatch. It cannot be reconstructed
@@ -168,14 +161,13 @@ pub struct EffectiveReaderSession {
     words: words::WordState,
     completion: completions::CompletionState,
     status: statuses::StatusState,
-    overrides: overrides::OverrideState,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct EffectiveRevisionExhausted;
 
 impl EffectiveReaderSession {
-    /// Movement, reflow, exit, refresh and override edits invalidate immediately,
+    /// Movement, reflow, exit and refresh invalidate immediately,
     /// before any asynchronous read/write. Even an identical later result gets
     /// a fresh revision. Counter exhaustion fails closed rather than wrapping.
     pub fn begin_load(
@@ -199,14 +191,9 @@ impl EffectiveReaderSession {
         self.pending = None;
         self.current = None;
         self.dismiss_word();
-        self.dismiss_override();
-        // A reload requirement belongs to the retired page. Normal movement,
-        // close/reopen and explicit page loads must not carry it to a new page.
-        // Override outcomes set it again after retiring their before-image.
-        self.overrides.clear_reload_requirement();
     }
 
-    /// Accept only the outstanding request and its document/page/original-B
+    /// Accept only the outstanding request and its document/page/original-C
     /// identity. Snapshots must come from the validated repository projection.
     /// A mismatched callback cannot consume a newer attempt or resurrect a page.
     pub fn accept(
@@ -226,8 +213,7 @@ impl EffectiveReaderSession {
         if snapshot.document_id != request.0.base.document_id
             || snapshot.page != request.0.base.page
             || analysis != request.0.base.analysis
-            || (snapshot.segmentation.is_none()
-                && (!snapshot.tokens.is_empty() || !snapshot.original_boundaries.is_empty()))
+            || (snapshot.segmentation.is_none() && (!snapshot.tokens.is_empty()))
         {
             return false;
         }
@@ -244,7 +230,6 @@ impl EffectiveReaderSession {
             view: EffectiveReaderPage {
                 identity: request.0,
                 tokens: snapshot.tokens.into_iter().map(Into::into).collect(),
-                original_boundaries: snapshot.original_boundaries,
             },
         });
         self.pending = None;

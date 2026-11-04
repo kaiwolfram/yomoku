@@ -16,7 +16,6 @@ use yomoku_core::{
 struct Fixture {
     document: ReaderDocument,
     original: ChapterAnalysis,
-    rules: Vec<StoredOverride>,
     intent: PageCompletionIntent,
 }
 
@@ -33,8 +32,8 @@ impl Fixture {
                 engine_revision: "fixture@1".into(),
                 dictionary_revision: "full@1".into(),
             },
-            mode: SplitMode::B,
-            tokens: ["猫犬", "𠮷か\u{3099}\0", "。"]
+            mode: SplitMode::C,
+            tokens: ["猫", "犬", "𠮷か\u{3099}\0", "。"]
                 .into_iter()
                 .map(|surface| {
                     let end = start + surface.len();
@@ -54,16 +53,6 @@ impl Fixture {
                 })
                 .collect(),
         };
-        let rules = vec![StoredOverride {
-            id: 5.try_into().unwrap(),
-            active: true,
-            edit: SegmentationOverride {
-                scope: OverrideScope::AllOccurrences,
-                anchor: original.tokens[0].anchor,
-                surface: Surface::new("猫犬").unwrap(),
-                parts: vec![Surface::new("猫").unwrap(), Surface::new("犬").unwrap()],
-            },
-        }];
         let intent = PageCompletionIntent {
             document_id: 1.try_into().unwrap(),
             page: TextAnchor {
@@ -92,7 +81,6 @@ impl Fixture {
                 reading_position: Some(intent.departing_position),
             },
             original,
-            rules,
             intent,
         }
     }
@@ -102,8 +90,6 @@ impl Fixture {
             &self.document.chapters[0],
             self.intent.analysis_id,
             &self.original,
-            &[],
-            &self.rules,
         )
         .unwrap()
     }
@@ -114,7 +100,6 @@ impl Fixture {
     ) -> yomoku_core::effective_session::EffectivePageIdentity {
         let resolved = self.resolved();
         let snapshot = EffectiveReaderTokenSnapshot {
-            original_boundaries: vec![],
             document_id: self.intent.document_id,
             page: self.intent.page,
             tokens: resolved.tokens_on_page(self.intent.page).unwrap(),
@@ -232,7 +217,6 @@ fn completion_rejects_stale_missing_and_mismatched_intents_without_retiring_the_
     let mut missing = snapshot();
     missing.segmentation = None;
     missing.tokens.clear();
-    missing.original_boundaries.clear();
     let request = session.begin_load(base(&missing)).unwrap();
     assert!(session.accept(request, missing));
     assert!(!session.begin_completion(session.page().unwrap().identity, fixture.intent));
@@ -312,7 +296,7 @@ fn wrong_stage_or_changed_reservation_cannot_replace_the_accepted_command() {
         );
     }
     let mut changed = Fixture::new();
-    changed.rules.clear();
+    changed.original.tokens[0].reading = None;
     let retry = session.dispatch_completion().unwrap();
     assert_eq!(
         session.finish_completion_request(
@@ -365,7 +349,7 @@ fn commit_retry_keeps_the_same_reservation_and_emits_success_once() {
                 .collect::<Vec<_>>(),
             ["猫", "犬", "𠮷か\u{3099}\0"]
         );
-        assert!(b.occurrences()[0].metadata.is_none());
+        assert!(b.occurrences()[0].metadata.is_some());
         let output = Output::PageCompleted(fixture.completed_document(), outcome);
         assert!(session
             .finish_completion_request(&first, Ok(output.clone()))
@@ -458,7 +442,7 @@ fn accepted_word_io_and_failed_custom_writes_must_drain_before_completion() {
         encountered: 0,
         candidates: DictionaryCandidates {
             surface: "猫".into(),
-            dictionary_form: None,
+            dictionary_form: Some("猫".into()),
             words: vec![],
             names: vec![],
         },

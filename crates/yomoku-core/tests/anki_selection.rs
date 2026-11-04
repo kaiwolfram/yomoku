@@ -96,7 +96,7 @@ impl Fixture {
             anchor: original.anchor,
             display_range: original.display_range,
             surface: original.surface.clone(),
-            eligibility: EffectiveTokenEligibility::ManualJapaneseSpan,
+            eligibility: EffectiveTokenEligibility::AnalyzerJapanese,
             reading: original.reading.clone(),
             dictionary_form: original.dictionary_form.clone(),
             vocabulary: original.vocabulary,
@@ -107,7 +107,6 @@ impl Fixture {
                 base: self.page.key(),
             },
             tokens: vec![token.clone()],
-            original_boundaries: vec![],
         };
         let details = EffectiveWordDetails {
             selection: EffectiveReaderSelection {
@@ -426,7 +425,7 @@ fn stale_effective_revisions_selections_and_metadata_are_rejected() {
             1 => page.tokens[0].segment_index += 1,
             2 => page.tokens[0].surface = "犬".into(),
             3 => page.tokens[0].reading = None,
-            4 => page.tokens[0].eligibility = EffectiveTokenEligibility::AnalyzerJapanese,
+            4 => page.tokens[0].dictionary_form = Some("犬".into()),
             _ => unreachable!(),
         }
         assert!(

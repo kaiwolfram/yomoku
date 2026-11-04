@@ -321,7 +321,6 @@ class ReaderWordsTest {
             assertEquals(original, core().view.reader)
             val reloaded = core().view.effectiveReaderTokens!!
             assertEquals(tokens.tokens, reloaded.tokens)
-            assertEquals(tokens.originalBoundaries, reloaded.originalBoundaries)
             assertEquals(tokens.identity.base, reloaded.identity.base)
             assertTrue(reloaded.identity.revision > tokens.identity.revision)
             assertEquals(history, count(db, "SELECT count(*) FROM reading_completions"))

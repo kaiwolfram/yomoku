@@ -112,7 +112,7 @@ impl Storage {
         Ok(outcome)
     }
 
-    /// Allocate canonical source/chapter IDs, analyze, then commit text, a Mode B
+    /// Allocate canonical source/chapter IDs, analyze, then commit text, a Mode C
     /// snapshot and unique Japanese registrations together. Run on an I/O worker.
     /// The callback must reuse an already loaded analyzer; it runs while holding
     /// the write transaction and must not perform database work or publish IDs.
@@ -184,7 +184,7 @@ pub(crate) fn store_analyzed_chapter_in(
     registered_at_unix_ms: i64,
     analysis: &ChapterAnalysis,
 ) -> Result<(AnalysisId, usize), StorageError> {
-    if analysis.mode != SplitMode::B {
+    if analysis.mode != SplitMode::C {
         return Err(StorageError::InvalidAnalysis);
     }
     let analysis_id = store_chapter_analysis_in(connection, chapter_id, analysis)?;

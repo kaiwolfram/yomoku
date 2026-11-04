@@ -1,5 +1,5 @@
 use yomoku_core::{
-    analysis::{OverrideScope, SegmentationOverride, SplitMode},
+    analysis::SplitMode,
     document::{ChapterText, DocumentId, PasteText, TextAnchor, TextOffset, TextRange},
     pagination::{LogicalPages, PageLength},
     reader::{ReaderAnalysis, ReaderVocabulary},
@@ -23,116 +23,6 @@ fn import(storage: &mut Storage, text: &str) -> AnalyzedPaste {
     storage
         .create_analyzed_paste(&PasteText::new(text.into()).unwrap(), 100, fixture)
         .unwrap()
-}
-
-#[test]
-fn read_only_lookup_reopens_original_b_metadata_and_all_five_global_statuses() {
-    let database = TestDatabase::new();
-    let mut storage = Storage::open(database.path()).unwrap();
-    let imported = storage
-        .create_analyzed_paste(
-            &PasteText::new("English 📖 \0 猫 猫 𠮷 食べた が か\u{3099}".into()).unwrap(),
-            100,
-            |chapter| {
-                let mut analysis = fixture(chapter)?;
-                for token in &mut analysis.tokens {
-                    if token.surface == "食べた" {
-                        token.reading = Some("タベタ".into());
-                        token.dictionary_form = Some(Surface::new("食べる").unwrap());
-                    }
-                }
-                Ok::<_, std::convert::Infallible>(analysis)
-            },
-        )
-        .unwrap();
-    let document = &imported.document;
-    let mut entries = Vec::new();
-    for (surface, status) in [
-        ("猫", VocabularyStatus::New),
-        ("𠮷", VocabularyStatus::Learning),
-        ("食べた", VocabularyStatus::Familiar),
-        ("が", VocabularyStatus::Known),
-        ("か\u{3099}", VocabularyStatus::Ignored),
-    ] {
-        let id = storage
-            .vocabulary_entry(&Surface::new(surface).unwrap())
-            .unwrap()
-            .unwrap()
-            .id;
-        storage.set_vocabulary_status(id, status, 200).unwrap();
-        entries.push((surface, ReaderVocabulary { id, status }));
-    }
-    // Alternate modes and a newer B must not substitute for the import's B.
-    let mut later = fixture(&document.chapter).unwrap();
-    later.profile.engine_revision = "later-engine@2".into();
-    for mode in [SplitMode::A, SplitMode::B, SplitMode::C] {
-        later.mode = mode;
-        storage
-            .store_chapter_analysis(document.chapter.chapter_id, &later)
-            .unwrap();
-    }
-    // Lookup also leaves an accepted boundary edit unapplied in this base-only slice.
-    let start = document.chapter.text.find("食べた").unwrap();
-    storage
-        .save_segmentation_override(&SegmentationOverride {
-            scope: OverrideScope::ThisOccurrence,
-            anchor: anchor(&document.chapter, start, start + "食べた".len()),
-            surface: Surface::new("食べた").unwrap(),
-            parts: ["食べ", "た"].map(|s| Surface::new(s).unwrap()).to_vec(),
-        })
-        .unwrap();
-    let position = super::positions::position(document, start);
-    storage
-        .save_reading_position(document.document_id, position)
-        .unwrap();
-    drop(storage);
-    let mut storage = Storage::open(database.path()).unwrap();
-    storage
-        .connection
-        .pragma_update(None, "query_only", true)
-        .unwrap();
-    let before = fs::read(database.path()).unwrap();
-    let page = anchor(&document.chapter, 0, document.chapter.text.len());
-    let result = storage
-        .load_reader_tokens(document.document_id, page)
-        .unwrap()
-        .unwrap();
-    assert_eq!(result.document_id, document.document_id);
-    assert_eq!(result.page, page);
-    assert_eq!(
-        result.analysis,
-        ReaderAnalysis::Available(imported.analysis_id)
-    );
-    assert_eq!(result.tokens.len(), 6);
-    assert_eq!(result.tokens[0].token_index, 3);
-    assert_eq!(result.tokens[0].vocabulary, result.tokens[1].vocabulary);
-    for token in &result.tokens {
-        assert_eq!(
-            token.vocabulary,
-            Some(entries.iter().find(|(s, _)| *s == token.surface).unwrap().1)
-        );
-        assert_eq!(
-            token.anchor.slice(&document.chapter).unwrap(),
-            token.surface
-        );
-        assert_eq!(
-            token.display_range.slice(&document.chapter.text).unwrap(),
-            token.surface
-        );
-    }
-    let verb = &result.tokens[3];
-    assert_eq!(verb.surface, "食べた");
-    assert_eq!(verb.reading.as_deref(), Some("タベタ"));
-    assert_eq!(verb.dictionary_form.as_deref(), Some("食べる"));
-    assert_eq!(
-        storage
-            .load_paste(document.document_id)
-            .unwrap()
-            .unwrap()
-            .reading_position,
-        Some(position)
-    );
-    assert_eq!(fs::read(database.path()).unwrap(), before);
 }
 
 #[test]
@@ -249,7 +139,7 @@ fn legacy_absence_never_substitutes_another_mode_or_document_and_missing_documen
         .unwrap();
     import(&mut storage, "犬");
     let mut alternate = fixture(&document.chapter).unwrap();
-    for mode in [SplitMode::A, SplitMode::C] {
+    for mode in [SplitMode::A, SplitMode::B] {
         alternate.mode = mode;
         storage
             .store_chapter_analysis(document.chapter.chapter_id, &alternate)

@@ -12,7 +12,7 @@ use crate::{
     vocabulary::VocabularyStatus,
 };
 
-/// The original stored Mode B base snapshot, independent of the installed engine.
+/// The original stored Mode C base snapshot, independent of the installed engine.
 /// Missing is an explicit legacy state: opening never analyzes or registers words.
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
@@ -31,7 +31,7 @@ pub struct ReaderSnapshot {
     pub analysis: ReaderAnalysis,
 }
 
-/// Ordered whole-document text and every chapter's original Mode B identity.
+/// Ordered whole-document text and every chapter's original Mode C identity.
 /// Used by the application and worker; the legacy ReaderSnapshot remains only
 /// for callers of the historical single-text storage APIs.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -147,7 +147,7 @@ pub fn reader_tokens_on_page(
     page: TextAnchor,
 ) -> Result<Vec<ReaderToken>, InvalidAnalysis> {
     analysis.validate(chapter)?;
-    if analysis.mode != SplitMode::B || page.slice(chapter).map_err(|_| InvalidAnalysis)?.is_empty()
+    if analysis.mode != SplitMode::C || page.slice(chapter).map_err(|_| InvalidAnalysis)?.is_empty()
     {
         return Err(InvalidAnalysis);
     }
@@ -362,7 +362,7 @@ pub struct ReaderWordDetails {
     pub custom_entry: Option<ReaderCustomEntry>,
 }
 
-/// A transient selection within the loaded original Mode B token snapshot.
+/// A transient selection within the loaded original Mode C token snapshot.
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
 pub struct ReaderWordSelection {

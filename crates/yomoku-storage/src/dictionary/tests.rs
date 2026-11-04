@@ -321,3 +321,34 @@ fn full_index_all_payloads_and_real_surface_base_word_name_matches() {
         .words
         .is_empty());
 }
+
+#[test]
+fn component_queries_keep_full_token_first_and_deduplicate_entries_and_forms() {
+    let file = fixture();
+    let db = Dictionary::open(file.path()).unwrap();
+    let found = db
+        .lookup_forms(
+            "か\u{3099}",
+            None,
+            &["試験語".into(), "しけんご".into(), "試験語".into()],
+        )
+        .unwrap();
+    assert_eq!(
+        found
+            .words
+            .iter()
+            .map(|entry| entry.entry_id)
+            .collect::<Vec<_>>(),
+        [3, 1, 2]
+    );
+    assert_eq!(
+        found.words[1]
+            .forms
+            .iter()
+            .map(|form| form.form.as_str())
+            .collect::<Vec<_>>(),
+        ["試験語", "しけんご"]
+    );
+    assert_eq!(found.names.len(), 1);
+    assert_eq!(found.names[0].forms.len(), 2);
+}
