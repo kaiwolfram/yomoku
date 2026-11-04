@@ -71,7 +71,7 @@ class AnkiSettingsSessionTest {
                 }
             }
         }
-        await { !it.storageBusy }
+        await { !it.storageBusy && it.ankiSettings.phase == AnkiSettingsPhase.READY }
     }
 
     private fun close() {
@@ -86,8 +86,7 @@ class AnkiSettingsSessionTest {
         open()
         try {
             assertEquals(0, reads.get())
-            assertEquals(AnkiSettingsPhase.UNLOADED, core.view.ankiSettings.phase)
-            click("anki_settings_load")
+            assertEquals(AnkiSettingsPhase.READY, core.view.ankiSettings.phase)
             await { it.ankiSettings.phase == AnkiSettingsPhase.READY }
             assertNull(core.view.ankiSettings.defaultDeckId)
             click("anki_decks_check")
@@ -123,10 +122,9 @@ class AnkiSettingsSessionTest {
             assertEquals(before.documents, core.view.documents)
             close()
             open()
-            assertEquals(AnkiSettingsPhase.UNLOADED, core.view.ankiSettings.phase)
+            assertEquals(AnkiSettingsPhase.READY, core.view.ankiSettings.phase)
             assertEquals(AnkiDeckDiscoveryState.Unchecked, core.ankiDecks.state)
             assertEquals(1, reads.get())
-            click("anki_settings_load")
             await { it.ankiSettings.phase == AnkiSettingsPhase.READY }
             assertEquals(Long.MAX_VALUE, core.view.ankiSettings.defaultDeckId)
             click("anki_settings_clear")
@@ -136,7 +134,6 @@ class AnkiSettingsSessionTest {
             }
             close()
             open()
-            click("anki_settings_load")
             await { it.ankiSettings.phase == AnkiSettingsPhase.READY }
             assertNull(core.view.ankiSettings.defaultDeckId)
         } finally {
@@ -149,7 +146,6 @@ class AnkiSettingsSessionTest {
     fun failedSaveRequiresAuthoritativeReloadAndDoesNotRepeatUpdate() {
         open()
         try {
-            click("anki_settings_load")
             await { it.ankiSettings.phase == AnkiSettingsPhase.READY }
             click("anki_decks_check")
             compose.waitUntil(30_000) { core.ankiDecks.state is AnkiDeckDiscoveryState.Ready }

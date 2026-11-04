@@ -11,6 +11,52 @@ import java.util.concurrent.TimeUnit
 
 internal fun verifyAnkiSettingsBridge(fixtures: String) {
     val root = File(fixtures)
+    val entrySelection =
+        AnkiSelection.Original(
+            ReaderWordSelection(
+                ReaderTokenKey(
+                    DocumentId(Long.MAX_VALUE),
+                    TextAnchor(
+                        SourceId(9007199254740993L),
+                        ChapterId(Long.MAX_VALUE),
+                        TextRange(TextOffset(0), TextOffset(3)),
+                    ),
+                    ReaderAnalysis.Available(AnalysisId(Long.MAX_VALUE)),
+                ),
+                ULong.MAX_VALUE,
+            )
+        )
+    val entryActions =
+        listOf(
+            Event.CheckAnkiSetup,
+            Event.CreateAnkiModel,
+            Event.LoadReaderAnkiEntries(entrySelection),
+            Event.AddReaderAnkiEntry(entrySelection, AnkiEntryKey.Word(Long.MAX_VALUE)),
+            Event.AddReaderAnkiEntry(entrySelection, AnkiEntryKey.Name(9007199254740993L)),
+            Event.AddReaderAnkiEntry(entrySelection, AnkiEntryKey.Custom),
+        )
+    for ((index, expected) in entryActions.withIndex()) {
+        val bytes = root.resolve("anki-entry-action-$index.bin").readBytes()
+        val event = Event.bincodeDeserialize(bytes)
+        check(event == expected)
+        root.resolve("anki-entry-action-$index-return.bin").writeBytes(event.bincodeSerialize())
+    }
+    val entryPhases =
+        listOf(
+            AnkiEntryPhase.Checking,
+            AnkiEntryPhase.Add,
+            AnkiEntryPhase.Existing(listOf(Long.MAX_VALUE, 9007199254740993L)),
+            AnkiEntryPhase.Export(AnkiExportPhase.NoteUncertain(Long.MAX_VALUE)),
+            AnkiEntryPhase.Failed(AnkiExportError.PERMISSIONDENIED),
+        )
+    for ((index, phase) in entryPhases.withIndex()) {
+        val view =
+            AnkiEntryView.bincodeDeserialize(root.resolve("anki-entry-view-$index.bin").readBytes())
+        check(
+            view == AnkiEntryView(entrySelection, AnkiEntryKey.Word(Long.MAX_VALUE), "𠮷<&", phase)
+        )
+        root.resolve("anki-entry-view-$index-return.bin").writeBytes(view.bincodeSerialize())
+    }
     val events =
         listOf(
             Event.LoadAnkiSettings,
@@ -81,7 +127,7 @@ internal fun verifyAnkiSettingsBridge(fixtures: String) {
             NativeBridge(database.path, listener, HostDictionary()).use { bridge ->
                 check(view(bridge).ankiSettings.phase == AnkiSettingsPhase.UNLOADED)
                 send(bridge, Event.LoadAnkiSettings)
-                check(view(bridge).ankiSettings.phase == AnkiSettingsPhase.UNLOADED)
+                awaitReady(bridge, null)
                 send(bridge, Event.OpenSettings)
                 val before = view(bridge)
                 send(bridge, Event.LoadAnkiSettings)

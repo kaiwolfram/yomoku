@@ -29,10 +29,12 @@ internal class AnkiPreflightReader(private val provider: AnkiProviderReader) {
                         result.value.map { AnkiPreflightDeck(it.id, it.filtered) }
                 }
             val notes =
-                when (val result = provider.duplicates(operation.surface)) {
-                    is AnkiReadResult.Failed -> return failure(result.error)
-                    is AnkiReadResult.Value -> result.value.map { it.value }
-                }
+                if (operation.surface.isEmpty()) emptyList()
+                else
+                    when (val result = provider.duplicates(operation.surface)) {
+                        is AnkiReadResult.Failed -> return failure(result.error)
+                        is AnkiReadResult.Value -> result.value.map { it.value }
+                    }
             val discovered =
                 when (val result = provider.models()) {
                     is AnkiReadResult.Failed -> return failure(result.error)

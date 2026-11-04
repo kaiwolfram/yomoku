@@ -43,6 +43,7 @@ pub struct AnkiPreflightObservation {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
 pub struct AnkiPreflightOperation {
+    /// Empty only for Settings/startup model validation; never a note identity.
     pub surface: String,
     pub deck_id: i64,
     pub layout: Box<AnkiReadModelLayout>,
@@ -102,53 +103,65 @@ impl AnkiPreflightRequest {
         &self,
         observation: AnkiPreflightObservation,
     ) -> Result<AnkiPreflightPlan, AnkiExportError> {
-        let invalid = AnkiExportError::InvalidResponse;
-        let mut deck_ids = BTreeSet::new();
-        for deck in &observation.decks {
-            if deck.id <= 0 || !deck_ids.insert(deck.id) {
-                return Err(invalid);
-            }
+        evaluate_layout(
+            self.export().layout(),
+            self.export().deck().into(),
+            observation,
+        )
+    }
+}
+
+pub(crate) fn evaluate_layout(
+    layout: &super::AnkiModelLayout,
+    deck_id: i64,
+    observation: AnkiPreflightObservation,
+) -> Result<AnkiPreflightPlan, AnkiExportError> {
+    let invalid = AnkiExportError::InvalidResponse;
+    let mut deck_ids = BTreeSet::new();
+    for deck in &observation.decks {
+        if deck.id <= 0 || !deck_ids.insert(deck.id) {
+            return Err(invalid);
         }
-        let mut model_ids = BTreeSet::new();
-        for model in &observation.models {
-            if model.id <= 0
-                || model.name.is_empty()
-                || !model_ids.insert(model.id)
-                || (model.matches_layout && model.name != self.export().layout().name)
-            {
-                return Err(invalid);
-            }
-        }
-        let notes = observation
-            .duplicate_note_ids
-            .into_iter()
-            .map(TryInto::try_into)
-            .collect::<Result<Vec<_>, _>>()
-            .map_err(|_| invalid)?;
-        if !observation
-            .decks
-            .iter()
-            .any(|deck| deck.id == i64::from(self.export().deck()) && !deck.filtered)
+    }
+    let mut model_ids = BTreeSet::new();
+    for model in &observation.models {
+        if model.id <= 0
+            || model.name.is_empty()
+            || !model_ids.insert(model.id)
+            || (model.matches_layout && model.name != layout.name)
         {
-            return Err(AnkiExportError::DeckUnavailable);
+            return Err(invalid);
         }
-        if !notes.is_empty() {
-            return Ok(AnkiPreflightPlan::Existing(
-                AnkiExistingNotes::new(notes).map_err(|_| invalid)?,
-            ));
-        }
-        let mut named = observation
-            .models
-            .iter()
-            .filter(|model| model.name == self.export().layout().name);
-        match (named.next(), named.next()) {
-            (None, _) => Ok(AnkiPreflightPlan::CreateModel),
-            (Some(model), None) if model.matches_layout => Ok(AnkiPreflightPlan::ReuseModel(
-                model.id.try_into().map_err(|_| invalid)?,
-            )),
-            // Never pick an arbitrary same-name model, rename or overwrite it.
-            _ => Err(AnkiExportError::IncompatibleModel),
-        }
+    }
+    let notes = observation
+        .duplicate_note_ids
+        .into_iter()
+        .map(TryInto::try_into)
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|_| invalid)?;
+    if !observation
+        .decks
+        .iter()
+        .any(|deck| deck.id == deck_id && !deck.filtered)
+    {
+        return Err(AnkiExportError::DeckUnavailable);
+    }
+    if !notes.is_empty() {
+        return Ok(AnkiPreflightPlan::Existing(
+            AnkiExistingNotes::new(notes).map_err(|_| invalid)?,
+        ));
+    }
+    let mut named = observation
+        .models
+        .iter()
+        .filter(|model| model.name == layout.name);
+    match (named.next(), named.next()) {
+        (None, _) => Ok(AnkiPreflightPlan::CreateModel),
+        (Some(model), None) if model.matches_layout => Ok(AnkiPreflightPlan::ReuseModel(
+            model.id.try_into().map_err(|_| invalid)?,
+        )),
+        // Never pick an arbitrary same-name model, rename or overwrite it.
+        _ => Err(AnkiExportError::IncompatibleModel),
     }
 }
 

@@ -23,6 +23,7 @@ pub struct EffectiveWordDetails {
     pub encountered: u64,
     pub candidates: DictionaryCandidates,
     pub custom_entry: Option<ReaderCustomEntry>,
+    pub dictionary_sources: Vec<crate::dictionary::DictionarySource>,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
@@ -359,6 +360,7 @@ impl EffectiveReaderSession {
             encountered: details.encountered,
             candidates: details.candidates,
             custom_entry: details.custom_entry,
+            dictionary_sources: details.dictionary_sources,
         })
     }
 

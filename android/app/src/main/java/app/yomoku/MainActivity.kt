@@ -98,6 +98,7 @@ class MainActivity : ComponentActivity() {
         super.onResume()
         core.ankiBrowser.attach { startActivity(it) }
         core.setReaderActive(true)
+        core.refreshAnkiSetup()
     }
 
     override fun onPause() {

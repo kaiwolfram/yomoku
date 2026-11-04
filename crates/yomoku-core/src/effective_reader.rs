@@ -80,6 +80,7 @@ pub struct EffectiveReaderWordDetails {
     pub candidates: DictionaryCandidates,
     /// User data remains separate from unresolved analyzer metadata.
     pub custom_entry: Option<ReaderCustomEntry>,
+    pub dictionary_sources: Vec<crate::dictionary::DictionarySource>,
 }
 
 /// Construction validates the entire snapshot before any page is projected.

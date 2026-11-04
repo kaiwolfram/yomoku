@@ -68,12 +68,14 @@ class AnkiExportSessionTest {
                         if (useExecutor) executor else Executors.newSingleThreadExecutor(),
                     readAnkiPreflight = {
                         assertNotEquals(Looper.getMainLooper(), Looper.myLooper())
-                        preflightReads++
-                        preflightFailure?.let { failure -> AnkiPreflightResult.Failed(failure) }
+                        if (it.surface.isNotEmpty()) preflightReads++
+                        preflightFailure
+                            ?.takeIf { _ -> it.surface.isNotEmpty() }
+                            ?.let { failure -> AnkiPreflightResult.Failed(failure) }
                             ?: AnkiPreflightResult.Complete(
                                 AnkiPreflightObservation(
                                     listOf(AnkiPreflightDeck(Long.MAX_VALUE, false)),
-                                    duplicates,
+                                    if (it.surface.isEmpty()) emptyList() else duplicates,
                                     if (createModel) emptyList()
                                     else
                                         listOf(
@@ -88,6 +90,12 @@ class AnkiExportSessionTest {
                     },
                     readAnkiDecks = {
                         AnkiReadResult.Value(listOf(AnkiProviderDeck(Long.MAX_VALUE, "日本語", false)))
+                    },
+                    resolveAnkiNotes = { ids ->
+                        assertNotEquals(Looper.getMainLooper(), Looper.myLooper())
+                        AnkiReadResult.Value(
+                            Intent("test.notes.${ids.joinToString(",") { it.value.toString() }}")
+                        )
                     },
                     resolveAnkiNote = {
                         assertNotEquals(Looper.getMainLooper(), Looper.myLooper())
@@ -215,6 +223,7 @@ class AnkiExportSessionTest {
         send(Event.OpenSettings)
         instrumentation.runOnMainSync { core.checkAnkiDecks() }
         compose.waitUntil(30_000) { core.ankiDecks.state is AnkiDeckDiscoveryState.Ready }
+        await { it.ankiSetup == AnkiSetupPhase.Ready }
         send(Event.CloseSettings)
         compose.setContent {
             YomokuTheme {
@@ -232,38 +241,42 @@ class AnkiExportSessionTest {
 
     private fun click(tag: String) = compose.onNodeWithTag(tag).performScrollTo().performClick()
 
+    private fun entryTag(entry: AnkiEntryView): String =
+        "anki_entry_" +
+            when (val key = entry.key) {
+                is AnkiEntryKey.Word -> "word_${key.value}"
+                is AnkiEntryKey.Name -> "name_${key.value}"
+                AnkiEntryKey.Custom -> "custom"
+            }
+
     @Test
     fun dictionaryAddFreezesTappedOccurrenceAcrossDismissalAndKeepsReaderState() {
         open()
         try {
             showDictionary()
             val original = core.view
-            assertEquals(0, preflightReads)
+            await { it.ankiEntries.any { entry -> entry.phase == AnkiEntryPhase.Add } }
+            val entry = core.view.ankiEntries.first { it.phase == AnkiEntryPhase.Add }
             assertTrue(operations.isEmpty())
-            click("word_anki_add")
-            assertEquals(AnkiExportPhase.Prepared, core.view.ankiExport?.phase)
-            compose.onNodeWithTag("word_anki_add").assertDoesNotExist()
-            assertEquals(0, preflightReads)
-            val prepared = core.view.ankiExport
+            click(entryTag(entry))
+            val operation =
+                checkNotNull(operations.poll(60, TimeUnit.SECONDS)) as AnkiLiveOperation.InsertNote
+            val accepted = core.view.ankiExport
             send(Event.DismissReaderWord)
             compose.onNodeWithTag("reader_word_panel").assertDoesNotExist()
             tapCat(last = false)
-            assertEquals(prepared, core.view.ankiExport)
-            assertEquals(0, preflightReads)
-            click("anki_export_check")
-            await { it.ankiExport?.phase is AnkiExportPhase.ReuseModel }
-            click("anki_export_begin")
-            val operation =
-                checkNotNull(operations.poll(60, TimeUnit.SECONDS)) as AnkiLiveOperation.InsertNote
+            assertEquals(accepted, core.view.ankiExport)
             assertEquals(Long.MAX_VALUE, operation.deckId)
             assertEquals("猫", operation.fields[0])
             assertEquals("猫と<strong class=\"yomoku-target\">猫</strong>。", operation.fields[3])
             results.add(AnkiLiveResult.NoteAdded(Long.MAX_VALUE))
-            await { it.ankiExport?.phase == AnkiExportPhase.NoteAdded(Long.MAX_VALUE) }
-            compose
-                .onNodeWithTag("anki_export_status")
-                .performScrollTo()
-                .assertTextEquals("Added to AnkiDroid.")
+            await {
+                it.ankiExport == null &&
+                    it.ankiEntries.any { entry ->
+                        entry.phase == AnkiEntryPhase.Existing(listOf(Long.MAX_VALUE))
+                    }
+            }
+            compose.onNodeWithTag("anki_export").assertDoesNotExist()
             assertEquals(original.reader, core.view.reader)
             assertEquals(original.effectiveReaderTokens, core.view.effectiveReaderTokens)
             assertEquals(original.statistics, core.view.statistics)
@@ -287,32 +300,24 @@ class AnkiExportSessionTest {
 
     @Test
     fun dictionaryPreflightRechecksAvailabilityAndShowsDuplicatesWithoutWrites() {
-        preflightFailure = AnkiExportError.PROVIDERUNAVAILABLE
         open()
         try {
             showDictionary()
-            click("word_anki_add")
-            click("anki_export_check")
-            await { it.ankiExport?.phase is AnkiExportPhase.ProviderFailed }
-            compose
-                .onNodeWithTag("anki_export_status")
-                .performScrollTo()
-                .assertTextEquals("AnkiDroid is unavailable.")
-            compose.onNodeWithTag("anki_export_begin").assertDoesNotExist()
-            compose.onNodeWithTag("word_anki_settings").assertDoesNotExist()
+            preflightFailure = AnkiExportError.PROVIDERUNAVAILABLE
+            val selection = AnkiSelection.Effective(core.view.effectiveReaderWord!!.selection!!)
+            send(Event.LoadReaderAnkiEntries(selection))
+            await { it.ankiEntries.any { entry -> entry.phase is AnkiEntryPhase.Failed } }
+            val entry = core.view.ankiEntries.first { it.phase is AnkiEntryPhase.Failed }
+            compose.onAllNodesWithText("AnkiDroid is unavailable.").onFirst().assertExists()
+            compose.onNodeWithTag("anki_export").assertDoesNotExist()
             preflightFailure = null
             duplicates = listOf(Long.MAX_VALUE, 9007199254740993L)
-            click("anki_export_check")
-            await { it.ankiExport?.phase == AnkiExportPhase.Existing(duplicates) }
-            compose
-                .onNodeWithTag("anki_export_status")
-                .performScrollTo()
-                .assertTextEquals(
-                    "Already in AnkiDroid. Note IDs: ${duplicates.joinToString(", ")}"
-                )
-            compose.onNodeWithTag("anki_export_begin").assertDoesNotExist()
+            click(entryTag(entry))
+            await {
+                it.ankiEntries.any { entry -> entry.phase == AnkiEntryPhase.Existing(duplicates) }
+            }
             assertTrue(operations.isEmpty())
-            assertEquals(2, preflightReads)
+            assertTrue(preflightReads >= 2)
         } finally {
             close()
         }
@@ -492,45 +497,32 @@ class AnkiExportSessionTest {
         open()
         try {
             showDictionary()
-            click("word_anki_add")
-            click("anki_export_check")
-            await { it.ankiExport?.phase == AnkiExportPhase.Existing(duplicates) }
+            await {
+                it.ankiEntries.any { entry -> entry.phase == AnkiEntryPhase.Existing(duplicates) }
+            }
+            val entry =
+                core.view.ankiEntries.first { it.phase == AnkiEntryPhase.Existing(duplicates) }
             val frozen = core.view
             val opened = mutableListOf<String?>()
+            instrumentation.runOnMainSync { core.ankiBrowser.attach { opened.add(it.action) } }
+            click(entryTag(entry))
+            compose.waitUntil(30_000) { opened.size == 1 }
             instrumentation.runOnMainSync {
+                core.ankiBrowser.detach()
                 core.ankiBrowser.attach { opened.add(it.action) }
             }
-            for (id in duplicates) {
-                click("anki_note_open_$id")
-                compose.waitUntil(30_000) { opened.size == duplicates.indexOf(id) + 1 }
-                instrumentation.runOnMainSync {
-                    // Same retained session on pause/resume or Activity replacement. Browser
-                    // return has no result that can acknowledge a provider/storage mutation.
-                    core.ankiBrowser.detach()
-                    core.ankiBrowser.attach { opened.add(it.action) }
-                }
-                assertEquals(frozen.ankiExport, core.view.ankiExport)
-                assertEquals(frozen.reader, core.view.reader)
-                assertEquals(frozen.effectiveReaderWord, core.view.effectiveReaderWord)
-                assertEquals(frozen.vocabulary, core.view.vocabulary)
-                assertEquals(frozen.statistics, core.view.statistics)
-            }
-            assertEquals(duplicates.map { "test.note.$it" }, opened)
+            assertEquals(listOf("test.notes.${duplicates.joinToString(",")}"), opened)
+            assertNull(core.view.ankiExport)
+            assertEquals(frozen.reader, core.view.reader)
+            assertEquals(frozen.effectiveReaderWord, core.view.effectiveReaderWord)
+            assertEquals(frozen.vocabulary, core.view.vocabulary)
+            assertEquals(frozen.statistics, core.view.statistics)
             send(Event.OpenSettings)
-            compose
-                .onNodeWithTag("anki_note_open_${Long.MAX_VALUE}")
-                .performScrollTo()
-                .assertExists()
-            val before = opened.size
-            send(Event.ClearAnkiExport(checkNotNull(frozen.ankiExport).preparationId))
-            instrumentation.runOnMainSync {
-                core.ankiBrowser.open(checkNotNull(frozen.ankiExport), Long.MAX_VALUE)
-            }
+            instrumentation.runOnMainSync { core.ankiBrowser.openEntry(entry) }
             executor.submit {}.get(30, TimeUnit.SECONDS)
             instrumentation.waitForIdleSync()
-            assertEquals(before, opened.size)
+            assertEquals(1, opened.size)
             assertTrue(operations.isEmpty())
-            assertEquals(1, preflightReads)
         } finally {
             close()
         }

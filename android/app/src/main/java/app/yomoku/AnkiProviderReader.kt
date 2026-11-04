@@ -321,14 +321,21 @@ internal class AnkiProviderReader(
      * Resolve the supported browser link only in the current provider's package. Does not launch.
      */
     fun existingNoteIntent(id: AnkiProviderNoteId): AnkiReadResult<Intent?> =
+        existingNotesIntent(listOf(id))
+
+    fun existingNotesIntent(ids: List<AnkiProviderNoteId>): AnkiReadResult<Intent?> =
         read(AnkiReadError.ProviderFailure) {
             val packageName = host()
+            if (ids.isEmpty()) fail(AnkiReadError.InvalidResponse)
             val link =
                 Uri.Builder()
                     .scheme("anki")
                     .authority("x-callback-url")
                     .appendPath("browser")
-                    .appendQueryParameter("search", "nid:${id.value}")
+                    .appendQueryParameter(
+                        "search",
+                        "nid:${ids.distinct().joinToString(",") { it.value.toString() }}",
+                    )
                     .build()
             val intent = Intent(Intent.ACTION_VIEW, link).setPackage(packageName)
             intent.takeIf { environment.resolves(it) }

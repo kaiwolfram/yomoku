@@ -21,10 +21,8 @@ class AnkiSettingsActivityTest {
         compose.runOnUiThread {
             original = ViewModelProvider(compose.activity)[CoreSessionOwner::class.java].session
             original.dispatch(Event.OpenSettings)
-            assertEquals(AnkiSettingsPhase.UNLOADED, original.view.ankiSettings.phase)
             assertEquals(AnkiDeckDiscoveryState.Unchecked, original.ankiDecks.state)
         }
-        compose.onNodeWithTag("anki_settings_load").performScrollTo().performClick()
         compose.waitUntil(30_000) { original.view.ankiSettings.phase == AnkiSettingsPhase.READY }
         compose.onNodeWithTag("anki_decks_check").performScrollTo().performClick()
         compose.waitUntil(30_000) { original.ankiDecks.state != AnkiDeckDiscoveryState.Loading }

@@ -10,14 +10,13 @@ impl Model {
         self.prepared_anki_export.as_ref()
     }
 
-    fn prepare_anki_export(
+    pub(super) fn prepare_anki_export(
         &self,
         selection: AnkiSelection,
         deck: AnkiDeckId,
+        entry: Option<crate::anki::AnkiEntryKey>,
     ) -> Option<AnkiExport> {
-        if self.prepared_anki_export.is_some()
-            || !self.anki_export_gate_open()
-            || self.storage_busy
+        if self.storage_busy
             || self.settings_open
             || self.pending_time_checkpoint.is_some()
             || self.queued_time_checkpoint.is_some()
@@ -41,6 +40,22 @@ impl Model {
                     return None;
                 }
                 let chapter = document.chapter(selection.key.page.chapter_id).ok()?;
+                if let Some(entry) = entry {
+                    let note = crate::anki::AnkiNote::from_original_entry(
+                        chapter,
+                        self.reader_tokens.as_ref()?,
+                        selection,
+                        self.reader_word.as_ref()?,
+                        Some(entry),
+                    )
+                    .ok()?;
+                    return Some(AnkiExport::for_entry(
+                        AnkiSelection::Original(selection),
+                        entry,
+                        deck,
+                        note,
+                    ));
+                }
                 AnkiExport::from_original_selection(
                     deck,
                     chapter,
@@ -62,6 +77,22 @@ impl Model {
                     return None;
                 }
                 let chapter = document.chapter(selection.page.base.page.chapter_id).ok()?;
+                if let Some(entry) = entry {
+                    let note = crate::anki::AnkiNote::from_effective_entry(
+                        chapter,
+                        session.page()?,
+                        selection,
+                        word.details.as_ref()?,
+                        Some(entry),
+                    )
+                    .ok()?;
+                    return Some(AnkiExport::for_entry(
+                        AnkiSelection::Effective(selection),
+                        entry,
+                        deck,
+                        note,
+                    ));
+                }
                 AnkiExport::from_effective_selection(
                     deck,
                     chapter,
@@ -101,7 +132,7 @@ impl Yomoku {
                 );
             }
             Event::ClearAnkiExport { preparation_id } => {
-                if model.prepared_anki_export.is_none()
+                if model.anki_export_view().is_none()
                     || model.anki_preparation_sequence != *preparation_id
                 {
                     return Some(Command::done());
@@ -112,7 +143,10 @@ impl Yomoku {
                 let Some(id) = model.anki_preparation_sequence.checked_add(1) else {
                     return Some(Command::done());
                 };
-                if let Some(export) = model.prepare_anki_export(*selection, *deck) {
+                if model.prepared_anki_export.is_some() || !model.anki_export_gate_open() {
+                    return Some(Command::done());
+                }
+                if let Some(export) = model.prepare_anki_export(*selection, *deck, None) {
                     model.anki_preparation_sequence = id;
                     model.prepared_anki_export = Some(export);
                 }

@@ -206,7 +206,6 @@ internal fun YomokuApp(
                                 dispatch,
                                 onReaderInteraction,
                                 imageLoader,
-                                ankiDecks,
                                 ankiBrowser,
                             )
                         view.destination == Destination.LIBRARY ->
@@ -297,6 +296,8 @@ private fun YomokuPreview() {
         YomokuApp(
             ViewModel(
                 ankiSettings = AnkiSettingsView(AnkiSettingsPhase.UNLOADED, null, null),
+                ankiSetup = app.yomoku.shared.AnkiSetupPhase.Unchecked,
+                ankiEntries = emptyList(),
                 vocabulary =
                     VocabularyState(
                         VocabularyQuery(

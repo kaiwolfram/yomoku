@@ -36,6 +36,7 @@ fn details(f: &Fixture, selection: EffectiveReaderSelection) -> EffectiveReaderW
         token,
         encountered: 7,
         custom_entry: None,
+        dictionary_sources: Vec::new(),
     }
 }
 

@@ -31,6 +31,66 @@ pub fn exchange(dir: &Path, writing: bool) -> Result<(), Box<dyn Error>> {
         },
         analysis: ReaderAnalysis::Available(i64::MAX.try_into()?),
     };
+    let entry_selection = AnkiSelection::Original(ReaderWordSelection {
+        key,
+        token_index: u64::MAX,
+    });
+    for (index, event) in [
+        Event::CheckAnkiSetup,
+        Event::CreateAnkiModel,
+        Event::LoadReaderAnkiEntries(entry_selection),
+        Event::AddReaderAnkiEntry {
+            selection: entry_selection,
+            entry: yomoku_core::anki::AnkiEntryKey::Word(i64::MAX),
+        },
+        Event::AddReaderAnkiEntry {
+            selection: entry_selection,
+            entry: yomoku_core::anki::AnkiEntryKey::Name(9007199254740993),
+        },
+        Event::AddReaderAnkiEntry {
+            selection: entry_selection,
+            entry: yomoku_core::anki::AnkiEntryKey::Custom,
+        },
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let bytes = super::encode(&event);
+        if writing {
+            fs::write(dir.join(format!("anki-entry-action-{index}.bin")), bytes)?;
+        } else {
+            assert_eq!(
+                fs::read(dir.join(format!("anki-entry-action-{index}-return.bin")))?,
+                bytes
+            );
+        }
+    }
+    for (index, phase) in [
+        yomoku_core::anki::AnkiEntryPhase::Checking,
+        yomoku_core::anki::AnkiEntryPhase::Add,
+        yomoku_core::anki::AnkiEntryPhase::Existing(vec![i64::MAX, 9007199254740993]),
+        yomoku_core::anki::AnkiEntryPhase::Export(AnkiExportPhase::NoteUncertain(Some(i64::MAX))),
+        yomoku_core::anki::AnkiEntryPhase::Failed(AnkiExportError::PermissionDenied),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let view = yomoku_core::anki::AnkiEntryView {
+            selection: entry_selection,
+            key: yomoku_core::anki::AnkiEntryKey::Word(i64::MAX),
+            headword: "𠮷<&".into(),
+            phase,
+        };
+        let bytes = super::encode(&view);
+        if writing {
+            fs::write(dir.join(format!("anki-entry-view-{index}.bin")), bytes)?;
+        } else {
+            assert_eq!(
+                fs::read(dir.join(format!("anki-entry-view-{index}-return.bin")))?,
+                bytes
+            );
+        }
+    }
     for (index, event) in [
         Event::PrepareReaderAnkiExport {
             selection: AnkiSelection::Original(ReaderWordSelection {

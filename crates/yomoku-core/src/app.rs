@@ -82,6 +82,8 @@ pub struct ImportSummary {
 #[derive(Default)]
 pub struct Model {
     anki_settings: crate::anki::AnkiSettingsView,
+    anki_entries: Vec<anki::entries::EntryState>,
+    anki_setup: anki::entries::SetupState,
     anki_settings_sequence: u64,
     anki_settings_request: Option<(u64, anki::settings::SettingsRequest)>,
     prepared_anki_export: Option<crate::anki::AnkiExport>,
@@ -319,12 +321,31 @@ pub enum Event {
     ClearAnkiExport {
         preparation_id: u64,
     },
-    /// Lazy local preference read in Settings; never queries the provider.
+    /// Read local preferences at startup or in Settings; never queries the provider.
     LoadAnkiSettings,
     /// Save a positive signed-64 deck preference, or explicitly clear it.
     SetAnkiDefaultDeck(Option<i64>),
     /// Read back authoritative local settings after failure or a lost response.
     RetryAnkiSettings,
+    /// Read-only entry availability for the current loaded selection.
+    LoadReaderAnkiEntries(crate::anki::AnkiSelection),
+    /// One explicit tap authorizes only this current dictionary entry.
+    AddReaderAnkiEntry {
+        selection: crate::anki::AnkiSelection,
+        entry: crate::anki::AnkiEntryKey,
+    },
+    CheckAnkiSetup,
+    CreateAnkiModel,
+    #[serde(skip)]
+    #[cfg_attr(feature = "facet_typegen", facet(skip))]
+    AnkiEntryChecked(
+        #[cfg_attr(feature = "facet_typegen", facet(opaque))]
+        Box<crate::anki::AnkiPreflightRequest>,
+        crate::anki::AnkiPreflightResult,
+    ),
+    #[serde(skip)]
+    #[cfg_attr(feature = "facet_typegen", facet(skip))]
+    AnkiSetupChecked(u64, i64, crate::anki::AnkiPreflightResult),
     #[serde(skip)]
     #[cfg_attr(feature = "facet_typegen", facet(skip))]
     AnkiSettingsFinished(u64, StorageResult),
@@ -435,6 +456,8 @@ pub enum Event {
 #[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
 pub struct ViewModel {
     pub anki_settings: crate::anki::AnkiSettingsView,
+    pub anki_setup: crate::anki::AnkiSetupPhase,
+    pub anki_entries: Vec<crate::anki::AnkiEntryView>,
     /// Settings-only recovery presentation; journal payloads and handles stay native.
     pub anki_recovery: Option<crate::anki::AnkiRecoveryView>,
     /// Session-owned frozen export status; observed IDs carry no callback authority.
@@ -516,10 +539,22 @@ impl App for Yomoku {
         if let Some(command) = self.update_anki_settings(&event, model) {
             return command;
         }
-        let anki_before = (model.anki_recovery_view(), model.anki_export_view());
+        let anki_before = (
+            model.anki_recovery_view(),
+            model.anki_export_view(),
+            model.anki_entries_view(),
+            model.anki_setup.phase.clone(),
+        );
         if let Some(command) = self.update_anki_recovery(&event, model) {
             model.remember_anki_recovery_attention();
-            if anki_before != (model.anki_recovery_view(), model.anki_export_view()) {
+            if anki_before
+                != (
+                    model.anki_recovery_view(),
+                    model.anki_export_view(),
+                    model.anki_entries_view(),
+                    model.anki_setup.phase.clone(),
+                )
+            {
                 return command.and(render::render());
             }
             return command;
@@ -1720,6 +1755,12 @@ impl App for Yomoku {
             | Event::SetStatisticsTimeframe { .. }
             | Event::RetryStatistics
             | Event::StatisticsFinished(..)
+            | Event::CheckAnkiSetup
+            | Event::CreateAnkiModel
+            | Event::LoadReaderAnkiEntries(_)
+            | Event::AddReaderAnkiEntry { .. }
+            | Event::AnkiEntryChecked(..)
+            | Event::AnkiSetupChecked(..)
             | Event::LoadAnkiSettings
             | Event::SetAnkiDefaultDeck(_)
             | Event::RetryAnkiSettings
@@ -1754,6 +1795,8 @@ impl App for Yomoku {
     fn view(&self, model: &Model) -> ViewModel {
         ViewModel {
             anki_settings: model.anki_settings.clone(),
+            anki_setup: model.anki_setup.phase.clone(),
+            anki_entries: model.anki_entries_view(),
             anki_recovery: model.anki_recovery_view(),
             anki_export: model.anki_export_view(),
             vocabulary: model.vocabulary.clone(),

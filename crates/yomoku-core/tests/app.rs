@@ -8,6 +8,8 @@ fn starts_in_library() {
         core.view(),
         ViewModel {
             anki_settings: Default::default(),
+            anki_setup: Default::default(),
+            anki_entries: Vec::new(),
             anki_recovery: None,
             anki_export: None,
             vocabulary: Default::default(),

@@ -125,11 +125,15 @@ impl Storage {
                 .as_ref()
                 .and_then(|metadata| metadata.dictionary_form.as_ref().map(|form| form.as_str())),
             token.vocabulary,
-            &components,
+            &components
+                .iter()
+                .map(|source| source.form.clone())
+                .collect::<Vec<_>>(),
         )?;
         transaction.commit().map_err(StorageError::from)?;
         Ok(Some(EffectiveReaderWordDetails {
             key: key.clone(),
+            dictionary_sources: components,
             token,
             encountered,
             candidates,
@@ -222,7 +226,7 @@ fn component_forms_in(
     connection: &Connection,
     key: &EffectiveReaderTokenKey,
     anchor: yomoku_core::document::TextAnchor,
-) -> Result<Vec<String>, ReaderWordError> {
+) -> Result<Vec<yomoku_core::dictionary::DictionarySource>, ReaderWordError> {
     let chapter = crate::analysis::read_chapter(connection, anchor.chapter_id)?;
     let mut statement = connection.prepare("SELECT id FROM chapter_analyses WHERE chapter_id = ?1 AND engine_revision = ?2 AND dictionary_revision = ?3 AND split_mode IN ('a','b') ORDER BY split_mode").map_err(StorageError::from)?;
     let ids = statement
@@ -262,8 +266,14 @@ fn component_forms_in(
         for form in std::iter::once(token.surface)
             .chain(token.dictionary_form.map(|f| f.as_str().to_owned()))
         {
-            if !forms.contains(&form) {
-                forms.push(form);
+            if !forms
+                .iter()
+                .any(|source: &yomoku_core::dictionary::DictionarySource| source.form == form)
+            {
+                forms.push(yomoku_core::dictionary::DictionarySource {
+                    form,
+                    anchor: token.anchor,
+                });
             }
         }
     }

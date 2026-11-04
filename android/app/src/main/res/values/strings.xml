@@ -113,7 +113,6 @@
     <string name="reader_title">Reader</string>
     <string name="retry_word_lookup">Retry word lookup</string>
     <string name="word_reading">Reading: %1$s</string>
-    <string name="word_dictionary_form">Dictionary form: %1$s</string>
     <string name="word_lookup_loading">Loading dictionary…</string>
     <string name="word_lookup_failed">Dictionary lookup failed.</string>
     <string name="word_encountered">Encountered %1$s times</string>
@@ -233,8 +232,6 @@
     <string name="anki_export_check_again">Check again</string>
     <string name="anki_export_create">Create note model</string>
     <string name="anki_export_add">Add to Anki</string>
-    <string name="word_anki_setup">Check AnkiDroid and configure a default deck in Settings, then reopen this word.</string>
-    <string name="word_anki_not_prepared">This word could not be prepared for export. Check AnkiDroid settings and recovery, then reopen the word.</string>
     <string name="anki_settings_title">AnkiDroid</string>
     <string name="anki_settings_description">Choose a default deck for future word exports.</string>
     <string name="anki_settings_unloaded">Saved Anki settings have not been loaded.</string>
@@ -254,4 +251,11 @@
     <string name="anki_settings_no_available_decks">No regular decks are available in AnkiDroid.</string>
     <string name="anki_settings_missing_deck">The saved deck is missing or filtered. Choose another deck or clear the default.</string>
     <string name="anki_settings_deck_option">%1$s (ID: %2$d)</string>
+    <string name="anki_entry_add">Add %1$s to Anki</string>
+    <string name="anki_entry_open">Open %1$s in Anki</string>
+    <string name="anki_entry_retry">Retry checking %1$s in Anki</string>
+    <string name="anki_entry_recovery">Check Anki recovery in Settings.</string>
+    <string name="anki_model_ready">Anki is ready. Cards show the word on the front, with readings, definitions and the highlighted source sentence on the back.</string>
+    <string name="anki_model_missing">Create the built-in Yomoku card format to finish setup. Existing cards will be preserved.</string>
+    <string name="anki_model_unchecked">Select a default deck and check the card format.</string>
 </resources>

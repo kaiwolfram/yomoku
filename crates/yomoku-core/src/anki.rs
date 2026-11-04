@@ -6,6 +6,8 @@ use crate::{
     vocabulary::Surface,
 };
 
+mod entries;
+pub use entries::*;
 mod export;
 mod export_view;
 pub use export_view::*;
@@ -14,6 +16,7 @@ mod live_dispatch;
 pub use live::*;
 pub use live_dispatch::*;
 mod preflight;
+pub(crate) use preflight::evaluate_layout;
 pub use preflight::*;
 mod projection;
 mod recovery;
@@ -28,11 +31,11 @@ pub use export::*;
 pub use settings::*;
 pub use submission::*;
 
-/// One forward card, with the exact written surface as its first field.
+/// One forward card, with the exact written headword as its first field.
 /// These are original templates, not copied Yomitan assets. Android must verify
 /// a stored model's complete layout before reusing it; never overwrite a user's
 /// unrelated model based only on its name.
-pub const MODEL_NAME: &str = "Yomoku v1";
+pub const MODEL_NAME: &str = "Yomoku v2";
 pub const FIELD_NAMES: [&str; 4] = ["Surface", "Reading", "Meanings", "Sentence"];
 pub const CARD_NAME: &str = "Japanese word";
 pub const QUESTION_FORMAT: &str = r#"<div class="yomoku-surface">{{Surface}}</div>"#;
@@ -41,7 +44,10 @@ pub const ANSWER_FORMAT: &str = r#"{{FrontSide}}
 {{#Reading}}<div class="yomoku-reading">{{Reading}}</div>{{/Reading}}
 {{#Meanings}}<div class="yomoku-meanings">{{Meanings}}</div>{{/Meanings}}
 <div class="yomoku-sentence">{{Sentence}}</div>"#;
-pub const CSS: &str = r#".card { font-family: sans-serif; font-size: 20px; text-align: left; }
+pub const CSS: &str = r#".card { font-family: sans-serif; font-size: 20px; line-height: 1.6; text-align: left; color: #263238; background: #fafafa; padding: 24px; }
+.card.nightMode, .nightMode .card { color: #e8eaed; background: #202124; }
+ol { padding-left: 1.5em; }
+hr { border: 0; border-top: 1px solid #8886; margin: 1em 0; }
 .yomoku-surface { font-size: 1.8em; text-align: center; white-space: pre-wrap; }
 .yomoku-reading, .yomoku-meanings, .yomoku-sentence { white-space: pre-wrap; }
 .yomoku-sentence { margin-top: 1em; }
@@ -71,12 +77,26 @@ impl AnkiNote {
         if target.slice(sentence)? != surface.as_str() {
             return Err(InvalidTextValue);
         }
+        Self::with_occurrence(surface, reading, meanings, sentence, target)
+    }
+
+    /// Headword identity and the canonical inflected occurrence are independent.
+    pub(crate) fn with_occurrence(
+        surface: &Surface,
+        reading: &str,
+        meanings: &[&str],
+        sentence: &str,
+        target: TextRange,
+    ) -> Result<Self, InvalidTextValue> {
+        if target.slice(sentence)?.is_empty() {
+            return Err(InvalidTextValue);
+        }
         let start = target.start.byte_index(sentence)?;
         let end = target.end.byte_index(sentence)?;
         let sentence = format!(
             "{}<strong class=\"yomoku-target\">{}</strong>{}",
             escape(&sentence[..start]),
-            escape(surface.as_str()),
+            escape(target.slice(sentence)?),
             escape(&sentence[end..]),
         );
         let meanings = if meanings.is_empty() {

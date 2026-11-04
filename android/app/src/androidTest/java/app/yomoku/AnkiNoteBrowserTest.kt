@@ -5,8 +5,7 @@ import android.content.Intent
 import android.os.Looper
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
-import app.yomoku.shared.AnkiExportPhase
-import app.yomoku.shared.AnkiExportView
+import app.yomoku.shared.*
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
@@ -30,6 +29,8 @@ class AnkiNoteBrowserTest {
     private class Fixture(val export: AnkiExportView) {
         val executor = Executors.newSingleThreadExecutor()
         var current: AnkiExportView? = export
+        var entries = emptyList<AnkiEntryView>()
+        val entryReads = mutableListOf<List<Long>>()
         val reads = mutableListOf<Long>()
         val launches = mutableListOf<Intent>()
         var resolve: (AnkiProviderNoteId) -> AnkiReadResult<Intent?> = {
@@ -43,6 +44,11 @@ class AnkiNoteBrowserTest {
                     assertNotEquals(Looper.getMainLooper(), Looper.myLooper())
                     reads.add(it.value)
                     resolve(it)
+                },
+                currentEntries = { entries },
+                resolveEntries = { ids ->
+                    entryReads.add(ids.map { it.value })
+                    AnkiReadResult.Value(Intent("test.entries"))
                 },
             ) {
                 current
@@ -72,6 +78,47 @@ class AnkiNoteBrowserTest {
             f.executor.shutdown()
             assertTrue(f.executor.awaitTermination(30, TimeUnit.SECONDS))
         }
+    }
+
+    @Test
+    fun entryOpenUsesAllVerifiedIdsAndRejectsRemovedSelections() = fixture { f ->
+        val key =
+            ReaderTokenKey(
+                DocumentId(1),
+                TextAnchor(SourceId(2), ChapterId(3), TextRange(TextOffset(0), TextOffset(3))),
+                ReaderAnalysis.Available(AnalysisId(4)),
+            )
+        val entry =
+            AnkiEntryView(
+                AnkiSelection.Original(ReaderWordSelection(key, 0UL)),
+                AnkiEntryKey.Word(5),
+                "猫",
+                AnkiEntryPhase.Existing(listOf(Long.MAX_VALUE, 9007199254740993L)),
+            )
+        main {
+            f.entries = listOf(entry)
+            f.browser.openEntry(entry)
+            f.browser.openEntry(entry)
+        }
+        drain(f)
+        assertEquals(listOf(listOf(Long.MAX_VALUE, 9007199254740993L)), f.entryReads)
+        assertEquals(1, f.launches.size)
+        main {
+            f.entries = emptyList()
+            f.browser.refresh()
+            f.browser.openEntry(entry)
+        }
+        drain(f)
+        assertEquals(1, f.launches.size)
+        assertEquals(1, f.entryReads.size)
+        main {
+            f.entries = listOf(entry)
+            f.browser.openEntry(entry)
+            f.entries = emptyList()
+        }
+        drain(f)
+        assertEquals(1, f.launches.size)
+        assertEquals(2, f.entryReads.size)
     }
 
     @Test

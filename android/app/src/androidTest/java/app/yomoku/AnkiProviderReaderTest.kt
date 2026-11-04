@@ -2055,6 +2055,20 @@ class AnkiProviderReaderTest {
             assertEquals("x-callback-url", intent.data!!.authority)
             assertEquals("/browser", intent.data!!.path)
             assertEquals("nid:${Long.MAX_VALUE}", intent.data!!.getQueryParameter("search"))
+            val entries =
+                value(
+                    f.reader.existingNotesIntent(
+                        listOf(
+                            AnkiProviderNoteId(Long.MAX_VALUE),
+                            AnkiProviderNoteId(9007199254740993L),
+                            AnkiProviderNoteId(Long.MAX_VALUE),
+                        )
+                    )
+                )!!
+            assertEquals(
+                "nid:${Long.MAX_VALUE},9007199254740993",
+                entries.data!!.getQueryParameter("search"),
+            )
             assertNull(intent.component)
             f.environment.canOpen = false
             assertNull(value(f.reader.existingNoteIntent(AnkiProviderNoteId(7))))

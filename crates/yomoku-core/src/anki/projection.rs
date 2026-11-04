@@ -23,6 +23,16 @@ impl AnkiNote {
         selection: ReaderWordSelection,
         details: &ReaderWordDetails,
     ) -> Result<Self, InvalidTextValue> {
+        Self::from_original_entry(chapter, current, selection, details, None)
+    }
+
+    pub(crate) fn from_original_entry(
+        chapter: &ChapterText,
+        current: &ReaderTokenSnapshot,
+        selection: ReaderWordSelection,
+        details: &ReaderWordDetails,
+        entry: Option<super::AnkiEntryKey>,
+    ) -> Result<Self, InvalidTextValue> {
         if current.key() != selection.key
             || details.selection() != selection
             || current.analysis == ReaderAnalysis::Missing
@@ -49,6 +59,8 @@ impl AnkiNote {
             token.dictionary_form.as_deref(),
             &details.candidates,
             details.custom_entry.as_ref(),
+            entry,
+            &[],
         )
     }
 
@@ -59,6 +71,16 @@ impl AnkiNote {
         current: &EffectiveReaderPage,
         selection: EffectiveReaderSelection,
         details: &EffectiveWordDetails,
+    ) -> Result<Self, InvalidTextValue> {
+        Self::from_effective_entry(chapter, current, selection, details, None)
+    }
+
+    pub(crate) fn from_effective_entry(
+        chapter: &ChapterText,
+        current: &EffectiveReaderPage,
+        selection: EffectiveReaderSelection,
+        details: &EffectiveWordDetails,
+        entry: Option<super::AnkiEntryKey>,
     ) -> Result<Self, InvalidTextValue> {
         if current.identity != selection.page
             || details.selection != selection
@@ -86,6 +108,8 @@ impl AnkiNote {
             token.dictionary_form.as_deref(),
             &details.candidates,
             details.custom_entry.as_ref(),
+            entry,
+            &details.dictionary_sources,
         )
     }
 }
@@ -101,6 +125,8 @@ fn prepare(
     dictionary_form: Option<&str>,
     candidates: &DictionaryCandidates,
     custom: Option<&ReaderCustomEntry>,
+    entry: Option<super::AnkiEntryKey>,
+    sources: &[crate::dictionary::DictionarySource],
 ) -> Result<AnkiNote, InvalidTextValue> {
     page.slice(chapter)?;
     if target.slice(chapter)? != surface
@@ -120,15 +146,37 @@ fn prepare(
     if display != expected_display {
         return Err(InvalidTextValue);
     }
-    let (reading, meanings) = definitions(candidates, analyzer_reading, custom)?;
+    let (headword, reading, meanings, form) = if let Some(key) = entry {
+        entry_content(candidates, custom, key)?
+    } else {
+        let (reading, meanings) = definitions(candidates, analyzer_reading, custom)?;
+        (surface.to_owned(), reading, meanings, surface.to_owned())
+    };
+    let occurrence = if form == surface || Some(form.as_str()) == dictionary_form {
+        target
+    } else {
+        let source = sources
+            .iter()
+            .find(|source| source.form == form)
+            .ok_or(InvalidTextValue)?;
+        if source.anchor.chapter_id != target.chapter_id
+            || source.anchor.range.start < target.range.start
+            || source.anchor.range.end > target.range.end
+        {
+            return Err(InvalidTextValue);
+        }
+        source.anchor.slice(chapter)?;
+        source.anchor
+    };
+    let target = occurrence;
     let sentence = sentence_range(&chapter.text, target.range)?;
     let text = sentence.slice(&chapter.text)?;
     let local = TextRange {
         start: (i64::from(target.range.start) - i64::from(sentence.start)).try_into()?,
         end: (i64::from(target.range.end) - i64::from(sentence.start)).try_into()?,
     };
-    AnkiNote::new(
-        &Surface::new(surface).map_err(|_| InvalidTextValue)?,
+    AnkiNote::with_occurrence(
+        &Surface::new(&headword).map_err(|_| InvalidTextValue)?,
         &reading,
         &meanings.iter().map(String::as_str).collect::<Vec<_>>(),
         text,
@@ -294,4 +342,107 @@ fn push_meaning(values: &mut Vec<String>, translations: &[Translation]) {
     if !english.is_empty() {
         values.push(english.join("; "));
     }
+}
+
+fn entry_content(
+    candidates: &DictionaryCandidates,
+    custom: Option<&ReaderCustomEntry>,
+    key: super::AnkiEntryKey,
+) -> Result<(String, String, Vec<String>, String), InvalidTextValue> {
+    use super::AnkiEntryKey;
+    let mut meanings = Vec::new();
+    let mut readings = Vec::new();
+    let (headword, form) = match key {
+        AnkiEntryKey::Word(id) => {
+            let candidate = candidates
+                .words
+                .iter()
+                .find(|c| c.entry_id == id && id > 0)
+                .ok_or(InvalidTextValue)?;
+            let first = candidate.forms.first().ok_or(InvalidTextValue)?;
+            let pair = &first.matches.first().ok_or(InvalidTextValue)?.reading;
+            for form in &candidate.forms {
+                if form.matches.is_empty() || form.matches != candidate.entry.matches(&form.form) {
+                    return Err(InvalidTextValue);
+                }
+            }
+            let headword = pair
+                .spelling_index
+                .map(|i| candidate.entry.kanji[i].text.clone())
+                .unwrap_or_else(|| candidate.entry.readings[pair.reading_index].text.clone());
+            for (i, reading) in candidate.entry.readings.iter().enumerate() {
+                if candidate
+                    .forms
+                    .iter()
+                    .flat_map(|f| &f.matches)
+                    .any(|m| m.reading.reading_index == i)
+                {
+                    push_unique(&mut readings, &reading.text);
+                }
+            }
+            for (i, sense) in candidate.entry.senses.iter().enumerate() {
+                if candidate
+                    .forms
+                    .iter()
+                    .flat_map(|f| &f.matches)
+                    .any(|m| m.sense_indices.contains(&i))
+                {
+                    push_meaning(&mut meanings, &sense.glosses);
+                }
+            }
+            (headword, first.form.clone())
+        }
+        AnkiEntryKey::Name(id) => {
+            let candidate = candidates
+                .names
+                .iter()
+                .find(|c| c.entry_id == id && id > 0)
+                .ok_or(InvalidTextValue)?;
+            let first = candidate.forms.first().ok_or(InvalidTextValue)?;
+            let pair = first.matches.first().ok_or(InvalidTextValue)?;
+            for form in &candidate.forms {
+                if form.matches.is_empty()
+                    || form.matches
+                        != matching_readings(
+                            &candidate.entry.kanji,
+                            &candidate.entry.readings,
+                            &form.form,
+                        )
+                {
+                    return Err(InvalidTextValue);
+                }
+            }
+            let headword = pair
+                .spelling_index
+                .map(|i| candidate.entry.kanji[i].text.clone())
+                .unwrap_or_else(|| candidate.entry.readings[pair.reading_index].text.clone());
+            for (i, reading) in candidate.entry.readings.iter().enumerate() {
+                if candidate
+                    .forms
+                    .iter()
+                    .flat_map(|f| &f.matches)
+                    .any(|m| m.reading_index == i)
+                {
+                    push_unique(&mut readings, &reading.text);
+                }
+            }
+            for group in &candidate.entry.names {
+                push_meaning(&mut meanings, &group.translations);
+            }
+            (headword, first.form.clone())
+        }
+        AnkiEntryKey::Custom => {
+            let (reading, meanings) = definitions(candidates, None, custom)?;
+            if custom.is_none() {
+                return Err(InvalidTextValue);
+            }
+            return Ok((
+                candidates.surface.clone(),
+                reading,
+                meanings,
+                candidates.surface.clone(),
+            ));
+        }
+    };
+    Ok((headword, readings.join("、"), meanings, form))
 }

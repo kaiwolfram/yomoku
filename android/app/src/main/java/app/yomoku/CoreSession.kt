@@ -87,6 +87,9 @@ internal class CoreSession(
     readAnkiDecks: () -> AnkiReadResult<List<AnkiProviderDeck>> = {
         AnkiReadResult.Failed(AnkiReadError.ProviderUnavailable)
     },
+    resolveAnkiNotes: (List<AnkiProviderNoteId>) -> AnkiReadResult<Intent?> = {
+        AnkiReadResult.Failed(AnkiReadError.ProviderUnavailable)
+    },
     resolveAnkiNote: (AnkiProviderNoteId) -> AnkiReadResult<Intent?> = {
         AnkiReadResult.Failed(AnkiReadError.ProviderUnavailable)
     },
@@ -103,6 +106,8 @@ internal class CoreSession(
     private var clockRunning = false
     private var tickScheduled = false
     private var scheduledAnkiPreparation: ULong? = null
+    private var checkedAnkiDeck: Long? = null
+    private var ankiSetupScheduled = false
     private val tick = Runnable {
         tickScheduled = false
         if (closing) {
@@ -174,7 +179,7 @@ internal class CoreSession(
 
     val ankiDecks = AnkiDeckDiscovery(ankiExecutor, readAnkiDecks)
     val ankiBrowser =
-        AnkiNoteBrowser(ankiExecutor, resolveAnkiNote) {
+        AnkiNoteBrowser(ankiExecutor, resolveAnkiNote, { view.ankiEntries }, resolveAnkiNotes) {
             view.ankiExport?.takeIf {
                 view.settingsOpen ||
                     (view.contentRoute == ContentRoute.READER &&
@@ -185,7 +190,47 @@ internal class CoreSession(
 
     fun checkAnkiDecks() {
         requireMainThread()
-        if (!closing && !isClosed && view.settingsOpen) ankiDecks.check()
+        if (!closing && !isClosed && view.settingsOpen) {
+            ankiDecks.check()
+            refreshAnkiSetup()
+        }
+    }
+
+    fun refreshAnkiSetup() {
+        requireMainThread()
+        if (!closing && !isClosed) {
+            checkedAnkiDeck = null
+            scheduleAnkiSetup()
+        }
+    }
+
+    private fun scheduleAnkiSetup() {
+        val deck = view.ankiSettings.defaultDeckId
+        if (deck == null) {
+            checkedAnkiDeck = null
+            return
+        }
+        if (
+            closing ||
+                view.ankiExport != null ||
+                ankiSetupScheduled ||
+                deck == checkedAnkiDeck ||
+                view.ankiSettings.phase != app.yomoku.shared.AnkiSettingsPhase.READY
+        )
+            return
+        ankiSetupScheduled = true
+        mainHandler.post {
+            ankiSetupScheduled = false
+            if (
+                !closing &&
+                    !isClosed &&
+                    view.ankiSettings.defaultDeckId == deck &&
+                    view.ankiExport == null
+            ) {
+                checkedAnkiDeck = deck
+                send(Event.CheckAnkiSetup)
+            }
+        }
     }
 
     // Platform import sequencing observes committed core outcomes, on the main thread.
@@ -238,6 +283,7 @@ internal class CoreSession(
 
     init {
         dispatch(Event.RefreshLibrary)
+        dispatch(Event.LoadAnkiSettings)
     }
 
     fun dispatch(event: Event) {
@@ -433,6 +479,7 @@ internal class CoreSession(
         )
         dispatchReadyAnki()
         ankiBrowser.refresh()
+        scheduleAnkiSetup()
     }
 
     /** Only a durably acknowledged begin can expose Ready; native code owns the permit. */

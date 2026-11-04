@@ -447,6 +447,7 @@ fn accepted_word_io_and_failed_custom_writes_must_drain_before_completion() {
             names: vec![],
         },
         custom_entry: None,
+        dictionary_sources: Vec::new(),
     };
     let read = session.begin_word_load(selection).unwrap();
     assert!(!session.begin_completion(identity, fixture.intent));

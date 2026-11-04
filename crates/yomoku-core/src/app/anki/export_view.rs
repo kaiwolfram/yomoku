@@ -6,7 +6,10 @@ use crate::anki::{
 
 impl Model {
     pub(in crate::app) fn anki_export_view(&self) -> Option<AnkiExportView> {
-        let export = self.prepared_anki_export.as_ref()?;
+        let export = self.prepared_anki_export.as_ref();
+        if export.is_none() && (self.anki_setup.live_deck.is_none() || self.anki_live.is_none()) {
+            return None;
+        }
         let phase = if let Some(live) = &self.anki_live {
             match live.progress {
                 AnkiLiveProgress::Beginning => AnkiExportPhase::Beginning,
@@ -57,8 +60,8 @@ impl Model {
         };
         Some(AnkiExportView {
             preparation_id: self.anki_preparation_sequence,
-            surface: export.note().surface().as_str().to_owned(),
-            deck_id: export.deck().into(),
+            surface: export.map_or_else(String::new, |e| e.note().surface().as_str().to_owned()),
+            deck_id: export.map_or_else(|| self.anki_setup.live_deck.unwrap(), |e| e.deck().into()),
             phase,
         })
     }

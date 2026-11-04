@@ -33,7 +33,6 @@ internal fun EffectiveReaderWords(
     dispatch: (Event) -> Unit,
     onInteraction: () -> Unit,
     imageLoader: EpubImageLoader? = null,
-    ankiDecks: AnkiDeckDiscoveryState = AnkiDeckDiscoveryState.Unchecked,
     ankiBrowser: AnkiNoteBrowser? = null,
 ) {
     // Compact revisions belong to one native session. A replacement cannot reuse a selection/draft.
@@ -44,7 +43,6 @@ internal fun EffectiveReaderWords(
             dispatch,
             onInteraction,
             imageLoader,
-            ankiDecks,
             ankiBrowser,
         )
     }
@@ -57,7 +55,6 @@ private fun EffectiveReaderWordContent(
     dispatch: (Event) -> Unit,
     onInteraction: () -> Unit,
     imageLoader: EpubImageLoader?,
-    ankiDecks: AnkiDeckDiscoveryState,
     ankiBrowser: AnkiNoteBrowser?,
 ) {
     val page = view.reader ?: return
@@ -196,20 +193,59 @@ private fun EffectiveReaderWordContent(
                         it.token == token &&
                         word.selection == display.selection
                 }
-            ReaderAnkiPanel(
-                details?.let { AnkiSelection.Effective(it.selection) },
-                view.ankiSettings,
-                view.ankiExport,
-                ankiDecks,
-                canRead,
-                dispatch,
-                onInteraction,
-                ankiBrowser,
-            )
             if (details != null) {
-                ReaderDictionary(details.encountered, details.candidates)
+                val ankiSelection = AnkiSelection.Effective(details.selection)
+                ObserveReaderAnkiEntries(
+                    ankiSelection,
+                    details.customEntry,
+                    view.ankiSetup,
+                    canRead,
+                    dispatch,
+                )
+                ReaderDictionary(
+                    details.encountered,
+                    details.candidates,
+                    action = { entry ->
+                        AnkiEntryAction(
+                            view.ankiEntries.find {
+                                it.selection == ankiSelection && it.key == entry
+                            },
+                            canRead,
+                            dispatch,
+                            onInteraction,
+                            ankiBrowser,
+                        )
+                    },
+                    notice = { entry ->
+                        AnkiEntryNotice(
+                            view.ankiEntries.find {
+                                it.selection == ankiSelection && it.key == entry
+                            },
+                            ankiBrowser,
+                        )
+                    },
+                )
                 if (details.candidates.words.isEmpty() && details.candidates.names.isEmpty()) {
                     EffectiveReaderCustomDictionary(details, word, canRead, dispatch, onInteraction)
+                    if (details.customEntry != null) {
+                        AnkiEntryAction(
+                            view.ankiEntries.find {
+                                it.selection == ankiSelection &&
+                                    it.key == app.yomoku.shared.AnkiEntryKey.Custom
+                            },
+                            canRead,
+                            dispatch,
+                            onInteraction,
+                            ankiBrowser,
+                        )
+                        AnkiEntryNotice(
+                            view.ankiEntries.find {
+                                it.selection == ankiSelection &&
+                                    it.key == app.yomoku.shared.AnkiEntryKey.Custom
+                            },
+                            ankiBrowser,
+                        )
+                    }
                 }
             } else {
                 ReaderWordLookupState(word.error != null, canRead, onInteraction) {

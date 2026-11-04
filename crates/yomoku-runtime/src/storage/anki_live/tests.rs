@@ -307,7 +307,7 @@ impl Harness {
                     } else {
                         vec![AnkiPreflightModel {
                             id: 9007199254740993,
-                            name: "Yomoku v1".into(),
+                            name: yomoku_core::anki::MODEL_NAME.into(),
                             matches_layout: true,
                         }]
                     },

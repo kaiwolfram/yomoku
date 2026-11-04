@@ -117,6 +117,7 @@ impl Fixture {
             encountered: self.details.encountered,
             candidates: self.details.candidates.clone(),
             custom_entry: self.details.custom_entry.clone(),
+            dictionary_sources: Vec::new(),
         };
         (page, details)
     }

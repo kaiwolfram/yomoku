@@ -7,6 +7,8 @@ import android.os.Looper
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import app.yomoku.shared.AnkiEntryPhase
+import app.yomoku.shared.AnkiEntryView
 import app.yomoku.shared.AnkiExportPhase
 import app.yomoku.shared.AnkiExportView
 import java.util.concurrent.ExecutorService
@@ -27,15 +29,20 @@ internal sealed interface AnkiBrowserPhase {
 }
 
 internal data class AnkiBrowserState(
-    val export: AnkiExportView,
+    val export: AnkiExportView?,
     val noteId: Long,
     val phase: AnkiBrowserPhase,
+    val entry: AnkiEntryView? = null,
 )
 
 /** Platform navigation only. Native export identity and acknowledged IDs remain authoritative. */
 internal class AnkiNoteBrowser(
     private val executor: ExecutorService,
     private val resolve: (AnkiProviderNoteId) -> AnkiReadResult<Intent?>,
+    private val currentEntries: () -> List<AnkiEntryView> = { emptyList() },
+    private val resolveEntries: (List<AnkiProviderNoteId>) -> AnkiReadResult<Intent?> = { ids ->
+        resolve(ids.first())
+    },
     private val current: () -> AnkiExportView?,
 ) : AutoCloseable {
     private val main = Handler(Looper.getMainLooper())
@@ -60,7 +67,7 @@ internal class AnkiNoteBrowser(
 
     fun refresh() {
         requireMain()
-        if (state?.export != current()) {
+        if (state?.let { !isCurrent(it) } == true) {
             pending = null
             state = null
         }
@@ -71,13 +78,37 @@ internal class AnkiNoteBrowser(
         if (closed || launch == null || pending != null || current() != export) return
         if (noteId <= 0 || noteId !in export.openableNoteIds()) return
         val request = AnkiBrowserState(export, noteId, AnkiBrowserPhase.Resolving)
+        openRequest(request)
+    }
+
+    fun openEntry(entry: AnkiEntryView) {
+        requireMain()
+        val ids = (entry.phase as? AnkiEntryPhase.Existing)?.value ?: return
+        if (
+            closed ||
+                launch == null ||
+                pending != null ||
+                entry !in currentEntries() ||
+                ids.isEmpty()
+        )
+            return
+        openRequest(AnkiBrowserState(null, ids.first(), AnkiBrowserPhase.Resolving, entry))
+    }
+
+    private fun isCurrent(request: AnkiBrowserState): Boolean =
+        request.entry?.let { it in currentEntries() } ?: (request.export == current())
+
+    private fun openRequest(request: AnkiBrowserState) {
         pending = request
         state = request
         executor.execute {
             if (pending !== request) return@execute
             val result =
                 try {
-                    resolve(AnkiProviderNoteId(noteId))
+                    request.entry?.let { entry ->
+                        val ids = (entry.phase as AnkiEntryPhase.Existing).value
+                        resolveEntries(ids.map(::AnkiProviderNoteId))
+                    } ?: resolve(AnkiProviderNoteId(request.noteId))
                 } catch (_: SecurityException) {
                     AnkiReadResult.Failed(AnkiReadError.PermissionDenied)
                 } catch (_: Exception) {
@@ -86,7 +117,7 @@ internal class AnkiNoteBrowser(
             main.post {
                 if (pending !== request) return@post
                 pending = null
-                if (closed || current() != export || launch == null) {
+                if (closed || !isCurrent(request) || launch == null) {
                     state = null
                     return@post
                 }

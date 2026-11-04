@@ -28,7 +28,7 @@ internal fun AnkiExportPanel(
             stringResource(R.string.anki_export_title),
             style = MaterialTheme.typography.titleMedium,
         )
-        Text(state.surface, Modifier.testTag("anki_export_surface"))
+        if (state.surface.isNotEmpty()) Text(state.surface, Modifier.testTag("anki_export_surface"))
         Text(stringResource(R.string.anki_export_deck, state.deckId.toString()))
         val message =
             when (phase) {

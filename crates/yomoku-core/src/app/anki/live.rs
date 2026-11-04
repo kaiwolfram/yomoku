@@ -37,6 +37,22 @@ impl Model {
 }
 
 impl Yomoku {
+    pub(super) fn begin_anki_intent(
+        &self,
+        model: &mut Model,
+        intent: AnkiLiveIntent,
+    ) -> Command<Effect, Event> {
+        let request = AnkiLiveRequest::new(intent);
+        model.anki_live = Some(AnkiLiveState {
+            request: request.clone(),
+            progress: AnkiLiveProgress::Beginning,
+            begun: None,
+            callback: None,
+        });
+        Command::request_from_shell(StorageOperation::BeginAnkiLive(Box::new(request.clone())))
+            .then_send(move |result| Event::AnkiLiveBeginFinished(Box::new(request), result))
+    }
+
     pub(super) fn update_anki_live(
         &self,
         event: &Event,
@@ -55,11 +71,16 @@ impl Yomoku {
                 return self.update_anki_live(&Event::BeginAnkiLive, model);
             }
             Event::DispatchAnkiLive => {
-                let Some(export) = model.prepared_anki_export.as_ref() else {
+                let (surface, deck_id) = if let Some(export) = model.prepared_anki_export.as_ref() {
+                    (
+                        export.note().surface().as_str().to_owned(),
+                        export.deck().into(),
+                    )
+                } else if let Some(deck) = model.anki_setup.live_deck {
+                    (String::new(), deck)
+                } else {
                     return Some(Command::done());
                 };
-                let surface = export.note().surface().as_str().to_owned();
-                let deck_id = export.deck().into();
                 let Some(invocation) = model.take_anki_live_invocation() else {
                     return Some(Command::done());
                 };
@@ -101,21 +122,7 @@ impl Yomoku {
                 let Ok(intent) = intent else {
                     return Some(Command::done());
                 };
-                let request = AnkiLiveRequest::new(intent);
-                model.anki_live = Some(AnkiLiveState {
-                    request: request.clone(),
-                    progress: AnkiLiveProgress::Beginning,
-                    begun: None,
-                    callback: None,
-                });
-                return Some(
-                    Command::request_from_shell(StorageOperation::BeginAnkiLive(Box::new(
-                        request.clone(),
-                    )))
-                    .then_send(move |result| {
-                        Event::AnkiLiveBeginFinished(Box::new(request), result)
-                    }),
-                );
+                return Some(self.begin_anki_intent(model, intent));
             }
             Event::AnkiLiveBeginFinished(request, result) => {
                 let Some(live) = &mut model.anki_live else {
@@ -188,12 +195,22 @@ impl Yomoku {
                     {
                         model.anki_recovery = AnkiRecoveryState::Restored(snapshot.clone());
                         live.progress = AnkiLiveProgress::Finished;
+                        if model.anki_setup.live_deck.is_some() {
+                            model.anki_setup.phase =
+                                match live.callback.as_ref().map(|c| c.outcome()) {
+                                    Some(crate::anki::AnkiLiveOutcome::Model(
+                                        crate::anki::AnkiModelCreationOutcome::Created(_),
+                                    )) => crate::anki::AnkiSetupPhase::Ready,
+                                    _ => crate::anki::AnkiSetupPhase::Unchecked,
+                                };
+                        }
                     }
                     StorageResult::Failed(error) => {
                         live.progress = AnkiLiveProgress::Failed(*error);
                     }
                     _ => live.progress = AnkiLiveProgress::Failed(DocumentError::Unavailable),
                 }
+                model.complete_entry_action();
             }
             Event::AbandonAnkiLive => {
                 if let Some(live) = &mut model.anki_live {

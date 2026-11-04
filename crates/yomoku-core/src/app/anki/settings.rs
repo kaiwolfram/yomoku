@@ -18,9 +18,7 @@ impl Yomoku {
     ) -> Option<Command<Effect, Event>> {
         use AnkiSettingsPhase::*;
         let request = match event {
-            Event::LoadAnkiSettings
-                if model.settings_open && model.anki_settings.phase == Unloaded =>
-            {
+            Event::LoadAnkiSettings if model.anki_settings.phase == Unloaded => {
                 SettingsRequest::Load
             }
             Event::RetryAnkiSettings
@@ -65,6 +63,10 @@ impl Yomoku {
                 };
                 match result {
                     Ok(deck) => {
+                        if model.anki_settings.default_deck_id != deck.map(i64::from) {
+                            model.anki_setup.phase = crate::anki::AnkiSetupPhase::Unchecked;
+                            model.anki_entries.clear();
+                        }
                         model.anki_settings.default_deck_id = deck.map(i64::from);
                         model.anki_settings.phase = Ready;
                         model.anki_settings.storage_error = None;

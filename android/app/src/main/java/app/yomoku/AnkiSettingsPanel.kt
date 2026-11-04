@@ -160,3 +160,40 @@ private fun AnkiReadError.messageResource(): Int =
         AnkiReadError.InvalidResponse -> R.string.anki_error_response
         AnkiReadError.ProviderFailure -> R.string.anki_error_provider
     }
+
+@Composable
+internal fun AnkiModelSetupPanel(
+    phase: app.yomoku.shared.AnkiSetupPhase,
+    dispatch: (Event) -> Unit,
+    enabled: Boolean = true,
+) {
+    Column(Modifier.testTag("anki_model_setup"), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(
+            stringResource(
+                when (phase) {
+                    app.yomoku.shared.AnkiSetupPhase.Ready -> R.string.anki_model_ready
+                    app.yomoku.shared.AnkiSetupPhase.Missing -> R.string.anki_model_missing
+                    app.yomoku.shared.AnkiSetupPhase.Checking -> R.string.anki_export_checking
+                    is app.yomoku.shared.AnkiSetupPhase.Failed -> phase.value.messageResource()
+                    else -> R.string.anki_model_unchecked
+                }
+            )
+        )
+        if (phase == app.yomoku.shared.AnkiSetupPhase.Missing) {
+            TextButton(
+                onClick = { dispatch(Event.CreateAnkiModel) },
+                enabled = enabled,
+                modifier = Modifier.testTag("anki_model_create"),
+            ) {
+                Text(stringResource(R.string.anki_export_create))
+            }
+        } else if (phase != app.yomoku.shared.AnkiSetupPhase.Checking) {
+            TextButton(
+                onClick = { dispatch(Event.CheckAnkiSetup) },
+                modifier = Modifier.testTag("anki_model_check"),
+            ) {
+                Text(stringResource(R.string.anki_export_check))
+            }
+        }
+    }
+}

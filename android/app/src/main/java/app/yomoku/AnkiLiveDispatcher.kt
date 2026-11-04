@@ -84,7 +84,9 @@ internal class AnkiLiveDispatcher(resolver: ContentResolver, environment: AnkiPr
                     val result =
                         models.create(layout) {
                             val decks = provider.decks()
-                            val duplicates = provider.duplicates(operation.surface)
+                            val duplicates =
+                                if (operation.surface.isEmpty()) AnkiReadResult.Value(emptyList())
+                                else provider.duplicates(operation.surface)
                             decks is AnkiReadResult.Value &&
                                 decks.value.any { it.id == operation.deckId && !it.filtered } &&
                                 duplicates is AnkiReadResult.Value &&

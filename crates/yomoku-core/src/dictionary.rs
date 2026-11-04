@@ -282,3 +282,11 @@ pub struct DictionaryCandidates {
     pub words: Vec<WordCandidate>,
     pub names: Vec<NameCandidate>,
 }
+
+/// Validated analyzer provenance for an entry form, including inflected components.
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
+pub struct DictionarySource {
+    pub form: String,
+    pub anchor: crate::document::TextAnchor,
+}

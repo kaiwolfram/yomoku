@@ -57,12 +57,28 @@ pub enum AnkiSelection {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct AnkiExport {
     selection: AnkiSelection,
+    pub(crate) entry: Option<super::AnkiEntryKey>,
     deck: AnkiDeckId,
     note: AnkiNote,
     layout: AnkiModelLayout,
 }
 
 impl AnkiExport {
+    pub(crate) fn for_entry(
+        selection: AnkiSelection,
+        entry: super::AnkiEntryKey,
+        deck: AnkiDeckId,
+        note: AnkiNote,
+    ) -> Self {
+        Self {
+            selection,
+            entry: Some(entry),
+            deck,
+            note,
+            layout: AnkiModelLayout::yomoku(),
+        }
+    }
+
     pub fn selection(&self) -> AnkiSelection {
         self.selection
     }
@@ -88,6 +104,7 @@ impl AnkiExport {
     ) -> Result<Self, InvalidTextValue> {
         Ok(Self {
             selection: AnkiSelection::Original(selection),
+            entry: None,
             deck,
             note: AnkiNote::from_original_selection(chapter, current, selection, details)?,
             layout: AnkiModelLayout::yomoku(),
@@ -103,6 +120,7 @@ impl AnkiExport {
     ) -> Result<Self, InvalidTextValue> {
         Ok(Self {
             selection: AnkiSelection::Effective(selection),
+            entry: None,
             deck,
             note: AnkiNote::from_effective_selection(chapter, current, selection, details)?,
             layout: AnkiModelLayout::yomoku(),

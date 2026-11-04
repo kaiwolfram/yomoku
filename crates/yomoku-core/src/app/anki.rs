@@ -4,6 +4,7 @@
 use super::*;
 use crate::anki::AnkiRecoveryState;
 
+pub(super) mod entries;
 mod export_view;
 mod live;
 mod preflight;
@@ -27,6 +28,9 @@ impl Yomoku {
         event: &Event,
         model: &mut Model,
     ) -> Option<Command<Effect, Event>> {
+        if let Some(command) = self.update_anki_entries(event, model) {
+            return Some(command);
+        }
         if let Some(command) = self.update_anki_live(event, model) {
             return Some(command);
         }

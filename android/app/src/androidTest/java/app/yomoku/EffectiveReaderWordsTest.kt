@@ -28,8 +28,6 @@ class EffectiveReaderWordsTest {
     private var failLookup = false
     private var originalReader = false
     private var interactions = 0
-    private val ankiDecks =
-        AnkiDeckDiscoveryState.Ready(listOf(AnkiProviderDeck(Long.MAX_VALUE, "日本語", false)))
 
     private fun anchor(start: Long, end: Long) =
         TextAnchor(
@@ -81,6 +79,8 @@ class EffectiveReaderWordsTest {
             }
         return ViewModel(
             ankiSettings = AnkiSettingsView(AnkiSettingsPhase.UNLOADED, null, null),
+            ankiSetup = app.yomoku.shared.AnkiSetupPhase.Unchecked,
+            ankiEntries = emptyList(),
             vocabulary =
                 VocabularyState(
                     VocabularyQuery("", VocabularyStatus.entries.toList(), VocabularySort.NEWEST),
@@ -119,7 +119,6 @@ class EffectiveReaderWordsTest {
                             frame.value,
                             ::dispatch,
                             { interactions++ },
-                            ankiDecks = ankiDecks,
                         )
                     } else
                         EffectiveReaderWords(
@@ -127,7 +126,6 @@ class EffectiveReaderWordsTest {
                             owner.value,
                             ::dispatch,
                             { interactions++ },
-                            ankiDecks = ankiDecks,
                         )
                 }
             }
@@ -180,6 +178,7 @@ class EffectiveReaderWordsTest {
                                             emptyList(),
                                         ),
                                         null,
+                                        emptyList(),
                                     ),
                             error = if (failLookup) DocumentError.UNAVAILABLE else null,
                             busy = false,
@@ -216,22 +215,44 @@ class EffectiveReaderWordsTest {
 
     private fun click(tag: String) = compose.onNodeWithTag(tag).performScrollTo().performClick()
 
+    private fun exposeCustomAnki(selection: AnkiSelection) {
+        compose.runOnUiThread {
+            val custom = ReaderCustomEntry("猫", "cat", "ねこ")
+            frame.value =
+                frame.value.copy(
+                    ankiSetup = AnkiSetupPhase.Ready,
+                    ankiEntries =
+                        listOf(
+                            AnkiEntryView(selection, AnkiEntryKey.Custom, "猫", AnkiEntryPhase.Add)
+                        ),
+                    effectiveReaderWord =
+                        frame.value.effectiveReaderWord?.let {
+                            it.copy(details = it.details?.copy(customEntry = custom))
+                        },
+                    readerWord = frame.value.readerWord?.copy(customEntry = custom),
+                )
+        }
+    }
+
     @Test
     fun dictionaryAddUsesLoadedCompactSelectionAndRespectsReaderBusyGates() {
         frame.value =
             frame.value.copy(
-                ankiSettings = AnkiSettingsView(AnkiSettingsPhase.READY, Long.MAX_VALUE, null)
+                ankiSettings = AnkiSettingsView(AnkiSettingsPhase.READY, Long.MAX_VALUE, null),
+                ankiSetup = app.yomoku.shared.AnkiSetupPhase.Unchecked,
+                ankiEntries = emptyList(),
             )
         show()
         tap(2)
         val selected = frame.value.effectiveReaderWord!!.selection!!
-        click("word_anki_add")
+        exposeCustomAnki(AnkiSelection.Effective(selected))
+        click("anki_entry_custom")
         assertEquals(
-            Event.PrepareReaderAnkiExport(AnkiSelection.Effective(selected)),
+            Event.AddReaderAnkiEntry(AnkiSelection.Effective(selected), AnkiEntryKey.Custom),
             events.last(),
         )
         compose.runOnUiThread { frame.value = frame.value.copy(readingTimeSavePending = true) }
-        compose.onNodeWithTag("word_anki_add").assertIsNotEnabled()
+        compose.onNodeWithTag("anki_entry_custom").assertIsNotEnabled()
         compose.runOnUiThread { frame.value = frame.value.copy(readingTimeSavePending = false) }
         val before = events.size
         compose.waitForIdle()
@@ -249,6 +270,8 @@ class EffectiveReaderWordsTest {
         frame.value =
             frame.value.copy(
                 ankiSettings = AnkiSettingsView(AnkiSettingsPhase.READY, Long.MAX_VALUE, null),
+                ankiSetup = app.yomoku.shared.AnkiSetupPhase.Unchecked,
+                ankiEntries = emptyList(),
                 effectiveReaderWord = null,
                 effectiveReaderTokens = null,
                 readerTokens =
@@ -272,8 +295,12 @@ class EffectiveReaderWordsTest {
         show()
         tap(2)
         val selected = frame.value.readerWordSelection!!
-        click("word_anki_add")
-        assertEquals(Event.PrepareReaderAnkiExport(AnkiSelection.Original(selected)), events.last())
+        exposeCustomAnki(AnkiSelection.Original(selected))
+        click("anki_entry_custom")
+        assertEquals(
+            Event.AddReaderAnkiEntry(AnkiSelection.Original(selected), AnkiEntryKey.Custom),
+            events.last(),
+        )
         val details = frame.value.readerWord!!
         compose.runOnUiThread {
             frame.value =
@@ -285,12 +312,12 @@ class EffectiveReaderWordsTest {
                         )
                 )
         }
-        compose.onNodeWithTag("word_anki_add").assertDoesNotExist()
+        compose.onNodeWithTag("anki_entry_custom").assertDoesNotExist()
         compose.runOnUiThread {
             frame.value = frame.value.copy(readerWord = details, completionSavePending = true)
         }
-        compose.onNodeWithTag("word_anki_add").assertIsNotEnabled()
-        assertEquals(1, events.filterIsInstance<Event.PrepareReaderAnkiExport>().size)
+        compose.onNodeWithTag("anki_entry_custom").assertIsNotEnabled()
+        assertEquals(1, events.filterIsInstance<Event.AddReaderAnkiEntry>().size)
         assertTrue(
             events.none { it is Event.LoadEffectiveReaderWord || it is Event.SetReaderStatus }
         )

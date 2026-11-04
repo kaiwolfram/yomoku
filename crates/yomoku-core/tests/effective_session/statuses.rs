@@ -31,6 +31,7 @@ fn loaded() -> (
             names: vec![],
         },
         custom_entry: None,
+        dictionary_sources: Vec::new(),
     };
     let mut session = EffectiveReaderSession::default();
     let request = session.begin_load(base(&snapshot)).unwrap();

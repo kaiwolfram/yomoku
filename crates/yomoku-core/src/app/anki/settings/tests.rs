@@ -45,27 +45,23 @@ fn loaded(deck: Option<i64>) -> Model {
 }
 
 #[test]
-fn anki_settings_lazy_load_distinguishes_unloaded_from_unconfigured_and_retains_on_navigation() {
+fn anki_settings_startup_load_distinguishes_unloaded_from_unconfigured_and_retains_on_navigation() {
     let mut model = Model::default();
     assert_eq!(
         Yomoku.view(&model).anki_settings,
         AnkiSettingsView::default()
     );
-    for event in [
-        Event::LoadAnkiSettings,
-        Event::RetryAnkiSettings,
-        Event::SetAnkiDefaultDeck(Some(1)),
-    ] {
+    for event in [Event::RetryAnkiSettings, Event::SetAnkiDefaultDeck(Some(1))] {
         quiet(&mut model, event);
     }
-    let mut navigation = Yomoku.update(Event::OpenSettings, &mut model);
-    assert!(navigation
-        .effects()
-        .all(|effect| matches!(effect, Effect::Render(_))));
     assert_eq!(
         request(&mut model, Event::LoadAnkiSettings),
         StorageOperation::LoadAnkiSettings
     );
+    let mut navigation = Yomoku.update(Event::OpenSettings, &mut model);
+    assert!(navigation
+        .effects()
+        .all(|effect| matches!(effect, Effect::Render(_))));
     quiet(&mut model, Event::LoadAnkiSettings);
     quiet(&mut model, Event::SetAnkiDefaultDeck(Some(1)));
     finish(&mut model, 1, StorageResult::AnkiSettingsLoaded(None));

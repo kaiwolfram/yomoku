@@ -223,6 +223,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let effective_word = EffectiveReaderWordState {
         selection: Some(effective_selection),
         details: Some(EffectiveWordDetails {
+            dictionary_sources: Vec::new(),
             selection: effective_selection,
             token: effective_page.tokens[1].clone(),
             encountered: u64::MAX,

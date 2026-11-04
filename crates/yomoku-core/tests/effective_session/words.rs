@@ -36,6 +36,7 @@ pub(super) fn loaded(
         token,
         encountered: 7,
         custom_entry: None,
+        dictionary_sources: Vec::new(),
     };
     assert!(pages.accept(request, snapshot));
     let selection = EffectiveReaderSelection {

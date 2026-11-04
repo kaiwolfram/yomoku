@@ -86,10 +86,23 @@ impl Yomoku {
                     .as_mut()
                     .expect("active read")
                     .result = Some(result);
+                if model
+                    .prepared_anki_export
+                    .as_ref()
+                    .is_some_and(|export| export.entry.is_some())
+                    && matches!(
+                        model.anki_export_preflight_result(),
+                        Some(Ok(AnkiPreflightPlan::ReuseModel(_)))
+                    )
+                {
+                    return self.update_anki_live(&Event::BeginAnkiLive, model);
+                }
+                model.complete_entry_action();
             }
             _ => return None,
         }
-        // Read completion grants no live token and emits no storage/write effect.
+        // A one-tap entry export can advance only through the durable begin above.
+        // Legacy/manual checks alone never authorize a provider mutation.
         Some(Command::done())
     }
 }

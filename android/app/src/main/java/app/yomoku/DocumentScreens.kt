@@ -337,7 +337,6 @@ internal fun ReaderScreen(
     dispatch: (Event) -> Unit,
     onInteraction: () -> Unit,
     imageLoader: EpubImageLoader? = null,
-    ankiDecks: AnkiDeckDiscoveryState = AnkiDeckDiscoveryState.Unchecked,
     ankiBrowser: AnkiNoteBrowser? = null,
 ) {
     val scroll =
@@ -442,11 +441,10 @@ internal fun ReaderScreen(
                     dispatch,
                     onInteraction,
                     imageLoader,
-                    ankiDecks,
                     ankiBrowser,
                 )
             } else {
-                ReaderWords(view, dispatch, onInteraction, imageLoader, ankiDecks, ankiBrowser)
+                ReaderWords(view, dispatch, onInteraction, imageLoader, ankiBrowser)
             }
             Row(
                 modifier = Modifier.fillMaxWidth(),

@@ -163,6 +163,8 @@ private fun statisticsView(): ViewModel {
     val data = statisticsFixture()
     return ViewModel(
         ankiSettings = AnkiSettingsView(AnkiSettingsPhase.UNLOADED, null, null),
+        ankiSetup = app.yomoku.shared.AnkiSetupPhase.Unchecked,
+        ankiEntries = emptyList(),
         vocabulary =
             VocabularyState(
                 VocabularyQuery("", VocabularyStatus.entries.toList(), VocabularySort.NEWEST),
