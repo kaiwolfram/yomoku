@@ -1,6 +1,6 @@
 //! Compact effective-reader identities backed by one retained Rust page.
 //!
-//! Production page/word/status/custom/completion integration retains full chapter
+//! Production page/word/status/completion integration retains full chapter
 //! provenance in the native model, outside shell callbacks.
 
 use serde::{Deserialize, Serialize};
@@ -131,7 +131,7 @@ impl EffectivePageCommand {
     }
 }
 
-/// A visible eligible selection authenticated before accepting a word/custom
+/// A visible eligible selection authenticated before accepting a word
 /// command. Storage still revalidates this full key in its own transaction.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct EffectiveSelectionCommand {
@@ -151,7 +151,7 @@ impl EffectiveSelectionCommand {
 
 /// Own this alongside the core model for its entire lifetime, never per page.
 /// At most one full chapter key is retained; replacing/invalidation drops it.
-/// Pending completion/custom commands must separately retain their accepted key
+/// Pending completion commands must separately retain their accepted key
 /// across retries; clearing the visible page must not discard accepted commands.
 #[derive(Default)]
 pub struct EffectiveReaderSession {

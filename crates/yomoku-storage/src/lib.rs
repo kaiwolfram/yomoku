@@ -11,7 +11,6 @@ mod anki_settings;
 mod backup_candidate;
 mod backup_snapshot;
 mod completions;
-pub mod custom_dictionary;
 pub mod dictionary;
 mod documents;
 mod effective_status;

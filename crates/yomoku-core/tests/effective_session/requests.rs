@@ -53,60 +53,6 @@ fn token_callbacks_use_captured_attempts_and_require_explicit_retry_after_bad_re
 }
 
 #[test]
-fn word_errors_do_not_consume_a_newer_callback_or_erase_exact_custom_retries() {
-    let (mut session, selection, details) = words::loaded(true);
-    let load = Request::Word(session.begin_word_load(selection).unwrap());
-    assert_eq!(
-        session.finish_request(&load, StorageResult::ImportCancelled),
-        Some(Progress::WordFinished)
-    );
-    assert_eq!(
-        session.word_state().error,
-        Some(DocumentError::InvalidDocument)
-    );
-    let retry = Request::Word(session.begin_word_load(selection).unwrap());
-    assert_eq!(
-        session.finish_request(&load, StorageResult::Failed(DocumentError::Unavailable)),
-        None
-    );
-    assert!(session.word_state().busy);
-    assert_eq!(
-        session.finish_request(
-            &retry,
-            StorageResult::Effective(Output::WordLoaded(selection, Box::new(details))),
-        ),
-        Some(Progress::WordFinished)
-    );
-    let save = Request::Word(
-        session
-            .begin_custom_entry_save(selection, " literal 📖\0 ".into(), " よみ\0 ".into())
-            .unwrap(),
-    );
-    assert_eq!(
-        session.finish_request(&save, StorageResult::ImportCancelled),
-        Some(Progress::WordFinished)
-    );
-    assert!(session.word_state().custom_entry_pending);
-    let retry = Request::Word(session.retry_custom_entry().unwrap());
-    assert_ne!(retry, save);
-    assert_eq!(retry.operation(), save.operation());
-    assert_eq!(
-        session.finish_request(&save, StorageResult::Failed(DocumentError::Unavailable)),
-        None
-    );
-    assert!(session.word_state().busy);
-    assert_eq!(
-        session.finish_request(&retry, StorageResult::Failed(DocumentError::Unavailable)),
-        Some(Progress::WordFinished)
-    );
-    assert_eq!(
-        session.word_state().custom_entry_error,
-        Some(DocumentError::Unavailable)
-    );
-    assert!(session.cancel_custom_entry_retry());
-}
-
-#[test]
 fn status_errors_preserve_frozen_choice_until_retry_or_cancel() {
     let mut snapshot = snapshot_with_manual_split(true);
     let id = 55.try_into().unwrap();

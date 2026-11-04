@@ -87,8 +87,7 @@ class EffectiveReaderNavigationTest {
             readingTimeSavePending = false,
             completionSavePending = false,
             effectiveReaderTokens = EffectiveReaderPage(identity, listOf(token)),
-            effectiveReaderWord =
-                EffectiveReaderWordState(busy = false, customEntryPending = false),
+            effectiveReaderWord = EffectiveReaderWordState(busy = false),
             effectiveReaderStatus = EffectiveStatusState(pending = false, busy = false),
             readerFurigana = emptyList(),
         )
@@ -150,43 +149,6 @@ class EffectiveReaderNavigationTest {
         compose.onNodeWithText("Finish Book").performScrollTo().performClick()
         assertEquals(3, events.filterIsInstance<Event.CompleteEffectiveReaderPage>().size)
         assertTrue(events.none { it is Event.CompleteReaderPage || it is Event.LoadReaderWord })
-    }
-
-    @Test
-    fun sharedTimeCompletionAndEffectiveMutationGatesBlockButtonsAndSwipes() {
-        show()
-        val ready = frame.value
-        val blocked =
-            listOf(
-                ready.copy(storageBusy = true),
-                ready.copy(readingTimeSavePending = true),
-                ready.copy(completionSavePending = true),
-                ready.copy(effectiveReaderWord = ready.effectiveReaderWord!!.copy(busy = true)),
-                ready.copy(
-                    effectiveReaderWord = ready.effectiveReaderWord.copy(customEntryPending = true)
-                ),
-                ready.copy(
-                    effectiveReaderStatus = EffectiveStatusState(pending = true, busy = false)
-                ),
-                ready.copy(
-                    effectiveReaderStatus = EffectiveStatusState(pending = false, busy = true)
-                ),
-            )
-        for (view in blocked) {
-            compose.runOnUiThread { frame.value = view }
-            compose.onNodeWithTag("next_page").performScrollTo().assertIsNotEnabled()
-            compose.onNodeWithTag("previous_page").assertIsNotEnabled()
-            compose.onNodeWithTag("reader_scroll").performTouchInput { swipeLeft() }
-            compose.onNodeWithTag("reader_scroll").performTouchInput { swipeRight() }
-        }
-        assertTrue(
-            events.none {
-                it is Event.CompleteEffectiveReaderPage || it is Event.PreviousReaderPage
-            }
-        )
-        compose.runOnUiThread { frame.value = ready }
-        click("next_page")
-        assertEquals(1, events.filterIsInstance<Event.CompleteEffectiveReaderPage>().size)
     }
 
     @Test

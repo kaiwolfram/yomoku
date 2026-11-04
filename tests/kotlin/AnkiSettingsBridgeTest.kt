@@ -33,7 +33,7 @@ internal fun verifyAnkiSettingsBridge(fixtures: String) {
             Event.LoadReaderAnkiEntries(entrySelection),
             Event.AddReaderAnkiEntry(entrySelection, AnkiEntryKey.Word(Long.MAX_VALUE)),
             Event.AddReaderAnkiEntry(entrySelection, AnkiEntryKey.Name(9007199254740993L)),
-            Event.AddReaderAnkiEntry(entrySelection, AnkiEntryKey.Custom),
+            Event.AddReaderAnkiEntry(entrySelection, AnkiEntryKey.Word(1)),
         )
     for ((index, expected) in entryActions.withIndex()) {
         val bytes = root.resolve("anki-entry-action-$index.bin").readBytes()

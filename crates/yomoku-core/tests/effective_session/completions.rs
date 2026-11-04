@@ -4,9 +4,8 @@ use super::*;
 use yomoku_core::{
     active_time::PendingReadingTime,
     completion::{AnalyzedCompletionOutcome, PageCompletion, PageCompletionIntent},
-    dictionary::DictionaryCandidates,
     document::ReaderDocument,
-    effective_reader::{EffectivePageCompletion, EffectiveReaderWordDetails},
+    effective_reader::EffectivePageCompletion,
     effective_session::{EffectiveCompletionProgress as Progress, EffectiveCompletionRequest},
     effective_storage::{EffectiveStorageOperation as Op, EffectiveStorageResult as Output},
     pagination::{PageLength, ReadingPosition},
@@ -421,45 +420,4 @@ fn invalid_commit_document_keeps_exact_retry_obligation() {
         ),
         Some(Progress::Completed { .. })
     ));
-}
-
-#[test]
-fn accepted_word_io_and_failed_custom_writes_must_drain_before_completion() {
-    let fixture = Fixture::new();
-    let mut session = EffectiveReaderSession::default();
-    let identity = fixture.load(&mut session);
-    let selection = EffectiveReaderSelection {
-        page: identity,
-        segment_index: 0,
-    };
-    let details = EffectiveReaderWordDetails {
-        key: session.resolve(identity).unwrap().clone(),
-        token: fixture
-            .resolved()
-            .tokens_on_page(fixture.intent.page)
-            .unwrap()
-            .remove(0),
-        encountered: 0,
-        candidates: DictionaryCandidates {
-            surface: "猫".into(),
-            dictionary_form: Some("猫".into()),
-            words: vec![],
-            names: vec![],
-        },
-        custom_entry: None,
-        dictionary_sources: Vec::new(),
-    };
-    let read = session.begin_word_load(selection).unwrap();
-    assert!(!session.begin_completion(identity, fixture.intent));
-    assert!(
-        session.finish_word_request(&read, Ok(Output::WordLoaded(selection, Box::new(details))))
-    );
-    let save = session
-        .begin_custom_entry_save(selection, "literal meaning".into(), "よみ".into())
-        .unwrap();
-    assert!(!session.begin_completion(identity, fixture.intent));
-    assert!(session.finish_word_request(&save, Err(DocumentError::Unavailable)));
-    assert!(!session.begin_completion(identity, fixture.intent));
-    assert!(session.cancel_custom_entry_retry());
-    assert!(session.begin_completion(identity, fixture.intent));
 }

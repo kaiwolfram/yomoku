@@ -71,7 +71,6 @@ impl Fixture {
                 words: vec![],
                 names: vec![],
             },
-            custom_entry: None,
         };
         Self {
             chapter,
@@ -116,7 +115,6 @@ impl Fixture {
             token,
             encountered: self.details.encountered,
             candidates: self.details.candidates.clone(),
-            custom_entry: self.details.custom_entry.clone(),
             dictionary_sources: Vec::new(),
         };
         (page, details)
@@ -365,34 +363,6 @@ fn sentence_boundaries_preserve_quotes_hard_lines_whitespace_and_ascii_decimals(
 }
 
 #[test]
-fn custom_manual_spans_preserve_literal_data_and_absent_definitions_stay_empty() {
-    let mut f = Fixture::new("前。か\u{3099}<猫>。", "か\u{3099}<猫>");
-    f.page.tokens[0].reading = None;
-    f.details.token = f.page.tokens[0].clone();
-    let note = f.original().unwrap();
-    assert_eq!(note.fields()[1], "");
-    assert_eq!(note.fields()[2], "");
-    f.details.custom_entry = Some(ReaderCustomEntry {
-        surface: f.details.token.surface.clone(),
-        english_meaning: " literal & [sound:a]\u{1f} ".into(),
-        reading: " かな\n ".into(),
-    });
-    let (page, details) = f.effective();
-    let note =
-        AnkiNote::from_effective_selection(&f.chapter, &page, details.selection, &details).unwrap();
-    assert_eq!(note.surface().as_str(), "か\u{3099}<猫>");
-    assert_eq!(note.fields()[1], " かな\n ");
-    assert_eq!(
-        note.fields()[2],
-        "<ol><li> literal &amp; &#91;sound:a&#93;&#31; </li></ol>"
-    );
-    assert_eq!(
-        note.fields()[3],
-        "<strong class=\"yomoku-target\">か\u{3099}&lt;猫&gt;</strong>。"
-    );
-}
-
-#[test]
 fn stale_original_keys_tokens_and_canonical_ownership_are_rejected() {
     for mutation in 0..10 {
         let mut f = Fixture::new("猫と猫。", "猫");
@@ -433,51 +403,5 @@ fn stale_effective_revisions_selections_and_metadata_are_rejected() {
             AnkiNote::from_effective_selection(&f.chapter, &page, details.selection, &details)
                 .is_err()
         );
-    }
-}
-
-#[test]
-fn malformed_or_unrelated_dictionary_indices_and_custom_fallbacks_fail_closed() {
-    for mutation in 0..9 {
-        let mut f = Fixture::new("生。", "生");
-        f.details.candidates = candidates();
-        match mutation {
-            0 => f.details.candidates.surface = "他".into(),
-            1 => f.details.candidates.dictionary_form = Some("他".into()),
-            2 => {
-                f.details.candidates.words[0].forms[0].matches[0]
-                    .reading
-                    .reading_index = usize::MAX
-            }
-            3 => f.details.candidates.words[0].forms[0].matches[0]
-                .sense_indices
-                .push(usize::MAX),
-            4 => f.details.candidates.words[0].forms[0].form = "他".into(),
-            5 => f.details.candidates.names[0].forms[0].matches[0].reading_index = usize::MAX,
-            6 => f.details.candidates.words[0].forms.clear(),
-            7 => f.details.candidates.names[0].entry_id = 0,
-            8 => {
-                f.details.custom_entry = Some(ReaderCustomEntry {
-                    surface: "生".into(),
-                    english_meaning: "override".into(),
-                    reading: "override".into(),
-                })
-            }
-            _ => unreachable!(),
-        }
-        assert!(f.original().is_err(), "mutation {mutation}");
-    }
-    for (surface, meaning, reading) in [
-        ("犬", "meaning", "よみ"),
-        ("猫", " ", "よみ"),
-        ("猫", "meaning", "\n"),
-    ] {
-        let mut f = Fixture::new("猫。", "猫");
-        f.details.custom_entry = Some(ReaderCustomEntry {
-            surface: surface.into(),
-            english_meaning: meaning.into(),
-            reading: reading.into(),
-        });
-        assert!(f.original().is_err());
     }
 }

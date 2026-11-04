@@ -34,7 +34,6 @@ impl Model {
                     || self.reader_word_selection != Some(selection)
                     || self.reader_word_error.is_some()
                     || self.pending_word_load.is_some()
-                    || self.pending_custom_change.is_some()
                     || document.document_id != selection.key.document_id
                 {
                     return None;

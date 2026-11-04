@@ -358,8 +358,6 @@ pub struct ReaderWordDetails {
     /// Complete source data plus applicable indices, separately for words/names.
     /// Callers must respect the applicable views when displaying definitions.
     pub candidates: crate::dictionary::DictionaryCandidates,
-    /// Exact-surface user fallback, only when both built-in sections are empty.
-    pub custom_entry: Option<ReaderCustomEntry>,
 }
 
 /// A transient selection within the loaded original Mode C token snapshot.
@@ -375,25 +373,6 @@ impl ReaderWordDetails {
         ReaderWordSelection {
             key: self.key,
             token_index: self.token.token_index,
-        }
-    }
-}
-
-/// Transport of a validated user definition; never an analyzer reading or mapping.
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
-#[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
-pub struct ReaderCustomEntry {
-    pub surface: String,
-    pub english_meaning: String,
-    pub reading: String,
-}
-
-impl From<crate::dictionary::CustomDictionaryEntry> for ReaderCustomEntry {
-    fn from(entry: crate::dictionary::CustomDictionaryEntry) -> Self {
-        Self {
-            surface: entry.surface().as_str().into(),
-            english_meaning: entry.english_meaning().into(),
-            reading: entry.reading().into(),
         }
     }
 }

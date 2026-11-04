@@ -11,8 +11,8 @@ use crate::imports::{EpubImport, SrtImport, TxtImport};
 use crate::library::LibraryWordDistribution;
 use crate::pagination::{PageLength, ReadingPosition};
 use crate::reader::{
-    DocumentReaderSnapshot, ReaderCustomEntry, ReaderStatusChange, ReaderTokenKey,
-    ReaderTokenSnapshot, ReaderVocabulary, ReaderWordDetails, ReaderWordSelection,
+    DocumentReaderSnapshot, ReaderStatusChange, ReaderTokenKey, ReaderTokenSnapshot,
+    ReaderVocabulary, ReaderWordDetails, ReaderWordSelection,
 };
 use crate::typography::ReaderTypography;
 
@@ -52,12 +52,7 @@ pub enum StorageOperation {
     LoadReaderTokens(ReaderTokenKey),
     SetReaderStatus(ReaderStatusChange),
     LoadReaderWord(ReaderWordSelection),
-    SaveReaderCustomEntry {
-        selection: ReaderWordSelection,
-        english_meaning: String,
-        reading: String,
-    },
-    DeleteReaderCustomEntry(ReaderWordSelection),
+
     ImportTxt(TxtImport),
     ImportSrt(SrtImport),
     ImportEpub(EpubImport),
@@ -178,7 +173,7 @@ pub enum StorageResult {
     Failed(DocumentError),
     ReaderTokensLoaded(ReaderTokenSnapshot),
     ReaderWordLoaded(Box<ReaderWordDetails>),
-    ReaderCustomEntryChanged(ReaderWordSelection, Option<ReaderCustomEntry>),
+
     ReaderStatusChanged(ReaderStatusChange, Option<ReaderVocabulary>),
     /// Cooperative file cancellation rolled back the current file, without error.
     ImportCancelled,

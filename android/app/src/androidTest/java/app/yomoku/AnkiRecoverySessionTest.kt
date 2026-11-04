@@ -154,8 +154,8 @@ class AnkiRecoverySessionTest {
             compose.onNodeWithTag("anki_recovery_status").assertTextEquals("Checking AnkiDroid…")
             compose.onNodeWithTag("anki_recovery_model").assertIsNotEnabled()
             instrumentation.runOnMainSync {
-                core.dispatch(Event.SelectDestination(Destination.NOSTR))
-                assertEquals(Destination.NOSTR, core.view.destination)
+                core.dispatch(Event.SelectDestination(Destination.STATISTICS))
+                assertEquals(Destination.STATISTICS, core.view.destination)
                 assertNull(core.view.documentError)
                 core.dispatch(Event.OpenSettings)
             }

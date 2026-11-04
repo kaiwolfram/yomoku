@@ -25,7 +25,7 @@ fn typed_events_requests_and_views_round_trip_through_router() {
     let bridge = bridge();
     assert_eq!(view(&bridge).destination, Destination::Library);
     for destination in [
-        Destination::Nostr,
+        Destination::Statistics,
         Destination::Statistics,
         Destination::Vocabulary,
         Destination::Library,
@@ -76,9 +76,9 @@ fn unknown_and_render_response_ids_return_errors_without_changing_state() {
 #[test]
 fn bridge_instances_have_independent_state() {
     let first = bridge();
-    select(&first, Destination::Nostr);
+    select(&first, Destination::Statistics);
     assert_eq!(view(&bridge()).destination, Destination::Library);
-    assert_eq!(view(&first).destination, Destination::Nostr);
+    assert_eq!(view(&first).destination, Destination::Statistics);
 }
 
 #[test]

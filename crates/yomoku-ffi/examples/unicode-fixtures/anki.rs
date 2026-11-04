@@ -49,7 +49,7 @@ pub fn exchange(dir: &Path, writing: bool) -> Result<(), Box<dyn Error>> {
         },
         Event::AddReaderAnkiEntry {
             selection: entry_selection,
-            entry: yomoku_core::anki::AnkiEntryKey::Custom,
+            entry: yomoku_core::anki::AnkiEntryKey::Word(1),
         },
     ]
     .into_iter()

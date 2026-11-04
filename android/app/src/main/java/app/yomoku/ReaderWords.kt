@@ -318,7 +318,6 @@ internal fun ReaderWords(
                 val ankiSelection = AnkiSelection.Original(details.selectionForAnki())
                 ObserveReaderAnkiEntries(
                     ankiSelection,
-                    details.customEntry,
                     view.ankiSetup,
                     canWrite,
                     dispatch,
@@ -346,34 +345,6 @@ internal fun ReaderWords(
                         )
                     },
                 )
-                if (details.candidates.words.isEmpty() && details.candidates.names.isEmpty()) {
-                    ReaderCustomDictionary(
-                        details,
-                        canWrite,
-                        view.readerCustomEntryError,
-                        dispatch,
-                        onInteraction,
-                    )
-                    if (details.customEntry != null) {
-                        AnkiEntryAction(
-                            view.ankiEntries.find {
-                                it.selection == ankiSelection &&
-                                    it.key == app.yomoku.shared.AnkiEntryKey.Custom
-                            },
-                            canWrite,
-                            dispatch,
-                            onInteraction,
-                            ankiBrowser,
-                        )
-                        AnkiEntryNotice(
-                            view.ankiEntries.find {
-                                it.selection == ankiSelection &&
-                                    it.key == app.yomoku.shared.AnkiEntryKey.Custom
-                            },
-                            ankiBrowser,
-                        )
-                    }
-                }
             } else {
                 ReaderWordLookupState(view.readerWordError != null, canWrite, onInteraction) {
                     selection?.let { dispatch(Event.LoadReaderWord(it)) }

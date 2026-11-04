@@ -103,8 +103,7 @@ class EffectiveReaderWordsTest {
             readingTimeSavePending = false,
             completionSavePending = false,
             effectiveReaderTokens = EffectiveReaderPage(identity, tokens),
-            effectiveReaderWord =
-                EffectiveReaderWordState(busy = false, customEntryPending = false),
+            effectiveReaderWord = EffectiveReaderWordState(busy = false),
             effectiveReaderStatus = EffectiveStatusState(false, false),
             readerFurigana = emptyList(),
         )
@@ -177,12 +176,10 @@ class EffectiveReaderWordsTest {
                                             emptyList(),
                                             emptyList(),
                                         ),
-                                        null,
                                         emptyList(),
                                     ),
                             error = if (failLookup) DocumentError.UNAVAILABLE else null,
                             busy = false,
-                            customEntryPending = false,
                         )
                 )
         }
@@ -215,21 +212,35 @@ class EffectiveReaderWordsTest {
 
     private fun click(tag: String) = compose.onNodeWithTag(tag).performScrollTo().performClick()
 
-    private fun exposeCustomAnki(selection: AnkiSelection) {
+    private fun exposeDictionaryAnki(selection: AnkiSelection) {
         compose.runOnUiThread {
-            val custom = ReaderCustomEntry("猫", "cat", "ねこ")
+            val candidate =
+                WordCandidate(1, WordEntry(emptyList(), emptyList(), emptyList()), emptyList())
             frame.value =
                 frame.value.copy(
                     ankiSetup = AnkiSetupPhase.Ready,
                     ankiEntries =
                         listOf(
-                            AnkiEntryView(selection, AnkiEntryKey.Custom, "猫", AnkiEntryPhase.Add)
+                            AnkiEntryView(selection, AnkiEntryKey.Word(1), "猫", AnkiEntryPhase.Add)
                         ),
                     effectiveReaderWord =
                         frame.value.effectiveReaderWord?.let {
-                            it.copy(details = it.details?.copy(customEntry = custom))
+                            it.copy(
+                                details =
+                                    it.details?.let { details ->
+                                        details.copy(
+                                            candidates =
+                                                details.candidates.copy(words = listOf(candidate))
+                                        )
+                                    }
+                            )
                         },
-                    readerWord = frame.value.readerWord?.copy(customEntry = custom),
+                    readerWord =
+                        frame.value.readerWord?.let { details ->
+                            details.copy(
+                                candidates = details.candidates.copy(words = listOf(candidate))
+                            )
+                        },
                 )
         }
     }
@@ -245,14 +256,14 @@ class EffectiveReaderWordsTest {
         show()
         tap(2)
         val selected = frame.value.effectiveReaderWord!!.selection!!
-        exposeCustomAnki(AnkiSelection.Effective(selected))
-        click("anki_entry_custom")
+        exposeDictionaryAnki(AnkiSelection.Effective(selected))
+        click("anki_entry_word_1")
         assertEquals(
-            Event.AddReaderAnkiEntry(AnkiSelection.Effective(selected), AnkiEntryKey.Custom),
+            Event.AddReaderAnkiEntry(AnkiSelection.Effective(selected), AnkiEntryKey.Word(1)),
             events.last(),
         )
         compose.runOnUiThread { frame.value = frame.value.copy(readingTimeSavePending = true) }
-        compose.onNodeWithTag("anki_entry_custom").assertIsNotEnabled()
+        compose.onNodeWithTag("anki_entry_word_1").assertIsNotEnabled()
         compose.runOnUiThread { frame.value = frame.value.copy(readingTimeSavePending = false) }
         val before = events.size
         compose.waitForIdle()
@@ -295,10 +306,10 @@ class EffectiveReaderWordsTest {
         show()
         tap(2)
         val selected = frame.value.readerWordSelection!!
-        exposeCustomAnki(AnkiSelection.Original(selected))
-        click("anki_entry_custom")
+        exposeDictionaryAnki(AnkiSelection.Original(selected))
+        click("anki_entry_word_1")
         assertEquals(
-            Event.AddReaderAnkiEntry(AnkiSelection.Original(selected), AnkiEntryKey.Custom),
+            Event.AddReaderAnkiEntry(AnkiSelection.Original(selected), AnkiEntryKey.Word(1)),
             events.last(),
         )
         val details = frame.value.readerWord!!
@@ -312,11 +323,11 @@ class EffectiveReaderWordsTest {
                         )
                 )
         }
-        compose.onNodeWithTag("anki_entry_custom").assertDoesNotExist()
+        compose.onNodeWithTag("anki_entry_word_1").assertDoesNotExist()
         compose.runOnUiThread {
             frame.value = frame.value.copy(readerWord = details, completionSavePending = true)
         }
-        compose.onNodeWithTag("anki_entry_custom").assertIsNotEnabled()
+        compose.onNodeWithTag("anki_entry_word_1").assertIsNotEnabled()
         assertEquals(1, events.filterIsInstance<Event.AddReaderAnkiEntry>().size)
         assertTrue(
             events.none { it is Event.LoadEffectiveReaderWord || it is Event.SetReaderStatus }
@@ -342,6 +353,7 @@ class EffectiveReaderWordsTest {
             .performScrollTo()
             .assertTextEquals("Encountered ${ULong.MAX_VALUE} times")
         compose.onNodeWithTag("word_no_match").assertExists()
+        compose.onNodeWithTag("word_custom_edit").assertDoesNotExist()
         for (status in VocabularyStatus.entries) {
             click("word_status_$status")
             val event = events.last() as Event.SetEffectiveReaderStatus
@@ -391,6 +403,7 @@ class EffectiveReaderWordsTest {
         click("retry_word_details")
         assertEquals(2, events.filterIsInstance<Event.LoadEffectiveReaderWord>().size)
         compose.onNodeWithTag("word_no_match").assertExists()
+        compose.onNodeWithTag("word_custom_edit").assertDoesNotExist()
         compose.runOnUiThread { frame.value = frame.value.copy(completionSavePending = true) }
         for (status in VocabularyStatus.entries) compose
             .onNodeWithTag("word_status_$status")
@@ -414,8 +427,7 @@ class EffectiveReaderWordsTest {
                         frame.value.effectiveReaderTokens!!.let {
                             it.copy(identity = it.identity.copy(revision = 2UL))
                         },
-                    effectiveReaderWord =
-                        EffectiveReaderWordState(busy = false, customEntryPending = false),
+                    effectiveReaderWord = EffectiveReaderWordState(busy = false),
                 )
         }
         compose.onNodeWithTag("reader_word_panel").assertDoesNotExist()
@@ -428,82 +440,6 @@ class EffectiveReaderWordsTest {
         assertEquals(2, events.filterIsInstance<Event.LoadEffectiveReaderWord>().size)
         tap()
         compose.onNodeWithTag("word_custom_meaning_input").assertDoesNotExist()
-    }
-
-    @Test
-    fun customLiteralWritesUseNativeRetryAndCancelAfterDismissalAndInvalidation() {
-        show()
-        tap()
-        val selection = frame.value.effectiveReaderWord!!.selection!!
-        click("word_custom_edit")
-        compose.onNodeWithTag("word_custom_save").assertIsNotEnabled()
-        val meaning = " literal meaning 📖 "
-        val reading = " か\u3099𠮷 "
-        compose
-            .onNodeWithTag("word_custom_meaning_input")
-            .performScrollTo()
-            .performTextReplacement(meaning)
-        compose
-            .onNodeWithTag("word_custom_reading_input")
-            .performScrollTo()
-            .performTextReplacement(reading)
-        click("word_custom_save")
-        assertEquals(
-            Event.SaveEffectiveReaderCustomEntry(selection, meaning, reading),
-            events.last(),
-        )
-        compose.runOnUiThread {
-            frame.value =
-                frame.value.copy(
-                    effectiveReaderWord =
-                        frame.value.effectiveReaderWord!!.copy(
-                            customEntryPending = true,
-                            customEntryError = DocumentError.UNAVAILABLE,
-                        )
-                )
-        }
-        compose.onNodeWithTag("word_custom_meaning_input").assertIsNotEnabled()
-        click("effective_custom_retry")
-        assertEquals(Event.RetryEffectiveReaderCustomEntry, events.last())
-        compose.onNodeWithText("Close").performScrollTo().performClick()
-        compose.onNodeWithTag("reader_word_panel").assertDoesNotExist()
-        compose.runOnUiThread { frame.value = frame.value.copy(effectiveReaderTokens = null) }
-        click("effective_custom_retry")
-        assertEquals(Event.RetryEffectiveReaderCustomEntry, events.last())
-        click("effective_custom_cancel")
-        assertEquals(Event.CancelEffectiveReaderCustomEntry, events.last())
-        assertEquals(1, events.filterIsInstance<Event.SaveEffectiveReaderCustomEntry>().size)
-    }
-
-    @Test
-    fun committedCustomEditsCancelLocallyAndDeleteUsesExactCompactSelection() {
-        show()
-        tap()
-        val selected = frame.value.effectiveReaderWord!!
-        val entry = ReaderCustomEntry(selected.details!!.token.surface, " committed ", " ぬ ")
-        compose.runOnUiThread {
-            frame.value =
-                frame.value.copy(
-                    effectiveReaderWord =
-                        selected.copy(details = selected.details.copy(customEntry = entry))
-                )
-        }
-        click("word_custom_edit")
-        compose
-            .onNodeWithTag("word_custom_meaning_input")
-            .assertTextEquals("English meaning", entry.englishMeaning)
-        compose
-            .onNodeWithTag("word_custom_reading_input")
-            .assertTextEquals("Reading", entry.reading)
-        compose
-            .onNodeWithTag("word_custom_meaning_input")
-            .performScrollTo()
-            .performTextReplacement("discard")
-        click("word_custom_cancel")
-        compose.onNodeWithTag("word_custom_meaning").assertTextEquals(entry.englishMeaning)
-        click("word_custom_delete")
-        assertEquals(Event.DeleteEffectiveReaderCustomEntry(selected.selection!!), events.last())
-        assertTrue(events.none { it is Event.SaveEffectiveReaderCustomEntry })
     }
 
     @Test
@@ -651,60 +587,6 @@ class EffectiveReaderWordsTest {
             EffectiveReaderSelection(identity, token.segmentIndex),
             (events.single() as Event.LoadEffectiveReaderWord).value,
         )
-    }
-
-    @Test
-    fun successfulLiteralCustomSaveClosesDraftAndWhitespaceMatchesRustValidation() {
-        show()
-        tap()
-        click("word_custom_edit")
-        compose
-            .onNodeWithTag("word_custom_meaning_input")
-            .performScrollTo()
-            .performTextReplacement("\u0085")
-        compose
-            .onNodeWithTag("word_custom_reading_input")
-            .performScrollTo()
-            .performTextReplacement("ぬ")
-        compose.onNodeWithTag("word_custom_save").assertIsNotEnabled()
-        // Rust accepts U+001C as content; Kotlin's isBlank would incorrectly reject it.
-        compose
-            .onNodeWithTag("word_custom_meaning_input")
-            .performScrollTo()
-            .performTextReplacement("\u001C")
-        compose.onNodeWithTag("word_custom_save").assertIsEnabled()
-        val meaning = " literal meaning 📖 "
-        val reading = " か\u3099𠮷 "
-        compose
-            .onNodeWithTag("word_custom_meaning_input")
-            .performScrollTo()
-            .performTextReplacement(meaning)
-        compose
-            .onNodeWithTag("word_custom_reading_input")
-            .performScrollTo()
-            .performTextReplacement(reading)
-        click("word_custom_save")
-        val word = frame.value.effectiveReaderWord!!
-        compose.runOnUiThread {
-            frame.value =
-                frame.value.copy(
-                    effectiveReaderWord =
-                        word.copy(
-                            details =
-                                word.details!!.copy(
-                                    customEntry =
-                                        ReaderCustomEntry(
-                                            word.details.token.surface,
-                                            meaning,
-                                            reading,
-                                        )
-                                )
-                        )
-                )
-        }
-        compose.onNodeWithTag("word_custom_meaning_input").assertDoesNotExist()
-        compose.onNodeWithTag("word_custom_meaning").performScrollTo().assertTextEquals(meaning)
-        compose.onNodeWithTag("word_custom_reading").assertTextEquals("Reading: $reading")
     }
 
     @Test

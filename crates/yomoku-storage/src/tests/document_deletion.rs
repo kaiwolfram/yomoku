@@ -156,140 +156,6 @@ fn document_deletion_rolls_back_text_cascades_entry_and_deferred_commit_then_ret
 }
 
 #[test]
-fn bulk_deletion_keeps_history_vocabulary_and_survivor_across_all_formats_and_reimport() {
-    let database = TestDatabase::new();
-    let mut storage = Storage::open(database.path()).unwrap();
-    let text = PasteText::new("猫 猫 犬".into()).unwrap();
-    let PasteImportOutcome::Created(pasted) =
-        storage.import_analyzed_paste(&text, 1, fixture).unwrap()
-    else {
-        panic!("paste")
-    };
-    let mut ids = vec![pasted.document.document_id];
-    ids.extend(["txt", "srt", "epub"].map(|kind| import_file(&mut storage, kind)));
-    let survivor = storage
-        .create_paste(&PasteText::new("残る本文".into()).unwrap())
-        .unwrap();
-    let survivor_snapshot = storage
-        .open_document_reader_snapshot(survivor.document_id)
-        .unwrap();
-    for &id in &ids {
-        let snapshot = storage.open_document_reader_snapshot(id).unwrap().unwrap();
-        let page = ReaderPage::open_document(&snapshot.document, snapshot.page_length).unwrap();
-        let analysis = snapshot
-            .analyses
-            .iter()
-            .find(|value| value.chapter_id == page.anchor.chapter_id)
-            .unwrap()
-            .analysis;
-        let yomoku_core::reader::ReaderAnalysis::Available(analysis_id) = analysis else {
-            panic!("B")
-        };
-        let saved = storage
-            .load_pending_reading_time(id, page.position)
-            .unwrap();
-        storage
-            .save_pending_reading_time(saved, PendingReadingTime::from_millis(1234).unwrap())
-            .unwrap();
-        let prepared = storage
-            .prepare_page_completion(PageCompletionIntent {
-                document_id: id,
-                page: page.anchor,
-                page_length: snapshot.page_length,
-                departing_position: page.position,
-                completed_at_unix_ms: 500,
-                analysis_id,
-            })
-            .unwrap();
-        storage
-            .record_analyzed_page_completion(prepared.completion, prepared.analysis_id)
-            .unwrap();
-        storage
-            .save_document_reading_position(id, page.position)
-            .unwrap();
-        let saved = storage
-            .load_pending_reading_time(id, page.position)
-            .unwrap();
-        storage
-            .save_pending_reading_time(saved, PendingReadingTime::from_millis(77).unwrap())
-            .unwrap();
-    }
-    let tables = [
-        "sources",
-        "chapters",
-        "completion_commands",
-        "reading_completions",
-        "completion_analyses",
-        "reading_occurrences",
-        "vocabulary",
-        "vocabulary_status_events",
-        "custom_dictionary_entries",
-        "effective_completion_commands",
-        "library_read_clock",
-    ];
-    let before: Vec<_> = tables.iter().map(|table| rows(&storage, table)).collect();
-    storage.delete_documents(&ids).unwrap();
-    assert_eq!(
-        storage
-            .load_document_reader_snapshot(survivor.document_id)
-            .unwrap(),
-        survivor_snapshot
-    );
-    assert_eq!(storage.list_documents().unwrap().len(), 1);
-    assert_eq!(
-        tables
-            .iter()
-            .map(|table| rows(&storage, table))
-            .collect::<Vec<_>>(),
-        before
-    );
-    for table in [
-        "imported_files",
-        "source_ruby",
-        "subtitle_cues",
-        "epub_documents",
-        "epub_chapters",
-        "epub_spans",
-        "epub_assets",
-        "epub_inline_images",
-        "chapter_analyses",
-        "analyzed_tokens",
-        "paste_content_hashes",
-        "pending_reading_time",
-    ] {
-        assert!(rows(&storage, table).is_empty(), "{table}");
-    }
-    drop(storage);
-    let mut storage = Storage::open(database.path()).unwrap();
-    let bytes = fs::read(database.path()).unwrap();
-    storage.delete_documents(&ids).unwrap();
-    storage.delete_documents(&[]).unwrap();
-    assert_eq!(fs::read(database.path()).unwrap(), bytes);
-    let PasteImportOutcome::Created(reimported) =
-        storage.import_analyzed_paste(&text, 1000, fixture).unwrap()
-    else {
-        panic!("fresh paste")
-    };
-    let mut fresh = vec![reimported.document.document_id];
-    fresh.extend(["txt", "srt", "epub"].map(|kind| import_file(&mut storage, kind)));
-    assert!(fresh.iter().all(|id| *id > *ids.last().unwrap()));
-    for id in fresh {
-        let snapshot = storage.load_document_reader_snapshot(id).unwrap().unwrap();
-        assert!(snapshot.document.reading_position.is_none());
-        assert!(!snapshot.document.finished_at_least_once);
-        assert!(snapshot.last_read_sequence.is_none());
-    }
-    assert_eq!(
-        tables
-            .iter()
-            .skip(2)
-            .map(|table| rows(&storage, table))
-            .collect::<Vec<_>>(),
-        before[2..]
-    );
-}
-
-#[test]
 fn bulk_deletion_rolls_back_earlier_documents_on_later_cascade_and_commit_failure() {
     for failure in ["text", "cascade", "document", "commit"] {
         let database = TestDatabase::new();
@@ -361,5 +227,138 @@ fn bulk_deletion_handles_large_duplicate_and_absent_id_selections_without_parame
     assert_eq!(
         storage.load_paste(survivor.document_id).unwrap(),
         Some(survivor)
+    );
+}
+
+#[test]
+fn bulk_deletion_keeps_history_vocabulary_and_survivor_across_all_formats_and_reimport() {
+    let database = TestDatabase::new();
+    let mut storage = Storage::open(database.path()).unwrap();
+    let text = PasteText::new("猫 猫 犬".into()).unwrap();
+    let PasteImportOutcome::Created(pasted) =
+        storage.import_analyzed_paste(&text, 1, fixture).unwrap()
+    else {
+        panic!("paste")
+    };
+    let mut ids = vec![pasted.document.document_id];
+    ids.extend(["txt", "srt", "epub"].map(|kind| import_file(&mut storage, kind)));
+    let survivor = storage
+        .create_paste(&PasteText::new("残る本文".into()).unwrap())
+        .unwrap();
+    let survivor_snapshot = storage
+        .open_document_reader_snapshot(survivor.document_id)
+        .unwrap();
+    for &id in &ids {
+        let snapshot = storage.open_document_reader_snapshot(id).unwrap().unwrap();
+        let page = ReaderPage::open_document(&snapshot.document, snapshot.page_length).unwrap();
+        let analysis = snapshot
+            .analyses
+            .iter()
+            .find(|value| value.chapter_id == page.anchor.chapter_id)
+            .unwrap()
+            .analysis;
+        let yomoku_core::reader::ReaderAnalysis::Available(analysis_id) = analysis else {
+            panic!("B")
+        };
+        let saved = storage
+            .load_pending_reading_time(id, page.position)
+            .unwrap();
+        storage
+            .save_pending_reading_time(saved, PendingReadingTime::from_millis(1234).unwrap())
+            .unwrap();
+        let prepared = storage
+            .prepare_page_completion(PageCompletionIntent {
+                document_id: id,
+                page: page.anchor,
+                page_length: snapshot.page_length,
+                departing_position: page.position,
+                completed_at_unix_ms: 500,
+                analysis_id,
+            })
+            .unwrap();
+        storage
+            .record_analyzed_page_completion(prepared.completion, prepared.analysis_id)
+            .unwrap();
+        storage
+            .save_document_reading_position(id, page.position)
+            .unwrap();
+        let saved = storage
+            .load_pending_reading_time(id, page.position)
+            .unwrap();
+        storage
+            .save_pending_reading_time(saved, PendingReadingTime::from_millis(77).unwrap())
+            .unwrap();
+    }
+    let tables = [
+        "sources",
+        "chapters",
+        "completion_commands",
+        "reading_completions",
+        "completion_analyses",
+        "reading_occurrences",
+        "vocabulary",
+        "vocabulary_status_events",
+        "effective_completion_commands",
+        "library_read_clock",
+    ];
+    let before: Vec<_> = tables.iter().map(|table| rows(&storage, table)).collect();
+    storage.delete_documents(&ids).unwrap();
+    assert_eq!(
+        storage
+            .load_document_reader_snapshot(survivor.document_id)
+            .unwrap(),
+        survivor_snapshot
+    );
+    assert_eq!(storage.list_documents().unwrap().len(), 1);
+    assert_eq!(
+        tables
+            .iter()
+            .map(|table| rows(&storage, table))
+            .collect::<Vec<_>>(),
+        before
+    );
+    for table in [
+        "imported_files",
+        "source_ruby",
+        "subtitle_cues",
+        "epub_documents",
+        "epub_chapters",
+        "epub_spans",
+        "epub_assets",
+        "epub_inline_images",
+        "chapter_analyses",
+        "analyzed_tokens",
+        "paste_content_hashes",
+        "pending_reading_time",
+    ] {
+        assert!(rows(&storage, table).is_empty(), "{table}");
+    }
+    drop(storage);
+    let mut storage = Storage::open(database.path()).unwrap();
+    let bytes = fs::read(database.path()).unwrap();
+    storage.delete_documents(&ids).unwrap();
+    storage.delete_documents(&[]).unwrap();
+    assert_eq!(fs::read(database.path()).unwrap(), bytes);
+    let PasteImportOutcome::Created(reimported) =
+        storage.import_analyzed_paste(&text, 1000, fixture).unwrap()
+    else {
+        panic!("fresh paste")
+    };
+    let mut fresh = vec![reimported.document.document_id];
+    fresh.extend(["txt", "srt", "epub"].map(|kind| import_file(&mut storage, kind)));
+    assert!(fresh.iter().all(|id| *id > *ids.last().unwrap()));
+    for id in fresh {
+        let snapshot = storage.load_document_reader_snapshot(id).unwrap().unwrap();
+        assert!(snapshot.document.reading_position.is_none());
+        assert!(!snapshot.document.finished_at_least_once);
+        assert!(snapshot.last_read_sequence.is_none());
+    }
+    assert_eq!(
+        tables
+            .iter()
+            .skip(2)
+            .map(|table| rows(&storage, table))
+            .collect::<Vec<_>>(),
+        before[2..]
     );
 }

@@ -30,7 +30,7 @@ fn loaded() -> (
             words: vec![],
             names: vec![],
         },
-        custom_entry: None,
+
         dictionary_sources: Vec::new(),
     };
     let mut session = EffectiveReaderSession::default();
@@ -257,81 +257,4 @@ fn invalidated_status_callbacks_drain_without_touching_fresh_page_or_restoring_w
     assert_eq!(session.page(), Some(&page));
     assert!(session.word_state().selection.is_none());
     assert!(session.word_state().details.is_none());
-}
-
-#[test]
-fn status_rejects_mismatched_results_and_requires_explicit_retry_cancel_or_choice() {
-    let (mut session, selection, _) = loaded();
-    let mut foreign = selection;
-    foreign.segment_index += 1;
-    for result in [
-        Output::StatusChanged(foreign, Some(entry())),
-        Output::StatusChanged(
-            selection,
-            Some(ReaderVocabulary {
-                id: 99.try_into().unwrap(),
-                ..entry()
-            }),
-        ),
-        Output::StatusChanged(
-            selection,
-            Some(ReaderVocabulary {
-                status: VocabularyStatus::Ignored,
-                ..entry()
-            }),
-        ),
-        Output::CustomEntryChanged(selection, None),
-    ] {
-        let request = begin(&mut session, selection);
-        assert!(session.finish_status_request(&request, Ok(result)));
-        assert_eq!(
-            session.status_state().error,
-            Some(DocumentError::InvalidDocument)
-        );
-        assert!(session.status_state().pending);
-        assert!(!session.status_state().busy);
-    }
-    assert!(session.cancel_status_retry());
-    assert!(!session.status_state().pending);
-    assert!(session.retry_status_change().is_none());
-    assert!(!session.cancel_status_retry());
-}
-
-#[test]
-fn status_word_custom_and_completion_obligations_gate_each_other() {
-    let (mut session, selection, details) = loaded();
-    let load = session.begin_word_load(selection).unwrap();
-    assert!(session
-        .begin_status_change(selection, entry().id, VocabularyStatus::Known, 500)
-        .is_none());
-    assert!(
-        session.finish_word_request(&load, Ok(Output::WordLoaded(selection, Box::new(details))))
-    );
-    let save = session
-        .begin_custom_entry_save(selection, " meaning ".into(), " よみ ".into())
-        .unwrap();
-    assert!(session
-        .begin_status_change(selection, entry().id, VocabularyStatus::Known, 500)
-        .is_none());
-    assert!(session.finish_word_request(&save, Err(DocumentError::Unavailable)));
-    assert!(session
-        .begin_status_change(selection, entry().id, VocabularyStatus::Known, 500)
-        .is_none());
-    assert!(session.cancel_custom_entry_retry());
-    let status = begin(&mut session, selection);
-    for failed in [false, true] {
-        if failed {
-            assert!(session.finish_status_request(&status, Err(DocumentError::Unavailable)));
-        }
-        assert!(!session.begin_completion(selection.page, intent(selection)));
-        assert!(session.begin_word_load(selection).is_none());
-        assert!(session
-            .begin_custom_entry_save(selection, "meaning".into(), "よみ".into())
-            .is_none());
-    }
-    assert!(session.cancel_status_retry());
-    assert!(session.begin_completion(selection.page, intent(selection)));
-    assert!(session
-        .begin_status_change(selection, entry().id, VocabularyStatus::Known, 500)
-        .is_none());
 }

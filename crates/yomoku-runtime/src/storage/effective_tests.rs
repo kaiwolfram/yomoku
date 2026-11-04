@@ -22,7 +22,7 @@ use yomoku_core::{
     effective_reader::EffectiveReaderWordDetails,
     effective_session::{
         EffectiveReaderProgress, EffectiveReaderRequest, EffectiveReaderSelection,
-        EffectiveReaderSession, EffectiveSelectionCommand, EffectiveWordRequest,
+        EffectiveReaderSession, EffectiveSelectionCommand,
     },
     effective_storage::{EffectiveStorageOperation as Op, EffectiveStorageResult as Output},
     pagination::PageLength,
@@ -269,298 +269,6 @@ fn word(router: &Router, command: EffectiveSelectionCommand) -> EffectiveReaderW
     *details
 }
 
-fn finish_word(
-    router: &Router,
-    session: &mut EffectiveReaderSession,
-    request: &EffectiveWordRequest,
-) {
-    assert_eq!(
-        finish_request(
-            router,
-            session,
-            EffectiveReaderRequest::Word(request.clone())
-        ),
-        EffectiveReaderProgress::WordFinished
-    );
-}
-
-#[test]
-fn effective_worker_retained_word_lifecycle_compacts_results_and_retries_frozen_custom_commands() {
-    let fixture = Fixture::new();
-    let router = fixture.router();
-    let mut session = EffectiveReaderSession::default();
-    load(&router, &mut session, fixture.base);
-    let cat = select(&session, "猫").selection();
-    let entry = session
-        .page()
-        .unwrap()
-        .tokens
-        .iter()
-        .find(|token| token.surface == "猫")
-        .unwrap()
-        .vocabulary
-        .unwrap();
-    fixture
-        .storage()
-        .set_vocabulary_status(entry.id, VocabularyStatus::Ignored, 110)
-        .unwrap();
-    let before = std::fs::read(fixture.path()).unwrap();
-    let request = session.begin_word_load(cat).unwrap();
-    finish_word(&router, &mut session, &request);
-    assert_eq!(std::fs::read(fixture.path()).unwrap(), before);
-    assert_eq!(
-        session
-            .word_state()
-            .details
-            .as_ref()
-            .unwrap()
-            .candidates
-            .words
-            .len(),
-        1
-    );
-    assert_eq!(
-        session
-            .word_state()
-            .details
-            .as_ref()
-            .unwrap()
-            .token
-            .vocabulary
-            .unwrap()
-            .status,
-        VocabularyStatus::Ignored
-    );
-    assert!(session
-        .begin_custom_entry_save(cat, "replace built-in".into(), "cat".into())
-        .is_none());
-    assert!(session.begin_custom_entry_delete(cat).is_none());
-    fixture
-        .sql()
-        .execute(
-            "DELETE FROM vocabulary WHERE id = ?1",
-            [i64::from(entry.id)],
-        )
-        .unwrap();
-    let before = std::fs::read(fixture.path()).unwrap();
-    let request = session.begin_word_load(cat).unwrap();
-    finish_word(&router, &mut session, &request);
-    assert_eq!(std::fs::read(fixture.path()).unwrap(), before);
-    assert!(session
-        .word_state()
-        .details
-        .as_ref()
-        .unwrap()
-        .token
-        .vocabulary
-        .is_none());
-
-    let manual = select(&session, "食べた").selection();
-    let request = session.begin_word_load(manual).unwrap();
-    finish_word(&router, &mut session, &request);
-    let details = session.word_state().details.unwrap();
-    assert!(details.token.reading.is_some() && details.token.dictionary_form.is_some());
-    assert!(details.candidates.dictionary_form.is_some());
-    fixture.sql().execute_batch("CREATE TRIGGER fail_custom BEFORE INSERT ON custom_dictionary_entries BEGIN SELECT RAISE(ABORT, 'fixture'); END;").unwrap();
-    let request = session
-        .begin_custom_entry_save(
-            manual,
-            " literal\0meaning 📖 ".into(),
-            " よみか\u{3099}\0 ".into(),
-        )
-        .unwrap();
-    finish_word(&router, &mut session, &request);
-    assert!(session.word_state().custom_entry_error.is_some());
-    assert!(session.word_state().details.unwrap().custom_entry.is_none());
-    fixture
-        .sql()
-        .execute_batch("DROP TRIGGER fail_custom")
-        .unwrap();
-    let retry = session.retry_custom_entry().unwrap();
-    assert_ne!(retry, request);
-    assert_eq!(retry.operation(), request.operation());
-    finish_word(&router, &mut session, &retry);
-    let saved = session.word_state().details.unwrap().custom_entry.unwrap();
-    assert_eq!(saved.surface, "食べた");
-    assert_eq!(saved.english_meaning, " literal\0meaning 📖 ");
-    assert_eq!(saved.reading, " よみか\u{3099}\0 ");
-    assert!(session
-        .page()
-        .unwrap()
-        .tokens
-        .iter()
-        .filter(|token| token.surface == "食べた")
-        .all(|token| token.vocabulary.is_some()));
-    let delete = session.begin_custom_entry_delete(manual).unwrap();
-    session.invalidate();
-    finish_word(&router, &mut session, &delete);
-    assert!(!session.word_state().custom_entry_pending);
-    assert!(session.word_state().details.is_none());
-    assert!(word(
-        &router,
-        match delete.operation() {
-            Op::DeleteCustomEntry(command) => command,
-            _ => unreachable!(),
-        }
-    )
-    .custom_entry
-    .is_none());
-    let sql = fixture.sql();
-    for table in [
-        "reading_completions",
-        "reading_occurrences",
-        "pending_reading_time",
-        "completion_commands",
-    ] {
-        let count: i64 = sql
-            .query_row(&format!("SELECT COUNT(*) FROM {table}"), [], |row| {
-                row.get(0)
-            })
-            .unwrap();
-        assert_eq!(count, 0, "{table}");
-    }
-}
-
-#[test]
-fn effective_worker_reads_exact_analyzer_metadata_live_status_and_literal_custom_entries() {
-    let fixture = Fixture::new();
-    let router = fixture.router();
-    let mut session = EffectiveReaderSession::default();
-    let before = std::fs::read(fixture.path()).unwrap();
-    load(&router, &mut session, fixture.base);
-    let manual = select(&session, "食べた");
-    let details = word(&router, manual.clone());
-    assert!(details.token.metadata.is_some());
-    assert!(details.token.vocabulary.is_some()); // reads never register override parts
-    assert!(details.candidates.dictionary_form.is_some());
-    assert_eq!(details.encountered, 0);
-    let cat = select(&session, "猫");
-    assert_eq!(word(&router, cat.clone()).candidates.words.len(), 1);
-    assert_eq!(std::fs::read(fixture.path()).unwrap(), before);
-    let id = word(&router, cat.clone()).token.vocabulary.unwrap().id;
-    fixture
-        .storage()
-        .set_vocabulary_status(id, VocabularyStatus::Ignored, 200)
-        .unwrap();
-    assert_eq!(
-        word(&router, cat.clone()).token.vocabulary.unwrap().status,
-        VocabularyStatus::Ignored
-    );
-
-    let command = select(&session, "𠮷か\u{3099}\0");
-    let save = Op::SaveCustomEntry {
-        command: command.clone(),
-        english_meaning: " literal\0meaning 📖 ".into(),
-        reading: " よみ\u{3099}\0 ".into(),
-    };
-    let StorageResult::Effective(Output::CustomEntryChanged(selection, Some(entry))) =
-        run(&router, save.clone())
-    else {
-        panic!("expected custom entry")
-    };
-    assert_eq!(selection, command.selection());
-    assert_eq!(entry.english_meaning, " literal\0meaning 📖 ");
-    assert_eq!(entry.reading, " よみ\u{3099}\0 ");
-    assert_eq!(
-        word(&router, command.clone()).custom_entry,
-        Some(entry.clone())
-    );
-    let before = std::fs::read(fixture.path()).unwrap();
-    assert!(matches!(
-        run(&router, save),
-        StorageResult::Effective(Output::CustomEntryChanged(_, Some(_)))
-    ));
-    assert_eq!(std::fs::read(fixture.path()).unwrap(), before);
-    assert_eq!(
-        run(
-            &router,
-            Op::SaveCustomEntry {
-                command: cat.clone(),
-                english_meaning: "replace".into(),
-                reading: "replace".into()
-            }
-        ),
-        StorageResult::Failed(DocumentError::InvalidDocument)
-    );
-    assert_eq!(
-        run(&router, Op::DeleteCustomEntry(cat)),
-        StorageResult::Failed(DocumentError::InvalidDocument)
-    );
-    assert!(matches!(
-        run(&router, Op::DeleteCustomEntry(command.clone())),
-        StorageResult::Effective(Output::CustomEntryChanged(_, None))
-    ));
-    assert!(word(&router, command).custom_entry.is_none());
-    // Session invalidation retires callbacks while accepted commands keep their key.
-    session.invalidate();
-    assert_eq!(word(&router, manual).token.surface, "食べた");
-}
-
-#[test]
-fn effective_worker_dictionary_failures_require_explicit_retry_and_reopen_the_index() {
-    let fixture = Fixture::new();
-    let attempts = Arc::new(AtomicUsize::new(0));
-    let trace = Arc::clone(&attempts);
-    let index = fixture.index();
-    let calling_thread = thread::current().id();
-    let (effects, _) = StorageEffects::with_dictionaries(
-        fixture.path(),
-        Box::new(|| panic!("no analyzer")),
-        Box::new(move || {
-            assert_ne!(thread::current().id(), calling_thread);
-            if trace.fetch_add(1, Ordering::Relaxed) == 0 {
-                Err(DocumentError::Unavailable)
-            } else {
-                Ok(index.clone())
-            }
-        }),
-    )
-    .unwrap();
-    let router = Core::<Probe>::new().handle_effects_using(effects);
-    let mut session = EffectiveReaderSession::default();
-    load(&router, &mut session, fixture.base);
-    assert_eq!(attempts.load(Ordering::Relaxed), 0);
-    let command = select(&session, "猫");
-    assert_eq!(
-        run(&router, Op::LoadWord(command.clone())),
-        StorageResult::Failed(DocumentError::Unavailable)
-    );
-    assert_eq!(attempts.load(Ordering::Relaxed), 1);
-    let expected = word(&router, command.clone());
-    assert_eq!(attempts.load(Ordering::Relaxed), 2);
-    let index = Connection::open(fixture.index()).unwrap();
-    let payload: String = index
-        .query_row("SELECT payload FROM entries", [], |r| r.get(0))
-        .unwrap();
-    index
-        .execute("UPDATE entries SET payload = '{}'", [])
-        .unwrap();
-    assert_eq!(
-        run(&router, Op::LoadWord(command.clone())),
-        StorageResult::Failed(DocumentError::Unavailable)
-    );
-    let before = std::fs::read(fixture.path()).unwrap();
-    for operation in [
-        Op::SaveCustomEntry {
-            command: command.clone(),
-            english_meaning: "must not overwrite a corrupt built-in".into(),
-            reading: "読み".into(),
-        },
-        Op::DeleteCustomEntry(command.clone()),
-    ] {
-        assert_eq!(
-            run(&router, operation),
-            StorageResult::Failed(DocumentError::Unavailable)
-        );
-        assert_eq!(std::fs::read(fixture.path()).unwrap(), before);
-    }
-    index
-        .execute("UPDATE entries SET payload = ?1", [payload])
-        .unwrap();
-    assert_eq!(word(&router, command), expected);
-    assert_eq!(attempts.load(Ordering::Relaxed), 5);
-}
-
 #[test]
 fn effective_worker_missing_foreign_and_deleted_pages_fail_without_analysis_or_registration() {
     let fixture = Fixture::new();
@@ -622,4 +330,88 @@ fn effective_worker_missing_foreign_and_deleted_pages_fail_without_analysis_or_r
         run(&router, Op::LoadTokens(request)),
         StorageResult::Failed(DocumentError::NotFound)
     );
+}
+
+#[test]
+fn effective_worker_reads_exact_analyzer_metadata_live_status_and_literal_custom_entries() {
+    let fixture = Fixture::new();
+    let router = fixture.router();
+    let mut session = EffectiveReaderSession::default();
+    let before = std::fs::read(fixture.path()).unwrap();
+    load(&router, &mut session, fixture.base);
+    let manual = select(&session, "食べた");
+    let details = word(&router, manual.clone());
+    assert!(details.token.metadata.is_some());
+    assert!(details.token.vocabulary.is_some()); // reads never register override parts
+    assert!(details.candidates.dictionary_form.is_some());
+    assert_eq!(details.encountered, 0);
+    let cat = select(&session, "猫");
+    assert_eq!(word(&router, cat.clone()).candidates.words.len(), 1);
+    assert_eq!(std::fs::read(fixture.path()).unwrap(), before);
+    let id = word(&router, cat.clone()).token.vocabulary.unwrap().id;
+    fixture
+        .storage()
+        .set_vocabulary_status(id, VocabularyStatus::Ignored, 200)
+        .unwrap();
+    assert_eq!(
+        word(&router, cat.clone()).token.vocabulary.unwrap().status,
+        VocabularyStatus::Ignored
+    );
+
+    let command = select(&session, "𠮷か\u{3099}\0");
+    let missing = word(&router, command);
+    assert!(missing.candidates.words.is_empty() && missing.candidates.names.is_empty());
+    // Session invalidation retires callbacks while accepted commands keep their key.
+    session.invalidate();
+    assert_eq!(word(&router, manual).token.surface, "食べた");
+}
+
+#[test]
+fn effective_worker_dictionary_failures_require_explicit_retry_and_reopen_the_index() {
+    let fixture = Fixture::new();
+    let attempts = Arc::new(AtomicUsize::new(0));
+    let trace = Arc::clone(&attempts);
+    let index = fixture.index();
+    let calling_thread = thread::current().id();
+    let (effects, _) = StorageEffects::with_dictionaries(
+        fixture.path(),
+        Box::new(|| panic!("no analyzer")),
+        Box::new(move || {
+            assert_ne!(thread::current().id(), calling_thread);
+            if trace.fetch_add(1, Ordering::Relaxed) == 0 {
+                Err(DocumentError::Unavailable)
+            } else {
+                Ok(index.clone())
+            }
+        }),
+    )
+    .unwrap();
+    let router = Core::<Probe>::new().handle_effects_using(effects);
+    let mut session = EffectiveReaderSession::default();
+    load(&router, &mut session, fixture.base);
+    assert_eq!(attempts.load(Ordering::Relaxed), 0);
+    let command = select(&session, "猫");
+    assert_eq!(
+        run(&router, Op::LoadWord(command.clone())),
+        StorageResult::Failed(DocumentError::Unavailable)
+    );
+    assert_eq!(attempts.load(Ordering::Relaxed), 1);
+    let expected = word(&router, command.clone());
+    assert_eq!(attempts.load(Ordering::Relaxed), 2);
+    let index = Connection::open(fixture.index()).unwrap();
+    let payload: String = index
+        .query_row("SELECT payload FROM entries", [], |r| r.get(0))
+        .unwrap();
+    index
+        .execute("UPDATE entries SET payload = '{}'", [])
+        .unwrap();
+    assert_eq!(
+        run(&router, Op::LoadWord(command.clone())),
+        StorageResult::Failed(DocumentError::Unavailable)
+    );
+    index
+        .execute("UPDATE entries SET payload = ?1", [payload])
+        .unwrap();
+    assert_eq!(word(&router, command), expected);
+    assert_eq!(attempts.load(Ordering::Relaxed), 3);
 }

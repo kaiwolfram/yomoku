@@ -86,48 +86,17 @@ internal fun verifyReaderWordBridge() {
             check(fresh.calls.get() == 0 && fresh.wordCalls.get() == 1)
             check(before.contentEquals(database.readBytes()))
         }
-        val customDatabase = directory.resolve("custom.sqlite3")
-        var customSurface = ""
-        val customId = NativeBridge(customDatabase.path, listener, HostDictionary()).use { bridge ->
+        NativeBridge(directory.resolve("missing.sqlite3").path, listener, HostDictionary()).use { bridge ->
             val created = dispatch(bridge, Event.CreatePaste("ヌヌヌヌヌヌ"))
             val id = created.documents.single().documentId
             val opened = dispatch(bridge, Event.OpenReader(id))
             val page = checkNotNull(opened.reader)
             val key = ReaderTokenKey(id, page.anchor, checkNotNull(opened.readerAnalysis))
             val tokens = checkNotNull(dispatch(bridge, Event.LoadReaderTokens(key)).effectiveReaderTokens)
-            val token = tokens.tokens.single()
-            customSurface = token.surface
-            val selection = EffectiveReaderSelection(tokens.identity, token.segmentIndex)
+            val selection = EffectiveReaderSelection(tokens.identity, tokens.tokens.single().segmentIndex)
             val missing = checkNotNull(dispatch(bridge, Event.LoadEffectiveReaderWord(selection)).effectiveReaderWord?.details)
             check(missing.candidates.words.isEmpty() && missing.candidates.names.isEmpty())
-            check(missing.customEntry == null)
-            val meaning = " literal meaning 📖\u0000 "
-            val reading = " か\u3099𠮷\u0000 "
-            val saved = dispatch(bridge, Event.SaveEffectiveReaderCustomEntry(selection, meaning, reading))
-            val entry = checkNotNull(saved.effectiveReaderWord?.details?.customEntry)
-            check(entry.surface == customSurface && entry.englishMeaning == meaning && entry.reading == reading)
-            check(ViewModel.bincodeDeserialize(saved.bincodeSerialize()) == saved)
-            check(saved.reader == page && saved.effectiveReaderTokens == tokens && saved.readerTime == null)
-            val failed = dispatch(bridge, Event.SaveEffectiveReaderCustomEntry(selection, " ", reading), 0)
-            check(failed.effectiveReaderWord?.customEntryError == null && failed.effectiveReaderWord?.details?.customEntry == entry)
-            check(failed.effectiveReaderWord.error == null && failed.documentError == null)
-            val edited = dispatch(bridge, Event.SaveEffectiveReaderCustomEntry(selection, "edited", reading))
-            check(edited.effectiveReaderWord?.customEntryError == null && edited.effectiveReaderWord?.details?.customEntry?.englishMeaning == "edited")
-            id
-        }
-        NativeBridge(customDatabase.path, listener, HostDictionary()).use { bridge ->
-            val opened = dispatch(bridge, Event.OpenReader(customId))
-            val key = ReaderTokenKey(customId, checkNotNull(opened.reader).anchor, checkNotNull(opened.readerAnalysis))
-            val tokens = checkNotNull(dispatch(bridge, Event.LoadReaderTokens(key)).effectiveReaderTokens)
-            val token = tokens.tokens.single()
-            val selection = EffectiveReaderSelection(tokens.identity, token.segmentIndex)
-            val loaded = dispatch(bridge, Event.LoadEffectiveReaderWord(selection))
-            val entry = checkNotNull(loaded.effectiveReaderWord?.details?.customEntry)
-            check(entry.surface == customSurface && entry.englishMeaning == "edited")
-            val deleted = dispatch(bridge, Event.DeleteEffectiveReaderCustomEntry(selection))
-            check(deleted.effectiveReaderWord?.customEntryError == null && deleted.effectiveReaderWord?.details?.customEntry == null)
-            check(dispatch(bridge, Event.LoadEffectiveReaderWord(selection)).effectiveReaderWord?.details?.customEntry == null)
         }
     } finally { directory.deleteRecursively() }
-    println("PASS: selected-word JNI word/name payloads, custom CRUD/Unicode/reopen/retry, count and lazy workers")
+    println("PASS: selected-word JNI word/name payloads, no-match state, count and lazy workers")
 }

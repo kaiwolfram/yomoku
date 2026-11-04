@@ -6,10 +6,7 @@ use crate::{
     document::{ChapterText, InvalidTextValue, TextAnchor, TextOffset, TextRange},
     effective_session::{EffectiveReaderPage, EffectiveReaderSelection, EffectiveWordDetails},
     pagination::{is_sentence_end, is_sentence_tail},
-    reader::{
-        ReaderAnalysis, ReaderCustomEntry, ReaderTokenSnapshot, ReaderWordDetails,
-        ReaderWordSelection,
-    },
+    reader::{ReaderAnalysis, ReaderTokenSnapshot, ReaderWordDetails, ReaderWordSelection},
     vocabulary::Surface,
 };
 
@@ -58,14 +55,13 @@ impl AnkiNote {
             token.reading.as_deref(),
             token.dictionary_form.as_deref(),
             &details.candidates,
-            details.custom_entry.as_ref(),
             entry,
             &[],
         )
     }
 
     /// Effective revisions distinguish changed segmentation and page revisits.
-    /// Manual spans use only their own metadata/custom entry, never old B data.
+    /// Manual spans use only their own metadata, never old B data.
     pub fn from_effective_selection(
         chapter: &ChapterText,
         current: &EffectiveReaderPage,
@@ -107,7 +103,6 @@ impl AnkiNote {
             token.reading.as_deref(),
             token.dictionary_form.as_deref(),
             &details.candidates,
-            details.custom_entry.as_ref(),
             entry,
             &details.dictionary_sources,
         )
@@ -124,7 +119,6 @@ fn prepare(
     analyzer_reading: Option<&str>,
     dictionary_form: Option<&str>,
     candidates: &DictionaryCandidates,
-    custom: Option<&ReaderCustomEntry>,
     entry: Option<super::AnkiEntryKey>,
     sources: &[crate::dictionary::DictionarySource],
 ) -> Result<AnkiNote, InvalidTextValue> {
@@ -147,9 +141,9 @@ fn prepare(
         return Err(InvalidTextValue);
     }
     let (headword, reading, meanings, form) = if let Some(key) = entry {
-        entry_content(candidates, custom, key)?
+        entry_content(candidates, key)?
     } else {
-        let (reading, meanings) = definitions(candidates, analyzer_reading, custom)?;
+        let (reading, meanings) = definitions(candidates, analyzer_reading)?;
         (surface.to_owned(), reading, meanings, surface.to_owned())
     };
     let occurrence = if form == surface || Some(form.as_str()) == dictionary_form {
@@ -230,19 +224,7 @@ fn sentence_range(text: &str, target: TextRange) -> Result<TextRange, InvalidTex
 fn definitions(
     candidates: &DictionaryCandidates,
     analyzer_reading: Option<&str>,
-    custom: Option<&ReaderCustomEntry>,
 ) -> Result<(String, Vec<String>), InvalidTextValue> {
-    if let Some(custom) = custom {
-        if !candidates.words.is_empty()
-            || !candidates.names.is_empty()
-            || custom.surface != candidates.surface
-            || custom.reading.trim().is_empty()
-            || custom.english_meaning.trim().is_empty()
-        {
-            return Err(InvalidTextValue);
-        }
-        return Ok((custom.reading.clone(), vec![custom.english_meaning.clone()]));
-    }
     let valid_form = |form: &str| {
         form == candidates.surface || Some(form) == candidates.dictionary_form.as_deref()
     };
@@ -346,7 +328,6 @@ fn push_meaning(values: &mut Vec<String>, translations: &[Translation]) {
 
 fn entry_content(
     candidates: &DictionaryCandidates,
-    custom: Option<&ReaderCustomEntry>,
     key: super::AnkiEntryKey,
 ) -> Result<(String, String, Vec<String>, String), InvalidTextValue> {
     use super::AnkiEntryKey;
@@ -430,18 +411,6 @@ fn entry_content(
                 push_meaning(&mut meanings, &group.translations);
             }
             (headword, first.form.clone())
-        }
-        AnkiEntryKey::Custom => {
-            let (reading, meanings) = definitions(candidates, None, custom)?;
-            if custom.is_none() {
-                return Err(InvalidTextValue);
-            }
-            return Ok((
-                candidates.surface.clone(),
-                reading,
-                meanings,
-                candidates.surface.clone(),
-            ));
         }
     };
     Ok((headword, readings.join("、"), meanings, form))

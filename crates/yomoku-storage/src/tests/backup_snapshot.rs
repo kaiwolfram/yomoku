@@ -197,7 +197,6 @@ pub(super) fn populate(storage: &mut Storage) {
             .set_vocabulary_status(entry.id, status, 1000)
             .unwrap();
     }
-    storage.connection.execute("INSERT INTO custom_dictionary_entries VALUES ('𠮷', 1, 'literal <meaning>\nsecond line', 'よし')", []).unwrap();
     storage.save_page_length(PageLength::Characters750).unwrap();
     storage
         .save_reader_typography(ReaderTypography {

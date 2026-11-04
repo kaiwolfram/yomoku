@@ -11,7 +11,7 @@ use yomoku_storage::{dictionary::Dictionary, Storage};
 
 use crate::imports::Imports;
 
-use super::{map_custom_error, map_error, map_word_error, word_dictionary, WordDictionaryLoader};
+use super::{map_error, map_word_error, word_dictionary, WordDictionaryLoader};
 
 pub(super) fn execute(
     storage: &mut Storage,
@@ -107,37 +107,7 @@ pub(super) fn execute(
                 Box::new(details),
             ))
         }
-        EffectiveStorageOperation::SaveCustomEntry {
-            command,
-            english_meaning,
-            reading,
-        } => {
-            let selection = command.selection();
-            let result = storage.save_effective_reader_custom_entry(
-                word_dictionary(dictionary, word_loader)?,
-                command.key(),
-                selection.segment_index,
-                english_meaning,
-                reading,
-            );
-            let entry = result
-                .map_err(|error| map_custom_error(error, dictionary))?
-                .ok_or(DocumentError::NotFound)?;
-            Ok(EffectiveStorageResult::CustomEntryChanged(
-                selection,
-                Some(entry.into()),
-            ))
-        }
-        EffectiveStorageOperation::DeleteCustomEntry(command) => {
-            let selection = command.selection();
-            let result = storage.delete_effective_reader_custom_entry(
-                word_dictionary(dictionary, word_loader)?,
-                command.key(),
-                selection.segment_index,
-            );
-            result.map_err(|error| map_custom_error(error, dictionary))?;
-            Ok(EffectiveStorageResult::CustomEntryChanged(selection, None))
-        }
+
         EffectiveStorageOperation::PrepareCompletion { intent, command } => storage
             .prepare_effective_page_completion(intent, command.key())
             .map(|prepared| EffectiveStorageResult::CompletionPrepared(Arc::new(prepared)))

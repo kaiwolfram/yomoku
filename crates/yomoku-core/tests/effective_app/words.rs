@@ -1,9 +1,7 @@
 use super::*;
 use yomoku_core::{
-    dictionary::DictionaryCandidates,
-    effective_reader::EffectiveReaderWordDetails,
-    effective_session::EffectiveReaderSelection,
-    reader::{ReaderCustomEntry, ReaderVocabulary},
+    dictionary::DictionaryCandidates, effective_reader::EffectiveReaderWordDetails,
+    effective_session::EffectiveReaderSelection, reader::ReaderVocabulary,
     vocabulary::VocabularyStatus,
 };
 
@@ -35,7 +33,7 @@ fn details(f: &Fixture, selection: EffectiveReaderSelection) -> EffectiveReaderW
         },
         token,
         encountered: 7,
-        custom_entry: None,
+
         dictionary_sources: Vec::new(),
     }
 }
@@ -67,22 +65,6 @@ fn status_event(selection: EffectiveReaderSelection, status: VocabularyStatus) -
         vocabulary_id: 55.try_into().unwrap(),
         status,
         occurred_at_unix_ms: 600,
-    }
-}
-
-fn custom_event(selection: EffectiveReaderSelection) -> Event {
-    Event::SaveEffectiveReaderCustomEntry {
-        selection,
-        english_meaning: " literal\0meaning 📖 ".into(),
-        reading: " よみか\u{3099}\0 ".into(),
-    }
-}
-
-fn entry() -> ReaderCustomEntry {
-    ReaderCustomEntry {
-        surface: "猫".into(),
-        english_meaning: " literal\0meaning 📖 ".into(),
-        reading: " よみか\u{3099}\0 ".into(),
     }
 }
 
@@ -348,151 +330,6 @@ fn status_failure_drains_time_but_defers_departure_until_exact_retry_or_cancel()
 }
 
 #[test]
-fn custom_save_delete_retain_literal_payload_and_committed_entry_through_failure_and_cancel() {
-    let f = Fixture::new(false);
-    f.load();
-    let selected = selection(&f);
-    load_word(&f, selected, None);
-    let mut effects = f.core.process_event(custom_event(selected));
-    let frozen = operation(&effects);
-    resolve(
-        &f.core,
-        &mut effects,
-        StorageResult::Failed(DocumentError::Unavailable),
-    );
-    assert!(
-        f.core
-            .view()
-            .effective_reader_word
-            .unwrap()
-            .custom_entry_pending
-    );
-    assert!(f
-        .core
-        .process_event(Event::LoadEffectiveReaderWord(selected))
-        .is_empty());
-    assert!(f.core.process_event(f.complete(selected.page)).is_empty());
-    let mut retry = f.core.process_event(Event::RetryEffectiveReaderCustomEntry);
-    assert_eq!(operation(&retry), frozen);
-    resolve(
-        &f.core,
-        &mut retry,
-        StorageResult::Effective(Output::CustomEntryChanged(selected, Some(entry()))),
-    );
-    assert_eq!(
-        f.core
-            .view()
-            .effective_reader_word
-            .unwrap()
-            .details
-            .unwrap()
-            .custom_entry,
-        Some(entry())
-    );
-    let mut effects = f
-        .core
-        .process_event(Event::DeleteEffectiveReaderCustomEntry(selected));
-    let frozen = operation(&effects);
-    resolve(
-        &f.core,
-        &mut effects,
-        StorageResult::Failed(DocumentError::Unavailable),
-    );
-    assert_eq!(
-        f.core
-            .view()
-            .effective_reader_word
-            .unwrap()
-            .details
-            .unwrap()
-            .custom_entry,
-        Some(entry())
-    );
-    f.core
-        .process_event(Event::CancelEffectiveReaderCustomEntry);
-    assert_eq!(
-        f.core
-            .view()
-            .effective_reader_word
-            .unwrap()
-            .details
-            .unwrap()
-            .custom_entry,
-        Some(entry())
-    );
-    let mut effects = f
-        .core
-        .process_event(Event::DeleteEffectiveReaderCustomEntry(selected));
-    assert_eq!(operation(&effects), frozen);
-    resolve(
-        &f.core,
-        &mut effects,
-        StorageResult::Effective(Output::CustomEntryChanged(selected, None)),
-    );
-    assert!(f
-        .core
-        .view()
-        .effective_reader_word
-        .unwrap()
-        .details
-        .unwrap()
-        .custom_entry
-        .is_none());
-    assert!(f
-        .core
-        .process_event(Event::DeleteEffectiveReaderCustomEntry(selected))
-        .is_empty());
-}
-
-#[test]
-fn dismissed_custom_failure_stays_retryable_and_cancel_releases_deferred_position() {
-    let f = Fixture::new(false);
-    f.load();
-    let selected = selection(&f);
-    load_word(&f, selected, None);
-    let mut effects = f.core.process_event(custom_event(selected));
-    f.core.process_event(Event::DismissReaderWord);
-    f.core.process_event(Event::SaveReadingPosition(
-        f.document.reading_position.unwrap(),
-    ));
-    resolve(
-        &f.core,
-        &mut effects,
-        StorageResult::Failed(DocumentError::Unavailable),
-    );
-    let word = f.core.view().effective_reader_word.unwrap();
-    assert!(word.selection.is_none() && word.details.is_none() && word.custom_entry_pending);
-    assert_eq!(word.custom_entry_error, Some(DocumentError::Unavailable));
-    f.core.process_event(Event::OpenSettings);
-    assert!(f
-        .core
-        .process_event(Event::SetPageLength(PageLength::Characters250))
-        .is_empty());
-    f.core.process_event(Event::CloseSettings);
-    assert_eq!(
-        f.core
-            .view()
-            .effective_reader_word
-            .unwrap()
-            .custom_entry_error,
-        Some(DocumentError::Unavailable)
-    );
-    let mut save = f
-        .core
-        .process_event(Event::CancelEffectiveReaderCustomEntry);
-    assert!(matches!(
-        operation(&save),
-        StorageOperation::SaveReadingPosition { .. }
-    ));
-    resolve(
-        &f.core,
-        &mut save,
-        StorageResult::PositionSaved(f.document.clone()),
-    );
-    assert!(!f.core.view().storage_busy);
-}
-
-#[test]
 fn dismissed_word_callback_does_not_reopen_panel_or_release_newer_checkpoint() {
     let f = Fixture::new(false);
     f.load();
@@ -543,28 +380,4 @@ fn dismissed_word_callback_does_not_reopen_panel_or_release_newer_checkpoint() {
         .is_empty());
     save_time(&f, &mut checkpoint, 300);
     assert!(!f.core.view().storage_busy);
-}
-
-#[test]
-fn compact_events_fail_closed_in_production_model() {
-    let f = Fixture::new(false);
-    f.load();
-    let selected = selection(&f);
-    let core = Core::<Yomoku>::new();
-    for event in [
-        Event::LoadEffectiveReaderWord(selected),
-        custom_event(selected),
-        Event::DeleteEffectiveReaderCustomEntry(selected),
-        Event::RetryEffectiveReaderCustomEntry,
-        Event::CancelEffectiveReaderCustomEntry,
-        status_event(selected, VocabularyStatus::Known),
-        Event::RetryEffectiveReaderStatus,
-        Event::CancelEffectiveReaderStatus,
-    ] {
-        assert!(core.process_event(event).is_empty());
-    }
-    assert!(
-        core.view().effective_reader_word.is_none()
-            && core.view().effective_reader_status.is_none()
-    );
 }

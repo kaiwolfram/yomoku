@@ -356,7 +356,7 @@ internal fun ReaderScreen(
                 effectiveDisplayTokens(page, snapshot.identity, snapshot) != null
         }
     val effectiveIdle =
-        view.effectiveReaderWord?.let { !it.busy && !it.customEntryPending } != false &&
+        view.effectiveReaderWord?.let { !it.busy } != false &&
             view.effectiveReaderStatus?.let { !it.busy && !it.pending } != false
     val canNavigate =
         page != null &&

@@ -7,7 +7,7 @@ use rusqlite::Connection;
 use yomoku_core::{
     dictionary::DictionaryCandidates,
     effective_reader::{EffectiveReaderToken, EffectiveReaderTokenKey, EffectiveReaderWordDetails},
-    reader::{ReaderCustomEntry, ReaderToken, ReaderTokenKey, ReaderVocabulary},
+    reader::{ReaderToken, ReaderTokenKey, ReaderVocabulary},
 };
 
 use crate::{
@@ -26,7 +26,6 @@ pub enum ReaderWordError {
     Dictionary(DictionaryError),
     /// A stale base identity or an index outside this page's Japanese tokens.
     InvalidSelection,
-    InvalidCustomEntry,
 }
 
 impl fmt::Display for ReaderWordError {
@@ -35,7 +34,6 @@ impl fmt::Display for ReaderWordError {
             Self::Storage(error) => error.fmt(f),
             Self::Dictionary(error) => error.fmt(f),
             Self::InvalidSelection => f.write_str("invalid or stale reader word selection"),
-            Self::InvalidCustomEntry => f.write_str("invalid custom dictionary entry"),
         }
     }
 }
@@ -45,7 +43,7 @@ impl Error for ReaderWordError {
         match self {
             Self::Storage(error) => Some(error),
             Self::Dictionary(error) => Some(error),
-            Self::InvalidSelection | Self::InvalidCustomEntry => None,
+            Self::InvalidSelection => None,
         }
     }
 }
@@ -82,7 +80,7 @@ impl Storage {
         let Some(token) = selected_token_in(&transaction, key, token_index)? else {
             return Ok(None);
         };
-        let (encountered, candidates, custom_entry) = word_details_in(
+        let (encountered, candidates) = word_details_in(
             &transaction,
             dictionary,
             &token.surface,
@@ -96,14 +94,13 @@ impl Storage {
             token,
             encountered,
             candidates,
-            custom_entry,
         }))
     }
 
     /// Read a currently resolved effective Japanese segment. The whole frozen
     /// resolution is compared before using its index, so metadata changes cannot
     /// silently select a different word.
-    /// Status/count/custom-entry reads remain live and never register vocabulary.
+    /// Status/count reads remain live and never register vocabulary.
     /// Only exact analyzer metadata may supply a base form for dictionary lookup.
     pub fn load_effective_reader_word(
         &mut self,
@@ -116,7 +113,7 @@ impl Storage {
             return Ok(None);
         };
         let components = component_forms_in(&transaction, key, token.anchor)?;
-        let (encountered, candidates, custom_entry) = word_details_in(
+        let (encountered, candidates) = word_details_in(
             &transaction,
             dictionary,
             &token.surface,
@@ -137,12 +134,11 @@ impl Storage {
             token,
             encountered,
             candidates,
-            custom_entry,
         }))
     }
 }
 
-/// Shared validation for effective word reads and custom-entry mutations. Call
+/// Shared validation for effective word reads. Call
 /// inside the operation's transaction so rules cannot change between validation
 /// and use. Only visible, eligible segments may supply surface/base identity.
 pub(crate) fn selected_effective_token_in(
@@ -192,7 +188,7 @@ fn word_details_in(
     dictionary_form: Option<&str>,
     vocabulary: Option<ReaderVocabulary>,
     components: &[String],
-) -> Result<(u64, DictionaryCandidates, Option<ReaderCustomEntry>), ReaderWordError> {
+) -> Result<(u64, DictionaryCandidates), ReaderWordError> {
     let encountered = match vocabulary {
         Some(entry) => {
             let count: i64 = connection
@@ -203,23 +199,7 @@ fn word_details_in(
         None => 0,
     };
     let candidates = dictionary.lookup_forms(surface, dictionary_form, components)?;
-    let custom_entry = if candidates.words.is_empty() && candidates.names.is_empty() {
-        crate::custom_dictionary::read_entry_in(
-            connection,
-            yomoku_core::vocabulary::Surface::new(surface)
-                .map_err(|_| ReaderWordError::InvalidSelection)?,
-        )
-        .map_err(|error| match error {
-            crate::custom_dictionary::CustomDictionaryError::Storage(error) => {
-                ReaderWordError::Storage(error)
-            }
-            _ => ReaderWordError::InvalidCustomEntry,
-        })?
-        .map(Into::into)
-    } else {
-        None
-    };
-    Ok((encountered, candidates, custom_entry))
+    Ok((encountered, candidates))
 }
 
 fn component_forms_in(

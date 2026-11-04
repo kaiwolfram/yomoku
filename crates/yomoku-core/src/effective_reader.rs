@@ -9,7 +9,7 @@ use crate::{
     document::{
         AnalysisId, ChapterText, DocumentId, InvalidTextValue, TextAnchor, TextOffset, TextRange,
     },
-    reader::{ReaderCustomEntry, ReaderVocabulary},
+    reader::ReaderVocabulary,
     reader_ruby::{source_preferred_ruby, ReaderChapterRuby, ReaderRuby},
     segmentation::{
         resolve_effective_segmentation, EffectiveChapterSegmentation, EffectiveSegment,
@@ -78,8 +78,7 @@ pub struct EffectiveReaderWordDetails {
     pub token: EffectiveReaderToken,
     pub encountered: u64,
     pub candidates: DictionaryCandidates,
-    /// User data remains separate from unresolved analyzer metadata.
-    pub custom_entry: Option<ReaderCustomEntry>,
+
     pub dictionary_sources: Vec<crate::dictionary::DictionarySource>,
 }
 

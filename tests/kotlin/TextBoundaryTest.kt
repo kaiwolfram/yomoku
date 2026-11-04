@@ -127,41 +127,27 @@ fun verifyTextBoundaries(directory: String) {
     check(details.encountered == ULong.MAX_VALUE)
     check(details.candidates.dictionaryForm == null)
     check(details.candidates.words.isEmpty() && details.candidates.names.isEmpty())
-    val customEntry = checkNotNull(details.customEntry)
-    check(customEntry.englishMeaning == " literal\u0000meaning 📖 ")
-    check(customEntry.reading == " よみか\u3099\u0000 ")
-    check(effectiveWord.customEntryPending && !effectiveWord.busy)
-    check(effectiveWord.error == null && effectiveWord.customEntryError != null)
+    check(!effectiveWord.busy && effectiveWord.error == null)
     check(effectiveWord.bincodeSerialize().contentEquals(effectiveWordBytes))
     File(dir, "effective-word-return.bin").writeBytes(effectiveWord.bincodeSerialize())
     check(view.effectiveReaderWord == effectiveWord)
     val effectiveStatus = checkNotNull(view.effectiveReaderStatus)
     check(effectiveStatus.pending && !effectiveStatus.busy)
     check(effectiveStatus.error == DocumentError.UNAVAILABLE)
-    for (index in 0..7) {
+    for (index in 0..3) {
         val bytes = File(dir, "effective-word-event-$index.bin").readBytes()
         val event = Event.bincodeDeserialize(bytes)
         when (index) {
             0 -> check((event as Event.LoadEffectiveReaderWord).value == effectiveSelection)
             1 -> {
-                event as Event.SaveEffectiveReaderCustomEntry
-                check(event.selection == effectiveSelection)
-                check(event.englishMeaning == customEntry.englishMeaning)
-                check(event.reading == customEntry.reading)
-            }
-            2 ->
-                check((event as Event.DeleteEffectiveReaderCustomEntry).value == effectiveSelection)
-            3 -> check(event is Event.RetryEffectiveReaderCustomEntry)
-            4 -> check(event is Event.CancelEffectiveReaderCustomEntry)
-            5 -> {
                 event as Event.SetEffectiveReaderStatus
                 check(event.selection == effectiveSelection)
                 check(event.vocabularyId.value == Long.MAX_VALUE)
                 check(event.status == VocabularyStatus.IGNORED)
                 check(event.occurredAtUnixMs == Long.MAX_VALUE)
             }
-            6 -> check(event is Event.RetryEffectiveReaderStatus)
-            7 -> check(event is Event.CancelEffectiveReaderStatus)
+            2 -> check(event is Event.RetryEffectiveReaderStatus)
+            3 -> check(event is Event.CancelEffectiveReaderStatus)
         }
         check(event.bincodeSerialize().contentEquals(bytes))
         File(dir, "effective-word-event-$index-return.bin").writeBytes(event.bincodeSerialize())

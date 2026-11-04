@@ -246,7 +246,6 @@ class AnkiExportSessionTest {
             when (val key = entry.key) {
                 is AnkiEntryKey.Word -> "word_${key.value}"
                 is AnkiEntryKey.Name -> "name_${key.value}"
-                AnkiEntryKey.Custom -> "custom"
             }
 
     @Test

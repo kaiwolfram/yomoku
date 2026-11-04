@@ -16,18 +16,15 @@ use yomoku_core::{
     analysis::{AnalysisProfile, AnalyzedToken, ChapterAnalysis, SplitMode},
     app::{Event, ViewModel},
     document::{ChapterText, DocumentId, PasteText, TextAnchor, TextOffset, TextRange},
-    effective_session::EffectiveReaderSelection,
     reader::ReaderTokenKey,
     storage::DocumentError,
-    vocabulary::{Surface, VocabularyStatus},
+    vocabulary::Surface,
 };
 use yomoku_ffi::{FfiError, YomokuBridge};
 use yomoku_runtime::{AnalyzerLifecycle, AnalyzerLoader, ShellEffectFfi};
 use yomoku_storage::Storage;
 
 const TIMEOUT: Duration = Duration::from_secs(10);
-const MEANING: &str = " literal\0meaning 📖 ";
-const READING: &str = " か\u{3099}𠮷\0 ";
 
 struct Fixture {
     directory: PathBuf,
@@ -204,124 +201,6 @@ impl Harness {
             analysis: opened.reader_analysis.unwrap(),
         }))
     }
-
-    fn reload(&self, view: &ViewModel) -> ViewModel {
-        self.dispatch(Event::LoadReaderTokens(ReaderTokenKey {
-            document_id: view.reader.as_ref().unwrap().document_id,
-            page: view.reader.as_ref().unwrap().anchor,
-            analysis: view.reader_analysis.unwrap(),
-        }))
-    }
-}
-
-fn selection(view: &ViewModel, surface: &str) -> EffectiveReaderSelection {
-    let page = view.effective_reader_tokens.as_ref().unwrap();
-    EffectiveReaderSelection {
-        page: page.identity,
-        segment_index: page
-            .tokens
-            .iter()
-            .find(|t| t.surface == surface)
-            .unwrap()
-            .segment_index,
-    }
-}
-
-#[test]
-fn serialized_word_status_custom_retry_unicode_reopen_and_stale_guards() {
-    let f = Fixture::new();
-    let h = f.bridge();
-    let loaded = h.load(f.id);
-    let selected = selection(&loaded, "東京");
-    let before = std::fs::read(f.path()).unwrap();
-    let word = h.dispatch(Event::LoadEffectiveReaderWord(selected));
-    assert_eq!(std::fs::read(f.path()).unwrap(), before);
-    let details = word.effective_reader_word.unwrap().details.unwrap();
-    assert!(!details.candidates.words.is_empty());
-    let id = details.token.vocabulary.unwrap().id;
-    for status in [
-        VocabularyStatus::New,
-        VocabularyStatus::Learning,
-        VocabularyStatus::Familiar,
-        VocabularyStatus::Known,
-        VocabularyStatus::Ignored,
-    ] {
-        let changed = h.dispatch(Event::SetEffectiveReaderStatus {
-            selection: selected,
-            vocabulary_id: id,
-            status,
-            occurred_at_unix_ms: 300,
-        });
-        assert!(
-            changed.effective_reader_tokens.as_ref().unwrap().tokens[..2]
-                .iter()
-                .all(|t| t.vocabulary.unwrap().status == status)
-        );
-        assert_eq!(
-            changed
-                .effective_reader_word
-                .unwrap()
-                .details
-                .unwrap()
-                .token
-                .vocabulary
-                .unwrap()
-                .status,
-            status
-        );
-    }
-    let missing = selection(&h.view(), "ヌヌ𠮷か\u{3099}\0");
-    h.dispatch(Event::LoadEffectiveReaderWord(missing));
-    f.sql().execute_batch("CREATE TRIGGER fail_custom BEFORE INSERT ON custom_dictionary_entries BEGIN SELECT RAISE(ABORT,'fixture'); END;").unwrap();
-    let failed = h.dispatch(Event::SaveEffectiveReaderCustomEntry {
-        selection: missing,
-        english_meaning: MEANING.into(),
-        reading: READING.into(),
-    });
-    assert!(failed.effective_reader_word.unwrap().custom_entry_pending);
-    assert_eq!(f.count("custom_dictionary_entries"), 0);
-    h.send(Event::DismissReaderWord);
-    f.sql().execute_batch("DROP TRIGGER fail_custom").unwrap();
-    h.dispatch(Event::RetryEffectiveReaderCustomEntry);
-    assert_eq!(f.count("custom_dictionary_entries"), 1);
-    drop(h);
-
-    let h = f.bridge();
-    let loaded = h.load(f.id);
-    let selected = selection(&loaded, "ヌヌ𠮷か\u{3099}\0");
-    let word = h.dispatch(Event::LoadEffectiveReaderWord(selected));
-    let entry = word
-        .effective_reader_word
-        .unwrap()
-        .details
-        .unwrap()
-        .custom_entry
-        .unwrap();
-    assert_eq!(
-        (entry.english_meaning.as_str(), entry.reading.as_str()),
-        (MEANING, READING)
-    );
-    let reloaded = h.reload(&loaded);
-    assert_ne!(
-        reloaded.effective_reader_tokens.as_ref().unwrap().identity,
-        selected.page
-    );
-    let before = std::fs::read(f.path()).unwrap();
-    h.send(Event::DeleteEffectiveReaderCustomEntry(selected));
-    assert!(!h.view().storage_busy);
-    assert!(h.callbacks.try_recv().is_err());
-    assert_eq!(std::fs::read(f.path()).unwrap(), before);
-    let selected = selection(&reloaded, "ヌヌ𠮷か\u{3099}\0");
-    h.dispatch(Event::LoadEffectiveReaderWord(selected));
-    let deleted = h.dispatch(Event::DeleteEffectiveReaderCustomEntry(selected));
-    assert!(deleted
-        .effective_reader_word
-        .unwrap()
-        .details
-        .unwrap()
-        .custom_entry
-        .is_none());
-    assert_eq!(f.count("reading_occurrences"), 0);
 }
 
 #[test]

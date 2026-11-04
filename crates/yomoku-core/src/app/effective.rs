@@ -109,10 +109,6 @@ impl Yomoku {
                 event,
                 Event::CompleteEffectiveReaderPage { .. }
                     | Event::LoadEffectiveReaderWord(_)
-                    | Event::SaveEffectiveReaderCustomEntry { .. }
-                    | Event::DeleteEffectiveReaderCustomEntry(_)
-                    | Event::RetryEffectiveReaderCustomEntry
-                    | Event::CancelEffectiveReaderCustomEntry
                     | Event::SetEffectiveReaderStatus { .. }
                     | Event::RetryEffectiveReaderStatus
                     | Event::CancelEffectiveReaderStatus
@@ -123,11 +119,7 @@ impl Yomoku {
         // effective partition. This native opt-in cannot silently fall back to B.
         if matches!(
             event,
-            Event::CompleteReaderPage { .. }
-                | Event::SetReaderStatus(_)
-                | Event::LoadReaderWord(_)
-                | Event::SaveReaderCustomEntry { .. }
-                | Event::DeleteReaderCustomEntry(_)
+            Event::CompleteReaderPage { .. } | Event::SetReaderStatus(_) | Event::LoadReaderWord(_)
         ) {
             return Some(Command::done());
         }
@@ -147,36 +139,7 @@ impl Yomoku {
                     self.dispatch_effective(EffectiveReaderRequest::Word(request), model)
                 }))
             }
-            Event::SaveEffectiveReaderCustomEntry {
-                selection,
-                english_meaning,
-                reading,
-            } => {
-                if !model.can_start_effective_selection(*selection) {
-                    return Some(Command::done());
-                }
-                let request = model
-                    .effective_reader
-                    .as_mut()
-                    .expect("opt-in checked")
-                    .begin_custom_entry_save(*selection, english_meaning.clone(), reading.clone());
-                Some(request.map_or_else(Command::done, |request| {
-                    self.dispatch_effective(EffectiveReaderRequest::Word(request), model)
-                }))
-            }
-            Event::DeleteEffectiveReaderCustomEntry(selection) => {
-                if !model.can_start_effective_selection(*selection) {
-                    return Some(Command::done());
-                }
-                let request = model
-                    .effective_reader
-                    .as_mut()
-                    .expect("opt-in checked")
-                    .begin_custom_entry_delete(*selection);
-                Some(request.map_or_else(Command::done, |request| {
-                    self.dispatch_effective(EffectiveReaderRequest::Word(request), model)
-                }))
-            }
+
             Event::SetEffectiveReaderStatus {
                 selection,
                 vocabulary_id,
@@ -195,7 +158,7 @@ impl Yomoku {
                     self.dispatch_effective(EffectiveReaderRequest::Status(request), model)
                 }))
             }
-            Event::RetryEffectiveReaderCustomEntry | Event::RetryEffectiveReaderStatus => {
+            Event::RetryEffectiveReaderStatus => {
                 if model.storage_busy
                     || model.pending_time_checkpoint.is_some()
                     || model.queued_time_checkpoint.is_some()
@@ -203,29 +166,19 @@ impl Yomoku {
                     return Some(Command::done());
                 }
                 let session = model.effective_reader.as_mut().expect("opt-in checked");
-                let request = if matches!(event, Event::RetryEffectiveReaderCustomEntry) {
-                    session
-                        .retry_custom_entry()
-                        .map(EffectiveReaderRequest::Word)
-                } else {
-                    session
-                        .retry_status_change()
-                        .map(EffectiveReaderRequest::Status)
-                };
+                let request = session
+                    .retry_status_change()
+                    .map(EffectiveReaderRequest::Status);
                 Some(request.map_or_else(Command::done, |request| {
                     self.dispatch_effective(request, model)
                 }))
             }
-            Event::CancelEffectiveReaderCustomEntry | Event::CancelEffectiveReaderStatus => {
+            Event::CancelEffectiveReaderStatus => {
                 if model.storage_busy {
                     return Some(Command::done());
                 }
                 let session = model.effective_reader.as_mut().expect("opt-in checked");
-                let cancelled = if matches!(event, Event::CancelEffectiveReaderCustomEntry) {
-                    session.cancel_custom_entry_retry()
-                } else {
-                    session.cancel_status_retry()
-                };
+                let cancelled = session.cancel_status_retry();
                 Some(if cancelled {
                     self.drain_effective(model)
                 } else {

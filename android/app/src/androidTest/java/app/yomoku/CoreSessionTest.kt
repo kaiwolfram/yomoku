@@ -74,8 +74,8 @@ class CoreSessionTest {
                             val measuredRequests = requests.size
                             core.onRenderMeasured = null
                             core.onRequestsMeasured = null
-                            core.dispatch(Event.SelectDestination(Destination.NOSTR))
-                            assertEquals(Destination.NOSTR, core.view.destination)
+                            core.dispatch(Event.SelectDestination(Destination.STATISTICS))
+                            assertEquals(Destination.STATISTICS, core.view.destination)
                             assertEquals(measured, renders.size)
                             assertEquals(measuredRequests, requests.size)
                         }
@@ -95,7 +95,7 @@ class CoreSessionTest {
                 core.close()
                 core.close()
                 assertThrows(IllegalStateException::class.java) {
-                    core.dispatch(Event.SelectDestination(Destination.NOSTR))
+                    core.dispatch(Event.SelectDestination(Destination.STATISTICS))
                 }
             }
         }
@@ -124,7 +124,7 @@ class CoreSessionTest {
                 core.onViewChanged = { changes++ }
                 core.onRenderMeasured = { renders.add(it) }
                 core.onRequestsMeasured = { requests.add(it) }
-                core.dispatch(Event.SelectDestination(Destination.NOSTR))
+                core.dispatch(Event.SelectDestination(Destination.STATISTICS))
                 val before = core.view
                 val requestsBefore = requests.size
                 val changesBefore = changes

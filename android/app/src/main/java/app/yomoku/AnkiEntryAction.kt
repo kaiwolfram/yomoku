@@ -30,18 +30,16 @@ import app.yomoku.shared.AnkiExportPhase
 import app.yomoku.shared.AnkiSelection
 import app.yomoku.shared.AnkiSetupPhase
 import app.yomoku.shared.Event
-import app.yomoku.shared.ReaderCustomEntry
 
 @Composable
 internal fun ObserveReaderAnkiEntries(
     selection: AnkiSelection,
-    custom: ReaderCustomEntry?,
     setup: AnkiSetupPhase,
     enabled: Boolean,
     dispatch: (Event) -> Unit,
 ) {
-    var requested by remember(selection, custom, setup) { mutableStateOf(false) }
-    LaunchedEffect(selection, custom, setup, enabled) {
+    var requested by remember(selection, setup) { mutableStateOf(false) }
+    LaunchedEffect(selection, setup, enabled) {
         if (setup == AnkiSetupPhase.Ready && enabled && !requested) {
             requested = true
             dispatch(Event.LoadReaderAnkiEntries(selection))
@@ -82,7 +80,6 @@ internal fun AnkiEntryAction(
         when (val key = entry.key) {
             is AnkiEntryKey.Word -> "word_${key.value}"
             is AnkiEntryKey.Name -> "name_${key.value}"
-            AnkiEntryKey.Custom -> "custom"
         }
     Column {
         FilledIconButton(

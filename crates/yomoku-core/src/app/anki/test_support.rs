@@ -132,7 +132,7 @@ pub(super) fn fixture(effective: bool) -> (Model, AnkiSelection) {
             token: snapshot.tokens[1].clone(),
             encountered: 47,
             candidates,
-            custom_entry: None,
+
             dictionary_sources: Vec::new(),
         };
         assert!(session.accept(request, snapshot));
@@ -163,7 +163,6 @@ pub(super) fn fixture(effective: bool) -> (Model, AnkiSelection) {
             token: snapshot.tokens[1].clone(),
             encountered: 47,
             candidates,
-            custom_entry: None,
         };
         let selected = details.selection();
         model.reader_word_selection = Some(selected);

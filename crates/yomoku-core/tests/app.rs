@@ -2,59 +2,6 @@ use crux_core::Core;
 use yomoku_core::app::{Destination, Effect, Event, ViewModel, Yomoku};
 
 #[test]
-fn starts_in_library() {
-    let core = Core::<Yomoku>::new();
-    assert_eq!(
-        core.view(),
-        ViewModel {
-            anki_settings: Default::default(),
-            anki_setup: Default::default(),
-            anki_entries: Vec::new(),
-            anki_recovery: None,
-            anki_export: None,
-            vocabulary: Default::default(),
-            statistics: Default::default(),
-            library_rename: None,
-            library_word_distributions: None,
-            library_word_error: None,
-            library_delete_target: None,
-            library_delete_error: None,
-            library_selection: None,
-            library_bulk_delete_targets: None,
-            reader_time: None,
-            reading_time_save_pending: false,
-            completion_save_pending: false,
-            completion_notice: None,
-            book_completion_notice: None,
-            destination: Destination::Library,
-            settings_open: false,
-            documents: vec![],
-            library_title_query: String::new(),
-            library_sort: Default::default(),
-            library_document_count: 0,
-            loaded_document: None,
-            storage_busy: false,
-            document_error: None,
-            content_route: yomoku_core::app::ContentRoute::Main,
-            reader: None,
-            reader_analysis: None,
-            reader_tokens: None,
-            effective_reader_tokens: None,
-            effective_reader_word: None,
-            effective_reader_status: None,
-            reader_furigana: Vec::new(),
-            reader_word_selection: None,
-            reader_word: None,
-            reader_word_error: None,
-            reader_custom_entry_error: None,
-            reader_typography: None,
-            page_length: None,
-            import_summary: None,
-        }
-    );
-}
-
-#[test]
 fn destination_commands_update_view_and_request_one_render() {
     let core = Core::<Yomoku>::new();
     for destination in [
@@ -147,4 +94,56 @@ fn storage_commands_are_serialized_while_navigation_remains_available() {
     assert_eq!(core.view().document_error, Some(DocumentError::Unavailable));
     assert!(!core.process_event(Event::RefreshLibrary).is_empty());
     assert!(core.view().document_error.is_none());
+}
+
+#[test]
+fn starts_in_library() {
+    let core = Core::<Yomoku>::new();
+    assert_eq!(
+        core.view(),
+        ViewModel {
+            anki_settings: Default::default(),
+            anki_setup: Default::default(),
+            anki_entries: Vec::new(),
+            anki_recovery: None,
+            anki_export: None,
+            vocabulary: Default::default(),
+            statistics: Default::default(),
+            library_rename: None,
+            library_word_distributions: None,
+            library_word_error: None,
+            library_delete_target: None,
+            library_delete_error: None,
+            library_selection: None,
+            library_bulk_delete_targets: None,
+            reader_time: None,
+            reading_time_save_pending: false,
+            completion_save_pending: false,
+            completion_notice: None,
+            book_completion_notice: None,
+            destination: Destination::Library,
+            settings_open: false,
+            documents: vec![],
+            library_title_query: String::new(),
+            library_sort: Default::default(),
+            library_document_count: 0,
+            loaded_document: None,
+            storage_busy: false,
+            document_error: None,
+            content_route: yomoku_core::app::ContentRoute::Main,
+            reader: None,
+            reader_analysis: None,
+            reader_tokens: None,
+            effective_reader_tokens: None,
+            effective_reader_word: None,
+            effective_reader_status: None,
+            reader_furigana: Vec::new(),
+            reader_word_selection: None,
+            reader_word: None,
+            reader_word_error: None,
+            reader_typography: None,
+            page_length: None,
+            import_summary: None,
+        }
+    );
 }

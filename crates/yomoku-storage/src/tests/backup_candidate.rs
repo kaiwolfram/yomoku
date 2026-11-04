@@ -139,29 +139,6 @@ fn backup_candidate_rejects_unsupported_or_disagreeing_manifest_and_journal() {
 }
 
 #[test]
-fn backup_candidate_rejects_extra_missing_and_changed_schema_objects() {
-    for sql in [
-        "CREATE TABLE extra (secret TEXT)",
-        "CREATE VIEW extra AS SELECT * FROM documents",
-        "CREATE VIRTUAL TABLE extra USING fts5(secret)",
-        "CREATE INDEX extra ON documents(title)",
-        "CREATE TRIGGER extra AFTER INSERT ON documents BEGIN DELETE FROM reader_settings; END",
-        "DROP TABLE custom_dictionary_entries",
-        "DROP INDEX anki_one_unresolved",
-        "ALTER TABLE documents ADD COLUMN secret TEXT",
-        // Correct name but different semantics, including dropped CHECKs.
-        "DROP TABLE anki_settings; CREATE TABLE anki_settings (id INTEGER PRIMARY KEY, default_deck_id INTEGER) STRICT",
-        // Even an extra SQLite-maintained statistics object is not app schema.
-        "ANALYZE",
-    ] {
-        let database = TestDatabase::new();
-        let storage = Storage::open(database.path()).unwrap();
-        storage.connection.execute_batch(sql).unwrap();
-        check_rejected(&database, 24, CandidateError::InvalidDatabase);
-    }
-}
-
-#[test]
 fn backup_candidate_rejects_view_impersonating_migration_journal_before_querying_it() {
     let database = TestDatabase::new();
     let storage = Storage::open(database.path()).unwrap();

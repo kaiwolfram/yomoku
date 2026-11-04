@@ -233,16 +233,9 @@ fn main() -> Result<(), Box<dyn Error>> {
                 words: vec![],
                 names: vec![],
             },
-            custom_entry: Some(yomoku_core::reader::ReaderCustomEntry {
-                surface: image_text.into(),
-                english_meaning: " literal\0meaning 📖 ".into(),
-                reading: " よみか\u{3099}\0 ".into(),
-            }),
         }),
         error: None,
-        custom_entry_error: Some(yomoku_core::storage::DocumentError::Unavailable),
         busy: false,
-        custom_entry_pending: true,
     };
     let identity_bytes = encode(&effective_page.identity);
     let selection_bytes = encode(&effective_selection);
@@ -266,14 +259,6 @@ fn main() -> Result<(), Box<dyn Error>> {
     use yomoku_core::app::Event as AppEvent;
     for (index, event) in [
         AppEvent::LoadEffectiveReaderWord(effective_selection),
-        AppEvent::SaveEffectiveReaderCustomEntry {
-            selection: effective_selection,
-            english_meaning: " literal\0meaning 📖 ".into(),
-            reading: " よみか\u{3099}\0 ".into(),
-        },
-        AppEvent::DeleteEffectiveReaderCustomEntry(effective_selection),
-        AppEvent::RetryEffectiveReaderCustomEntry,
-        AppEvent::CancelEffectiveReaderCustomEntry,
         AppEvent::SetEffectiveReaderStatus {
             selection: effective_selection,
             vocabulary_id: i64::MAX.try_into()?,

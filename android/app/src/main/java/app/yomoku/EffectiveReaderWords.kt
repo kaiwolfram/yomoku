@@ -62,11 +62,7 @@ private fun EffectiveReaderWordContent(
     val base = view.readerAnalysis?.let { ReaderTokenKey(page.documentId, page.anchor, it) }
     val snapshot = view.effectiveReaderTokens?.takeIf { it.identity.base == base }
     val idle = !view.storageBusy && !view.readingTimeSavePending && !view.completionSavePending
-    val canRead =
-        idle &&
-            !word.busy &&
-            !word.customEntryPending &&
-            view.effectiveReaderStatus?.pending != true
+    val canRead = idle && !word.busy && view.effectiveReaderStatus?.pending != true
     var requested by remember(base, page.position, view.pageLength) { mutableStateOf(false) }
     LaunchedEffect(base, page.position, view.pageLength, snapshot, canRead, view.documentError) {
         if (snapshot != null) requested = true
@@ -197,7 +193,6 @@ private fun EffectiveReaderWordContent(
                 val ankiSelection = AnkiSelection.Effective(details.selection)
                 ObserveReaderAnkiEntries(
                     ankiSelection,
-                    details.customEntry,
                     view.ankiSetup,
                     canRead,
                     dispatch,
@@ -225,28 +220,6 @@ private fun EffectiveReaderWordContent(
                         )
                     },
                 )
-                if (details.candidates.words.isEmpty() && details.candidates.names.isEmpty()) {
-                    EffectiveReaderCustomDictionary(details, word, canRead, dispatch, onInteraction)
-                    if (details.customEntry != null) {
-                        AnkiEntryAction(
-                            view.ankiEntries.find {
-                                it.selection == ankiSelection &&
-                                    it.key == app.yomoku.shared.AnkiEntryKey.Custom
-                            },
-                            canRead,
-                            dispatch,
-                            onInteraction,
-                            ankiBrowser,
-                        )
-                        AnkiEntryNotice(
-                            view.ankiEntries.find {
-                                it.selection == ankiSelection &&
-                                    it.key == app.yomoku.shared.AnkiEntryKey.Custom
-                            },
-                            ankiBrowser,
-                        )
-                    }
-                }
             } else {
                 ReaderWordLookupState(word.error != null, canRead, onInteraction) {
                     dispatch(Event.LoadEffectiveReaderWord(display.selection))
@@ -267,18 +240,7 @@ private fun EffectiveReaderPendingActions(
     dispatch: (Event) -> Unit,
     onInteraction: () -> Unit,
 ) {
-    val word = view.effectiveReaderWord
-    if (word?.customEntryPending == true && !word.busy) {
-        EffectiveReaderRetry(
-            "custom",
-            R.string.word_custom_pending_failed,
-            idle,
-            Event.RetryEffectiveReaderCustomEntry,
-            Event.CancelEffectiveReaderCustomEntry,
-            dispatch,
-            onInteraction,
-        )
-    }
+
     val status = view.effectiveReaderStatus
     if (status?.pending == true && !status.busy) {
         EffectiveReaderRetry(

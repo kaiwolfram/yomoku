@@ -110,24 +110,12 @@
     <string name="import_existing">Already in Library: %1$s</string>
     <string name="reader_title">Reader</string>
     <string name="retry_word_lookup">Retry word lookup</string>
-    <string name="word_reading">Reading: %1$s</string>
     <string name="word_lookup_loading">Loading dictionary…</string>
     <string name="word_lookup_failed">Dictionary lookup failed.</string>
     <string name="word_encountered">Encountered %1$s times</string>
     <string name="word_definitions">JMdict · English definitions</string>
     <string name="word_names">JMnedict · Names</string>
     <string name="word_no_match">No dictionary or name match.</string>
-    <string name="word_custom_title">Custom dictionary entry</string>
-    <string name="word_custom_meaning_label">English meaning</string>
-    <string name="word_custom_reading_label">Reading</string>
-    <string name="word_custom_add">Add meaning and reading</string>
-    <string name="word_custom_edit">Edit entry</string>
-    <string name="word_custom_delete">Delete entry</string>
-    <string name="word_custom_save">Save entry</string>
-    <string name="word_custom_save_failed">Could not save entry. Your changes are still here.</string>
-    <string name="word_custom_delete_failed">Could not delete entry. Your saved entry is still here.</string>
-    <string name="word_custom_retry_save">Retry save</string>
-    <string name="word_custom_retry_delete">Retry delete</string>
     <string name="status_new">New</string>
     <string name="status_learning">Learning</string>
     <string name="status_familiar">Familiar</string>
@@ -208,7 +196,6 @@
         <item quantity="other">Delete these %1$d documents from your Library? This removes their content and reading progress. Your vocabulary and reading history are kept. This cannot be undone.</item>
     </plurals>
     <string name="library_bulk_delete_error">Could not delete these documents. Retry or cancel.</string>
-    <string name="word_custom_pending_failed">Custom entry change failed. Retry or cancel the pending change.</string>
     <string name="word_status_pending_failed">Status change failed. Retry or cancel the pending change.</string>
     <string name="anki_export_title">AnkiDroid export</string>
     <string name="anki_export_deck">Target deck ID: %1$s</string>

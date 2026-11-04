@@ -13,7 +13,7 @@ use crate::{
         EffectivePageCommand, EffectivePageRequest, EffectiveReaderSelection,
         EffectiveSelectionCommand,
     },
-    reader::{ReaderCustomEntry, ReaderVocabulary},
+    reader::ReaderVocabulary,
     vocabulary::VocabularyStatus,
 };
 
@@ -27,12 +27,7 @@ pub enum EffectiveStorageOperation {
         status: VocabularyStatus,
         occurred_at_unix_ms: i64,
     },
-    SaveCustomEntry {
-        command: EffectiveSelectionCommand,
-        english_meaning: String,
-        reading: String,
-    },
-    DeleteCustomEntry(EffectiveSelectionCommand),
+
     /// Freeze the accepted key before final time drain; reserve only afterward.
     PrepareCompletion {
         intent: PageCompletionIntent,
@@ -48,7 +43,7 @@ pub enum EffectiveStorageResult {
     TokensLoaded(EffectivePageRequest, EffectiveReaderTokenSnapshot),
     WordLoaded(EffectiveReaderSelection, Box<EffectiveReaderWordDetails>),
     StatusChanged(EffectiveReaderSelection, Option<ReaderVocabulary>),
-    CustomEntryChanged(EffectiveReaderSelection, Option<ReaderCustomEntry>),
+
     CompletionPrepared(Arc<EffectivePageCompletion>),
     PageCompleted(ReaderDocument, AnalyzedCompletionOutcome),
 }

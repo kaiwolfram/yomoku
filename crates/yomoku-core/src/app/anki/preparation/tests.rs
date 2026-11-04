@@ -140,7 +140,6 @@ fn anki_preparation_rejects_obsolete_original_selection_and_modified_owner_metad
         },
         |m| m.reader_word_error = Some(DocumentError::Unavailable),
         |m| m.pending_word_load = m.reader_word_selection,
-        |m| m.pending_custom_change = m.reader_word_selection,
         |m| m.reader_document.as_mut().unwrap().document_id = 99.try_into().unwrap(),
         |m| m.reader_document.as_mut().unwrap().chapters[0].text = "犬".into(),
         |m| m.reader_tokens = None,
@@ -206,64 +205,6 @@ fn anki_preparation_survives_dismissal_navigation_and_duplicate_events_until_exp
         );
         assert!(Model::default().prepared_anki_export().is_none());
     }
-}
-
-#[test]
-fn anki_preparation_rejects_pending_or_failed_effective_dictionary_mutations() {
-    for fail in [false, true] {
-        let (mut model, AnkiSelection::Effective(selected)) = fixture(true) else {
-            unreachable!()
-        };
-        let session = model.effective_reader.as_mut().unwrap();
-        let request = session
-            .begin_custom_entry_save(selected, "cat".into(), "ねこ".into())
-            .unwrap();
-        if fail {
-            assert!(session.finish_word_request(&request, Err(DocumentError::Unavailable)));
-        }
-        let before = reader_view(&model);
-        prepare(&mut model, AnkiSelection::Effective(selected), 1);
-        assert!(model.prepared_anki_export().is_none());
-        assert_eq!(reader_view(&model), before);
-    }
-    let (mut model, AnkiSelection::Effective(selected)) = fixture(true) else {
-        unreachable!()
-    };
-    model
-        .effective_reader
-        .as_mut()
-        .unwrap()
-        .begin_word_load(selected)
-        .unwrap();
-    prepare(&mut model, AnkiSelection::Effective(selected), 1);
-    assert!(model.prepared_anki_export().is_none());
-}
-
-#[test]
-fn anki_preparation_keeps_frozen_definitions_until_clear_then_accepts_current_data() {
-    let (mut model, selection) = fixture(false);
-    prepare(&mut model, selection, 7);
-    let frozen = model.prepared_anki_export().unwrap().clone();
-    model.reader_word.as_mut().unwrap().custom_entry = Some(crate::reader::ReaderCustomEntry {
-        surface: "猫".into(),
-        english_meaning: "new & literal definition".into(),
-        reading: "changed reading".into(),
-    });
-    prepare(&mut model, selection, 8);
-    assert_eq!(model.prepared_anki_export(), Some(&frozen));
-    assert!(Yomoku
-        .update(Event::ClearPreparedAnkiExport, &mut model)
-        .effects()
-        .all(|effect| matches!(effect, Effect::Render(_))));
-    prepare(&mut model, selection, 8);
-    let current = model.prepared_anki_export().unwrap();
-    assert_eq!(i64::from(current.deck()), 8);
-    assert_eq!(current.note().fields()[1], "changed reading");
-    assert_eq!(
-        current.note().fields()[2],
-        "<ol><li>new &amp; literal definition</li></ol>"
-    );
-    assert_eq!(current.note().fields()[3], frozen.note().fields()[3]);
 }
 
 #[test]

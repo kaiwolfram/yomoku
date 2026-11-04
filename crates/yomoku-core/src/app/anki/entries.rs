@@ -74,10 +74,10 @@ impl Model {
             .effective_reader
             .as_ref()
             .map(|session| session.word_state());
-        let (candidates, custom) = match selection {
+        let candidates = match selection {
             AnkiSelection::Original(s) if self.reader_word_selection == Some(s) => {
                 let details = self.reader_word.as_ref()?;
-                (&details.candidates, details.custom_entry.is_some())
+                &details.candidates
             }
             AnkiSelection::Effective(s) => {
                 let word = effective_word.as_ref()?;
@@ -88,7 +88,7 @@ impl Model {
                 if details.selection != s {
                     return None;
                 }
-                (&details.candidates, details.custom_entry.is_some())
+                &details.candidates
             }
             _ => return None,
         };
@@ -103,7 +103,6 @@ impl Model {
                         .iter()
                         .map(|e| AnkiEntryKey::Name(e.entry_id)),
                 )
-                .chain(custom.then_some(AnkiEntryKey::Custom))
                 .collect(),
         )
     }
@@ -716,7 +715,7 @@ mod tests {
             },
             token,
             encountered: 0,
-            custom_entry: None,
+
             dictionary_sources: vec![source],
         };
         let note = AnkiNote::from_effective_entry(

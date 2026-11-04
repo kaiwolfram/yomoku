@@ -8,7 +8,6 @@ use serde::{Deserialize, Serialize};
 pub enum AnkiEntryKey {
     Word(i64),
     Name(i64),
-    Custom,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]

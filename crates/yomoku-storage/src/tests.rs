@@ -19,7 +19,6 @@ mod anki_settings;
 mod backup_candidate;
 mod backup_snapshot;
 mod completions;
-mod custom_dictionary;
 mod document_deletion;
 mod document_rename;
 mod documents;
@@ -109,56 +108,6 @@ fn failing_migration() -> Migration {
         name: "0025_failure_fixture",
         sql: "CREATE TABLE partial_fixture (value TEXT); INSERT INTO partial_fixture VALUES ('途中'); INSERT INTO nonexistent VALUES (1);",
     }
-}
-
-#[test]
-fn creates_empty_database_and_reopens_without_reapplying_migrations() {
-    let database = TestDatabase::new();
-    assert!(!database.path().exists());
-    for _ in 0..3 {
-        let storage = Storage::open(database.path()).unwrap();
-        assert_eq!(storage.schema_version().unwrap(), 24);
-        assert!(!storage
-            .connection
-            .table_exists(None, "vocabulary_dictionary_forms")
-            .unwrap());
-    }
-    assert_eq!(
-        history(&database.path()),
-        [
-            (1, "0001_migration_history".into()),
-            (2, "0002_paste_documents".into()),
-            (3, "0003_reading_positions".into()),
-            (4, "0004_reader_settings".into()),
-            (5, "0005_page_completions".into()),
-            (6, "0006_vocabulary".into()),
-            (7, "0007_analysis_anchors".into()),
-            (8, "0008_paste_content_hashes".into()),
-            (9, "0009_pending_reading_time".into()),
-            (10, "0010_completion_occurrences".into()),
-            (11, "0011_finished_documents".into()),
-            (12, "0012_txt_imports".into()),
-            (13, "0013_srt_imports".into()),
-            (14, "0014_epub_imports".into()),
-            (15, "0015_reader_typography".into()),
-            (16, "0016_reader_furigana".into()),
-            (17, "0017_custom_dictionary".into()),
-            (18, "0018_effective_completions".into()),
-            (19, "0019_library_read_order".into()),
-            (20, "0020_vocabulary_dictionary_forms".into()),
-            (21, "0021_anki_submissions".into()),
-            (22, "0022_anki_model_creations".into()),
-            (23, "0023_remove_known_forms".into()),
-            (24, "0024_anki_settings".into())
-        ]
-    );
-    let connection = Connection::open(database.path()).unwrap();
-    assert_eq!(
-        connection
-            .query_row("PRAGMA integrity_check", [], |row| row.get::<_, String>(0))
-            .unwrap(),
-        "ok"
-    );
 }
 
 #[test]
@@ -438,4 +387,54 @@ fn concurrent_initialization_records_migration_once() {
         }
     });
     assert_eq!(history(&database.path()).len(), 24);
+}
+
+#[test]
+fn creates_empty_database_and_reopens_without_reapplying_migrations() {
+    let database = TestDatabase::new();
+    assert!(!database.path().exists());
+    for _ in 0..3 {
+        let storage = Storage::open(database.path()).unwrap();
+        assert_eq!(storage.schema_version().unwrap(), 24);
+        assert!(!storage
+            .connection
+            .table_exists(None, "vocabulary_dictionary_forms")
+            .unwrap());
+    }
+    assert_eq!(
+        history(&database.path()),
+        [
+            (1, "0001_migration_history".into()),
+            (2, "0002_paste_documents".into()),
+            (3, "0003_reading_positions".into()),
+            (4, "0004_reader_settings".into()),
+            (5, "0005_page_completions".into()),
+            (6, "0006_vocabulary".into()),
+            (7, "0007_analysis_anchors".into()),
+            (8, "0008_paste_content_hashes".into()),
+            (9, "0009_pending_reading_time".into()),
+            (10, "0010_completion_occurrences".into()),
+            (11, "0011_finished_documents".into()),
+            (12, "0012_txt_imports".into()),
+            (13, "0013_srt_imports".into()),
+            (14, "0014_epub_imports".into()),
+            (15, "0015_reader_typography".into()),
+            (16, "0016_reader_furigana".into()),
+            (17, "0017_custom_dictionary".into()),
+            (18, "0018_effective_completions".into()),
+            (19, "0019_library_read_order".into()),
+            (20, "0020_vocabulary_dictionary_forms".into()),
+            (21, "0021_anki_submissions".into()),
+            (22, "0022_anki_model_creations".into()),
+            (23, "0023_remove_known_forms".into()),
+            (24, "0024_anki_settings".into())
+        ]
+    );
+    let connection = Connection::open(database.path()).unwrap();
+    assert_eq!(
+        connection
+            .query_row("PRAGMA integrity_check", [], |row| row.get::<_, String>(0))
+            .unwrap(),
+        "ok"
+    );
 }
