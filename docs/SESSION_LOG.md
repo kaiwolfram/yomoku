@@ -1,3 +1,6 @@
+> Historical session record. Current behavior and setup are described in
+> [PRODUCT_SPEC.md](PRODUCT_SPEC.md), [ARCHITECTURE.md](ARCHITECTURE.md) and [DEVELOPMENT.md](DEVELOPMENT.md).
+
 # Session log
 
 ## 2026-10-22 — Automatic step commits

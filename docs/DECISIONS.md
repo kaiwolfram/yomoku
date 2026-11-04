@@ -1,5 +1,35 @@
 # Architectural decisions
 
+## 2026-11-04 — First-release persistence and reader simplification
+
+Use one initial release schema with the small transactional runner/journal retained
+for future published upgrades. Existing development databases/backups are unsupported:
+reject incompatibility without clearing files. Save paste hashes in the import
+transaction. The release database has 28 application tables and no custom dictionary
+entries or Anki submission/model-creation journals.
+
+`Model::default()` owns the sole production Mode C reader session. Remove old reader
+commands/factories/Compose paths and text-only imports; preserve shared rendering and
+A/B dictionary components. Compact completion reservations are version 2 and freeze
+only the page command, C analysis identity/profile and counted occurrences. Exact
+retry identity, atomic time/history/position and deliberate reread counting remain.
+
+Keep prepared Anki fields, fresh duplicate observations and active-operation ownership
+in memory. Consume typed provider invocations once and reject stale callbacks. Query
+on lookup/return/pre-insertion; failures never imply absence. Revalidate permission,
+deck and model before writes, preserve incompatible/partial model conflicts, and
+require fresh observations plus explicit action after interruption. Chosen tradeoff:
+no durable recovery and no exactly-once guarantee across process death; a partial
+external write may survive. Startup/restore never replay writes, and backup restore
+has no Anki recovery prerequisite. This supersedes earlier recovery decisions below.
+
+Gradle variants select matching Rust profiles automatically, use separate generated
+outputs and serialize native generation. Release packages both ABIs and excludes
+debug probes. Remove the unused Nostr destination and Feed resources; deferred
+Nostr requirements are unchanged. Earlier entries remain historical evidence and
+must not override current [architecture](ARCHITECTURE.md)/[data model](DATA_MODEL.md).
+
+
 ## 2026-10-22 — Android native packaging
 Pin NDK r30 **30.0.16248370**, the current official LTS, and install Rust
 `aarch64-linux-android` / `x86_64-linux-android` standard libraries for the
