@@ -100,16 +100,9 @@ private fun EffectiveReaderWordContent(
     val uriHandler = LocalUriHandler.current
     val text =
         remember(page, tokens, dark, foreground, linkColor, uriHandler) {
-            readerAnnotatedSpans(
+            readerAnnotatedText(
                 page.text,
-                tokens.orEmpty().map {
-                    ReaderAnnotatedToken(
-                        it.token.segmentIndex,
-                        it.token.vocabulary?.status,
-                        it.start,
-                        it.end,
-                    )
-                },
+                tokens.orEmpty(),
                 dark,
                 foreground,
                 page.formatting,

@@ -138,7 +138,6 @@ fn compact_lookup_requires_current_visible_selection_and_explicit_retry_after_ba
     assert_eq!(word.token.surface, "猫");
     assert!(word.token.reading.is_some() && word.token.dictionary_form.is_some());
     assert_eq!(word.encountered, 7);
-    assert!(f.core.view().reader_word.is_none());
     f.load();
     assert!(f
         .core

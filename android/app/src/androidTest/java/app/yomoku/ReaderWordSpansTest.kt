@@ -13,6 +13,36 @@ import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
 class ReaderWordSpansTest {
+    private fun identity(document: DocumentId, anchor: TextAnchor, analysis: ReaderAnalysis) =
+        EffectivePageIdentity(1UL, ReaderTokenKey(document, anchor, analysis))
+
+    private fun snapshot(
+        document: DocumentId,
+        anchor: TextAnchor,
+        analysis: ReaderAnalysis,
+        tokens: List<EffectivePageToken>,
+    ) = EffectiveReaderPage(identity(document, anchor, analysis), tokens)
+
+    private fun token(
+        index: ULong,
+        anchor: TextAnchor,
+        display: TextRange,
+        surface: String,
+        reading: String?,
+        form: String?,
+        vocabulary: ReaderVocabulary?,
+    ) =
+        EffectivePageToken(
+            index,
+            anchor,
+            display,
+            surface,
+            EffectiveTokenEligibility.ANALYZERJAPANESE,
+            reading,
+            form,
+            vocabulary,
+        )
+
     private fun anchor(start: Long, end: Long) =
         TextAnchor(SourceId(1), ChapterId(2), TextRange(TextOffset(start), TextOffset(end)))
 
@@ -34,10 +64,9 @@ class ReaderWordSpansTest {
     @Test
     fun unicodeRangesPreserveGapsCombiningMarksAndFullCrossingTokenIdentity() {
         val page = page("😀 𠮷か\u3099\u0000猫", 4)
-        val key =
-            ReaderTokenKey(page.documentId, page.anchor, ReaderAnalysis.Available(AnalysisId(4)))
+        val key = identity(page.documentId, page.anchor, ReaderAnalysis.Available(AnalysisId(4)))
         val first =
-            ReaderToken(
+            token(
                 7UL,
                 anchor(9, 19),
                 TextRange(TextOffset(5), TextOffset(15)),
@@ -47,7 +76,7 @@ class ReaderWordSpansTest {
                 ReaderVocabulary(VocabularyId(5), VocabularyStatus.NEW),
             )
         val second =
-            ReaderToken(
+            token(
                 8UL,
                 anchor(20, 23),
                 TextRange(TextOffset(16), TextOffset(19)),
@@ -57,8 +86,8 @@ class ReaderWordSpansTest {
                 null,
             )
         val snapshot =
-            ReaderTokenSnapshot(page.documentId, page.anchor, key.analysis, listOf(first, second))
-        val spans = readerDisplayTokens(page, key, snapshot)!!
+            snapshot(page.documentId, page.anchor, key.base.analysis, listOf(first, second))
+        val spans = effectiveDisplayTokens(page, key, snapshot)!!
         assertEquals(listOf(3 to 7, 8 to 9), spans.map { it.start to it.end })
         assertEquals("𠮷か\u3099", page.text.substring(spans.first().start, spans.first().end))
         val taps = mutableListOf<ULong>()
@@ -82,15 +111,15 @@ class ReaderWordSpansTest {
         val full = "𠮷野家"
         for ((visible, start, end) in listOf(Triple("𠮷", 10L, 14L), Triple("野家", 14L, 20L))) {
             val clippedPage = page(visible, start)
-            val clippedKey = key.copy(page = clippedPage.anchor)
+            val clippedKey = key.copy(base = key.base.copy(page = clippedPage.anchor))
             val crossing =
                 first.copy(
                     anchor = anchor(10, 20),
                     surface = full,
                     displayRange = TextRange(TextOffset(0), TextOffset(end - start)),
                 )
-            val clipped = snapshot.copy(page = clippedPage.anchor, tokens = listOf(crossing))
-            val span = readerDisplayTokens(clippedPage, clippedKey, clipped)!!.single()
+            val clipped = snapshot.copy(identity = clippedKey, tokens = listOf(crossing))
+            val span = effectiveDisplayTokens(clippedPage, clippedKey, clipped)!!.single()
             assertEquals(full, span.token.surface)
             assertEquals(visible, visible.substring(span.start, span.end))
         }
@@ -99,10 +128,9 @@ class ReaderWordSpansTest {
     @Test
     fun invalidOrForeignRangesNeverCreateLinksAndMissingAnalysisStaysEmpty() {
         val page = page("𠮷猫")
-        val key =
-            ReaderTokenKey(page.documentId, page.anchor, ReaderAnalysis.Available(AnalysisId(4)))
+        val key = identity(page.documentId, page.anchor, ReaderAnalysis.Available(AnalysisId(4)))
         val token =
-            ReaderToken(
+            token(
                 0UL,
                 page.anchor,
                 TextRange(TextOffset(0), TextOffset(7)),
@@ -111,9 +139,8 @@ class ReaderWordSpansTest {
                 null,
                 null,
             )
-        val snapshot =
-            ReaderTokenSnapshot(page.documentId, page.anchor, key.analysis, listOf(token))
-        assertNotNull(readerDisplayTokens(page, key, snapshot))
+        val snapshot = snapshot(page.documentId, page.anchor, key.base.analysis, listOf(token))
+        assertNotNull(effectiveDisplayTokens(page, key, snapshot))
         for (range in
             listOf(
                 -1L to 7L,
@@ -124,7 +151,7 @@ class ReaderWordSpansTest {
                 Long.MAX_VALUE to Long.MAX_VALUE,
             )) {
             assertNull(
-                readerDisplayTokens(
+                effectiveDisplayTokens(
                     page,
                     key,
                     snapshot.copy(
@@ -139,46 +166,57 @@ class ReaderWordSpansTest {
                 )
             )
         }
-        assertNull(readerDisplayTokens(page, key, snapshot.copy(documentId = DocumentId(99))))
         assertNull(
-            readerDisplayTokens(
+            effectiveDisplayTokens(
                 page,
                 key,
-                snapshot.copy(analysis = ReaderAnalysis.Available(AnalysisId(9))),
+                snapshot.copy(
+                    identity = key.copy(base = key.base.copy(documentId = DocumentId(99)))
+                ),
             )
         )
-        assertNull(readerDisplayTokens(page, key, snapshot.copy(tokens = listOf(token, token))))
         assertNull(
-            readerDisplayTokens(
+            effectiveDisplayTokens(
+                page,
+                key,
+                snapshot.copy(
+                    identity =
+                        key.copy(
+                            base = key.base.copy(analysis = ReaderAnalysis.Available(AnalysisId(9)))
+                        )
+                ),
+            )
+        )
+        assertNull(effectiveDisplayTokens(page, key, snapshot.copy(tokens = listOf(token, token))))
+        assertNull(
+            effectiveDisplayTokens(
                 page,
                 key,
                 snapshot.copy(tokens = listOf(token.copy(surface = "違う"))),
             )
         )
-        assertNull(readerDisplayTokens(page.copy(text = "\uD800"), key, snapshot))
+        assertNull(effectiveDisplayTokens(page.copy(text = "\uD800"), key, snapshot))
         assertEquals(
-            emptyList<ReaderDisplayToken>(),
-            readerDisplayTokens(page, key, snapshot.copy(tokens = emptyList())),
+            emptyList<EffectiveDisplayToken>(),
+            effectiveDisplayTokens(page, key, snapshot.copy(tokens = emptyList())),
         )
-        val missingKey = key.copy(analysis = ReaderAnalysis.Missing)
+        val missingKey = key.copy(base = key.base.copy(analysis = ReaderAnalysis.Missing))
         assertEquals(
-            emptyList<ReaderDisplayToken>(),
-            readerDisplayTokens(
+            emptyList<EffectiveDisplayToken>(),
+            effectiveDisplayTokens(
                 page,
                 missingKey,
-                snapshot.copy(analysis = ReaderAnalysis.Missing, tokens = emptyList()),
+                snapshot.copy(identity = missingKey, tokens = emptyList()),
             ),
         )
-        assertNull(
-            readerDisplayTokens(page, missingKey, snapshot.copy(analysis = ReaderAnalysis.Missing))
-        )
+        assertNull(effectiveDisplayTokens(page, missingKey, snapshot.copy(identity = missingKey)))
     }
 
     @Test
     fun sourceStylesPreserveUnicodeAndWordIdentityAroundWebsiteTapAreas() {
         val page = page("😀𠮷猫犬")
         val token =
-            ReaderToken(
+            token(
                 7UL,
                 page.anchor,
                 TextRange(TextOffset(0), TextOffset(14)),
@@ -187,13 +225,12 @@ class ReaderWordSpansTest {
                 null,
                 ReaderVocabulary(VocabularyId(5), VocabularyStatus.NEW),
             )
-        val key =
-            ReaderTokenKey(page.documentId, page.anchor, ReaderAnalysis.Available(AnalysisId(4)))
+        val key = identity(page.documentId, page.anchor, ReaderAnalysis.Available(AnalysisId(4)))
         val tokens =
-            readerDisplayTokens(
+            effectiveDisplayTokens(
                 page,
                 key,
-                ReaderTokenSnapshot(page.documentId, page.anchor, key.analysis, listOf(token)),
+                snapshot(page.documentId, page.anchor, key.base.analysis, listOf(token)),
             )!!
         fun span(start: Long, end: Long, style: ReaderTextStyle) =
             ReaderTextSpan(TextRange(TextOffset(start), TextOffset(end)), style)

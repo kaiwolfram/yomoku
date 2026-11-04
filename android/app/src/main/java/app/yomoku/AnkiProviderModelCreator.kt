@@ -32,7 +32,7 @@ internal sealed interface AnkiModelCreationResult {
  * Worker-only creation boundary used by the retained typed dispatcher. Only the fresh ID returned
  * by this invocation can receive a template update. There is no repair/delete API or automatic
  * retry/cleanup. Rust supplies the expected layout; creation is not a lease for note insertion. The
- * dispatcher requires a durably committed native permit before any live call.
+ * dispatcher consumes an in-memory native invocation before any live call.
  */
 internal class AnkiProviderModelCreator(
     private val resolver: ContentResolver,

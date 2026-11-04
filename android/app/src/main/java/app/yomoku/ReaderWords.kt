@@ -24,12 +24,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -39,7 +34,6 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -57,16 +51,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupProperties
-import androidx.core.net.toUri
-import app.yomoku.shared.AnkiSelection
-import app.yomoku.shared.Event
-import app.yomoku.shared.ReaderStatusChange
 import app.yomoku.shared.ReaderTextSpan
 import app.yomoku.shared.ReaderTextStyle
-import app.yomoku.shared.ReaderTokenKey
 import app.yomoku.shared.ReaderVocabulary
-import app.yomoku.shared.ReaderWordSelection
-import app.yomoku.shared.ViewModel
 import app.yomoku.shared.VocabularyStatus
 
 internal fun vocabularyBackground(status: VocabularyStatus?, dark: Boolean): Color =
@@ -81,7 +68,7 @@ internal fun vocabularyBackground(status: VocabularyStatus?, dark: Boolean): Col
 
 internal fun readerAnnotatedText(
     text: String,
-    tokens: List<ReaderDisplayToken>,
+    tokens: List<EffectiveDisplayToken>,
     dark: Boolean,
     foreground: Color,
     formatting: List<ReaderTextSpan> = emptyList(),
@@ -92,7 +79,12 @@ internal fun readerAnnotatedText(
     readerAnnotatedSpans(
         text,
         tokens.map {
-            ReaderAnnotatedToken(it.token.tokenIndex, it.token.vocabulary?.status, it.start, it.end)
+            ReaderAnnotatedToken(
+                it.token.segmentIndex,
+                it.token.vocabulary?.status,
+                it.start,
+                it.end,
+            )
         },
         dark,
         foreground,
@@ -186,170 +178,6 @@ internal fun readerAnnotatedSpans(
                 range.first,
                 range.last + 1,
             )
-        }
-    }
-}
-
-@Composable
-internal fun ReaderWords(
-    view: ViewModel,
-    dispatch: (Event) -> Unit,
-    onInteraction: () -> Unit,
-    imageLoader: EpubImageLoader? = null,
-    ankiBrowser: AnkiNoteBrowser? = null,
-) {
-    val page = view.reader ?: return
-    val key = view.readerAnalysis?.let { ReaderTokenKey(page.documentId, page.anchor, it) }
-    val snapshot = view.readerTokens
-    val canWrite = !view.storageBusy && !view.readingTimeSavePending && !view.completionSavePending
-    var requested by remember(key) { mutableStateOf(false) }
-    LaunchedEffect(key, snapshot, canWrite, view.documentError) {
-        if (snapshot != null) requested = false
-        else if (key != null && !requested && canWrite && view.documentError == null) {
-            requested = true
-            dispatch(Event.LoadReaderTokens(key))
-        }
-    }
-    val tokens =
-        remember(page, key, snapshot) {
-            if (key != null && snapshot != null) readerDisplayTokens(page, key, snapshot) else null
-        }
-    var selectedIndex by remember(key, tokens == null) { mutableStateOf<ULong?>(null) }
-    val selection = selectedIndex?.let { index -> key?.let { ReaderWordSelection(it, index) } }
-    var wordRequested by remember(selection) { mutableStateOf(false) }
-    val currentDispatch by rememberUpdatedState(dispatch)
-    DisposableEffect(Unit) {
-        onDispose { currentDispatch(Event.DismissReaderWord) }
-    }
-    LaunchedEffect(selection, canWrite, view.readerWordSelection) {
-        if (selection != null) {
-            if (wordRequested && view.readerWordSelection != selection) {
-                // Core invalidation must dismiss, including refresh at the same page anchor.
-                selectedIndex = null
-            } else if (!wordRequested && canWrite) {
-                wordRequested = true
-                dispatch(Event.LoadReaderWord(selection))
-            }
-        }
-    }
-    val currentInteraction by rememberUpdatedState(onInteraction)
-    val dark = isSystemInDarkTheme()
-    val foreground = MaterialTheme.colorScheme.onSurface
-    val linkColor = MaterialTheme.colorScheme.primary
-    val uriHandler = LocalUriHandler.current
-    val text =
-        remember(key, page, tokens, dark, foreground, linkColor, uriHandler) {
-            readerAnnotatedText(
-                page.text,
-                tokens.orEmpty(),
-                dark,
-                foreground,
-                page.formatting,
-                linkColor,
-                onExternalLink = { target ->
-                    currentInteraction()
-                    try {
-                        uriHandler.openUri(target.toUri().normalizeScheme().toString())
-                    } catch (_: IllegalArgumentException) {
-                        // No external browser can handle this source URL.
-                    }
-                },
-            ) { index ->
-                currentInteraction()
-                selectedIndex = index
-            }
-        }
-    ReaderImageContent(
-        page,
-        text,
-        imageLoader,
-        onInteraction,
-        view.readerTypography,
-        view.readerFurigana,
-    )
-    if (
-        key != null &&
-            snapshot == null &&
-            (requested || view.documentError != null) &&
-            canWrite &&
-            view.readerTime != null
-    ) {
-        TextButton(
-            onClick = {
-                requested = true
-                dispatch(Event.LoadReaderTokens(key))
-            },
-            modifier = Modifier.testTag("retry_word_lookup"),
-        ) {
-            Text(stringResource(R.string.retry_word_lookup))
-        }
-    }
-    val selected = tokens?.singleOrNull { it.token.tokenIndex == selectedIndex }?.token
-    if (selected != null && key != null) {
-        ReaderWordPanel(
-            ReaderWordHeader(
-                selected.surface,
-                selected.reading,
-                selected.dictionaryForm,
-                selected.vocabulary,
-            ),
-            canWrite,
-            onInteraction,
-            onClose = {
-                selectedIndex = null
-                dispatch(Event.DismissReaderWord)
-            },
-            onStatus = { status ->
-                selected.vocabulary?.let {
-                    dispatch(
-                        Event.SetReaderStatus(
-                            ReaderStatusChange(key, it.id, status, System.currentTimeMillis())
-                        )
-                    )
-                }
-            },
-        ) {
-            StorageStatus(view)
-            val details =
-                view.readerWord?.takeIf {
-                    it.token == selected && it.key == key && view.readerWordSelection == selection
-                }
-            if (details != null) {
-                val ankiSelection = AnkiSelection.Original(details.selectionForAnki())
-                ObserveReaderAnkiEntries(
-                    ankiSelection,
-                    view.ankiSetup,
-                    canWrite,
-                    dispatch,
-                )
-                ReaderDictionary(
-                    details.encountered,
-                    details.candidates,
-                    action = { entry ->
-                        AnkiEntryAction(
-                            view.ankiEntries.find {
-                                it.selection == ankiSelection && it.key == entry
-                            },
-                            canWrite,
-                            dispatch,
-                            onInteraction,
-                            ankiBrowser,
-                        )
-                    },
-                    notice = { entry ->
-                        AnkiEntryNotice(
-                            view.ankiEntries.find {
-                                it.selection == ankiSelection && it.key == entry
-                            },
-                            ankiBrowser,
-                        )
-                    },
-                )
-            } else {
-                ReaderWordLookupState(view.readerWordError != null, canWrite, onInteraction) {
-                    selection?.let { dispatch(Event.LoadReaderWord(it)) }
-                }
-            }
         }
     }
 }
@@ -524,6 +352,3 @@ internal fun VocabularyStatus.labelResource(): Int =
         VocabularyStatus.KNOWN -> R.string.status_known
         VocabularyStatus.IGNORED -> R.string.status_ignored
     }
-
-private fun app.yomoku.shared.ReaderWordDetails.selectionForAnki() =
-    ReaderWordSelection(key, token.tokenIndex)

@@ -31,7 +31,7 @@ fn prepare(model: &mut Model, selection: AnkiSelection) -> AnkiPreflightRequest 
     model.pending_anki_export_preflight().unwrap().clone()
 }
 fn ready() -> (Model, AnkiSelection) {
-    let (mut model, selection) = fixture(true);
+    let (mut model, selection) = fixture();
     let read = prepare(&mut model, selection);
     update(
         &mut model,
@@ -84,7 +84,7 @@ fn direct_provider_effect_consumes_one_owner_and_ignores_repeated_taps_and_callb
 
 #[test]
 fn lost_or_failed_query_never_implies_absence_and_retry_uses_a_new_read_owner() {
-    let (mut model, selection) = fixture(true);
+    let (mut model, selection) = fixture();
     let old = prepare(&mut model, selection);
     update(&mut model, Event::RetryAnkiExportPreflight);
     let fresh = model.pending_anki_export_preflight().unwrap().clone();
@@ -111,7 +111,7 @@ fn lost_or_failed_query_never_implies_absence_and_retry_uses_a_new_read_owner() 
 
 #[test]
 fn exact_existing_notes_created_or_deleted_externally_are_observed_by_fresh_queries() {
-    let (mut model, selection) = fixture(true);
+    let (mut model, selection) = fixture();
     let read = prepare(&mut model, selection);
     update(
         &mut model,

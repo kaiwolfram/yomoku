@@ -12,16 +12,19 @@ import java.util.concurrent.TimeUnit
 internal fun verifyAnkiSettingsBridge(fixtures: String) {
     val root = File(fixtures)
     val entrySelection =
-        AnkiSelection.Original(
-            ReaderWordSelection(
-                ReaderTokenKey(
-                    DocumentId(Long.MAX_VALUE),
-                    TextAnchor(
-                        SourceId(9007199254740993L),
-                        ChapterId(Long.MAX_VALUE),
-                        TextRange(TextOffset(0), TextOffset(3)),
+        AnkiSelection.Effective(
+            EffectiveReaderSelection(
+                EffectivePageIdentity(
+                    ULong.MAX_VALUE,
+                    ReaderTokenKey(
+                        DocumentId(Long.MAX_VALUE),
+                        TextAnchor(
+                            SourceId(9007199254740993L),
+                            ChapterId(Long.MAX_VALUE),
+                            TextRange(TextOffset(0), TextOffset(3)),
+                        ),
+                        ReaderAnalysis.Available(AnalysisId(Long.MAX_VALUE)),
                     ),
-                    ReaderAnalysis.Available(AnalysisId(Long.MAX_VALUE)),
                 ),
                 ULong.MAX_VALUE,
             )
@@ -121,9 +124,8 @@ internal fun verifyAnkiSettingsBridge(fixtures: String) {
         }
     }
     try {
-        for (kind in listOf("note", "model")) {
+        for (kind in listOf("settings")) {
             val database = directory.resolve("$kind.sqlite3")
-            root.resolve("anki-$kind-seed.sqlite3").copyTo(database)
             NativeBridge(database.path, listener, HostDictionary()).use { bridge ->
                 check(view(bridge).ankiSettings.phase == AnkiSettingsPhase.UNLOADED)
                 send(bridge, Event.LoadAnkiSettings)

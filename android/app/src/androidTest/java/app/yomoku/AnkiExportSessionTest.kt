@@ -103,10 +103,6 @@ class AnkiExportSessionTest {
                     },
                     invokeAnkiLive = {
                         assertNotEquals(Looper.getMainLooper(), Looper.myLooper())
-                        // An invocation must see its already committed pending journal.
-                        val table =
-                            if (it is AnkiLiveOperation.CreateModel) "anki_model_creations"
-                            else "anki_submissions"
                         SQLiteDatabase.openDatabase(
                                 File(directory, "db.sqlite3").path,
                                 null,
@@ -114,12 +110,13 @@ class AnkiExportSessionTest {
                             )
                             .use { sql ->
                                 sql.rawQuery(
-                                        "SELECT state FROM $table ORDER BY id DESC LIMIT 1",
+                                        "SELECT name FROM sqlite_schema WHERE type = 'table' AND name LIKE 'anki_%'",
                                         null,
                                     )
                                     .use { row ->
                                         assertTrue(row.moveToFirst())
-                                        assertEquals("pending", row.getString(0))
+                                        assertEquals("anki_settings", row.getString(0))
+                                        assertFalse(row.moveToNext())
                                     }
                             }
                         operations.add(it)
@@ -260,6 +257,7 @@ class AnkiExportSessionTest {
             click(entryTag(entry))
             val operation =
                 checkNotNull(operations.poll(60, TimeUnit.SECONDS)) as AnkiLiveOperation.InsertNote
+            await { it.ankiExport?.phase == AnkiExportPhase.Invoking }
             val accepted = core.view.ankiExport
             send(Event.DismissReaderWord)
             compose.onNodeWithTag("reader_word_panel").assertDoesNotExist()

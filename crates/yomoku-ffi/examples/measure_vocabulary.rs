@@ -290,7 +290,7 @@ impl Session {
             sender.send((Instant::now(), result.unwrap())).unwrap();
         };
         #[cfg(not(feature = "storage-measurements"))]
-        let (bridge, _) = YomokuBridge::with_effective_reader(
+        let (bridge, _) = YomokuBridge::new(
             path.into(),
             Box::new(|| panic!("Vocabulary must not load an analyzer")),
             Box::new(|| panic!("Vocabulary must not load a dictionary")),

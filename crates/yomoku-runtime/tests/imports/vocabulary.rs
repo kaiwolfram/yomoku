@@ -16,7 +16,7 @@ fn vocabulary_fifo_pages_match_repository_and_never_load_analyzer_or_write() {
     let database = Database::new();
     let observer = seed(&database);
     let Factory { loader, trace, .. } = Factory::new(false, None);
-    let (router, lifecycle) = effect_router_with_analyzed_imports(database.path(), loader).unwrap();
+    let (router, lifecycle) = import_router(database.path(), loader).unwrap();
     router.update(Event::SelectDestination(Destination::Vocabulary), |_| {});
     let before = std::fs::read(database.path()).unwrap();
     for sort in [
@@ -54,7 +54,7 @@ fn vocabulary_worker_failed_append_retries_exact_page_without_rescan_then_refres
     let database = Database::new();
     let mut observer = seed(&database);
     let Factory { loader, trace, .. } = Factory::new(false, None);
-    let (router, lifecycle) = effect_router_with_analyzed_imports(database.path(), loader).unwrap();
+    let (router, lifecycle) = import_router(database.path(), loader).unwrap();
     router.update(Event::SelectDestination(Destination::Vocabulary), |_| {});
     let query = VocabularyQuery {
         sort: VocabularySort::Alphabetical,
@@ -97,7 +97,7 @@ fn vocabulary_external_count_changes_restart_pages_and_reopen_reads_literal_filt
     let database = Database::new();
     let mut observer = seed(&database);
     let Factory { loader, trace, .. } = Factory::new(false, None);
-    let (router, lifecycle) = effect_router_with_analyzed_imports(database.path(), loader).unwrap();
+    let (router, lifecycle) = import_router(database.path(), loader).unwrap();
     router.update(Event::SelectDestination(Destination::Vocabulary), |_| {});
     dispatch(&router, Event::LoadVocabulary);
     observer
@@ -124,8 +124,7 @@ fn vocabulary_external_count_changes_restart_pages_and_reopen_reads_literal_filt
         trace: reopened_trace,
         ..
     } = Factory::new(false, None);
-    let (reopened, lifecycle) =
-        effect_router_with_analyzed_imports(database.path(), loader).unwrap();
+    let (reopened, lifecycle) = import_router(database.path(), loader).unwrap();
     reopened.update(Event::SelectDestination(Destination::Vocabulary), |_| {});
     for statuses in [
         vec![VocabularyStatus::New],
@@ -155,7 +154,7 @@ fn vocabulary_bulk_fifo_frozen_status_retry_rolls_back_all_rows_and_excludes_lat
     let database = Database::new();
     let mut observer = seed(&database);
     let Factory { loader, trace, .. } = Factory::new(false, None);
-    let (router, lifecycle) = effect_router_with_analyzed_imports(database.path(), loader).unwrap();
+    let (router, lifecycle) = import_router(database.path(), loader).unwrap();
     router.update(Event::SelectDestination(Destination::Vocabulary), |_| {});
     let first = dispatch(&router, Event::LoadVocabulary);
     assert_eq!(first.vocabulary.rows.len(), 100);
@@ -244,7 +243,7 @@ fn vocabulary_bulk_fifo_delete_cancel_rollback_retry_and_reopen_keep_new_generat
     let database = Database::new();
     let mut observer = seed(&database);
     let Factory { loader, trace, .. } = Factory::new(false, None);
-    let (router, lifecycle) = effect_router_with_analyzed_imports(database.path(), loader).unwrap();
+    let (router, lifecycle) = import_router(database.path(), loader).unwrap();
     router.update(Event::SelectDestination(Destination::Vocabulary), |_| {});
     dispatch(&router, Event::LoadVocabulary);
     dispatch(&router, Event::SelectAllVocabulary);
@@ -309,8 +308,7 @@ fn vocabulary_bulk_fifo_delete_cancel_rollback_retry_and_reopen_keep_new_generat
         trace: reopened_trace,
         ..
     } = Factory::new(false, None);
-    let (reopened, lifecycle) =
-        effect_router_with_analyzed_imports(database.path(), loader).unwrap();
+    let (reopened, lifecycle) = import_router(database.path(), loader).unwrap();
     reopened.update(Event::SelectDestination(Destination::Vocabulary), |_| {});
     let view = dispatch(&reopened, Event::LoadVocabulary);
     assert_eq!(view.vocabulary.matching_count, Some(2));

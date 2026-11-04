@@ -1,7 +1,6 @@
 package app.yomoku.tests
 
 import app.yomoku.effectiveDisplayTokens
-import app.yomoku.readerDisplayTokens
 import app.yomoku.shared.*
 import app.yomoku.utf8Boundaries
 
@@ -74,26 +73,6 @@ fun verifyEffectiveReaderDisplay() {
         check(spans.map { it.selection.segmentIndex } == listOf(7uL, ULong.MAX_VALUE))
         check(spans.all { it.selection.page == identity })
         check(spans.last().token.reading == null && spans.last().token.dictionaryForm == null)
-        // The shared geometry preserves the existing B renderer's ranges too.
-        val legacy =
-            ReaderTokenSnapshot(
-                page.documentId,
-                page.anchor,
-                identity.base.analysis,
-                tokens.map {
-                    ReaderToken(
-                        it.segmentIndex,
-                        it.anchor,
-                        it.displayRange,
-                        it.surface,
-                        it.reading,
-                        it.dictionaryForm,
-                        it.vocabulary,
-                    )
-                },
-            )
-        val old = checkNotNull(readerDisplayTokens(page, identity.base, legacy))
-        check(old.map { it.start to it.end } == spans.map { it.start to it.end })
     }
     check(before.contentEquals(snapshot.bincodeSerialize()))
 

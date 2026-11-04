@@ -31,11 +31,7 @@ use crate::{
     imports::{EpubImport, SrtImport, TxtImport},
     library::{valid_document_title, LibraryRenameState, LibrarySort, LibraryWordDistribution},
     pagination::{LogicalPages, PageLength, ReadingPosition},
-    reader::{
-        ReaderAnalysis, ReaderChapterAnalysis, ReaderPage, ReaderStatusChange, ReaderTokenKey,
-        ReaderTokenSnapshot,
-    },
-    reader::{ReaderWordDetails, ReaderWordSelection},
+    reader::{ReaderAnalysis, ReaderChapterAnalysis, ReaderPage, ReaderTokenKey},
     storage::{DocumentError, StorageOperation, StorageResult},
 };
 
@@ -89,7 +85,6 @@ pub struct Model {
     anki_preparation_sequence: u64,
     anki_live: Option<crate::anki::AnkiLiveState>,
     anki_export_preflight: Option<crate::anki::AnkiPreflight>,
-    /// Keep a completed recovery visible for this session after attention was needed.
     vocabulary: crate::vocabulary::VocabularyState,
     vocabulary_request: Option<vocabulary::VocabularyRequest>,
     vocabulary_request_sequence: u64,
@@ -115,7 +110,6 @@ pub struct Model {
     pending_documents_delete: Option<Vec<DocumentId>>,
     library_rename: Option<LibraryRenameState>,
     pending_document_rename: Option<(DocumentId, String)>,
-    loaded_document: Option<ReaderDocument>,
     storage_busy: bool,
     document_error: Option<DocumentError>,
     content_route: ContentRoute,
@@ -132,19 +126,11 @@ pub struct Model {
     pending_time_checkpoint: Option<StorageOperation>,
     queued_time_checkpoint: Option<ReadingTimeUpdate>,
     deferred_reader_event: Option<Event>,
-    pending_completion: Option<StorageOperation>,
     completion_notice: Option<CompletionNotice>,
     book_completion_notice: Option<CompletionCommandId>,
     reader_clock: Option<ActiveReadingTime>,
     time_checkpoint_can_wait: bool,
-    reader_tokens: Option<ReaderTokenSnapshot>,
-    pending_token_load: Option<ReaderTokenKey>,
-    pending_status_change: Option<ReaderStatusChange>,
-    pending_word_load: Option<ReaderWordSelection>,
-    reader_word_selection: Option<ReaderWordSelection>,
-    reader_word: Option<ReaderWordDetails>,
-    reader_word_error: Option<DocumentError>,
-    effective_reader: Option<EffectiveReaderSession>,
+    effective_reader: EffectiveReaderSession,
     effective_request: Option<EffectiveReaderRequest>,
 }
 
@@ -204,7 +190,7 @@ pub enum Event {
     CancelDocumentRename,
     SaveDocumentTitle(DocumentId),
     CreatePaste(String),
-    LoadPaste(DocumentId),
+
     OpenPaste,
     OpenReader(DocumentId),
     CloseDocument,
@@ -220,14 +206,7 @@ pub enum Event {
     CheckpointReadingTime(ReadingTimeUpdate),
     /// Retry the frozen absolute checkpoint, including its original revision.
     RetryReadingTimeCheckpoint,
-    /// Anchors reject late duplicate callbacks after moving to another page.
-    /// Caller pauses accounting and submits its final checkpoint first.
-    CompleteReaderPage {
-        document_id: DocumentId,
-        page: TextAnchor,
-        position: ReadingPosition,
-        completed_at_unix_ms: i64,
-    },
+
     /// Retry preparation or the exact frozen analyzed command after a failure.
     RetryReaderCompletion,
     DismissCompletionNotice,
@@ -244,10 +223,7 @@ pub enum Event {
     DismissBookCompletionNotice(CompletionCommandId),
     /// Explicit refresh; stale UI callbacks cannot request another page's tokens.
     LoadReaderTokens(ReaderTokenKey),
-    /// Explicit manual choice; only existing vocabulary on the loaded page.
-    SetReaderStatus(ReaderStatusChange),
-    /// Explicit selection/refresh; rejected until current page tokens are loaded.
-    LoadReaderWord(ReaderWordSelection),
+
     DismissReaderWord,
 
     /// Per-file atomic import; success returns to Library with a summary.
@@ -277,7 +253,7 @@ pub enum Event {
     /// Explicitly abandon a lost read or old observation and capture a fresh handle.
     RetryAnkiExportPreflight,
 
-    /// Consume an already committed native permit once; cannot prepare or begin a write.
+    /// Consume an in-memory native invocation once; cannot prepare or begin a write.
     DispatchAnkiLive,
     /// Freeze the current loaded dictionary selection with the acknowledged configured deck.
     /// Unready/unconfigured settings and invalid selections do nothing; no I/O is started.
@@ -289,7 +265,7 @@ pub enum Event {
         preparation_id: u64,
         expected_phase: crate::anki::AnkiExportPhase,
     },
-    /// Dismiss only the matching frozen intent; native live/recovery gates still apply.
+    /// Dismiss only the matching frozen intent; active-operation gates still apply.
     ClearAnkiExport {
         preparation_id: u64,
     },
@@ -389,7 +365,6 @@ pub struct ViewModel {
     pub anki_settings: crate::anki::AnkiSettingsView,
     pub anki_setup: crate::anki::AnkiSetupPhase,
     pub anki_entries: Vec<crate::anki::AnkiEntryView>,
-    /// Settings-only recovery presentation; journal payloads and handles stay native.
     /// Session-owned frozen export status; observed IDs carry no callback authority.
     pub anki_export: Option<crate::anki::AnkiExportView>,
     pub vocabulary: crate::vocabulary::VocabularyState,
@@ -412,12 +387,11 @@ pub struct ViewModel {
     pub library_selection: Option<Vec<DocumentId>>,
     pub library_bulk_delete_targets: Option<Vec<LibraryDocument>>,
     pub library_rename: Option<LibraryRenameState>,
-    pub loaded_document: Option<ReaderDocument>,
     pub storage_busy: bool,
     pub document_error: Option<DocumentError>,
     pub content_route: ContentRoute,
     pub reader: Option<ReaderPage>,
-    /// Present only for an opened reader; Missing identifies a legacy document.
+    /// Present only for an opened reader; Missing identifies unavailable stored analysis.
     pub reader_analysis: Option<ReaderAnalysis>,
     /// None until persisted settings have been loaded successfully.
     pub page_length: Option<PageLength>,
@@ -432,17 +406,11 @@ pub struct ViewModel {
     /// One newly recorded final-page command, independent of permanent finish state.
     pub book_completion_notice: Option<CompletionCommandId>,
     /// None until explicitly loaded for the current document/page/base analysis.
-    pub reader_tokens: Option<ReaderTokenSnapshot>,
-    /// Native opt-in integration path; production activation waits for all consumers.
     pub effective_reader_tokens: Option<EffectiveReaderPage>,
     pub effective_reader_word: Option<EffectiveReaderWordState>,
     pub effective_reader_status: Option<EffectiveStatusState>,
     /// Enabled source-preferred readings, in page-local UTF-8 ranges. No I/O.
     pub reader_furigana: Vec<crate::reader_ruby::ReaderRuby>,
-    pub reader_word_selection: Option<ReaderWordSelection>,
-    pub reader_word: Option<ReaderWordDetails>,
-    /// Separate from save errors so timer checkpoints cannot erase a failed lookup.
-    pub reader_word_error: Option<DocumentError>,
 }
 
 #[effect]
@@ -613,60 +581,6 @@ impl App for Yomoku {
             }
         }
         let operation = match &event {
-            Event::CompleteReaderPage {
-                document_id,
-                page,
-                position,
-                completed_at_unix_ms,
-            } => {
-                if model.completion_pending()
-                    || model.deferred_reader_event.is_some()
-                    || (model.storage_busy
-                        && model.pending_time_checkpoint.is_none()
-                        && model.queued_time_checkpoint.is_none())
-                    || model.content_route != ContentRoute::Reader
-                    || model.settings_open
-                    || *completed_at_unix_ms < 0
-                    || !model.reader.as_ref().is_some_and(|reader| {
-                        reader.position.offset != reader.anchor.range.end
-                            && reader.document_id == *document_id
-                            && reader.anchor == *page
-                            && reader.position == *position
-                    })
-                {
-                    return Command::done();
-                }
-                let Some(ReaderAnalysis::Available(analysis_id)) = model.reader_analysis else {
-                    model.document_error = Some(DocumentError::MissingAnalysis);
-                    return render::render();
-                };
-                let operation = StorageOperation::PreparePageCompletion(PageCompletionIntent {
-                    document_id: *document_id,
-                    page: *page,
-                    page_length: model.page_length.expect("opened reader settings"),
-                    departing_position: *position,
-                    completed_at_unix_ms: *completed_at_unix_ms,
-                    analysis_id,
-                });
-                model.pending_completion = Some(operation.clone());
-                model.completion_notice = None;
-                model.book_completion_notice = None;
-                if model.pending_time_checkpoint.is_some() || model.queued_time_checkpoint.is_some()
-                {
-                    return render::render();
-                }
-                Some(operation)
-            }
-            Event::RetryReaderCompletion => {
-                if model.pending_time_checkpoint.is_some() || model.queued_time_checkpoint.is_some()
-                {
-                    return Command::done();
-                }
-                let Some(operation) = model.pending_completion.clone() else {
-                    return Command::done();
-                };
-                Some(operation)
-            }
             Event::RestoreReadingTime => {
                 let Some(reader) = model.reader.as_ref() else {
                     return Command::done();
@@ -756,57 +670,15 @@ impl App for Yomoku {
                 {
                     return Command::done();
                 }
-                Some(if model.effective_reader.is_some() {
-                    StorageOperation::LoadEffectiveLibraryWordDistributions
-                } else {
-                    StorageOperation::LoadLibraryWordDistributions
-                })
+                Some(StorageOperation::LoadEffectiveLibraryWordDistributions)
             }
             Event::CreatePaste(text) => Some(StorageOperation::CreatePaste(text.clone())),
             Event::ImportTxt(input) => Some(StorageOperation::ImportTxt(input.clone())),
             Event::ImportSrt(input) => Some(StorageOperation::ImportSrt(input.clone())),
             Event::ImportEpub(input) => Some(StorageOperation::ImportEpub(input.clone())),
-            Event::LoadPaste(id) => Some(StorageOperation::LoadPaste(*id)),
-            Event::OpenReader(id) => Some(StorageOperation::OpenReader(*id)),
-            Event::LoadReaderTokens(key) => {
-                if model.settings_open || model.current_token_key() != Some(*key) {
-                    return Command::done();
-                }
-                Some(StorageOperation::LoadReaderTokens(*key))
-            }
-            Event::LoadReaderWord(selection) => {
-                if model.settings_open
-                    || model.current_token_key() != Some(selection.key)
-                    || !model.reader_tokens.as_ref().is_some_and(|snapshot| {
-                        snapshot.key() == selection.key
-                            && snapshot
-                                .tokens
-                                .iter()
-                                .any(|token| token.token_index == selection.token_index)
-                    })
-                {
-                    return Command::done();
-                }
-                Some(StorageOperation::LoadReaderWord(*selection))
-            }
 
-            Event::SetReaderStatus(change) => {
-                if model.settings_open
-                    || change.occurred_at_unix_ms < 0
-                    || model.current_token_key() != Some(change.key)
-                    || !model.reader_tokens.as_ref().is_some_and(|snapshot| {
-                        snapshot.key() == change.key
-                            && snapshot.tokens.iter().any(|token| {
-                                token
-                                    .vocabulary
-                                    .is_some_and(|entry| entry.id == change.vocabulary_id)
-                            })
-                    })
-                {
-                    return Command::done();
-                }
-                Some(StorageOperation::SetReaderStatus(*change))
-            }
+            Event::OpenReader(id) => Some(StorageOperation::OpenReader(*id)),
+
             Event::SetReaderTypography(typography) => {
                 if !model.settings_open
                     || model.reader_typography.is_none()
@@ -862,9 +734,7 @@ impl App for Yomoku {
                 || (model.completion_pending()
                     && !matches!(
                         event,
-                        Event::CompleteReaderPage { .. }
-                            | Event::RetryReaderCompletion
-                            | Event::RetryReadingTimeCheckpoint
+                        Event::RetryReaderCompletion | Event::RetryReadingTimeCheckpoint
                     )
                     && !draining_completion_time)
             {
@@ -882,15 +752,10 @@ impl App for Yomoku {
                 matches!(operation, StorageOperation::LoadReadingTime { .. });
             model.time_checkpoint_can_wait = match &operation {
                 StorageOperation::List
-                | StorageOperation::LoadLibraryWordDistributions
                 | StorageOperation::LoadEffectiveLibraryWordDistributions
-                | StorageOperation::LoadPaste(_)
                 | StorageOperation::SavePageLength(_)
                 | StorageOperation::SaveReaderTypography(_)
                 | StorageOperation::LoadReadingTime { .. }
-                | StorageOperation::LoadReaderWord(_)
-                | StorageOperation::LoadReaderTokens(_)
-                | StorageOperation::SetReaderStatus(_)
                 | StorageOperation::SaveReadingTime { .. } => true,
                 StorageOperation::SaveReadingPosition { position, .. } => model
                     .reader
@@ -916,8 +781,7 @@ impl App for Yomoku {
                     model.pending_documents_delete = Some(ids.clone());
                     model.library_delete_error = None;
                 }
-                StorageOperation::LoadLibraryWordDistributions
-                | StorageOperation::LoadEffectiveLibraryWordDistributions => {}
+                StorageOperation::LoadEffectiveLibraryWordDistributions => {}
                 _ => {
                     model.clear_library_delete();
                     model.library_selection = None;
@@ -930,48 +794,30 @@ impl App for Yomoku {
             }
             if !matches!(
                 operation,
-                StorageOperation::LoadLibraryWordDistributions
-                    | StorageOperation::LoadEffectiveLibraryWordDistributions
+                StorageOperation::LoadEffectiveLibraryWordDistributions
                     | StorageOperation::DeleteDocument(_)
                     | StorageOperation::DeleteDocuments(_)
                     | StorageOperation::RenameDocument { .. }
             ) {
                 model.document_error = None;
             }
-            if let StorageOperation::LoadReaderWord(selection) = operation {
-                model.reader_word_selection = Some(selection);
-                model.pending_word_load = Some(selection);
-                model.reader_word = None;
-                model.reader_word_error = None;
-            }
+
             // Every accepted operation that invalidates page tokens also retires
             // its selected-word result, even if the resulting anchor is unchanged.
             if matches!(
                 operation,
-                StorageOperation::LoadReaderTokens(_)
-                    | StorageOperation::List
-                    | StorageOperation::LoadPaste(_)
-                    | StorageOperation::OpenReader(_)
+                |StorageOperation::List| StorageOperation::OpenReader(_)
                     | StorageOperation::CreatePaste(_)
                     | StorageOperation::ImportTxt(_)
                     | StorageOperation::ImportSrt(_)
                     | StorageOperation::ImportEpub(_)
                     | StorageOperation::SavePageLength(_)
                     | StorageOperation::SaveReadingPosition { .. }
-                    | StorageOperation::PreparePageCompletion(_)
             ) {
                 model.invalidate_effective_page();
                 model.clear_reader_word();
             }
-            if let StorageOperation::LoadReaderTokens(key) = operation {
-                model.pending_token_load = Some(key);
-                model.invalidate_effective_page();
-                model.reader_tokens = None;
-                model.clear_reader_word();
-            }
-            if let StorageOperation::SetReaderStatus(change) = operation {
-                model.pending_status_change = Some(change);
-            }
+
             if matches!(
                 event,
                 Event::CreatePaste(_)
@@ -984,17 +830,7 @@ impl App for Yomoku {
                 model.completion_notice = None;
                 model.book_completion_notice = None;
             }
-            if matches!(
-                event,
-                Event::CreatePaste(_)
-                    | Event::ImportTxt(_)
-                    | Event::ImportSrt(_)
-                    | Event::ImportEpub(_)
-                    | Event::LoadPaste(_)
-                    | Event::OpenReader(_)
-            ) {
-                model.loaded_document = None;
-            }
+
             if let Event::OpenReader(id) = event {
                 model.destination = Destination::Library;
                 model.settings_open = false;
@@ -1003,7 +839,6 @@ impl App for Yomoku {
                 model.reader = None;
                 model.reader_analysis = None;
                 model.invalidate_effective_page();
-                model.reader_tokens = None;
                 model.clear_reader_word();
                 model.reader_document = None;
                 model.reader_analyses.clear();
@@ -1191,7 +1026,6 @@ impl App for Yomoku {
                 model.reader = None;
                 model.reader_analysis = None;
                 model.invalidate_effective_page();
-                model.reader_tokens = None;
                 model.clear_reader_word();
                 model.reader_document = None;
                 model.reader_analyses.clear();
@@ -1211,7 +1045,6 @@ impl App for Yomoku {
                 model.reader = None;
                 model.reader_analysis = None;
                 model.invalidate_effective_page();
-                model.reader_tokens = None;
                 model.clear_reader_word();
                 model.reader_document = None;
                 model.reader_analyses.clear();
@@ -1250,9 +1083,6 @@ impl App for Yomoku {
                 let restoring_time = std::mem::take(&mut model.restoring_reader_time);
                 let loading_library_words = std::mem::take(&mut model.loading_library_words);
                 let pending_reader = model.pending_reader.take();
-                let token_load = model.pending_token_load.take();
-                let status_change = model.pending_status_change.take();
-                let word_load = model.pending_word_load.take();
                 let document_delete = model.pending_document_delete.take();
                 let documents_delete = model.pending_documents_delete.take();
                 let document_rename = model.pending_document_rename.take();
@@ -1261,10 +1091,7 @@ impl App for Yomoku {
                     StorageResult::Existing(_) => Some(ImportOutcome::Existing),
                     _ => None,
                 };
-                if matches!(
-                    result,
-                    StorageResult::Created(_) | StorageResult::ReaderStatusChanged(..)
-                ) {
+                if matches!(result, StorageResult::Created(_)) {
                     model.invalidate_statistics();
                     model.invalidate_vocabulary();
                 }
@@ -1289,13 +1116,7 @@ impl App for Yomoku {
                                 summary.title.clone_from(&title);
                             }
                             // A cached read must not present the old title later.
-                            if model
-                                .loaded_document
-                                .as_ref()
-                                .is_some_and(|document| document.document_id == document_id)
-                            {
-                                model.loaded_document = None;
-                            }
+
                             model.library_rename = None;
                         }
                     }
@@ -1310,7 +1131,7 @@ impl App for Yomoku {
                         }
                     }
                     // Effective results must arrive through their captured request,
-                    // never through this uncaptured legacy callback envelope.
+                    // never through this uncaptured callback envelope.
                     StorageResult::Effective(_)
                     | StorageResult::StatisticsLoaded(_)
                     | StorageResult::VocabularyLoaded(_)
@@ -1321,75 +1142,7 @@ impl App for Yomoku {
                         model.document_error = Some(DocumentError::InvalidDocument);
                     }
                     StorageResult::ImportCancelled => {}
-                    StorageResult::ReaderWordLoaded(details) => {
-                        model.invalidate_library_words();
-                        if word_load == Some(details.selection())
-                            && model.reader_word_selection == word_load
-                            && model.current_token_key() == Some(details.key)
-                            && model.reader_tokens.as_ref().is_some_and(|snapshot| {
-                                snapshot.key() == details.key
-                                    && snapshot.tokens.iter().any(|token| {
-                                        let mut expected = token.clone();
-                                        expected.vocabulary = details.token.vocabulary;
-                                        expected == details.token
-                                    })
-                            })
-                        {
-                            // Status can have changed in another session since page load.
-                            if let Some(snapshot) = model.reader_tokens.as_mut() {
-                                for token in &mut snapshot.tokens {
-                                    if token.surface == details.token.surface {
-                                        token.vocabulary = details.token.vocabulary;
-                                    }
-                                }
-                            }
-                            model.reader_word = Some(*details);
-                        }
-                    }
 
-                    StorageResult::ReaderStatusChanged(change, entry) => {
-                        model.invalidate_library_words();
-                        if status_change == Some(change)
-                            && model.current_token_key() == Some(change.key)
-                            && entry.is_none_or(|entry| {
-                                entry.id == change.vocabulary_id && entry.status == change.status
-                            })
-                        {
-                            if let Some(details) = model.reader_word.as_mut().filter(|details| {
-                                details.key == change.key
-                                    && details
-                                        .token
-                                        .vocabulary
-                                        .is_some_and(|value| value.id == change.vocabulary_id)
-                            }) {
-                                details.token.vocabulary = entry;
-                                if entry.is_none() {
-                                    details.encountered = 0;
-                                }
-                            }
-                            if let Some(snapshot) = model
-                                .reader_tokens
-                                .as_mut()
-                                .filter(|snapshot| snapshot.key() == change.key)
-                            {
-                                for token in &mut snapshot.tokens {
-                                    if token
-                                        .vocabulary
-                                        .is_some_and(|entry| entry.id == change.vocabulary_id)
-                                    {
-                                        token.vocabulary = entry;
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    StorageResult::ReaderTokensLoaded(snapshot) => {
-                        if token_load == Some(snapshot.key())
-                            && model.current_token_key() == Some(snapshot.key())
-                        {
-                            model.reader_tokens = Some(snapshot);
-                        }
-                    }
                     StorageResult::Listed(documents, length, typography) => {
                         model.invalidate_library_words();
                         model.reader_typography = Some(typography);
@@ -1438,22 +1191,7 @@ impl App for Yomoku {
                             }
                         }
                     }
-                    StorageResult::PageCompletionPrepared(prepared) => {
-                        model.pending_completion = Some(StorageOperation::CompletePage(prepared));
-                        return self.update(Event::RetryReaderCompletion, model);
-                    }
-                    StorageResult::PageCompleted(document, outcome) => {
-                        model.invalidate_library_words();
-                        let Some(StorageOperation::CompletePage(prepared)) =
-                            model.pending_completion.take()
-                        else {
-                            return render::render();
-                        };
-                        model.apply_completion(prepared.completion, document, outcome);
-                        if let Some(event) = model.deferred_reader_event.take() {
-                            return self.update(event, model);
-                        }
-                    }
+
                     StorageResult::Created(document) | StorageResult::Existing(document) => {
                         model.invalidate_library_words();
                         model.import_summary = Some(ImportSummary {
@@ -1477,7 +1215,6 @@ impl App for Yomoku {
                         model.reader = None;
                         model.reader_analysis = None;
                         model.invalidate_effective_page();
-                        model.reader_tokens = None;
                         model.clear_reader_word();
                         model.reader_document = None;
                         model.reader_analyses.clear();
@@ -1518,11 +1255,9 @@ impl App for Yomoku {
                                 }
                             }
                         }
-                        model.loaded_document = Some(document);
                     }
                     StorageResult::PositionSaved(document) => model.apply_position(document),
                     StorageResult::Failed(error) => {
-                        let key = token_load.or(status_change.map(|change| change.key));
                         if let Some((id, _)) = document_rename {
                             if let Some(draft) = model
                                 .library_rename
@@ -1545,25 +1280,14 @@ impl App for Yomoku {
                             }
                         } else if loading_library_words {
                             model.library_word_error = Some(error);
-                        } else if let Some(selection) = word_load {
-                            if model.reader_word_selection == Some(selection)
-                                && model.current_token_key() == Some(selection.key)
-                            {
-                                model.reader_word_error = Some(error);
-                            }
-                        } else if key.is_none() || key == model.current_token_key() {
+                        } else {
                             model.document_error = Some(error);
                         }
                     }
                 }
                 // Reads and atomic manual choices have no frozen retry obligation.
                 // Their failures must still drain final time and deferred departures.
-                if (!failed
-                    || token_load.is_some()
-                    || status_change.is_some()
-                    || word_load.is_some())
-                    && model.pending_time_checkpoint.is_none()
-                {
+                if !failed && model.pending_time_checkpoint.is_none() {
                     if let Some(checkpoint) = model.queued_time_checkpoint {
                         return self.update(Event::CheckpointReadingTime(checkpoint), model);
                     }
@@ -1578,18 +1302,14 @@ impl App for Yomoku {
             | Event::ImportTxt(_)
             | Event::ImportSrt(_)
             | Event::ImportEpub(_)
-            | Event::LoadPaste(_)
             | Event::OpenReader(_)
-            | Event::LoadReaderWord(_)
             | Event::LoadReaderTokens(_)
-            | Event::SetReaderStatus(_)
             | Event::SetReaderTypography(_)
             | Event::SetPageLength(_)
             | Event::SaveReadingPosition(_) => unreachable!(),
             Event::RestoreReadingTime
             | Event::CheckpointReadingTime(_)
             | Event::RetryReadingTimeCheckpoint
-            | Event::CompleteReaderPage { .. }
             | Event::RetryReaderCompletion
             | Event::PreviousReaderPage { .. }
             | Event::ObserveReaderClock(_)
@@ -1667,7 +1387,6 @@ impl App for Yomoku {
             library_bulk_delete_targets: model.library_bulk_delete_targets.clone(),
             library_rename: model.library_rename.clone(),
             library_document_count: model.documents.len() as u64,
-            loaded_document: model.loaded_document.clone(),
             storage_busy: model.storage_busy,
             document_error: model.document_error,
             content_route: model.content_route,
@@ -1682,35 +1401,18 @@ impl App for Yomoku {
             completion_save_pending: model.completion_pending(),
             completion_notice: model.completion_notice,
             book_completion_notice: model.book_completion_notice,
-            reader_tokens: model.reader_tokens.clone(),
-            effective_reader_tokens: model
-                .effective_reader
-                .as_ref()
-                .and_then(|session| session.page().cloned()),
-            effective_reader_word: model
-                .effective_reader
-                .as_ref()
-                .map(|session| session.word_state()),
-            effective_reader_status: model
-                .effective_reader
-                .as_ref()
-                .map(|session| session.status_state()),
+            effective_reader_tokens: model.effective_reader.page().cloned(),
+            effective_reader_word: Some(model.effective_reader.word_state()),
+            effective_reader_status: Some(model.effective_reader.status_state()),
             reader_furigana: model
                 .reader_typography
                 .filter(|typography| typography.furigana)
                 .and(model.reader.as_ref())
                 .and_then(|page| {
                     let analysis = model.reader_analysis.unwrap_or(ReaderAnalysis::Missing);
-                    if let Some(session) = &model.effective_reader {
-                        session.furigana(page, analysis).ok()
-                    } else {
-                        page.furigana(analysis, model.reader_tokens.as_ref()).ok()
-                    }
+                    model.effective_reader.furigana(page, analysis).ok()
                 })
                 .unwrap_or_default(),
-            reader_word_selection: model.reader_word_selection,
-            reader_word: model.reader_word.clone(),
-            reader_word_error: model.reader_word_error,
         }
     }
 }
@@ -1753,13 +1455,6 @@ impl Model {
         {
             self.import_summary = None;
         }
-        if self
-            .loaded_document
-            .as_ref()
-            .is_some_and(|document| ids.contains(&document.document_id))
-        {
-            self.loaded_document = None;
-        }
     }
 
     fn invalidate_library_words(&mut self) {
@@ -1768,13 +1463,7 @@ impl Model {
     }
 
     fn clear_reader_word(&mut self) {
-        if let Some(session) = &mut self.effective_reader {
-            session.dismiss_word();
-        }
-        self.reader_word_selection = None;
-        self.reader_word = None;
-        self.reader_word_error = None;
-        // Keep the in-flight identity until its callback for clock-save draining.
+        self.effective_reader.dismiss_word();
     }
 
     fn current_token_key(&self) -> Option<ReaderTokenKey> {
@@ -1800,7 +1489,6 @@ impl Model {
         self.reader = None;
         self.reader_analysis = None;
         self.invalidate_effective_page();
-        self.reader_tokens = None;
         self.clear_reader_word();
         self.reader_document = None;
         self.reader_analyses.clear();
@@ -1864,7 +1552,6 @@ impl Model {
             match ReaderPage::open_document(&document, self.page_length.unwrap_or_default()) {
                 Ok(reader) => {
                     self.invalidate_effective_page();
-                    self.reader_tokens = None;
                     self.clear_reader_word();
                     if self.reader_time.is_some_and(|saved| {
                         saved.value.document_id != reader.document_id
@@ -1880,7 +1567,6 @@ impl Model {
                         .map(|entry| entry.analysis);
                     self.reader = Some(reader);
                     self.reader_document = Some(document.clone());
-                    self.loaded_document = Some(document);
                 }
                 Err(_) => self.document_error = Some(DocumentError::InvalidDocument),
             }
@@ -1925,7 +1611,6 @@ impl Model {
                 Ok(page) => {
                     if page.anchor != reader.anchor {
                         self.invalidate_effective_page();
-                        self.reader_tokens = None;
                         self.clear_reader_word();
                     }
                     self.reader = Some(page);

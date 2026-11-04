@@ -124,7 +124,7 @@ impl Fixture {
     fn bridge_with_loader(&self, loader: AnalyzerLoader) -> Harness {
         let (tx, callbacks) = mpsc::channel();
         let index = self.directory.join("words.sqlite3");
-        let (bridge, lifecycle) = YomokuBridge::with_effective_reader(
+        let (bridge, lifecycle) = YomokuBridge::new(
             self.path(),
             loader,
             Box::new(move || Ok(index.clone())),
@@ -214,7 +214,6 @@ fn serialized_missing_analysis_and_legacy_commands_fail_closed() {
     let loaded = h.load(missing.document_id);
     let page = loaded.effective_reader_tokens.as_ref().unwrap();
     assert!(page.tokens.is_empty());
-    assert!(loaded.reader_tokens.is_none());
     let before = std::fs::read(f.path()).unwrap();
     h.send(Event::CompleteEffectiveReaderPage {
         identity: page.identity,
@@ -228,29 +227,9 @@ fn serialized_missing_analysis_and_legacy_commands_fail_closed() {
     assert!(h.callbacks.try_recv().is_err());
     assert_eq!(std::fs::read(f.path()).unwrap(), before);
     let loaded = h.load(f.id);
-    let page = loaded.reader.as_ref().unwrap();
+    let _page = loaded.reader.as_ref().unwrap();
     let before = std::fs::read(f.path()).unwrap();
-    for event in [
-        Event::CompleteReaderPage {
-            document_id: f.id,
-            page: page.anchor,
-            position: page.position,
-            completed_at_unix_ms: 500,
-        },
-        Event::LoadReaderWord(yomoku_core::reader::ReaderWordSelection {
-            key: loaded
-                .effective_reader_tokens
-                .as_ref()
-                .unwrap()
-                .identity
-                .base,
-            token_index: 0,
-        }),
-    ] {
-        h.send(event);
-        assert!(!h.view().storage_busy);
-        assert!(h.callbacks.try_recv().is_err());
-    }
+
     assert_eq!(std::fs::read(f.path()).unwrap(), before);
     assert_eq!(f.count("reading_completions"), 0);
 }

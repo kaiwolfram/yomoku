@@ -178,8 +178,7 @@ internal class CoreSession(
             view.ankiExport?.takeIf {
                 view.settingsOpen ||
                     (view.contentRoute == ContentRoute.READER &&
-                        (view.readerWordSelection != null ||
-                            view.effectiveReaderWord?.selection != null))
+                        view.effectiveReaderWord?.selection != null)
             }
         }
 
@@ -292,11 +291,9 @@ internal class CoreSession(
             Event.CloseDocument,
             Event.OpenPaste,
             is Event.SelectDestination,
-            is Event.CompleteReaderPage,
             is Event.CompleteEffectiveReaderPage,
             is Event.PreviousReaderPage,
             is Event.OpenReader,
-            is Event.LoadPaste,
             is Event.CreatePaste,
             is Event.ImportTxt,
             is Event.ImportSrt,

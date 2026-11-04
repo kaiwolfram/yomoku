@@ -81,7 +81,7 @@ fn statistics_fifo_returns_exact_all_timeframes_without_loading_analyzer_or_writ
     let database = Database::new();
     let (mut observer, id) = seed(&database);
     let Factory { loader, trace, .. } = Factory::new(false, None);
-    let (router, lifecycle) = effect_router_with_analyzed_imports(database.path(), loader).unwrap();
+    let (router, lifecycle) = import_router(database.path(), loader).unwrap();
     router.update(Event::SelectDestination(Destination::Statistics), |_| {});
     for frame in [
         Timeframe::LastYear,
@@ -121,8 +121,7 @@ fn statistics_fifo_returns_exact_all_timeframes_without_loading_analyzer_or_writ
         trace: reopened_trace,
         ..
     } = Factory::new(false, None);
-    let (reopened, reopened_lifecycle) =
-        effect_router_with_analyzed_imports(database.path(), loader).unwrap();
+    let (reopened, reopened_lifecycle) = import_router(database.path(), loader).unwrap();
     reopened.update(Event::SelectDestination(Destination::Statistics), |_| {});
     assert_eq!(read(&reopened, Timeframe::AllTime), retained);
     let cat = observer
@@ -146,7 +145,7 @@ fn statistics_worker_corruption_and_bad_dates_fail_read_only_then_retry_exact_qu
     let database = Database::new();
     let (_observer, _) = seed(&database);
     let Factory { loader, trace, .. } = Factory::new(false, None);
-    let (router, lifecycle) = effect_router_with_analyzed_imports(database.path(), loader).unwrap();
+    let (router, lifecycle) = import_router(database.path(), loader).unwrap();
     // Open/validate before simulating later corruption; the open-time integrity
     // audit would otherwise reject the entire database before this projection.
     dispatch(&router, Event::RefreshLibrary);
@@ -191,11 +190,11 @@ fn statistics_worker_corruption_and_bad_dates_fail_read_only_then_retry_exact_qu
 
 #[test]
 fn statistics_refreshes_after_reader_status_and_reread_completion() {
-    use yomoku_core::reader::{ReaderStatusChange, ReaderTokenKey};
+    use yomoku_core::reader::ReaderTokenKey;
     let database = Database::new();
     let (_observer, id) = seed(&database);
     let Factory { loader, trace, .. } = Factory::new(false, None);
-    let (router, lifecycle) = effect_router_with_analyzed_imports(database.path(), loader).unwrap();
+    let (router, lifecycle) = import_router(database.path(), loader).unwrap();
     router.update(Event::SelectDestination(Destination::Vocabulary), |_| {});
     assert_eq!(
         dispatch(&router, Event::LoadVocabulary)
@@ -215,7 +214,7 @@ fn statistics_refreshes_after_reader_status_and_reread_completion() {
         analysis: opened.reader_analysis.unwrap(),
     };
     let tokens = dispatch(&router, Event::LoadReaderTokens(key))
-        .reader_tokens
+        .effective_reader_tokens
         .unwrap();
     let cat = tokens
         .tokens
@@ -226,12 +225,20 @@ fn statistics_refreshes_after_reader_status_and_reread_completion() {
         .unwrap();
     let changed = dispatch(
         &router,
-        Event::SetReaderStatus(ReaderStatusChange {
-            key,
+        Event::SetEffectiveReaderStatus {
+            selection: yomoku_core::effective_session::EffectiveReaderSelection {
+                page: tokens.identity,
+                segment_index: tokens
+                    .tokens
+                    .iter()
+                    .find(|t| t.surface == "猫")
+                    .unwrap()
+                    .segment_index,
+            },
             vocabulary_id: cat.id,
             status: VocabularyStatus::Known,
             occurred_at_unix_ms: NOW,
-        }),
+        },
     );
     assert!(changed.statistics.data.is_none());
     assert_eq!(changed.vocabulary.matching_count, None);
@@ -250,11 +257,20 @@ fn statistics_refreshes_after_reader_status_and_reread_completion() {
     dispatch(&router, Event::LoadVocabulary);
     router.update(Event::SelectDestination(Destination::Library), |_| {});
     let page = dispatch(&router, Event::OpenReader(id)).reader.unwrap();
-    let (sender, receiver) = mpsc::channel();
-    router.update(
-        Event::CompleteReaderPage {
+    let tokens = dispatch(
+        &router,
+        Event::LoadReaderTokens(ReaderTokenKey {
             document_id: id,
             page: page.anchor,
+            analysis: router.view().reader_analysis.unwrap(),
+        }),
+    )
+    .effective_reader_tokens
+    .unwrap();
+    let (sender, receiver) = mpsc::channel();
+    router.update(
+        Event::CompleteEffectiveReaderPage {
+            identity: tokens.identity,
             position: page.position,
             completed_at_unix_ms: NOW,
         },
@@ -307,7 +323,7 @@ fn vocabulary_bulk_mutations_invalidate_and_refresh_statistics_library_and_reade
     let database = Database::new();
     let (mut observer, id) = seed(&database);
     let Factory { loader, trace, .. } = Factory::new(false, None);
-    let (router, lifecycle) = effect_router_with_analyzed_imports(database.path(), loader).unwrap();
+    let (router, lifecycle) = import_router(database.path(), loader).unwrap();
     for action in [
         VocabularyBulkAction::SetStatus {
             status: VocabularyStatus::Known,
@@ -327,7 +343,10 @@ fn vocabulary_bulk_mutations_invalidate_and_refresh_statistics_library_and_reade
         let changed = dispatch(&router, Event::ConfirmVocabularyBulkAction(command));
         assert!(changed.statistics.data.is_none() && changed.statistics.query.is_none());
         assert!(changed.library_word_distributions.is_none());
-        assert!(changed.reader_tokens.is_none() && changed.reader_word.is_none());
+        assert!(
+            changed.effective_reader_tokens.is_none()
+                && changed.effective_reader_word.unwrap().details.is_none()
+        );
         assert_eq!(changed.vocabulary.matching_count, None);
         let expected_count = if action == VocabularyBulkAction::Delete {
             0
@@ -386,7 +405,7 @@ fn vocabulary_bulk_mutations_invalidate_and_refresh_statistics_library_and_reade
                 analysis: opened.reader_analysis.unwrap(),
             }),
         )
-        .reader_tokens
+        .effective_reader_tokens
         .unwrap();
         assert!(tokens.tokens.iter().all(|token| match action {
             VocabularyBulkAction::Delete => token.vocabulary.is_none(),

@@ -4,7 +4,7 @@ use super::*;
 fn document_rename_fifo_retries_failure_without_analysis_and_reports_deleted_target() {
     let database = Database::new();
     let Factory { loader, trace, .. } = Factory::new(false, None);
-    let (router, lifecycle) = effect_router_with_analyzed_imports(database.path(), loader).unwrap();
+    let (router, lifecycle) = import_router(database.path(), loader).unwrap();
     let text = "猫 犬 𠮷";
     let created = dispatch(&router, Event::CreatePaste(text.into()));
     let id = created.import_summary.unwrap().document_id;

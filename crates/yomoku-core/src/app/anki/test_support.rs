@@ -8,11 +8,11 @@ use crate::{
         EffectiveReaderChapter, EffectiveReaderTokenSnapshot, EffectiveReaderWordDetails,
     },
     effective_storage::EffectiveStorageResult,
-    reader::{reader_tokens_on_page, ReaderVocabulary},
+    reader::ReaderVocabulary,
     vocabulary::VocabularyStatus,
 };
 
-pub(super) fn fixture(effective: bool) -> (Model, AnkiSelection) {
+pub(super) fn fixture() -> (Model, AnkiSelection) {
     let chapter = ChapterText {
         source_id: 1.try_into().unwrap(),
         chapter_id: 2.try_into().unwrap(),
@@ -94,14 +94,10 @@ pub(super) fn fixture(effective: bool) -> (Model, AnkiSelection) {
         reader: Some(page.clone()),
         reader_document: Some(document),
         reader_analysis: Some(ReaderAnalysis::Available(analysis_id)),
-        ..if effective {
-            Model::with_effective_reader()
-        } else {
-            Model::default()
-        }
+        ..Model::default()
     };
-    let selection = if effective {
-        let session = model.effective_reader.as_mut().unwrap();
+    let selection = {
+        let session = &mut model.effective_reader;
         let request = session
             .begin_load(ReaderTokenKey {
                 document_id: page.document_id,
@@ -140,26 +136,41 @@ pub(super) fn fixture(effective: bool) -> (Model, AnkiSelection) {
             ))
         ));
         AnkiSelection::Effective(selected)
-    } else {
-        let mut tokens = reader_tokens_on_page(&chapter, &original, page.anchor).unwrap();
-        tokens[1].vocabulary = vocabulary;
-        let snapshot = ReaderTokenSnapshot {
-            document_id: page.document_id,
-            page: page.anchor,
-            analysis: ReaderAnalysis::Available(analysis_id),
-            tokens,
-        };
-        let details = ReaderWordDetails {
-            key: snapshot.key(),
-            token: snapshot.tokens[1].clone(),
-            encountered: 47,
-            candidates,
-        };
-        let selected = details.selection();
-        model.reader_word_selection = Some(selected);
-        model.reader_word = Some(details);
-        model.reader_tokens = Some(snapshot);
-        AnkiSelection::Original(selected)
     };
     (model, selection)
+}
+
+pub(super) fn set_candidates(model: &mut Model, words: Vec<crate::dictionary::WordCandidate>) {
+    let session = &mut model.effective_reader;
+    let current = session.word_state().details.unwrap();
+    let command = session.freeze_selection(current.selection).unwrap();
+    let metadata = command.key().segmentation.segments[current.selection.segment_index as usize]
+        .metadata
+        .clone();
+    let details = EffectiveReaderWordDetails {
+        key: command.key().clone(),
+        token: crate::effective_reader::EffectiveReaderToken {
+            segment_index: current.token.segment_index,
+            anchor: current.token.anchor,
+            display_range: current.token.display_range,
+            surface: current.token.surface,
+            eligibility: current.token.eligibility,
+            metadata,
+            vocabulary: current.token.vocabulary,
+        },
+        encountered: current.encountered,
+        candidates: DictionaryCandidates {
+            words,
+            ..current.candidates
+        },
+        dictionary_sources: current.dictionary_sources,
+    };
+    let request = session.begin_word_load(current.selection).unwrap();
+    assert!(session.finish_word_request(
+        &request,
+        Ok(EffectiveStorageResult::WordLoaded(
+            current.selection,
+            Box::new(details)
+        ))
+    ));
 }

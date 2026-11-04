@@ -134,7 +134,7 @@ class AnalyzedImportSessionTest {
                 assertEquals(0L, count("reading_completions"))
                 db.rawQuery("SELECT split_mode FROM chapter_analyses", null).use {
                     assertTrue(it.moveToFirst())
-                    assertEquals("b", it.getString(0))
+                    assertEquals("c", it.getString(0))
                 }
                 val id = created.documents.single().documentId
                 val reader = dispatch(core, Event.OpenReader(id)).reader!!

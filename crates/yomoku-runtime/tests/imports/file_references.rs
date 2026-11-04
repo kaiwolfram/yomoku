@@ -1,4 +1,5 @@
 use super::*;
+use yomoku_core::reader::ReaderTokenKey;
 use yomoku_core::{app::ImportOutcome, pagination::ReadingPosition};
 use yomoku_storage::EpubImportOutcome;
 
@@ -65,8 +66,7 @@ fn txt_and_srt_reference_complete_epub_without_loading_full_or_resetting_progres
             called.fetch_add(1, Ordering::SeqCst);
             Err(DocumentError::Unavailable)
         });
-        let (router, lifecycle) =
-            effect_router_with_analyzed_imports(database.path(), loader).unwrap();
+        let (router, lifecycle) = import_router(database.path(), loader).unwrap();
         let view = dispatch(&router, import_event(&bytes, format));
         assert_eq!(view.document_error, None);
         assert_eq!(view.documents, expected);
@@ -76,7 +76,7 @@ fn txt_and_srt_reference_complete_epub_without_loading_full_or_resetting_progres
         assert_eq!(summary.outcome, ImportOutcome::Existing);
         assert_eq!(view.content_route, ContentRoute::Main);
         assert_eq!(view.destination, Destination::Library);
-        assert!(view.reader.is_none() && view.loaded_document.is_none());
+        assert!(view.reader.is_none());
         assert_eq!(calls.load(Ordering::SeqCst), 0);
         assert_eq!(totals(&database.path()), counts);
         assert_eq!(storage.load_epub_document(id).unwrap().unwrap(), before);
@@ -105,7 +105,7 @@ fn corrupt_existing_epub_fails_without_analysis_and_later_file_still_imports() {
         .unwrap();
     let counts = totals(&database.path());
     let Factory { loader, trace, .. } = Factory::new(false, None);
-    let (router, lifecycle) = effect_router_with_analyzed_imports(database.path(), loader).unwrap();
+    let (router, lifecycle) = import_router(database.path(), loader).unwrap();
     for format in 0..3 {
         let rejected = dispatch(&router, import_event(&bytes, format));
         assert_eq!(
@@ -143,12 +143,22 @@ fn corrupt_existing_epub_fails_without_analysis_and_later_file_still_imports() {
 }
 
 fn complete(router: &EffectRouter, timestamp: i64) -> ViewModel {
-    let page = router.view().reader.unwrap();
-    let (sender, receiver) = mpsc::channel();
-    router.update(
-        Event::CompleteReaderPage {
+    let current = router.view();
+    let page = current.reader.unwrap();
+    let tokens = dispatch(
+        router,
+        Event::LoadReaderTokens(ReaderTokenKey {
             document_id: page.document_id,
             page: page.anchor,
+            analysis: current.reader_analysis.unwrap(),
+        }),
+    )
+    .effective_reader_tokens
+    .unwrap();
+    let (sender, receiver) = mpsc::channel();
+    router.update(
+        Event::CompleteEffectiveReaderPage {
+            identity: tokens.identity,
             position: page.position,
             completed_at_unix_ms: timestamp,
         },
@@ -190,7 +200,7 @@ fn ordered_reader_worker_crosses_chapters_with_original_analysis_time_and_whole_
     assert_ne!(original.analyses[0].analysis, original.analyses[1].analysis);
     let calls = Arc::new(AtomicUsize::new(0));
     let called = calls.clone();
-    let (router, lifecycle) = effect_router_with_analyzed_imports(
+    let (router, lifecycle) = import_router(
         database.path(),
         Box::new(move || {
             called.fetch_add(1, Ordering::SeqCst);
@@ -200,7 +210,10 @@ fn ordered_reader_worker_crosses_chapters_with_original_analysis_time_and_whole_
     .unwrap();
     dispatch(&router, Event::RefreshLibrary);
     let opened = dispatch(&router, Event::OpenReader(id));
-    assert_eq!(opened.loaded_document, Some(original.document.clone()));
+    assert_eq!(
+        opened.reader.as_ref().unwrap().text,
+        original.document.chapters[0].text
+    );
     assert_eq!(opened.reader_analysis, Some(original.analyses[0].analysis));
     assert_eq!(opened.reader.as_ref().unwrap().page_number, 1);
     assert_eq!(opened.reader.as_ref().unwrap().total_pages, 2);
@@ -213,7 +226,7 @@ fn ordered_reader_worker_crosses_chapters_with_original_analysis_time_and_whole_
         analysis: original.analyses[0].analysis,
     };
     assert!(!dispatch(&router, Event::LoadReaderTokens(first_key))
-        .reader_tokens
+        .effective_reader_tokens
         .unwrap()
         .tokens
         .is_empty());
@@ -239,7 +252,7 @@ fn ordered_reader_worker_crosses_chapters_with_original_analysis_time_and_whole_
     );
     assert_eq!(second.position.offset, TextOffset::START);
     assert_eq!(moved.reader_analysis, Some(original.analyses[1].analysis));
-    assert!(moved.reader_time.is_none() && moved.reader_tokens.is_none());
+    assert!(moved.reader_time.is_none() && moved.effective_reader_tokens.is_none());
     assert!(moved.documents[0].progress_percent > 0 && moved.documents[0].progress_percent < 100);
     assert!(!moved.documents[0].finished_at_least_once);
     let before_previous = totals(&database.path());
@@ -290,7 +303,7 @@ fn ordered_reader_worker_crosses_chapters_with_original_analysis_time_and_whole_
         analysis: original.analyses[1].analysis,
     };
     let tokens = dispatch(&router, Event::LoadReaderTokens(second_key))
-        .reader_tokens
+        .effective_reader_tokens
         .unwrap();
     assert!(tokens
         .tokens
@@ -314,7 +327,12 @@ fn ordered_reader_worker_crosses_chapters_with_original_analysis_time_and_whole_
     assert_eq!(finished.documents[0].progress_percent, 100);
     assert!(finished.documents[0].finished_at_least_once);
     assert_eq!(
-        finished.loaded_document.as_ref().unwrap().chapters,
+        storage
+            .load_document_reader_snapshot(id)
+            .unwrap()
+            .unwrap()
+            .document
+            .chapters,
         original.document.chapters
     );
     let durations: Vec<i64> = Connection::open(database.path())
@@ -327,16 +345,18 @@ fn ordered_reader_worker_crosses_chapters_with_original_analysis_time_and_whole_
         .unwrap();
     assert_eq!(durations, vec![123, 0, 456]);
     // Ordinary loads retain chapter-2 EOF; a fresh worker explicitly opens at chapter 1.
-    let loaded = dispatch(&router, Event::LoadPaste(id))
-        .loaded_document
-        .unwrap();
+    let loaded = storage
+        .load_document_reader_snapshot(id)
+        .unwrap()
+        .unwrap()
+        .document;
     assert_eq!(
         loaded.reading_position.unwrap().chapter_id,
         second.position.chapter_id
     );
     drop(router);
     drop(lifecycle);
-    let (router, lifecycle) = effect_router_with_analyzed_imports(
+    let (router, lifecycle) = import_router(
         database.path(),
         Box::new(|| Err(DocumentError::Unavailable)),
     )
@@ -378,7 +398,7 @@ fn image_only_chapter_worker_can_load_tokens_and_finish_without_words() {
         panic!("new EPUB")
     };
     let id = imported.document.document_id;
-    let (router, lifecycle) = effect_router_with_analyzed_imports(
+    let (router, lifecycle) = import_router(
         database.path(),
         Box::new(|| Err(DocumentError::Unavailable)),
     )
@@ -396,7 +416,7 @@ fn image_only_chapter_worker_can_load_tokens_and_finish_without_words() {
             analysis: view.reader_analysis.unwrap(),
         }),
     );
-    assert!(tokens.reader_tokens.unwrap().tokens.is_empty());
+    assert!(tokens.effective_reader_tokens.unwrap().tokens.is_empty());
     dispatch(&router, Event::RestoreReadingTime);
     let finished = complete(&router, 11);
     assert!(finished.book_completion_notice.is_some());
@@ -432,7 +452,7 @@ fn corrupt_ordered_reader_load_fails_without_truncation_or_analysis_and_next_rea
         )
         .unwrap();
     let before = totals(&database.path());
-    let (router, lifecycle) = effect_router_with_analyzed_imports(
+    let (router, lifecycle) = import_router(
         database.path(),
         Box::new(|| panic!("reader must not load Full")),
     )
@@ -442,10 +462,10 @@ fn corrupt_ordered_reader_load_fails_without_truncation_or_analysis_and_next_rea
         rejected.document_error,
         Some(DocumentError::InvalidDocument)
     );
-    assert!(rejected.reader.is_none() && rejected.loaded_document.is_none());
+    assert!(rejected.reader.is_none());
     let opened = dispatch(&router, Event::OpenReader(valid.document_id));
     assert_eq!(opened.document_error, None);
-    assert_eq!(opened.loaded_document.unwrap(), valid.into());
+    assert_eq!(opened.reader.unwrap().text, valid.chapter.text);
     assert_eq!(opened.reader_analysis, Some(ReaderAnalysis::Missing));
     assert_eq!(totals(&database.path()), before);
     drop(router);

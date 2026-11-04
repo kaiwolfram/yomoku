@@ -108,7 +108,6 @@ class EffectiveReaderPerformanceTest {
             assertEquals(key, page.identity.base)
             assertNotEquals(before, page.identity) // A cached/no-op dispatch is not a sample.
             assertTrue(page.tokens.isNotEmpty())
-            assertNull(it.view.readerTokens)
         }
     }
 
@@ -225,16 +224,34 @@ class EffectiveReaderPerformanceTest {
             report(name, "setup", "import", listOf(imported))
             val id = checkNotNull(imported.view.importSummary).documentId
             command(core, Event.OpenReader(id))
-            val document = checkNotNull(core.view.loadedDocument)
-            val chapter = document.chapters.maxBy { it.text.codePointCount(0, it.text.length) }
+            val chapters =
+                SQLiteDatabase.openDatabase(database.path, null, SQLiteDatabase.OPEN_READONLY)
+                    .use { db ->
+                        db.rawQuery(
+                                "SELECT c.source_id, c.id, t.text FROM chapters c JOIN chapter_texts t ON t.chapter_id = c.id ORDER BY c.chapter_index",
+                                null,
+                            )
+                            .use { rows ->
+                                buildList {
+                                    while (rows.moveToNext()) add(
+                                        Triple(rows.getLong(0), rows.getLong(1), rows.getString(2))
+                                    )
+                                }
+                            }
+                    }
+            val chapter = chapters.maxBy { it.third.codePointCount(0, it.third.length) }
             command(
                 core,
                 Event.SaveReadingPosition(
-                    ReadingPosition(chapter.sourceId, chapter.chapterId, TextOffset(0))
+                    ReadingPosition(
+                        SourceId(chapter.first),
+                        ChapterId(chapter.second),
+                        TextOffset(0),
+                    )
                 ),
             )
             emit(
-                "FIXTURE,$name,bytes=${bytes.size},sha256=${MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }},chapters=${document.chapters.size},characters=${document.chapters.sumOf { it.text.codePointCount(0, it.text.length) }},largest_characters=${chapter.text.codePointCount(0, chapter.text.length)},database_bytes=${database.length()}"
+                "FIXTURE,$name,bytes=${bytes.size},sha256=${MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }},chapters=${chapters.size},characters=${chapters.sumOf { it.third.codePointCount(0, it.third.length) }},largest_characters=${chapter.third.codePointCount(0, chapter.third.length)},database_bytes=${database.length()}"
             )
             val fullCalls = dictionaryCalls.get()
             phase(core, database, name, "mode_c", iterations, id)

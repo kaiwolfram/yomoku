@@ -8,10 +8,7 @@ use yomoku_core::{
 const NOW: i64 = 1_800_000_000_123;
 
 fn cores() -> [Core<Yomoku>; 2] {
-    [
-        Core::new(),
-        Core::new_with(Yomoku, Model::with_effective_reader()),
-    ]
+    [Core::new(), Core::new_with(Yomoku, Model::default())]
 }
 
 fn query(timeframe: Timeframe, as_of_unix_ms: i64) -> StatisticsQuery {

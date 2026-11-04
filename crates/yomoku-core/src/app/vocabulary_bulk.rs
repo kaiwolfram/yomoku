@@ -192,7 +192,6 @@ impl Yomoku {
                 model.invalidate_statistics();
                 model.invalidate_library_words();
                 model.invalidate_effective_page();
-                model.reader_tokens = None;
                 model.clear_reader_word();
             }
             (_, StorageResult::Failed(error)) => model.vocabulary.bulk_error = Some(error),

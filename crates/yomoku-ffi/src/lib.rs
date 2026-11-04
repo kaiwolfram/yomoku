@@ -8,9 +8,7 @@ use crux_core::{
     middleware::{Bridge, Layer},
 };
 use yomoku_runtime::{
-    effect_router, effect_router_with_analyzed_imports, effect_router_with_dictionaries,
-    effect_router_with_effective_reader, AnalyzerLifecycle, AnalyzerLoader, EffectRouter,
-    WordDictionaryLoader,
+    effect_router, AnalyzerLifecycle, AnalyzerLoader, EffectRouter, WordDictionaryLoader,
 };
 
 pub mod native;
@@ -71,47 +69,13 @@ impl YomokuBridge {
 
     /// Production effective reader with retained native provenance, sharing the
     /// import/dictionary worker and lifecycle without a shell toggle.
-    pub fn with_effective_reader(
+    pub fn new(
         database_path: std::path::PathBuf,
         loader: AnalyzerLoader,
         word_loader: WordDictionaryLoader,
         on_effects: impl Fn(Result<Vec<u8>, FfiError>) + Send + Sync + 'static,
     ) -> Result<(Self, AnalyzerLifecycle), FfiError> {
-        let (router, lifecycle) =
-            effect_router_with_effective_reader(database_path, loader, word_loader)
-                .map_err(|_| FfiError::WorkerUnavailable)?;
-        Ok((
-            Self {
-                bridge: router.bridge(move |result| on_effects(result.map_err(Into::into))),
-            },
-            lifecycle,
-        ))
-    }
-
-    pub fn with_dictionaries(
-        database_path: std::path::PathBuf,
-        loader: AnalyzerLoader,
-        word_loader: WordDictionaryLoader,
-        on_effects: impl Fn(Result<Vec<u8>, FfiError>) + Send + Sync + 'static,
-    ) -> Result<(Self, AnalyzerLifecycle), FfiError> {
-        let (router, lifecycle) =
-            effect_router_with_dictionaries(database_path, loader, word_loader)
-                .map_err(|_| FfiError::WorkerUnavailable)?;
-        Ok((
-            Self {
-                bridge: router.bridge(move |result| on_effects(result.map_err(Into::into))),
-            },
-            lifecycle,
-        ))
-    }
-
-    /// Production imports require a loader; no text-only fallback is selected.
-    pub fn with_analyzed_imports(
-        database_path: std::path::PathBuf,
-        loader: AnalyzerLoader,
-        on_effects: impl Fn(Result<Vec<u8>, FfiError>) + Send + Sync + 'static,
-    ) -> Result<(Self, AnalyzerLifecycle), FfiError> {
-        let (router, lifecycle) = effect_router_with_analyzed_imports(database_path, loader)
+        let (router, lifecycle) = effect_router(database_path, loader, word_loader)
             .map_err(|_| FfiError::WorkerUnavailable)?;
         Ok((
             Self {
@@ -119,19 +83,6 @@ impl YomokuBridge {
             },
             lifecycle,
         ))
-    }
-
-    /// The callback delivers effects produced after an asynchronous Rust
-    /// operation completes. Hosts must dispatch it onto their UI thread.
-    pub fn new(
-        database_path: std::path::PathBuf,
-        on_effects: impl Fn(Result<Vec<u8>, FfiError>) + Send + Sync + 'static,
-    ) -> Result<Self, FfiError> {
-        Ok(Self {
-            bridge: effect_router(database_path)
-                .map_err(|_| FfiError::WorkerUnavailable)?
-                .bridge(move |result| on_effects(result.map_err(Into::into))),
-        })
     }
 
     pub fn update(&self, event: &[u8]) -> Result<Vec<u8>, FfiError> {

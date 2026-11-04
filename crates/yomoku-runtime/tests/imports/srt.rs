@@ -4,7 +4,7 @@ use super::*;
 fn srt_typed_decoding_errors_skip_full_and_manual_choices_retry_without_partial_files() {
     let database = Database::new();
     let Factory { loader, trace, .. } = Factory::new(false, None);
-    let (router, lifecycle) = effect_router_with_analyzed_imports(database.path(), loader).unwrap();
+    let (router, lifecycle) = import_router(database.path(), loader).unwrap();
     dispatch(&router, Event::RefreshLibrary);
     let before = srt_totals(&database.path());
     for (bytes, encoding, error) in [
@@ -86,13 +86,13 @@ fn srt_duplicate_of_txt_skips_decoding_and_unavailable_full() {
     let database = Database::new();
     let bytes = b"1\n00:00:01,000 --> 00:00:02,000\n<i>English</i>";
     let Factory { loader, trace, .. } = Factory::new(false, None);
-    let (router, lifecycle) = effect_router_with_analyzed_imports(database.path(), loader).unwrap();
+    let (router, lifecycle) = import_router(database.path(), loader).unwrap();
     let created = dispatch(&router, txt_event(bytes, None));
     let id = created.import_summary.unwrap().document_id;
     finish_worker(router, lifecycle, &trace);
     let before = srt_totals(&database.path());
     let Factory { loader, trace, .. } = Factory::new(true, None);
-    let (router, lifecycle) = effect_router_with_analyzed_imports(database.path(), loader).unwrap();
+    let (router, lifecycle) = import_router(database.path(), loader).unwrap();
     let duplicate = dispatch(&router, srt_event(bytes, Some(TextEncoding::ShiftJis)));
     let summary = duplicate.import_summary.unwrap();
     assert_eq!(summary.document_id, id);
@@ -124,7 +124,7 @@ fn srt_loader_analysis_and_invalid_output_failures_preserve_completed_files_and_
         trace,
         failure,
     } = Factory::new(true, None);
-    let (router, lifecycle) = effect_router_with_analyzed_imports(database.path(), loader).unwrap();
+    let (router, lifecycle) = import_router(database.path(), loader).unwrap();
     for mode in [0, 1, 2] {
         failure.store(mode, Ordering::Relaxed);
         let failed = dispatch(
@@ -186,8 +186,7 @@ fn srt_each_write_and_commit_failure_is_atomic_through_worker() {
     ] {
         let database = Database::new();
         let Factory { loader, trace, .. } = Factory::new(false, None);
-        let (router, lifecycle) =
-            effect_router_with_analyzed_imports(database.path(), loader).unwrap();
+        let (router, lifecycle) = import_router(database.path(), loader).unwrap();
         let created = dispatch(&router, srt_event(b"English", None));
         let before = srt_totals(&database.path());
         let connection = Connection::open(database.path()).unwrap();
@@ -237,11 +236,11 @@ fn srt_duplicates_preserve_first_interpretation_status_position_and_skip_full_af
     let database = Database::new();
     let bytes = "\u{feff}1\r\n00:00:01,000 --> 00:00:02,000\r\n<i>猫</i> 猫\r\n\r\n2\r\n00:00:02,000 --> 00:00:03,000\r\n｜𠮷《よし》".as_bytes();
     let Factory { loader, trace, .. } = Factory::new(false, None);
-    let (router, lifecycle) = effect_router_with_analyzed_imports(database.path(), loader).unwrap();
+    let (router, lifecycle) = import_router(database.path(), loader).unwrap();
     let created = dispatch(&router, srt_event(bytes, None));
     assert_eq!(created.destination, Destination::Library);
     assert_eq!(created.content_route, ContentRoute::Main);
-    assert!(created.reader.is_none() && created.loaded_document.is_none());
+    assert!(created.reader.is_none());
     let id = created.import_summary.unwrap().document_id;
     assert_eq!(created.documents[0].title, "本𠮷.srt");
     let opened = dispatch(&router, Event::OpenReader(id));
@@ -284,7 +283,7 @@ fn srt_duplicates_preserve_first_interpretation_status_position_and_skip_full_af
     assert_eq!(existing.documents, saved.documents);
     finish_worker(router, lifecycle, &trace);
     let Factory { loader, trace, .. } = Factory::new(true, None);
-    let (router, lifecycle) = effect_router_with_analyzed_imports(database.path(), loader).unwrap();
+    let (router, lifecycle) = import_router(database.path(), loader).unwrap();
     assert_eq!(
         dispatch(&router, duplicate)
             .import_summary

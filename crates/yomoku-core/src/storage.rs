@@ -4,16 +4,12 @@ use crux_core::capability::Operation;
 use serde::{Deserialize, Serialize};
 
 use crate::active_time::{ReadingTimeUpdate, SavedReadingTime};
-use crate::completion::{AnalyzedCompletionOutcome, AnalyzedPageCompletion, PageCompletionIntent};
 use crate::document::{DocumentId, LibraryDocument, ReaderDocument};
 use crate::effective_storage::{EffectiveStorageOperation, EffectiveStorageResult};
 use crate::imports::{EpubImport, SrtImport, TxtImport};
 use crate::library::LibraryWordDistribution;
 use crate::pagination::{PageLength, ReadingPosition};
-use crate::reader::{
-    DocumentReaderSnapshot, ReaderStatusChange, ReaderTokenKey, ReaderTokenSnapshot,
-    ReaderVocabulary, ReaderWordDetails, ReaderWordSelection,
-};
+use crate::reader::DocumentReaderSnapshot;
 use crate::typography::ReaderTypography;
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -21,7 +17,7 @@ use crate::typography::ReaderTypography;
 #[repr(C)]
 pub enum StorageOperation {
     List,
-    LoadLibraryWordDistributions,
+
     DeleteDocument(DocumentId),
     DeleteDocuments(Vec<DocumentId>),
     RenameDocument {
@@ -29,7 +25,7 @@ pub enum StorageOperation {
         title: String,
     },
     CreatePaste(String),
-    LoadPaste(DocumentId),
+
     /// Explicit entry records Library recency and resets a finished book atomically.
     OpenReader(DocumentId),
     SaveReadingPosition {
@@ -46,12 +42,6 @@ pub enum StorageOperation {
         previous: SavedReadingTime,
         checkpoint: ReadingTimeUpdate,
     },
-    PreparePageCompletion(PageCompletionIntent),
-    CompletePage(AnalyzedPageCompletion),
-    /// Read original tokens and live global statuses without registration.
-    LoadReaderTokens(ReaderTokenKey),
-    SetReaderStatus(ReaderStatusChange),
-    LoadReaderWord(ReaderWordSelection),
 
     ImportTxt(TxtImport),
     ImportSrt(SrtImport),
@@ -95,10 +85,7 @@ pub enum StorageOperation {
 
 impl StorageOperation {
     pub(crate) fn loads_library_words(&self) -> bool {
-        matches!(
-            self,
-            Self::LoadLibraryWordDistributions | Self::LoadEffectiveLibraryWordDistributions
-        )
+        matches!(self, Self::LoadEffectiveLibraryWordDistributions)
     }
 }
 
@@ -150,13 +137,9 @@ pub enum StorageResult {
     ReaderTypographySaved(ReaderTypography),
     ReadingTimeLoaded(SavedReadingTime),
     ReadingTimeSaved(SavedReadingTime),
-    PageCompletionPrepared(AnalyzedPageCompletion),
-    PageCompleted(ReaderDocument, AnalyzedCompletionOutcome),
-    Failed(DocumentError),
-    ReaderTokensLoaded(ReaderTokenSnapshot),
-    ReaderWordLoaded(Box<ReaderWordDetails>),
 
-    ReaderStatusChanged(ReaderStatusChange, Option<ReaderVocabulary>),
+    Failed(DocumentError),
+
     /// Cooperative file cancellation rolled back the current file, without error.
     ImportCancelled,
     #[serde(skip)]

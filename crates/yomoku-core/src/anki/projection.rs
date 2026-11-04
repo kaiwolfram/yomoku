@@ -6,60 +6,11 @@ use crate::{
     document::{ChapterText, InvalidTextValue, TextAnchor, TextOffset, TextRange},
     effective_session::{EffectiveReaderPage, EffectiveReaderSelection, EffectiveWordDetails},
     pagination::{is_sentence_end, is_sentence_tail},
-    reader::{ReaderAnalysis, ReaderTokenSnapshot, ReaderWordDetails, ReaderWordSelection},
+    reader::ReaderAnalysis,
     vocabulary::Surface,
 };
 
 impl AnkiNote {
-    /// The owner supplies its CURRENT selection/snapshot, not values reconstructed
-    /// from an export callback. Status and encounter observations may have changed;
-    /// all text, metadata and page/analysis identities must still agree.
-    pub fn from_original_selection(
-        chapter: &ChapterText,
-        current: &ReaderTokenSnapshot,
-        selection: ReaderWordSelection,
-        details: &ReaderWordDetails,
-    ) -> Result<Self, InvalidTextValue> {
-        Self::from_original_entry(chapter, current, selection, details, None)
-    }
-
-    pub(crate) fn from_original_entry(
-        chapter: &ChapterText,
-        current: &ReaderTokenSnapshot,
-        selection: ReaderWordSelection,
-        details: &ReaderWordDetails,
-        entry: Option<super::AnkiEntryKey>,
-    ) -> Result<Self, InvalidTextValue> {
-        if current.key() != selection.key
-            || details.selection() != selection
-            || current.analysis == ReaderAnalysis::Missing
-        {
-            return Err(InvalidTextValue);
-        }
-        let token = current
-            .tokens
-            .iter()
-            .find(|token| token.token_index == selection.token_index)
-            .ok_or(InvalidTextValue)?;
-        let mut observed = details.token.clone();
-        observed.vocabulary = token.vocabulary;
-        if &observed != token {
-            return Err(InvalidTextValue);
-        }
-        prepare(
-            chapter,
-            current.page,
-            token.anchor,
-            token.display_range,
-            &token.surface,
-            token.reading.as_deref(),
-            token.dictionary_form.as_deref(),
-            &details.candidates,
-            entry,
-            &[],
-        )
-    }
-
     /// Effective revisions distinguish changed segmentation and page revisits.
     /// Manual spans use only their own metadata, never old B data.
     pub fn from_effective_selection(

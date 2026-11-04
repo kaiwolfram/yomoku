@@ -76,13 +76,9 @@ impl Fixture {
         }
     }
 
-    fn original(&self) -> Result<AnkiNote, yomoku_core::document::InvalidTextValue> {
-        AnkiNote::from_original_selection(
-            &self.chapter,
-            &self.page,
-            self.details.selection(),
-            &self.details,
-        )
+    fn note(&self) -> Result<AnkiNote, yomoku_core::document::InvalidTextValue> {
+        let (page, details) = self.effective();
+        AnkiNote::from_effective_selection(&self.chapter, &page, details.selection, &details)
     }
 
     fn effective(&self) -> (EffectiveReaderPage, EffectiveWordDetails) {
@@ -212,11 +208,11 @@ fn candidates() -> DictionaryCandidates {
 }
 
 #[test]
-fn original_and_effective_export_all_licensed_readings_and_ordered_english_senses() {
+fn production_export_keeps_all_licensed_readings_and_ordered_english_senses() {
     let mut f = Fixture::new("生と生。", "生");
     f.details.candidates = candidates();
     let before = (f.page.clone(), f.details.clone());
-    let original = f.original().unwrap();
+    let original = f.note().unwrap();
     let (page, details) = f.effective();
     let effective =
         AnkiNote::from_effective_selection(&f.chapter, &page, details.selection, &details).unwrap();
@@ -239,11 +235,11 @@ fn original_and_effective_export_all_licensed_readings_and_ordered_english_sense
         VocabularyStatus::Ignored,
     ] {
         f.page.tokens[0].vocabulary.as_mut().unwrap().status = status;
-        assert_eq!(f.original().unwrap(), original);
+        assert_eq!(f.note().unwrap(), original);
         assert_eq!(f.page.tokens[0].vocabulary.unwrap().status, status);
     }
     f.page.tokens[0].vocabulary = None;
-    assert_eq!(f.original().unwrap(), original); // Deleted vocabulary is not recreated.
+    assert_eq!(f.note().unwrap(), original); // Deleted vocabulary is not recreated.
 }
 
 #[test]
@@ -254,7 +250,7 @@ fn dictionary_form_supplies_definitions_without_replacing_inflected_surface() {
     f.details.candidates = candidates();
     f.details.candidates.surface = "生じた".into();
     f.details.candidates.dictionary_form = Some("生".into());
-    let note = f.original().unwrap();
+    let note = f.note().unwrap();
     assert_eq!(note.surface().as_str(), "生じた");
     assert_eq!(note.fields()[0], "生じた");
     assert_eq!(note.fields()[1], "せい、しょう、いく");
@@ -277,7 +273,7 @@ fn shared_surface_and_base_matches_do_not_repeat_readings_or_senses() {
         form: "しょう".into(),
         matches: matching_readings(&name.entry.kanji, &name.entry.readings, "しょう"),
     });
-    let note = f.original().unwrap();
+    let note = f.note().unwrap();
     assert_eq!(note.fields()[1], "せい、しょう、いく");
     assert_eq!(
         note.fields()[2],
@@ -288,14 +284,14 @@ fn shared_surface_and_base_matches_do_not_repeat_readings_or_senses() {
 #[test]
 fn unmatched_analyzer_reading_is_used_only_without_licensed_dictionary_readings() {
     let f = Fixture::new("猫。", "猫");
-    assert_eq!(f.original().unwrap().fields()[1], "アナライザー");
-    assert_eq!(f.original().unwrap().fields()[2], "");
+    assert_eq!(f.note().unwrap().fields()[1], "アナライザー");
+    assert_eq!(f.note().unwrap().fields()[2], "");
     let mut f = Fixture::new("生。", "生");
     f.details.candidates = candidates();
     f.details.candidates.words.clear();
     f.details.candidates.names[0].entry.names[0].translations =
         vec![translation("non-English", "fre")];
-    let note = f.original().unwrap();
+    let note = f.note().unwrap();
     assert_eq!(note.fields()[1], "しょう、いく");
     assert_eq!(note.fields()[2], "");
 }
@@ -310,13 +306,13 @@ fn sentence_uses_full_chapter_when_page_only_displays_part_of_word() {
     f.details.key = f.page.key();
     f.details.token = f.page.tokens[0].clone();
     assert_eq!(
-        f.original().unwrap().fields()[3],
+        f.note().unwrap().fields()[3],
         "猫と<strong class=\"yomoku-target\">𠮷野家</strong>です。"
     );
     let (page, details) = f.effective();
     assert_eq!(
         AnkiNote::from_effective_selection(&f.chapter, &page, details.selection, &details).unwrap(),
-        f.original().unwrap()
+        f.note().unwrap()
     );
 }
 
@@ -355,31 +351,7 @@ fn sentence_boundaries_preserve_quotes_hard_lines_whitespace_and_ascii_decimals(
         ),
     ] {
         let f = Fixture::new(text, surface);
-        assert_eq!(f.original().unwrap().fields()[3], expected, "{text:?}");
-    }
-}
-
-#[test]
-fn stale_original_keys_tokens_and_canonical_ownership_are_rejected() {
-    for mutation in 0..10 {
-        let mut f = Fixture::new("猫と猫。", "猫");
-        match mutation {
-            0 => f.page.document_id = 99.try_into().unwrap(),
-            1 => f.page.analysis = ReaderAnalysis::Available(99.try_into().unwrap()),
-            2 => f.page.analysis = ReaderAnalysis::Missing,
-            3 => f.page.tokens[0].token_index += 1,
-            4 => f.page.tokens[0].reading = Some("changed".into()),
-            5 => f.page.tokens[0].dictionary_form = Some("犬".into()),
-            6 => f.chapter.source_id = 99.try_into().unwrap(),
-            7 => f.chapter.chapter_id = 99.try_into().unwrap(),
-            8 => f.chapter.text = "犬と犬。".into(),
-            9 => {
-                f.details.token.display_range.start = TextOffset::START;
-                f.page.tokens[0] = f.details.token.clone();
-            }
-            _ => unreachable!(),
-        }
-        assert!(f.original().is_err(), "mutation {mutation}");
+        assert_eq!(f.note().unwrap().fields()[3], expected, "{text:?}");
     }
 }
 

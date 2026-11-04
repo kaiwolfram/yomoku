@@ -542,7 +542,6 @@ class ReaderWordsTest {
             tapSurface("猫")
             compose.onNodeWithTag("word_lookup_error").assertExists()
             compose.onNodeWithTag("word_no_match").assertDoesNotExist()
-            compose.onNodeWithTag("word_custom_entry").assertDoesNotExist()
             assertEquals(1, calls.get())
             fail.set(false)
             compose.runOnUiThread { session.setReaderActive(false) }

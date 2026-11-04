@@ -7,13 +7,13 @@ type AppRouter = HandleEffectLayer<Core<Yomoku>, StorageEffects>;
 mod library;
 
 fn router(fixture: &Fixture) -> AppRouter {
-    let (effects, _) = StorageEffects::with_dictionaries(
+    let (effects, _) = StorageEffects::new(
         fixture.path(),
         Box::new(|| panic!("application reads/completion must not load Sudachi")),
         Box::new(|| panic!("application reads/completion must not load word dictionaries")),
     )
     .unwrap();
-    Core::new_with(Yomoku, Model::with_effective_reader()).handle_effects_using(effects)
+    Core::new_with(Yomoku, Model::default()).handle_effects_using(effects)
 }
 
 fn dispatch(router: &AppRouter, event: AppEvent) -> ViewModel {

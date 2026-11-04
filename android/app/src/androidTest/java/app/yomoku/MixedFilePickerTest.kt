@@ -130,7 +130,7 @@ class MixedFilePickerTest {
                     for ((title, encoding, chapters) in expected) {
                         val id = documents.single { it.title == title }.documentId.value.toString()
                         db.rawQuery(
-                                "SELECT f.text_encoding, s.kind, COUNT(c.id), COUNT(a.id) FROM imported_files f JOIN documents d ON d.id = f.document_id JOIN sources s ON s.id = d.source_id JOIN chapters c ON c.source_id = s.id LEFT JOIN chapter_analyses a ON a.chapter_id = c.id AND a.split_mode = 'b' WHERE d.id = ? GROUP BY d.id",
+                                "SELECT f.text_encoding, s.kind, COUNT(c.id), COUNT(a.id) FROM imported_files f JOIN documents d ON d.id = f.document_id JOIN sources s ON s.id = d.source_id JOIN chapters c ON c.source_id = s.id LEFT JOIN chapter_analyses a ON a.chapter_id = c.id AND a.split_mode = 'c' WHERE d.id = ? GROUP BY d.id",
                                 arrayOf(id),
                             )
                             .use {

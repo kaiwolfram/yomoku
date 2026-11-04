@@ -8,10 +8,7 @@ use yomoku_core::{
 };
 
 fn cores() -> [Core<Yomoku>; 2] {
-    [
-        Core::new(),
-        Core::new_with(Yomoku, Model::with_effective_reader()),
-    ]
+    [Core::new(), Core::new_with(Yomoku, Model::default())]
 }
 fn enter(core: &Core<Yomoku>) {
     core.process_event(Event::SelectDestination(Destination::Vocabulary));

@@ -1018,14 +1018,14 @@ class AnkiProviderReaderTest {
             val result = f.inserter.insert(request) as AnkiNoteInsertionResult.Uncertain
             repeat(2) {
                 assertEquals(
-                    AnkiReadReconciliation.Unresolved,
-                    f.reader.reconcile(result.request.surface),
+                    AnkiReadResult.Value(emptyList<AnkiProviderNoteId>()),
+                    f.reader.duplicates(result.request.surface),
                 )
             }
             f.provider.note(9, "猫", model = 88, deck = 99)
             assertEquals(
-                AnkiReadReconciliation.Existing(listOf(AnkiProviderNoteId(9))),
-                f.reader.reconcile(result.request.surface),
+                AnkiReadResult.Value(listOf(AnkiProviderNoteId(9))),
+                f.reader.duplicates(result.request.surface),
             )
             assertEquals("猫\u001fねこ\u001f\u001f猫。<strong>猫</strong>。", result.request.joinedFields)
             assertEquals(Long.MAX_VALUE, result.request.deckId)
@@ -1677,8 +1677,8 @@ class AnkiProviderReaderTest {
             f.environment.permitted = true
             supported.metaData.putInt(AnkiProviderReader.SPEC_KEY, 1)
             assertEquals(
-                AnkiReadReconciliation.Failed(AnkiReadError.UnsupportedProvider),
-                f.reader.reconcile("猫"),
+                AnkiReadResult.Failed(AnkiReadError.UnsupportedProvider),
+                f.reader.duplicates("猫"),
             )
             assertEquals(1, f.provider.queries)
         }
@@ -1911,23 +1911,26 @@ class AnkiProviderReaderTest {
     }
 
     @Test
-    fun reconciliationEmptyAndFailedReadsRemainUnresolvedWithoutAnyWrite() {
+    fun freshEmptyAndFailedDuplicateReadsStayDistinctWithoutAnyWrite() {
         Fixture().use { f ->
-            repeat(2) { assertSame(AnkiReadReconciliation.Unresolved, f.reader.reconcile("猫")) }
+            repeat(2) {
+                assertEquals(
+                    AnkiReadResult.Value(emptyList<AnkiProviderNoteId>()),
+                    f.reader.duplicates("猫"),
+                )
+            }
             f.provider.replacement = { null }
             assertEquals(
-                AnkiReadReconciliation.Failed(AnkiReadError.DuplicateLookupFailed),
-                f.reader.reconcile("猫"),
+                AnkiReadResult.Failed(AnkiReadError.DuplicateLookupFailed),
+                f.reader.duplicates("猫"),
             )
             f.provider.replacement = null
             f.provider.note(7, "猫", model = 9, deck = 10)
             f.provider.note(8, "猫", model = 11, deck = 12)
             val before = f.provider.rows()
             assertEquals(
-                AnkiReadReconciliation.Existing(
-                    listOf(AnkiProviderNoteId(7), AnkiProviderNoteId(8))
-                ),
-                f.reader.reconcile("猫"),
+                AnkiReadResult.Value(listOf(AnkiProviderNoteId(7), AnkiProviderNoteId(8))),
+                f.reader.duplicates("猫"),
             )
             assertEquals(before, f.provider.rows())
         }
@@ -1987,7 +1990,6 @@ class AnkiProviderReaderTest {
                         { f.reader.modelMatches(AnkiProviderModelId(7), f.layout) },
                         { f.reader.decks() },
                         { f.reader.duplicates("猫") },
-                        { f.reader.reconcile("猫") },
                         { f.reader.existingNoteIntent(AnkiProviderNoteId(7)) },
                         { f.creator.create(f.layout) },
                     )

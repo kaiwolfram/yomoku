@@ -34,7 +34,7 @@ fn counts(path: &PathBuf) -> Vec<i64> {
 fn whole_book_import_registers_all_chapters_without_encounters_and_reopens_without_full() {
     let database = Database::new();
     let Factory { loader, trace, .. } = Factory::new(false, None);
-    let (router, lifecycle) = effect_router_with_analyzed_imports(database.path(), loader).unwrap();
+    let (router, lifecycle) = import_router(database.path(), loader).unwrap();
     let first = dispatch(
         &router,
         txt_event("猫".as_bytes(), Some(TextEncoding::Utf8)),
@@ -54,7 +54,7 @@ fn whole_book_import_registers_all_chapters_without_encounters_and_reopens_witho
     assert_eq!(created.document_error, None);
     assert_eq!(created.content_route, ContentRoute::Main);
     assert_eq!(created.destination, Destination::Library);
-    assert!(created.reader.is_none() && created.loaded_document.is_none());
+    assert!(created.reader.is_none());
     let summary = created.import_summary.unwrap();
     assert_eq!(summary.outcome, ImportOutcome::Created);
     assert_eq!(summary.title, parsed.title.unwrap());
@@ -112,14 +112,20 @@ fn whole_book_import_registers_all_chapters_without_encounters_and_reopens_witho
     );
     assert_eq!(connection.query_row("SELECT COUNT(*) FROM vocabulary_status_events WHERE vocabulary_id = (SELECT id FROM vocabulary WHERE surface = '犬')", [], |row| row.get::<_, i64>(0)).unwrap(), 1);
     finish_worker(router, lifecycle, &trace);
-    let (router, lifecycle) = effect_router_with_analyzed_imports(
+    let (router, lifecycle) = import_router(
         database.path(),
         Box::new(|| panic!("open cannot load Full")),
     )
     .unwrap();
     let opened = dispatch(&router, Event::OpenReader(summary.document_id));
     assert_eq!(
-        opened.loaded_document.unwrap().chapters,
+        Storage::open(database.path())
+            .unwrap()
+            .load_document_reader_snapshot(summary.document_id)
+            .unwrap()
+            .unwrap()
+            .document
+            .chapters,
         stored
             .chapters
             .into_iter()
@@ -135,7 +141,7 @@ fn whole_book_import_registers_all_chapters_without_encounters_and_reopens_witho
 fn invalid_containers_skip_full_and_later_valid_file_imports_with_filename_fallback() {
     let database = Database::new();
     let Factory { loader, trace, .. } = Factory::new(false, None);
-    let (router, lifecycle) = effect_router_with_analyzed_imports(database.path(), loader).unwrap();
+    let (router, lifecycle) = import_router(database.path(), loader).unwrap();
     dispatch(&router, Event::RefreshLibrary);
     let before = counts(&database.path());
     let invalid_xml = epub_fixture::book(true, "<p>unclosed");
@@ -177,8 +183,7 @@ fn epub_duplicate_of_txt_or_srt_preserves_first_interpretation_before_container_
         let database = Database::new();
         let bytes = b"English first interpretation";
         let Factory { loader, trace, .. } = Factory::new(false, None);
-        let (router, lifecycle) =
-            effect_router_with_analyzed_imports(database.path(), loader).unwrap();
+        let (router, lifecycle) = import_router(database.path(), loader).unwrap();
         let created = dispatch(
             &router,
             if srt {
@@ -190,8 +195,7 @@ fn epub_duplicate_of_txt_or_srt_preserves_first_interpretation_before_container_
         finish_worker(router, lifecycle, &trace);
         let before = counts(&database.path());
         let Factory { loader, trace, .. } = Factory::new(true, None);
-        let (router, lifecycle) =
-            effect_router_with_analyzed_imports(database.path(), loader).unwrap();
+        let (router, lifecycle) = import_router(database.path(), loader).unwrap();
         let duplicate = dispatch(
             &router,
             Event::ImportEpub(EpubImport {
@@ -235,8 +239,7 @@ fn loader_and_later_chapter_analysis_failures_roll_back_then_next_file_and_retry
                 Ok(fixture(chapter))
             }))
         });
-        let (router, lifecycle) =
-            effect_router_with_analyzed_imports(database.path(), loader).unwrap();
+        let (router, lifecycle) = import_router(database.path(), loader).unwrap();
         dispatch(&router, Event::RefreshLibrary);
         let before = counts(&database.path());
         let bytes = epub_fixture::book(true, "<p>later 猫</p>");
@@ -269,8 +272,7 @@ fn loader_and_later_chapter_analysis_failures_roll_back_then_next_file_and_retry
         drop(router);
         drop(lifecycle);
         let Factory { loader, trace, .. } = Factory::new(false, None);
-        let (router, lifecycle) =
-            effect_router_with_analyzed_imports(database.path(), loader).unwrap();
+        let (router, lifecycle) = import_router(database.path(), loader).unwrap();
         dispatch(&router, Event::RefreshLibrary);
         assert_eq!(dispatch(&router, event(&bytes)).document_error, None);
         assert_eq!(dispatch(&router, event(&single)).documents.len(), 3);
@@ -301,8 +303,7 @@ fn every_epub_write_later_chapter_and_deferred_commit_failure_rolls_back_whole_b
     ] {
         let database = Database::new();
         let Factory { loader, trace, .. } = Factory::new(false, None);
-        let (router, lifecycle) =
-            effect_router_with_analyzed_imports(database.path(), loader).unwrap();
+        let (router, lifecycle) = import_router(database.path(), loader).unwrap();
         let created = dispatch(&router, txt_event(b"English", None));
         let before = counts(&database.path());
         let connection = Connection::open(database.path()).unwrap();
@@ -353,7 +354,7 @@ fn cancel_in_later_chapter_discards_earlier_chapter_assets_registrations_and_all
             Ok(fixture(chapter))
         }))
     });
-    let (router, lifecycle) = effect_router_with_analyzed_imports(database.path(), loader).unwrap();
+    let (router, lifecycle) = import_router(database.path(), loader).unwrap();
     // Seed a committed file without using this analyzer.
     Storage::open(database.path())
         .unwrap()

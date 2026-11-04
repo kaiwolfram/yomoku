@@ -88,17 +88,16 @@ class DocumentSessionTest {
             assertEquals("本𠮷.txt", created.documents.single().title)
             assertNull(created.reader)
             val id = created.documents.single().documentId
-            val loaded = dispatch(core, Event.LoadPaste(id)).loadedDocument!!
-            assertEquals("猫と猫。\r\n𠮷😀\u0000終", loaded.chapters.single().text)
-            val ruby = loaded.sourceRuby.single()
-            assertEquals(loaded.chapters.single().chapterId, ruby.chapterId)
+            val loaded = dispatch(core, Event.OpenReader(id)).reader!!
+            assertEquals("猫と猫。\r\n𠮷😀\u0000終", loaded.text)
+            val ruby = loaded.sourceRuby
             assertEquals(
                 ReaderRuby(TextRange(TextOffset(0), TextOffset(3)), "ねこ"),
-                ruby.ruby.single(),
+                ruby.single(),
             )
             val opened = dispatch(core, Event.OpenReader(id))
             val page = opened.reader!!
-            assertEquals(ruby.ruby, page.sourceRuby)
+            assertEquals(ruby, page.sourceRuby)
             assertTrue(opened.readerFurigana.isEmpty())
             dispatch(core, Event.OpenSettings)
             val enabled =
@@ -174,7 +173,7 @@ class DocumentSessionTest {
             val reopenedView = dispatch(core, Event.OpenReader(id))
             val reopened = reopenedView.reader!!
             assertEquals(position, reopened.position)
-            assertEquals(ruby.ruby, reopened.sourceRuby)
+            assertEquals(ruby, reopened.sourceRuby)
             assertTrue(reopenedView.readerTypography!!.furigana)
             assertEquals(reopened.sourceRuby, reopenedView.readerFurigana)
             val restored = dispatch(core, Event.LoadReaderTokens(key)).effectiveReaderTokens!!
@@ -189,7 +188,7 @@ class DocumentSessionTest {
             val legacyId = selected.importSummary!!.documentId
             assertEquals(
                 "ﾂｩ",
-                dispatch(core, Event.LoadPaste(legacyId)).loadedDocument!!.chapters.single().text,
+                dispatch(core, Event.OpenReader(legacyId)).reader!!.text,
             )
         } finally {
             instrumentation.runOnMainSync { core.close() }
@@ -230,7 +229,6 @@ class DocumentSessionTest {
                     )
                 assertNull(changed.documentError)
                 assertEquals(page, changed.reader)
-                assertEquals(opened.loadedDocument, changed.loadedDocument)
                 assertNull(changed.readerTime)
                 assertNull(changed.completionNotice)
                 assertNull(changed.bookCompletionNotice)
@@ -312,18 +310,17 @@ class DocumentSessionTest {
             val created = dispatch(core, Event.CreatePaste(text))
             assertNull(created.documentError)
             assertEquals("  題𠮷📖  ", created.documents.single().title)
-            assertNull(created.loadedDocument)
+            assertNull(created.reader)
             var document =
-                dispatch(core, Event.LoadPaste(created.documents.single().documentId))
-                    .loadedDocument
+                dispatch(core, Event.OpenReader(created.documents.single().documentId)).reader
             assertNotNull(document)
-            assertEquals(text, document!!.chapters.single().text)
+            assertEquals(text, document!!.text)
             val opened = dispatch(core, Event.OpenReader(document.documentId)).reader!!
             val position = opened.position.copy(offset = TextOffset(5))
             val saved = dispatch(core, Event.SaveReadingPosition(position))
             assertNull(saved.documentError)
             assertEquals(position, saved.reader!!.position)
-            document = saved.loadedDocument!!
+            document = saved.reader
             dispatch(core, Event.OpenSettings)
             assertEquals(
                 PageLength.CHARACTERS750,
@@ -351,7 +348,7 @@ class DocumentSessionTest {
             assertEquals(PageLength.CHARACTERS750, initial.pageLength)
             assertEquals(
                 document,
-                dispatch(core, Event.LoadPaste(document.documentId)).loadedDocument,
+                dispatch(core, Event.OpenReader(document.documentId)).reader,
             )
             assertEquals(
                 position,

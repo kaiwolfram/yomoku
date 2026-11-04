@@ -15,7 +15,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import app.yomoku.shared.AnkiEntryKey
 import app.yomoku.shared.DictionaryCandidates
-import app.yomoku.shared.ReaderWordDetails
 import app.yomoku.shared.Reading
 import app.yomoku.shared.ReadingMatch
 import app.yomoku.shared.Spelling
@@ -63,10 +62,6 @@ private fun translationText(translation: Translation): String {
     return if (qualifiers.isEmpty()) translation.text
     else "${translation.text} (${qualifiers.joinToString(", ")})"
 }
-
-@Composable
-internal fun ReaderDictionary(details: ReaderWordDetails) =
-    ReaderDictionary(details.encountered, details.candidates)
 
 @Composable
 internal fun ReaderDictionary(

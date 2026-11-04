@@ -34,18 +34,6 @@ internal data class AnkiProviderNoteId(val value: Long) {
 
 internal data class AnkiProviderDeck(val id: Long, val name: String, val filtered: Boolean)
 
-internal sealed interface AnkiReadReconciliation {
-    data class Existing(val ids: List<AnkiProviderNoteId>) : AnkiReadReconciliation {
-        init {
-            require(ids.isNotEmpty())
-        }
-    }
-
-    data object Unresolved : AnkiReadReconciliation
-
-    data class Failed(val error: AnkiReadError) : AnkiReadReconciliation
-}
-
 internal interface AnkiProviderEnvironment {
     fun provider(): ProviderInfo?
 
@@ -73,8 +61,8 @@ internal class AndroidAnkiProviderEnvironment(context: Context) : AnkiProviderEn
 
 /**
  * Read-only ContentResolver boundary. Call on a worker. No provider state is cached and no
- * permission dialog, Activity launch, model creation or note mutation occurs here. Explicit
- * recovery dispatch uses the app's captured handle and durable evidence commit gate.
+ * permission dialog, Activity launch, model creation or note mutation occurs here. Fresh results
+ * are observations for the current in-memory operation.
  */
 internal class AnkiProviderReader(
     private val resolver: ContentResolver,
@@ -306,15 +294,6 @@ internal class AnkiProviderReader(
             } finally {
                 cursor.close()
             }
-        }
-
-    /** Empty reads never authorize another insertion, even after a successful query. */
-    fun reconcile(surface: String): AnkiReadReconciliation =
-        when (val result = duplicates(surface)) {
-            is AnkiReadResult.Failed -> AnkiReadReconciliation.Failed(result.error)
-            is AnkiReadResult.Value ->
-                if (result.value.isEmpty()) AnkiReadReconciliation.Unresolved
-                else AnkiReadReconciliation.Existing(result.value)
         }
 
     /**

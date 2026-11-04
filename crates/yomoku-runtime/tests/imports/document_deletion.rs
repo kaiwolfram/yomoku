@@ -4,7 +4,7 @@ use super::*;
 fn confirmed_document_deletion_runs_on_fifo_without_analysis_and_retries_transaction_failure() {
     let database = Database::new();
     let Factory { loader, trace, .. } = Factory::new(false, None);
-    let (router, lifecycle) = effect_router_with_analyzed_imports(database.path(), loader).unwrap();
+    let (router, lifecycle) = import_router(database.path(), loader).unwrap();
     let created = dispatch(&router, Event::CreatePaste("猫 犬 𠮷".into()));
     let id = created.import_summary.unwrap().document_id;
     trace.recv_timeout(TIMEOUT).unwrap(); // load
@@ -52,7 +52,7 @@ fn confirmed_document_deletion_runs_on_fifo_without_analysis_and_retries_transac
 fn confirmed_bulk_deletion_uses_one_fifo_transaction_and_exact_selection_on_retry() {
     let database = Database::new();
     let Factory { loader, trace, .. } = Factory::new(false, None);
-    let (router, lifecycle) = effect_router_with_analyzed_imports(database.path(), loader).unwrap();
+    let (router, lifecycle) = import_router(database.path(), loader).unwrap();
     let first = dispatch(&router, Event::CreatePaste("猫 犬".into()))
         .import_summary
         .unwrap()

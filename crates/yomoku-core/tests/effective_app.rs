@@ -76,7 +76,7 @@ impl Fixture {
             images: vec![],
             source_ruby: vec![],
         };
-        let core = Core::new_with(Yomoku, Model::with_effective_reader());
+        let core = Core::new_with(Yomoku, Model::default());
         let mut effects = core.process_event(Event::OpenReader(document.document_id));
         resolve(
             &core,
@@ -294,7 +294,6 @@ fn effective_application_loads_compact_page_and_uses_exact_furigana_without_lega
     assert!(f.core.view().reader_furigana.is_empty());
     let identity = f.load();
     let view = f.core.view();
-    assert!(view.reader_tokens.is_none());
     let tokens = view.effective_reader_tokens.unwrap().tokens;
     assert_eq!(
         tokens
@@ -305,16 +304,7 @@ fn effective_application_loads_compact_page_and_uses_exact_furigana_without_lega
     );
     assert!(tokens[0].reading.is_some() && tokens[1].reading.is_some());
     assert_eq!(view.reader_furigana.len(), 3); // exact analyzed word, never borrowed B for 猫/犬
-    let page = view.reader.unwrap();
-    assert!(f
-        .core
-        .process_event(Event::CompleteReaderPage {
-            document_id: page.document_id,
-            page: page.anchor,
-            position: page.position,
-            completed_at_unix_ms: 500
-        })
-        .is_empty());
+    let _page = view.reader.unwrap();
     let mut effects = f.core.process_event(f.complete(identity));
     let (mut effects, prepared) = f.prepare(&mut effects, 0);
     assert!(f.core.view().completion_save_pending);
@@ -599,4 +589,52 @@ fn missing_analysis_stays_plain_and_cannot_complete_or_rescan() {
         Some(DocumentError::MissingAnalysis)
     );
     assert!(!f.core.view().completion_save_pending && !f.core.view().storage_busy);
+}
+
+#[test]
+fn accepted_failed_completion_blocks_typography_and_imports_until_explicit_retry() {
+    let f = Fixture::new(true);
+    let identity = f.load();
+    let mut effects = f.core.process_event(f.complete(identity));
+    resolve(
+        &f.core,
+        &mut effects,
+        StorageResult::Failed(DocumentError::Unavailable),
+    );
+    assert!(f.core.view().completion_save_pending);
+    let before = f.core.view().reader;
+    for event in [
+        Event::CreatePaste("猫".into()),
+        Event::ImportTxt(yomoku_core::imports::TxtImport {
+            original_bytes: b"text".to_vec(),
+            filename: "book.txt".into(),
+            encoding: None,
+        }),
+        Event::ImportSrt(yomoku_core::imports::SrtImport {
+            original_bytes: b"text".to_vec(),
+            filename: "book.srt".into(),
+            encoding: None,
+        }),
+        Event::ImportEpub(yomoku_core::imports::EpubImport {
+            original_bytes: b"text".to_vec(),
+            filename: "book.epub".into(),
+        }),
+    ] {
+        assert!(f.core.process_event(event).is_empty());
+        assert_eq!(f.core.view().reader, before);
+    }
+    f.core.process_event(Event::OpenSettings);
+    let typography = yomoku_core::typography::ReaderTypography {
+        furigana: true,
+        ..Default::default()
+    };
+    assert!(f
+        .core
+        .process_event(Event::SetReaderTypography(typography))
+        .is_empty());
+    assert!(f.core.view().completion_save_pending);
+    assert!(!f
+        .core
+        .process_event(Event::RetryReaderCompletion)
+        .is_empty());
 }

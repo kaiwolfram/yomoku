@@ -12,13 +12,11 @@ internal fun verifyAnkiProtocol(fixtures: String) {
         when (event) {
             is Event.PrepareReaderAnkiExport -> {
                 when (val selected = event.selection) {
-                    is AnkiSelection.Original -> {
-                        check(index == 0 && selected.value.tokenIndex == ULong.MAX_VALUE)
-                        check(selected.value.key.documentId.value == Long.MAX_VALUE)
-                    }
                     is AnkiSelection.Effective -> {
-                        check(index == 1 && selected.value.segmentIndex == ULong.MAX_VALUE)
-                        check(selected.value.page.revision == ULong.MAX_VALUE)
+                        check(index in 0..1 && selected.value.segmentIndex == ULong.MAX_VALUE)
+                        check(
+                            selected.value.page.revision == if (index == 0) 1UL else ULong.MAX_VALUE
+                        )
                         check(selected.value.page.base.documentId.value == Long.MAX_VALUE)
                     }
                 }

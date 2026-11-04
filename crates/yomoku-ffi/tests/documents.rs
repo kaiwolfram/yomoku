@@ -11,11 +11,10 @@ use std::{
 use crux_core::bridge::{BincodeFfiFormat, FfiFormat, Requests};
 use yomoku_core::{
     app::{Destination, Event, ViewModel},
-    document::DocumentId,
-    reader::ReaderAnalysis,
-    storage::{DocumentError, StorageResult},
+    storage::DocumentError,
 };
-use yomoku_ffi::{FfiError, YomokuBridge as NativeBridge};
+use yomoku_ffi::YomokuBridge as NativeBridge;
+mod support;
 use yomoku_runtime::ShellEffectFfi;
 
 type Callbacks = mpsc::Receiver<(ThreadId, Vec<u8>)>;
@@ -25,11 +24,12 @@ fn bridge(path: &str) -> (NativeBridge, Callbacks, Weak<()>) {
     let life = Arc::new(());
     let weak = Arc::downgrade(&life);
     (
-        NativeBridge::new(path.into(), move |result| {
+        support::bridge(path.into(), move |result| {
             let _keep_alive = &life;
             let _ = sender.send((thread::current().id(), result.unwrap()));
         })
-        .unwrap(),
+        .unwrap()
+        .0,
         receiver,
         weak,
     )
@@ -76,69 +76,6 @@ impl Drop for Database {
 }
 
 #[test]
-fn async_native_pastes_list_load_reopen_and_release_listeners() {
-    let db = Database::new();
-    std::fs::create_dir(&db.0).unwrap();
-    let (native, callbacks, life) = bridge(&db.path());
-    assert!(!std::path::Path::new(&db.path()).exists()); // constructor performs no I/O
-    assert!(dispatch(&native, &callbacks, Event::RefreshLibrary)
-        .documents
-        .is_empty());
-    let text = "  題𠮷📖  \r\nか\u{3099}👩‍👩‍👧‍👦\0終\n";
-    let mut created = dispatch(&native, &callbacks, Event::CreatePaste(text.into()));
-    assert_eq!(created.documents.len(), 1);
-    assert_eq!(created.documents[0].title, "  題𠮷📖  ");
-    assert_eq!(created.destination, Destination::Library);
-    assert!(created.loaded_document.is_none()); // storage does not start a reader
-    let id = created.documents[0].document_id;
-    let expected = dispatch(&native, &callbacks, Event::LoadPaste(id))
-        .loaded_document
-        .unwrap();
-    assert_eq!(expected.chapters[0].text, text);
-    assert_eq!(
-        dispatch(&native, &callbacks, Event::OpenReader(id)).reader_analysis,
-        Some(ReaderAnalysis::Missing)
-    );
-    assert_eq!(
-        dispatch(&native, &callbacks, Event::CreatePaste(" \n\t".into())).document_error,
-        Some(DocumentError::EmptyPaste)
-    );
-    assert_eq!(
-        dispatch(&native, &callbacks, Event::RefreshLibrary)
-            .documents
-            .len(),
-        1
-    );
-    assert_eq!(
-        dispatch(
-            &native,
-            &callbacks,
-            Event::LoadPaste(DocumentId::try_from(i64::MAX).unwrap())
-        )
-        .document_error,
-        Some(DocumentError::NotFound)
-    );
-    drop(native);
-    // Wait for the worker to drop its last callback capture before asserting lifetime.
-    assert!(callbacks.recv_timeout(Duration::from_secs(10)).is_err());
-    assert!(life.upgrade().is_none());
-    let (reopened, callbacks, _) = bridge(&db.path());
-    created.documents[0].last_read_sequence = Some(1);
-    assert_eq!(
-        dispatch(&reopened, &callbacks, Event::RefreshLibrary).documents,
-        created.documents
-    );
-    assert_eq!(
-        dispatch(&reopened, &callbacks, Event::LoadPaste(id)).loaded_document,
-        Some(expected)
-    );
-    let (independent, callbacks, _) = bridge(":memory:");
-    assert!(dispatch(&independent, &callbacks, Event::RefreshLibrary)
-        .documents
-        .is_empty());
-}
-
-#[test]
 fn async_open_failure_is_typed_retryable_and_preserves_invalid_files() {
     let db = Database::new();
     let (native, callbacks, _) = bridge(&db.path());
@@ -164,301 +101,6 @@ fn async_open_failure_is_typed_retryable_and_preserves_invalid_files() {
         Some(DocumentError::Unavailable)
     );
     assert_eq!(std::fs::read(db.path()).unwrap(), b"not a database");
-}
-
-#[test]
-fn token_reads_and_manual_choices_preserve_metadata_and_global_status_semantics() {
-    use yomoku_core::{
-        analysis::{AnalysisProfile, AnalyzedToken, ChapterAnalysis, SplitMode},
-        document::{PasteText, TextAnchor, TextOffset, TextRange},
-        reader::{ReaderStatusChange, ReaderTokenKey},
-        vocabulary::{Surface, VocabularyStatus},
-    };
-    let db = Database::new();
-    std::fs::create_dir(&db.0).unwrap();
-    let mut storage = yomoku_storage::Storage::open(db.path()).unwrap();
-    let imported = storage
-        .create_analyzed_paste(
-            &PasteText::new("📖\0 猫𠮷 猫𠮷".into()).unwrap(),
-            100,
-            |chapter| {
-                let mut tokens: Vec<_> = chapter
-                    .text
-                    .match_indices("猫𠮷")
-                    .map(|(start, surface)| AnalyzedToken {
-                        anchor: TextAnchor {
-                            source_id: chapter.source_id,
-                            chapter_id: chapter.chapter_id,
-                            range: TextRange {
-                                start: TextOffset::at(&chapter.text, start).unwrap(),
-                                end: TextOffset::at(&chapter.text, start + surface.len()).unwrap(),
-                            },
-                        },
-                        surface: surface.into(),
-                        is_japanese: true,
-                        reading: Some("ネコヨシ".into()),
-                        dictionary_form: Some(Surface::new("猫𠮷").unwrap()),
-                    })
-                    .collect();
-                tokens.insert(
-                    0,
-                    AnalyzedToken {
-                        anchor: TextAnchor {
-                            source_id: chapter.source_id,
-                            chapter_id: chapter.chapter_id,
-                            range: TextRange {
-                                start: TextOffset::START,
-                                end: TextOffset::at(&chapter.text, "📖\0".len()).unwrap(),
-                            },
-                        },
-                        surface: "📖\0".into(),
-                        is_japanese: false,
-                        reading: None,
-                        dictionary_form: None,
-                    },
-                );
-                Ok::<_, std::convert::Infallible>(ChapterAnalysis {
-                    profile: AnalysisProfile {
-                        engine_revision: "fixture-engine@1".into(),
-                        dictionary_revision: "fixture-full@1".into(),
-                    },
-                    mode: SplitMode::C,
-                    tokens,
-                })
-            },
-        )
-        .unwrap();
-    let id = imported.document.document_id;
-    let entry = storage
-        .vocabulary_entry(&Surface::new("猫𠮷").unwrap())
-        .unwrap()
-        .unwrap();
-    let (native, callbacks, _) = bridge(&db.path());
-    let opened = dispatch(&native, &callbacks, Event::OpenReader(id));
-    let reader = opened.reader.as_ref().unwrap();
-    let key = ReaderTokenKey {
-        document_id: id,
-        page: reader.anchor,
-        analysis: opened.reader_analysis.unwrap(),
-    };
-    assert!(opened.reader_tokens.is_none());
-    for status in [
-        VocabularyStatus::New,
-        VocabularyStatus::Learning,
-        VocabularyStatus::Familiar,
-        VocabularyStatus::Known,
-        VocabularyStatus::Ignored,
-    ] {
-        storage
-            .set_vocabulary_status(entry.id, status, 200)
-            .unwrap();
-        let before = std::fs::read(db.path()).unwrap();
-        let loaded = dispatch(&native, &callbacks, Event::LoadReaderTokens(key));
-        let snapshot = loaded.reader_tokens.unwrap();
-        assert_eq!(snapshot.key(), key);
-        assert_eq!(
-            snapshot.analysis,
-            ReaderAnalysis::Available(imported.analysis_id)
-        );
-        assert_eq!(snapshot.tokens.len(), 2);
-        assert_ne!(
-            snapshot.tokens[0].token_index,
-            snapshot.tokens[1].token_index
-        );
-        for token in snapshot.tokens {
-            assert_eq!(
-                token.anchor.slice(&imported.document.chapter).unwrap(),
-                "猫𠮷"
-            );
-            assert_eq!(token.display_range.slice(&reader.text).unwrap(), "猫𠮷");
-            assert_eq!(token.surface, "猫𠮷");
-            assert_eq!(token.reading.as_deref(), Some("ネコヨシ"));
-            assert_eq!(token.dictionary_form.as_deref(), Some("猫𠮷"));
-            assert_eq!(
-                token.vocabulary.unwrap(),
-                yomoku_core::reader::ReaderVocabulary {
-                    id: entry.id,
-                    status
-                }
-            );
-        }
-        assert_eq!(loaded.reader, opened.reader);
-        assert_eq!(loaded.loaded_document, opened.loaded_document);
-        assert!(loaded.completion_notice.is_none());
-        assert_eq!(std::fs::read(db.path()).unwrap(), before);
-    }
-    // Explicit choices share the read transport's identity but mutate only the
-    // global entry and its manual history, including all repeated visible spans.
-    let sql = rusqlite::Connection::open(db.path()).unwrap();
-    sql.execute_batch("PRAGMA foreign_keys = ON;").unwrap();
-    let manual_count = || -> i64 {
-        sql.query_row(
-            "SELECT COUNT(*) FROM vocabulary_status_events WHERE cause = 'manual'",
-            [],
-            |row| row.get(0),
-        )
-        .unwrap()
-    };
-    let change = ReaderStatusChange {
-        key,
-        vocabulary_id: entry.id,
-        status: VocabularyStatus::New,
-        occurred_at_unix_ms: 321,
-    };
-    for (index, status) in [
-        VocabularyStatus::New,
-        VocabularyStatus::Learning,
-        VocabularyStatus::Familiar,
-        VocabularyStatus::Known,
-        VocabularyStatus::Ignored,
-    ]
-    .into_iter()
-    .enumerate()
-    {
-        let change = ReaderStatusChange { status, ..change };
-        let before = manual_count();
-        let changed = dispatch(&native, &callbacks, Event::SetReaderStatus(change));
-        assert_eq!(manual_count(), before + 1);
-        let tokens = changed.reader_tokens.as_ref().unwrap();
-        assert!(tokens
-            .tokens
-            .iter()
-            .all(|token| token.vocabulary.unwrap().status == status));
-        assert_eq!(changed.reader, opened.reader);
-        assert_eq!(changed.loaded_document, opened.loaded_document);
-        assert!(changed.completion_notice.is_none());
-        assert_eq!(
-            storage
-                .vocabulary_entry(&Surface::new("猫𠮷").unwrap())
-                .unwrap()
-                .unwrap()
-                .status,
-            status
-        );
-        let repeated = dispatch(&native, &callbacks, Event::SetReaderStatus(change));
-        assert_eq!(repeated.reader_tokens, changed.reader_tokens);
-        assert_eq!(
-            manual_count(),
-            before + 1,
-            "same choice is idempotent {index}"
-        );
-    }
-    assert_eq!(
-        sql.query_row("SELECT COUNT(*) FROM vocabulary_status_events WHERE cause = 'manual' AND occurred_at_unix_ms = 321", [], |row| row.get::<_, i64>(0)).unwrap(),
-        5
-    );
-    assert_eq!(
-        sql.query_row("SELECT COUNT(*) FROM reading_completions", [], |row| row
-            .get::<_, i64>(0))
-            .unwrap(),
-        0
-    );
-    // A failed status/history transaction leaves the old snapshot and database
-    // intact. The same direct choice retries after the fault is removed.
-    sql.execute_batch("CREATE TRIGGER fail_status BEFORE INSERT ON vocabulary_status_events BEGIN SELECT RAISE(ABORT, 'fixture'); END;").unwrap();
-    let before = manual_count();
-    let failed = dispatch(&native, &callbacks, Event::SetReaderStatus(change));
-    assert_eq!(failed.document_error, Some(DocumentError::Unavailable));
-    assert!(failed
-        .reader_tokens
-        .unwrap()
-        .tokens
-        .iter()
-        .all(|token| token.vocabulary.unwrap().status == VocabularyStatus::Ignored));
-    assert_eq!(manual_count(), before);
-    assert_eq!(
-        storage
-            .vocabulary_entry(&Surface::new("猫𠮷").unwrap())
-            .unwrap()
-            .unwrap()
-            .status,
-        VocabularyStatus::Ignored
-    );
-    sql.execute_batch("DROP TRIGGER fail_status;").unwrap();
-    let retried = dispatch(&native, &callbacks, Event::SetReaderStatus(change));
-    assert!(retried.document_error.is_none());
-    assert_eq!(manual_count(), before + 1);
-    // Fresh worker/session reads the global persisted choice without an analyzer.
-    let (reopened, reopened_callbacks, _) = bridge(&db.path());
-    dispatch(&reopened, &reopened_callbacks, Event::OpenReader(id));
-    let persisted = dispatch(&reopened, &reopened_callbacks, Event::LoadReaderTokens(key));
-    assert!(persisted
-        .reader_tokens
-        .unwrap()
-        .tokens
-        .iter()
-        .all(|token| token.vocabulary.unwrap().status == VocabularyStatus::New));
-    // A deletion after lookup is never undone by an accepted stale ID choice.
-    sql.execute(
-        "DELETE FROM vocabulary WHERE id = ?1",
-        [i64::from(entry.id)],
-    )
-    .unwrap();
-    let absent = dispatch(&native, &callbacks, Event::SetReaderStatus(change));
-    assert!(absent.document_error.is_none());
-    assert!(absent
-        .reader_tokens
-        .unwrap()
-        .tokens
-        .iter()
-        .all(|token| token.vocabulary.is_none()));
-    assert!(storage
-        .vocabulary_entry(&Surface::new("猫𠮷").unwrap())
-        .unwrap()
-        .is_none());
-    // A separately opened legacy paste remains Missing; the FIFO has no loader.
-    let legacy = storage
-        .create_paste(&PasteText::new("未解析".into()).unwrap())
-        .unwrap();
-    let opened = dispatch(&native, &callbacks, Event::OpenReader(legacy.document_id));
-    let key = ReaderTokenKey {
-        document_id: legacy.document_id,
-        page: opened.reader.unwrap().anchor,
-        analysis: ReaderAnalysis::Missing,
-    };
-    let snapshot = dispatch(&native, &callbacks, Event::LoadReaderTokens(key))
-        .reader_tokens
-        .unwrap();
-    assert_eq!(snapshot.key(), key);
-    assert!(snapshot.tokens.is_empty());
-}
-
-#[test]
-fn internal_storage_results_cannot_be_injected_over_ffi() {
-    let (native, _, _) = bridge(":memory:");
-    // StorageFinished is skipped by Serde and by Facet generation.
-    let forged = Event::StorageFinished(StorageResult::Failed(DocumentError::Unavailable));
-    assert!(BincodeFfiFormat::serialize(&mut vec![], &forged).is_err());
-    // The skipped internal variant follows the final public variant. Derive its
-    // discriminant so adding a public event cannot silently weaken this check.
-    let mut last_public = Vec::new();
-    BincodeFfiFormat::serialize(
-        &mut last_public,
-        &Event::SetReaderStatus(yomoku_core::reader::ReaderStatusChange {
-            vocabulary_id: 1.try_into().unwrap(),
-            status: yomoku_core::vocabulary::VocabularyStatus::New,
-            occurred_at_unix_ms: 0,
-            key: yomoku_core::reader::ReaderTokenKey {
-                document_id: 1.try_into().unwrap(),
-                page: yomoku_core::document::TextAnchor {
-                    source_id: 1.try_into().unwrap(),
-                    chapter_id: 1.try_into().unwrap(),
-                    range: yomoku_core::document::TextRange {
-                        start: 0.try_into().unwrap(),
-                        end: 3.try_into().unwrap(),
-                    },
-                },
-                analysis: ReaderAnalysis::Missing,
-            },
-        }),
-    )
-    .unwrap();
-    let internal_tag = u32::from_le_bytes(last_public[..4].try_into().unwrap()) + 1;
-    assert_eq!(
-        native.update(&internal_tag.to_le_bytes()),
-        Err(FfiError::InvalidEvent)
-    );
-    assert!(view(&native).documents.is_empty());
 }
 
 #[test]
@@ -591,7 +233,11 @@ fn monotonic_clock_final_save_survives_unrelated_busy_work_close_and_fresh_epoch
             sql.query_row(&format!("SELECT count(*) FROM {table}"), [], |row| row
                 .get::<_, i64>(0))
                 .unwrap(),
-            0
+            if table == "vocabulary_status_events" {
+                1
+            } else {
+                0
+            }
         );
     }
 }
@@ -714,7 +360,11 @@ fn async_time_checkpoints_retry_exact_payload_and_restore_each_offset_after_reop
             sql.query_row(&format!("SELECT count(*) FROM {table}"), [], |row| row
                 .get::<_, i64>(0))
                 .unwrap(),
-            0
+            if table == "vocabulary_status_events" {
+                1
+            } else {
+                0
+            }
         );
     }
 }
@@ -834,200 +484,11 @@ fn busy_time_updates_flush_before_position_and_close_through_async_ffi() {
             sql.query_row(&format!("SELECT count(*) FROM {table}"), [], |row| row
                 .get::<_, i64>(0))
                 .unwrap(),
-            0
+            if table == "vocabulary_status_events" {
+                1
+            } else {
+                0
+            }
         );
     }
-}
-
-#[test]
-fn analyzed_completion_flushes_freezes_retries_and_rereads_through_async_ffi() {
-    use yomoku_core::{
-        active_time::PendingReadingTime,
-        analysis::{AnalysisProfile, AnalyzedToken, ChapterAnalysis, SplitMode},
-        document::{PasteText, TextAnchor, TextOffset, TextRange},
-        pagination::PageLength,
-    };
-    let db = Database::new();
-    std::fs::create_dir(&db.0).unwrap();
-    let mut storage = yomoku_storage::Storage::open(db.path()).unwrap();
-    storage.save_page_length(PageLength::Characters250).unwrap();
-    let imported = storage
-        .create_analyzed_paste(
-            &PasteText::new(format!("{}English 。\n犬 犬", "猫 ".repeat(250))).unwrap(),
-            1,
-            |chapter| {
-                let mut cursor = 0;
-                let tokens = chapter
-                    .text
-                    .split_whitespace()
-                    .map(|surface| {
-                        let start = cursor + chapter.text[cursor..].find(surface).unwrap();
-                        cursor = start + surface.len();
-                        AnalyzedToken {
-                            anchor: TextAnchor {
-                                source_id: chapter.source_id,
-                                chapter_id: chapter.chapter_id,
-                                range: TextRange {
-                                    start: TextOffset::at(&chapter.text, start).unwrap(),
-                                    end: TextOffset::at(&chapter.text, cursor).unwrap(),
-                                },
-                            },
-                            surface: surface.into(),
-                            is_japanese: matches!(surface, "猫" | "犬"),
-                            reading: None,
-                            dictionary_form: None,
-                        }
-                    })
-                    .collect();
-                Ok::<_, std::convert::Infallible>(ChapterAnalysis {
-                    profile: AnalysisProfile {
-                        engine_revision: "fixture-engine".into(),
-                        dictionary_revision: "fixture-dictionary".into(),
-                    },
-                    mode: SplitMode::C,
-                    tokens,
-                })
-            },
-        )
-        .unwrap();
-    drop(storage);
-    let (native, callbacks, _) = bridge(&db.path());
-    dispatch(&native, &callbacks, Event::RefreshLibrary);
-    let opened = dispatch(
-        &native,
-        &callbacks,
-        Event::OpenReader(imported.document.document_id),
-    );
-    let first = opened.reader.unwrap();
-    let request = Event::CompleteReaderPage {
-        document_id: first.document_id,
-        page: first.anchor,
-        position: first.position,
-        completed_at_unix_ms: 1234,
-    };
-    let mut checkpoint = dispatch(&native, &callbacks, Event::RestoreReadingTime)
-        .reader_time
-        .unwrap();
-    let sql = rusqlite::Connection::open(db.path()).unwrap();
-    let send = |event: Event| {
-        let mut bytes = Vec::new();
-        BincodeFfiFormat::serialize(&mut bytes, &event).unwrap();
-        native.update(&bytes).unwrap();
-    };
-    let await_callbacks = |count| {
-        for _ in 0..count {
-            let (worker, bytes) = callbacks.recv_timeout(Duration::from_secs(10)).unwrap();
-            assert_ne!(worker, thread::current().id());
-            let requests: Requests<ShellEffectFfi> = BincodeFfiFormat::deserialize(&bytes).unwrap();
-            assert!(requests
-                .0
-                .iter()
-                .all(|request| matches!(request.effect, ShellEffectFfi::Render(_))));
-        }
-        assert!(!view(&native).storage_busy);
-    };
-    sql.execute_batch("BEGIN IMMEDIATE; CREATE TRIGGER fail BEFORE INSERT ON reading_occurrences BEGIN SELECT RAISE(ABORT, 'fixture'); END;").unwrap();
-    for ms in [100, 400, 200] {
-        checkpoint.pending = PendingReadingTime::from_millis(ms).unwrap();
-        send(Event::CheckpointReadingTime(checkpoint));
-    }
-    send(request.clone());
-    send(Event::CompleteReaderPage {
-        completed_at_unix_ms: 9999,
-        document_id: first.document_id,
-        page: first.anchor,
-        position: first.position,
-    });
-    assert!(view(&native).completion_save_pending);
-    assert!(callbacks.recv_timeout(Duration::from_millis(100)).is_err());
-    sql.execute_batch("COMMIT").unwrap();
-    await_callbacks(4); // Two checkpoints, preparation, failed completion.
-    assert_eq!(
-        view(&native).document_error,
-        Some(DocumentError::Unavailable)
-    );
-    assert!(view(&native).completion_save_pending);
-    assert_eq!(view(&native).reader.unwrap(), first);
-    let count = |table: &str| {
-        sql.query_row(&format!("SELECT count(*) FROM {table}"), [], |row| {
-            row.get::<_, i64>(0)
-        })
-        .unwrap()
-    };
-    assert_eq!(count("completion_commands"), 1);
-    assert_eq!(count("reading_completions"), 0);
-    assert_eq!(count("reading_occurrences"), 0);
-    assert!(view(&native).completion_notice.is_none());
-    sql.execute_batch("DROP TRIGGER fail").unwrap();
-    let completed = dispatch(&native, &callbacks, Event::RetryReaderCompletion);
-    assert!(!completed.completion_save_pending && !completed.reading_time_save_pending);
-    assert!(completed.reader_time.is_none());
-    assert_eq!(
-        completed.reader_analysis,
-        Some(ReaderAnalysis::Available(imported.analysis_id))
-    );
-    assert_eq!(
-        completed.reader.as_ref().unwrap().position.offset,
-        first.anchor.range.end
-    );
-    let notice = completed.completion_notice.unwrap();
-    assert_eq!(notice.newly_known, 1);
-    assert_eq!(i64::from(notice.command_id), 1);
-    assert_eq!(count("completion_commands"), 1);
-    assert_eq!(count("reading_occurrences"), 250);
-    let frozen: (i64, i64, i64) = sql.query_row("SELECT completed_at_unix_ms, active_time_ms, (SELECT analysis_id FROM completion_analyses) FROM reading_completions", [], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?))).unwrap();
-    assert_eq!(frozen, (1234, 400, i64::from(imported.analysis_id)));
-    let states: Vec<(String, String)> = sql
-        .prepare("SELECT surface, status FROM vocabulary ORDER BY surface")
-        .unwrap()
-        .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))
-        .unwrap()
-        .collect::<Result<_, _>>()
-        .unwrap();
-    assert!(states.contains(&("猫".into(), "known".into())));
-    assert!(states.contains(&("犬".into(), "new".into())));
-    let before = view(&native);
-    send(request);
-    send(Event::RetryReaderCompletion);
-    assert_eq!(view(&native), before);
-    assert!(callbacks.try_recv().is_err());
-    dispatch(
-        &native,
-        &callbacks,
-        Event::SaveReadingPosition(first.position),
-    );
-    assert_eq!(count("reading_completions"), 1); // Backward movement counts nothing.
-    assert_eq!(
-        dispatch(&native, &callbacks, Event::RestoreReadingTime)
-            .reader_time
-            .unwrap()
-            .pending
-            .milliseconds(),
-        0
-    );
-    send(Event::CompleteReaderPage {
-        document_id: first.document_id,
-        page: first.anchor,
-        position: first.position,
-        completed_at_unix_ms: 5678,
-    });
-    await_callbacks(2);
-    assert!(view(&native).completion_notice.is_none()); // Reread gets a new ID, no New words.
-    assert_eq!(count("completion_commands"), 2);
-    assert_eq!(count("reading_completions"), 2);
-    assert_eq!(count("reading_occurrences"), 500);
-    send(Event::CloseDocument);
-    drop(native);
-    assert!(callbacks.recv_timeout(Duration::from_secs(10)).is_err());
-    let (native, callbacks, _) = bridge(&db.path());
-    let reopened = dispatch(&native, &callbacks, Event::OpenReader(first.document_id));
-    assert_eq!(
-        reopened.reader.unwrap().position.offset,
-        first.anchor.range.end
-    );
-    assert_eq!(
-        reopened.reader_analysis,
-        Some(ReaderAnalysis::Available(imported.analysis_id))
-    );
-    assert!(reopened.completion_notice.is_none() && !reopened.completion_save_pending);
 }

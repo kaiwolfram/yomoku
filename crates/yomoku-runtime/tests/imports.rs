@@ -20,11 +20,15 @@ use yomoku_core::{
     storage::DocumentError,
     vocabulary::{Surface, VocabularyStatus},
 };
-use yomoku_runtime::{
-    effect_router_with_analyzed_imports, AnalyzerLifecycle, AnalyzerLoader, EffectRouter,
-    PasteAnalyzer, ShellEffect,
-};
+use yomoku_runtime::{AnalyzerLifecycle, AnalyzerLoader, EffectRouter, PasteAnalyzer, ShellEffect};
 use yomoku_storage::Storage;
+
+fn import_router(
+    path: PathBuf,
+    loader: AnalyzerLoader,
+) -> std::io::Result<(EffectRouter, AnalyzerLifecycle)> {
+    yomoku_runtime::effect_router(path, loader, Box::new(|| Err(DocumentError::Unavailable)))
+}
 
 const TIMEOUT: Duration = Duration::from_secs(10);
 
@@ -256,8 +260,7 @@ fn reader_open_restores_stored_identity_and_legacy_missing_without_loading_analy
     for _ in 0..2 {
         // fresh worker/session also needs no dictionary
         let Factory { loader, trace, .. } = Factory::new(true, None);
-        let (router, lifecycle) =
-            effect_router_with_analyzed_imports(database.path(), loader).unwrap();
+        let (router, lifecycle) = import_router(database.path(), loader).unwrap();
         let before = totals(&database.path());
         for (id, expected) in [
             (analyzed.document_id, ReaderAnalysis::Available(identity)),
@@ -280,7 +283,7 @@ fn reader_open_restores_stored_identity_and_legacy_missing_without_loading_analy
 fn library_settings_and_invalid_pastes_never_load_analyzer() {
     let database = Database::new();
     let Factory { loader, trace, .. } = Factory::new(false, None);
-    let (router, lifecycle) = effect_router_with_analyzed_imports(database.path(), loader).unwrap();
+    let (router, lifecycle) = import_router(database.path(), loader).unwrap();
     assert!(!database.path().exists());
     assert_eq!(
         dispatch(&router, Event::CreatePaste(" \r\n".into())).document_error,
@@ -310,7 +313,7 @@ fn failed_database_open_retries_without_loading_dictionary_first() {
     let parent = database.0.join("missing");
     let path = parent.join("import.sqlite3");
     let Factory { loader, trace, .. } = Factory::new(false, None);
-    let (router, lifecycle) = effect_router_with_analyzed_imports(path, loader).unwrap();
+    let (router, lifecycle) = import_router(path, loader).unwrap();
     assert_eq!(
         dispatch(&router, Event::CreatePaste("猫".into())).document_error,
         Some(DocumentError::Unavailable)
@@ -338,7 +341,7 @@ fn worker_imports_deduplicate_preserve_status_and_progress_and_reopen() {
         .unwrap()
         .unwrap();
     let Factory { loader, trace, .. } = Factory::new(false, None);
-    let (router, lifecycle) = effect_router_with_analyzed_imports(database.path(), loader).unwrap();
+    let (router, lifecycle) = import_router(database.path(), loader).unwrap();
     let text = "猫 猫\r\n𠮷 か\u{3099} English 。 📖 \0";
     let view = dispatch(&router, Event::CreatePaste(text.into()));
     assert_eq!(
@@ -347,7 +350,7 @@ fn worker_imports_deduplicate_preserve_status_and_progress_and_reopen() {
     );
     assert!(view.document_error.is_none());
     assert_eq!(view.content_route, ContentRoute::Main);
-    assert!(view.reader.is_none() && view.loaded_document.is_none());
+    assert!(view.reader.is_none());
     let worker = match trace.recv_timeout(TIMEOUT).unwrap() {
         Trace::Load(id) => id,
         other => panic!("{other:?}"),
@@ -393,7 +396,7 @@ fn worker_imports_deduplicate_preserve_status_and_progress_and_reopen() {
     finish_worker(router, lifecycle, &trace);
 
     let Factory { loader, trace, .. } = Factory::new(false, None);
-    let (router, lifecycle) = effect_router_with_analyzed_imports(database.path(), loader).unwrap();
+    let (router, lifecycle) = import_router(database.path(), loader).unwrap();
     // Existing result alone must populate a fresh Library without a preceding list.
     let duplicate = dispatch(&router, Event::CreatePaste(text.into()));
     assert_eq!(
@@ -418,7 +421,7 @@ fn load_engine_and_invalid_output_failures_roll_back_and_retry_fresh() {
         trace,
         failure,
     } = Factory::new(true, None);
-    let (router, lifecycle) = effect_router_with_analyzed_imports(database.path(), loader).unwrap();
+    let (router, lifecycle) = import_router(database.path(), loader).unwrap();
     router.update(Event::OpenPaste, |_| unreachable!());
     for mode in [0, 1, 2] {
         failure.store(mode, Ordering::Relaxed);
@@ -440,8 +443,10 @@ fn load_engine_and_invalid_output_failures_roll_back_and_retry_fresh() {
         .document_error
         .is_none());
     drop(router);
-    assert!(lifecycle.set_foreground(false).is_err());
+    // The delivered callback can briefly retain its resolver's worker sender.
+    // Wait for worker teardown before asserting that the weak handle is closed.
     let events = drain_trace(&trace);
+    assert!(lifecycle.set_foreground(false).is_err());
     assert_eq!(
         events
             .iter()
@@ -496,8 +501,7 @@ fn every_write_and_commit_failure_roll_back_through_the_router_and_can_retry() {
                 .unwrap();
         }
         let Factory { loader, trace, .. } = Factory::new(false, None);
-        let (router, lifecycle) =
-            effect_router_with_analyzed_imports(database.path(), loader).unwrap();
+        let (router, lifecycle) = import_router(database.path(), loader).unwrap();
         let rejected = dispatch(&router, Event::CreatePaste("猫 𠮷".into()));
         assert_eq!(
             rejected.document_error,
@@ -536,7 +540,7 @@ fn every_write_and_commit_failure_roll_back_through_the_router_and_can_retry() {
 fn background_releases_cache_hidden_imports_release_and_foreground_is_lazy() {
     let database = Database::new();
     let Factory { loader, trace, .. } = Factory::new(false, None);
-    let (router, lifecycle) = effect_router_with_analyzed_imports(database.path(), loader).unwrap();
+    let (router, lifecycle) = import_router(database.path(), loader).unwrap();
     dispatch(&router, Event::CreatePaste("猫".into()));
     let worker = match trace.recv_timeout(TIMEOUT).unwrap() {
         Trace::Load(id) => id,
@@ -572,8 +576,7 @@ fn background_and_close_wait_for_accepted_atomic_work_without_blocking_dispatch(
         let database = Database::new();
         let (release, gate) = mpsc::channel();
         let Factory { loader, trace, .. } = Factory::new(false, Some(gate));
-        let (router, lifecycle) =
-            effect_router_with_analyzed_imports(database.path(), loader).unwrap();
+        let (router, lifecycle) = import_router(database.path(), loader).unwrap();
         let (completed, completion) = mpsc::channel();
         router.update(Event::CreatePaste("猫 𠮷".into()), move |_| {
             let _ = completed.send(());
@@ -695,7 +698,7 @@ fn cancel_bypasses_blocked_analysis_retains_completed_files_and_retries_fresh(
     let before = file_totals(&database.path());
     let (release, gate) = mpsc::channel();
     let Factory { loader, trace, .. } = Factory::new(false, Some(gate));
-    let (router, lifecycle) = effect_router_with_analyzed_imports(database.path(), loader).unwrap();
+    let (router, lifecycle) = import_router(database.path(), loader).unwrap();
     dispatch(&router, Event::RefreshLibrary);
     lifecycle.cancel_file_import().unwrap(); // Idle cancellation cannot poison the next attempt.
     let (done, result) = mpsc::channel();
@@ -818,7 +821,7 @@ fn cancel_during_full_load_skips_analysis_and_does_not_poison_encoding_retry(
             Ok(fixture(chapter))
         }))
     });
-    let (router, lifecycle) = effect_router_with_analyzed_imports(database.path(), loader).unwrap();
+    let (router, lifecycle) = import_router(database.path(), loader).unwrap();
     dispatch(&router, Event::RefreshLibrary);
     let before = file_totals(&database.path());
     let (done, result) = mpsc::channel();
@@ -863,7 +866,7 @@ fn cancel_remains_available_while_closed_router_drains_accepted_analysis(
     let database = Database::new();
     let (release, gate) = mpsc::channel();
     let Factory { loader, trace, .. } = Factory::new(false, Some(gate));
-    let (router, lifecycle) = effect_router_with_analyzed_imports(database.path(), loader).unwrap();
+    let (router, lifecycle) = import_router(database.path(), loader).unwrap();
     dispatch(&router, Event::RefreshLibrary);
     let before = file_totals(&database.path());
     router.update(import_event(b"draining", None), |_| {});
@@ -934,7 +937,7 @@ fn cancel_reaches_queued_attempt_before_fifo_can_start_it(
             gate: gate.take(),
         }))
     });
-    let (router, lifecycle) = effect_router_with_analyzed_imports(database.path(), loader).unwrap();
+    let (router, lifecycle) = import_router(database.path(), loader).unwrap();
     dispatch(&router, import_event(b"completed", None));
     let before = file_totals(&database.path());
     lifecycle.set_foreground(false).unwrap();
@@ -961,7 +964,7 @@ fn cancel_reaches_queued_attempt_before_fifo_can_start_it(
 fn txt_typed_decoding_errors_skip_full_and_manual_choices_retry_without_partial_files() {
     let database = Database::new();
     let Factory { loader, trace, .. } = Factory::new(false, None);
-    let (router, lifecycle) = effect_router_with_analyzed_imports(database.path(), loader).unwrap();
+    let (router, lifecycle) = import_router(database.path(), loader).unwrap();
     dispatch(&router, Event::RefreshLibrary);
     let before = file_totals(&database.path());
     for (bytes, encoding, error) in [
@@ -1038,7 +1041,7 @@ fn txt_duplicates_after_reopen_preserve_source_status_progress_and_skip_unavaila
     let database = Database::new();
     let bytes = "｜𠮷《よし》 猫 猫\r\nか\u{3099} English 。 📖 \0".as_bytes();
     let Factory { loader, trace, .. } = Factory::new(false, None);
-    let (router, lifecycle) = effect_router_with_analyzed_imports(database.path(), loader).unwrap();
+    let (router, lifecycle) = import_router(database.path(), loader).unwrap();
     router.update(
         Event::SelectDestination(Destination::Vocabulary),
         |_| unreachable!(),
@@ -1046,7 +1049,7 @@ fn txt_duplicates_after_reopen_preserve_source_status_progress_and_skip_unavaila
     let created = dispatch(&router, txt_event(bytes, Some(TextEncoding::Utf8)));
     assert_eq!(created.destination, Destination::Library);
     assert_eq!(created.content_route, ContentRoute::Main);
-    assert!(created.reader.is_none() && created.loaded_document.is_none());
+    assert!(created.reader.is_none());
     let id = created.import_summary.as_ref().unwrap().document_id;
     assert_eq!(created.documents[0].title, "本𠮷.txt");
     let worker = match trace.recv_timeout(TIMEOUT).unwrap() {
@@ -1092,7 +1095,7 @@ fn txt_duplicates_after_reopen_preserve_source_status_progress_and_skip_unavaila
     assert!(trace.try_recv().is_err());
     finish_worker(router, lifecycle, &trace);
     let Factory { loader, trace, .. } = Factory::new(true, None);
-    let (router, lifecycle) = effect_router_with_analyzed_imports(database.path(), loader).unwrap();
+    let (router, lifecycle) = import_router(database.path(), loader).unwrap();
     let existing = dispatch(&router, Event::ImportTxt(duplicate));
     assert_eq!(existing.import_summary.as_ref().unwrap().document_id, id);
     assert_eq!(existing.documents, saved.documents);
@@ -1115,7 +1118,7 @@ fn txt_loader_analysis_and_invalid_output_failures_preserve_completed_files_and_
         trace,
         failure,
     } = Factory::new(true, None);
-    let (router, lifecycle) = effect_router_with_analyzed_imports(database.path(), loader).unwrap();
+    let (router, lifecycle) = import_router(database.path(), loader).unwrap();
     for mode in [0, 1, 2] {
         failure.store(mode, Ordering::Relaxed);
         let failed = dispatch(
@@ -1177,8 +1180,7 @@ fn txt_each_write_and_commit_failure_is_atomic_through_worker() {
     ] {
         let database = Database::new();
         let Factory { loader, trace, .. } = Factory::new(false, None);
-        let (router, lifecycle) =
-            effect_router_with_analyzed_imports(database.path(), loader).unwrap();
+        let (router, lifecycle) = import_router(database.path(), loader).unwrap();
         let created = dispatch(&router, txt_event(b"English", None));
         let before = file_totals(&database.path());
         let connection = Connection::open(database.path()).unwrap();
@@ -1229,8 +1231,7 @@ fn background_and_close_drain_atomic_import_and_reject_duplicate_callbacks(
         let database = Database::new();
         let (release, gate) = mpsc::channel();
         let Factory { loader, trace, .. } = Factory::new(false, Some(gate));
-        let (router, lifecycle) =
-            effect_router_with_analyzed_imports(database.path(), loader).unwrap();
+        let (router, lifecycle) = import_router(database.path(), loader).unwrap();
         let event = import_event("猫 𠮷".as_bytes(), Some(TextEncoding::Utf8));
         let (sender, receiver) = mpsc::channel();
         router.update(event.clone(), move |_| {
@@ -1283,7 +1284,7 @@ impl Drop for FullAnalyzer {
 
 #[test]
 #[ignore = "requires pinned Sudachi Full; run tools/test-sudachi.sh"]
-fn real_full_worker_import_and_lazy_reopen_preserve_mode_b_unicode_and_vocabulary() {
+fn real_full_worker_import_and_lazy_reopen_preserve_mode_c_unicode_and_vocabulary() {
     // Real debug Full initialization can exceed the data-free harness deadline.
     let dispatch = |router: &EffectRouter, event| {
         dispatch_with_timeout(router, event, Duration::from_secs(60))
@@ -1329,13 +1330,13 @@ fn real_full_worker_import_and_lazy_reopen_preserve_mode_b_unicode_and_vocabular
         .set_vocabulary_status(cat_entry.id, VocabularyStatus::Familiar, 20)
         .unwrap()
         .unwrap();
-    let (router, lifecycle) = effect_router_with_analyzed_imports(database.path(), loader).unwrap();
+    let (router, lifecycle) = import_router(database.path(), loader).unwrap();
     dispatch(&router, Event::RefreshLibrary);
     assert!(trace.try_recv().is_err());
     let text = "国家公務員。猫と猫が食べた。\r\nｶﾞｯﾂﾎﾟｰｽﾞと𰻞 English 123 📖\0猫";
     let imported = dispatch(&router, Event::CreatePaste(text.into()));
     assert!(imported.document_error.is_none());
-    assert!(imported.reader.is_none() && imported.loaded_document.is_none());
+    assert!(imported.reader.is_none());
     let worker = match trace.recv_timeout(TIMEOUT).unwrap() {
         Trace::Load(id) => id,
         other => panic!("{other:?}"),

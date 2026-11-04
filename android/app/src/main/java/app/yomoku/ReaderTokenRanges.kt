@@ -6,13 +6,8 @@ import app.yomoku.shared.EffectiveReaderPage
 import app.yomoku.shared.EffectiveReaderSelection
 import app.yomoku.shared.ReaderAnalysis
 import app.yomoku.shared.ReaderPage
-import app.yomoku.shared.ReaderToken
-import app.yomoku.shared.ReaderTokenKey
-import app.yomoku.shared.ReaderTokenSnapshot
 import app.yomoku.shared.TextAnchor
 import app.yomoku.shared.TextRange
-
-internal data class ReaderDisplayToken(val token: ReaderToken, val start: Int, val end: Int)
 
 /** Reject malformed UTF-16 and byte offsets inside a scalar, never round them. */
 internal fun utf8Boundaries(text: String): Map<Long, Int>? {
@@ -41,39 +36,6 @@ internal fun utf8Boundaries(text: String): Map<Long, Int>? {
         boundaries[bytes] = utf16
     }
     return boundaries
-}
-
-/** Full identity stays on the token; only the clipped display range becomes UTF-16. */
-internal fun readerDisplayTokens(
-    page: ReaderPage,
-    key: ReaderTokenKey,
-    snapshot: ReaderTokenSnapshot,
-): List<ReaderDisplayToken>? {
-    if (
-        page.documentId != key.documentId ||
-            page.anchor != key.page ||
-            snapshot.documentId != key.documentId ||
-            snapshot.page != key.page ||
-            snapshot.analysis != key.analysis ||
-            (key.analysis is app.yomoku.shared.ReaderAnalysis.Missing &&
-                snapshot.tokens.isNotEmpty())
-    )
-        return null
-    val projection = ReaderTokenRanges.create(page) ?: return null
-    var previousEnd = 0
-    var previousIndex: ULong? = null
-    return snapshot.tokens.map { token ->
-        val range =
-            projection.displayRange(token.anchor, token.displayRange, token.surface) ?: return null
-        if (
-            range.first < previousEnd ||
-                (previousIndex != null && token.tokenIndex <= previousIndex)
-        )
-            return null
-        previousEnd = range.last + 1
-        previousIndex = token.tokenIndex
-        ReaderDisplayToken(token, range.first, range.last + 1)
-    }
 }
 
 internal data class EffectiveDisplayToken(
@@ -121,7 +83,7 @@ internal fun effectiveDisplayTokens(
     }
 }
 
-/** Geometry is shared with the live B renderer until its coordinated replacement. */
+/** Validate canonical UTF-8 ranges before converting them to Compose UTF-16 ranges. */
 private class ReaderTokenRanges
 private constructor(
     private val page: ReaderPage,

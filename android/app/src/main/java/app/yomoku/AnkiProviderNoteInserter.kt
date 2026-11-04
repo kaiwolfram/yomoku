@@ -6,7 +6,7 @@ import android.database.Cursor
 import android.net.Uri
 import android.os.Looper
 
-/** Frozen provider transport; core owns content/layout and the durable export lifecycle. */
+/** Frozen provider transport; core owns content/layout and the in-memory operation. */
 internal class AnkiProviderNoteRequest(
     val surface: String,
     fields: List<String>,
@@ -54,10 +54,10 @@ internal sealed interface AnkiNoteInsertionResult {
 }
 
 /**
- * Worker-only insertion boundary. The retained dispatcher consumes a committed native permit before
+ * Worker-only insertion boundary. The retained dispatcher consumes an in-memory invocation before
  * invoking this boundary, invokes once per request and never replays on restart. There is no
- * retry/repair/delete here. Reconciliation uses the separate read-only reader; an empty observation
- * cannot fence a submitted write or authorize another insertion.
+ * retry/repair/delete here. A later explicit attempt queries the provider afresh; it cannot
+ * establish that a previous interrupted write never completed.
  */
 internal class AnkiProviderNoteInserter(
     private val resolver: ContentResolver,

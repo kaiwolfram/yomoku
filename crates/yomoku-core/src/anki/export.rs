@@ -4,7 +4,6 @@ use super::{AnkiModelLayout, AnkiNote};
 use crate::{
     document::{ChapterText, InvalidTextValue},
     effective_session::{EffectiveReaderPage, EffectiveReaderSelection, EffectiveWordDetails},
-    reader::{ReaderTokenSnapshot, ReaderWordDetails, ReaderWordSelection},
 };
 
 macro_rules! provider_id {
@@ -46,7 +45,6 @@ provider_id!(
 #[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
 #[repr(C)]
 pub enum AnkiSelection {
-    Original(ReaderWordSelection),
     Effective(EffectiveReaderSelection),
 }
 
@@ -91,22 +89,6 @@ impl AnkiExport {
 
     pub fn layout(&self) -> &AnkiModelLayout {
         &self.layout
-    }
-
-    pub(crate) fn from_original_selection(
-        deck: AnkiDeckId,
-        chapter: &ChapterText,
-        current: &ReaderTokenSnapshot,
-        selection: ReaderWordSelection,
-        details: &ReaderWordDetails,
-    ) -> Result<Self, InvalidTextValue> {
-        Ok(Self {
-            selection: AnkiSelection::Original(selection),
-            entry: None,
-            deck,
-            note: AnkiNote::from_original_selection(chapter, current, selection, details)?,
-            layout: AnkiModelLayout::yomoku(),
-        })
     }
 
     pub(crate) fn from_effective_selection(

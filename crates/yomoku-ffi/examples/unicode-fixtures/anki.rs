@@ -10,7 +10,7 @@ use yomoku_core::{
     app::Event,
     document::{TextAnchor, TextOffset, TextRange},
     effective_session::{EffectivePageIdentity, EffectiveReaderSelection},
-    reader::{ReaderAnalysis, ReaderTokenKey, ReaderWordSelection},
+    reader::{ReaderAnalysis, ReaderTokenKey},
 };
 
 pub fn exchange(dir: &Path, writing: bool) -> Result<(), Box<dyn Error>> {
@@ -27,9 +27,12 @@ pub fn exchange(dir: &Path, writing: bool) -> Result<(), Box<dyn Error>> {
         },
         analysis: ReaderAnalysis::Available(i64::MAX.try_into()?),
     };
-    let entry_selection = AnkiSelection::Original(ReaderWordSelection {
-        key,
-        token_index: u64::MAX,
+    let entry_selection = AnkiSelection::Effective(EffectiveReaderSelection {
+        page: EffectivePageIdentity {
+            base: key,
+            revision: u64::MAX,
+        },
+        segment_index: u64::MAX,
     });
     for (index, event) in [
         Event::CheckAnkiSetup,
@@ -89,9 +92,12 @@ pub fn exchange(dir: &Path, writing: bool) -> Result<(), Box<dyn Error>> {
     }
     for (index, event) in [
         Event::PrepareReaderAnkiExport {
-            selection: AnkiSelection::Original(ReaderWordSelection {
-                key,
-                token_index: u64::MAX,
+            selection: AnkiSelection::Effective(EffectiveReaderSelection {
+                page: EffectivePageIdentity {
+                    base: key,
+                    revision: 1,
+                },
+                segment_index: u64::MAX,
             }),
         },
         Event::PrepareReaderAnkiExport {

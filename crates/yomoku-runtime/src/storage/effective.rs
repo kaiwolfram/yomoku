@@ -1,4 +1,4 @@
-//! Effective commands use the same connection/queue/dictionary as legacy reads.
+//! Effective commands use the shared SQLite connection, FIFO queue and dictionary.
 
 use std::sync::Arc;
 
@@ -15,9 +15,9 @@ use super::{map_error, map_word_error, word_dictionary, WordDictionaryLoader};
 
 pub(super) fn execute(
     storage: &mut Storage,
-    imports: &mut Option<Imports>,
+    imports: &mut Imports,
     dictionary: &mut Option<Dictionary>,
-    word_loader: &mut Option<WordDictionaryLoader>,
+    word_loader: &mut WordDictionaryLoader,
     operation: EffectiveStorageOperation,
 ) -> Result<EffectiveStorageResult, DocumentError> {
     match operation {
@@ -79,10 +79,8 @@ pub(super) fn execute(
                         .expect("loaded document")
                         .chapter(key.page.chapter_id)
                         .map_err(|_| DocumentError::InvalidDocument)?;
-                    let analysis = imports
-                        .as_mut()
-                        .ok_or(DocumentError::Unavailable)?
-                        .analyze_mode(chapter, mode, &key.segmentation.profile)?;
+                    let analysis =
+                        imports.analyze_mode(chapter, mode, &key.segmentation.profile)?;
                     analysis
                         .validate(chapter)
                         .map_err(|_| DocumentError::InvalidDocument)?;

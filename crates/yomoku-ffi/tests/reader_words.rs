@@ -13,7 +13,8 @@ use yomoku_core::{
     analysis::{AnalysisProfile, AnalyzedToken, ChapterAnalysis, SplitMode},
     app::{Event, ViewModel},
     document::{PasteText, TextAnchor, TextOffset, TextRange},
-    reader::{ReaderTokenKey, ReaderWordSelection},
+    effective_session::EffectiveReaderSelection,
+    reader::ReaderTokenKey,
     storage::DocumentError,
 };
 use yomoku_ffi::YomokuBridge;
@@ -39,8 +40,8 @@ impl Fixture {
         self.0.join("index.sqlite3")
     }
     fn seed(&self) -> yomoku_core::document::DocumentId {
-        Storage::open(self.user())
-            .unwrap()
+        let mut storage = Storage::open(self.user()).unwrap();
+        let imported = storage
             .create_analyzed_paste(
                 &PasteText::new("東京 東京 未収録".into()).unwrap(),
                 100,
@@ -78,9 +79,18 @@ impl Fixture {
                     })
                 },
             )
-            .unwrap()
-            .document
-            .document_id
+            .unwrap();
+        for mode in [SplitMode::A, SplitMode::B] {
+            let mut analysis = storage
+                .chapter_analysis(imported.analysis_id)
+                .unwrap()
+                .unwrap();
+            analysis.mode = mode;
+            storage
+                .store_chapter_analysis(imported.document.chapter.chapter_id, &analysis)
+                .unwrap();
+        }
+        imported.document.document_id
     }
 }
 impl Drop for Fixture {
@@ -138,17 +148,19 @@ fn selection(
     bridge: &YomokuBridge,
     callbacks: &mpsc::Receiver<thread::ThreadId>,
     id: yomoku_core::document::DocumentId,
-) -> ReaderWordSelection {
+) -> EffectiveReaderSelection {
     let opened = dispatch(bridge, callbacks, Event::OpenReader(id));
     let key = ReaderTokenKey {
         document_id: id,
         page: opened.reader.unwrap().anchor,
         analysis: opened.reader_analysis.unwrap(),
     };
-    dispatch(bridge, callbacks, Event::LoadReaderTokens(key));
-    ReaderWordSelection {
-        key,
-        token_index: 0,
+    let page = dispatch(bridge, callbacks, Event::LoadReaderTokens(key))
+        .effective_reader_tokens
+        .unwrap();
+    EffectiveReaderSelection {
+        page: page.identity,
+        segment_index: 0,
     }
 }
 
@@ -162,7 +174,7 @@ fn selected_word_bridge_loads_lazily_retries_both_failure_kinds_reuses_fifo_and_
     let fail = Arc::new(AtomicBool::new(true));
     let worker_fail = fail.clone();
     let path = fixture.index();
-    let (bridge, lifecycle) = YomokuBridge::with_dictionaries(
+    let (bridge, lifecycle) = YomokuBridge::new(
         fixture.user(),
         Box::new(|| panic!("lookup never loads analyzer")),
         Box::new(move || {
@@ -183,16 +195,27 @@ fn selected_word_bridge_loads_lazily_retries_both_failure_kinds_reuses_fifo_and_
     let selected = selection(&bridge, &callbacks, id);
     assert!(loads.try_recv().is_err());
     let user_before = std::fs::read(fixture.user()).unwrap();
-    let failed = dispatch(&bridge, &callbacks, Event::LoadReaderWord(selected));
+    let failed = dispatch(
+        &bridge,
+        &callbacks,
+        Event::LoadEffectiveReaderWord(selected),
+    );
     let worker = loads.recv_timeout(TIMEOUT).unwrap();
     assert_ne!(worker, thread::current().id());
-    assert_eq!(failed.reader_word_error, Some(DocumentError::Unavailable));
+    assert_eq!(
+        failed.effective_reader_word.as_ref().unwrap().error,
+        Some(DocumentError::Unavailable)
+    );
     assert!(failed.document_error.is_none());
     fail.store(false, Ordering::SeqCst);
-    let malformed = dispatch(&bridge, &callbacks, Event::LoadReaderWord(selected));
+    let malformed = dispatch(
+        &bridge,
+        &callbacks,
+        Event::LoadEffectiveReaderWord(selected),
+    );
     assert_eq!(loads.recv_timeout(TIMEOUT).unwrap(), worker);
     assert_eq!(
-        malformed.reader_word_error,
+        malformed.effective_reader_word.as_ref().unwrap().error,
         Some(DocumentError::Unavailable)
     );
     // Publish a repaired inode. A payload failure must retire the cached connection.
@@ -200,10 +223,20 @@ fn selected_word_bridge_loads_lazily_retries_both_failure_kinds_reuses_fifo_and_
     index(&repaired, false);
     std::fs::rename(repaired, fixture.index()).unwrap();
     let index_before = std::fs::read(fixture.index()).unwrap();
-    let loaded = dispatch(&bridge, &callbacks, Event::LoadReaderWord(selected));
+    let loaded = dispatch(
+        &bridge,
+        &callbacks,
+        Event::LoadEffectiveReaderWord(selected),
+    );
     assert_eq!(loads.recv_timeout(TIMEOUT).unwrap(), worker);
-    let details = loaded.reader_word.unwrap();
-    assert_eq!(details.selection(), selected);
+    let details = loaded
+        .effective_reader_word
+        .as_ref()
+        .unwrap()
+        .details
+        .clone()
+        .unwrap();
+    assert_eq!(details.selection, selected);
     assert_eq!(details.encountered, 0);
     let words = details.candidates.words;
     let names = details.candidates.names;
@@ -220,12 +253,12 @@ fn selected_word_bridge_loads_lazily_retries_both_failure_kinds_reuses_fifo_and_
     let absent = dispatch(
         &bridge,
         &callbacks,
-        Event::LoadReaderWord(ReaderWordSelection {
-            token_index: 2,
+        Event::LoadEffectiveReaderWord(EffectiveReaderSelection {
+            segment_index: 2,
             ..selected
         }),
     );
-    let absent = absent.reader_word.unwrap();
+    let absent = absent.effective_reader_word.unwrap().details.unwrap();
     assert!(absent.candidates.words.is_empty() && absent.candidates.names.is_empty());
     assert_eq!(absent.encountered, 0);
     assert!(loads.try_recv().is_err());
@@ -242,7 +275,7 @@ fn selected_word_bridge_discards_a_dismissed_selection_while_provider_is_blocked
     let (entered_tx, entered) = mpsc::channel();
     let (release, wait) = mpsc::channel();
     let path = fixture.index();
-    let (bridge, _) = YomokuBridge::with_dictionaries(
+    let (bridge, _) = YomokuBridge::new(
         fixture.user(),
         Box::new(|| panic!("no analyzer")),
         Box::new(move || {
@@ -257,13 +290,21 @@ fn selected_word_bridge_discards_a_dismissed_selection_while_provider_is_blocked
     )
     .unwrap();
     let selected = selection(&bridge, &callbacks, id);
-    send(&bridge, Event::LoadReaderWord(selected));
+    send(&bridge, Event::LoadEffectiveReaderWord(selected));
     entered.recv_timeout(TIMEOUT).unwrap();
     assert!(view(&bridge).storage_busy);
     send(&bridge, Event::DismissReaderWord);
     release.send(()).unwrap();
     callbacks.recv_timeout(TIMEOUT).unwrap();
     assert!(!view(&bridge).storage_busy);
-    assert!(view(&bridge).reader_word_selection.is_none());
-    assert!(view(&bridge).reader_word.is_none());
+    assert!(view(&bridge)
+        .effective_reader_word
+        .unwrap()
+        .selection
+        .is_none());
+    assert!(view(&bridge)
+        .effective_reader_word
+        .unwrap()
+        .details
+        .is_none());
 }

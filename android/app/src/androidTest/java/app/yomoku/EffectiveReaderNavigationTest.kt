@@ -148,7 +148,6 @@ class EffectiveReaderNavigationTest {
         }
         compose.onNodeWithText("Finish Book").performScrollTo().performClick()
         assertEquals(3, events.filterIsInstance<Event.CompleteEffectiveReaderPage>().size)
-        assertTrue(events.none { it is Event.CompleteReaderPage || it is Event.LoadReaderWord })
     }
 
     @Test
@@ -206,7 +205,7 @@ class EffectiveReaderNavigationTest {
         }
         assertTrue(
             events.none {
-                it is Event.CompleteEffectiveReaderPage || it is Event.CompleteReaderPage
+                it is Event.CompleteEffectiveReaderPage
             }
         )
         compose.runOnUiThread {

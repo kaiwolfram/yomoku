@@ -26,51 +26,34 @@ impl Model {
         {
             return None;
         }
+        let AnkiSelection::Effective(current) = selection;
+        if !self.can_start_effective_selection(current) {
+            return None;
+        }
+        self.project_anki_export(selection, deck, entry)
+    }
+
+    /// Pure observation payload: a reader time save cannot suppress fresh provider queries.
+    /// Explicit write preparation still passes all the mutation gates above.
+    pub(super) fn project_anki_export(
+        &self,
+        selection: AnkiSelection,
+        deck: AnkiDeckId,
+        entry: Option<crate::anki::AnkiEntryKey>,
+    ) -> Option<AnkiExport> {
+        if self.settings_open || self.content_route != ContentRoute::Reader {
+            return None;
+        }
         let document = self.reader_document.as_ref()?;
         match selection {
-            AnkiSelection::Original(selection) => {
-                if self.effective_reader.is_some()
-                    || self.current_token_key() != Some(selection.key)
-                    || self.reader_word_selection != Some(selection)
-                    || self.reader_word_error.is_some()
-                    || self.pending_word_load.is_some()
-                    || document.document_id != selection.key.document_id
-                {
-                    return None;
-                }
-                let chapter = document.chapter(selection.key.page.chapter_id).ok()?;
-                if let Some(entry) = entry {
-                    let note = crate::anki::AnkiNote::from_original_entry(
-                        chapter,
-                        self.reader_tokens.as_ref()?,
-                        selection,
-                        self.reader_word.as_ref()?,
-                        Some(entry),
-                    )
-                    .ok()?;
-                    return Some(AnkiExport::for_entry(
-                        AnkiSelection::Original(selection),
-                        entry,
-                        deck,
-                        note,
-                    ));
-                }
-                AnkiExport::from_original_selection(
-                    deck,
-                    chapter,
-                    self.reader_tokens.as_ref()?,
-                    selection,
-                    self.reader_word.as_ref()?,
-                )
-                .ok()
-            }
             AnkiSelection::Effective(selection) => {
-                if !self.can_start_effective_selection(selection)
+                if self.current_token_key() != Some(selection.page.base)
+                    || self.effective_reader.page()?.identity != selection.page
                     || document.document_id != selection.page.base.document_id
                 {
                     return None;
                 }
-                let session = self.effective_reader.as_ref()?;
+                let session = &self.effective_reader;
                 let word = session.word_state();
                 if word.selection != Some(selection) || word.busy || word.error.is_some() {
                     return None;

@@ -71,12 +71,13 @@ class AnkiEntrySessionTest {
                             )
                             .use { sql ->
                                 sql.rawQuery(
-                                        "SELECT state FROM anki_submissions ORDER BY id DESC LIMIT 1",
+                                        "SELECT name FROM sqlite_schema WHERE type = 'table' AND name LIKE 'anki_%'",
                                         null,
                                     )
                                     .use { row ->
                                         assertTrue(row.moveToFirst())
-                                        assertEquals("pending", row.getString(0))
+                                        assertEquals("anki_settings", row.getString(0))
+                                        assertFalse(row.moveToNext())
                                     }
                             }
                         assertEquals("猫", note.fields.first())

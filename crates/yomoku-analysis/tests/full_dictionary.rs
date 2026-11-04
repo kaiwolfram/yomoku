@@ -280,7 +280,7 @@ fn real_snapshots_persist_all_modes_and_reopen_without_source_changes() {
 
 #[test]
 #[ignore = "requires pinned Sudachi Full; run tools/test-sudachi.sh"]
-fn real_mode_b_import_and_completion_preserve_surfaces_and_duplicate_identity() {
+fn real_mode_c_import_and_completion_preserve_surfaces_and_duplicate_identity() {
     use std::collections::BTreeSet;
     use yomoku_analysis::AnalysisError;
     use yomoku_core::{
@@ -926,7 +926,7 @@ fn real_epub_import_analyzes_every_canonical_chapter_and_reopens_without_rescan(
             Some(expected)
         );
     }
-    // Exercise the same original real Mode B chapters through the generic reader
+    // Exercise the same original real Mode C chapters through the generic reader
     // repositories, without parsing again or keeping an analyzer in the reader.
     use yomoku_core::{
         active_time::PendingReadingTime,

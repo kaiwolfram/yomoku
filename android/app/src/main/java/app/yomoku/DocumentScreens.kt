@@ -343,7 +343,6 @@ internal fun ReaderScreen(
         remember(sessionKey, view.reader?.documentId, view.reader?.anchor) { ScrollState(0) }
     val page = view.reader
     // Native state selects compact consumers. A missing/retired effective page never uses B.
-    val effective = view.effectiveReaderWord != null
     val snapshot = view.effectiveReaderTokens
     val identity = snapshot?.identity
     val effectivePageReady =
@@ -364,11 +363,9 @@ internal fun ReaderScreen(
             !view.storageBusy &&
             !view.readingTimeSavePending &&
             !view.completionSavePending &&
-            (!effective || effectiveIdle)
+            effectiveIdle
     val canAdvance =
-        canNavigate &&
-            page.position.offset != page.anchor.range.end &&
-            (!effective || effectivePageReady)
+        canNavigate && page.position.offset != page.anchor.range.end && effectivePageReady
     val canGoBack = canNavigate && page.pageNumber > 1UL
     val navigationKey = Triple(sessionKey, page, identity)
     val currentKey by rememberUpdatedState(navigationKey)
@@ -377,20 +374,11 @@ internal fun ReaderScreen(
     val next = {
         if (canAdvance && currentCanAdvance && currentKey == navigationKey) {
             dispatch(
-                if (effective) {
-                    Event.CompleteEffectiveReaderPage(
-                        snapshot!!.identity,
-                        page.position,
-                        System.currentTimeMillis(),
-                    )
-                } else {
-                    Event.CompleteReaderPage(
-                        page.documentId,
-                        page.anchor,
-                        page.position,
-                        System.currentTimeMillis(),
-                    )
-                }
+                Event.CompleteEffectiveReaderPage(
+                    snapshot!!.identity,
+                    page.position,
+                    System.currentTimeMillis(),
+                )
             )
         }
     }
@@ -434,18 +422,16 @@ internal fun ReaderScreen(
             if (page.finishedAtLeastOnce) {
                 FinishedCheckmark(Modifier.testTag("reader_finished"))
             }
-            if (effective) {
-                EffectiveReaderWords(
-                    view,
-                    sessionKey,
-                    dispatch,
-                    onInteraction,
-                    imageLoader,
-                    ankiBrowser,
-                )
-            } else {
-                ReaderWords(view, dispatch, onInteraction, imageLoader, ankiBrowser)
-            }
+
+            EffectiveReaderWords(
+                view,
+                sessionKey,
+                dispatch,
+                onInteraction,
+                imageLoader,
+                ankiBrowser,
+            )
+
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,

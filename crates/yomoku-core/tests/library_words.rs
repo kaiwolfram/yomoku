@@ -1,6 +1,6 @@
 use crux_core::Core;
 use yomoku_core::{
-    app::{Destination, Effect, Event, Model, Yomoku},
+    app::{Destination, Effect, Event, Yomoku},
     document::LibraryDocument,
     library::{LibrarySort, LibraryWordDistribution, WordStatusCounts},
     storage::{DocumentError, StorageOperation, StorageResult},
@@ -28,19 +28,12 @@ fn distribution() -> Vec<LibraryWordDistribution> {
     }]
 }
 
-fn cores() -> [Core<Yomoku>; 2] {
-    [
-        Core::new(),
-        Core::new_with(Yomoku, Model::with_effective_reader()),
-    ]
+fn cores() -> [Core<Yomoku>; 1] {
+    [Core::new()]
 }
 
 fn loaded(core: &Core<Yomoku>) {
-    let expected = if core.view().effective_reader_status.is_some() {
-        StorageOperation::LoadEffectiveLibraryWordDistributions
-    } else {
-        StorageOperation::LoadLibraryWordDistributions
-    };
+    let expected = StorageOperation::LoadEffectiveLibraryWordDistributions;
     let mut effects = core.process_event(Event::LoadLibraryWordDistributions);
     assert!(effects
         .iter()

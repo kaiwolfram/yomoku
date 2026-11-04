@@ -26,7 +26,7 @@ fn asset_fifo_reads_reopen_without_dictionaries_renders_or_state_changes() {
     let id = imported.document.document_id;
     let before = totals(&database.path());
     let Factory { loader, trace, .. } = Factory::new(true, None);
-    let (router, lifecycle) = yomoku_runtime::effect_router_with_dictionaries(
+    let (router, lifecycle) = yomoku_runtime::effect_router(
         database.path(),
         loader,
         Box::new(|| panic!("asset reads must not load word index")),
@@ -76,8 +76,7 @@ fn queued_asset_reads_follow_import_and_drain_after_router_close() {
         let database = Database::new();
         let (release, gate) = mpsc::channel();
         let Factory { loader, trace, .. } = Factory::new(false, Some(gate));
-        let (router, lifecycle) =
-            effect_router_with_analyzed_imports(database.path(), loader).unwrap();
+        let (router, lifecycle) = import_router(database.path(), loader).unwrap();
         let (send, receive) = mpsc::channel();
         let imported = send.clone();
         router.update(
@@ -138,7 +137,7 @@ fn asset_open_failure_is_retryable_and_invalid_keys_do_not_create_database() {
     let directory = Database::new();
     let path = directory.0.join("missing").join("assets.sqlite3");
     let Factory { loader, trace, .. } = Factory::new(true, None);
-    let (router, lifecycle) = effect_router_with_analyzed_imports(path.clone(), loader).unwrap();
+    let (router, lifecycle) = import_router(path.clone(), loader).unwrap();
     let id = DocumentId::try_from(1).unwrap();
     for (key, expected) in [
         (asset("../bad"), DocumentError::InvalidDocument),
@@ -187,7 +186,7 @@ fn cover_fifo_reads_metadata_without_dictionaries_renders_or_state_changes() {
     let before = totals(&database.path());
     drop(storage);
     let Factory { loader, trace, .. } = Factory::new(true, None);
-    let (router, lifecycle) = yomoku_runtime::effect_router_with_dictionaries(
+    let (router, lifecycle) = yomoku_runtime::effect_router(
         database.path(),
         loader,
         Box::new(|| panic!("cover read loaded index")),
@@ -221,7 +220,7 @@ fn cover_fifo_waits_for_import_and_drains_after_close() {
     let database = Database::new();
     let (release, gate) = mpsc::channel();
     let Factory { loader, trace, .. } = Factory::new(false, Some(gate));
-    let (router, lifecycle) = effect_router_with_analyzed_imports(database.path(), loader).unwrap();
+    let (router, lifecycle) = import_router(database.path(), loader).unwrap();
     router.update(
         epub::event(&epub_fixture::book(true, "<p>English</p>")),
         |_| {},
@@ -256,7 +255,7 @@ fn cover_open_failure_can_retry_without_loading_dictionaries() {
     let directory = Database::new();
     let path = directory.0.join("missing").join("covers.sqlite3");
     let Factory { loader, trace, .. } = Factory::new(true, None);
-    let (router, lifecycle) = effect_router_with_analyzed_imports(path.clone(), loader).unwrap();
+    let (router, lifecycle) = import_router(path.clone(), loader).unwrap();
     let id = DocumentId::try_from(1).unwrap();
     let (send, receive) = mpsc::channel();
     let first = send.clone();

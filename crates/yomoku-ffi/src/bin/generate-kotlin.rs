@@ -4,7 +4,7 @@ use std::{env, error::Error, fs, path::PathBuf};
 
 use crux_core::type_generation::facet::{Config, Export, TypeRegistry};
 use yomoku_core::app::{Event, ViewModel};
-use yomoku_core::document::{ChapterText, DocumentId, TextAnchor};
+use yomoku_core::document::{ChapterText, DocumentId, ReaderDocument, TextAnchor};
 use yomoku_core::effective_session::{
     EffectiveReaderPage, EffectiveReaderSelection, EffectiveReaderWordState,
 };
@@ -28,6 +28,8 @@ fn main() -> Result<(), Box<dyn Error>> {
         .register_type::<DocumentId>()?
         .register_type::<TextAnchor>()?
         .register_type::<ChapterText>()?
+        // Standalone Unicode fixtures; whole documents are absent from runtime views.
+        .register_type::<ReaderDocument>()?
         // Compact schemas also used by staged native application integration.
         // Production activation waits for the coordinated reader switch.
         .register_type::<EffectiveReaderPage>()?

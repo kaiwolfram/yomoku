@@ -104,7 +104,7 @@ fun verifyTextBoundaries(directory: String) {
     File(dir, "effective-completion-event-return.bin").writeBytes(completion.bincodeSerialize())
     val viewBytes = File(dir, "effective-app-view.bin").readBytes()
     val view = ViewModel.bincodeDeserialize(viewBytes)
-    check(view.effectiveReaderTokens == effective && view.readerTokens == null)
+    check(view.effectiveReaderTokens == effective)
     check(view.completionSavePending && !view.storageBusy)
     check(view.bincodeSerialize().contentEquals(viewBytes))
     File(dir, "effective-app-view-return.bin").writeBytes(view.bincodeSerialize())

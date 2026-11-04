@@ -6,22 +6,26 @@ fn anki_export_preparation_and_clear_have_no_shell_codec() {
     use yomoku_core::{
         anki::AnkiSelection,
         document::{TextAnchor, TextOffset, TextRange},
-        reader::{ReaderAnalysis, ReaderTokenKey, ReaderWordSelection},
+        effective_session::{EffectivePageIdentity, EffectiveReaderSelection},
+        reader::{ReaderAnalysis, ReaderTokenKey},
     };
-    let selection = AnkiSelection::Original(ReaderWordSelection {
-        key: ReaderTokenKey {
-            document_id: 1.try_into().unwrap(),
-            page: TextAnchor {
-                source_id: 2.try_into().unwrap(),
-                chapter_id: 3.try_into().unwrap(),
-                range: TextRange {
-                    start: TextOffset::START,
-                    end: 3.try_into().unwrap(),
+    let selection = AnkiSelection::Effective(EffectiveReaderSelection {
+        page: EffectivePageIdentity {
+            revision: 1,
+            base: ReaderTokenKey {
+                document_id: 1.try_into().unwrap(),
+                page: TextAnchor {
+                    source_id: 2.try_into().unwrap(),
+                    chapter_id: 3.try_into().unwrap(),
+                    range: TextRange {
+                        start: TextOffset::START,
+                        end: 3.try_into().unwrap(),
+                    },
                 },
+                analysis: ReaderAnalysis::Available(4.try_into().unwrap()),
             },
-            analysis: ReaderAnalysis::Available(4.try_into().unwrap()),
         },
-        token_index: 0,
+        segment_index: 0,
     });
     for event in [
         Event::PrepareAnkiExport {

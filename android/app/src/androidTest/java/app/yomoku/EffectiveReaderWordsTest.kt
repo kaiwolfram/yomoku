@@ -26,7 +26,6 @@ class EffectiveReaderWordsTest {
     private val owner = mutableStateOf("session-one")
     private val frame = mutableStateOf(fixture())
     private var failLookup = false
-    private var originalReader = false
     private var interactions = 0
 
     private fun anchor(start: Long, end: Long) =
@@ -113,19 +112,12 @@ class EffectiveReaderWordsTest {
         compose.setContent {
             YomokuTheme {
                 Column(Modifier.verticalScroll(rememberScrollState())) {
-                    if (originalReader) {
-                        ReaderWords(
-                            frame.value,
-                            ::dispatch,
-                            { interactions++ },
-                        )
-                    } else
-                        EffectiveReaderWords(
-                            frame.value,
-                            owner.value,
-                            ::dispatch,
-                            { interactions++ },
-                        )
+                    EffectiveReaderWords(
+                        frame.value,
+                        owner.value,
+                        ::dispatch,
+                        { interactions++ },
+                    )
                 }
             }
         }
@@ -133,26 +125,7 @@ class EffectiveReaderWordsTest {
 
     private fun dispatch(event: Event) {
         events.add(event)
-        if (event is Event.LoadReaderWord) {
-            val token =
-                frame.value.readerTokens!!.tokens.single { it.tokenIndex == event.value.tokenIndex }
-            frame.value =
-                frame.value.copy(
-                    readerWordSelection = event.value,
-                    readerWord =
-                        ReaderWordDetails(
-                            event.value.key,
-                            token,
-                            ULong.MAX_VALUE,
-                            DictionaryCandidates(
-                                token.surface,
-                                token.dictionaryForm,
-                                emptyList(),
-                                emptyList(),
-                            ),
-                        ),
-                )
-        }
+
         if (event is Event.LoadEffectiveReaderWord) {
             val token =
                 frame.value.effectiveReaderTokens!!.tokens.single {
@@ -191,9 +164,7 @@ class EffectiveReaderWordsTest {
                             selection = null,
                             details = null,
                             error = null,
-                        ),
-                    readerWordSelection = null,
-                    readerWord = null,
+                        )
                 )
     }
 
@@ -235,12 +206,6 @@ class EffectiveReaderWordsTest {
                                     }
                             )
                         },
-                    readerWord =
-                        frame.value.readerWord?.let { details ->
-                            details.copy(
-                                candidates = details.candidates.copy(words = listOf(candidate))
-                            )
-                        },
                 )
         }
     }
@@ -269,69 +234,7 @@ class EffectiveReaderWordsTest {
         compose.waitForIdle()
         assertEquals(before, events.size)
         compose.onNodeWithTag("word_anki_settings").assertDoesNotExist()
-        assertTrue(
-            events.none { it is Event.SetEffectiveReaderStatus || it is Event.SetReaderStatus }
-        )
-    }
-
-    @Test
-    fun originalDictionaryAddAuthenticatesDetailsAgainstThePresentedSelection() {
-        originalReader = true
-        val snapshot = frame.value.effectiveReaderTokens!!
-        frame.value =
-            frame.value.copy(
-                ankiSettings = AnkiSettingsView(AnkiSettingsPhase.READY, Long.MAX_VALUE, null),
-                ankiSetup = app.yomoku.shared.AnkiSetupPhase.Unchecked,
-                ankiEntries = emptyList(),
-                effectiveReaderWord = null,
-                effectiveReaderTokens = null,
-                readerTokens =
-                    ReaderTokenSnapshot(
-                        snapshot.identity.base.documentId,
-                        snapshot.identity.base.page,
-                        snapshot.identity.base.analysis,
-                        snapshot.tokens.map {
-                            ReaderToken(
-                                it.segmentIndex,
-                                it.anchor,
-                                it.displayRange,
-                                it.surface,
-                                it.reading,
-                                it.dictionaryForm,
-                                it.vocabulary,
-                            )
-                        },
-                    ),
-            )
-        show()
-        tap(2)
-        val selected = frame.value.readerWordSelection!!
-        exposeDictionaryAnki(AnkiSelection.Original(selected))
-        click("anki_entry_word_1")
-        assertEquals(
-            Event.AddReaderAnkiEntry(AnkiSelection.Original(selected), AnkiEntryKey.Word(1)),
-            events.last(),
-        )
-        val details = frame.value.readerWord!!
-        compose.runOnUiThread {
-            frame.value =
-                frame.value.copy(
-                    readerWord =
-                        details.copy(
-                            key =
-                                details.key.copy(analysis = ReaderAnalysis.Available(AnalysisId(7)))
-                        )
-                )
-        }
-        compose.onNodeWithTag("anki_entry_word_1").assertDoesNotExist()
-        compose.runOnUiThread {
-            frame.value = frame.value.copy(readerWord = details, completionSavePending = true)
-        }
-        compose.onNodeWithTag("anki_entry_word_1").assertIsNotEnabled()
-        assertEquals(1, events.filterIsInstance<Event.AddReaderAnkiEntry>().size)
-        assertTrue(
-            events.none { it is Event.LoadEffectiveReaderWord || it is Event.SetReaderStatus }
-        )
+        assertTrue(events.none { it is Event.SetEffectiveReaderStatus })
     }
 
     @Test
@@ -353,7 +256,6 @@ class EffectiveReaderWordsTest {
             .performScrollTo()
             .assertTextEquals("Encountered ${ULong.MAX_VALUE} times")
         compose.onNodeWithTag("word_no_match").assertExists()
-        compose.onNodeWithTag("word_custom_edit").assertDoesNotExist()
         for (status in VocabularyStatus.entries) {
             click("word_status_$status")
             val event = events.last() as Event.SetEffectiveReaderStatus
@@ -363,7 +265,6 @@ class EffectiveReaderWordsTest {
             assertTrue(event.occurredAtUnixMs > 0)
         }
         assertTrue(interactions > 0)
-        assertTrue(events.none { it is Event.LoadReaderWord || it is Event.SetReaderStatus })
     }
 
     @Test
@@ -403,7 +304,6 @@ class EffectiveReaderWordsTest {
         click("retry_word_details")
         assertEquals(2, events.filterIsInstance<Event.LoadEffectiveReaderWord>().size)
         compose.onNodeWithTag("word_no_match").assertExists()
-        compose.onNodeWithTag("word_custom_edit").assertDoesNotExist()
         compose.runOnUiThread { frame.value = frame.value.copy(completionSavePending = true) }
         for (status in VocabularyStatus.entries) compose
             .onNodeWithTag("word_status_$status")
@@ -411,15 +311,10 @@ class EffectiveReaderWordsTest {
     }
 
     @Test
-    fun newRevisionAndSessionReplacementRetireSelectionsDraftsAndOldLinkCallbacks() {
+    fun newRevisionAndSessionReplacementRetireSelectionsAndOldLinkCallbacks() {
         show()
         val old = text().getLinkAnnotations(0, text().length).first().item
         tap()
-        click("word_custom_edit")
-        compose
-            .onNodeWithTag("word_custom_meaning_input")
-            .performScrollTo()
-            .performTextReplacement("discard draft")
         compose.runOnUiThread {
             frame.value =
                 frame.value.copy(
@@ -434,12 +329,10 @@ class EffectiveReaderWordsTest {
         compose.runOnUiThread { old.linkInteractionListener!!.onClick(old) }
         compose.onNodeWithTag("reader_word_panel").assertDoesNotExist()
         tap()
-        compose.onNodeWithTag("word_custom_meaning_input").assertDoesNotExist()
         compose.runOnUiThread { owner.value = "session-two" }
         compose.onNodeWithTag("reader_word_panel").assertDoesNotExist()
         assertEquals(2, events.filterIsInstance<Event.LoadEffectiveReaderWord>().size)
         tap()
-        compose.onNodeWithTag("word_custom_meaning_input").assertDoesNotExist()
     }
 
     @Test
@@ -535,7 +428,7 @@ class EffectiveReaderWordsTest {
     }
 
     @Test
-    fun builtInCandidatesHideCustomActionsAndCrossingTokenKeepsFullSurfaceIdentity() {
+    fun bundledCandidatesAndCrossingTokenKeepFullSurfaceIdentity() {
         val base = frame.value
         val full = "𠮷か\u3099"
         val page =
@@ -582,7 +475,6 @@ class EffectiveReaderWordsTest {
                 )
         }
         compose.onNodeWithTag("word_definitions").assertExists()
-        compose.onNodeWithTag("word_custom_entry").assertDoesNotExist()
         assertEquals(
             EffectiveReaderSelection(identity, token.segmentIndex),
             (events.single() as Event.LoadEffectiveReaderWord).value,

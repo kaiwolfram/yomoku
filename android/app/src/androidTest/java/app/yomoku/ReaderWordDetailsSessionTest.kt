@@ -83,7 +83,7 @@ class ReaderWordDetailsSessionTest {
             assertTrue(details.candidates.words.all { it.entry.senses.isNotEmpty() })
             assertTrue(details.candidates.names.all { it.entry.names.isNotEmpty() })
             assertEquals(page, loaded.reader)
-            assertEquals(opened.loadedDocument, loaded.loadedDocument)
+            assertEquals(opened.reader, loaded.reader)
             assertNull(loaded.readerTime)
             assertNull(loaded.completionNotice)
             assertEquals(2, wordCalls.get())

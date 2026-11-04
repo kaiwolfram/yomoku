@@ -3,11 +3,13 @@ use yomoku_core::app::{Destination, Event, ViewModel};
 use yomoku_ffi::{FfiError, YomokuBridge};
 use yomoku_runtime::ShellEffectFfi;
 
+mod support;
 fn bridge() -> YomokuBridge {
-    YomokuBridge::new(":memory:".into(), |_| {
+    support::bridge(":memory:".into(), |_| {
         panic!("navigation must produce synchronous effects")
     })
     .unwrap()
+    .0
 }
 
 fn select(bridge: &YomokuBridge, destination: Destination) -> Requests<ShellEffectFfi> {

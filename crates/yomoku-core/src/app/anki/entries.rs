@@ -72,17 +72,10 @@ impl Model {
         if self.settings_open || self.content_route != ContentRoute::Reader {
             return None;
         }
-        let effective_word = self
-            .effective_reader
-            .as_ref()
-            .map(|session| session.word_state());
+        let effective_word = self.effective_reader.word_state();
         let candidates = match selection {
-            AnkiSelection::Original(s) if self.reader_word_selection == Some(s) => {
-                let details = self.reader_word.as_ref()?;
-                &details.candidates
-            }
             AnkiSelection::Effective(s) => {
-                let word = effective_word.as_ref()?;
+                let word = &effective_word;
                 if word.selection != Some(s) || word.busy || word.error.is_some() {
                     return None;
                 }
@@ -92,7 +85,6 @@ impl Model {
                 }
                 &details.candidates
             }
-            _ => return None,
         };
         Some(
             candidates
@@ -198,6 +190,8 @@ impl Yomoku {
                 model.anki_setup.generation = id;
                 model.anki_setup.deck = Some(deck);
                 model.anki_setup.phase = AnkiSetupPhase::Checking;
+                // Retire observations and callbacks before querying the external collection.
+                model.anki_entries.clear();
                 // A model check has no selected word and never checks empty-word duplicates.
                 let operation = AnkiPreflightOperation {
                     surface: String::new(),
@@ -229,6 +223,15 @@ impl Yomoku {
                     },
                     AnkiPreflightResult::Failed(error) => AnkiSetupPhase::Failed(*error),
                 };
+                if model.anki_setup.phase == AnkiSetupPhase::Ready {
+                    if let Some(selection) = model.effective_reader.word_state().selection {
+                        // Refresh even when Compose coalesces Checking -> Ready into one frame.
+                        return self.update_anki_entries(
+                            &Event::LoadReaderAnkiEntries(AnkiSelection::Effective(selection)),
+                            model,
+                        );
+                    }
+                }
                 Some(Command::done())
             }
             Event::CreateAnkiModel => {
@@ -274,7 +277,7 @@ impl Yomoku {
                 };
                 let exports: Vec<_> = keys
                     .into_iter()
-                    .filter_map(|key| model.prepare_anki_export(*selection, deck, Some(key)))
+                    .filter_map(|key| model.project_anki_export(*selection, deck, Some(key)))
                     .collect();
                 model.anki_entries.clear();
                 let mut command = Command::done();
@@ -426,15 +429,16 @@ mod tests {
     }
 
     fn configured() -> (Model, AnkiSelection) {
-        let (mut model, selection) = fixture(false);
+        let (mut model, selection) = fixture();
         model.anki_settings.phase = AnkiSettingsPhase::Ready;
         model.anki_settings.default_deck_id = Some(7);
         model.anki_setup.phase = AnkiSetupPhase::Ready;
         model.anki_setup.deck = Some(7);
-        model.reader_word.as_mut().unwrap().candidates.words = vec![
+        let words = vec![
             candidate(1, "猫", "ねこ", "cat & feline"),
             candidate(2, "猫", "ねこ", "different entry"),
         ];
+        super::test_support::set_candidates(&mut model, words);
         (model, selection)
     }
 
@@ -456,9 +460,101 @@ mod tests {
         update(model, event);
     }
     #[test]
+    fn return_queries_can_refresh_during_reader_io_but_cannot_start_a_write() {
+        let (mut model, selection) = configured();
+        model.storage_busy = true;
+        update(&mut model, Event::CheckAnkiSetup);
+        let generation = model.anki_setup.generation;
+        update(
+            &mut model,
+            Event::AnkiSetupChecked(generation, 7, observation(vec![], true)),
+        );
+        assert_eq!(model.anki_entries.len(), 2);
+        let requests = model
+            .anki_entries
+            .iter()
+            .map(|entry| entry.request.clone())
+            .collect::<Vec<_>>();
+        for request in requests {
+            update(
+                &mut model,
+                Event::AnkiEntryChecked(Box::new(request), observation(vec![], true)),
+            );
+        }
+        update(
+            &mut model,
+            Event::AddReaderAnkiEntry {
+                selection,
+                entry: AnkiEntryKey::Word(1),
+            },
+        );
+        assert!(model.prepared_anki_export.is_none() && model.anki_live.is_none());
+        model.storage_busy = false;
+        assert!(model.prepared_anki_export.is_none());
+        update(
+            &mut model,
+            Event::AddReaderAnkiEntry {
+                selection,
+                entry: AnkiEntryKey::Word(1),
+            },
+        );
+        assert!(model.prepared_anki_export.is_some());
+        assert!(model.anki_live.is_none()); // A fresh pre-insert query still precedes invocation.
+    }
+
+    #[test]
+    fn returning_to_app_replaces_entry_observations_without_a_shell_reload() {
+        let (mut model, selection) = configured();
+        update(&mut model, Event::LoadReaderAnkiEntries(selection));
+        let old = model.anki_entries[0].request.clone();
+        update(
+            &mut model,
+            Event::AnkiEntryChecked(Box::new(old.clone()), observation(vec![88], true)),
+        );
+        for ids in [vec![], vec![99]] {
+            update(&mut model, Event::CheckAnkiSetup);
+            assert!(model.anki_entries.is_empty());
+            let generation = model.anki_setup.generation;
+            update(
+                &mut model,
+                Event::AnkiSetupChecked(generation, 7, observation(vec![], true)),
+            );
+            assert_eq!(model.anki_entries.len(), 2);
+            update(
+                &mut model,
+                Event::AnkiEntryChecked(Box::new(old.clone()), observation(vec![88], true)),
+            );
+            assert!(model
+                .anki_entries
+                .iter()
+                .all(|entry| entry.result.is_none()));
+            let requests = model
+                .anki_entries
+                .iter()
+                .map(|entry| entry.request.clone())
+                .collect::<Vec<_>>();
+            for request in requests {
+                update(
+                    &mut model,
+                    Event::AnkiEntryChecked(Box::new(request), observation(ids.clone(), true)),
+                );
+            }
+            assert!(model
+                .anki_entries_view()
+                .iter()
+                .all(|entry| if ids.is_empty() {
+                    entry.phase == AnkiEntryPhase::Add
+                } else {
+                    entry.phase == AnkiEntryPhase::Existing(ids.clone())
+                }));
+            assert!(model.anki_live.is_none());
+        }
+    }
+
+    #[test]
     fn entry_checks_do_not_write_and_one_tap_rechecks_then_begins_once() {
         let (mut model, selection) = configured();
-        let before = model.reader_word.clone();
+        let before = model.effective_reader.word_state().details;
         update(&mut model, Event::LoadReaderAnkiEntries(selection));
         assert_eq!(model.anki_entries.len(), 2);
         assert_eq!(
@@ -511,7 +607,7 @@ mod tests {
             ),
         );
         assert_eq!(model.anki_live.as_ref().unwrap().request, live);
-        assert_eq!(model.reader_word, before);
+        assert_eq!(model.effective_reader.word_state().details, before);
         update(&mut model, Event::DismissReaderWord);
         assert!(model.prepared_anki_export.is_some());
         acknowledge_live(&mut model, AnkiLiveResult::NoteAdded(88));
@@ -560,7 +656,7 @@ mod tests {
             update(&mut model, Event::AddReaderAnkiEntry { selection, entry });
         }
         assert!(model.prepared_anki_export.is_none());
-        model.reader_word_selection = None;
+        model.effective_reader.dismiss_word();
         assert!(model.anki_entries_view().is_empty());
     }
 
@@ -595,8 +691,8 @@ mod tests {
 
     #[test]
     fn component_export_uses_analyzer_anchor_instead_of_searching_the_sentence() {
-        let (model, _) = fixture(true);
-        let session = model.effective_reader.as_ref().unwrap();
+        let (model, _) = fixture();
+        let session = &model.effective_reader;
         let page = session.page().unwrap();
         let token = page.tokens[0].clone();
         let chapter = &model.reader_document.as_ref().unwrap().chapters[0];

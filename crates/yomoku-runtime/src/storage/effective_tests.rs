@@ -1,4 +1,4 @@
-//! Exercise the real middleware/worker, including queued legacy time saves.
+//! Exercise the real middleware/worker, including queued pending-time saves.
 use std::{
     convert::Infallible,
     path::PathBuf,
@@ -180,7 +180,7 @@ impl Fixture {
     }
     fn router(&self) -> Router {
         let index = self.index();
-        let (effects, _) = StorageEffects::with_dictionaries(
+        let (effects, _) = StorageEffects::new(
             self.path(),
             Box::new(|| panic!("effective commands must never load Sudachi")),
             Box::new(move || Ok(index.clone())),
@@ -373,7 +373,7 @@ fn effective_worker_dictionary_failures_require_explicit_retry_and_reopen_the_in
     let trace = Arc::clone(&attempts);
     let index = fixture.index();
     let calling_thread = thread::current().id();
-    let (effects, _) = StorageEffects::with_dictionaries(
+    let (effects, _) = StorageEffects::new(
         fixture.path(),
         Box::new(|| panic!("no analyzer")),
         Box::new(move || {

@@ -222,9 +222,9 @@ fn anki_settings_generation_exhaustion_invalidates_old_responses_without_dispatc
 }
 
 #[test]
-fn anki_settings_callbacks_preserve_reader_and_frozen_export_for_both_selection_kinds() {
-    for effective in [false, true] {
-        let (mut model, selection) = super::super::test_support::fixture(effective);
+fn anki_settings_callbacks_preserve_reader_and_frozen_export() {
+    {
+        let (mut model, selection) = super::super::test_support::fixture();
         drop(Yomoku.update(
             Event::PrepareAnkiExport {
                 selection,

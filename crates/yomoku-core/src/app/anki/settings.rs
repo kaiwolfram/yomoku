@@ -25,7 +25,7 @@ impl Yomoku {
                 if model.settings_open
                     && matches!(model.anki_settings.phase, Failed | Loading | Saving) =>
             {
-                // Read-only recovery queues behind the previous operation on the
+                // Read-only preference reload queues behind the previous operation on the
                 // same FIFO. Even a committed write with a lost response cannot
                 // be replayed by Retry; old callbacks lose their request ID.
                 SettingsRequest::Load

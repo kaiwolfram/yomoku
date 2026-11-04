@@ -18,12 +18,19 @@ import org.junit.runner.RunWith
 class AnkiEntryActionTest {
     @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
     private val selection =
-        AnkiSelection.Original(
-            ReaderWordSelection(
-                ReaderTokenKey(
-                    DocumentId(1),
-                    TextAnchor(SourceId(2), ChapterId(3), TextRange(TextOffset(0), TextOffset(6))),
-                    ReaderAnalysis.Available(AnalysisId(4)),
+        AnkiSelection.Effective(
+            EffectiveReaderSelection(
+                EffectivePageIdentity(
+                    1UL,
+                    ReaderTokenKey(
+                        DocumentId(1),
+                        TextAnchor(
+                            SourceId(2),
+                            ChapterId(3),
+                            TextRange(TextOffset(0), TextOffset(6)),
+                        ),
+                        ReaderAnalysis.Available(AnalysisId(4)),
+                    ),
                 ),
                 0UL,
             )
