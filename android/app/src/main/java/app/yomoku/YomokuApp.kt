@@ -268,7 +268,6 @@ private fun DestinationIcon(destination: Destination) {
 private fun Destination.titleResource(): Int =
     when (this) {
         Destination.LIBRARY -> R.string.library_title
-        Destination.NOSTR -> R.string.feed_title
         Destination.STATISTICS -> R.string.statistics_title
         Destination.VOCABULARY -> R.string.vocabulary_title
     }
@@ -276,7 +275,6 @@ private fun Destination.titleResource(): Int =
 private fun Destination.emptyResource(): Int =
     when (this) {
         Destination.LIBRARY -> R.string.library_empty
-        Destination.NOSTR -> R.string.feed_empty
         Destination.STATISTICS -> R.string.statistics_empty
         Destination.VOCABULARY -> R.string.vocabulary_empty
     }
@@ -284,7 +282,6 @@ private fun Destination.emptyResource(): Int =
 private fun Destination.iconResource(): Int =
     when (this) {
         Destination.LIBRARY -> R.drawable.ic_library
-        Destination.NOSTR -> R.drawable.ic_nostr
         Destination.STATISTICS -> R.drawable.ic_statistics
         Destination.VOCABULARY -> R.drawable.ic_vocabulary
     }

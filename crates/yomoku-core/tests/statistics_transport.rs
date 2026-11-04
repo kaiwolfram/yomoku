@@ -223,7 +223,7 @@ fn hidden_requests_and_unrelated_busy_work_are_not_replaced() {
         );
         for event in [
             Event::OpenSettings,
-            Event::SelectDestination(Destination::Nostr),
+            Event::SelectDestination(Destination::Vocabulary),
             Event::OpenPaste,
         ] {
             core.process_event(event);

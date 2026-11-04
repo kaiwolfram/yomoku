@@ -1,12 +1,17 @@
 #!/usr/bin/env python3
 """Build the measurement-only JNI library for debug APKs, never release APKs."""
 
+import fcntl
 import os
 from pathlib import Path
 import shutil
 import subprocess
 
 REPO = Path(__file__).resolve().parent.parent
+lock_path = REPO / "target/generated/native-generation.lock"
+lock_path.parent.mkdir(parents=True, exist_ok=True)
+lock = lock_path.open("w")
+fcntl.flock(lock, fcntl.LOCK_EX)
 sdk = Path(os.environ.get("ANDROID_HOME", Path.home() / "Android/Sdk"))
 ndk = sdk / "ndk/30.0.16248370"
 if "Pkg.Revision = 30.0.16248370" not in (ndk / "source.properties").read_text():

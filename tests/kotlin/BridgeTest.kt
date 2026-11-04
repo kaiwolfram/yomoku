@@ -118,7 +118,7 @@ fun main(args: Array<String>) {
         bridge.close()
         check(listenerCount() == 0)
         expectFailure<IllegalStateException> { bridge.view() }
-        expectFailure<IllegalStateException> { bridge.update(Event.SelectDestination(Destination.NOSTR).bincodeSerialize()) }
+        expectFailure<IllegalStateException> { bridge.update(Event.SelectDestination(Destination.STATISTICS).bincodeSerialize()) }
         expectFailure<IllegalStateException> { bridge.resolve(0u, byteArrayOf()) }
     }
     val providerDeadline = System.nanoTime() + 10_000_000_000L

@@ -162,7 +162,7 @@ fn library_words_hidden_requests_are_rejected() {
     for event in [
         Event::OpenSettings,
         Event::OpenPaste,
-        Event::SelectDestination(Destination::Nostr),
+        Event::SelectDestination(Destination::Statistics),
     ] {
         for core in cores() {
             core.process_event(event.clone());

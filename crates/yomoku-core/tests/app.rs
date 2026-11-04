@@ -58,7 +58,6 @@ fn starts_in_library() {
 fn destination_commands_update_view_and_request_one_render() {
     let core = Core::<Yomoku>::new();
     for destination in [
-        Destination::Nostr,
         Destination::Statistics,
         Destination::Vocabulary,
         Destination::Library,
@@ -95,7 +94,6 @@ fn settings_returns_to_each_selected_destination_and_is_not_restored() {
     let core = Core::<Yomoku>::new();
     for destination in [
         Destination::Library,
-        Destination::Nostr,
         Destination::Statistics,
         Destination::Vocabulary,
     ] {

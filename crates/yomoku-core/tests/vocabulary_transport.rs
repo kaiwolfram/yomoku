@@ -277,7 +277,7 @@ fn unrelated_busy_work_is_preserved_and_hidden_coalesced_query_resumes_after_set
         assert!(core.process_event(Event::LoadMoreVocabulary).is_empty());
         enter(&core);
         let mut pending = core.process_event(Event::LoadVocabulary);
-        core.process_event(Event::SelectDestination(Destination::Nostr));
+        core.process_event(Event::SelectDestination(Destination::Statistics));
         enter(&core);
         let mut refreshed = resolve(&core, &mut pending, loaded("犬", 0, 2));
         assert_eq!(operation(&refreshed), Some(&request(query("犬"), 0)));

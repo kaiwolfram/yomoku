@@ -36,13 +36,14 @@ val bundleSudachi by
         inputs.dir(repoDirectory.dir(".local/sudachi/full-20261015"))
         outputs.dir(sudachiAssets)
     }
-val buildRustBridge by
-    tasks.registering(Exec::class) {
+
+fun rustBridgeTask(variant: String) =
+    tasks.register<Exec>("buildRustBridge${variant.replaceFirstChar { it.uppercase() }}") {
         group = "build"
         description =
             "Generate Kotlin bindings and package the Rust/JNI bridge for both Android ABIs"
         workingDir(repoDirectory)
-        commandLine("bash", repoDirectory.file("tools/build-android-native.sh").asFile)
+        commandLine("bash", repoDirectory.file("tools/build-android-native.sh").asFile, variant)
         environment("ANDROID_HOME", androidComponents.sdkComponents.sdkDirectory.get().asFile)
         inputs.files(repoDirectory.file("Cargo.toml"), repoDirectory.file("Cargo.lock"))
         inputs.files(
@@ -55,17 +56,22 @@ val buildRustBridge by
         inputs.file(repoDirectory.file("tools/verify-sudachi-source.py"))
         inputs.dir(repoDirectory.dir("third_party/sudachi"))
         outputs.dirs(
-            nativeOutput.dir("kotlin"),
-            nativeOutput.dir("native"),
-            nativeOutput.dir("android"),
+            nativeOutput.dir("$variant/kotlin"),
+            nativeOutput.dir("$variant/native"),
+            nativeOutput.dir("$variant/android"),
         )
     }
+
+val buildRustBridgeDebug = rustBridgeTask("debug")
+val buildRustBridgeRelease = rustBridgeTask("release")
+
+buildRustBridgeRelease.configure { mustRunAfter(buildRustBridgeDebug) }
 
 val buildSudachiAppProbe by
     tasks.registering(Exec::class) {
         group = "verification"
         description = "Build the measurement-only Sudachi JNI library for debug APKs"
-        dependsOn(buildRustBridge) // Native builds share Cargo output; keep them sequential.
+        dependsOn(buildRustBridgeDebug) // Native builds share Cargo output; keep them sequential.
         workingDir(repoDirectory)
         commandLine("python3", repoDirectory.file("tools/build-sudachi-app-probe.py").asFile)
         environment("ANDROID_HOME", androidComponents.sdkComponents.sdkDirectory.get().asFile)
@@ -99,13 +105,17 @@ android {
     sourceSets.named("main") {
         assets.directories += sudachiAssets.asFile.absolutePath
         assets.directories += dictionaryAssets.asFile.absolutePath
-        kotlin.directories +=
-            listOf(
-                nativeOutput.dir("kotlin/app").asFile.absolutePath,
-                nativeOutput.dir("kotlin/com").asFile.absolutePath,
-                nativeOutput.dir("native/app").asFile.absolutePath,
-            )
-        jniLibs.directories += nativeOutput.dir("android/jniLibs").asFile.absolutePath
+    }
+    listOf("debug", "release").forEach { variant ->
+        sourceSets.named(variant) {
+            kotlin.directories +=
+                listOf(
+                    nativeOutput.dir("$variant/kotlin/app").asFile.absolutePath,
+                    nativeOutput.dir("$variant/kotlin/com").asFile.absolutePath,
+                    nativeOutput.dir("$variant/native/app").asFile.absolutePath,
+                )
+            jniLibs.directories += nativeOutput.dir("$variant/android/jniLibs").asFile.absolutePath
+        }
     }
     sourceSets.named("debug") {
         jniLibs.directories += nativeOutput.dir("sudachi-probe/jniLibs").asFile.absolutePath
@@ -132,9 +142,13 @@ android {
     }
 }
 
-tasks.named("preBuild") { dependsOn(buildRustBridge, bundleSudachi, bundleDictionaries) }
+tasks.named("preBuild") { dependsOn(bundleSudachi, bundleDictionaries) }
 
 tasks.matching { it.name == "preDebugBuild" }.configureEach { dependsOn(buildSudachiAppProbe) }
+
+tasks.matching { it.name == "preReleaseBuild" }.configureEach { dependsOn(buildRustBridgeRelease) }
+
+buildSudachiAppProbe.configure { mustRunAfter(buildRustBridgeRelease) }
 
 kotlin {
     jvmToolchain(17)

@@ -204,10 +204,11 @@ tools/build-android-native.sh
 Gradle preBuild invokes the same script with its SDK path and tracks Rust inputs
 and generated outputs. It generates Crux codecs and uses BoltFFI 0.30.1 to build
 and combine Rust static archives with generated JNI C. Outputs stay under
-`target/generated/{kotlin,native,android}`; BoltFFI also places temporary linker
+`target/generated/{debug,release}/{kotlin,native,android}`; BoltFFI also places temporary linker
 files under `crates/yomoku-ffi/target/`. All are ignored. Both development ABIs
-(`arm64-v8a`, `x86_64`) are always packaged. The default Rust profile is debug;
-for an optimized local release, use the explicit release procedure below. `BOLTFFI_BIN` overrides the local
+(`arm64-v8a`, `x86_64`) are always packaged. Gradle debug/release variants automatically select the matching Rust profile.
+Each variant has separate generated outputs; native generation is serialized.
+The standalone script accepts `debug` (default) or `release`. `BOLTFFI_BIN` overrides the local
 CLI path; `ANDROID_NDK_HOME` can select an installation of the exact pinned NDK.
 The script fails early for another NDK or missing targets and uses locked/offline
 Cargo. Do not run native generation/build/test scripts concurrently.

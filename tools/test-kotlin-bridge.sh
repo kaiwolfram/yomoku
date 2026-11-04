@@ -3,6 +3,9 @@ set -euo pipefail
 
 repo_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$repo_dir"
+mkdir -p target/generated
+exec 9>target/generated/native-generation.lock
+flock 9
 export YOMOKU_SUDACHI_DICTIONARY="${YOMOKU_SUDACHI_DICTIONARY:-$repo_dir/.local/sudachi/full-20261015/system_full.dic}"
 if [[ ! -f "$YOMOKU_SUDACHI_DICTIONARY" ]]; then
     echo 'Prepare Sudachi Full first; production JNI imports require the real dictionary.' >&2

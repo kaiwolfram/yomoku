@@ -46,7 +46,6 @@ use crate::{
 pub enum Destination {
     #[default]
     Library,
-    Nostr,
     Statistics,
     Vocabulary,
 }

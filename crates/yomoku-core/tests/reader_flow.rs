@@ -477,7 +477,7 @@ fn resolve(core: &Core<Yomoku>, effects: &mut [Effect], result: StorageResult) -
 #[test]
 fn paste_success_returns_to_library_without_opening_reader_and_failures_keep_form() {
     let core = Core::<Yomoku>::new();
-    core.process_event(Event::SelectDestination(Destination::Nostr));
+    core.process_event(Event::SelectDestination(Destination::Statistics));
     core.process_event(Event::OpenPaste);
     assert_eq!(core.view().destination, Destination::Library);
     assert_eq!(core.view().content_route, ContentRoute::Paste);
@@ -1554,7 +1554,7 @@ fn cancelled_or_mismatched_manual_status_callbacks_cannot_attach_or_surface_erro
     for exit in [
         Event::CloseDocument,
         Event::OpenPaste,
-        Event::SelectDestination(Destination::Nostr),
+        Event::SelectDestination(Destination::Statistics),
     ] {
         for failed in [false, true] {
             let (core, _) = analyzed_reader();
@@ -1719,7 +1719,7 @@ fn token_reads_clear_on_reflow_movement_and_navigation_and_ignore_cancelled_erro
     for exit in [
         Event::CloseDocument,
         Event::OpenPaste,
-        Event::SelectDestination(Destination::Nostr),
+        Event::SelectDestination(Destination::Statistics),
     ] {
         for failed in [false, true] {
             let (core, _) = analyzed_reader();
@@ -2505,7 +2505,7 @@ fn selected_word_cancellation_rejects_late_success_and_errors_even_after_returni
         Event::DismissReaderWord,
         Event::CloseDocument,
         Event::OpenPaste,
-        Event::SelectDestination(Destination::Nostr),
+        Event::SelectDestination(Destination::Statistics),
         Event::OpenSettings,
     ] {
         for failed in [false, true] {
@@ -3298,7 +3298,7 @@ fn custom_entry_cancellation_discards_success_and_failure_without_restoring_sele
         Event::DismissReaderWord,
         Event::CloseDocument,
         Event::OpenPaste,
-        Event::SelectDestination(Destination::Nostr),
+        Event::SelectDestination(Destination::Statistics),
         Event::OpenSettings,
     ] {
         for failed in [false, true] {

@@ -140,7 +140,7 @@ fn hidden_sort_callbacks_cannot_change_session_sort() {
     core.process_event(Event::SortLibrary(LibrarySort::TitleDescending));
     for event in [
         Event::OpenSettings,
-        Event::SelectDestination(Destination::Nostr),
+        Event::SelectDestination(Destination::Statistics),
         Event::OpenPaste,
         Event::OpenReader(1.try_into().unwrap()),
     ] {

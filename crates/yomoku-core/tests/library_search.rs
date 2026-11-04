@@ -119,7 +119,7 @@ fn hidden_search_callbacks_cannot_replace_the_retained_query() {
     core.process_event(Event::SearchLibraryTitles("猫".into()));
     for event in [
         Event::OpenSettings,
-        Event::SelectDestination(Destination::Nostr),
+        Event::SelectDestination(Destination::Statistics),
         Event::OpenPaste,
         Event::OpenReader(1.try_into().unwrap()),
     ] {
