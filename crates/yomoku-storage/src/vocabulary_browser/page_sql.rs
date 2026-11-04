@@ -60,7 +60,7 @@ pub(crate) fn page_sql(sort: VocabularySort, predicate: &str) -> String {
              LEFT JOIN effective_completion_commands e USING (command_id)
              WHERE o.vocabulary_id = {alias}.id AND
                 (c.semantics_version IS NOT 1 OR a.semantics_version IS NOT 1
-                 OR (e.semantics_version IS NOT NULL AND e.semantics_version <> 1)
+                 OR (e.semantics_version IS NOT NULL AND e.semantics_version <> 2)
                  OR c.completed_at_unix_ms < 0)) AS valid_history
          FROM {source} {suffix}"
     )

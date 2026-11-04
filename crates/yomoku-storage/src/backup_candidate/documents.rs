@@ -10,19 +10,14 @@ use super::{check_cancelled, CandidateError};
 
 pub(super) fn check(
     connection: &Connection,
-    version: usize,
     cancelled: &mut impl FnMut() -> bool,
 ) -> Result<(), CandidateError> {
-    if version < 2 {
-        return Ok(());
-    }
     check_sources(connection, cancelled)?;
-    if version >= 3 {
-        check_positions(connection, cancelled)?;
-    }
-    if version >= 9 {
-        check_pending_time(connection, cancelled)?;
-    }
+
+    check_positions(connection, cancelled)?;
+
+    check_pending_time(connection, cancelled)?;
+
     check_cancelled(cancelled)
 }
 

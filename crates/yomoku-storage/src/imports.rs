@@ -63,8 +63,8 @@ impl<E> From<StorageError> for PasteImportError<E> {
 
 impl Storage {
     /// Atomically deduplicate exact pasted UTF-8 bytes before analyzing a new
-    /// document. The callback is never invoked for an existing document. Legacy
-    /// documents get hashes lazily; existing duplicates remain separate entries.
+    /// document. The callback is never invoked for an existing document.
+    /// Hashes are committed atomically with every new paste.
     /// Like create_analyzed_paste, this must run on a worker with a ready analyzer.
     pub fn import_analyzed_paste<E>(
         &mut self,
@@ -80,7 +80,6 @@ impl Storage {
             .connection
             .transaction_with_behavior(TransactionBehavior::Immediate)
             .map_err(StorageError::from)?;
-        index_unhashed_pastes_in(&transaction)?;
         let existing: Option<i64> = transaction
             .query_row(
                 "SELECT document_id FROM paste_content_hashes WHERE sha256 = ?1
@@ -101,11 +100,6 @@ impl Storage {
         } else {
             let imported =
                 create_analyzed_paste_in(&transaction, text, registered_at_unix_ms, analyze)?;
-            insert_paste_hash_in(
-                &transaction,
-                imported.document.document_id,
-                digest.as_slice(),
-            )?;
             PasteImportOutcome::Created(imported)
         };
         transaction.commit().map_err(StorageError::from)?;
@@ -197,36 +191,4 @@ pub(crate) fn store_analyzed_chapter_in(
         .map_err(|_| StorageError::InvalidAnalysis)?;
     let registered_surfaces = register_vocabulary_in(connection, &surfaces, registered_at_unix_ms)?;
     Ok((analysis_id, registered_surfaces))
-}
-
-fn insert_paste_hash_in(
-    connection: &Connection,
-    id: DocumentId,
-    digest: &[u8],
-) -> Result<(), StorageError> {
-    connection.execute(
-        "INSERT INTO paste_content_hashes (document_id, sha256) VALUES (?1, ?2)",
-        (i64::from(id), digest),
-    )?;
-    Ok(())
-}
-
-fn index_unhashed_pastes_in(connection: &Connection) -> Result<(), StorageError> {
-    let mut statement = connection.prepare(
-        "SELECT d.id FROM documents d JOIN sources s ON s.id = d.source_id
-         WHERE s.kind = 'paste'
-         AND NOT EXISTS (SELECT 1 FROM paste_content_hashes h WHERE h.document_id = d.id)
-         ORDER BY d.id",
-    )?;
-    let ids = statement
-        .query_map([], |row| row.get::<_, i64>(0))?
-        .collect::<Result<Vec<_>, _>>()?;
-    // Load/hash one document at a time; do not hold all legacy text in memory.
-    for id in ids {
-        let id = DocumentId::try_from(id).map_err(|_| StorageError::InvalidDocument)?;
-        let document = load_paste_in(connection, id)?.ok_or(StorageError::InvalidDocument)?;
-        let digest = Sha256::digest(document.chapter.text.as_bytes());
-        insert_paste_hash_in(connection, id, digest.as_slice())?;
-    }
-    Ok(())
 }

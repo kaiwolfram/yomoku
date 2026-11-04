@@ -61,7 +61,7 @@ pub(crate) fn record_occurrences_in(
     Ok(newly_known)
 }
 
-/// Shares exact-surface registration and New-only transitions with original B.
+/// Shares exact-surface registration and New-only transitions across reader projections.
 fn register_completed_surfaces_in(
     connection: &Connection,
     surfaces: &BTreeSet<Surface>,
@@ -98,13 +98,13 @@ pub(crate) fn record_effective_occurrences_in(
 ) -> Result<usize, StorageError> {
     let completion = frozen.completion();
     let segmentation = &frozen.key().segmentation;
-    // This header identifies the immutable B basis. The versioned effective
+    // This header identifies the immutable Mode C basis. The versioned effective
     // reservation distinguishes effective segment indices from analyzer indices
     // and preserves each exact metadata/rule source, including unresolved spans.
     connection.execute(
         "INSERT INTO completion_analyses
          (command_id, semantics_version, analysis_id, engine_revision, dictionary_revision, split_mode)
-         VALUES (?1, 1, ?2, ?3, ?4, 'b')",
+         VALUES (?1, 1, ?2, ?3, ?4, 'c')",
         (i64::from(completion.command_id), i64::from(segmentation.original_analysis_id),
          &segmentation.profile.engine_revision, &segmentation.profile.dictionary_revision),
     )?;

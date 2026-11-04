@@ -7,7 +7,7 @@ import app.yomoku.shared.AnkiLiveResult
 import app.yomoku.shared.AnkiPreflightOperation
 import app.yomoku.shared.AnkiPreflightResult
 
-/** Only called by the retained session for an issued, durably committed native invocation. */
+/** Only called by the retained session for an issued native invocation. */
 internal class AnkiLiveDispatcher(resolver: ContentResolver, environment: AnkiProviderEnvironment) {
     constructor(
         context: Context

@@ -3,10 +3,6 @@
 //! Paste repositories use pure domain values. Runtime effect handling is separate.
 
 mod analysis;
-pub mod anki;
-pub mod anki_live;
-pub mod anki_model;
-mod anki_recovery;
 mod anki_settings;
 mod backup_candidate;
 mod backup_snapshot;
@@ -54,128 +50,11 @@ struct Migration {
     sql: &'static str,
 }
 
-const MIGRATIONS: &[Migration] = &[
-    Migration {
-        version: 1,
-        name: "0001_migration_history",
-        sql: include_str!("../migrations/0001_migration_history.sql"),
-    },
-    Migration {
-        version: 2,
-        name: "0002_paste_documents",
-        sql: include_str!("../migrations/0002_paste_documents.sql"),
-    },
-    Migration {
-        version: 3,
-        name: "0003_reading_positions",
-        sql: include_str!("../migrations/0003_reading_positions.sql"),
-    },
-    Migration {
-        version: 4,
-        name: "0004_reader_settings",
-        sql: include_str!("../migrations/0004_reader_settings.sql"),
-    },
-    Migration {
-        version: 5,
-        name: "0005_page_completions",
-        sql: include_str!("../migrations/0005_page_completions.sql"),
-    },
-    Migration {
-        version: 6,
-        name: "0006_vocabulary",
-        sql: include_str!("../migrations/0006_vocabulary.sql"),
-    },
-    Migration {
-        version: 7,
-        name: "0007_analysis_anchors",
-        sql: include_str!("../migrations/0007_analysis_anchors.sql"),
-    },
-    Migration {
-        version: 8,
-        name: "0008_paste_content_hashes",
-        sql: include_str!("../migrations/0008_paste_content_hashes.sql"),
-    },
-    Migration {
-        version: 9,
-        name: "0009_pending_reading_time",
-        sql: include_str!("../migrations/0009_pending_reading_time.sql"),
-    },
-    Migration {
-        version: 10,
-        name: "0010_completion_occurrences",
-        sql: include_str!("../migrations/0010_completion_occurrences.sql"),
-    },
-    Migration {
-        version: 11,
-        name: "0011_finished_documents",
-        sql: include_str!("../migrations/0011_finished_documents.sql"),
-    },
-    Migration {
-        version: 12,
-        name: "0012_txt_imports",
-        sql: include_str!("../migrations/0012_txt_imports.sql"),
-    },
-    Migration {
-        version: 13,
-        name: "0013_srt_imports",
-        sql: include_str!("../migrations/0013_srt_imports.sql"),
-    },
-    Migration {
-        version: 14,
-        name: "0014_epub_imports",
-        sql: include_str!("../migrations/0014_epub_imports.sql"),
-    },
-    Migration {
-        version: 15,
-        name: "0015_reader_typography",
-        sql: include_str!("../migrations/0015_reader_typography.sql"),
-    },
-    Migration {
-        version: 16,
-        name: "0016_reader_furigana",
-        sql: include_str!("../migrations/0016_reader_furigana.sql"),
-    },
-    Migration {
-        version: 17,
-        name: "0017_custom_dictionary",
-        sql: include_str!("../migrations/0017_custom_dictionary.sql"),
-    },
-    Migration {
-        version: 18,
-        name: "0018_effective_completions",
-        sql: include_str!("../migrations/0018_effective_completions.sql"),
-    },
-    Migration {
-        version: 19,
-        name: "0019_library_read_order",
-        sql: include_str!("../migrations/0019_library_read_order.sql"),
-    },
-    Migration {
-        version: 20,
-        name: "0020_vocabulary_dictionary_forms",
-        sql: include_str!("../migrations/0020_vocabulary_dictionary_forms.sql"),
-    },
-    Migration {
-        version: 21,
-        name: "0021_anki_submissions",
-        sql: include_str!("../migrations/0021_anki_submissions.sql"),
-    },
-    Migration {
-        version: 22,
-        name: "0022_anki_model_creations",
-        sql: include_str!("../migrations/0022_anki_model_creations.sql"),
-    },
-    Migration {
-        version: 23,
-        name: "0023_remove_known_forms",
-        sql: include_str!("../migrations/0023_remove_known_forms.sql"),
-    },
-    Migration {
-        version: 24,
-        name: "0024_anki_settings",
-        sql: include_str!("../migrations/0024_anki_settings.sql"),
-    },
-];
+const MIGRATIONS: &[Migration] = &[Migration {
+    version: 1,
+    name: "0001_initial_schema",
+    sql: include_str!("../migrations/0001_initial_schema.sql"),
+}];
 
 /// Failures are returned to the runtime; opening never resets a database.
 #[derive(Debug)]
@@ -261,19 +140,6 @@ impl Storage {
 }
 
 fn migrate(connection: &mut Connection, migrations: &[Migration]) -> Result<(), StorageError> {
-    // SQLite's documented table-rebuild procedure requires this outside BEGIN.
-    // Restore even on rollback; no application operation uses an unchecked connection.
-    let foreign_keys: bool =
-        connection.pragma_query_value(None, "foreign_keys", |row| row.get(0))?;
-    connection.pragma_update(None, "foreign_keys", false)?;
-    let result = migrate_in(connection, migrations);
-    let restored = connection.pragma_update(None, "foreign_keys", foreign_keys);
-    result?;
-    restored?;
-    Ok(())
-}
-
-fn migrate_in(connection: &mut Connection, migrations: &[Migration]) -> Result<(), StorageError> {
     // Lock before reading history so concurrent opens cannot apply a migration twice.
     let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
     let has_history: bool = transaction.query_row(

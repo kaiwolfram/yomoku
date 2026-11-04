@@ -1,12 +1,12 @@
 //! Read-only observations for a frozen export. None of these values grants a
-//! live mutation token; durable begin and fresh provider checks are still needed.
+//! live mutation token; an active owner and fresh provider checks are still needed.
 
 use std::{collections::BTreeSet, sync::Arc};
 
 use crux_core::capability::Operation;
 use serde::{Deserialize, Serialize};
 
-use super::{AnkiExistingNotes, AnkiExport, AnkiExportError, AnkiModelId, AnkiReadModelLayout};
+use super::{AnkiExistingNotes, AnkiExport, AnkiExportError, AnkiModelId};
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
@@ -168,4 +168,28 @@ pub(crate) fn evaluate_layout(
 pub(crate) struct AnkiPreflight {
     pub request: AnkiPreflightRequest,
     pub result: Option<Result<AnkiPreflightPlan, AnkiExportError>>,
+}
+
+/// Complete expected model layout for provider validation.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
+pub struct AnkiReadModelLayout {
+    pub name: String,
+    pub field_names: Vec<String>,
+    pub css: String,
+    pub card_name: String,
+    pub question_format: String,
+    pub answer_format: String,
+}
+impl From<&super::AnkiModelLayout> for AnkiReadModelLayout {
+    fn from(v: &super::AnkiModelLayout) -> Self {
+        Self {
+            name: v.name.clone(),
+            field_names: v.field_names.to_vec(),
+            css: v.css.clone(),
+            card_name: v.card_name.clone(),
+            question_format: v.question_format.clone(),
+            answer_format: v.answer_format.clone(),
+        }
+    }
 }

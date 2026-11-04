@@ -2,10 +2,10 @@ use yomoku_core::document::PasteText;
 
 use super::*;
 
-fn prefix(version: usize) -> (TestDatabase, Connection) {
+fn prefix() -> (TestDatabase, Connection) {
     let database = TestDatabase::new();
     let mut connection = Connection::open(database.path()).unwrap();
-    migrate(&mut connection, &MIGRATIONS[..version]).unwrap();
+    migrate(&mut connection, MIGRATIONS).unwrap();
     for text in ["\n 𠮷か\u{3099}。\r\n", "二つ目"] {
         crate::documents::create_paste_in(&connection, &PasteText::new(text.into()).unwrap())
             .unwrap();
@@ -15,7 +15,8 @@ fn prefix(version: usize) -> (TestDatabase, Connection) {
 
 #[test]
 fn backup_candidate_documents_require_complete_live_text_and_deleted_provenance() {
-    for version in [2, 3, 8, 11, 14, 23, 24] {
+    {
+        let version = 1;
         for sql in [
             "DELETE FROM chapter_texts WHERE chapter_id = 1",
             "DELETE FROM chapter_texts WHERE chapter_id = 1; DELETE FROM chapters WHERE id = 1",
@@ -26,7 +27,7 @@ fn backup_candidate_documents_require_complete_live_text_and_deleted_provenance(
             // even when there is no live document.
             "INSERT INTO sources (kind, original_title) VALUES ('paste', 'orphan')",
         ] {
-            let (database, connection) = prefix(version);
+            let (database, connection) = prefix();
             connection.execute_batch(sql).unwrap();
             drop(connection);
             check_rejected(&database, version as u32, CandidateError::InvalidData);
@@ -36,7 +37,8 @@ fn backup_candidate_documents_require_complete_live_text_and_deleted_provenance(
 
 #[test]
 fn backup_candidate_documents_require_contiguous_and_format_appropriate_chapters() {
-    for version in [2, 12, 13, 14, 23, 24] {
+    {
+        let version = 1;
         for sql in [
             "UPDATE chapters SET chapter_index = 2 WHERE id = 1",
             "INSERT INTO chapters (source_id, chapter_index) VALUES (1, 1);
@@ -45,7 +47,7 @@ fn backup_candidate_documents_require_contiguous_and_format_appropriate_chapters
             "DELETE FROM chapter_texts WHERE chapter_id = 1; DELETE FROM documents WHERE id = 1;
              UPDATE chapters SET chapter_index = 1 WHERE id = 1",
         ] {
-            let (database, connection) = prefix(version);
+            let (database, connection) = prefix();
             connection.execute_batch(sql).unwrap();
             drop(connection);
             check_rejected(&database, version as u32, CandidateError::InvalidData);
@@ -56,7 +58,7 @@ fn backup_candidate_documents_require_contiguous_and_format_appropriate_chapters
         "UPDATE chapters SET chapter_index = 2 WHERE source_id = 1 AND chapter_index = 1",
         "DELETE FROM chapters WHERE source_id = 1 AND chapter_index = 0",
     ] {
-        let (database, connection) = prefix(24);
+        let (database, connection) = prefix();
         connection
             .execute_batch(
                 "UPDATE sources SET kind = 'epub' WHERE id = 1;
@@ -67,13 +69,14 @@ fn backup_candidate_documents_require_contiguous_and_format_appropriate_chapters
             .unwrap();
         connection.execute_batch(sql).unwrap();
         drop(connection);
-        check_rejected(&database, 24, CandidateError::InvalidData);
+        check_rejected(&database, 1, CandidateError::InvalidData);
     }
 }
 
 #[test]
 fn backup_candidate_documents_reject_invalid_utf8_and_nontext_canonical_fields() {
-    for version in [2, 12, 24] {
+    {
+        let version = 1;
         for sql in [
             "UPDATE sources SET original_title = CAST(X'ff' AS TEXT) WHERE id = 1",
             "UPDATE documents SET title = CAST(X'ff' AS TEXT) WHERE id = 1",
@@ -86,7 +89,7 @@ fn backup_candidate_documents_reject_invalid_utf8_and_nontext_canonical_fields()
             "DELETE FROM chapter_texts WHERE chapter_id = 1; DELETE FROM documents WHERE id = 1;
              UPDATE sources SET original_title = CAST(X'ff' AS TEXT) WHERE id = 1",
         ] {
-            let (database, connection) = prefix(version);
+            let (database, connection) = prefix();
             connection.execute_batch(sql).unwrap();
             drop(connection);
             check_rejected(&database, version as u32, CandidateError::InvalidData);
@@ -96,9 +99,10 @@ fn backup_candidate_documents_reject_invalid_utf8_and_nontext_canonical_fields()
 
 #[test]
 fn backup_candidate_documents_check_position_ownership_range_and_scalar_boundaries() {
-    for version in [3, 8, 9, 11, 14, 23, 24] {
+    {
+        let version = 1;
         for (chapter, offset) in [(2, 0), (1, 3), (1, 5), (1, 999), (1, i64::MAX)] {
-            let (database, connection) = prefix(version);
+            let (database, connection) = prefix();
             connection
                 .execute(
                     "INSERT INTO reading_positions VALUES (1, ?1, ?2)",
@@ -113,9 +117,10 @@ fn backup_candidate_documents_check_position_ownership_range_and_scalar_boundari
 
 #[test]
 fn backup_candidate_documents_check_every_pending_anchor_independently_of_current_position() {
-    for version in [9, 11, 14, 23, 24] {
+    {
+        let version = 1;
         for (chapter, offset) in [(2, 0), (1, 3), (1, 5), (1, 999), (1, i64::MAX)] {
-            let (database, connection) = prefix(version);
+            let (database, connection) = prefix();
             // The current position is valid; every old pending anchor still matters.
             connection
                 .execute_batch("INSERT INTO reading_positions VALUES (1, 1, 0)")
@@ -134,29 +139,29 @@ fn backup_candidate_documents_check_every_pending_anchor_independently_of_curren
 
 #[test]
 fn backup_candidate_documents_migrate_all_populated_prefixes_without_repairing_legacy_positions() {
-    for version in 2..=24 {
-        let (database, connection) = prefix(version);
+    {
+        let version = 1;
+        let (database, connection) = prefix();
         let literal = "\n 𠮷か\u{3099}。\r\n";
-        if version >= 3 {
-            connection
-                .execute(
-                    "INSERT INTO reading_positions VALUES (1, 1, ?1)",
-                    [literal.len() as i64],
-                )
-                .unwrap();
-        }
-        if version >= 9 {
-            // Reflow/movement can retain multiple anchors unrelated to the
-            // current position. Preserve zero-duration tombstones/max revision.
-            connection
-                .execute_batch(
-                    "INSERT INTO pending_reading_time VALUES
+
+        connection
+            .execute(
+                "INSERT INTO reading_positions VALUES (1, 1, ?1)",
+                [literal.len() as i64],
+            )
+            .unwrap();
+
+        // Reflow/movement can retain multiple anchors unrelated to the
+        // current position. Preserve zero-duration tombstones/max revision.
+        connection
+            .execute_batch(
+                "INSERT INTO pending_reading_time VALUES
                  (1, 1, 0, 0, 9223372036854775807),
                  (1, 1, 2, 9223372036854775807, 1),
                  (1, 1, 9, 0, 9007199254740993);",
-                )
-                .unwrap(); // Offset 9 bisects the grapheme, at a scalar boundary.
-        }
+            )
+            .unwrap(); // Offset 9 bisects the grapheme, at a scalar boundary.
+
         drop(connection);
         let before = fs::read(database.path()).unwrap();
         let directory = database.0.join("upgrade");
@@ -171,7 +176,7 @@ fn backup_candidate_documents_migrate_all_populated_prefixes_without_repairing_l
         assert_eq!(document.chapter.text, literal);
         assert_eq!(
             document.reading_position.map(|p| i64::from(p.offset)),
-            (version >= 3).then_some(literal.len() as i64)
+            true.then_some(literal.len() as i64)
         );
         let absent: i64 = copy
             .connection
@@ -188,11 +193,7 @@ fn backup_candidate_documents_migrate_all_populated_prefixes_without_repairing_l
             .unwrap().collect::<Result<_, _>>().unwrap();
         assert_eq!(
             pending,
-            if version >= 9 {
-                vec![(0, 0, i64::MAX), (2, i64::MAX, 1), (9, 0, 9007199254740993)]
-            } else {
-                vec![]
-            }
+            vec![(0, 0, i64::MAX), (2, i64::MAX, 1), (9, 0, 9007199254740993)]
         );
         drop(copy);
         checked.discard().unwrap();
@@ -223,7 +224,7 @@ fn backup_candidate_documents_preserve_renames_literal_text_and_deleted_sources(
          INSERT INTO chapters (source_id, chapter_index) VALUES (2, 1);",
         )
         .unwrap();
-    accept_unchanged(&database, 24);
+    accept_unchanged(&database, 1);
 }
 
 #[test]
@@ -233,7 +234,7 @@ fn backup_candidate_documents_accept_every_scalar_position_including_eof() {
         .map(|(offset, _)| offset)
         .chain(std::iter::once("\n 𠮷か\u{3099}。\r\n".len()))
     {
-        let (database, connection) = prefix(24);
+        let (database, connection) = prefix();
         connection
             .execute(
                 "INSERT INTO reading_positions VALUES (1, 1, ?1)",
@@ -247,7 +248,7 @@ fn backup_candidate_documents_accept_every_scalar_position_including_eof() {
             )
             .unwrap();
         drop(connection);
-        accept_unchanged(&database, 24);
+        accept_unchanged(&database, 1);
     }
 }
 
@@ -279,14 +280,15 @@ fn backup_candidate_documents_preserve_full_i64_identities_and_time_revisions() 
             "INSERT INTO pending_reading_time VALUES (?1, ?1, 4, 9223372036854775807, 9223372036854775807)",
             [id],
         ).unwrap();
-        accept_unchanged(&database, 24);
+        accept_unchanged(&database, 1);
     }
 }
 
 #[test]
-fn backup_candidate_documents_cancel_every_populated_pre_and_post_migration_poll() {
-    for version in [9, 24] {
-        let (database, connection) = prefix(version);
+fn backup_candidate_documents_cancel_every_populated_validation_poll() {
+    {
+        let version = 1;
+        let (database, connection) = prefix();
         connection
             .execute_batch(
                 "INSERT INTO reading_positions VALUES (1, 1, 0);

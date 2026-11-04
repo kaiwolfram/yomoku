@@ -79,7 +79,6 @@ internal fun SettingsScreen(
         )
         AnkiModelSetupPanel(view.ankiSetup, dispatch, enabled = view.ankiExport == null)
         view.ankiExport?.let { AnkiExportPanel(it, dispatch, ankiBrowser) }
-        view.ankiRecovery?.let { AnkiRecoveryPanel(it, dispatch) }
         val typography = view.readerTypography
         val typographyEnabled =
             typography != null &&

@@ -1,4 +1,4 @@
-//! Read-only decoder for version-1 frozen effective completions. These private
+//! Read-only decoder for version-2 frozen effective completions. These private
 //! wire records cannot become a live EffectivePageCompletion or mutation permit.
 
 use std::collections::BTreeMap;
@@ -26,7 +26,9 @@ use super::{check_cancelled, CandidateError};
 #[serde(deny_unknown_fields)]
 struct Record {
     completion: Completion,
-    key: Key,
+    analysis_id: AnalysisId,
+    profile: Profile,
+    mode: SplitMode,
     occurrences: Vec<Token>,
 }
 
@@ -44,42 +46,9 @@ struct Completion {
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
-struct Key {
-    document_id: DocumentId,
-    page: Anchor,
-    segmentation: Segmentation,
-}
-
-#[derive(Deserialize)]
-#[serde(deny_unknown_fields)]
-struct Segmentation {
-    original_analysis_id: AnalysisId,
-    profile: Profile,
-    segments: Vec<Segment>,
-}
-
-#[derive(Deserialize)]
-#[serde(deny_unknown_fields)]
 struct Profile {
     engine_revision: String,
     dictionary_revision: String,
-}
-
-#[derive(Deserialize)]
-#[serde(deny_unknown_fields)]
-struct Segment {
-    boundary: Boundary,
-    #[serde(deserialize_with = "present_option")]
-    metadata: Option<Metadata>,
-}
-
-#[derive(Deserialize)]
-#[serde(deny_unknown_fields)]
-struct Boundary {
-    anchor: Anchor,
-    surface: String,
-    #[serde(deserialize_with = "present_option")]
-    original_token_index: Option<usize>,
 }
 
 #[derive(Deserialize, Eq, PartialEq)]
@@ -135,12 +104,8 @@ struct Position {
 
 pub(super) fn check(
     connection: &Connection,
-    version: usize,
     cancelled: &mut impl FnMut() -> bool,
 ) -> Result<(), CandidateError> {
-    if version < 18 {
-        return check_cancelled(cancelled);
-    }
     let issued_ids: BTreeMap<String, i64> = connection
         .prepare("SELECT name, seq FROM main.sqlite_sequence WHERE name IN ('documents', 'chapter_analyses')")?
         .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))?
@@ -154,7 +119,7 @@ pub(super) fn check(
         check_cancelled(cancelled)?;
         let record: Record =
             serde_json::from_str(text(row, 2)?).map_err(|_| CandidateError::InvalidData)?;
-        require(row.get::<_, i64>(1)? == 1)?;
+        require(row.get::<_, i64>(1)? == 2)?;
         require(i64::from(record.completion.command_id) == row.get::<_, i64>(0)?)?;
         check_record(connection, &issued_ids, &record, cancelled)?;
         check_surviving_content(connection, &record, cancelled)?;
@@ -172,26 +137,22 @@ fn check_record(
     let completion = &record.completion;
     let page = completion.page;
     let position = &completion.departing_position;
-    let segmentation = &record.key.segmentation;
     require(
-        completion.document_id == record.key.document_id
-            && page == record.key.page
-            && page.range.start < page.range.end
+        page.range.start < page.range.end
             && position.source_id == page.source_id
             && position.chapter_id == page.chapter_id
             && position.offset >= page.range.start
-            && position.offset <= page.range.end
+            && position.offset < page.range.end
             && completion.completed_at_unix_ms >= 0
-            && !segmentation.profile.engine_revision.trim().is_empty()
-            && !segmentation.profile.dictionary_revision.trim().is_empty(),
+            && record.mode == SplitMode::C
+            && !record.profile.engine_revision.trim().is_empty()
+            && !record.profile.dictionary_revision.trim().is_empty(),
     )?;
-    // Sources/chapters survive document deletion, while document/analysis/rule
-    // IDs can exist only in history. Require issued bounds, never live content.
     let source: Option<i64> = connection
         .query_row(
             "SELECT source_id FROM main.chapters WHERE id = ?1",
             [i64::from(page.chapter_id)],
-            |row| row.get(0),
+            |r| r.get(0),
         )
         .optional()?;
     require(source == Some(i64::from(page.source_id)))?;
@@ -199,122 +160,58 @@ fn check_record(
         .query_row(
             "SELECT source_id FROM main.documents WHERE id = ?1",
             [i64::from(completion.document_id)],
-            |row| row.get(0),
+            |r| r.get(0),
         )
         .optional()?;
-    require(live_source.is_none_or(|source| source == i64::from(page.source_id)))?;
+    require(live_source.is_none_or(|id| id == i64::from(page.source_id)))?;
     issued(issued_ids, "documents", i64::from(completion.document_id))?;
     issued(
         issued_ids,
         "chapter_analyses",
-        i64::from(segmentation.original_analysis_id),
+        i64::from(record.analysis_id),
     )?;
-
-    let mut previous_end = TextOffset::START;
-    let mut original_index = None;
-    // One immutable analysis identity per A/B/C mode; exact matches retain
-    // increasing source token indices even when intervening tokens were replaced.
-    let mut metadata_sources = BTreeMap::new();
-    let mut occurrences = record.occurrences.iter();
-    for (index, segment) in segmentation.segments.iter().enumerate() {
+    let mut previous = None;
+    let mut previous_end = page.range.start;
+    for token in &record.occurrences {
         check_cancelled(cancelled)?;
-        let boundary = &segment.boundary;
-        let anchor = boundary.anchor;
-        let length = i64::from(anchor.range.end) - i64::from(anchor.range.start);
+        let anchor = token.anchor;
         require(
-            anchor.source_id == page.source_id
+            i64::try_from(token.segment_index).is_ok()
+                && previous.is_none_or(|index| token.segment_index > index)
+                && anchor.source_id == page.source_id
                 && anchor.chapter_id == page.chapter_id
                 && anchor.range.start >= previous_end
-                && length > 0
-                && usize::try_from(length).ok() == Some(boundary.surface.len()),
+                && anchor.range.start < page.range.end
+                && anchor.range.end > anchor.range.start
+                && i64::from(anchor.range.end) - i64::from(anchor.range.start)
+                    == token.surface.len() as i64
+                && token.vocabulary.is_none()
+                && token.eligibility == EffectiveTokenEligibility::AnalyzerJapanese
+                && i64::from(token.display_range.start)
+                    == i64::from(anchor.range.start) - i64::from(page.range.start)
+                && i64::from(token.display_range.end)
+                    == i64::from(anchor.range.end.min(page.range.end))
+                        - i64::from(page.range.start),
         )?;
-        previous_end = anchor.range.end;
-        for offset in [page.range.start, page.range.end, position.offset] {
-            if offset >= anchor.range.start && offset <= anchor.range.end {
-                let relative = usize::try_from(i64::from(offset) - i64::from(anchor.range.start))
-                    .map_err(|_| CandidateError::InvalidData)?;
-                require(boundary.surface.is_char_boundary(relative))?;
-            }
-        }
-
-        if let Some(index) = boundary.original_token_index {
-            require(original_index.is_none_or(|previous| index > previous))?;
-            original_index = Some(index);
-            let metadata = segment
-                .metadata
-                .as_ref()
-                .ok_or(CandidateError::InvalidData)?;
-            require(
-                metadata.analysis_id == segmentation.original_analysis_id
-                    && metadata.mode == SplitMode::C
-                    && metadata.token_index == index,
-            )?;
-        } else {
-            return Err(CandidateError::InvalidData);
-        }
-        if let Some(metadata) = &segment.metadata {
-            require(i64::try_from(metadata.token_index).is_ok())?;
-            if let Some(form) = &metadata.dictionary_form {
-                Surface::new(form).map_err(|_| CandidateError::InvalidData)?;
-            }
-            require(
-                metadata
+        Surface::new(&token.surface).map_err(|_| CandidateError::InvalidData)?;
+        let metadata = token.metadata.as_ref().ok_or(CandidateError::InvalidData)?;
+        require(
+            metadata.analysis_id == record.analysis_id
+                && metadata.mode == record.mode
+                && metadata.token_index as u64 == token.segment_index
+                && metadata.is_japanese
+                && metadata
                     .reading
                     .as_ref()
-                    .is_none_or(|s| !s.trim().is_empty()),
-            )?;
-            issued(
-                issued_ids,
-                "chapter_analyses",
-                i64::from(metadata.analysis_id),
-            )?;
-            let mode = match metadata.mode {
-                SplitMode::A => 0,
-                SplitMode::B => 1,
-                SplitMode::C => 2,
-            };
-            require((metadata.analysis_id == segmentation.original_analysis_id) == (mode == 2))?;
-            if let Some((id, previous)) =
-                metadata_sources.insert(mode, (metadata.analysis_id, metadata.token_index))
-            {
-                require(id == metadata.analysis_id && previous < metadata.token_index)?;
-            }
-            require(
-                !metadata_sources
-                    .iter()
-                    .any(|(other, (id, _))| *other != mode && *id == metadata.analysis_id),
-            )?;
+                    .is_none_or(|r| !r.trim().is_empty()),
+        )?;
+        if let Some(form) = &metadata.dictionary_form {
+            Surface::new(form).map_err(|_| CandidateError::InvalidData)?;
         }
-        let eligibility = match &segment.metadata {
-            Some(metadata) if metadata.is_japanese => {
-                Some(EffectiveTokenEligibility::AnalyzerJapanese)
-            }
-            Some(_) => None,
-            None => None,
-        };
-        if eligibility.is_some() {
-            Surface::new(&boundary.surface).map_err(|_| CandidateError::InvalidData)?;
-        }
-        if let Some(eligibility) = eligibility.filter(|_| {
-            anchor.range.start >= page.range.start && anchor.range.start < page.range.end
-        }) {
-            let token = occurrences.next().ok_or(CandidateError::InvalidData)?;
-            let display_start = i64::from(anchor.range.start) - i64::from(page.range.start);
-            let display_end =
-                i64::from(anchor.range.end.min(page.range.end)) - i64::from(page.range.start);
-            require(
-                token.segment_index == index as u64
-                    && token.anchor == anchor
-                    && token.surface == boundary.surface
-                    && token.eligibility == eligibility
-                    && token.metadata == segment.metadata
-                    && token.vocabulary.is_none()
-                    && i64::from(token.display_range.start) == display_start
-                    && i64::from(token.display_range.end) == display_end,
-            )?;
-        }
+        previous = Some(token.segment_index);
+        previous_end = anchor.range.end;
     }
-    require(occurrences.next().is_none())
+    Ok(())
 }
 
 fn check_surviving_content(
@@ -324,7 +221,6 @@ fn check_surviving_content(
 ) -> Result<(), CandidateError> {
     check_cancelled(cancelled)?;
     let c = &record.completion;
-    let segmentation = &record.key.segmentation;
     // One chapter only, never load/reimport a whole book or resolve today's rules.
     let canonical: Option<String> = connection
         .query_row(
@@ -342,10 +238,10 @@ fn check_surviving_content(
     let live = chapter.is_some();
     check_analysis_header(
         connection,
-        segmentation.original_analysis_id,
+        record.analysis_id,
         SplitMode::C,
         c.page.chapter_id,
-        &segmentation.profile,
+        &record.profile,
         live,
     )?;
     if let Some(chapter) = &chapter {
@@ -370,65 +266,38 @@ fn check_surviving_content(
                 },
         )?;
     }
-    check_cancelled(cancelled)?;
-    let mut checked_headers = BTreeMap::new();
-    let mut previous_end = 0;
-    let mut tokens = connection.prepare(
-        "SELECT start_byte, end_byte, surface, is_japanese, reading, dictionary_form
-         FROM main.analyzed_tokens WHERE analysis_id = ?1 AND token_index = ?2",
-    )?;
-    for segment in &segmentation.segments {
-        check_cancelled(cancelled)?;
-        let boundary = &segment.boundary;
-        let start = i64::from(boundary.anchor.range.start);
-        let end = i64::from(boundary.anchor.range.end);
-        if let Some(canonical) = &canonical {
-            require(super::analyses::slice(canonical, start, end)? == boundary.surface)?;
-            require(
-                super::analyses::slice(canonical, previous_end, start)?
-                    .chars()
-                    .all(char::is_whitespace),
-            )?;
-        }
-        previous_end = end;
-        let Some(metadata) = &segment.metadata else {
-            continue;
-        };
-        let id = i64::from(metadata.analysis_id);
-        let exists = if let Some(exists) = checked_headers.get(&id) {
-            *exists
-        } else {
-            let exists = check_analysis_header(
-                connection,
-                metadata.analysis_id,
-                metadata.mode,
-                c.page.chapter_id,
-                &segmentation.profile,
-                live,
-            )?;
-            checked_headers.insert(id, exists);
-            exists
-        };
-        if exists {
-            let matches = tokens
-                .query_row((id, metadata.token_index as i64), |row| {
-                    Ok(row.get::<_, i64>(0)? == start
-                        && row.get::<_, i64>(1)? == end
-                        && row.get::<_, String>(2)? == boundary.surface
-                        && row.get::<_, bool>(3)? == metadata.is_japanese
-                        && row.get::<_, Option<String>>(4)? == metadata.reading
-                        && row.get::<_, Option<String>>(5)? == metadata.dictionary_form)
-                })
-                .optional()?;
-            require(matches == Some(true))?;
-        }
-    }
-    if let Some(canonical) = &canonical {
-        require(
-            super::analyses::slice(canonical, previous_end, canonical.len() as i64)?
-                .chars()
-                .all(char::is_whitespace),
+    if live {
+        let mut statement = connection.prepare(
+            "SELECT token_index, start_byte, end_byte, surface, reading, dictionary_form
+             FROM main.analyzed_tokens WHERE analysis_id = ?1 AND is_japanese = 1
+             AND start_byte >= ?2 AND start_byte < ?3 ORDER BY token_index",
         )?;
+        let mut rows = statement.query((
+            i64::from(record.analysis_id),
+            i64::from(c.page.range.start),
+            i64::from(c.page.range.end),
+        ))?;
+        for token in &record.occurrences {
+            check_cancelled(cancelled)?;
+            let row = rows.next()?.ok_or(CandidateError::InvalidData)?;
+            let metadata = token.metadata.as_ref().ok_or(CandidateError::InvalidData)?;
+            require(
+                row.get::<_, i64>(0)? == token.segment_index as i64
+                    && row.get::<_, i64>(1)? == i64::from(token.anchor.range.start)
+                    && row.get::<_, i64>(2)? == i64::from(token.anchor.range.end)
+                    && text(row, 3)? == token.surface
+                    && row.get::<_, Option<String>>(4)? == metadata.reading
+                    && row.get::<_, Option<String>>(5)? == metadata.dictionary_form,
+            )?;
+            require(
+                super::analyses::slice(
+                    canonical.as_ref().expect("live"),
+                    i64::from(token.anchor.range.start),
+                    i64::from(token.anchor.range.end),
+                )? == token.surface,
+            )?;
+        }
+        require(rows.next()?.is_none())?;
     }
     Ok(())
 }
@@ -500,7 +369,6 @@ fn check_receipt(
                 c.pending_time.milliseconds(),
             ],
     )?;
-    let segmentation = &record.key.segmentation;
     let header: Option<(i64, String, String, String)> = connection
         .query_row(
             "SELECT analysis_id, engine_revision, dictionary_revision, split_mode
@@ -512,10 +380,10 @@ fn check_receipt(
     require(
         header
             == Some((
-                i64::from(segmentation.original_analysis_id),
-                segmentation.profile.engine_revision.clone(),
-                segmentation.profile.dictionary_revision.clone(),
-                "b".into(),
+                i64::from(record.analysis_id),
+                record.profile.engine_revision.clone(),
+                record.profile.dictionary_revision.clone(),
+                "c".into(),
             )),
     )?;
     let mut statement = connection.prepare(

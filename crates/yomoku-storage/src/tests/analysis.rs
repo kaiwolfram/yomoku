@@ -1,6 +1,6 @@
 use yomoku_core::{
     analysis::{AnalysisProfile, AnalyzedToken, ChapterAnalysis, SplitMode},
-    document::{ChapterText, DocumentId, PasteText, TextAnchor, TextOffset, TextRange},
+    document::{ChapterText, PasteText, TextAnchor, TextOffset, TextRange},
     pagination::{PageLength, ReadingPosition},
     reader::{ReaderAnalysis, ReaderSnapshot},
     vocabulary::Surface,
@@ -104,46 +104,6 @@ fn reader_snapshot_pins_original_mode_b_with_exact_position_and_preset_after_reo
             analysis: ReaderAnalysis::Available(original),
         })
     );
-    assert_eq!(fs::read(database.path()).unwrap(), before);
-}
-
-#[test]
-fn legacy_reader_snapshot_is_explicitly_missing_and_never_substitutes_other_modes_or_chapters() {
-    let database = TestDatabase::new();
-    let mut storage = Storage::open(database.path()).unwrap();
-    let document = storage
-        .create_paste(&PasteText::new("猫".into()).unwrap())
-        .unwrap();
-    let other = storage
-        .create_paste(&PasteText::new("犬".into()).unwrap())
-        .unwrap();
-    storage
-        .store_chapter_analysis(other.chapter.chapter_id, &analysis(&other.chapter))
-        .unwrap();
-    let mut snapshot = analysis(&document.chapter);
-    for mode in [SplitMode::A, SplitMode::B] {
-        snapshot.mode = mode;
-        storage
-            .store_chapter_analysis(document.chapter.chapter_id, &snapshot)
-            .unwrap();
-    }
-    storage
-        .connection
-        .pragma_update(None, "query_only", true)
-        .unwrap();
-    let before = fs::read(database.path()).unwrap();
-    assert_eq!(
-        storage.load_reader_snapshot(document.document_id).unwrap(),
-        Some(ReaderSnapshot {
-            document,
-            page_length: PageLength::default(),
-            analysis: ReaderAnalysis::Missing,
-        })
-    );
-    assert!(storage
-        .load_reader_snapshot(DocumentId::try_from(i64::MAX).unwrap())
-        .unwrap()
-        .is_none());
     assert_eq!(fs::read(database.path()).unwrap(), before);
 }
 
@@ -265,51 +225,4 @@ fn analysis_statement_and_commit_failures_roll_back_and_retry() {
         let id = storage.store_chapter_analysis(document.chapter.chapter_id, &expected).unwrap();
         assert_eq!(storage.chapter_analysis(id).unwrap(), Some(expected));
     }
-}
-
-#[test]
-fn upgrades_version_six_without_rescanning_and_failed_migration_preserves_data() {
-    let database = TestDatabase::new();
-    let mut connection = Connection::open(database.path()).unwrap();
-    migrate(&mut connection, &MIGRATIONS[..6]).unwrap();
-    let mut storage = Storage { connection };
-    let document = storage
-        .create_paste(&PasteText::new("𠮷食べた".into()).unwrap())
-        .unwrap();
-    let word = Surface::new("食べた").unwrap();
-    storage.register_vocabulary(&[word], 10).unwrap();
-    let before = history(&database.path());
-    // Force a real version-7 SQL collision after the first table was created.
-    storage
-        .connection
-        .execute_batch("CREATE TABLE analyzed_tokens (fixture TEXT);")
-        .unwrap();
-    drop(storage);
-    assert!(matches!(
-        Storage::open(database.path()),
-        Err(StorageError::Sqlite(_))
-    ));
-    assert_eq!(history(&database.path()), before);
-    let connection = Connection::open(database.path()).unwrap();
-    assert!(!connection.table_exists(None, "chapter_analyses").unwrap());
-    connection
-        .execute_batch("DROP TABLE analyzed_tokens;")
-        .unwrap();
-    drop(connection);
-    let mut storage = Storage::open(database.path()).unwrap();
-    assert_eq!(storage.schema_version().unwrap(), 24);
-    assert_eq!(
-        storage.load_paste(document.document_id).unwrap(),
-        Some(document)
-    );
-    assert_eq!(counts(&storage), (0, 0, 0, 0));
-    assert_eq!(
-        storage
-            .connection
-            .query_row("SELECT COUNT(*) FROM vocabulary_status_events", [], |row| {
-                row.get::<_, i64>(0)
-            })
-            .unwrap(),
-        1
-    );
 }

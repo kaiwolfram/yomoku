@@ -11,8 +11,8 @@ impl Model {
         preflight.result.is_none().then_some(&preflight.request)
     }
 
-    /// An observation only. Any future durable begin must check the journal
-    /// gates again; a provider can change after this read completes.
+    /// An observation only. Dispatch rechecks the owner and the provider
+    /// refreshes prerequisites immediately before writing.
     pub fn anki_export_preflight_result(
         &self,
     ) -> Option<&Result<AnkiPreflightPlan, AnkiExportError>> {
@@ -20,12 +20,7 @@ impl Model {
     }
 
     pub(super) fn anki_export_gate_open(&self) -> bool {
-        self.anki_recovery.allows_preparation()
-            && self.anki_live.is_none()
-            && self.anki_recovery_commit.is_none()
-            && self.anki_recovery_commit_error.is_none()
-            && self.anki_recovery_read.is_none()
-            && self.anki_recovery_read_error.is_none()
+        self.anki_live.is_none()
     }
 }
 
@@ -101,11 +96,8 @@ impl Yomoku {
             }
             _ => return None,
         }
-        // A one-tap entry export can advance only through the durable begin above.
+        // A one-tap entry export can advance only through the active owner above.
         // Legacy/manual checks alone never authorize a provider mutation.
         Some(Command::done())
     }
 }
-
-#[cfg(test)]
-mod tests;

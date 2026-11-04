@@ -9,7 +9,6 @@ internal class CoreSessionOwner(application: Application) : AndroidViewModel(app
         CoreSession(
             java.io.File(application.filesDir, "yomoku.sqlite3").absolutePath,
             sudachiDictionaryProvider(application),
-            readAnkiRecovery = AnkiRecoveryReader(AnkiProviderReader(application))::read,
             readAnkiPreflight = AnkiPreflightReader(AnkiProviderReader(application))::read,
             invokeAnkiLive = AnkiLiveDispatcher(application)::invoke,
             readAnkiDecks = AnkiProviderReader(application)::decks,

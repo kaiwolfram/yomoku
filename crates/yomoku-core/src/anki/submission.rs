@@ -1,10 +1,9 @@
-//! Frozen provider payload for the durable submission journal. Restoring this
-//! value is data recovery, never authorization to replay a provider mutation.
+//! Frozen in-memory provider payloads, separate from current reader selection.
 
 use serde::{Deserialize, Serialize};
 
 use super::{AnkiDeckId, AnkiModelId, AnkiNote};
-use crate::{document::InvalidTextValue, vocabulary::Surface};
+use crate::document::InvalidTextValue;
 
 /// Complete expected normal, sort-field-zero, single forward-card layout.
 /// Keep the actual strings, so an app upgrade cannot change an unresolved call.
@@ -51,10 +50,8 @@ impl AnkiModelLayout {
     }
 }
 
-/// Frozen model-creation intent. Recovery is comparison data only; it must never
-/// authorize another insert or an update to a partially created model.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(try_from = "StoredModelCreation", into = "StoredModelCreation")]
+/// Frozen model-creation intent. Never update a partially created model.
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct AnkiModelCreation {
     layout: AnkiModelLayout,
 }
@@ -72,38 +69,9 @@ impl AnkiModelCreation {
     }
 }
 
-#[derive(Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-struct StoredModelCreation {
-    version: i64,
-    layout: AnkiModelLayout,
-}
-
-impl From<AnkiModelCreation> for StoredModelCreation {
-    fn from(value: AnkiModelCreation) -> Self {
-        Self {
-            version: 1,
-            layout: value.layout,
-        }
-    }
-}
-
-impl TryFrom<StoredModelCreation> for AnkiModelCreation {
-    type Error = InvalidTextValue;
-
-    fn try_from(value: StoredModelCreation) -> Result<Self, Self::Error> {
-        if value.version != 1 {
-            return Err(InvalidTextValue);
-        }
-        Self::new(value.layout)
-    }
-}
-
-/// Validated immutable payload; no selection or live document is needed to
-/// reconcile after restart. The live owner must authenticate selection BEFORE
-/// constructing/recording it. No vocabulary/history mutation occurs here.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(try_from = "StoredSubmission", into = "StoredSubmission")]
+/// Validated immutable payload. The live owner authenticates the selection
+/// before construction. This changes no vocabulary or reading history.
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct AnkiSubmission {
     note: AnkiNote,
     deck: AnkiDeckId,
@@ -147,48 +115,5 @@ impl AnkiSubmission {
     }
     pub fn layout(&self) -> &AnkiModelLayout {
         &self.layout
-    }
-}
-
-#[derive(Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-struct StoredSubmission {
-    version: i64,
-    surface: String,
-    fields: [String; 4],
-    deck: i64,
-    model: i64,
-    layout: AnkiModelLayout,
-}
-
-impl From<AnkiSubmission> for StoredSubmission {
-    fn from(value: AnkiSubmission) -> Self {
-        Self {
-            version: 1,
-            surface: value.note.surface.as_str().into(),
-            fields: value.note.fields,
-            deck: value.deck.into(),
-            model: value.model.into(),
-            layout: value.layout,
-        }
-    }
-}
-
-impl TryFrom<StoredSubmission> for AnkiSubmission {
-    type Error = InvalidTextValue;
-
-    fn try_from(value: StoredSubmission) -> Result<Self, Self::Error> {
-        if value.version != 1 {
-            return Err(InvalidTextValue);
-        }
-        Self::new(
-            AnkiNote {
-                surface: Surface::new(value.surface).map_err(|_| InvalidTextValue)?,
-                fields: value.fields,
-            },
-            AnkiDeckId::try_from(value.deck)?,
-            AnkiModelId::try_from(value.model)?,
-            value.layout,
-        )
     }
 }

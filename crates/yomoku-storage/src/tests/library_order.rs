@@ -130,44 +130,6 @@ fn failed_reader_entry_rolls_back_recency_clock_and_finish_reset_then_retries() 
 }
 
 #[test]
-fn version_eighteen_upgrade_keeps_content_progress_and_unknown_legacy_recency() {
-    let database = TestDatabase::new();
-    let mut connection = Connection::open(database.path()).unwrap();
-    connection
-        .pragma_update(None, "foreign_keys", true)
-        .unwrap();
-    migrate(&mut connection, &MIGRATIONS[..18]).unwrap();
-    let mut legacy = Storage { connection };
-    let document = create(&mut legacy, "legacy\n𠮷");
-    let position = yomoku_core::pagination::ReadingPosition {
-        source_id: document.chapter.source_id,
-        chapter_id: document.chapter.chapter_id,
-        offset: yomoku_core::document::TextOffset::at(&document.chapter.text, 7).unwrap(),
-    };
-    legacy
-        .save_reading_position(document.document_id, position)
-        .unwrap();
-    drop(legacy);
-    let mut upgraded = Storage::open(database.path()).unwrap();
-    let loaded = upgraded
-        .load_document_reader_snapshot(document.document_id)
-        .unwrap()
-        .unwrap();
-    assert_eq!(loaded.document.reading_position, Some(position));
-    assert_eq!(loaded.document.chapters[0], document.chapter);
-    assert_eq!(loaded.last_read_sequence, None);
-    assert_eq!(clock(&upgraded), 0);
-    assert_eq!(
-        upgraded
-            .open_document_reader_snapshot(document.document_id)
-            .unwrap()
-            .unwrap()
-            .last_read_sequence,
-        Some(1)
-    );
-}
-
-#[test]
 fn concurrent_opens_allocate_distinct_recency_and_reimport_starts_unopened() {
     let database = TestDatabase::new();
     let mut storage = Storage::open(database.path()).unwrap();
@@ -241,44 +203,6 @@ fn exhausted_clock_fails_atomically_without_reusing_order() {
     );
     assert_eq!(clock(&storage), i64::MAX);
     assert_eq!(fs::read(database.path()).unwrap(), before);
-}
-
-#[test]
-fn failed_read_order_migration_rolls_back_its_column_and_preserves_legacy_database() {
-    let database = TestDatabase::new();
-    let mut connection = Connection::open(database.path()).unwrap();
-    migrate(&mut connection, &MIGRATIONS[..18]).unwrap();
-    let mut old = Storage { connection };
-    let document = create(&mut old, "legacy\n本文");
-    old.connection.execute_batch("CREATE TABLE library_read_clock (sentinel TEXT); INSERT INTO library_read_clock VALUES ('keep');").unwrap();
-    drop(old);
-    let before = fs::read(database.path()).unwrap();
-    assert!(Storage::open(database.path()).is_err());
-    assert_eq!(fs::read(database.path()).unwrap(), before);
-    assert_eq!(history(&database.path()).len(), 18);
-    let connection = Connection::open(database.path()).unwrap();
-    assert!(connection
-        .prepare("SELECT last_read_sequence FROM documents")
-        .is_err());
-    assert_eq!(
-        connection
-            .query_row("SELECT sentinel FROM library_read_clock", [], |row| row
-                .get::<_, String>(
-                0
-            ))
-            .unwrap(),
-        "keep"
-    );
-    connection
-        .execute_batch("DROP TABLE library_read_clock")
-        .unwrap();
-    drop(connection);
-    let mut storage = Storage::open(database.path()).unwrap();
-    assert_eq!(
-        storage.load_paste(document.document_id).unwrap(),
-        Some(document)
-    );
-    assert_eq!(clock(&storage), 0);
 }
 
 #[test]

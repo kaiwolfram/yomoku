@@ -12,13 +12,9 @@ impl Model {
         }
         let phase = if let Some(live) = &self.anki_live {
             match live.progress {
-                AnkiLiveProgress::Beginning => AnkiExportPhase::Beginning,
                 AnkiLiveProgress::Ready => AnkiExportPhase::Ready,
                 AnkiLiveProgress::Invoking => AnkiExportPhase::Invoking,
-                AnkiLiveProgress::Saving => AnkiExportPhase::Saving,
-                AnkiLiveProgress::Failed(error) => AnkiExportPhase::StorageFailed(error),
-                // Never present provider success/known IDs before the outcome
-                // transaction has acknowledged the exact captured journal pair.
+                // Terminal results belong to the consumed native invocation.
                 AnkiLiveProgress::Finished => match live.callback.as_ref()?.outcome() {
                     AnkiLiveOutcome::Note(outcome) => match outcome {
                         AnkiSubmissionOutcome::Added(id) => {

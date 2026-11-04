@@ -5,7 +5,7 @@ use crate::anki::{AnkiDeckId, AnkiExport, AnkiSelection, AnkiSettingsPhase};
 
 impl Model {
     /// Native immutable intent, retained across popup/page changes. Before live
-    /// use, the dispatcher still needs provider preflight and durable begin gates.
+    /// use, the dispatcher still needs provider preflight and an active owner.
     pub fn prepared_anki_export(&self) -> Option<&AnkiExport> {
         self.prepared_anki_export.as_ref()
     }
@@ -151,16 +151,15 @@ impl Yomoku {
                 }
             }
             // Clear unsubmitted intent or dismiss a finished live presentation.
-            // Active/failed live work requires explicit read-only restoration;
-            // durable recovery obligations always remain in their own state.
+            // Active provider work must finish before intent can be cleared.
             Event::ClearPreparedAnkiExport => {
-                if model.anki_live_blocks_recovery() {
+                if model.anki_operation_busy() {
                     return Some(Command::done());
                 }
                 model.anki_live = None;
                 model.prepared_anki_export = None;
                 // Preflight is read-only; invalidate its handle and observation.
-                // Submitted mutations retain their separate journal.
+                // A later explicit action must capture a fresh observation.
                 model.anki_export_preflight = None;
             }
             _ => return None,
@@ -168,6 +167,3 @@ impl Yomoku {
         Some(Command::done())
     }
 }
-
-#[cfg(test)]
-mod tests;

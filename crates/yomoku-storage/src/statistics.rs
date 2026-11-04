@@ -28,7 +28,7 @@ const LIFETIME_SQL: &str = "
         NOT EXISTS (
             SELECT 1 FROM completed
             WHERE completion_version <> 1 OR analysis_version <> 1
-               OR (effective_version IS NOT NULL AND effective_version <> 1)
+               OR (effective_version IS NOT NULL AND effective_version <> 2)
                OR active_time_ms < 0
         )";
 
@@ -99,7 +99,7 @@ fn reading_timeline(
                      WHERE o.command_id = c.command_id)),
                 SUM(c.active_time_ms),
                 MIN(c.semantics_version = 1 AND a.semantics_version = 1
-                    AND (e.semantics_version IS NULL OR e.semantics_version = 1)
+                    AND (e.semantics_version IS NULL OR e.semantics_version = 2)
                     AND c.active_time_ms >= 0)
          FROM reading_completions c
          JOIN completion_analyses a USING (command_id)

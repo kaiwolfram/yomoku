@@ -4,18 +4,14 @@ use std::{error::Error, fs, path::Path};
 use yomoku_core::{
     anki::{
         AnkiExportError, AnkiExportPhase, AnkiExportView, AnkiLiveOperation, AnkiLiveResult,
-        AnkiModelCreation, AnkiModelLayout, AnkiNote, AnkiPreflightDeck, AnkiPreflightModel,
-        AnkiPreflightObservation, AnkiPreflightOperation, AnkiPreflightResult, AnkiReadModelLayout,
-        AnkiRecoveryPhase, AnkiRecoveryView, AnkiSelection, AnkiSubmission,
+        AnkiModelLayout, AnkiPreflightDeck, AnkiPreflightModel, AnkiPreflightObservation,
+        AnkiPreflightOperation, AnkiPreflightResult, AnkiReadModelLayout, AnkiSelection,
     },
     app::Event,
     document::{TextAnchor, TextOffset, TextRange},
     effective_session::{EffectivePageIdentity, EffectiveReaderSelection},
     reader::{ReaderAnalysis, ReaderTokenKey, ReaderWordSelection},
-    storage::DocumentError,
-    vocabulary::Surface,
 };
-use yomoku_storage::Storage;
 
 pub fn exchange(dir: &Path, writing: bool) -> Result<(), Box<dyn Error>> {
     fs::create_dir_all(dir)?;
@@ -142,10 +138,8 @@ pub fn exchange(dir: &Path, writing: bool) -> Result<(), Box<dyn Error>> {
         AnkiExportPhase::CreateModel,
         AnkiExportPhase::ReuseModel(9007199254740993),
         AnkiExportPhase::Existing(vec![i64::MAX, 9007199254740993]),
-        AnkiExportPhase::Beginning,
         AnkiExportPhase::Ready,
         AnkiExportPhase::Invoking,
-        AnkiExportPhase::Saving,
         AnkiExportPhase::NoteAdded(i64::MAX),
         AnkiExportPhase::ModelCreated(9007199254740993),
         AnkiExportPhase::NotSubmitted,
@@ -154,7 +148,6 @@ pub fn exchange(dir: &Path, writing: bool) -> Result<(), Box<dyn Error>> {
         AnkiExportPhase::ModelUncertain(None),
         AnkiExportPhase::ModelUncertain(Some(9007199254740993)),
         AnkiExportPhase::ProviderFailed(AnkiExportError::IncompatibleModel),
-        AnkiExportPhase::StorageFailed(DocumentError::Unavailable),
     ]
     .into_iter()
     .enumerate()
@@ -171,38 +164,6 @@ pub fn exchange(dir: &Path, writing: bool) -> Result<(), Box<dyn Error>> {
         } else {
             assert_eq!(
                 fs::read(dir.join(format!("anki-export-view-{index}-return.bin")))?,
-                bytes
-            );
-        }
-    }
-    for (index, phase) in [
-        AnkiRecoveryPhase::Loading,
-        AnkiRecoveryPhase::Ready,
-        AnkiRecoveryPhase::Unresolved,
-        AnkiRecoveryPhase::Checking,
-        AnkiRecoveryPhase::Saving,
-        AnkiRecoveryPhase::Busy,
-        AnkiRecoveryPhase::Failed,
-    ]
-    .into_iter()
-    .enumerate()
-    {
-        let view = AnkiRecoveryView {
-            phase,
-            note_pending: index % 2 == 0,
-            model_pending: index % 2 != 0,
-            storage_error: Some(DocumentError::Unavailable),
-            provider_error: Some(AnkiExportError::PermissionDenied),
-            can_retry: index % 2 == 0,
-            can_check_note: false,
-            can_check_model: index % 2 != 0,
-        };
-        let bytes = super::encode(&view);
-        if writing {
-            fs::write(dir.join(format!("anki-recovery-view-{index}.bin")), bytes)?;
-        } else {
-            assert_eq!(
-                fs::read(dir.join(format!("anki-recovery-view-{index}-return.bin")))?,
                 bytes
             );
         }
@@ -300,45 +261,11 @@ pub fn exchange(dir: &Path, writing: bool) -> Result<(), Box<dyn Error>> {
             dir.join("anki-layout.bin"),
             super::encode(&AnkiReadModelLayout::from(&layout)),
         )?;
-        for model in [false, true] {
-            let name = if model { "model" } else { "note" };
-            let path = dir.join(format!("anki-{name}-seed.sqlite3"));
-            if path.exists() {
-                fs::remove_file(&path)?;
-            }
-            let mut storage = Storage::open(path)?;
-            if model {
-                storage.begin_anki_model_creation(&AnkiModelCreation::new(layout.clone())?)?;
-            } else {
-                let note = AnkiNote::new(
-                    &Surface::new("𠮷猫")?,
-                    "ねこ",
-                    &["cat"],
-                    "𠮷猫。",
-                    TextRange {
-                        start: TextOffset::START,
-                        end: 7.try_into()?,
-                    },
-                )?;
-                storage.begin_anki_submission(&AnkiSubmission::new(
-                    note,
-                    9007199254740993_i64.try_into()?,
-                    i64::MAX.try_into()?,
-                    layout.clone(),
-                )?)?;
-            }
-        }
     } else {
         assert_eq!(
             fs::read(dir.join("anki-layout-return.bin"))?,
             super::encode(&AnkiReadModelLayout::from(&layout))
         );
-        for model in [false, true] {
-            let name = if model { "model" } else { "note" };
-            let mut storage = Storage::open(dir.join(format!("anki-{name}-jni.sqlite3")))?;
-            assert!(storage.anki_recovery_snapshot()?.note.is_none());
-            assert!(storage.anki_recovery_snapshot()?.model.is_none());
-        }
     }
     Ok(())
 }

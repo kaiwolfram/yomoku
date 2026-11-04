@@ -1,58 +1,43 @@
-//! App-owned begin, one native permit and durable outcome acceptance. Provider
-//! dispatch uses a typed effect and owning response closure; this module performs no I/O.
-
+//! One in-memory owner per provider write. No SQLite begin, finish, or replay.
 use super::*;
 use crate::anki::{
     AnkiLiveIntent, AnkiLiveInvocation, AnkiLiveProgress, AnkiLiveRequest, AnkiLiveState,
     AnkiModelCreation, AnkiPreflightPlan, AnkiSubmission,
 };
-
 impl Model {
     pub fn anki_live_progress(&self) -> Option<AnkiLiveProgress> {
         self.anki_live.as_ref().map(|live| live.progress)
     }
-
-    pub(super) fn anki_live_blocks_recovery(&self) -> bool {
-        self.anki_live_progress()
-            .is_some_and(|progress| progress != AnkiLiveProgress::Finished)
+    pub(super) fn anki_operation_busy(&self) -> bool {
+        self.anki_live
+            .as_ref()
+            .is_some_and(|live| live.progress != AnkiLiveProgress::Finished)
     }
-
-    /// Native dispatcher prerequisite, consumed once after matching successful
-    /// begin. Typed dispatch consumes it once. Fresh provider checks remain mandatory.
     pub fn take_anki_live_invocation(&mut self) -> Option<AnkiLiveInvocation> {
         let live = self.anki_live.as_mut()?;
-        if live.progress != AnkiLiveProgress::Ready
-            || self.anki_recovery_commit.is_some()
-            || self.anki_recovery_commit_error.is_some()
-            || self.anki_recovery_read.is_some()
-            || self.anki_recovery_read_error.is_some()
-            || !matches!(&self.anki_recovery, AnkiRecoveryState::Restored(pair)
-                if live.begun.as_ref() == Some(pair))
-        {
+        if live.progress != AnkiLiveProgress::Ready {
             return None;
         }
         live.progress = AnkiLiveProgress::Invoking;
         Some(AnkiLiveInvocation::new(live.request.clone()))
     }
 }
-
 impl Yomoku {
     pub(super) fn begin_anki_intent(
         &self,
         model: &mut Model,
         intent: AnkiLiveIntent,
     ) -> Command<Effect, Event> {
-        let request = AnkiLiveRequest::new(intent);
+        if model.anki_live.is_some() {
+            return Command::done();
+        }
         model.anki_live = Some(AnkiLiveState {
-            request: request.clone(),
-            progress: AnkiLiveProgress::Beginning,
-            begun: None,
+            request: AnkiLiveRequest::new(intent),
+            progress: AnkiLiveProgress::Ready,
             callback: None,
         });
-        Command::request_from_shell(StorageOperation::BeginAnkiLive(Box::new(request.clone())))
-            .then_send(move |result| Event::AnkiLiveBeginFinished(Box::new(request), result))
+        Command::done()
     }
-
     pub(super) fn update_anki_live(
         &self,
         event: &Event,
@@ -63,8 +48,8 @@ impl Yomoku {
                 preparation_id,
                 expected_phase,
             } => {
-                if !model.anki_export_view().is_some_and(|view| {
-                    view.preparation_id == *preparation_id && view.phase == *expected_phase
+                if !model.anki_export_view().is_some_and(|v| {
+                    v.preparation_id == *preparation_id && v.phase == *expected_phase
                 }) {
                     return Some(Command::done());
                 }
@@ -84,11 +69,12 @@ impl Yomoku {
                 let Some(invocation) = model.take_anki_live_invocation() else {
                     return Some(Command::done());
                 };
-                let operation = invocation.operation(surface, deck_id);
                 return Some(
-                    Command::request_from_shell(operation).then_send(move |result| {
-                        Event::FinishAnkiLive(Box::new(invocation.complete_provider(result)))
-                    }),
+                    Command::request_from_shell(invocation.operation(surface, deck_id)).then_send(
+                        move |result| {
+                            Event::FinishAnkiLive(Box::new(invocation.complete_provider(result)))
+                        },
+                    ),
                 );
             }
             Event::BeginAnkiLive => {
@@ -111,44 +97,17 @@ impl Yomoku {
                         *id,
                         export.layout().clone(),
                     )
-                    .map(|value| AnkiLiveIntent::Note(Box::new(value))),
+                    .map(|v| AnkiLiveIntent::Note(Box::new(v))),
                     Some(Ok(AnkiPreflightPlan::CreateModel)) => {
                         AnkiModelCreation::new(export.layout().clone())
-                            .map(|value| AnkiLiveIntent::Model(Box::new(value)))
+                            .map(|v| AnkiLiveIntent::Model(Box::new(v)))
                     }
-                    // Exact duplicates and failed/incomplete reads grant no begin.
                     _ => return Some(Command::done()),
                 };
                 let Ok(intent) = intent else {
                     return Some(Command::done());
                 };
                 return Some(self.begin_anki_intent(model, intent));
-            }
-            Event::AnkiLiveBeginFinished(request, result) => {
-                let Some(live) = &mut model.anki_live else {
-                    return Some(Command::done());
-                };
-                if live.request != **request || live.progress != AnkiLiveProgress::Beginning {
-                    return Some(Command::done());
-                }
-                match result {
-                    StorageResult::AnkiLiveBegun(snapshot)
-                        if live.request.accepts_begin(snapshot)
-                            && model.anki_recovery.allows_preparation()
-                            && model.anki_recovery_read.is_none()
-                            && model.anki_recovery_read_error.is_none()
-                            && model.anki_recovery_commit.is_none()
-                            && model.anki_recovery_commit_error.is_none() =>
-                    {
-                        model.anki_recovery = AnkiRecoveryState::Restored(snapshot.clone());
-                        live.begun = Some(snapshot.clone());
-                        live.progress = AnkiLiveProgress::Ready;
-                    }
-                    StorageResult::Failed(error) => {
-                        live.progress = AnkiLiveProgress::Failed(*error);
-                    }
-                    _ => live.progress = AnkiLiveProgress::Failed(DocumentError::Unavailable),
-                }
             }
             Event::FinishAnkiLive(callback) => {
                 let Some(live) = &mut model.anki_live else {
@@ -159,71 +118,33 @@ impl Yomoku {
                 {
                     return Some(Command::done());
                 }
-                if live.begun.as_ref().is_none_or(|pair| {
-                    callback.expected_result(pair).is_none()
-                        || model.anki_recovery != AnkiRecoveryState::Restored(pair.clone())
-                }) {
-                    live.progress = AnkiLiveProgress::Failed(DocumentError::Unavailable);
-                    return Some(Command::done());
-                }
-                live.progress = AnkiLiveProgress::Saving;
+                live.progress = AnkiLiveProgress::Finished;
                 live.callback = Some(*callback.clone());
-                let request = live.request.clone();
-                return Some(
-                    Command::request_from_shell(StorageOperation::FinishAnkiLive(callback.clone()))
-                        .then_send(move |result| {
-                            Event::AnkiLiveOutcomeFinished(Box::new(request), result)
-                        }),
-                );
-            }
-            Event::AnkiLiveOutcomeFinished(request, result) => {
-                let Some(live) = &mut model.anki_live else {
-                    return Some(Command::done());
-                };
-                if live.request != **request || live.progress != AnkiLiveProgress::Saving {
-                    return Some(Command::done());
-                }
-                let expected = live
-                    .callback
-                    .as_ref()
-                    .and_then(|callback| callback.expected_result(live.begun.as_ref()?.as_ref()));
-                match result {
-                    StorageResult::AnkiLiveFinished(snapshot)
-                        if expected.as_ref() == Some(snapshot)
-                            && matches!(&model.anki_recovery, AnkiRecoveryState::Restored(pair)
-                                if live.begun.as_ref() == Some(pair)) =>
-                    {
-                        model.anki_recovery = AnkiRecoveryState::Restored(snapshot.clone());
-                        live.progress = AnkiLiveProgress::Finished;
-                        if model.anki_setup.live_deck.is_some() {
-                            model.anki_setup.phase =
-                                match live.callback.as_ref().map(|c| c.outcome()) {
-                                    Some(crate::anki::AnkiLiveOutcome::Model(
-                                        crate::anki::AnkiModelCreationOutcome::Created(_),
-                                    )) => crate::anki::AnkiSetupPhase::Ready,
-                                    _ => crate::anki::AnkiSetupPhase::Unchecked,
-                                };
-                        }
-                    }
-                    StorageResult::Failed(error) => {
-                        live.progress = AnkiLiveProgress::Failed(*error);
-                    }
-                    _ => live.progress = AnkiLiveProgress::Failed(DocumentError::Unavailable),
+                if model.anki_setup.live_deck.is_some() {
+                    model.anki_setup.phase = match callback.outcome() {
+                        crate::anki::AnkiLiveOutcome::Model(
+                            crate::anki::AnkiModelCreationOutcome::Created(_),
+                        ) => crate::anki::AnkiSetupPhase::Ready,
+                        _ => crate::anki::AnkiSetupPhase::Failed(
+                            crate::anki::AnkiExportError::ProviderFailure,
+                        ),
+                    };
                 }
                 model.complete_entry_action();
             }
             Event::AbandonAnkiLive => {
-                if let Some(live) = &mut model.anki_live {
-                    if live.progress != AnkiLiveProgress::Finished {
-                        live.progress = AnkiLiveProgress::Failed(DocumentError::Unavailable);
-                    }
-                }
+                // Invalidate the owner, never recreate an invocation from its payload.
+                model.anki_live = None;
+                model.prepared_anki_export = None;
+                model.anki_export_preflight = None;
+                model.anki_setup.live_deck = None;
+                model.anki_setup.phase = crate::anki::AnkiSetupPhase::Unchecked;
+                model.anki_entries.clear();
             }
             _ => return None,
         }
         Some(Command::done())
     }
 }
-
 #[cfg(test)]
 mod tests;

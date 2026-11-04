@@ -11,7 +11,7 @@ impl Storage {
     }
 
     /// Publish only after commit. Changing/clearing the preference cannot retarget
-    /// frozen exports or erase pending/uncertain external-write obligations.
+    /// in-memory frozen exports.
     pub fn save_anki_default_deck(
         &mut self,
         deck: Option<AnkiDeckId>,

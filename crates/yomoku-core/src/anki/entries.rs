@@ -20,7 +20,6 @@ pub enum AnkiEntryPhase {
     Export(AnkiExportPhase),
     Failed(AnkiExportError),
     Busy,
-    RecoveryRequired,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]

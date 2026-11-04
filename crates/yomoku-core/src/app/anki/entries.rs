@@ -27,7 +27,7 @@ impl Model {
                         self.anki_setup.phase = AnkiSetupPhase::Unchecked;
                     }
                 }
-                AnkiExportPhase::NotSubmitted => {
+                AnkiExportPhase::NotSubmitted | AnkiExportPhase::ModelUncertain(_) => {
                     self.anki_setup.phase = AnkiSetupPhase::Failed(AnkiExportError::ProviderFailure)
                 }
                 _ => return,
@@ -51,7 +51,9 @@ impl Model {
                 AnkiExistingNotes::new(ids.into_iter().map(|id| id.try_into().unwrap()).collect())
                     .unwrap(),
             )),
-            AnkiExportPhase::NotSubmitted => Err(AnkiExportError::ProviderFailure),
+            AnkiExportPhase::NotSubmitted
+            | AnkiExportPhase::NoteUncertain(_)
+            | AnkiExportPhase::ModelUncertain(_) => Err(AnkiExportError::ProviderFailure),
             AnkiExportPhase::ProviderFailed(error) => Err(error),
             AnkiExportPhase::CreateModel => Err(AnkiExportError::IncompatibleModel),
             _ => return,
@@ -149,18 +151,8 @@ impl Model {
                     Some(Ok(AnkiPreflightPlan::ReuseModel(_))) => {
                         if self.anki_export_gate_open() {
                             AnkiEntryPhase::Add
-                        } else if self.anki_live.as_ref().is_some_and(|live| {
-                            matches!(
-                                live.progress,
-                                AnkiLiveProgress::Beginning
-                                    | AnkiLiveProgress::Ready
-                                    | AnkiLiveProgress::Invoking
-                                    | AnkiLiveProgress::Saving
-                            )
-                        }) {
-                            AnkiEntryPhase::Busy
                         } else {
-                            AnkiEntryPhase::RecoveryRequired
+                            AnkiEntryPhase::Busy
                         }
                     }
                     Some(Ok(AnkiPreflightPlan::Existing(ids))) => AnkiEntryPhase::Existing(
@@ -191,7 +183,7 @@ impl Yomoku {
         match event {
             Event::CheckAnkiSetup => {
                 if model.anki_settings.phase != AnkiSettingsPhase::Ready
-                    || model.anki_live_blocks_recovery()
+                    || model.anki_operation_busy()
                 {
                     return Some(Command::done());
                 }
@@ -451,57 +443,18 @@ mod tests {
     }
 
     fn acknowledge_live(model: &mut Model, result: AnkiLiveResult) {
-        let request = model.anki_live.as_ref().unwrap().request.clone();
-        let mut snapshot = AnkiRecoverySnapshot::default();
-        match request.intent() {
-            AnkiLiveIntent::Model(creation) => {
-                snapshot.model = Some(AnkiModelRecovery {
-                    id: 1.try_into().unwrap(),
-                    creation: *creation.clone(),
-                    known_model_id: None,
-                })
-            }
-            AnkiLiveIntent::Note(submission) => {
-                snapshot.note = Some(AnkiRecovery {
-                    id: 1.try_into().unwrap(),
-                    submission: *submission.clone(),
-                    known_note_id: None,
-                })
-            }
-        }
-        update(
-            model,
-            Event::AnkiLiveBeginFinished(
-                Box::new(request.clone()),
-                StorageResult::AnkiLiveBegun(Box::new(snapshot.clone())),
-            ),
-        );
         let mut command = Yomoku.update(Event::DispatchAnkiLive, model);
-        let effect = command
+        let mut effect = command
             .effects()
             .find_map(|effect| match effect {
-                Effect::AnkiLive(request) => Some(request),
+                Effect::AnkiLive(r) => Some(r),
                 _ => None,
             })
             .unwrap();
-        let mut effect = effect;
         effect.resolve(result).unwrap();
         let event = command.events().next().unwrap();
-        let Event::FinishAnkiLive(callback) = &event else {
-            panic!("live completion");
-        };
-        let expected = callback.expected_result(&snapshot).unwrap();
         update(model, event);
-        assert_eq!(model.anki_live_progress(), Some(AnkiLiveProgress::Saving));
-        update(
-            model,
-            Event::AnkiLiveOutcomeFinished(
-                Box::new(request),
-                StorageResult::AnkiLiveFinished(expected),
-            ),
-        );
     }
-
     #[test]
     fn entry_checks_do_not_write_and_one_tap_rechecks_then_begins_once() {
         let (mut model, selection) = configured();
@@ -548,10 +501,7 @@ mod tests {
                 observation(vec![], true),
             ),
         );
-        assert_eq!(
-            model.anki_live_progress(),
-            Some(AnkiLiveProgress::Beginning)
-        );
+        assert_eq!(model.anki_live_progress(), Some(AnkiLiveProgress::Ready));
         let live = model.anki_live.as_ref().unwrap().request.clone();
         update(
             &mut model,
@@ -615,11 +565,10 @@ mod tests {
     }
 
     #[test]
-    fn model_setup_is_settings_only_and_uses_durable_begin_without_a_selected_word() {
+    fn model_setup_is_settings_only_and_dispatches_without_a_selected_word() {
         let mut model = Model::default();
         model.anki_settings.phase = AnkiSettingsPhase::Ready;
         model.anki_settings.default_deck_id = Some(7);
-        model.anki_recovery = AnkiRecoveryState::Restored(Box::default());
         update(&mut model, Event::CheckAnkiSetup);
         let generation = model.anki_setup.generation;
         update(
@@ -631,10 +580,7 @@ mod tests {
         assert!(model.anki_live.is_none());
         model.settings_open = true;
         update(&mut model, Event::CreateAnkiModel);
-        assert_eq!(
-            model.anki_live_progress(),
-            Some(AnkiLiveProgress::Beginning)
-        );
+        assert_eq!(model.anki_live_progress(), Some(AnkiLiveProgress::Ready));
         assert!(model.prepared_anki_export.is_none());
         assert_eq!(model.anki_export_view().unwrap().deck_id, 7);
         assert!(matches!(
@@ -645,42 +591,6 @@ mod tests {
         assert_eq!(model.anki_setup.phase, AnkiSetupPhase::Ready);
         assert!(model.anki_export_gate_open());
         assert!(model.anki_export_view().is_none());
-    }
-
-    #[test]
-    fn reader_can_observe_existing_notes_while_recovery_blocks_new_writes() {
-        let (mut model, selection) = configured();
-        model.anki_recovery = AnkiRecoveryState::Unrestored;
-        update(&mut model, Event::LoadReaderAnkiEntries(selection));
-        assert_eq!(model.anki_entries.len(), 2);
-        for index in 0..2 {
-            let request = model.anki_entries[index].request.clone();
-            update(
-                &mut model,
-                Event::AnkiEntryChecked(
-                    Box::new(request),
-                    observation(if index == 0 { vec![88] } else { vec![] }, true),
-                ),
-            );
-        }
-        assert_eq!(
-            model.anki_entries_view()[0].phase,
-            AnkiEntryPhase::Existing(vec![88])
-        );
-        assert_eq!(
-            model.anki_entries_view()[1].phase,
-            AnkiEntryPhase::RecoveryRequired
-        );
-        update(
-            &mut model,
-            Event::AddReaderAnkiEntry {
-                selection,
-                entry: AnkiEntryKey::Word(2),
-            },
-        );
-        assert!(model.prepared_anki_export.is_none());
-        model.anki_recovery = AnkiRecoveryState::Restored(Box::default());
-        assert_eq!(model.anki_entries_view()[1].phase, AnkiEntryPhase::Add);
     }
 
     #[test]

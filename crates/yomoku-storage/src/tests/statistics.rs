@@ -72,45 +72,6 @@ fn assert_totals(storage: &Storage, japanese_occurrences: u64, active_time_ms: u
 }
 
 #[test]
-fn imports_checkpoints_unused_commands_and_legacy_events_are_excluded_and_reads_never_write() {
-    let database = TestDatabase::new();
-    let mut storage = Storage::open(database.path()).unwrap();
-    assert_totals(&storage, 0, 0);
-    let imported = import(&mut storage, "猫 猫 𠮷 English 。 📖");
-    save_time(&mut storage, &imported, 1234);
-    storage.new_completion_command_id().unwrap();
-    let pending = prepare(&mut storage, &imported);
-    let legacy = import(&mut storage, "犬");
-    save_time(&mut storage, &legacy, 9999);
-    let legacy_intent = intent(&mut storage, &legacy);
-    let legacy = storage.prepare_page_completion(legacy_intent).unwrap();
-    storage.record_page_completion(legacy.completion).unwrap();
-    // A read-only connection and exact DB bytes protect against cache/registration
-    // writes, including when the result is empty despite substantial pending work.
-    storage
-        .connection
-        .pragma_update(None, "query_only", true)
-        .unwrap();
-    let before = fs::read(database.path()).unwrap();
-    for _ in 0..3 {
-        assert_totals(&storage, 0, 0);
-    }
-    assert_eq!(fs::read(database.path()).unwrap(), before);
-    storage
-        .connection
-        .pragma_update(None, "query_only", false)
-        .unwrap();
-    storage.record_effective_page_completion(&pending).unwrap();
-    storage
-        .connection
-        .pragma_update(None, "query_only", true)
-        .unwrap();
-    let before = fs::read(database.path()).unwrap();
-    assert_totals(&storage, 3, 1234);
-    assert_eq!(fs::read(database.path()).unwrap(), before);
-}
-
-#[test]
 fn original_and_effective_completions_keep_repetitions_rereads_statuses_and_exact_unicode() {
     let database = TestDatabase::new();
     let mut storage = Storage::open(database.path()).unwrap();
@@ -268,7 +229,7 @@ fn unknown_event_versions_and_corrupt_durations_fail_without_repair() {
     for sql in [
         "UPDATE reading_completions SET semantics_version = 2",
         "UPDATE completion_analyses SET semantics_version = 2",
-        "UPDATE effective_completion_commands SET semantics_version = 2",
+        "UPDATE effective_completion_commands SET semantics_version = 3",
         "UPDATE reading_completions SET active_time_ms = -1",
     ] {
         let database = TestDatabase::new();
@@ -318,4 +279,73 @@ fn lifetime_time_uses_exact_integers_and_overflow_errors_without_truncating_or_w
         Err(StorageError::Sqlite(_))
     ));
     assert_eq!(fs::read(database.path()).unwrap(), before);
+}
+
+#[test]
+fn compact_mode_c_reservation_excludes_other_pages_and_keeps_atomic_deletion_safe_retries() {
+    let database = TestDatabase::new();
+    let mut storage = Storage::open(database.path()).unwrap();
+    let imported = import(
+        &mut storage,
+        &format!("猫\n{}\nUNRELATED_CHAPTER_MARKER", "English ".repeat(1000)),
+    );
+    save_time(&mut storage, &imported, 1234);
+    let frozen = prepare(&mut storage, &imported);
+    let (version, payload): (i64, String) = storage
+        .connection
+        .query_row(
+            "SELECT semantics_version, payload FROM effective_completion_commands",
+            [],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )
+        .unwrap();
+    assert_eq!(version, 2);
+    assert!(!payload.contains("UNRELATED_CHAPTER_MARKER"));
+    let record: serde_json::Value = serde_json::from_str(&payload).unwrap();
+    assert_eq!(record["mode"], "C");
+    assert_eq!(record["analysis_id"], i64::from(imported.analysis_id));
+    assert!(record.get("key").is_none());
+    assert!(record.get("segmentation").is_none());
+    assert_eq!(record["occurrences"].as_array().unwrap().len(), 1);
+    assert!(payload.len() < imported.document.chapter.text.len());
+    storage.connection.execute_batch("CREATE TRIGGER fail_receipt BEFORE INSERT ON reading_occurrences BEGIN SELECT RAISE(ABORT, 'fixture'); END;").unwrap();
+    assert!(storage.record_effective_page_completion(&frozen).is_err());
+    assert_totals(&storage, 0, 0);
+    assert_eq!(
+        storage
+            .load_pending_reading_time(
+                imported.document.document_id,
+                frozen.completion().departing_position
+            )
+            .unwrap()
+            .pending()
+            .milliseconds(),
+        1234
+    );
+    storage
+        .connection
+        .execute_batch("DROP TRIGGER fail_receipt")
+        .unwrap();
+    assert!(matches!(
+        storage.record_effective_page_completion(&frozen).unwrap(),
+        AnalyzedCompletionOutcome::Recorded { .. }
+    ));
+    assert_totals(&storage, 1, 1234);
+    let mode: String = storage
+        .connection
+        .query_row("SELECT split_mode FROM completion_analyses", [], |row| {
+            row.get(0)
+        })
+        .unwrap();
+    assert_eq!(mode, "c");
+    storage
+        .delete_document(imported.document.document_id)
+        .unwrap();
+    drop(storage);
+    let mut storage = Storage::open(database.path()).unwrap();
+    assert_eq!(
+        storage.record_effective_page_completion(&frozen).unwrap(),
+        AnalyzedCompletionOutcome::AlreadyRecorded
+    );
+    assert_totals(&storage, 1, 1234);
 }

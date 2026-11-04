@@ -102,7 +102,7 @@ impl Storage {
             .freeze_completion(completion)
             .map_err(|_| StorageError::InvalidAnalysis)?;
         transaction.execute(
-            "INSERT INTO effective_completion_commands (command_id, semantics_version, payload) VALUES (?1, 1, ?2)",
+            "INSERT INTO effective_completion_commands (command_id, semantics_version, payload) VALUES (?1, 2, ?2)",
             (i64::from(completion.command_id), effective_payload(&frozen)?),
         )?;
         transaction.commit()?;
@@ -174,7 +174,7 @@ impl Storage {
             [i64::from(completion.command_id)], |row| Ok((row.get(0)?, row.get(1)?)),
         ).optional()?;
         match (effective, reserved) {
-            (Some(frozen), Some((1, payload))) if effective_payload(frozen)? == payload => {}
+            (Some(frozen), Some((2, payload))) if effective_payload(frozen)? == payload => {}
             (None, None) => {}
             _ => return Err(StorageError::InvalidCompletion),
         }
@@ -286,7 +286,23 @@ impl Storage {
 }
 
 fn effective_payload(frozen: &EffectivePageCompletion) -> Result<String, StorageError> {
-    serde_json::to_string(frozen).map_err(|_| StorageError::InvalidCompletion)
+    #[derive(serde::Serialize)]
+    struct Record<'a> {
+        completion: PageCompletion,
+        analysis_id: AnalysisId,
+        profile: &'a yomoku_core::analysis::AnalysisProfile,
+        mode: yomoku_core::analysis::SplitMode,
+        occurrences: &'a [yomoku_core::effective_reader::EffectiveReaderToken],
+    }
+    let segmentation = &frozen.key().segmentation;
+    serde_json::to_string(&Record {
+        completion: frozen.completion(),
+        analysis_id: segmentation.original_analysis_id,
+        profile: &segmentation.profile,
+        mode: yomoku_core::analysis::SplitMode::C,
+        occurrences: frozen.occurrences(),
+    })
+    .map_err(|_| StorageError::InvalidCompletion)
 }
 
 fn analyzed_outcome(

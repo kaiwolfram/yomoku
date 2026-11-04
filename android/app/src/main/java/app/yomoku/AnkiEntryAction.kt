@@ -60,15 +60,12 @@ internal fun AnkiEntryAction(
     val existing = phase is AnkiEntryPhase.Existing
     val export = (phase as? AnkiEntryPhase.Export)?.value
     val failed = phase is AnkiEntryPhase.Failed || export is AnkiExportPhase.ProviderFailed
-    val recovery =
-        phase == AnkiEntryPhase.RecoveryRequired ||
-            export is AnkiExportPhase.NoteUncertain ||
-            export is AnkiExportPhase.ModelUncertain ||
-            export is AnkiExportPhase.StorageFailed
+    val uncertain =
+        export is AnkiExportPhase.NoteUncertain || export is AnkiExportPhase.ModelUncertain
     val busy =
         phase == AnkiEntryPhase.Checking ||
             phase == AnkiEntryPhase.Busy ||
-            (export != null && !failed && !recovery)
+            (export != null && !failed && !uncertain)
     val dark = isSystemInDarkTheme()
     val label =
         stringResource(
@@ -92,13 +89,13 @@ internal fun AnkiEntryAction(
                         dispatch(Event.AddReaderAnkiEntry(entry.selection, entry.key))
                 }
             },
-            enabled = enabled && !busy && !recovery && (!existing || browser != null),
+            enabled = enabled && !busy && !uncertain && (!existing || browser != null),
             colors =
                 IconButtonDefaults.filledIconButtonColors(
                     containerColor =
                         when {
                             existing -> Color(if (dark) 0xFF744052 else 0xFFF7C9D9)
-                            failed || recovery -> MaterialTheme.colorScheme.errorContainer
+                            failed || uncertain -> MaterialTheme.colorScheme.errorContainer
                             else -> Color(if (dark) 0xFF285C3B else 0xFFB6E6BE)
                         },
                     contentColor =
@@ -137,14 +134,9 @@ internal fun AnkiEntryNotice(entry: AnkiEntryView?, browser: AnkiNoteBrowser? = 
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.error,
         )
-    if (
-        entry.phase == AnkiEntryPhase.RecoveryRequired ||
-            export is AnkiExportPhase.NoteUncertain ||
-            export is AnkiExportPhase.ModelUncertain ||
-            export is AnkiExportPhase.StorageFailed
-    ) {
+    if (export is AnkiExportPhase.NoteUncertain || export is AnkiExportPhase.ModelUncertain) {
         Text(
-            stringResource(R.string.anki_entry_recovery),
+            stringResource(R.string.anki_entry_uncertain),
             style = MaterialTheme.typography.bodySmall,
         )
     }

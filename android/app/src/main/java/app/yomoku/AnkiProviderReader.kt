@@ -9,7 +9,7 @@ import android.database.Cursor
 import android.net.Uri
 import android.os.Looper
 
-/** Provider-local failures, translated to the typed recovery protocol by AnkiRecoveryReader. */
+/** Provider-local failures translated to typed query and write results. */
 internal enum class AnkiReadError {
     ProviderUnavailable,
     UnsupportedProvider,

@@ -81,10 +81,7 @@ fn storage_commands_are_serialized_while_navigation_remains_available() {
         .iter_mut()
         .find_map(|effect| match effect {
             Effect::Storage(request) => Some(request),
-            Effect::Render(_)
-            | Effect::AnkiRecoveryRead(_)
-            | Effect::AnkiExportPreflight(_)
-            | Effect::AnkiLive(_) => None,
+            Effect::Render(_) | Effect::AnkiExportPreflight(_) | Effect::AnkiLive(_) => None,
         })
         .unwrap();
     assert_eq!(request.operation, StorageOperation::List);
@@ -105,7 +102,6 @@ fn starts_in_library() {
             anki_settings: Default::default(),
             anki_setup: Default::default(),
             anki_entries: Vec::new(),
-            anki_recovery: None,
             anki_export: None,
             vocabulary: Default::default(),
             statistics: Default::default(),

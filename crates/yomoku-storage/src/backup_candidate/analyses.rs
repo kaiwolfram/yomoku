@@ -8,12 +8,8 @@ use super::{check_cancelled, CandidateError};
 
 pub(super) fn check(
     connection: &Connection,
-    version: usize,
     cancelled: &mut impl FnMut() -> bool,
 ) -> Result<(), CandidateError> {
-    if version < 7 {
-        return check_cancelled(cancelled);
-    }
     let mut headers = connection.prepare(
         "SELECT a.id, a.semantics_version, a.engine_revision, a.dictionary_revision,
                 a.split_mode, t.text

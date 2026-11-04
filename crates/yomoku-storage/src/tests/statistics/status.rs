@@ -356,7 +356,7 @@ fn invalid_versions_causes_dates_status_chains_and_completion_provenance_fail_wi
         "DELETE FROM vocabulary_status_events WHERE cause = 'registration'",
         "UPDATE reading_completions SET semantics_version = 2",
         "UPDATE completion_analyses SET semantics_version = 2",
-        "UPDATE effective_completion_commands SET semantics_version = 2",
+        "UPDATE effective_completion_commands SET semantics_version = 3",
     ] {
         let database = TestDatabase::new();
         let mut storage = Storage::open(database.path()).unwrap();

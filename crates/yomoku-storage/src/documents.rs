@@ -1,3 +1,5 @@
+use sha2::{Digest, Sha256};
+
 use rusqlite::{Connection, OptionalExtension, TransactionBehavior};
 use yomoku_core::document::{
     ChapterId, ChapterText, DocumentId, LibraryDocument, PasteText, PastedDocument, SourceId,
@@ -372,7 +374,13 @@ pub(crate) fn create_paste_in(
     text: &PasteText,
 ) -> Result<PastedDocument, StorageError> {
     let title = text.initial_title();
-    create_single_text_in(connection, "paste", title, text.as_str())
+    let document = create_single_text_in(connection, "paste", title, text.as_str())?;
+    let digest = Sha256::digest(text.as_str().as_bytes());
+    connection.execute(
+        "INSERT INTO paste_content_hashes (document_id, sha256) VALUES (?1, ?2)",
+        (i64::from(document.document_id), digest.as_slice()),
+    )?;
+    Ok(document)
 }
 
 pub(crate) fn create_single_text_in(

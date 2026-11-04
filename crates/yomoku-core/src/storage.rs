@@ -82,25 +82,7 @@ pub enum StorageOperation {
     #[serde(skip)]
     #[cfg_attr(feature = "facet_typegen", facet(skip))]
     Effective(#[cfg_attr(feature = "facet_typegen", facet(opaque))] EffectiveStorageOperation),
-    /// Native startup snapshot of both external mutation journals.
-    #[serde(skip)]
-    #[cfg_attr(feature = "facet_typegen", facet(skip))]
-    LoadAnkiRecovery,
-    #[serde(skip)]
-    #[cfg_attr(feature = "facet_typegen", facet(skip))]
-    CommitAnkiRecovery(
-        #[cfg_attr(feature = "facet_typegen", facet(opaque))] Box<crate::anki::AnkiRecoveryCommit>,
-    ),
-    #[serde(skip)]
-    #[cfg_attr(feature = "facet_typegen", facet(skip))]
-    BeginAnkiLive(
-        #[cfg_attr(feature = "facet_typegen", facet(opaque))] Box<crate::anki::AnkiLiveRequest>,
-    ),
-    #[serde(skip)]
-    #[cfg_attr(feature = "facet_typegen", facet(skip))]
-    FinishAnkiLive(
-        #[cfg_attr(feature = "facet_typegen", facet(opaque))] Box<crate::anki::AnkiLiveCallback>,
-    ),
+
     #[serde(skip)]
     #[cfg_attr(feature = "facet_typegen", facet(skip))]
     LoadAnkiSettings,
@@ -192,30 +174,7 @@ pub enum StorageResult {
     #[serde(skip)]
     #[cfg_attr(feature = "facet_typegen", facet(skip))]
     Effective(#[cfg_attr(feature = "facet_typegen", facet(opaque))] EffectiveStorageResult),
-    #[serde(skip)]
-    #[cfg_attr(feature = "facet_typegen", facet(skip))]
-    AnkiRecoveryLoaded(
-        #[cfg_attr(feature = "facet_typegen", facet(opaque))]
-        Box<crate::anki::AnkiRecoverySnapshot>,
-    ),
-    #[serde(skip)]
-    #[cfg_attr(feature = "facet_typegen", facet(skip))]
-    AnkiRecoveryCommitted(
-        #[cfg_attr(feature = "facet_typegen", facet(opaque))]
-        Box<crate::anki::AnkiRecoverySnapshot>,
-    ),
-    #[serde(skip)]
-    #[cfg_attr(feature = "facet_typegen", facet(skip))]
-    AnkiLiveBegun(
-        #[cfg_attr(feature = "facet_typegen", facet(opaque))]
-        Box<crate::anki::AnkiRecoverySnapshot>,
-    ),
-    #[serde(skip)]
-    #[cfg_attr(feature = "facet_typegen", facet(skip))]
-    AnkiLiveFinished(
-        #[cfg_attr(feature = "facet_typegen", facet(opaque))]
-        Box<crate::anki::AnkiRecoverySnapshot>,
-    ),
+
     #[serde(skip)]
     #[cfg_attr(feature = "facet_typegen", facet(skip))]
     AnkiSettingsLoaded(

@@ -8,8 +8,6 @@ use crux_core::{
 };
 use yomoku_core::app::{Effect, Model, Yomoku};
 
-mod anki_startup;
-pub use anki_startup::AnkiStartupLayer;
 mod epub_assets;
 mod storage;
 #[cfg(feature = "storage-measurements")]
@@ -23,7 +21,7 @@ pub use imports::{AnalyzerLifecycle, AnalyzerLoader, PasteAnalyzer};
 #[effect(facet_typegen)]
 pub enum ShellEffect {
     Render(RenderOperation),
-    AnkiRecoveryRead(yomoku_core::anki::AnkiRecoveryReadOperation),
+
     AnkiExportPreflight(yomoku_core::anki::AnkiPreflightOperation),
     AnkiLive(yomoku_core::anki::AnkiLiveOperation),
 }
@@ -34,7 +32,6 @@ impl From<Effect> for ShellEffect {
         // its owner here. Rust I/O must be handled below this mapping layer.
         match effect {
             Effect::Render(request) => Self::Render(request),
-            Effect::AnkiRecoveryRead(request) => Self::AnkiRecoveryRead(request),
             Effect::AnkiExportPreflight(request) => Self::AnkiExportPreflight(request),
             Effect::AnkiLive(request) => Self::AnkiLive(request),
             Effect::Storage(_) => unreachable!("storage effects are consumed by Rust middleware"),
@@ -44,14 +41,12 @@ impl From<Effect> for ShellEffect {
 
 /// SQLite effects stay native; render and typed Anki provider requests cross FFI.
 pub type EffectRouter =
-    AnkiStartupLayer<MapEffectLayer<HandleEffectLayer<Core<Yomoku>, StorageEffects>, ShellEffect>>;
+    MapEffectLayer<HandleEffectLayer<Core<Yomoku>, StorageEffects>, ShellEffect>;
 
 pub fn effect_router(database_path: std::path::PathBuf) -> std::io::Result<EffectRouter> {
-    Ok(AnkiStartupLayer::new(
-        Core::<Yomoku>::new()
-            .handle_effects_using(StorageEffects::new(database_path)?)
-            .map_effect(),
-    ))
+    Ok(Core::<Yomoku>::new()
+        .handle_effects_using(StorageEffects::new(database_path)?)
+        .map_effect())
 }
 
 /// Analyzed, deduplicating imports on the existing SQLite worker. The shell
@@ -64,11 +59,9 @@ pub fn effect_router_with_analyzed_imports(
 ) -> std::io::Result<(EffectRouter, AnalyzerLifecycle)> {
     let (effects, lifecycle) = StorageEffects::with_analyzed_imports(database_path, loader)?;
     Ok((
-        AnkiStartupLayer::new(
-            Core::<Yomoku>::new()
-                .handle_effects_using(effects)
-                .map_effect(),
-        ),
+        Core::<Yomoku>::new()
+            .handle_effects_using(effects)
+            .map_effect(),
         lifecycle,
     ))
 }
@@ -82,11 +75,9 @@ pub fn effect_router_with_dictionaries(
     let (effects, lifecycle) =
         StorageEffects::with_dictionaries(database_path, loader, word_loader)?;
     Ok((
-        AnkiStartupLayer::new(
-            Core::<Yomoku>::new()
-                .handle_effects_using(effects)
-                .map_effect(),
-        ),
+        Core::<Yomoku>::new()
+            .handle_effects_using(effects)
+            .map_effect(),
         lifecycle,
     ))
 }
@@ -102,11 +93,9 @@ pub fn effect_router_with_effective_reader(
     let (effects, lifecycle) =
         StorageEffects::with_dictionaries(database_path, loader, word_loader)?;
     Ok((
-        AnkiStartupLayer::new(
-            Core::new_with(Yomoku, Model::with_effective_reader())
-                .handle_effects_using(effects)
-                .map_effect(),
-        ),
+        Core::new_with(Yomoku, Model::with_effective_reader())
+            .handle_effects_using(effects)
+            .map_effect(),
         lifecycle,
     ))
 }
@@ -124,11 +113,9 @@ pub fn effect_router_with_measured_effective_reader(
         StorageEffects::with_dictionaries(database_path, loader, word_loader)?;
     effects.measurements = Some(observer);
     Ok((
-        AnkiStartupLayer::new(
-            Core::new_with(Yomoku, Model::with_effective_reader())
-                .handle_effects_using(effects)
-                .map_effect(),
-        ),
+        Core::new_with(Yomoku, Model::with_effective_reader())
+            .handle_effects_using(effects)
+            .map_effect(),
         lifecycle,
     ))
 }

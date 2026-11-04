@@ -331,7 +331,11 @@ fn bulk_deletion_keeps_history_vocabulary_and_survivor_across_all_formats_and_re
         "paste_content_hashes",
         "pending_reading_time",
     ] {
-        assert!(rows(&storage, table).is_empty(), "{table}");
+        if table == "paste_content_hashes" {
+            assert_eq!(rows(&storage, table).len(), 1, "surviving paste hash");
+        } else {
+            assert!(rows(&storage, table).is_empty(), "{table}");
+        }
     }
     drop(storage);
     let mut storage = Storage::open(database.path()).unwrap();

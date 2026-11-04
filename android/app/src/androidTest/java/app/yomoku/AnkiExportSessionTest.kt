@@ -323,73 +323,6 @@ class AnkiExportSessionTest {
     }
 
     @Test
-    fun readyAutomaticallyInvokesOnceAndProjectsDurableOutcome() {
-        open()
-        try {
-            prepare()
-            val original = core.view
-            instrumentation.runOnMainSync {
-                core.dispatch(Event.OpenSettings)
-                compose.activity.setContent {
-                    YomokuTheme { SettingsScreen(core.view, core::dispatch) }
-                }
-            }
-            compose.onNodeWithTag("anki_export_check").performScrollTo().performClick()
-            await { it.ankiExport?.phase is AnkiExportPhase.ReuseModel }
-            val checked = checkNotNull(core.view.ankiExport)
-            compose.onNodeWithTag("anki_export_begin").performScrollTo().performClick()
-            val operation =
-                checkNotNull(operations.poll(60, TimeUnit.SECONDS)) as AnkiLiveOperation.InsertNote
-            assertEquals(Long.MAX_VALUE, operation.deckId)
-            assertEquals("猫", operation.fields[0])
-            assertEquals("猫と<strong class=\"yomoku-target\">猫</strong>。", operation.fields[3])
-            compose
-                .onNodeWithTag("anki_export_status")
-                .performScrollTo()
-                .assertTextEquals("Sending to AnkiDroid…")
-            compose.onNodeWithText("Added to AnkiDroid.").assertDoesNotExist()
-            send(Event.BeginPreparedAnkiExport(checked.preparationId, checked.phase))
-            send(Event.DispatchAnkiLive)
-            send(Event.OpenSettings)
-            assertTrue(operations.isEmpty())
-            results.add(AnkiLiveResult.NoteAdded(Long.MAX_VALUE))
-            await { it.ankiExport?.phase == AnkiExportPhase.NoteAdded(Long.MAX_VALUE) }
-            compose
-                .onNodeWithTag("anki_export_status")
-                .performScrollTo()
-                .assertTextEquals("Added to AnkiDroid.")
-            SQLiteDatabase.openDatabase(
-                    File(directory, "db.sqlite3").path,
-                    null,
-                    SQLiteDatabase.OPEN_READONLY,
-                )
-                .use { sql ->
-                    sql.rawQuery("SELECT state, known_note_id FROM anki_submissions", null).use {
-                        row ->
-                        assertTrue(row.moveToFirst())
-                        assertEquals("added", row.getString(0))
-                        assertEquals(Long.MAX_VALUE, row.getLong(1))
-                    }
-                }
-            assertEquals(original.reader, core.view.reader)
-            assertEquals(original.effectiveReaderTokens, core.view.effectiveReaderTokens)
-            send(Event.CloseSettings)
-            send(
-                Event.LoadEffectiveReaderWord(checkNotNull(original.effectiveReaderWord?.selection))
-            )
-            await { it.effectiveReaderWord?.details != null && !it.storageBusy }
-            assertEquals(
-                original.effectiveReaderWord.details,
-                core.view.effectiveReaderWord?.details,
-            )
-            assertEquals(original.completionNotice, core.view.completionNotice)
-            assertTrue(operations.isEmpty())
-        } finally {
-            close()
-        }
-    }
-
-    @Test
     fun modelCreationStopsAfterAcknowledgementAndRestartCannotReplay() {
         createModel = true
         open()
@@ -408,14 +341,13 @@ class AnkiExportSessionTest {
             send(Event.DispatchAnkiLive)
             assertTrue(operations.isEmpty())
             send(Event.OpenSettings)
-            assertNull(core.view.ankiRecovery)
         } finally {
             close()
         }
     }
 
     @Test
-    fun closeAtReadyLeavesPendingJournalAndSuppressesQueuedInvocation() {
+    fun closeAtReadySuppressesQueuedInvocationWithoutRestartReplay() {
         open()
         try {
             prepare()
@@ -435,7 +367,6 @@ class AnkiExportSessionTest {
             open(useExecutor = false)
             assertNull(core.view.ankiExport)
             send(Event.OpenSettings)
-            assertTrue(checkNotNull(core.view.ankiRecovery).notePending)
             send(Event.DispatchAnkiLive)
             assertTrue(operations.isEmpty())
         } finally {
@@ -444,7 +375,7 @@ class AnkiExportSessionTest {
     }
 
     @Test
-    fun inFlightCloseDropsLateResultAndRestartKeepsUncertainty() {
+    fun inFlightCloseDropsLateResultAndRestartRequiresFreshQueries() {
         open()
         try {
             prepare()
@@ -458,7 +389,6 @@ class AnkiExportSessionTest {
             instrumentation.waitForIdleSync()
             assertNull(core.view.ankiExport)
             send(Event.OpenSettings)
-            assertTrue(checkNotNull(core.view.ankiRecovery).notePending)
             send(Event.DispatchAnkiLive)
             assertTrue(operations.isEmpty())
         } finally {

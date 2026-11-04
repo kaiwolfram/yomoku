@@ -157,7 +157,6 @@ class AnkiNoteBrowserTest {
             for (phase in
                 listOf(
                     AnkiExportPhase.Prepared,
-                    AnkiExportPhase.Saving,
                     AnkiExportPhase.NoteUncertain(Long.MAX_VALUE),
                     AnkiExportPhase.ModelCreated(Long.MAX_VALUE),
                 )) {

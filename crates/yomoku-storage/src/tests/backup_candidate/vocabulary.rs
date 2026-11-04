@@ -1,17 +1,18 @@
 use super::*;
 
-fn prefix(version: usize) -> (TestDatabase, Connection) {
+fn prefix() -> (TestDatabase, Connection) {
     let database = TestDatabase::new();
     let mut connection = Connection::open(database.path()).unwrap();
-    migrate(&mut connection, &MIGRATIONS[..version]).unwrap();
+    migrate(&mut connection, MIGRATIONS).unwrap();
     (database, connection)
 }
 
 #[test]
-fn backup_candidate_vocabulary_rejects_blank_surfaces_before_and_after_migration() {
-    for version in [6, 9, 16, 17, 20, 23, 24] {
+fn backup_candidate_vocabulary_rejects_blank_surfaces_in_initial_schema() {
+    {
+        let version = 1;
         for blank in [" ", "\t\r\n", "\u{85}\u{a0}", "\u{2003}\u{3000}"] {
-            let (database, connection) = prefix(version);
+            let (database, connection) = prefix();
             connection
                 .execute(
                     "INSERT INTO vocabulary (surface, status, registered_at_unix_ms)

@@ -38,10 +38,8 @@ internal fun AnkiExportPanel(
                 is AnkiExportPhase.ReuseModel -> stringResource(R.string.anki_export_reuse_model)
                 is AnkiExportPhase.Existing ->
                     stringResource(R.string.anki_export_existing, phase.value.joinToString(", "))
-                AnkiExportPhase.Beginning,
                 AnkiExportPhase.Ready -> stringResource(R.string.anki_export_beginning)
                 AnkiExportPhase.Invoking -> stringResource(R.string.anki_export_invoking)
-                AnkiExportPhase.Saving -> stringResource(R.string.anki_export_saving)
                 is AnkiExportPhase.NoteAdded -> stringResource(R.string.anki_export_added)
                 is AnkiExportPhase.ModelCreated ->
                     stringResource(R.string.anki_export_model_created)
@@ -51,8 +49,6 @@ internal fun AnkiExportPanel(
                 is AnkiExportPhase.ModelUncertain ->
                     stringResource(R.string.anki_export_model_uncertain)
                 is AnkiExportPhase.ProviderFailed -> stringResource(phase.value.messageResource())
-                is AnkiExportPhase.StorageFailed ->
-                    stringResource(R.string.anki_export_storage_failed)
             }
         Text(message, Modifier.testTag("anki_export_status"))
         if (browser != null) {
@@ -111,13 +107,10 @@ internal fun AnkiExportPanel(
                 }
             else -> Unit
         }
-        // A failed live commit must be restored through recovery. Never offer a write Retry.
+        // An active provider call must finish before its presentation can be dismissed.
         when (phase) {
-            AnkiExportPhase.Beginning,
             AnkiExportPhase.Ready,
-            AnkiExportPhase.Invoking,
-            AnkiExportPhase.Saving,
-            is AnkiExportPhase.StorageFailed -> Unit
+            AnkiExportPhase.Invoking -> Unit
             else ->
                 TextButton(
                     onClick = { dispatch(Event.ClearAnkiExport(state.preparationId)) },

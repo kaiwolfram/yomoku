@@ -1,6 +1,5 @@
 use yomoku_core::{
-    analysis::SplitMode,
-    document::{ChapterText, DocumentId, PasteText, TextAnchor, TextOffset, TextRange},
+    document::{ChapterText, PasteText, TextAnchor, TextOffset, TextRange},
     pagination::{LogicalPages, PageLength},
     reader::{ReaderAnalysis, ReaderVocabulary},
     vocabulary::{Surface, VocabularyStatus},
@@ -127,40 +126,6 @@ fn deleted_or_never_registered_vocabulary_stays_absent_while_base_tokens_survive
             .unwrap()
             .is_none());
     }
-    assert_eq!(fs::read(database.path()).unwrap(), before);
-}
-
-#[test]
-fn legacy_absence_never_substitutes_another_mode_or_document_and_missing_document_returns_none() {
-    let database = TestDatabase::new();
-    let mut storage = Storage::open(database.path()).unwrap();
-    let document = storage
-        .create_paste(&PasteText::new("猫".into()).unwrap())
-        .unwrap();
-    import(&mut storage, "犬");
-    let mut alternate = fixture(&document.chapter).unwrap();
-    for mode in [SplitMode::A, SplitMode::B] {
-        alternate.mode = mode;
-        storage
-            .store_chapter_analysis(document.chapter.chapter_id, &alternate)
-            .unwrap();
-    }
-    let page = anchor(&document.chapter, 0, document.chapter.text.len());
-    storage
-        .connection
-        .pragma_update(None, "query_only", true)
-        .unwrap();
-    let before = fs::read(database.path()).unwrap();
-    let result = storage
-        .load_reader_tokens(document.document_id, page)
-        .unwrap()
-        .unwrap();
-    assert_eq!(result.analysis, ReaderAnalysis::Missing);
-    assert!(result.tokens.is_empty());
-    assert!(storage
-        .load_reader_tokens(DocumentId::try_from(i64::MAX).unwrap(), page)
-        .unwrap()
-        .is_none());
     assert_eq!(fs::read(database.path()).unwrap(), before);
 }
 

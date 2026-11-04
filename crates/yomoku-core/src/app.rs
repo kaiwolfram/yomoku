@@ -89,15 +89,7 @@ pub struct Model {
     anki_preparation_sequence: u64,
     anki_live: Option<crate::anki::AnkiLiveState>,
     anki_export_preflight: Option<crate::anki::AnkiPreflight>,
-    anki_recovery_read: Option<crate::anki::AnkiRecoveryReadRequest>,
-    anki_recovery_read_error: Option<crate::anki::AnkiExportError>,
-    anki_recovery: crate::anki::AnkiRecoveryState,
-    anki_recovery_sequence: u64,
-    anki_recovery_request: Option<u64>,
-    anki_recovery_commit: Option<(u64, Box<crate::anki::AnkiRecoveryCommit>)>,
-    anki_recovery_commit_error: Option<DocumentError>,
     /// Keep a completed recovery visible for this session after attention was needed.
-    anki_recovery_notice: bool,
     vocabulary: crate::vocabulary::VocabularyState,
     vocabulary_request: Option<vocabulary::VocabularyRequest>,
     vocabulary_request_sequence: u64,
@@ -284,9 +276,7 @@ pub enum Event {
     BeginAnkiExportPreflight,
     /// Explicitly abandon a lost read or old observation and capture a fresh handle.
     RetryAnkiExportPreflight,
-    RetryAnkiRecovery,
-    /// Explicit read-only recovery; native handles stay in the response closure.
-    BeginAnkiRecoveryRead(crate::anki::AnkiRecoveryReadTarget),
+
     /// Consume an already committed native permit once; cannot prepare or begin a write.
     DispatchAnkiLive,
     /// Freeze the current loaded dictionary selection with the acknowledged configured deck.
@@ -380,58 +370,17 @@ pub enum Event {
     #[serde(skip)]
     #[cfg_attr(feature = "facet_typegen", facet(skip))]
     BeginAnkiLive,
-    #[serde(skip)]
-    #[cfg_attr(feature = "facet_typegen", facet(skip))]
-    AnkiLiveBeginFinished(
-        #[cfg_attr(feature = "facet_typegen", facet(opaque))] Box<crate::anki::AnkiLiveRequest>,
-        StorageResult,
-    ),
+
     #[serde(skip)]
     #[cfg_attr(feature = "facet_typegen", facet(skip))]
     FinishAnkiLive(
         #[cfg_attr(feature = "facet_typegen", facet(opaque))] Box<crate::anki::AnkiLiveCallback>,
     ),
-    #[serde(skip)]
-    #[cfg_attr(feature = "facet_typegen", facet(skip))]
-    AnkiLiveOutcomeFinished(
-        #[cfg_attr(feature = "facet_typegen", facet(opaque))] Box<crate::anki::AnkiLiveRequest>,
-        StorageResult,
-    ),
+
     /// Invalidate a lost native callback; explicit Retry must restore read-only.
     #[serde(skip)]
     #[cfg_attr(feature = "facet_typegen", facet(skip))]
     AbandonAnkiLive,
-    /// Runtime startup only; no shell codec and no provider mutation.
-    #[serde(skip)]
-    #[cfg_attr(feature = "facet_typegen", facet(skip))]
-    RestoreAnkiRecovery,
-    #[serde(skip)]
-    #[cfg_attr(feature = "facet_typegen", facet(skip))]
-    AnkiRecoveryFinished(u64, StorageResult),
-    #[serde(skip)]
-    #[cfg_attr(feature = "facet_typegen", facet(skip))]
-    CommitAnkiRecovery(
-        #[cfg_attr(feature = "facet_typegen", facet(opaque))] Box<crate::anki::AnkiRecoveryCommit>,
-    ),
-    #[serde(skip)]
-    #[cfg_attr(feature = "facet_typegen", facet(skip))]
-    AnkiRecoveryCommitFinished(u64, StorageResult),
-    /// Native response; the callback retains its own read handle.
-    #[serde(skip)]
-    #[cfg_attr(feature = "facet_typegen", facet(skip))]
-    AnkiRecoveryProviderFinished(
-        #[cfg_attr(feature = "facet_typegen", facet(opaque))]
-        Box<crate::anki::AnkiRecoveryReadRequest>,
-        crate::anki::AnkiRecoveryReadResult,
-    ),
-    #[serde(skip)]
-    #[cfg_attr(feature = "facet_typegen", facet(skip))]
-    AnkiRecoveryReadFinished(
-        #[cfg_attr(feature = "facet_typegen", facet(opaque))]
-        Box<crate::anki::AnkiRecoveryReadRequest>,
-        #[cfg_attr(feature = "facet_typegen", facet(opaque))]
-        Box<crate::anki::AnkiRecoveryObservation>,
-    ),
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -441,7 +390,6 @@ pub struct ViewModel {
     pub anki_setup: crate::anki::AnkiSetupPhase,
     pub anki_entries: Vec<crate::anki::AnkiEntryView>,
     /// Settings-only recovery presentation; journal payloads and handles stay native.
-    pub anki_recovery: Option<crate::anki::AnkiRecoveryView>,
     /// Session-owned frozen export status; observed IDs carry no callback authority.
     pub anki_export: Option<crate::anki::AnkiExportView>,
     pub vocabulary: crate::vocabulary::VocabularyState,
@@ -501,7 +449,7 @@ pub struct ViewModel {
 pub enum Effect {
     Render(RenderOperation),
     Storage(StorageOperation),
-    AnkiRecoveryRead(crate::anki::AnkiRecoveryReadOperation),
+
     AnkiExportPreflight(crate::anki::AnkiPreflightOperation),
     AnkiLive(crate::anki::AnkiLiveOperation),
 }
@@ -520,16 +468,13 @@ impl App for Yomoku {
             return command;
         }
         let anki_before = (
-            model.anki_recovery_view(),
             model.anki_export_view(),
             model.anki_entries_view(),
             model.anki_setup.phase.clone(),
         );
-        if let Some(command) = self.update_anki_recovery(&event, model) {
-            model.remember_anki_recovery_attention();
+        if let Some(command) = self.update_anki(&event, model) {
             if anki_before
                 != (
-                    model.anki_recovery_view(),
                     model.anki_export_view(),
                     model.anki_entries_view(),
                     model.anki_setup.phase.clone(),
@@ -1371,10 +1316,6 @@ impl App for Yomoku {
                     | StorageResult::VocabularyLoaded(_)
                     | StorageResult::VocabularyMatchingIds(_)
                     | StorageResult::VocabularyBulkApplied(_)
-                    | StorageResult::AnkiRecoveryLoaded(_)
-                    | StorageResult::AnkiRecoveryCommitted(_)
-                    | StorageResult::AnkiLiveBegun(_)
-                    | StorageResult::AnkiLiveFinished(_)
                     | StorageResult::AnkiSettingsLoaded(_)
                     | StorageResult::AnkiDefaultDeckSaved(_) => {
                         model.document_error = Some(DocumentError::InvalidDocument);
@@ -1686,29 +1627,19 @@ impl App for Yomoku {
             | Event::SetAnkiDefaultDeck(_)
             | Event::RetryAnkiSettings
             | Event::AnkiSettingsFinished(..)
-            | Event::RestoreAnkiRecovery
             | Event::BeginAnkiLive
             | Event::DispatchAnkiLive
             | Event::PrepareReaderAnkiExport { .. }
             | Event::BeginPreparedAnkiExport { .. }
             | Event::ClearAnkiExport { .. }
-            | Event::AnkiLiveBeginFinished(..)
             | Event::FinishAnkiLive(..)
-            | Event::AnkiLiveOutcomeFinished(..)
             | Event::AbandonAnkiLive
             | Event::PrepareAnkiExport { .. }
             | Event::ClearPreparedAnkiExport
             | Event::BeginAnkiExportPreflight
             | Event::RetryAnkiExportPreflight
             | Event::AnkiExportPreflightFinished(..)
-            | Event::AnkiExportPreflightProviderFinished(..)
-            | Event::RetryAnkiRecovery
-            | Event::AnkiRecoveryFinished(..)
-            | Event::CommitAnkiRecovery(_)
-            | Event::AnkiRecoveryCommitFinished(..)
-            | Event::BeginAnkiRecoveryRead(_)
-            | Event::AnkiRecoveryProviderFinished(..)
-            | Event::AnkiRecoveryReadFinished(..) => unreachable!(),
+            | Event::AnkiExportPreflightProviderFinished(..) => unreachable!(),
         }
         render::render()
     }
@@ -1718,7 +1649,6 @@ impl App for Yomoku {
             anki_settings: model.anki_settings.clone(),
             anki_setup: model.anki_setup.phase.clone(),
             anki_entries: model.anki_entries_view(),
-            anki_recovery: model.anki_recovery_view(),
             anki_export: model.anki_export_view(),
             vocabulary: model.vocabulary.clone(),
             statistics: model.statistics.clone(),

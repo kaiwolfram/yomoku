@@ -25,7 +25,6 @@ pub type WordDictionaryLoader = Box<dyn FnMut() -> Result<PathBuf, DocumentError
 
 use crate::imports::{AnalyzerLifecycle, AnalyzerLoader, FileImportControl, Imports};
 
-mod anki_live;
 mod effective;
 #[cfg(test)]
 mod effective_tests;
@@ -97,7 +96,6 @@ impl StorageEffects {
             .spawn(move || {
                 let mut storage = None;
                 let mut dictionary = None;
-                let mut anki_live = anki_live::AnkiLiveWorker::default();
                 let mut imports = loader.map(Imports::new);
                 while let Ok(job) = receiver.recv() {
                     match job {
@@ -145,13 +143,6 @@ impl StorageEffects {
                                 .is_some_and(|value| value.is_cancelled())
                             {
                                 Ok(StorageResult::ImportCancelled)
-                            } else if matches!(
-                                operation,
-                                StorageOperation::BeginAnkiLive(_)
-                                    | StorageOperation::FinishAnkiLive(_)
-                                    | StorageOperation::LoadAnkiRecovery
-                            ) {
-                                anki_live.execute(&path, &mut storage, operation)
                             } else {
                                 execute(
                                     &path,
@@ -261,13 +252,6 @@ fn execute(
     }
     let storage = storage.as_mut().expect("opened storage");
     match operation {
-        StorageOperation::CommitAnkiRecovery(command) => storage
-            .commit_anki_recovery(&command)
-            .map(StorageResult::AnkiRecoveryCommitted)
-            .map_err(|_| DocumentError::Unavailable),
-        StorageOperation::BeginAnkiLive(_)
-        | StorageOperation::FinishAnkiLive(_)
-        | StorageOperation::LoadAnkiRecovery => unreachable!("owned by live worker"),
         StorageOperation::LoadVocabulary { query, offset } => storage
             .vocabulary_page(&query, offset)
             .map(StorageResult::VocabularyLoaded)

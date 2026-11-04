@@ -3,23 +3,6 @@ use yomoku_core::{document::PasteText, pagination::PageLength};
 use super::*;
 
 #[test]
-fn settings_upgrade_defaults_to_500_preserving_text_and_exact_position() {
-    let database = TestDatabase::new();
-    let mut connection = Connection::open(database.path()).unwrap();
-    migrate(&mut connection, &MIGRATIONS[..3]).unwrap();
-    connection.execute_batch("INSERT INTO sources VALUES (1, 'paste', '𠮷'); INSERT INTO chapters VALUES (1, 1, 0); INSERT INTO documents VALUES (1, 1, '𠮷'); INSERT INTO chapter_texts VALUES (1, '𠮷本文'); INSERT INTO reading_positions VALUES (1, 1, 4);").unwrap();
-    drop(connection);
-    let mut storage = Storage::open(database.path()).unwrap();
-    assert_eq!(storage.page_length().unwrap(), PageLength::Characters500);
-    let document = storage
-        .load_paste(yomoku_core::document::DocumentId::try_from(1).unwrap())
-        .unwrap()
-        .unwrap();
-    assert_eq!(document.chapter.text, "𠮷本文");
-    assert_eq!(i64::from(document.reading_position.unwrap().offset), 4);
-}
-
-#[test]
 fn every_preset_is_global_durable_and_does_not_change_documents_or_positions() {
     let database = TestDatabase::new();
     let mut storage = Storage::open(database.path()).unwrap();
@@ -86,41 +69,6 @@ fn invalid_or_missing_settings_are_rejected_without_repair() {
             Err(StorageError::InvalidSettings)
         ));
     }
-}
-
-#[test]
-fn typography_migration_preserves_existing_page_length_text_position_and_analysis() {
-    use yomoku_core::typography::ReaderTypography;
-    let database = TestDatabase::new();
-    let mut connection = Connection::open(database.path()).unwrap();
-    migrate(&mut connection, &MIGRATIONS[..14]).unwrap();
-    let mut old = Storage { connection };
-    old.save_page_length(PageLength::Characters750).unwrap();
-    let document = old
-        .create_paste(&PasteText::new("𠮷本文".into()).unwrap())
-        .unwrap();
-    let position = yomoku_core::pagination::ReadingPosition {
-        source_id: document.chapter.source_id,
-        chapter_id: document.chapter.chapter_id,
-        offset: yomoku_core::document::TextOffset::at(&document.chapter.text, 4).unwrap(),
-    };
-    let expected = old
-        .save_reading_position(document.document_id, position)
-        .unwrap();
-    drop(old);
-    let mut storage = Storage::open(database.path()).unwrap();
-    assert_eq!(
-        storage.reader_typography().unwrap(),
-        ReaderTypography::default()
-    );
-    assert_eq!(storage.page_length().unwrap(), PageLength::Characters750);
-    assert_eq!(storage.load_paste(document.document_id).unwrap(), expected);
-    let snapshot = storage
-        .load_document_reader_snapshot(document.document_id)
-        .unwrap()
-        .unwrap();
-    assert_eq!(snapshot.typography, ReaderTypography::default());
-    assert_eq!(snapshot.document.reading_position, Some(position));
 }
 
 #[test]
@@ -214,105 +162,4 @@ fn corrupt_typography_is_rejected_without_writes_or_silent_repair() {
         ));
         assert_eq!(fs::read(database.path()).unwrap(), before);
     }
-}
-
-#[test]
-fn typography_migration_failure_rolls_back_first_column_and_history_before_retry() {
-    let database = TestDatabase::new();
-    let mut connection = Connection::open(database.path()).unwrap();
-    migrate(&mut connection, &MIGRATIONS[..14]).unwrap();
-    connection.execute_batch("UPDATE reader_settings SET page_length = 750; ALTER TABLE reader_settings ADD COLUMN line_spacing INTEGER NOT NULL DEFAULT 150;").unwrap();
-    drop(connection);
-    let before = fs::read(database.path()).unwrap();
-    let before_history = history(&database.path());
-    assert!(matches!(
-        Storage::open(database.path()),
-        Err(StorageError::Sqlite(_))
-    ));
-    assert_eq!(fs::read(database.path()).unwrap(), before);
-    assert_eq!(history(&database.path()), before_history);
-    let connection = Connection::open(database.path()).unwrap();
-    assert!(connection
-        .prepare("SELECT font_size FROM reader_settings")
-        .is_err());
-    connection
-        .execute_batch("ALTER TABLE reader_settings DROP COLUMN line_spacing")
-        .unwrap();
-    drop(connection);
-    let storage = Storage::open(database.path()).unwrap();
-    assert_eq!(storage.reader_typography().unwrap(), Default::default());
-    assert_eq!(storage.page_length().unwrap(), PageLength::Characters750);
-}
-
-#[test]
-fn furigana_migration_defaults_off_preserving_existing_preferences_and_exact_position() {
-    use yomoku_core::typography::{ReaderFontSize, ReaderLineSpacing, ReaderTypography};
-    let database = TestDatabase::new();
-    let mut connection = Connection::open(database.path()).unwrap();
-    migrate(&mut connection, &MIGRATIONS[..15]).unwrap();
-    let mut old = Storage { connection };
-    old.connection
-        .execute_batch(
-            "UPDATE reader_settings SET font_size = 24, line_spacing = 200, page_length = 750",
-        )
-        .unwrap();
-    let document = old
-        .create_paste(&PasteText::new("𠮷本文".into()).unwrap())
-        .unwrap();
-    let position = yomoku_core::pagination::ReadingPosition {
-        source_id: document.chapter.source_id,
-        chapter_id: document.chapter.chapter_id,
-        offset: yomoku_core::document::TextOffset::at(&document.chapter.text, 4).unwrap(),
-    };
-    let expected = old
-        .save_reading_position(document.document_id, position)
-        .unwrap();
-    drop(old);
-    let mut storage = Storage::open(database.path()).unwrap();
-    let typography = ReaderTypography {
-        font_size: ReaderFontSize::Sp24,
-        line_spacing: ReaderLineSpacing::Percent200,
-        furigana: false,
-    };
-    assert_eq!(storage.reader_typography().unwrap(), typography);
-    assert_eq!(storage.page_length().unwrap(), PageLength::Characters750);
-    assert_eq!(storage.load_paste(document.document_id).unwrap(), expected);
-    let snapshot = storage
-        .load_document_reader_snapshot(document.document_id)
-        .unwrap()
-        .unwrap();
-    assert_eq!(snapshot.typography, typography);
-    assert_eq!(snapshot.document.reading_position, Some(position));
-    let before = fs::read(database.path()).unwrap();
-    drop(storage);
-    let reopened = Storage::open(database.path()).unwrap();
-    assert_eq!(reopened.reader_typography().unwrap(), typography);
-    assert_eq!(fs::read(database.path()).unwrap(), before);
-}
-
-#[test]
-fn furigana_migration_failure_preserves_schema_and_history_before_retry() {
-    let database = TestDatabase::new();
-    let mut connection = Connection::open(database.path()).unwrap();
-    migrate(&mut connection, &MIGRATIONS[..15]).unwrap();
-    connection.execute_batch("UPDATE reader_settings SET font_size = 24, line_spacing = 200; ALTER TABLE reader_settings ADD COLUMN furigana INTEGER NOT NULL DEFAULT 0").unwrap();
-    drop(connection);
-    let before = fs::read(database.path()).unwrap();
-    let before_history = history(&database.path());
-    assert!(matches!(
-        Storage::open(database.path()),
-        Err(StorageError::Sqlite(_))
-    ));
-    assert_eq!(fs::read(database.path()).unwrap(), before);
-    assert_eq!(history(&database.path()), before_history);
-    let connection = Connection::open(database.path()).unwrap();
-    connection
-        .execute_batch("ALTER TABLE reader_settings DROP COLUMN furigana")
-        .unwrap();
-    drop(connection);
-    let storage = Storage::open(database.path()).unwrap();
-    let typography = storage.reader_typography().unwrap();
-    assert!(!typography.furigana);
-    assert_eq!(typography.font_size.sp(), 24);
-    assert_eq!(typography.line_spacing.percent(), 200);
 }

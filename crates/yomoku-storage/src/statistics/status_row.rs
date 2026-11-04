@@ -39,7 +39,7 @@ pub(super) fn decode(row: &rusqlite::Row<'_>) -> Result<VocabularyStatusChange, 
                 && command.is_some()
                 && completion_version == Some(1)
                 && analysis_version == Some(1)
-                && effective_version.is_none_or(|version| version == 1)
+                && effective_version.is_none_or(|version| version == 2)
         }
         _ => false,
     };

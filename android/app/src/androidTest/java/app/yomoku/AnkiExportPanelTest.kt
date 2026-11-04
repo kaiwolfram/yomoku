@@ -62,16 +62,13 @@ class AnkiExportPanelTest {
     }
 
     @Test
-    fun busyUncertainAndDurableOutcomesNeverOfferWriteRetry() {
+    fun busyAndUncertainOutcomesNeverReplayWrites() {
         render()
         for (busy in
             listOf(
                 AnkiExportPhase.Checking,
-                AnkiExportPhase.Beginning,
                 AnkiExportPhase.Ready,
                 AnkiExportPhase.Invoking,
-                AnkiExportPhase.Saving,
-                AnkiExportPhase.StorageFailed(DocumentError.UNAVAILABLE),
             )) {
             phase(busy)
             compose.onNodeWithTag("anki_export_begin").assertDoesNotExist()
@@ -86,9 +83,9 @@ class AnkiExportPanelTest {
                     "Note model created. Close and select the word again to add it.",
                 AnkiExportPhase.NotSubmitted to "Nothing was submitted to AnkiDroid.",
                 AnkiExportPhase.NoteUncertain(Long.MAX_VALUE) to
-                    "The note may have been added. Use Check note in AnkiDroid recovery before another export.",
+                    "Write interrupted. Check AnkiDroid, then check again before an explicit retry.",
                 AnkiExportPhase.ModelUncertain(null) to
-                    "The note model may have been created. Use Check model in AnkiDroid recovery before another export.",
+                    "Write interrupted. Check AnkiDroid, then check again before an explicit retry.",
                 AnkiExportPhase.Existing(listOf(Long.MAX_VALUE, 9007199254740993L)) to
                     "Already in AnkiDroid. Note IDs: ${Long.MAX_VALUE}, 9007199254740993",
             )
@@ -183,7 +180,6 @@ class AnkiExportPanelTest {
             for (value in
                 listOf(
                     AnkiExportPhase.Prepared,
-                    AnkiExportPhase.Saving,
                     AnkiExportPhase.ModelCreated(Long.MAX_VALUE),
                     AnkiExportPhase.NoteUncertain(Long.MAX_VALUE),
                     AnkiExportPhase.ModelUncertain(Long.MAX_VALUE),

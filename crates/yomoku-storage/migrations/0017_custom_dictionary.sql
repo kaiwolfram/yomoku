@@ -1,1 +1,0 @@
--- Custom dictionary entries are excluded from the first release.

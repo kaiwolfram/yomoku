@@ -118,7 +118,6 @@ class AnkiSettingsSessionTest {
             assertEquals(1, reads.get())
             assertEquals(before.ankiSettings, core.view.ankiSettings)
             assertEquals(before.ankiExport, core.view.ankiExport)
-            assertEquals(before.ankiRecovery, core.view.ankiRecovery)
             assertEquals(before.documents, core.view.documents)
             close()
             open()

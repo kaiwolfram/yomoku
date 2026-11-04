@@ -237,7 +237,6 @@ fn anki_settings_callbacks_preserve_reader_and_frozen_export_for_both_selection_
         model.storage_busy = true;
         model.document_error = Some(DocumentError::MissingAnalysis);
         let before = Yomoku.view(&model);
-        let recovery = model.anki_recovery.clone();
         let export = model.prepared_anki_export.clone();
         let mut command = Yomoku.update(Event::LoadAnkiSettings, &mut model);
         let mut effects = command.effects();
@@ -261,7 +260,6 @@ fn anki_settings_callbacks_preserve_reader_and_frozen_export_for_both_selection_
         let mut after = Yomoku.view(&model);
         after.anki_settings = before.anki_settings.clone();
         assert_eq!(after, before);
-        assert_eq!(model.anki_recovery, recovery);
         assert_eq!(model.prepared_anki_export, export);
         assert_eq!(
             Yomoku.view(&Model::default()).anki_settings.phase,

@@ -1,13 +1,9 @@
-//! Native live ownership. Restored payloads and journal IDs cannot mint requests
-//! or invocation permits, and none of these ownership types has a shell codec.
+//! In-memory native ownership. Only the active owner may consume an invocation;
+//! these ownership types have no shell codec.
 
-use std::sync::{Arc, Weak};
+use std::sync::Arc;
 
-use super::{
-    AnkiExistingNotes, AnkiModelCreation, AnkiModelId, AnkiNoteId, AnkiRecoverySnapshot,
-    AnkiSubmission,
-};
-use crate::storage::DocumentError;
+use super::{AnkiExistingNotes, AnkiModelCreation, AnkiModelId, AnkiNoteId, AnkiSubmission};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum AnkiLiveIntent {
@@ -58,36 +54,6 @@ impl AnkiLiveRequest {
     pub fn intent(&self) -> &AnkiLiveIntent {
         &self.0
     }
-
-    /// Non-owning identity for a worker's consumed-request ledger. It retains
-    /// neither frozen note fields nor abandoned session payloads.
-    pub fn downgrade(&self) -> AnkiLiveRequestWeak {
-        AnkiLiveRequestWeak(Arc::downgrade(&self.0))
-    }
-
-    pub(crate) fn accepts_begin(&self, snapshot: &AnkiRecoverySnapshot) -> bool {
-        match (self.intent(), &snapshot.note, &snapshot.model) {
-            (AnkiLiveIntent::Note(payload), Some(note), None) => {
-                &note.submission == payload.as_ref() && note.known_note_id.is_none()
-            }
-            (AnkiLiveIntent::Model(payload), None, Some(model)) => {
-                &model.creation == payload.as_ref() && model.known_model_id.is_none()
-            }
-            _ => false,
-        }
-    }
-}
-
-pub struct AnkiLiveRequestWeak(Weak<AnkiLiveIntent>);
-
-impl AnkiLiveRequestWeak {
-    pub fn is_live(&self) -> bool {
-        self.0.strong_count() != 0
-    }
-
-    pub fn matches(&self, request: &AnkiLiveRequest) -> bool {
-        self.0.ptr_eq(&Arc::downgrade(&request.0))
-    }
 }
 
 /// Move-only native permit. Taking it consumes the app's Ready state. Typed
@@ -131,48 +97,17 @@ impl AnkiLiveCallback {
     pub fn outcome(&self) -> &AnkiLiveOutcome {
         &self.outcome
     }
-
-    pub fn expected_result(
-        &self,
-        before: &AnkiRecoverySnapshot,
-    ) -> Option<Box<AnkiRecoverySnapshot>> {
-        if !self.request.accepts_begin(before) {
-            return None;
-        }
-        let mut after = Box::new(before.clone());
-        match (self.request.intent(), &self.outcome) {
-            (AnkiLiveIntent::Note(_), AnkiLiveOutcome::Note(outcome)) => match outcome {
-                AnkiSubmissionOutcome::Uncertain { known_note_id } => {
-                    after.note.as_mut()?.known_note_id = *known_note_id;
-                }
-                _ => after.note = None,
-            },
-            (AnkiLiveIntent::Model(_), AnkiLiveOutcome::Model(outcome)) => match outcome {
-                AnkiModelCreationOutcome::Uncertain { known_model_id } => {
-                    after.model.as_mut()?.known_model_id = *known_model_id;
-                }
-                _ => after.model = None,
-            },
-            _ => return None,
-        }
-        Some(after)
-    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum AnkiLiveProgress {
-    Beginning,
     Ready,
     Invoking,
-    Saving,
     Finished,
-    /// Requires explicit read-only restoration, never another invocation.
-    Failed(DocumentError),
 }
 
 pub(crate) struct AnkiLiveState {
     pub request: AnkiLiveRequest,
     pub progress: AnkiLiveProgress,
-    pub begun: Option<Box<AnkiRecoverySnapshot>>,
     pub callback: Option<AnkiLiveCallback>,
 }

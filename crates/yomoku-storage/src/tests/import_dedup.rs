@@ -163,53 +163,6 @@ fn identity_uses_sha256_of_exact_utf8_including_nul_line_endings_and_unicode() {
 }
 
 #[test]
-fn upgrades_legacy_duplicates_lazily_and_references_oldest_live_document() {
-    let database = TestDatabase::new();
-    let mut connection = Connection::open(database.path()).unwrap();
-    migrate(&mut connection, &MIGRATIONS[..7]).unwrap();
-    let mut old = Storage { connection };
-    let input = text("猫 𠮷");
-    let first = old.create_paste(&input).unwrap();
-    let second = old.create_paste(&input).unwrap();
-    let other = old.create_paste(&text("犬")).unwrap();
-    let before: Vec<_> = [&first, &second, &other]
-        .map(|document| document.library_summary().unwrap())
-        .into();
-    drop(old);
-    let mut storage = Storage::open(database.path()).unwrap();
-    assert_eq!(storage.list_documents().unwrap(), before);
-    assert_eq!(count(&storage, "paste_content_hashes"), 0);
-    assert_eq!(
-        existing(
-            storage
-                .import_analyzed_paste(&input, 10, must_not_analyze)
-                .unwrap()
-        ),
-        first
-    );
-    assert_eq!(count(&storage, "paste_content_hashes"), 3);
-    assert_eq!(storage.list_documents().unwrap(), before);
-    assert_eq!(
-        storage.load_paste(second.document_id).unwrap(),
-        Some(second)
-    );
-    assert_eq!(storage.load_paste(other.document_id).unwrap(), Some(other));
-    assert_eq!(count(&storage, "vocabulary"), 0);
-    assert_eq!(count(&storage, "chapter_analyses"), 0);
-    // Raw creation remains available for repository foundations; its missing
-    // hash is discovered even after the first lazy indexing pass.
-    let later = storage.create_paste(&text("鳥")).unwrap();
-    assert_eq!(
-        existing(
-            storage
-                .import_analyzed_paste(&text("鳥"), 20, must_not_analyze)
-                .unwrap()
-        ),
-        later
-    );
-}
-
-#[test]
 fn concurrent_identical_imports_create_one_document_and_analyze_once() {
     let database = TestDatabase::new();
     drop(Storage::open(database.path()).unwrap());
@@ -256,78 +209,6 @@ fn concurrent_identical_imports_create_one_document_and_analyze_once() {
     assert_eq!(count(&storage, "documents"), 1);
     assert_eq!(count(&storage, "paste_content_hashes"), 1);
     assert_eq!(count(&storage, "vocabulary_status_events"), 2);
-}
-
-#[test]
-fn failures_at_every_stage_roll_back_new_content_hashes_and_legacy_indexing() {
-    for table in [
-        "sources",
-        "chapters",
-        "documents",
-        "chapter_texts",
-        "chapter_analyses",
-        "analyzed_tokens",
-        "vocabulary",
-        "vocabulary_status_events",
-        "paste_content_hashes",
-        "commit",
-    ] {
-        let database = TestDatabase::new();
-        let mut storage = Storage::open(database.path()).unwrap();
-        let saved = storage.create_paste(&text("既存")).unwrap();
-        let before = state(&storage);
-        if table == "commit" {
-            storage.connection.execute_batch("CREATE TEMP TABLE parent (id INTEGER PRIMARY KEY);
-                CREATE TEMP TABLE child (id INTEGER REFERENCES parent(id) DEFERRABLE INITIALLY DEFERRED);
-                CREATE TEMP TRIGGER fail_import AFTER INSERT ON paste_content_hashes
-                BEGIN INSERT INTO child VALUES (99); END;").unwrap();
-        } else {
-            // Hash failure occurs on the new document after its analysis/vocab
-            // writes, and after the legacy hash has been written provisionally.
-            let condition = if table == "paste_content_hashes" {
-                "WHEN NEW.document_id > 1"
-            } else {
-                ""
-            };
-            storage
-                .connection
-                .execute_batch(&format!(
-                    "CREATE TEMP TRIGGER fail_import AFTER INSERT ON {table} {condition}
-                 BEGIN SELECT RAISE(ABORT, 'fixture'); END;"
-                ))
-                .unwrap();
-        }
-        assert!(
-            matches!(
-                storage.import_analyzed_paste(&text("猫 犬"), 10, fixture),
-                Err(PasteImportError::Storage(StorageError::Sqlite(_)))
-            ),
-            "{table}"
-        );
-        assert_eq!(state(&storage), before, "{table}");
-        assert_eq!(storage.load_paste(saved.document_id).unwrap(), Some(saved));
-        storage
-            .connection
-            .execute_batch("DROP TRIGGER fail_import")
-            .unwrap();
-        let imported = created(
-            storage
-                .import_analyzed_paste(&text("猫 犬"), 10, fixture)
-                .unwrap(),
-        );
-        assert_eq!(imported.registered_surfaces, 2);
-        assert_eq!(count(&storage, "paste_content_hashes"), 2);
-        drop(storage);
-        let mut storage = Storage::open(database.path()).unwrap();
-        assert_eq!(
-            existing(
-                storage
-                    .import_analyzed_paste(&text("猫 犬"), 20, must_not_analyze)
-                    .unwrap()
-            ),
-            imported.document
-        );
-    }
 }
 
 #[test]
@@ -464,37 +345,4 @@ fn corrupt_hash_match_errors_instead_of_returning_unrelated_document() {
         Err(PasteImportError::Storage(StorageError::InvalidDocument))
     ));
     assert_eq!(state(&storage), before);
-}
-
-#[test]
-fn failed_hash_migration_preserves_version_seven_database_and_can_retry() {
-    let database = TestDatabase::new();
-    let mut connection = Connection::open(database.path()).unwrap();
-    migrate(&mut connection, &MIGRATIONS[..7]).unwrap();
-    let mut storage = Storage { connection };
-    let saved = storage.create_paste(&text("猫")).unwrap();
-    storage
-        .connection
-        .execute_batch("CREATE TABLE paste_content_hashes_by_digest (fixture TEXT)")
-        .unwrap();
-    drop(storage);
-    let before = fs::read(database.path()).unwrap();
-    assert!(matches!(
-        Storage::open(database.path()),
-        Err(StorageError::Sqlite(_))
-    ));
-    assert_eq!(fs::read(database.path()).unwrap(), before);
-    assert_eq!(history(&database.path()).len(), 7);
-    let connection = Connection::open(database.path()).unwrap();
-    assert!(!connection
-        .table_exists(None, "paste_content_hashes")
-        .unwrap());
-    connection
-        .execute_batch("DROP TABLE paste_content_hashes_by_digest")
-        .unwrap();
-    drop(connection);
-    let mut storage = Storage::open(database.path()).unwrap();
-    assert_eq!(storage.schema_version().unwrap(), 24);
-    assert_eq!(storage.load_paste(saved.document_id).unwrap(), Some(saved));
-    assert_eq!(count(&storage, "paste_content_hashes"), 0);
 }

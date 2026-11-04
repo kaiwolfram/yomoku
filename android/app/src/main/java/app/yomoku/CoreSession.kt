@@ -17,8 +17,6 @@ import app.yomoku.shared.AnkiLiveOperation
 import app.yomoku.shared.AnkiLiveResult
 import app.yomoku.shared.AnkiPreflightOperation
 import app.yomoku.shared.AnkiPreflightResult
-import app.yomoku.shared.AnkiRecoveryReadOperation
-import app.yomoku.shared.AnkiRecoveryReadResult
 import app.yomoku.shared.ContentRoute
 import app.yomoku.shared.Event
 import app.yomoku.shared.ReaderClockAction
@@ -74,9 +72,6 @@ internal class CoreSession(
     private val monotonicMs: () -> Long = SystemClock::elapsedRealtime,
     private val checkpointIntervalMs: Long = 15_000L,
     private val cancellationExecutor: ExecutorService = Executors.newSingleThreadExecutor(),
-    private val readAnkiRecovery: (AnkiRecoveryReadOperation) -> AnkiRecoveryReadResult = {
-        AnkiRecoveryReadResult.Failed(AnkiExportError.PROVIDERUNAVAILABLE)
-    },
     private val ankiExecutor: ExecutorService = Executors.newSingleThreadExecutor(),
     private val readAnkiPreflight: (AnkiPreflightOperation) -> AnkiPreflightResult = {
         AnkiPreflightResult.Failed(AnkiExportError.PROVIDERUNAVAILABLE)
@@ -446,13 +441,7 @@ internal class CoreSession(
         for (request in decoded) {
             when (request.effect) {
                 is ShellEffect.Render -> renderView(source)
-                is ShellEffect.AnkiRecoveryRead -> {
-                    val operation = request.effect.value
-                    readAnki(request.id, { readAnkiRecovery(operation).bincodeSerialize() }) {
-                        AnkiRecoveryReadResult.Failed(AnkiExportError.PROVIDERFAILURE)
-                            .bincodeSerialize()
-                    }
-                }
+
                 is ShellEffect.AnkiLive -> {
                     val operation = request.effect.value
                     ankiLiveWorker.dispatch(request.id, operation)
@@ -482,7 +471,7 @@ internal class CoreSession(
         scheduleAnkiSetup()
     }
 
-    /** Only a durably acknowledged begin can expose Ready; native code owns the permit. */
+    /** Only an active native owner can expose Ready; dispatch consumes its permit. */
     private fun dispatchReadyAnki() {
         val export = view.ankiExport ?: return
         if (

@@ -11,42 +11,37 @@ use super::{analyses::slice, check_cancelled, CandidateError};
 
 pub(super) fn check(
     connection: &Connection,
-    version: usize,
     cancelled: &mut impl FnMut() -> bool,
 ) -> Result<(), CandidateError> {
-    if version >= 8 {
-        check_pastes(connection, cancelled)?;
-    }
-    if version >= 12 {
-        check_files(connection, cancelled)?;
-        check_ruby(connection, cancelled)?;
-    }
-    if version >= 13 {
-        // Each SRT's full cue list is compared below. Reject foreign ownership
-        // separately so an otherwise valid cue on a TXT/paste/EPUB cannot hide.
-        let mut statement = connection.prepare(
-            "SELECT s.kind FROM main.subtitle_cues q
+    check_pastes(connection, cancelled)?;
+
+    check_files(connection, cancelled)?;
+    check_ruby(connection, cancelled)?;
+
+    // Each SRT's full cue list is compared below. Reject foreign ownership
+    // separately so an otherwise valid cue on a TXT/paste/EPUB cannot hide.
+    let mut statement = connection.prepare(
+        "SELECT s.kind FROM main.subtitle_cues q
              JOIN main.chapters c ON c.id = q.chapter_id
              JOIN main.sources s ON s.id = c.source_id",
-        )?;
-        let mut rows = statement.query([])?;
-        while let Some(row) = rows.next()? {
-            check_cancelled(cancelled)?;
-            require(text(row, 0)? == "srt")?;
-        }
+    )?;
+    let mut rows = statement.query([])?;
+    while let Some(row) = rows.next()? {
+        check_cancelled(cancelled)?;
+        require(text(row, 0)? == "srt")?;
     }
-    if version >= 14 {
-        let mut statement = connection.prepare(
-            "SELECT s.kind, e.document_id FROM main.documents d
+
+    let mut statement = connection.prepare(
+        "SELECT s.kind, e.document_id FROM main.documents d
              JOIN main.sources s ON s.id = d.source_id
              LEFT JOIN main.epub_documents e ON e.document_id = d.id",
-        )?;
-        let mut rows = statement.query([])?;
-        while let Some(row) = rows.next()? {
-            check_cancelled(cancelled)?;
-            require((text(row, 0)? == "epub") == (row.get_ref(1)? != ValueRef::Null))?;
-        }
+    )?;
+    let mut rows = statement.query([])?;
+    while let Some(row) = rows.next()? {
+        check_cancelled(cancelled)?;
+        require((text(row, 0)? == "epub") == (row.get_ref(1)? != ValueRef::Null))?;
     }
+
     check_cancelled(cancelled)
 }
 
@@ -67,7 +62,14 @@ fn check_pastes(
         require(text(row, 0)? == "paste")?;
         check_hash(text(row, 1)?.as_bytes(), blob(row, 2)?, cancelled)?;
     }
-    // Legacy hashes are optional and duplicates remain independent documents.
+    let missing: bool = connection.query_row(
+        "SELECT EXISTS(SELECT 1 FROM main.documents d JOIN main.sources s ON s.id = d.source_id
+         LEFT JOIN main.paste_content_hashes h ON h.document_id = d.id
+         WHERE s.kind = 'paste' AND h.document_id IS NULL)",
+        [],
+        |row| row.get(0),
+    )?;
+    require(!missing)?;
     Ok(())
 }
 

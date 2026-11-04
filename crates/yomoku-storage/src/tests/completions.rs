@@ -380,55 +380,6 @@ fn only_final_page_records_exact_unicode_eof_and_permanent_finish_state() {
 }
 
 #[test]
-fn upgrades_version_four_without_changing_existing_text_settings_or_position() {
-    let database = TestDatabase::new();
-    let mut connection = Connection::open(database.path()).unwrap();
-    migrate(&mut connection, &MIGRATIONS[..4]).unwrap();
-    let mut old = Storage { connection };
-    let document = fixture(&mut old);
-    let expected = legacy_position(&old, &document, position(&document, 3));
-    old.save_page_length(PageLength::Characters750).unwrap();
-    drop(old);
-    let mut storage = Storage::open(database.path()).unwrap();
-    assert_eq!(storage.schema_version().unwrap(), 24);
-    assert_eq!(storage.page_length().unwrap(), PageLength::Characters750);
-    assert_eq!(storage.load_paste(document.document_id).unwrap(), expected);
-    assert_eq!(count(&storage), 0);
-}
-
-#[test]
-fn failed_completion_migration_preserves_version_four_and_can_retry() {
-    let database = TestDatabase::new();
-    let mut connection = Connection::open(database.path()).unwrap();
-    migrate(&mut connection, &MIGRATIONS[..4]).unwrap();
-    let mut old = Storage { connection };
-    let document = fixture(&mut old);
-    let expected = legacy_position(&old, &document, position(&document, 3));
-    // Fail after the new command table has been created, within migration 0005.
-    old.connection
-        .execute_batch("CREATE TABLE reading_completions (fixture TEXT);")
-        .unwrap();
-    drop(old);
-    assert!(matches!(
-        Storage::open(database.path()),
-        Err(StorageError::Sqlite(_))
-    ));
-    let connection = Connection::open(database.path()).unwrap();
-    assert!(!connection
-        .table_exists(None, "completion_commands")
-        .unwrap());
-    assert_eq!(history(&database.path()).len(), 4);
-    connection
-        .execute_batch("DROP TABLE reading_completions")
-        .unwrap();
-    drop(connection);
-    let mut storage = Storage::open(database.path()).unwrap();
-    assert_eq!(storage.load_paste(document.document_id).unwrap(), expected);
-    assert_eq!(storage.schema_version().unwrap(), 24);
-    assert_eq!(count(&storage), 0);
-}
-
-#[test]
 fn issued_ids_survive_reopen_and_exhaustion_preserves_history_and_position() {
     let database = TestDatabase::new();
     let mut storage = Storage::open(database.path()).unwrap();

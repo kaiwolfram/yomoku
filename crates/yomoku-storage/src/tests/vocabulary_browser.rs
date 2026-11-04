@@ -412,65 +412,6 @@ fn read_only_reopen_document_deletion_and_erased_vocabulary_do_not_rescan_or_cha
 }
 
 #[test]
-fn pending_legacy_unused_and_failed_completions_and_uncommitted_writes_are_invisible() {
-    let database = TestDatabase::new();
-    let mut storage = Storage::open(database.path()).unwrap();
-    let imported = import(&mut storage, "猫 猫");
-    let intent = intent(&mut storage, &imported, 500);
-    let pending = storage
-        .load_pending_reading_time(intent.document_id, intent.departing_position)
-        .unwrap();
-    storage
-        .save_pending_reading_time(
-            pending,
-            yomoku_core::active_time::PendingReadingTime::from_millis(123).unwrap(),
-        )
-        .unwrap();
-    let frozen = storage.prepare_page_completion(intent).unwrap();
-    storage.record_page_completion(frozen.completion).unwrap();
-    storage
-        .save_document_reading_position(intent.document_id, intent.departing_position)
-        .unwrap();
-    let unused = storage.prepare_page_completion(intent).unwrap();
-    let expected = storage
-        .vocabulary_page(&VocabularyQuery::default(), 0)
-        .unwrap();
-    assert_eq!(expected.rows[0].encountered_count, 0);
-    assert!(expected.rows[0].last_seen_unix_ms.is_none());
-    storage.connection.execute_batch("CREATE TRIGGER fail_occurrence BEFORE INSERT ON reading_occurrences BEGIN SELECT RAISE(ABORT, 'fixture'); END;").unwrap();
-    assert!(storage
-        .record_analyzed_page_completion(unused.completion, unused.analysis_id)
-        .is_err());
-    assert_eq!(
-        storage
-            .vocabulary_page(&VocabularyQuery::default(), 0)
-            .unwrap(),
-        expected
-    );
-    storage
-        .connection
-        .execute_batch("DROP TRIGGER fail_occurrence")
-        .unwrap();
-    let observer = Storage::open(database.path()).unwrap();
-    storage.connection.execute_batch("BEGIN IMMEDIATE; UPDATE vocabulary SET status = 'ignored'; INSERT INTO vocabulary (surface, status, registered_at_unix_ms) VALUES ('未確定', 'new', 999);").unwrap();
-    assert_eq!(
-        observer
-            .vocabulary_page(&VocabularyQuery::default(), 0)
-            .unwrap(),
-        expected
-    );
-    storage.connection.execute_batch("ROLLBACK").unwrap();
-    storage
-        .record_analyzed_page_completion(unused.completion, unused.analysis_id)
-        .unwrap();
-    let visible = observer
-        .vocabulary_page(&VocabularyQuery::default(), 0)
-        .unwrap();
-    assert_eq!(visible.rows[0].encountered_count, 2);
-    assert_eq!(visible.rows[0].last_seen_unix_ms, Some(500));
-}
-
-#[test]
 fn prefix_query_plans_search_existing_surface_and_occurrence_indexes_for_all_sorts() {
     let database = TestDatabase::new();
     let mut storage = Storage::open(database.path()).unwrap();

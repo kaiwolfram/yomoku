@@ -240,8 +240,6 @@ internal fun verifyAnkiExportBridge() {
                 send(bridge, Event.LoadAnkiSettings)
                 awaitView(bridge) { it.ankiSettings.phase == AnkiSettingsPhase.READY }
                 check(view(bridge).ankiSettings.defaultDeckId == 9007199254740993L)
-                if (create) check(view(bridge).ankiRecovery == null)
-                else check(view(bridge).ankiRecovery?.notePending == true)
                 send(bridge, Event.CloseSettings)
                 send(bridge, Event.OpenReader(DocumentId(documentId)))
                 awaitView(bridge) { it.reader != null && !it.storageBusy }
@@ -252,6 +250,6 @@ internal fun verifyAnkiExportBridge() {
         check(directory.deleteRecursively())
     }
     println(
-        "PASS: native configured-deck preparation, acknowledged-only targets, frozen fields/deck, durable model/note outcomes, one dispatch and restart without replay"
+        "PASS: native configured-deck preparation, acknowledged-only targets, frozen fields/deck, in-memory model/note outcomes, one dispatch and restart without replay"
     )
 }

@@ -23,8 +23,6 @@ import app.yomoku.shared.AnkiPreflightModel
 import app.yomoku.shared.AnkiPreflightOperation
 import app.yomoku.shared.AnkiPreflightResult
 import app.yomoku.shared.AnkiReadModelLayout
-import app.yomoku.shared.AnkiRecoveryReadOperation
-import app.yomoku.shared.AnkiRecoveryReadResult
 import org.junit.Assert.*
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -346,12 +344,12 @@ class AnkiProviderReaderTest {
             request.joinedFields.split('\u001f'),
             request.deckId,
             request.modelId.value,
-            recoveryModel().layout,
+            modelLayout(),
         )
     }
 
     private fun Fixture.liveModel(): AnkiLiveOperation.CreateModel =
-        AnkiLiveOperation.CreateModel("𠮷猫", Long.MAX_VALUE, recoveryModel().layout)
+        AnkiLiveOperation.CreateModel("𠮷猫", Long.MAX_VALUE, modelLayout())
 
     private fun Fixture.dispatch(operation: AnkiLiveOperation): AnkiLiveResult =
         AnkiLiveDispatcher(ContentResolver.wrap(provider), environment).invoke(operation)
@@ -456,21 +454,17 @@ class AnkiProviderReaderTest {
         assertEquals(AnkiReadResult.Failed(reason), result)
     }
 
-    private fun Fixture.recoveryModel(knownId: Long? = null) =
-        AnkiRecoveryReadOperation.Model(
-            knownId,
-            AnkiReadModelLayout(
-                layout.name,
-                layout.joinedFieldNames.split('\u001f'),
-                layout.css,
-                layout.cardName,
-                layout.questionFormat,
-                layout.answerFormat,
-            ),
+    private fun Fixture.modelLayout() =
+        AnkiReadModelLayout(
+            layout.name,
+            layout.joinedFieldNames.split('\u001f'),
+            layout.css,
+            layout.cardName,
+            layout.questionFormat,
+            layout.answerFormat,
         )
 
-    private fun Fixture.preflight() =
-        AnkiPreflightOperation("𠮷猫", Long.MAX_VALUE, recoveryModel().layout)
+    private fun Fixture.preflight() = AnkiPreflightOperation("𠮷猫", Long.MAX_VALUE, modelLayout())
 
     @Test
     fun typedPreflightKeepsDecksExactDuplicatesAndAllNamedModelsWithoutWrites() {
@@ -606,112 +600,6 @@ class AnkiProviderReaderTest {
                 reader.read(f.preflight()),
             )
             assertEquals(0, f.provider.queries)
-        }
-    }
-
-    @Test
-    fun typedRecoveryNotesPreserveUnicodeAndLongIdsWithoutProviderWrites() {
-        Fixture().use { fixture ->
-            val adapter = AnkiRecoveryReader(fixture.reader)
-            val operation = AnkiRecoveryReadOperation.Note("𠮷猫")
-            assertEquals(AnkiRecoveryReadResult.Notes(emptyList()), adapter.read(operation))
-            fixture.provider.database.execSQL(
-                "INSERT INTO notes VALUES(?, 7, ?, 1)",
-                arrayOf<Any?>(Long.MAX_VALUE, "𠮷猫\u001fmeaning"),
-            )
-            val before = fixture.provider.rows()
-            val result = adapter.read(operation)
-            assertEquals(AnkiRecoveryReadResult.Notes(listOf(Long.MAX_VALUE)), result)
-            assertEquals(
-                result,
-                AnkiRecoveryReadResult.bincodeDeserialize(result.bincodeSerialize()),
-            )
-            assertEquals(before, fixture.provider.rows())
-            fixture.environment.permitted = false
-            assertEquals(
-                AnkiRecoveryReadResult.Failed(AnkiExportError.PERMISSIONDENIED),
-                adapter.read(operation),
-            )
-            assertTrue(fixture.provider.inserts.isEmpty())
-            assertTrue(fixture.provider.updates.isEmpty())
-        }
-    }
-
-    @Test
-    fun typedRecoveryUnknownModelRequiresOneCompleteUnambiguousMatch() {
-        Fixture().use { fixture ->
-            val adapter = AnkiRecoveryReader(fixture.reader)
-            val operation = fixture.recoveryModel()
-            assertEquals(AnkiRecoveryReadResult.Model(null), adapter.read(operation))
-            fixture.model(Long.MAX_VALUE)
-            assertEquals(AnkiRecoveryReadResult.Model(Long.MAX_VALUE), adapter.read(operation))
-            fixture.model(9007199254740993L)
-            assertEquals(AnkiRecoveryReadResult.Model(null), adapter.read(operation))
-            fixture.provider.templates[9007199254740993L] = emptyList()
-            assertEquals(AnkiRecoveryReadResult.Model(Long.MAX_VALUE), adapter.read(operation))
-            assertTrue(fixture.provider.inserts.isEmpty())
-            assertTrue(fixture.provider.updates.isEmpty())
-        }
-    }
-
-    @Test
-    fun typedRecoveryKnownModelNeverSubstitutesAnotherMatchingModel() {
-        Fixture().use { fixture ->
-            val adapter = AnkiRecoveryReader(fixture.reader)
-            fixture.model(7)
-            val operation = fixture.recoveryModel(Long.MAX_VALUE)
-            assertEquals(AnkiRecoveryReadResult.Model(null), adapter.read(operation))
-            fixture.model(Long.MAX_VALUE)
-            assertEquals(AnkiRecoveryReadResult.Model(Long.MAX_VALUE), adapter.read(operation))
-            fixture.provider.templates[Long.MAX_VALUE] = emptyList()
-            assertEquals(AnkiRecoveryReadResult.Model(null), adapter.read(operation))
-            assertFalse(fixture.provider.operations.any { it == "query:/models" })
-        }
-    }
-
-    @Test
-    fun typedRecoveryDiscardsEarlierModelMatchOnLaterFailureOrRevokedPermission() {
-        for (permission in listOf(false, true)) {
-            Fixture().use { fixture ->
-                fixture.model(7)
-                fixture.model(Long.MAX_VALUE)
-                fixture.provider.beforeQuery = { uri ->
-                    if (uri.path == "/models/${Long.MAX_VALUE}") {
-                        if (permission) fixture.environment.permitted = false
-                        else throw IllegalStateException("collection unavailable")
-                    }
-                }
-                val result = AnkiRecoveryReader(fixture.reader).read(fixture.recoveryModel())
-                assertEquals(
-                    AnkiRecoveryReadResult.Failed(
-                        if (permission) AnkiExportError.PERMISSIONDENIED
-                        else AnkiExportError.COLLECTIONUNAVAILABLE
-                    ),
-                    result,
-                )
-            }
-        }
-    }
-
-    @Test
-    fun typedRecoveryInvalidTransportAndMissingProviderFailWithoutMutation() {
-        Fixture().use { fixture ->
-            val adapter = AnkiRecoveryReader(fixture.reader)
-            assertEquals(
-                AnkiRecoveryReadResult.Failed(AnkiExportError.INVALIDRESPONSE),
-                adapter.read(fixture.recoveryModel(0)),
-            )
-            fixture.environment.info = null
-            for (operation in
-                listOf(AnkiRecoveryReadOperation.Note("猫"), fixture.recoveryModel())) {
-                assertEquals(
-                    AnkiRecoveryReadResult.Failed(AnkiExportError.PROVIDERUNAVAILABLE),
-                    adapter.read(operation),
-                )
-            }
-            assertEquals(0, fixture.provider.queries)
-            assertTrue(fixture.provider.inserts.isEmpty())
-            assertTrue(fixture.provider.updates.isEmpty())
         }
     }
 

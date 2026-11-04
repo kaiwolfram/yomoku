@@ -2,10 +2,10 @@ use yomoku_core::{analysis::SplitMode, document::PasteText, vocabulary::Surface}
 
 use super::*;
 
-fn setup(version: usize) -> (TestDatabase, Storage) {
+fn setup() -> (TestDatabase, Storage) {
     let database = TestDatabase::new();
     let mut connection = Connection::open(database.path()).unwrap();
-    migrate(&mut connection, &MIGRATIONS[..version]).unwrap();
+    migrate(&mut connection, MIGRATIONS).unwrap();
     let mut storage = Storage { connection };
     let document = storage
         .create_paste(&PasteText::new(" \n猫 𠮷 か\u{3099} English 。 📖 \0\r\n　".into()).unwrap())
@@ -19,7 +19,8 @@ fn setup(version: usize) -> (TestDatabase, Storage) {
 
 #[test]
 fn backup_candidate_analyses_reject_gaps_overlaps_missing_tokens_and_wrong_exact_surfaces() {
-    for version in [7, 11, 18, 20, 23, 24] {
+    {
+        let version = 1;
         for sql in [
             "DELETE FROM analyzed_tokens",
             "DELETE FROM analyzed_tokens WHERE token_index = 1",
@@ -32,7 +33,7 @@ fn backup_candidate_analyses_reject_gaps_overlaps_missing_tokens_and_wrong_exact
             "UPDATE analyzed_tokens SET end_byte = 99999 WHERE token_index = 0",
             "UPDATE analyzed_tokens SET end_byte = 9223372036854775807 WHERE token_index = 0",
         ] {
-            let (database, storage) = setup(version);
+            let (database, storage) = setup();
             storage.connection.execute_batch(sql).unwrap();
             check_rejected(&database, version as u32, CandidateError::InvalidData);
         }
@@ -41,7 +42,8 @@ fn backup_candidate_analyses_reject_gaps_overlaps_missing_tokens_and_wrong_exact
 
 #[test]
 fn backup_candidate_analyses_reject_blank_and_invalid_utf8_profiles_and_metadata() {
-    for version in [7, 23, 24] {
+    {
+        let version = 1;
         for sql in [
             "UPDATE chapter_analyses SET engine_revision = '　\n'",
             "UPDATE chapter_analyses SET dictionary_revision = '　\n'",
@@ -53,7 +55,7 @@ fn backup_candidate_analyses_reject_blank_and_invalid_utf8_profiles_and_metadata
             "UPDATE analyzed_tokens SET reading = CAST(X'ff' AS TEXT) WHERE token_index = 0",
             "UPDATE analyzed_tokens SET dictionary_form = CAST(X'ff' AS TEXT) WHERE token_index = 0",
         ] {
-            let (database, storage) = setup(version);
+            let (database, storage) = setup();
             storage.connection.execute_batch(sql).unwrap();
             check_rejected(&database, version as u32, CandidateError::InvalidData);
         }
@@ -64,7 +66,7 @@ fn backup_candidate_analyses_reject_blank_and_invalid_utf8_profiles_and_metadata
 fn backup_candidate_analyses_apply_existing_japanese_surface_domain_without_classification_guessing(
 ) {
     for japanese in [false, true] {
-        let (database, mut storage) = setup(24);
+        let (database, mut storage) = setup();
         let mut analysis = storage
             .chapter_analysis(1.try_into().unwrap())
             .unwrap()
@@ -84,17 +86,18 @@ fn backup_candidate_analyses_apply_existing_japanese_surface_domain_without_clas
             (japanese, i64::from(id)),
         ).unwrap();
         if japanese {
-            check_rejected(&database, 24, CandidateError::InvalidData);
+            check_rejected(&database, 1, CandidateError::InvalidData);
         } else {
-            accept_unchanged(&database, 24);
+            accept_unchanged(&database, 1);
         }
     }
 }
 
 #[test]
 fn backup_candidate_analyses_preserve_every_populated_prefix_all_modes_and_literal_metadata() {
-    for version in 7..=24 {
-        let (database, mut storage) = setup(version);
+    {
+        let version = 1;
+        let (database, mut storage) = setup();
         let mut analysis = storage
             .chapter_analysis(1.try_into().unwrap())
             .unwrap()
@@ -135,9 +138,9 @@ fn backup_candidate_analyses_preserve_every_populated_prefix_all_modes_and_liter
 }
 
 #[test]
-fn backup_candidate_analyses_preserve_full_i64_ids_and_legacy_absence() {
+fn backup_candidate_analyses_preserve_full_i64_ids_and_missing_analysis() {
     for id in [9_007_199_254_740_993_i64, i64::MAX] {
-        let (database, mut storage) = setup(24);
+        let (database, mut storage) = setup();
         let mut analysis = storage
             .chapter_analysis(1.try_into().unwrap())
             .unwrap()
@@ -160,14 +163,15 @@ fn backup_candidate_analyses_preserve_full_i64_ids_and_legacy_absence() {
         );
         // Explicit legacy absence remains valid without synthesizing a replacement.
         storage.connection.execute_batch("DELETE FROM analyzed_tokens WHERE analysis_id = 1; DELETE FROM chapter_analyses WHERE id = 1").unwrap();
-        accept_unchanged(&database, 24);
+        accept_unchanged(&database, 1);
     }
 }
 
 #[test]
-fn backup_candidate_analyses_cancel_every_pre_and_post_migration_poll() {
-    for version in [7, 24] {
-        let (database, _storage) = setup(version);
+fn backup_candidate_analyses_cancel_every_validation_poll() {
+    {
+        let version = 1;
+        let (database, _storage) = setup();
         let bytes = fs::read(database.path()).unwrap();
         let mut polls = 0;
         candidate(&database.0.join("count"), &bytes)

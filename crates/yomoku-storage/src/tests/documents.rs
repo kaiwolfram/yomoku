@@ -309,36 +309,6 @@ fn concurrent_pastes_allocate_distinct_complete_documents() {
 }
 
 #[test]
-fn real_paste_migration_failure_preserves_version_one_database() {
-    let database = TestDatabase::new();
-    let mut connection = Connection::open(database.path()).unwrap();
-    migrate(&mut connection, &MIGRATIONS[..1]).unwrap();
-    connection
-        .execute_batch(
-            "CREATE TABLE chapters (sentinel TEXT);
-         INSERT INTO chapters VALUES ('既存データ');",
-        )
-        .unwrap();
-    drop(connection);
-    let before = fs::read(database.path()).unwrap();
-    assert!(matches!(
-        Storage::open(database.path()),
-        Err(StorageError::Sqlite(_))
-    ));
-    assert_eq!(fs::read(database.path()).unwrap(), before);
-    assert_eq!(
-        history(&database.path()),
-        [(1, "0001_migration_history".into())]
-    );
-    let connection = Connection::open(database.path()).unwrap();
-    assert!(!connection.table_exists(None, "sources").unwrap());
-    let sentinel: String = connection
-        .query_row("SELECT sentinel FROM chapters", [], |row| row.get(0))
-        .unwrap();
-    assert_eq!(sentinel, "既存データ");
-}
-
-#[test]
 fn each_identity_uses_its_own_full_width_sqlite_allocation() {
     let database = TestDatabase::new();
     let mut storage = Storage::open(database.path()).unwrap();

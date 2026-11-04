@@ -12,14 +12,6 @@ use crate::{
     vocabulary::VocabularyStatus,
 };
 
-/// Compare reader state independently of the export presentation, which has
-/// dedicated projection assertions.
-pub(super) fn reader_view(model: &Model) -> ViewModel {
-    let mut view = Yomoku.view(model);
-    view.anki_export = None;
-    view
-}
-
 pub(super) fn fixture(effective: bool) -> (Model, AnkiSelection) {
     let chapter = ChapterText {
         source_id: 1.try_into().unwrap(),
@@ -98,7 +90,6 @@ pub(super) fn fixture(effective: bool) -> (Model, AnkiSelection) {
         names: vec![],
     };
     let mut model = Model {
-        anki_recovery: AnkiRecoveryState::Restored(Box::default()),
         content_route: ContentRoute::Reader,
         reader: Some(page.clone()),
         reader_document: Some(document),

@@ -7,7 +7,6 @@ use rusqlite::types::Value;
 use yomoku_backup::{decrypt_snapshot, encrypt_snapshot, BackupError, Manifest, Password};
 use yomoku_core::{
     active_time::PendingReadingTime,
-    anki::{AnkiModelCreation, AnkiModelLayout},
     completion::PageCompletionIntent,
     document::{PasteText, TextOffset},
     pagination::PageLength,
@@ -18,7 +17,6 @@ use yomoku_core::{
 use yomoku_import::txt::TextEncoding;
 
 use super::{imports::fixture, *};
-use crate::{anki::AnkiSubmissionOutcome, anki_model::AnkiModelCreationOutcome};
 
 // Snapshot every table and schema object, including sequences; no list of
 // selected tables that could silently omit future durable state.
@@ -208,24 +206,7 @@ pub(super) fn populate(storage: &mut Storage) {
     storage
         .save_anki_default_deck(Some(HIGH_WATER.try_into().unwrap()))
         .unwrap();
-    for outcome in [
-        AnkiSubmissionOutcome::NotInserted,
-        AnkiSubmissionOutcome::Added(i64::MAX.try_into().unwrap()),
-    ] {
-        let live = storage
-            .begin_anki_submission(&anki::payload(HIGH_WATER))
-            .unwrap();
-        storage.finish_anki_submission(&live, outcome).unwrap();
-    }
-    for outcome in [
-        AnkiModelCreationOutcome::NotCreated,
-        AnkiModelCreationOutcome::Created(i64::MAX.try_into().unwrap()),
-    ] {
-        let live = storage
-            .begin_anki_model_creation(&AnkiModelCreation::new(AnkiModelLayout::yomoku()).unwrap())
-            .unwrap();
-        storage.finish_anki_model_creation(&live, outcome).unwrap();
-    }
+
     storage
         .connection
         .execute("UPDATE sqlite_sequence SET seq = ?1", [HIGH_WATER])
@@ -302,71 +283,6 @@ fn full_state_encrypted_round_trip_preserves_every_table_and_remains_usable() {
     );
     assert_ne!(fs::read(database.path()).unwrap(), before); // explicit source setting write
     assert_eq!(storage.page_length().unwrap(), PageLength::Characters250);
-}
-
-#[test]
-fn snapshots_preserve_pending_and_uncertain_anki_journals_without_replay() {
-    for model in [false, true] {
-        for uncertain in [false, true] {
-            let database = TestDatabase::new();
-            let mut storage = Storage::open(database.path()).unwrap();
-            if model {
-                let live = storage
-                    .begin_anki_model_creation(
-                        &AnkiModelCreation::new(AnkiModelLayout::yomoku()).unwrap(),
-                    )
-                    .unwrap();
-                if uncertain {
-                    storage
-                        .finish_anki_model_creation(
-                            &live,
-                            AnkiModelCreationOutcome::Uncertain {
-                                known_model_id: Some(i64::MAX.try_into().unwrap()),
-                            },
-                        )
-                        .unwrap();
-                }
-            } else {
-                let live = storage
-                    .begin_anki_submission(&anki::payload(HIGH_WATER))
-                    .unwrap();
-                if uncertain {
-                    storage
-                        .finish_anki_submission(
-                            &live,
-                            AnkiSubmissionOutcome::Uncertain {
-                                known_note_id: Some(i64::MAX.try_into().unwrap()),
-                            },
-                        )
-                        .unwrap();
-                }
-            }
-            let recovery = storage.anki_recovery_snapshot().unwrap();
-            let expected = state(&storage.connection);
-            let before = fs::read(database.path()).unwrap();
-            let mut snapshot = storage
-                .create_backup_snapshot(database.0.join("snapshot"), || false)
-                .unwrap();
-            let manifest = Manifest::new(snapshot.schema_version(), snapshot.sqlite_len()).unwrap();
-            let mut archive = Vec::new();
-            encrypt_snapshot(password(), &manifest, &mut snapshot, &mut archive, || false).unwrap();
-            let candidate = TestDatabase::new();
-            let mut output = File::create(candidate.path()).unwrap();
-            decrypt_snapshot(password(), &mut archive.as_slice(), &mut output, || false).unwrap();
-            drop(output);
-            let mut restored = Storage::open(candidate.path()).unwrap();
-            assert_eq!(restored.anki_recovery_snapshot().unwrap(), recovery);
-            assert_eq!(state(&restored.connection), expected);
-            assert!(restored.begin_anki_submission(&anki::payload(1)).is_err());
-            assert!(restored
-                .begin_anki_model_creation(
-                    &AnkiModelCreation::new(AnkiModelLayout::yomoku()).unwrap()
-                )
-                .is_err());
-            assert_eq!(state(&restored.connection), expected);
-            assert_eq!(fs::read(database.path()).unwrap(), before);
-        }
-    }
 }
 
 #[test]
@@ -553,7 +469,7 @@ fn staging_io_failures_clean_owned_files_and_explicit_discard_reports_cleanup_er
 fn validation_and_vacuum_failures_discard_only_owned_staging_and_allow_retry() {
     for corrupt in [
         "UPDATE schema_migrations SET name = 'wrong' WHERE version = 1",
-        "DELETE FROM schema_migrations WHERE version = 24",
+        "DELETE FROM schema_migrations WHERE version = 1",
         "PRAGMA foreign_keys = OFF; INSERT INTO chapters VALUES (1, 123, 0)",
         "PRAGMA ignore_check_constraints = ON; UPDATE reader_settings SET page_length = -1",
     ] {

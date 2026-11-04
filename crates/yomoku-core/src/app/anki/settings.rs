@@ -1,5 +1,5 @@
 //! Independent local settings slot on the shared SQLite FIFO. Never owns reader
-//! busy/errors, frozen exports, journal gates or provider invocation permits.
+//! busy/errors, frozen exports or provider invocation permits.
 
 use super::*;
 use crate::anki::{AnkiDeckId, AnkiSettingsPhase};

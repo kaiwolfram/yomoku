@@ -105,23 +105,6 @@ fn insert_update_and_commit_failures_leave_previous_position_and_allow_retry() {
 }
 
 #[test]
-fn migration_preserves_version_two_content_and_adds_unopened_zero_progress() {
-    let database = TestDatabase::new();
-    let mut connection = Connection::open(database.path()).unwrap();
-    migrate(&mut connection, &MIGRATIONS[..2]).unwrap();
-    connection.execute_batch("INSERT INTO sources VALUES (1, 'paste', '𠮷'); INSERT INTO chapters VALUES (1, 1, 0); INSERT INTO documents VALUES (1, 1, '𠮷'); INSERT INTO chapter_texts VALUES (1, '𠮷本文');").unwrap();
-    drop(connection);
-    let mut storage = Storage::open(database.path()).unwrap();
-    let document = storage
-        .load_paste(DocumentId::try_from(1).unwrap())
-        .unwrap()
-        .unwrap();
-    assert_eq!(document.chapter.text, "𠮷本文");
-    assert!(document.reading_position.is_none());
-    assert_eq!(storage.list_documents().unwrap()[0].progress_percent, 0);
-}
-
-#[test]
 fn corrupt_position_is_rejected_without_repair_and_document_deletion_removes_only_progress() {
     let database = TestDatabase::new();
     let mut storage = Storage::open(database.path()).unwrap();
