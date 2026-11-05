@@ -44,9 +44,8 @@ impl EffectiveReaderRequest {
     }
 
     /// Send through the existing Crux storage effect/FIFO, capturing this exact
-    /// request in the native callback. The app still applies shared clock,
+    /// request in the native callback. The app still applies shared
     /// lifecycle and busy gates BEFORE accepting work in the retained session.
-    /// Completion preparation must wait for both final checkpoint slots to drain.
     pub fn command<Event: Send + 'static>(
         self,
         finished: impl FnOnce(Self, StorageResult) -> Event + Send + 'static,

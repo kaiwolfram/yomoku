@@ -1,8 +1,5 @@
 use super::{imports::fixture, *};
-use yomoku_core::{
-    active_time::PendingReadingTime, completion::PageCompletionIntent, document::PasteText,
-    reader::ReaderPage,
-};
+use yomoku_core::{completion::PageCompletionIntent, document::PasteText, reader::ReaderPage};
 use yomoku_import::txt::TextEncoding;
 
 // Compare every persisted field outside the one explicitly mutable live table.
@@ -46,12 +43,7 @@ fn document_rename_preserves_all_content_provenance_history_time_statuses_and_du
     let id = imported.document.document_id;
     let snapshot = storage.open_document_reader_snapshot(id).unwrap().unwrap();
     let page = ReaderPage::open_document(&snapshot.document, snapshot.page_length).unwrap();
-    let saved = storage
-        .load_pending_reading_time(id, page.position)
-        .unwrap();
-    storage
-        .save_pending_reading_time(saved, PendingReadingTime::from_millis(1234).unwrap())
-        .unwrap();
+
     let prepared = storage
         .prepare_page_completion(PageCompletionIntent {
             document_id: id,
@@ -68,12 +60,7 @@ fn document_rename_preserves_all_content_provenance_history_time_statuses_and_du
     storage
         .save_document_reading_position(id, page.position)
         .unwrap();
-    let saved = storage
-        .load_pending_reading_time(id, page.position)
-        .unwrap();
-    storage
-        .save_pending_reading_time(saved, PendingReadingTime::from_millis(77).unwrap())
-        .unwrap();
+
     let PasteImportOutcome::Created(survivor) = storage
         .import_analyzed_paste(&PasteText::new("別の本".into()).unwrap(), 600, fixture)
         .unwrap()

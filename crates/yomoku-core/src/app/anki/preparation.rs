@@ -18,8 +18,6 @@ impl Model {
     ) -> Option<AnkiExport> {
         if self.storage_busy
             || self.settings_open
-            || self.pending_time_checkpoint.is_some()
-            || self.queued_time_checkpoint.is_some()
             || self.completion_pending()
             || self.deferred_reader_event.is_some()
             || self.effective_mutation_pending()

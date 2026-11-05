@@ -20,6 +20,7 @@ must not change without user approval.
 
 **Important late scope changes that override earlier brainstorming:**
 
+- **Remove statistics details and reading-time tracking** (user scope reduction, 2026-11-04): Statistics is an overview only; do not collect, persist or aggregate reading durations. Keep the two charts and existing timeframe filters.
 - **Remove Known forms statistics** (user scope reduction, 2026-10-31): no separate Known surface/dictionary-form chart or dedicated dictionary-form aggregation storage. The five-status vocabulary chart still includes Known.
 - **Feed/Nostr is no longer planned** (user scope reduction, 2026-11-02). Remove the Feed placeholder from phone bottom navigation and the tablet rail. No relay configuration/networking, post reading, signing identity, reactions or forwarding. Section 5 retains historical requirements only.
 - **No custom dictionary entries in v1**: no editor, fallback definitions, saved custom records or custom-entry Anki export. Bundled dictionaries alone supply definitions; unmatched words show the no-match state.
@@ -55,7 +56,7 @@ If a chosen library does not support a required capability or architecture in cu
 - Logical pages may **scroll vertically**, e.g. for long text or images. **Never persist vertical scroll positions**: navigating forward or backward, or reopening a document, starts at the top of the destination page. Page boundaries don't depend on screen dimensions. Page-length changes reflow pages while preserving the exact underlying reading text offset.
 - **Previous** and **Next** controls, with counter `12 / 85` between them, appear at the bottom of the page content. Left swipe = next logical page, right swipe = previous, even before the bottom is reached. **No bottom-reached requirement**. Both forward and backward navigation update the *current* reading position; the Library's percentage uses current text offset / total text length, so it can decrease if the reader goes backward.
 - Advancing **forward** completes the departing page, even if the user swiped without reaching the bottom. Simply moving **backward** does not complete or count the page. Reading a previously read page and completing it again **does count again** (idempotency must prevent accidental double-trigger/tap counting).
-- Incomplete pages save position and pending time, **not** read-word events/counts/status updates until page completion. On page completion, every Japanese word occurrence (including repetitions) contributes to encounter/reading counts; any still-**New** unique words present on that page are changed directly to **Known**. Don't automatically change Learning/Familiar/Ignored. Show toast `N new words marked as Known` **only when N > 0**.
+- Incomplete pages save position, **not** read-word events/counts/status updates until page completion. On page completion, every Japanese word occurrence (including repetitions) contributes to encounter/reading counts; any still-**New** unique words present on that page are changed directly to **Known**. Don't automatically change Learning/Familiar/Ignored. Show toast `N new words marked as Known` **only when N > 0**.
 - Full-document completion: maintain permanent **finished-at-least-once** checkmark independent of current position. Show brief confetti on each completion; **Finish Book** returns to Library. Reopening a finished book begins at page 1. Deleting and later reimporting resets progress and checkmark, while global history survives.
 - Reader styling: bundled **Noto Serif JP**; adjustable global font size and line spacing; furigana switch **off by default**, when on show available ruby readings (source ruby when provided, else analyzer), irrespective of vocabulary status.
 - EPUB supports chapters, headings, emphasis, inline images, links, and source ruby, **but ignore EPUB CSS**. Inline images keep position/ratio, fit column width; tapping opens full-screen pinch-zoom/pan viewer. Internal footnote/chapter links are **not navigable**; external website links open external browser. No TOC-jump feature.
@@ -91,10 +92,9 @@ If a chosen library does not support a required capability or architecture in cu
 
 ### 4.1 Events and statistics
 
-- Design schema around immutable, dated **status-change events**, **reading-completion events**, **every Japanese surface occurrence encountered on completed pages/posts**, source identity/provenance, and **active reading time**. History matters more than cached counters; use migration-safe IDs and explicit versioned semantics.
+- Design schema around immutable, dated **status-change events**, **reading-completion events**, **every Japanese surface occurrence encountered on completed pages/posts**, and source identity/provenance. History matters more than cached counters; use migration-safe IDs and explicit versioned semantics.
 - Multiple occurrences of a word on one completed page count multiple times. Re-reading counts again. Avoid duplicate counting on accidental repeated click/gesture. Non-Japanese content and punctuation aren't included in Japanese word counts.
-- Active time starts while reader open and includes dictionary popups, but pauses in background/when reader closes and after **5 min with no interaction**. Reset idle timer on any interaction. Persist partial-page accumulated time across closing/reopening/reboots; commit time to reading statistics **only after that page/post is completed**. Hidden timer (no timer in reader UI).
-- Statistics: overview + tap into detailed charts. Timeframes: **last month**, **last six months**, **last year (default)**, **all time**; group **daily / weekly / weekly / monthly** respectively.
+- Statistics: one overview with two charts; no detail pages or drilldown actions. Timeframes: **last month**, **last six months**, **last year (default)**, **all time**; group **daily / weekly / weekly / monthly** respectively.
 - Graph 1: **cumulative lifetime Japanese word occurrences read**. Time filter changes visible x-range but **not** origin of cumulative y-values (e.g. 85k→100k for last month).
 - Graph 2: **five distinct time-series lines** of absolute number of registered word surfaces in each status, with statuses' graph colors; import-time registration causes jumps in New.
 - There are **two charts only**: cumulative reading occurrences and the five vocabulary statuses. No separate **Known forms** chart or distinct dictionary-form count. Keep the Known status line in Graph 2 and dictionary-form metadata required by reader/dictionary/history workflows.
@@ -153,7 +153,7 @@ they must not drive implementation unless the user explicitly reopens this scope
 - Follow **Android system light/dark mode** automatically; no in-app override.
 - All user-facing interface and offline definitions **English**.
 - No Undo in v1; destructive bulk actions require confirmation.
-- No reading-session timer visible, and no mandatory bottom-of-page reached check.
+- No reading-time tracking, and no mandatory bottom-of-page reached check.
 - Keep designs compact, tablet-first but usable on phones. Don't add unrequested document editing, longform Nostr support, AI, etc.
 
 ## 9. Open questions and inputs

@@ -9,7 +9,7 @@ and measurements remain in [ARCHITECTURE_HISTORY.md](ARCHITECTURE_HISTORY.md).
 | Component | Responsibility |
 | --- | --- |
 | Kotlin/Compose | Rendering, lifecycle, file descriptors, permissions, AnkiDroid ContentResolver and browser intents |
-| `yomoku-core` | Pure Crux model/events, pagination, time accounting, dictionary projection, vocabulary rules and in-memory operation ownership |
+| `yomoku-core` | Pure Crux model/events, pagination, dictionary projection, vocabulary rules and in-memory operation ownership |
 | `yomoku-runtime` | EffectRouter, lazy analyzer/dictionary loaders and one FIFO SQLite/analysis worker |
 | `yomoku-storage` | SQLite repositories, atomic imports/completions, schema runner and private backup candidates |
 | `yomoku-analysis` / `yomoku-import` | Sudachi adapter and pure EPUB/TXT/SRT parsing |
@@ -38,11 +38,10 @@ Status changes commit through the worker and update repeated surfaces globally.
 Shared text styling, links, images and ruby rendering remain independent of word
 selection. Whole-document payloads are not part of the live view.
 
-Time uses monotonic samples and absolute, revisioned pending-duration saves.
-Completion freezes identity before draining time and reserves a command ID. The
+Completion freezes identity and reserves a command ID. The
 stored version-2 reservation contains the page command, Mode C analysis identity/
 profile and counted occurrences; it omits whole-chapter segmentation. Retry uses
-the same reservation. Completion atomically commits history, time, status changes
+the same reservation. Completion atomically commits history, status changes
 and position; deletion-safe receipt lookup prevents duplicate counting. Explicit
 rereads use new commands and count again. Previous moves position without counting.
 
@@ -65,7 +64,7 @@ See [ANKIDROID_API.md](ANKIDROID_API.md) for provider details.
 
 ## Persistence and builds
 
-The [data model](DATA_MODEL.md) contains 28 application tables. A transactional
+The [data model](DATA_MODEL.md) contains 27 application tables. A transactional
 migration runner/journal remains for future releases; historical development files
 are rejected without clearing them. Bundled dictionaries are separate read-only assets.
 

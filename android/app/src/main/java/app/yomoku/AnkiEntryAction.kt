@@ -52,7 +52,6 @@ internal fun AnkiEntryAction(
     entry: AnkiEntryView?,
     enabled: Boolean,
     dispatch: (Event) -> Unit,
-    onInteraction: () -> Unit,
     browser: AnkiNoteBrowser? = null,
 ) {
     if (entry == null) return
@@ -81,7 +80,6 @@ internal fun AnkiEntryAction(
     Column {
         FilledIconButton(
             onClick = {
-                onInteraction()
                 when {
                     existing -> browser?.openEntry(entry)
                     failed -> dispatch(Event.LoadReaderAnkiEntries(entry.selection))

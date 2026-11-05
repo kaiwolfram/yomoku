@@ -22,7 +22,6 @@ class VocabularyProductionTest {
         compose.waitUntil(90_000) {
             val view = core().view
             !view.storageBusy &&
-                !view.readingTimeSavePending &&
                 !view.completionSavePending &&
                 (view.destination != Destination.VOCABULARY ||
                     view.settingsOpen ||
@@ -387,7 +386,6 @@ class VocabularyProductionTest {
         compose.runOnUiThread { core().dispatch(Event.OpenReader(id)) }
         compose.waitUntil(90_000) {
             core().view.effectiveReaderTokens?.identity?.base?.documentId == id &&
-                core().view.readerTime != null &&
                 !core().view.storageBusy
         }
         return checkNotNull(core().view.effectiveReaderTokens)
@@ -460,7 +458,6 @@ class VocabularyProductionTest {
             before.reading.japaneseOccurrences - cat.encounteredCount,
             after.reading.japaneseOccurrences,
         )
-        assertEquals(before.reading.activeTimeMs, after.reading.activeTimeMs)
         assertEquals(before.statuses.learning - 1UL, after.statuses.learning)
         library()
         assertEquals(

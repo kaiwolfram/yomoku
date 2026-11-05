@@ -3,7 +3,6 @@
 use crux_core::capability::Operation;
 use serde::{Deserialize, Serialize};
 
-use crate::active_time::{ReadingTimeUpdate, SavedReadingTime};
 use crate::document::{DocumentId, LibraryDocument, ReaderDocument};
 use crate::effective_storage::{EffectiveStorageOperation, EffectiveStorageResult};
 use crate::imports::{EpubImport, SrtImport, TxtImport};
@@ -34,15 +33,6 @@ pub enum StorageOperation {
     },
     SavePageLength(PageLength),
     SaveReaderTypography(ReaderTypography),
-    LoadReadingTime {
-        document_id: DocumentId,
-        position: ReadingPosition,
-    },
-    SaveReadingTime {
-        previous: SavedReadingTime,
-        checkpoint: ReadingTimeUpdate,
-    },
-
     ImportTxt(TxtImport),
     ImportSrt(SrtImport),
     ImportEpub(EpubImport),
@@ -135,8 +125,6 @@ pub enum StorageResult {
     PositionSaved(ReaderDocument),
     PageLengthSaved(PageLength),
     ReaderTypographySaved(ReaderTypography),
-    ReadingTimeLoaded(SavedReadingTime),
-    ReadingTimeSaved(SavedReadingTime),
 
     Failed(DocumentError),
 

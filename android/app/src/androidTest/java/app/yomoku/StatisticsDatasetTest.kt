@@ -28,7 +28,6 @@ class StatisticsDatasetTest {
             assertEquals(0UL, statuses.minimum)
             assertEquals(60UL, statuses.maximum)
             // Displaying charts never changes the transport's hidden completed time.
-            assertEquals(999UL, data.buckets.last().values.reading.activeTimeMs)
         }
     }
 
@@ -38,9 +37,7 @@ class StatisticsDatasetTest {
         val data =
             fixture.copy(
                 opening =
-                    fixture.opening.copy(
-                        reading = LifetimeReadingTotals(ULong.MAX_VALUE - 2UL, 0UL)
-                    ),
+                    fixture.opening.copy(reading = LifetimeReadingTotals(ULong.MAX_VALUE - 2UL)),
                 buckets =
                     fixture.buckets.mapIndexed { index, bucket ->
                         bucket.copy(
@@ -48,8 +45,7 @@ class StatisticsDatasetTest {
                                 bucket.values.copy(
                                     reading =
                                         LifetimeReadingTotals(
-                                            ULong.MAX_VALUE - 1UL + index.toULong(),
-                                            ULong.MAX_VALUE,
+                                            ULong.MAX_VALUE - 1UL + index.toULong()
                                         )
                                 )
                         )
@@ -65,7 +61,7 @@ class StatisticsDatasetTest {
         val fixture = statisticsFixture()
         val zero =
             StatisticsValues(
-                LifetimeReadingTotals(0UL, 0UL),
+                LifetimeReadingTotals(0UL),
                 WordStatusCounts(0UL, 0UL, 0UL, 0UL, 0UL),
             )
         val data =
@@ -89,7 +85,7 @@ internal fun statisticsFixture(
     val start = 1_700_000_000_000L
     val opening =
         StatisticsValues(
-            LifetimeReadingTotals(85_000UL, 123UL),
+            LifetimeReadingTotals(85_000UL),
             WordStatusCounts(10UL, 20UL, 30UL, 40UL, 50UL),
         )
     return StatisticsBuckets(
@@ -102,7 +98,7 @@ internal fun statisticsFixture(
                 start,
                 start + 1000,
                 StatisticsValues(
-                    LifetimeReadingTotals(90_000UL, 456UL),
+                    LifetimeReadingTotals(90_000UL),
                     WordStatusCounts(20UL, 10UL, 30UL, 50UL, 40UL),
                 ),
             ),
@@ -110,7 +106,7 @@ internal fun statisticsFixture(
                 start + 1000,
                 start + 4000,
                 StatisticsValues(
-                    LifetimeReadingTotals(100_000UL, 999UL),
+                    LifetimeReadingTotals(100_000UL),
                     WordStatusCounts(30UL, 0UL, 20UL, 60UL, 40UL),
                 ),
             ),

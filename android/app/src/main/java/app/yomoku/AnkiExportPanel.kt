@@ -20,7 +20,6 @@ internal fun AnkiExportPanel(
     state: AnkiExportView,
     dispatch: (Event) -> Unit,
     browser: AnkiNoteBrowser? = null,
-    onInteraction: () -> Unit = {},
 ) {
     val phase = state.phase
     Column(Modifier.testTag("anki_export"), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -56,7 +55,6 @@ internal fun AnkiExportPanel(
             for (id in state.openableNoteIds()) {
                 TextButton(
                     onClick = {
-                        onInteraction()
                         browser.open(state, id)
                     },
                     enabled = attempt?.phase != AnkiBrowserPhase.Resolving,

@@ -28,7 +28,7 @@ pub enum EffectiveStorageOperation {
         occurred_at_unix_ms: i64,
     },
 
-    /// Freeze the accepted key before final time drain; reserve only afterward.
+    /// Reserve a completion ID for the frozen accepted page key.
     PrepareCompletion {
         intent: PageCompletionIntent,
         command: EffectivePageCommand,

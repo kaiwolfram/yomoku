@@ -26,7 +26,6 @@ class ReaderTypographySettingsTest {
         compose.waitUntil(30_000) {
             val view = core().view
             !view.storageBusy &&
-                !view.readingTimeSavePending &&
                 !view.completionSavePending &&
                 (view.settingsOpen ||
                     view.contentRoute != ContentRoute.MAIN ||
@@ -38,9 +37,7 @@ class ReaderTypographySettingsTest {
 
     private fun awaitReader() {
         compose.waitUntil(60_000) {
-            !core().view.storageBusy &&
-                core().view.readerTime != null &&
-                core().view.effectiveReaderTokens != null
+            !core().view.storageBusy && core().view.effectiveReaderTokens != null
         }
         compose.waitForIdle()
     }

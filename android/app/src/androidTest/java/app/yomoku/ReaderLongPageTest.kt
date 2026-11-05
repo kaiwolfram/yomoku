@@ -83,7 +83,7 @@ class ReaderLongPageTest {
                 YomokuTheme {
                     measurer = rememberTextMeasurer()
                     Column(Modifier.width(340.dp).verticalScroll(rememberScrollState())) {
-                        ReaderImageContent(page, text, null, {})
+                        ReaderImageContent(page, text, null)
                     }
                 }
             }

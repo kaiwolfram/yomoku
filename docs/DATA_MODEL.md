@@ -2,7 +2,7 @@
 
 The authoritative SQL is [0001_initial_schema.sql](../crates/yomoku-storage/migrations/0001_initial_schema.sql).
 The release schema version is **1**, journal name `0001_initial_schema`. It has
-**28 application tables** plus SQLite's internal `sqlite_sequence` table.
+**27 application tables** plus SQLite's internal `sqlite_sequence` table.
 Earlier records are retained in [DATA_MODEL_HISTORY.md](DATA_MODEL_HISTORY.md);
 their development schemas are unsupported.
 
@@ -10,7 +10,7 @@ their development schemas are unsupported.
 | --- | --- |
 | Content | `sources`, `chapters`, `documents`, `chapter_texts`, `paste_content_hashes`, `imported_files`, `source_ruby`, `subtitle_cues`, `epub_documents`, `epub_chapters`, `epub_spans`, `epub_assets`, `epub_inline_images` |
 | Analysis and vocabulary | `chapter_analyses`, `analyzed_tokens`, `vocabulary`, `vocabulary_status_events` |
-| Progress and history | `reading_positions`, `pending_reading_time`, `library_read_clock`, `completion_commands`, `effective_completion_commands`, `reading_completions`, `completion_analyses`, `reading_occurrences` |
+| Progress and history | `reading_positions`, `library_read_clock`, `completion_commands`, `effective_completion_commands`, `reading_completions`, `completion_analyses`, `reading_occurrences` |
 | Settings and schema | `reader_settings`, `anki_settings`, `schema_migrations` |
 
 ## Initialization and compatibility
@@ -43,7 +43,7 @@ surfaces without changing existing status. Explicit status history supports the
 five statuses. Deleting vocabulary removes its events/occurrences without causing
 existing books to register it again. There are no custom dictionary records.
 
-## Completion and time
+## Completion
 
 `completion_commands` allocates retry identity. A version-2
 `effective_completion_commands` payload freezes the page command, analysis ID,
@@ -53,11 +53,10 @@ C provenance. Receipt/history semantics remain version 1; these version numbers
 are distinct from the database schema version.
 
 One transaction applies occurrence counts, New-to-Known transitions, completion
-history, pending-time consumption and next position/finish marker. Retry of the
+history and next position/finish marker. Retry of the
 same command is idempotent, including after content deletion. A deliberate reread
-uses a new command and counts again. Absolute pending durations carry revisions;
-stale or mismatched saves fail without partially applying history or position.
-Previous/reflow preserve exact position/time semantics without recording completion.
+uses a new command and counts again.
+Previous/reflow preserve exact position without recording completion.
 
 ## Settings
 

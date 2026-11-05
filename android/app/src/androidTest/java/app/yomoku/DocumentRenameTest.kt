@@ -23,7 +23,6 @@ class DocumentRenameTest {
         compose.waitUntil(90_000) {
             val view = core().view
             !view.storageBusy &&
-                !view.readingTimeSavePending &&
                 !view.completionSavePending &&
                 (view.libraryWordDistributions != null || view.libraryWordError != null)
         }
@@ -70,9 +69,7 @@ class DocumentRenameTest {
         }
         compose.onNodeWithTag("document_${id.value}").performClick()
         compose.waitUntil(90_000) {
-            core().view.effectiveReaderTokens != null &&
-                core().view.readerTime != null &&
-                !core().view.storageBusy
+            core().view.effectiveReaderTokens != null && !core().view.storageBusy
         }
         compose.onNodeWithTag("reader_scroll").performScrollToNode(hasTestTag("next_page"))
         compose.onNodeWithTag("next_page").performClick()

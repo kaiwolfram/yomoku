@@ -6,7 +6,6 @@ use std::collections::BTreeMap;
 use rusqlite::{Connection, OptionalExtension};
 use serde::Deserialize;
 use yomoku_core::{
-    active_time::PendingReadingTime,
     analysis::SplitMode,
     document::{
         AnalysisId, ChapterId, ChapterText, CompletionCommandId, DocumentId, SourceId, TextAnchor,
@@ -41,7 +40,6 @@ struct Completion {
     page_length: PageLength,
     departing_position: Position,
     completed_at_unix_ms: i64,
-    pending_time: PendingReadingTime,
 }
 
 #[derive(Deserialize)]
@@ -342,11 +340,11 @@ fn check_receipt(
     let receipt = connection
         .query_row(
             "SELECT document_id, source_id, chapter_id, start_byte_offset, end_byte_offset,
-                departing_byte_offset, page_length, completed_at_unix_ms, active_time_ms
+                departing_byte_offset, page_length, completed_at_unix_ms
          FROM main.reading_completions WHERE command_id = ?1",
             [command],
             |row| {
-                (0..9)
+                (0..8)
                     .map(|i| row.get::<_, i64>(i))
                     .collect::<Result<Vec<_>, _>>()
             },
@@ -366,7 +364,6 @@ fn check_receipt(
                 i64::from(c.departing_position.offset),
                 c.page_length.characters() as i64,
                 c.completed_at_unix_ms,
-                c.pending_time.milliseconds(),
             ],
     )?;
     let header: Option<(i64, String, String, String)> = connection

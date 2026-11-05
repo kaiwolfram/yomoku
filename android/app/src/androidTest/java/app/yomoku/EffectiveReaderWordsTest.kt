@@ -26,7 +26,6 @@ class EffectiveReaderWordsTest {
     private val owner = mutableStateOf("session-one")
     private val frame = mutableStateOf(fixture())
     private var failLookup = false
-    private var interactions = 0
 
     private fun anchor(start: Long, end: Long) =
         TextAnchor(
@@ -98,8 +97,6 @@ class EffectiveReaderWordsTest {
             contentRoute = ContentRoute.READER,
             reader = page,
             readerAnalysis = analysis,
-            readerTime = ReadingTimeUpdate(page.documentId, page.position, PendingReadingTime(0)),
-            readingTimeSavePending = false,
             completionSavePending = false,
             effectiveReaderTokens = EffectiveReaderPage(identity, tokens),
             effectiveReaderWord = EffectiveReaderWordState(busy = false),
@@ -116,7 +113,6 @@ class EffectiveReaderWordsTest {
                         frame.value,
                         owner.value,
                         ::dispatch,
-                        { interactions++ },
                     )
                 }
             }
@@ -227,9 +223,9 @@ class EffectiveReaderWordsTest {
             Event.AddReaderAnkiEntry(AnkiSelection.Effective(selected), AnkiEntryKey.Word(1)),
             events.last(),
         )
-        compose.runOnUiThread { frame.value = frame.value.copy(readingTimeSavePending = true) }
+        compose.runOnUiThread { frame.value = frame.value.copy(storageBusy = true) }
         compose.onNodeWithTag("anki_entry_word_1").assertIsNotEnabled()
-        compose.runOnUiThread { frame.value = frame.value.copy(readingTimeSavePending = false) }
+        compose.runOnUiThread { frame.value = frame.value.copy(storageBusy = false) }
         val before = events.size
         compose.waitForIdle()
         assertEquals(before, events.size)
@@ -264,7 +260,6 @@ class EffectiveReaderWordsTest {
             assertEquals(status, event.status)
             assertTrue(event.occurredAtUnixMs > 0)
         }
-        assertTrue(interactions > 0)
     }
 
     @Test
@@ -288,12 +283,12 @@ class EffectiveReaderWordsTest {
         assertEquals(1, events.size)
         click("retry_word_lookup")
         assertEquals(2, events.size)
-        compose.runOnUiThread { frame.value = ready.copy(readingTimeSavePending = true) }
+        compose.runOnUiThread { frame.value = ready.copy(storageBusy = true) }
         tap(1)
         assertTrue(events.none { it is Event.LoadEffectiveReaderWord })
         compose.onNodeWithTag("word_status_KNOWN").assertIsNotEnabled()
         failLookup = true
-        compose.runOnUiThread { frame.value = frame.value.copy(readingTimeSavePending = false) }
+        compose.runOnUiThread { frame.value = frame.value.copy(storageBusy = false) }
         compose.waitForIdle()
         assertEquals(1, events.filterIsInstance<Event.LoadEffectiveReaderWord>().size)
         compose.onNodeWithTag("word_lookup_error").assertExists()
@@ -354,10 +349,10 @@ class EffectiveReaderWordsTest {
         compose.onNodeWithText("Close").performScrollTo().performClick()
         tap(2)
         assertEquals(1, events.filterIsInstance<Event.LoadEffectiveReaderWord>().size)
-        compose.runOnUiThread { frame.value = frame.value.copy(readingTimeSavePending = true) }
+        compose.runOnUiThread { frame.value = frame.value.copy(storageBusy = true) }
         compose.onNodeWithTag("effective_status_retry").assertIsNotEnabled()
         compose.onNodeWithTag("effective_status_cancel").assertIsNotEnabled()
-        compose.runOnUiThread { frame.value = frame.value.copy(readingTimeSavePending = false) }
+        compose.runOnUiThread { frame.value = frame.value.copy(storageBusy = false) }
         click("effective_status_cancel")
         assertEquals(Event.CancelEffectiveReaderStatus, events.last())
     }
@@ -540,7 +535,6 @@ class EffectiveReaderWordsTest {
                 frame.value.copy(
                     storageBusy = false,
                     reader = page.copy(position = position),
-                    readerTime = ready.readerTime!!.copy(position = position),
                 )
         }
         compose.waitForIdle()

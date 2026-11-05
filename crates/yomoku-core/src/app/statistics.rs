@@ -88,7 +88,7 @@ impl Yomoku {
         model.statistics.loading = true;
         model.statistics.error = None;
         model.storage_busy = true;
-        model.time_checkpoint_can_wait = false;
+
         render::render().and(
             Command::request_from_shell(StorageOperation::LoadStatistics(query))
                 .then_send(move |result| Event::StatisticsFinished(request_id, result)),

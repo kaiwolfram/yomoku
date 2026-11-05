@@ -36,11 +36,7 @@ class ImageViewerTest {
     private fun awaitReader() {
         compose.waitUntil(60_000) {
             val view = core().view
-            !view.storageBusy &&
-                !view.readingTimeSavePending &&
-                !view.completionSavePending &&
-                view.readerTime != null &&
-                view.effectiveReaderTokens != null
+            !view.storageBusy && !view.completionSavePending && view.effectiveReaderTokens != null
         }
         compose.waitUntil(30_000) {
             compose.onAllNodesWithTag("reader_image_0").fetchSemanticsNodes().size == 1
@@ -224,11 +220,10 @@ class ImageViewerTest {
     }
 
     @Test
-    fun sharedViewerKeepsLoadingAndFailureModalAllowsRetryAndCountsDialogInteractions() {
+    fun sharedViewerKeepsLoadingAndFailureModalAllowsRetry() {
         val image = mutableStateOf<androidx.compose.ui.graphics.ImageBitmap?>(null)
         val loading = mutableStateOf(true)
         var retries = 0
-        var interactions = 0
         var closes = 0
         compose.runOnUiThread {
             compose.activity.setContent {
@@ -239,7 +234,6 @@ class ImageViewerTest {
                     loading.value,
                     { retries++ },
                     { closes++ },
-                    { interactions++ },
                 )
             }
         }
@@ -253,7 +247,6 @@ class ImageViewerTest {
         compose.runOnUiThread { image.value = bitmap.asImageBitmap() }
         compose.onNodeWithTag("image_viewer_zoom_in").performClick()
         compose.onNodeWithTag("image_viewer_canvas").performTouchInput { swipeLeft() }
-        assertTrue(interactions > 5)
         repeat(8) { compose.onNodeWithTag("image_viewer_zoom_in").performClick() }
         assertEquals(800, zoom())
         compose.onNodeWithTag("image_viewer_zoom_in").assertIsNotEnabled()

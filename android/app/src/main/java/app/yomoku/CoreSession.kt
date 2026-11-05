@@ -3,7 +3,6 @@ package app.yomoku
 import android.content.Intent
 import android.os.Handler
 import android.os.Looper
-import android.os.SystemClock
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -19,8 +18,6 @@ import app.yomoku.shared.AnkiPreflightOperation
 import app.yomoku.shared.AnkiPreflightResult
 import app.yomoku.shared.ContentRoute
 import app.yomoku.shared.Event
-import app.yomoku.shared.ReaderClockAction
-import app.yomoku.shared.ReaderClockSample
 import app.yomoku.shared.Requests
 import app.yomoku.shared.ShellEffect
 import app.yomoku.shared.ViewModel
@@ -69,8 +66,6 @@ internal data class CoreCallbackMeasurement(
 internal class CoreSession(
     databasePath: String,
     dictionary: DictionaryProvider,
-    private val monotonicMs: () -> Long = SystemClock::elapsedRealtime,
-    private val checkpointIntervalMs: Long = 15_000L,
     private val cancellationExecutor: ExecutorService = Executors.newSingleThreadExecutor(),
     private val ankiExecutor: ExecutorService = Executors.newSingleThreadExecutor(),
     private val readAnkiPreflight: (AnkiPreflightOperation) -> AnkiPreflightResult = {
@@ -97,30 +92,24 @@ internal class CoreSession(
 
     private var closing = false
     private var cancellationPending = false
-    private var readerActive = false
-    private var clockRunning = false
-    private var tickScheduled = false
+    private var closeRetryScheduled = false
     private var scheduledAnkiPreparation: ULong? = null
     private var checkedAnkiDeck: Long? = null
     private var ankiSetupScheduled = false
-    private val tick = Runnable {
-        tickScheduled = false
+    private val closeRetry = Runnable {
+        closeRetryScheduled = false
         if (closing) {
             if (!view.storageBusy) {
                 when {
-                    view.readingTimeSavePending -> send(Event.RetryReadingTimeCheckpoint)
                     view.completionSavePending -> send(Event.RetryReaderCompletion)
                 }
             }
-        } else if (clockRunning) {
-            observe(ReaderClockAction.CHECKPOINT)
         }
-        driveReaderClock()
+        finishClosing()
     }
 
     init {
         requireMainThread()
-        require(checkpointIntervalMs > 0)
     }
 
     private val bridge =
@@ -134,7 +123,7 @@ internal class CoreSession(
                         if (!isClosed) {
                             val start = if (observer != null) System.nanoTime() else 0L
                             render(requests, fromCallback = true)
-                            driveReaderClock()
+                            finishClosing()
                             if (observer != null && onCallbackMeasured === observer) {
                                 val end = System.nanoTime()
                                 observer(
@@ -165,7 +154,7 @@ internal class CoreSession(
         ) { id, result ->
             if (!closing && !isClosed) {
                 render(bridge.resolve(id, result.bincodeSerialize()))
-                driveReaderClock()
+                finishClosing()
             }
         }
 
@@ -285,30 +274,13 @@ internal class CoreSession(
         // Compose can dispose its transient selection after ViewModel teardown begins.
         if (closing && event == Event.DismissReaderWord) return
         check(!closing) { "CoreSession is closing or closed" }
-        // Sample before the intent: core may freeze the departing position immediately.
-        when (event) {
-            Event.OpenSettings,
-            Event.CloseDocument,
-            Event.OpenPaste,
-            is Event.SelectDestination,
-            is Event.CompleteEffectiveReaderPage,
-            is Event.PreviousReaderPage,
-            is Event.OpenReader,
-            is Event.CreatePaste,
-            is Event.ImportTxt,
-            is Event.ImportSrt,
-            is Event.ImportEpub -> pauseClock()
-            is Event.SaveReadingPosition -> if (event.value != view.reader?.position) pauseClock()
-            else -> Unit
-        }
         send(event)
-        driveReaderClock()
+        finishClosing()
     }
 
     fun setForeground(foreground: Boolean) {
         requireMainThread()
         check(!closing) { "CoreSession is closing or closed" }
-        if (!foreground) setReaderActive(false)
         bridge.setForeground(foreground)
     }
 
@@ -325,24 +297,10 @@ internal class CoreSession(
                     result.getOrThrow()
                     onComplete()
                 } finally {
-                    driveReaderClock()
+                    finishClosing()
                 }
             }
         }
-    }
-
-    /** Activity resume/pause, separate from the retained analyzer's start/stop policy. */
-    fun setReaderActive(active: Boolean) {
-        requireMainThread()
-        if (closing) return
-        readerActive = active
-        if (!active) pauseClock()
-        driveReaderClock()
-    }
-
-    fun onReaderInteraction() {
-        requireMainThread()
-        if (!closing && clockRunning) observe(ReaderClockAction.INTERACT)
     }
 
     private fun send(event: Event) {
@@ -358,70 +316,32 @@ internal class CoreSession(
         render(requests, eventEncodeNanos = encoded - start, nativeUpdateNanos = updated - encoded)
     }
 
-    private fun observe(action: ReaderClockAction) {
-        val reader = view.reader ?: return
-        send(
-            Event.ObserveReaderClock(
-                ReaderClockSample(reader.documentId, reader.position, monotonicMs(), action)
-            )
-        )
-    }
-
-    private fun pauseClock() {
-        if (clockRunning) observe(ReaderClockAction.PAUSE)
-        clockRunning = false
-        cancelTick()
-    }
-
-    private fun driveReaderClock() {
+    private fun finishClosing() {
         if (closing) {
-            if (
-                !view.storageBusy &&
-                    !view.readingTimeSavePending &&
-                    !view.completionSavePending &&
-                    !cancellationPending
-            ) {
-                cancelTick()
+            if (!view.storageBusy && !view.completionSavePending && !cancellationPending) {
+                cancelCloseRetry()
                 isClosed = true
                 bridge.close()
                 cancellationExecutor.shutdown()
                 ankiExecutor.shutdown()
             } else if (!view.storageBusy) {
                 // onCleared has no UI left for Retry. Keep the exact core obligation alive.
-                scheduleTick(1_000L)
+                scheduleCloseRetry(1_000L)
             }
             return
         }
-        val reader = view.reader
-        if (
-            !readerActive ||
-                view.settingsOpen ||
-                reader == null ||
-                reader.position.offset == reader.anchor.range.end
-        )
-            return
-        if (!view.storageBusy && !view.readingTimeSavePending && !view.completionSavePending) {
-            if (view.readerTime == null && view.documentError == null) {
-                send(Event.RestoreReadingTime)
-            }
-            if (view.readerTime != null && !clockRunning) {
-                observe(ReaderClockAction.RESUME)
-                clockRunning = true
-            }
-        }
-        if (clockRunning) scheduleTick(checkpointIntervalMs)
     }
 
-    private fun scheduleTick(delayMs: Long) {
-        if (!tickScheduled) {
-            tickScheduled = true
-            mainHandler.postDelayed(tick, delayMs)
+    private fun scheduleCloseRetry(delayMs: Long) {
+        if (!closeRetryScheduled) {
+            closeRetryScheduled = true
+            mainHandler.postDelayed(closeRetry, delayMs)
         }
     }
 
-    private fun cancelTick() {
-        mainHandler.removeCallbacks(tick)
-        tickScheduled = false
+    private fun cancelCloseRetry() {
+        mainHandler.removeCallbacks(closeRetry)
+        closeRetryScheduled = false
     }
 
     private fun render(
@@ -488,7 +408,7 @@ internal class CoreSession(
                     view.ankiExport?.phase == AnkiExportPhase.Ready
             ) {
                 send(Event.DispatchAnkiLive)
-                driveReaderClock()
+                finishClosing()
             }
         }
     }
@@ -507,7 +427,7 @@ internal class CoreSession(
                 // Read callbacks never keep a closing handle alive or reach a restarted bridge.
                 if (!closing && !isClosed) {
                     render(bridge.resolve(id, result))
-                    driveReaderClock()
+                    finishClosing()
                 }
             }
         }
@@ -546,13 +466,11 @@ internal class CoreSession(
         if (!closing) {
             covers.close()
             images.close()
-            pauseClock()
             closing = true
             ankiDecks.close()
             ankiBrowser.close()
             ankiLiveWorker.close()
-            readerActive = false
-            driveReaderClock()
+            finishClosing()
         }
     }
 

@@ -468,8 +468,7 @@ class VocabularyPerformanceTest {
                     assertEquals("ok", it.getString(0))
                 }
                 db.rawQuery("PRAGMA foreign_key_check", null).use { assertFalse(it.moveToFirst()) }
-                for (table in
-                    listOf("reading_completions", "reading_occurrences", "pending_reading_time")) {
+                for (table in listOf("reading_completions", "reading_occurrences")) {
                     db.rawQuery("SELECT count(*) FROM $table", null).use {
                         assertTrue(it.moveToFirst())
                         assertEquals(0L, it.getLong(0))

@@ -43,11 +43,7 @@ class ReaderWordsTest {
         compose.waitForIdle()
         compose.waitUntil(30_000) {
             val view = core().view
-            !view.storageBusy &&
-                !view.readingTimeSavePending &&
-                !view.completionSavePending &&
-                view.readerTime != null &&
-                view.effectiveReaderTokens != null
+            !view.storageBusy && !view.completionSavePending && view.effectiveReaderTokens != null
         }
         compose.waitForIdle()
     }
@@ -269,62 +265,6 @@ class ReaderWordsTest {
     }
 
     @Test
-    fun popupWindowInteractionsExtendIdleDeadlineAndKeepAccumulatingPartialTime() {
-        var now = 0L
-        lateinit var session: CoreSession
-        compose.runOnUiThread {
-            session =
-                CoreSession(
-                    ":memory:",
-                    sudachiDictionaryProvider(compose.activity),
-                    monotonicMs = { now },
-                )
-            testCore = session
-            session.setReaderActive(true)
-            compose.activity.setContent {
-                YomokuTheme {
-                    ReaderScreen(
-                        session.view,
-                        session.sessionKey,
-                        session::dispatch,
-                        session::onReaderInteraction,
-                    )
-                }
-            }
-        }
-        try {
-            openDocument()
-            val original = session.view.reader
-            compose.runOnUiThread { now = 299_000L }
-            tapSurface("猫")
-            compose.runOnUiThread { now = 550_000L }
-            // Touch metadata, without selecting a status. This window bypasses Activity input.
-            compose.onNodeWithTag("word_surface").performTouchInput { click() }
-            compose.runOnUiThread {
-                now = 750_000L
-                session.setReaderActive(false)
-            }
-            awaitWords()
-            assertEquals(750_000L, session.view.readerTime!!.pending.value)
-            assertEquals(original, session.view.reader)
-            assertNull(session.view.completionNotice)
-            assertTrue(
-                session.view.effectiveReaderTokens!!
-                    .tokens
-                    .filter { it.surface == "猫" }
-                    .all { it.vocabulary!!.status == VocabularyStatus.NEW }
-            )
-        } finally {
-            compose.runOnUiThread {
-                compose.activity.setContent {}
-                session.close()
-                testCore = null
-            }
-            compose.waitUntil(30_000) { session.isClosed }
-        }
-    }
-
-    @Test
     fun dictionaryShowsSeparateWordsNamesAndLifetimeCountsAndDismissesOnInvalidation() {
         val id = openDocument()
         val original = core().view.reader!!
@@ -432,14 +372,12 @@ class ReaderWordsTest {
         compose.runOnUiThread {
             session = CoreSession(":memory:", provider)
             testCore = session
-            session.setReaderActive(true)
             compose.activity.setContent {
                 YomokuTheme {
                     ReaderScreen(
                         session.view,
                         session.sessionKey,
                         session::dispatch,
-                        session::onReaderInteraction,
                     )
                 }
             }
@@ -525,14 +463,12 @@ class ReaderWordsTest {
         compose.runOnUiThread {
             session = CoreSession(":memory:", provider)
             testCore = session
-            session.setReaderActive(true)
             compose.activity.setContent {
                 YomokuTheme {
                     ReaderScreen(
                         session.view,
                         session.sessionKey,
                         session::dispatch,
-                        session::onReaderInteraction,
                     )
                 }
             }
@@ -544,7 +480,6 @@ class ReaderWordsTest {
             compose.onNodeWithTag("word_no_match").assertDoesNotExist()
             assertEquals(1, calls.get())
             fail.set(false)
-            compose.runOnUiThread { session.setReaderActive(false) }
             awaitWords()
             compose.onNodeWithTag("word_lookup_error").assertExists()
             assertEquals(1, calls.get())
@@ -572,7 +507,7 @@ class ReaderWordsTest {
                 compose.activity.setContent {
                     YomokuTheme {
                         Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
-                            EffectiveReaderWords(frame, core().sessionKey, { events.add(it) }, {})
+                            EffectiveReaderWords(frame, core().sessionKey, { events.add(it) })
                         }
                     }
                 }
@@ -641,7 +576,6 @@ class ReaderWordsTest {
                                         )
                                 }
                             },
-                            {},
                         )
                     }
                 }
@@ -655,7 +589,7 @@ class ReaderWordsTest {
         compose.runOnUiThread { frame = frame.copy(documentError = DocumentError.UNAVAILABLE) }
         compose.waitForIdle()
         assertEquals(1, events.size)
-        // A queued clock save can clear the shared error; this must not replay the failed read.
+        // Clearing the shared error must not replay the failed read.
         compose.runOnUiThread { frame = frame.copy(documentError = null) }
         compose.waitForIdle()
         assertEquals(1, events.size)
@@ -684,15 +618,15 @@ class ReaderWordsTest {
                 }
         val link = text.getLinkAnnotations(cat.start, cat.end).single().item
         compose.runOnUiThread {
-            frame = frame.copy(readingTimeSavePending = true)
+            frame = frame.copy(storageBusy = true)
             link.linkInteractionListener!!.onClick(link)
         }
         compose.onNodeWithTag("reader_word_panel").assertIsDisplayed()
         assertTrue(events.filterIsInstance<Event.LoadEffectiveReaderWord>().isEmpty())
-        compose.runOnUiThread { frame = frame.copy(readingTimeSavePending = false) }
+        compose.runOnUiThread { frame = frame.copy(storageBusy = false) }
         compose.waitForIdle()
         assertEquals(1, events.filterIsInstance<Event.LoadEffectiveReaderWord>().size)
-        compose.runOnUiThread { frame = frame.copy(readingTimeSavePending = true) }
+        compose.runOnUiThread { frame = frame.copy(storageBusy = true) }
         for (status in VocabularyStatus.entries) compose
             .onNodeWithTag("word_status_$status")
             .assertIsNotEnabled()

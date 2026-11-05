@@ -46,7 +46,6 @@ fn completion(document: &ReaderDocument, length: PageLength) -> PageCompletion {
         page_length: length,
         departing_position: page.position,
         completed_at_unix_ms: 100,
-        pending_time: Default::default(),
     }
 }
 

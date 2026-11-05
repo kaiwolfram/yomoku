@@ -107,7 +107,6 @@ class AnkiExportPanelTest {
         val reads = mutableListOf<Long>()
         val launches = mutableListOf<Intent>()
         var available = false
-        var interactions = 0
         lateinit var browser: AnkiNoteBrowser
         compose.runOnUiThread {
             frame.value =
@@ -131,7 +130,7 @@ class AnkiExportPanelTest {
         try {
             compose.setContent {
                 YomokuTheme {
-                    AnkiExportPanel(frame.value, events::add, browser) { interactions++ }
+                    AnkiExportPanel(frame.value, events::add, browser)
                 }
             }
             assertTrue(reads.isEmpty())
@@ -154,7 +153,6 @@ class AnkiExportPanelTest {
             assertEquals("test.9007199254740993", launches.single().action)
             compose.onNodeWithTag("anki_note_browser_status").assertDoesNotExist()
             assertTrue(events.isEmpty())
-            assertEquals(2, interactions)
         } finally {
             release.countDown()
             compose.runOnUiThread { browser.close() }

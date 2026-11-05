@@ -160,7 +160,6 @@ internal fun ReaderImageContent(
     page: ReaderPage,
     text: AnnotatedString,
     loader: EpubImageLoader?,
-    onInteraction: () -> Unit,
     typography: ReaderTypography? = null,
     furigana: List<ReaderRuby> = emptyList(),
 ) {
@@ -242,7 +241,6 @@ internal fun ReaderImageContent(
                                             onClickLabel =
                                                 stringResource(R.string.image_viewer_open)
                                         ) {
-                                            onInteraction()
                                             selectedImage = part.index
                                         }
                                         .testTag("reader_image_${part.index}"),
@@ -264,7 +262,6 @@ internal fun ReaderImageContent(
                             if (results.containsKey(reference.asset) && loader != null) {
                                 TextButton(
                                     onClick = {
-                                        onInteraction()
                                         retry++
                                     }
                                 ) {
@@ -287,7 +284,6 @@ internal fun ReaderImageContent(
                 loading = !results.containsKey(reference.asset),
                 onRetry = if (loader == null) null else ({ retry++ }),
                 onClose = { selectedImage = -1 },
-                onInteraction = onInteraction,
             )
         }
     }

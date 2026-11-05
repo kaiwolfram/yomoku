@@ -31,7 +31,6 @@ internal fun EffectiveReaderWords(
     view: ViewModel,
     sessionKey: String,
     dispatch: (Event) -> Unit,
-    onInteraction: () -> Unit,
     imageLoader: EpubImageLoader? = null,
     ankiBrowser: AnkiNoteBrowser? = null,
 ) {
@@ -41,7 +40,6 @@ internal fun EffectiveReaderWords(
             view,
             sessionKey,
             dispatch,
-            onInteraction,
             imageLoader,
             ankiBrowser,
         )
@@ -53,7 +51,6 @@ private fun EffectiveReaderWordContent(
     view: ViewModel,
     sessionKey: String,
     dispatch: (Event) -> Unit,
-    onInteraction: () -> Unit,
     imageLoader: EpubImageLoader?,
     ankiBrowser: AnkiNoteBrowser?,
 ) {
@@ -61,7 +58,7 @@ private fun EffectiveReaderWordContent(
     val word = view.effectiveReaderWord ?: return
     val base = view.readerAnalysis?.let { ReaderTokenKey(page.documentId, page.anchor, it) }
     val snapshot = view.effectiveReaderTokens?.takeIf { it.identity.base == base }
-    val idle = !view.storageBusy && !view.readingTimeSavePending && !view.completionSavePending
+    val idle = !view.storageBusy && !view.completionSavePending
     val canRead = idle && !word.busy && view.effectiveReaderStatus?.pending != true
     var requested by remember(base, page.position, view.pageLength) { mutableStateOf(false) }
     LaunchedEffect(base, page.position, view.pageLength, snapshot, canRead, view.documentError) {
@@ -93,7 +90,7 @@ private fun EffectiveReaderWordContent(
         }
     }
     val currentTokens by rememberUpdatedState(tokens)
-    val interaction by rememberUpdatedState(onInteraction)
+
     val dark = isSystemInDarkTheme()
     val foreground = MaterialTheme.colorScheme.onSurface
     val linkColor = MaterialTheme.colorScheme.primary
@@ -108,7 +105,6 @@ private fun EffectiveReaderWordContent(
                 page.formatting,
                 linkColor,
                 onExternalLink = { target ->
-                    interaction()
                     try {
                         uriHandler.openUri(target.toUri().normalizeScheme().toString())
                     } catch (_: IllegalArgumentException) {
@@ -120,7 +116,6 @@ private fun EffectiveReaderWordContent(
                 // A retained accessibility/link callback cannot select the same index on a newer
                 // page.
                 if (tapped != null && currentTokens?.any { it.selection == tapped } == true) {
-                    interaction()
                     selected = tapped
                 }
             }
@@ -129,7 +124,6 @@ private fun EffectiveReaderWordContent(
         page,
         text,
         imageLoader,
-        onInteraction,
         view.readerTypography,
         view.readerFurigana,
     )
@@ -137,12 +131,10 @@ private fun EffectiveReaderWordContent(
         base != null &&
             (snapshot == null || tokens == null) &&
             (requested || snapshot != null || view.documentError != null) &&
-            idle &&
-            view.readerTime != null
+            idle
     ) {
         TextButton(
             onClick = {
-                onInteraction()
                 requested = true
                 dispatch(Event.LoadReaderTokens(base))
             },
@@ -158,7 +150,6 @@ private fun EffectiveReaderWordContent(
         ReaderWordPanel(
             ReaderWordHeader(token.surface, token.reading, token.dictionaryForm, token.vocabulary),
             canRead,
-            onInteraction,
             onClose = {
                 selected = null
                 dispatch(Event.DismissReaderWord)
@@ -200,7 +191,6 @@ private fun EffectiveReaderWordContent(
                             },
                             canRead,
                             dispatch,
-                            onInteraction,
                             ankiBrowser,
                         )
                     },
@@ -214,15 +204,15 @@ private fun EffectiveReaderWordContent(
                     },
                 )
             } else {
-                ReaderWordLookupState(word.error != null, canRead, onInteraction) {
+                ReaderWordLookupState(word.error != null, canRead) {
                     dispatch(Event.LoadEffectiveReaderWord(display.selection))
                 }
             }
-            EffectiveReaderPendingActions(view, idle, dispatch, onInteraction)
+            EffectiveReaderPendingActions(view, idle, dispatch)
         }
     } else {
         // Accepted commands survive dismissal and page invalidation. Keep Retry/Cancel reachable.
-        EffectiveReaderPendingActions(view, idle, dispatch, onInteraction)
+        EffectiveReaderPendingActions(view, idle, dispatch)
     }
 }
 
@@ -231,9 +221,7 @@ private fun EffectiveReaderPendingActions(
     view: ViewModel,
     idle: Boolean,
     dispatch: (Event) -> Unit,
-    onInteraction: () -> Unit,
 ) {
-
     val status = view.effectiveReaderStatus
     if (status?.pending == true && !status.busy) {
         EffectiveReaderRetry(
@@ -243,7 +231,6 @@ private fun EffectiveReaderPendingActions(
             Event.RetryEffectiveReaderStatus,
             Event.CancelEffectiveReaderStatus,
             dispatch,
-            onInteraction,
         )
     }
 }
@@ -256,13 +243,11 @@ private fun EffectiveReaderRetry(
     retry: Event,
     cancel: Event,
     dispatch: (Event) -> Unit,
-    onInteraction: () -> Unit,
 ) {
     Text(stringResource(message), Modifier.testTag("effective_${tag}_error"))
     Row {
         TextButton(
             onClick = {
-                onInteraction()
                 dispatch(retry)
             },
             enabled = enabled,
@@ -272,7 +257,6 @@ private fun EffectiveReaderRetry(
         }
         TextButton(
             onClick = {
-                onInteraction()
                 dispatch(cancel)
             },
             enabled = enabled,

@@ -248,7 +248,7 @@ fn selected_word_bridge_loads_lazily_retries_both_failure_kinds_reuses_fifo_and_
     assert_eq!(words[0].forms[0].matches[1].sense_indices, vec![0, 1]);
     assert_eq!(names[0].entry.names[0].name_type, vec!["place name"]);
     assert_eq!(loaded.reader, failed.reader);
-    assert_eq!(loaded.reader_time, failed.reader_time);
+
     lifecycle.set_foreground(false).unwrap();
     let absent = dispatch(
         &bridge,

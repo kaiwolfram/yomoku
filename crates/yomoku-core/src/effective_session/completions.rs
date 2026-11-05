@@ -1,4 +1,4 @@
-//! Native completion ownership across final-clock drain, reservation and retries.
+//! Native completion ownership across reservation and retries.
 
 use std::sync::Arc;
 
@@ -44,13 +44,13 @@ impl EffectiveCompletionRequest {
 /// Native presentation facts for the app's existing busy/error projection.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct EffectiveCompletionState {
-    /// Includes waiting for final-time drain and a failed exact retry.
+    /// Includes preparation, commit and a failed exact retry.
     pub pending: bool,
     pub busy: bool,
     pub error: Option<DocumentError>,
 }
 
-/// Only a consumed successful commit may drive position/time/finish notices.
+/// Only a consumed successful commit may drive position/finish notices.
 /// The app uses Recorded/AlreadyRecorded and the frozen command ID as before.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum EffectiveCompletionProgress {
@@ -80,7 +80,7 @@ impl EffectiveReaderSession {
         }
     }
 
-    /// Freeze before final-time drain and immediately retire shell callbacks.
+    /// Freeze the accepted page identity and immediately retire shell callbacks.
     /// The app checks its current position/preset and shared FIFO/lifecycle gates;
     /// storage revalidates the full rendered partition in its transaction.
     pub fn begin_completion(
@@ -111,9 +111,8 @@ impl EffectiveReaderSession {
         true
     }
 
-    /// Dispatch only after BOTH accepted and coalesced final checkpoints drain.
-    /// Preparation does not freeze time early. Explicit retry uses this same
-    /// method; a commit retry shares the exact durable reservation, never prepares
+    /// Explicit retry uses this same method; a commit retry shares the exact
+    /// durable reservation, never prepares
     /// another one. The app must not auto-retry a Failed progress result.
     pub fn dispatch_completion(&mut self) -> Option<EffectiveCompletionRequest> {
         if self.completion.in_flight.is_some() {

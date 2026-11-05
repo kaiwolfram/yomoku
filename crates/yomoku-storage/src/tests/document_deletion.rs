@@ -1,6 +1,5 @@
 use super::{imports::fixture, *};
 use yomoku_core::{
-    active_time::PendingReadingTime,
     completion::PageCompletionIntent,
     document::{DocumentId, PasteText},
     reader::ReaderPage,
@@ -260,12 +259,7 @@ fn bulk_deletion_keeps_history_vocabulary_and_survivor_across_all_formats_and_re
         let yomoku_core::reader::ReaderAnalysis::Available(analysis_id) = analysis else {
             panic!("B")
         };
-        let saved = storage
-            .load_pending_reading_time(id, page.position)
-            .unwrap();
-        storage
-            .save_pending_reading_time(saved, PendingReadingTime::from_millis(1234).unwrap())
-            .unwrap();
+
         let prepared = storage
             .prepare_page_completion(PageCompletionIntent {
                 document_id: id,
@@ -281,12 +275,6 @@ fn bulk_deletion_keeps_history_vocabulary_and_survivor_across_all_formats_and_re
             .unwrap();
         storage
             .save_document_reading_position(id, page.position)
-            .unwrap();
-        let saved = storage
-            .load_pending_reading_time(id, page.position)
-            .unwrap();
-        storage
-            .save_pending_reading_time(saved, PendingReadingTime::from_millis(77).unwrap())
             .unwrap();
     }
     let tables = [
@@ -329,7 +317,6 @@ fn bulk_deletion_keeps_history_vocabulary_and_survivor_across_all_formats_and_re
         "chapter_analyses",
         "analyzed_tokens",
         "paste_content_hashes",
-        "pending_reading_time",
     ] {
         if table == "paste_content_hashes" {
             assert_eq!(rows(&storage, table).len(), 1, "surviving paste hash");

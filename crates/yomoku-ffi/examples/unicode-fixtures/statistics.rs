@@ -34,7 +34,6 @@ pub fn exchange(dir: &Path, writing: bool) -> Result<(), Box<dyn Error>> {
         let values = StatisticsValues {
             reading: LifetimeReadingTotals {
                 japanese_occurrences: u64::MAX,
-                active_time_ms: (1 << 53) + 1,
             },
             statuses: WordStatusCounts {
                 new: 1,

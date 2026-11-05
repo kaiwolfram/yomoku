@@ -1,5 +1,4 @@
 use yomoku_core::{
-    active_time::PendingReadingTime,
     completion::{AnalyzedCompletionOutcome, AnalyzedPageCompletion, PageCompletionIntent},
     document::{DocumentId, PasteText, ReaderDocument, TextOffset},
     pagination::{LogicalPages, PageLength, ReadingPosition},
@@ -63,27 +62,10 @@ fn record(storage: &mut Storage, command: AnalyzedPageCompletion) -> AnalyzedCom
         .unwrap()
 }
 
-fn checkpoint(
-    storage: &mut Storage,
-    document: &ReaderDocument,
-    position: ReadingPosition,
-    ms: i64,
-) {
+fn set_position(storage: &mut Storage, document: &ReaderDocument, position: ReadingPosition) {
     storage
         .save_document_reading_position(document.document_id, position)
         .unwrap();
-    let token = storage
-        .load_pending_reading_time(document.document_id, position)
-        .unwrap();
-    let saved = storage
-        .save_pending_reading_time(token, PendingReadingTime::from_millis(ms).unwrap())
-        .unwrap();
-    assert_eq!(
-        storage
-            .save_pending_reading_time(token, PendingReadingTime::from_millis(ms).unwrap())
-            .unwrap(),
-        saved
-    );
 }
 
 fn counts(storage: &Storage) -> Vec<i64> {
@@ -504,7 +486,7 @@ fn shared_image_references_survive_chapter_movement_reflow_and_reopen() {
 }
 
 #[test]
-fn all_presets_complete_chapters_in_order_with_exact_time_tokens_progress_and_finish() {
+fn all_presets_complete_chapters_in_order_with_exact_tokens_progress_and_finish() {
     for length in PageLength::ALL {
         let database = TestDatabase::new();
         let mut storage = Storage::open(database.path()).unwrap();
@@ -534,7 +516,7 @@ fn all_presets_complete_chapters_in_order_with_exact_time_tokens_progress_and_fi
             let page = ReaderPage::open_document(&before.document, length).unwrap();
             assert_eq!(page.anchor, *anchor);
             assert_eq!(page.page_number, index as u64 + 1);
-            checkpoint(&mut storage, &before.document, page.position, 123);
+            set_position(&mut storage, &before.document, page.position);
             let tokens = storage.load_reader_tokens(id, *anchor).unwrap().unwrap();
             let chapter_index = document
                 .chapters
@@ -551,7 +533,7 @@ fn all_presets_complete_chapters_in_order_with_exact_time_tokens_progress_and_fi
                 .filter(|token| token.anchor.range.start >= anchor.range.start)
                 .count() as i64;
             let command = prepare(&mut storage, id);
-            assert_eq!(command.completion.pending_time.milliseconds(), 123);
+
             let outcome = record(&mut storage, command);
             let AnalyzedCompletionOutcome::Recorded { newly_known } = outcome else {
                 panic!("expected new completion")
@@ -564,13 +546,7 @@ fn all_presets_complete_chapters_in_order_with_exact_time_tokens_progress_and_fi
                 storage.list_documents().unwrap()[0],
                 after.document.library_summary().unwrap()
             );
-            assert_eq!(
-                storage
-                    .pending_page_time(id, *anchor, length)
-                    .unwrap()
-                    .milliseconds(),
-                0
-            );
+
             assert_eq!(
                 record(&mut storage, command),
                 AnalyzedCompletionOutcome::AlreadyRecorded
@@ -588,15 +564,7 @@ fn all_presets_complete_chapters_in_order_with_exact_time_tokens_progress_and_fi
             VocabularyStatus::Learning
         );
         assert_eq!(counts(&storage)[2], occurrences);
-        let total_time: i64 = storage
-            .connection
-            .query_row(
-                "SELECT SUM(active_time_ms) FROM reading_completions",
-                [],
-                |row| row.get(0),
-            )
-            .unwrap();
-        assert_eq!(total_time, pages.len() as i64 * 123);
+
         let completed = snapshot(&mut storage, id);
         assert_eq!(
             completed
@@ -645,7 +613,7 @@ fn all_presets_complete_chapters_in_order_with_exact_time_tokens_progress_and_fi
 }
 
 #[test]
-fn chapter_local_time_survives_reflow_and_only_departing_chapter_is_consumed() {
+fn reflow_keeps_chapter_position_and_completion_advances_only_the_departing_chapter() {
     let database = TestDatabase::new();
     let mut storage = Storage::open(database.path()).unwrap();
     let imported = import(&mut storage, "<p>猫 犬 𠮷</p>");
@@ -653,25 +621,10 @@ fn chapter_local_time_survives_reflow_and_only_departing_chapter_is_consumed() {
     let document = snapshot(&mut storage, id).document;
     let first_eof = position(&document, 0, document.chapters[0].text.len());
     let second_start = position(&document, 1, 0);
-    checkpoint(&mut storage, &document, first_eof, 111);
-    checkpoint(&mut storage, &document, second_start, 222);
+    set_position(&mut storage, &document, first_eof);
+    set_position(&mut storage, &document, second_start);
     for length in PageLength::ALL {
         storage.save_page_length(length).unwrap();
-        let pages = LogicalPages::new(&document.chapters, length).unwrap();
-        assert_eq!(
-            storage
-                .pending_page_time(id, pages.pages()[0], length)
-                .unwrap()
-                .milliseconds(),
-            111
-        );
-        assert_eq!(
-            storage
-                .pending_page_time(id, pages.pages()[1], length)
-                .unwrap()
-                .milliseconds(),
-            222
-        );
         assert_eq!(
             snapshot(&mut storage, id).document.reading_position,
             Some(second_start)
@@ -681,7 +634,7 @@ fn chapter_local_time_survives_reflow_and_only_departing_chapter_is_consumed() {
         .save_document_reading_position(id, first_eof)
         .unwrap();
     let command = prepare(&mut storage, id);
-    assert_eq!(command.completion.pending_time.milliseconds(), 111);
+
     record(&mut storage, command);
     assert_eq!(
         snapshot(&mut storage, id).document.reading_position,
@@ -690,13 +643,6 @@ fn chapter_local_time_survives_reflow_and_only_departing_chapter_is_consumed() {
     assert!(!snapshot(&mut storage, id).document.finished_at_least_once);
     drop(storage);
     let mut storage = Storage::open(database.path()).unwrap();
-    assert_eq!(
-        prepare(&mut storage, id)
-            .completion
-            .pending_time
-            .milliseconds(),
-        222
-    );
     let second = prepare(&mut storage, id);
     record(&mut storage, second);
     assert!(snapshot(&mut storage, id).document.finished_at_least_once);
@@ -721,13 +667,10 @@ fn foreign_chapters_scalar_splits_wrong_analysis_and_missing_analysis_fail_witho
         },
     ] {
         assert!(storage.save_document_reading_position(id, bad).is_err());
-        assert!(storage.load_pending_reading_time(id, bad).is_err());
     }
     let foreign = ReaderPage::open_document(&other, PageLength::default()).unwrap();
     assert!(storage.load_reader_tokens(id, foreign.anchor).is_err());
-    assert!(storage
-        .pending_page_time(id, foreign.anchor, PageLength::default())
-        .is_err());
+
     for wrong in [a.analysis_ids[1], b.analysis_ids[0]] {
         assert!(matches!(
             storage.record_analyzed_page_completion(command.completion, wrong),
@@ -774,13 +717,12 @@ fn foreign_chapters_scalar_splits_wrong_analysis_and_missing_analysis_fail_witho
 }
 
 #[test]
-fn completion_write_and_commit_failures_roll_back_time_history_status_position_and_finish() {
+fn completion_write_and_commit_failures_roll_back_history_status_position_and_finish() {
     for table in [
         "reading_completions",
         "completion_analyses",
         "vocabulary_status_events",
         "reading_occurrences",
-        "pending_reading_time",
         "reading_positions",
         "documents",
         "deferred",
@@ -790,7 +732,7 @@ fn completion_write_and_commit_failures_roll_back_time_history_status_position_a
         let imported = import(&mut storage, "<p>犬 犬</p>");
         let id = imported.document.document_id;
         let document = snapshot(&mut storage, id).document;
-        checkpoint(&mut storage, &document, position(&document, 1, 0), 456);
+        set_position(&mut storage, &document, position(&document, 1, 0));
         let command = prepare(&mut storage, id);
         let before = snapshot(&mut storage, id);
         let before_counts = counts(&storage);
@@ -800,7 +742,7 @@ fn completion_write_and_commit_failures_roll_back_time_history_status_position_a
         if table == "deferred" {
             storage.connection.execute_batch("CREATE TABLE deferred_failure (id INTEGER REFERENCES documents(id) DEFERRABLE INITIALLY DEFERRED); CREATE TRIGGER fail_reader AFTER UPDATE ON documents BEGIN INSERT INTO deferred_failure VALUES (-1); END;").unwrap();
         } else {
-            let operation = if matches!(table, "pending_reading_time" | "documents") {
+            let operation = if table == "documents" {
                 "UPDATE"
             } else {
                 "INSERT"
@@ -822,13 +764,7 @@ fn completion_write_and_commit_failures_roll_back_time_history_status_position_a
                 .unwrap(),
             before_vocab
         );
-        assert_eq!(
-            storage
-                .pending_page_time(id, command.completion.page, command.completion.page_length)
-                .unwrap()
-                .milliseconds(),
-            456
-        );
+
         storage
             .connection
             .execute_batch("DROP TRIGGER fail_reader")

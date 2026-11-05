@@ -53,12 +53,8 @@
     <string name="statistics_weekly">Weekly · UTC · lifetime values</string>
     <string name="statistics_monthly">Monthly · UTC · lifetime values</string>
     <string name="statistics_range">%1$s – %2$s (UTC)</string>
-    <string name="statistics_overview">Back to overview</string>
     <string name="statistics_loading">Loading statistics…</string>
     <string name="statistics_error">Statistics could not be loaded.</string>
-    <string name="statistics_open_details">View details</string>
-    <string name="statistics_bucket_values">Lifetime values at each interval end</string>
-    <string name="statistics_opening">Before %1$s (UTC)</string>
     <string name="vocabulary_empty">No vocabulary yet.</string>
     <string name="vocabulary_search">Search written prefix</string>
     <string name="vocabulary_matches">Matching words: %1$s</string>

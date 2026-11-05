@@ -13,13 +13,12 @@ use crate::{
     documents::write_position_in,
     encounters::{record_effective_occurrences_in, record_occurrences_in},
     reader_documents::load_reader_document_in,
-    reading_time::{consume_time_in, page_time_in},
     settings::read_page_length,
     Storage, StorageError,
 };
 
 impl Storage {
-    /// Reserve a command and freeze the drained page total in one transaction.
+    /// Reserve a command and freeze the page identity in one transaction.
     /// Retrying preparation after failure cannot complete or consume anything.
     pub fn prepare_page_completion(
         &mut self,
@@ -33,7 +32,6 @@ impl Storage {
         if read_page_length(&transaction)? != intent.page_length {
             return Err(StorageError::InvalidCompletion);
         }
-        let (pending_time, _) = page_time_in(&transaction, &document, intent.page)?;
         transaction.execute("INSERT INTO completion_commands DEFAULT VALUES", [])?;
         let completion = PageCompletion {
             command_id: CompletionCommandId::try_from(transaction.last_insert_rowid())
@@ -43,7 +41,6 @@ impl Storage {
             page_length: intent.page_length,
             departing_position: intent.departing_position,
             completed_at_unix_ms: intent.completed_at_unix_ms,
-            pending_time,
         };
         completion
             .next_document_position(&document)
@@ -55,9 +52,9 @@ impl Storage {
         })
     }
 
-    /// After final-time drain, validate the rendered effective identity and freeze
-    /// its complete provenance/occurrences with a new command ID and durable time.
-    /// Preparation never registers words, consumes time or records encounters.
+    /// Validate the rendered effective identity and freeze
+    /// its complete provenance/occurrences with a new command ID.
+    /// Preparation never registers words or records encounters.
     pub fn prepare_effective_page_completion(
         &mut self,
         intent: PageCompletionIntent,
@@ -83,7 +80,6 @@ impl Storage {
         if effective.segmentation() != &key.segmentation {
             return Err(StorageError::InvalidCompletion);
         }
-        let (pending_time, _) = page_time_in(&transaction, &document, intent.page)?;
         transaction.execute("INSERT INTO completion_commands DEFAULT VALUES", [])?;
         let completion = PageCompletion {
             command_id: CompletionCommandId::try_from(transaction.last_insert_rowid())
@@ -93,7 +89,6 @@ impl Storage {
             page_length: intent.page_length,
             departing_position: intent.departing_position,
             completed_at_unix_ms: intent.completed_at_unix_ms,
-            pending_time,
         };
         completion
             .next_document_position(&document)
@@ -136,7 +131,7 @@ impl Storage {
         Ok(id)
     }
 
-    /// Legacy position/time-only repository foundation, not a reader forward action.
+    /// Legacy position-only repository foundation, not a reader forward action.
     /// An analyzed command cannot be replayed without its frozen analysis identity.
     pub fn record_page_completion(
         &mut self,
@@ -147,7 +142,7 @@ impl Storage {
     }
 
     /// Freeze analysis_id with the command payload. Every Japanese occurrence,
-    /// New→Known event, pending duration and destination position commits together.
+    /// New→Known event and destination position commits together.
     /// Retries check identity before live content, so deletion/reflow is harmless.
     pub fn record_analyzed_page_completion(
         &mut self,
@@ -188,7 +183,6 @@ impl Storage {
             ":departing": i64::from(completion.departing_position.offset),
             ":length": completion.page_length.characters() as i64,
             ":date": completion.completed_at_unix_ms,
-            ":time": completion.pending_time.milliseconds(),
         };
         // Replay precedes live-content validation: history remains retry-safe
         // after progress changes, page reflow and future document deletion.
@@ -198,8 +192,7 @@ impl Storage {
                 AND source_id = :source AND chapter_id = :chapter
                 AND start_byte_offset = :start AND end_byte_offset = :end
                 AND departing_byte_offset = :departing AND page_length = :length
-                AND completed_at_unix_ms = :date
-                AND active_time_ms = :time,
+                AND completed_at_unix_ms = :date,
                 (SELECT analysis_id FROM completion_analyses WHERE command_id = :command)
              FROM reading_completions WHERE command_id = :command",
                 values,
@@ -233,15 +226,11 @@ impl Storage {
         let next = completion
             .next_document_position(&document)
             .map_err(|_| StorageError::InvalidCompletion)?;
-        let (pending, anchors) = page_time_in(&transaction, &document, completion.page)?;
-        if pending != completion.pending_time {
-            return Err(StorageError::InvalidCompletion);
-        }
         transaction.execute(
             "INSERT INTO reading_completions
              (command_id, semantics_version, document_id, source_id, chapter_id,
-              start_byte_offset, end_byte_offset, departing_byte_offset, page_length, completed_at_unix_ms, active_time_ms)
-             VALUES (:command, 1, :document, :source, :chapter, :start, :end, :departing, :length, :date, :time)",
+              start_byte_offset, end_byte_offset, departing_byte_offset, page_length, completed_at_unix_ms)
+             VALUES (:command, 1, :document, :source, :chapter, :start, :end, :departing, :length, :date)",
             values,
         )?;
         let newly_known = if let Some(frozen) = effective {
@@ -258,7 +247,6 @@ impl Storage {
         } else {
             0
         };
-        consume_time_in(&transaction, &anchors)?;
         write_position_in(&transaction, completion.document_id, next)?;
         // Only the whole document's final page sets the permanent marker.
         // Intermediate chapter EOF, position-only movement and retries do not.

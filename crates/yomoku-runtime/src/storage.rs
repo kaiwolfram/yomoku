@@ -339,36 +339,15 @@ fn execute(
             .map_err(map_error)?
             .map(StorageResult::PositionSaved)
             .ok_or(DocumentError::NotFound),
-        StorageOperation::LoadReadingTime {
-            document_id,
-            position,
-        } => storage
-            .load_pending_reading_time(document_id, position)
-            .map(StorageResult::ReadingTimeLoaded)
-            .map_err(map_error),
-        StorageOperation::SaveReadingTime {
-            previous,
-            checkpoint,
-        } => {
-            if previous.value.document_id != checkpoint.document_id
-                || previous.position() != checkpoint.position
-            {
-                return Err(DocumentError::InvalidDocument);
-            }
-            storage
-                .save_pending_reading_time(previous, checkpoint.pending)
-                .map(StorageResult::ReadingTimeSaved)
-                .map_err(map_error)
-        }
     }
 }
 
 pub(crate) fn map_error(error: StorageError) -> DocumentError {
     match error {
         StorageError::Sqlite(_) => DocumentError::Unavailable,
-        StorageError::InvalidDocument
-        | StorageError::InvalidCompletion
-        | StorageError::InvalidReadingTime => DocumentError::InvalidDocument,
+        StorageError::InvalidDocument | StorageError::InvalidCompletion => {
+            DocumentError::InvalidDocument
+        }
         StorageError::InvalidSettings => DocumentError::InvalidSettings,
         StorageError::UnsupportedSchemaVersion { .. }
         | StorageError::InvalidMigrationHistory

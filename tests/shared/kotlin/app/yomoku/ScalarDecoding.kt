@@ -193,7 +193,6 @@ internal fun frozenScalarView(ids: List<VocabularyId>): ViewModel =
         libraryDocumentCount = 0UL,
         storageBusy = false,
         contentRoute = ContentRoute.MAIN,
-        readingTimeSavePending = false,
         completionSavePending = false,
         readerFurigana = emptyList(),
     )

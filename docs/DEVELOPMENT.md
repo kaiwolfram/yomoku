@@ -127,7 +127,7 @@ tools/start-android-emulator.sh medium_phone
 Use instrumentation class filters for focused reader/provider cases. Do not wipe
 an ordinary installation or accept unsupported development data by resetting it.
 An isolated fresh AVD is suitable for initial-schema tests. Reader trials should
-cover import, lookup/no-match, status, Next/Previous, time, reread and recreation.
+cover import, lookup/no-match, status, Next/Previous, reread and recreation.
 Anki fake-provider tests cover failures, duplicate refresh, guards and model
 compatibility; they do not establish real AnkiDroid collection/browser behavior.
 Trial a disposable real collection before release and a physical arm64 device

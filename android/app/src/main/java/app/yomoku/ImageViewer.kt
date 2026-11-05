@@ -19,8 +19,6 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.input.key.onPreviewKeyEvent
-import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.testTag
@@ -118,16 +116,14 @@ internal fun ImageViewer(
     loading: Boolean,
     onRetry: (() -> Unit)?,
     onClose: () -> Unit,
-    onInteraction: () -> Unit,
 ) {
     var transform by
         rememberSaveable(stateSaver = ImageViewerTransform.Saver) {
             mutableStateOf(ImageViewerTransform())
         }
     var viewport by remember { mutableStateOf(IntSize.Zero) }
-    val interaction by rememberUpdatedState(onInteraction)
+
     val close = {
-        interaction()
         onClose()
     }
     val percent = stringResource(R.string.image_viewer_zoom, (transform.zoom * 100).roundToInt())
@@ -150,27 +146,10 @@ internal fun ImageViewer(
             contentColor = Color.White,
             modifier = Modifier.fillMaxSize().testTag("image_viewer"),
         ) {
-            Column(
-                Modifier.fillMaxSize()
-                    .windowInsetsPadding(WindowInsets.safeDrawing)
-                    // Dialog input does not pass through Activity's reader-idle observer.
-                    .pointerInput(Unit) {
-                        awaitPointerEventScope {
-                            while (true) {
-                                awaitPointerEvent(PointerEventPass.Initial)
-                                interaction()
-                            }
-                        }
-                    }
-                    .onPreviewKeyEvent {
-                        interaction()
-                        false
-                    }
-            ) {
+            Column(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)) {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                     TextButton(
                         onClick = {
-                            interaction()
                             transform = ImageViewerTransform()
                         },
                         colors = colors,
@@ -240,7 +219,6 @@ internal fun ImageViewer(
                             if (!loading && onRetry != null) {
                                 TextButton(
                                     onClick = {
-                                        interaction()
                                         onRetry()
                                     },
                                     colors = colors,
@@ -257,7 +235,6 @@ internal fun ImageViewer(
                 ) {
                     TextButton(
                         onClick = {
-                            interaction()
                             transform =
                                 transformImageViewer(
                                     viewport,
@@ -277,7 +254,6 @@ internal fun ImageViewer(
                     Text(percent, Modifier.testTag("image_viewer_zoom"))
                     TextButton(
                         onClick = {
-                            interaction()
                             transform =
                                 transformImageViewer(
                                     viewport,

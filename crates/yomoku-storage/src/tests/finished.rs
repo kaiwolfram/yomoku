@@ -1,5 +1,4 @@
 use yomoku_core::{
-    active_time::PendingReadingTime,
     completion::{CompletionOutcome, PageCompletion},
     document::{DocumentId, PasteText, PastedDocument},
     pagination::PageLength,
@@ -24,9 +23,6 @@ fn command(storage: &mut Storage, document: &PastedDocument) -> PageCompletion {
         page_length,
         departing_position: page.position,
         completed_at_unix_ms: 500,
-        pending_time: storage
-            .pending_page_time(document.document_id, page.anchor, page_length)
-            .unwrap(),
     }
 }
 
@@ -34,7 +30,7 @@ fn command(storage: &mut Storage, document: &PastedDocument) -> PageCompletion {
 // against an old schema. This is not a production completion path.
 
 #[test]
-fn finished_marker_survives_backward_position_reflow_time_reopen_and_each_reread() {
+fn finished_marker_survives_backward_position_reflow_reopen_and_each_reread() {
     let database = TestDatabase::new();
     let mut storage = Storage::open(database.path()).unwrap();
     let document = paste(&mut storage, "猫𠮷\0終");
@@ -59,12 +55,7 @@ fn finished_marker_survives_backward_position_reflow_time_reopen_and_each_reread
                 .unwrap(),
             Some(true)
         );
-        let token = storage
-            .load_pending_reading_time(document.document_id, position(&document, 0))
-            .unwrap();
-        storage
-            .save_pending_reading_time(token, PendingReadingTime::from_millis(123).unwrap())
-            .unwrap();
+
         drop(storage);
         storage = Storage::open(database.path()).unwrap();
         let before = storage.load_paste(document.document_id).unwrap();
@@ -264,12 +255,10 @@ fn explicit_finished_open_resets_durably_but_loads_and_completion_reloads_keep_p
     for length in PageLength::ALL {
         storage.save_page_length(length).unwrap();
         let partial = position(&document, 3);
-        let token = storage.load_pending_reading_time(id, partial).unwrap();
-        // A finished reread's partial-page time survives closing/reopening at page 1.
+
+        // A finished reread can save a partial-page position before reopening at page 1.
         storage.save_reading_position(id, partial).unwrap();
-        let token = storage
-            .save_pending_reading_time(token, PendingReadingTime::from_millis(123).unwrap())
-            .unwrap();
+
         let before = storage.load_paste(id).unwrap().unwrap();
         assert_eq!(
             storage.load_reader_snapshot(id).unwrap().unwrap().document,
@@ -292,10 +281,7 @@ fn explicit_finished_open_resets_durably_but_loads_and_completion_reloads_keep_p
         drop(storage);
         storage = Storage::open(database.path()).unwrap();
         assert_eq!(storage.load_paste(id).unwrap(), Some(opened.document));
-        assert_eq!(
-            storage.load_pending_reading_time(id, partial).unwrap(),
-            token
-        );
+
         let summary = &storage.list_documents().unwrap()[0];
         assert!(summary.finished_at_least_once);
         assert_eq!(summary.progress_percent, 0);

@@ -56,7 +56,6 @@ class EffectiveReaderPerformanceTest {
                 instrumentation.runOnMainSync { core.onViewChanged = null }
             }
         assertNull(view.documentError)
-        assertFalse(view.readingTimeSavePending)
         assertFalse(view.completionSavePending)
         return Sample(view, (end - start) / 1e6, mainMs)
     }
@@ -258,8 +257,7 @@ class EffectiveReaderPerformanceTest {
             assertEquals(fullCalls, dictionaryCalls.get())
             SQLiteDatabase.openDatabase(database.path, null, SQLiteDatabase.OPEN_READONLY).use { db
                 ->
-                for (table in
-                    listOf("reading_completions", "reading_occurrences", "pending_reading_time")) {
+                for (table in listOf("reading_completions", "reading_occurrences")) {
                     db.rawQuery("SELECT count(*) FROM $table", null).use { rows ->
                         assertTrue(rows.moveToFirst())
                         assertEquals(0L, rows.getLong(0))

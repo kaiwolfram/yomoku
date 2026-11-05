@@ -55,9 +55,7 @@ CREATE TABLE reading_completions (
     departing_byte_offset INTEGER NOT NULL
         CHECK (departing_byte_offset >= start_byte_offset AND departing_byte_offset <= end_byte_offset),
     page_length INTEGER NOT NULL CHECK (page_length IN (250, 500, 750, 1000, 1500)),
-    completed_at_unix_ms INTEGER NOT NULL CHECK (completed_at_unix_ms >= 0)
-, active_time_ms INTEGER NOT NULL
-    DEFAULT 0 CHECK (active_time_ms >= 0)) STRICT;
+    completed_at_unix_ms INTEGER NOT NULL CHECK (completed_at_unix_ms >= 0)) STRICT;
 
 CREATE TABLE vocabulary (
     id INTEGER PRIMARY KEY AUTOINCREMENT CHECK (id > 0),
@@ -91,15 +89,6 @@ CREATE TABLE analyzed_tokens (
 CREATE TABLE paste_content_hashes (
     document_id INTEGER PRIMARY KEY REFERENCES documents(id) ON DELETE CASCADE,
     sha256 BLOB NOT NULL CHECK (length(sha256) = 32)
-) STRICT;
-
-CREATE TABLE pending_reading_time (
-    document_id INTEGER NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
-    chapter_id INTEGER NOT NULL REFERENCES chapters(id),
-    byte_offset INTEGER NOT NULL CHECK (byte_offset >= 0),
-    milliseconds INTEGER NOT NULL CHECK (milliseconds >= 0),
-    revision INTEGER NOT NULL CHECK (revision > 0),
-    PRIMARY KEY (document_id, chapter_id, byte_offset)
 ) STRICT;
 
 CREATE TABLE completion_analyses (

@@ -1,5 +1,4 @@
 use yomoku_core::{
-    active_time::PendingReadingTime,
     completion::{AnalyzedCompletionOutcome, PageCompletionIntent},
     document::PasteText,
     effective_reader::EffectivePageCompletion,
@@ -35,19 +34,6 @@ fn intent(storage: &mut Storage, imported: &AnalyzedPaste) -> PageCompletionInte
     }
 }
 
-fn save_time(storage: &mut Storage, imported: &AnalyzedPaste, milliseconds: i64) {
-    let position = intent(storage, imported).departing_position;
-    let saved = storage
-        .load_pending_reading_time(imported.document.document_id, position)
-        .unwrap();
-    storage
-        .save_pending_reading_time(
-            saved,
-            PendingReadingTime::from_millis(milliseconds).unwrap(),
-        )
-        .unwrap();
-}
-
 fn prepare(storage: &mut Storage, imported: &AnalyzedPaste) -> EffectivePageCompletion {
     let intent = intent(storage, imported);
     let key = storage
@@ -61,12 +47,11 @@ fn prepare(storage: &mut Storage, imported: &AnalyzedPaste) -> EffectivePageComp
         .unwrap()
 }
 
-fn assert_totals(storage: &Storage, japanese_occurrences: u64, active_time_ms: u64) {
+fn assert_totals(storage: &Storage, japanese_occurrences: u64) {
     assert_eq!(
         storage.lifetime_reading_totals().unwrap(),
         LifetimeReadingTotals {
             japanese_occurrences,
-            active_time_ms
         }
     );
 }
@@ -93,45 +78,43 @@ fn original_and_effective_completions_keep_repetitions_rereads_statuses_and_exac
             .set_vocabulary_status(entry.id, status, 200)
             .unwrap();
     }
-    save_time(&mut storage, &imported, 1234);
     let first_intent = intent(&mut storage, &imported);
     let original = storage.prepare_page_completion(first_intent).unwrap();
     storage
         .record_analyzed_page_completion(original.completion, original.analysis_id)
         .unwrap();
-    assert_totals(&storage, 7, 1234);
+    assert_totals(&storage, 7);
     storage
         .save_document_reading_position(
             imported.document.document_id,
             first_intent.departing_position,
         )
         .unwrap();
-    save_time(&mut storage, &imported, 2000);
-    // Replaying old success cannot consume the new incomplete reread's time.
+    // Replaying old success cannot count the incomplete reread.
     assert_eq!(
         storage
             .record_analyzed_page_completion(original.completion, original.analysis_id)
             .unwrap(),
         AnalyzedCompletionOutcome::AlreadyRecorded
     );
-    assert_totals(&storage, 7, 1234);
+    assert_totals(&storage, 7);
     drop(storage);
     let mut storage = Storage::open(database.path()).unwrap();
-    assert_totals(&storage, 7, 1234);
+    assert_totals(&storage, 7);
     let reread = prepare(&mut storage, &imported);
     storage.record_effective_page_completion(&reread).unwrap();
-    assert_totals(&storage, 14, 3234);
+    assert_totals(&storage, 14);
     assert_eq!(
         storage.record_effective_page_completion(&reread).unwrap(),
         AnalyzedCompletionOutcome::AlreadyRecorded
     );
-    assert_totals(&storage, 14, 3234);
+    assert_totals(&storage, 14);
     let before = fs::read(database.path()).unwrap();
     storage
         .connection
         .pragma_update(None, "query_only", true)
         .unwrap();
-    assert_totals(&storage, 14, 3234);
+    assert_totals(&storage, 14);
     assert_eq!(fs::read(database.path()).unwrap(), before);
 }
 
@@ -140,7 +123,6 @@ fn document_deletion_keeps_totals_and_vocabulary_deletion_recalculates_without_j
     let database = TestDatabase::new();
     let mut storage = Storage::open(database.path()).unwrap();
     let imported = import(&mut storage, "猫 猫 犬");
-    save_time(&mut storage, &imported, 1234);
     let completed = prepare(&mut storage, &imported);
     storage
         .record_effective_page_completion(&completed)
@@ -152,24 +134,24 @@ fn document_deletion_keeps_totals_and_vocabulary_deletion_recalculates_without_j
     storage
         .delete_document(imported.document.document_id)
         .unwrap();
-    assert_totals(&storage, 3, 1234);
+    assert_totals(&storage, 3);
     // Exercise the existing history cascade directly; production confirmed
     // vocabulary deletion remains its own later implementation-plan slice.
     storage
         .connection
         .execute("DELETE FROM vocabulary WHERE id = ?1", [i64::from(cat.id)])
         .unwrap();
-    assert_totals(&storage, 1, 1234);
+    assert_totals(&storage, 1);
     assert_eq!(
         storage
             .record_effective_page_completion(&completed)
             .unwrap(),
         AnalyzedCompletionOutcome::AlreadyRecorded
     );
-    assert_totals(&storage, 1, 1234);
+    assert_totals(&storage, 1);
     drop(storage);
     let mut storage = Storage::open(database.path()).unwrap();
-    assert_totals(&storage, 1, 1234);
+    assert_totals(&storage, 1);
     let reimported = import(&mut storage, "猫 猫 犬");
     let new_cat = storage
         .vocabulary_entry(&Surface::new("猫").unwrap())
@@ -177,18 +159,17 @@ fn document_deletion_keeps_totals_and_vocabulary_deletion_recalculates_without_j
         .unwrap();
     assert_ne!(new_cat.id, cat.id);
     assert_eq!(new_cat.status, VocabularyStatus::New);
-    assert_totals(&storage, 1, 1234);
-    save_time(&mut storage, &reimported, 100);
+    assert_totals(&storage, 1);
     let reimported = prepare(&mut storage, &reimported);
     storage
         .record_effective_page_completion(&reimported)
         .unwrap();
-    assert_totals(&storage, 4, 1334);
+    assert_totals(&storage, 4);
     storage
         .connection
         .execute("DELETE FROM vocabulary", [])
         .unwrap();
-    assert_totals(&storage, 0, 1334);
+    assert_totals(&storage, 0);
 }
 
 #[test]
@@ -196,13 +177,12 @@ fn failed_completion_is_invisible_and_concurrent_duplicate_success_counts_once()
     let database = TestDatabase::new();
     let mut storage = Storage::open(database.path()).unwrap();
     let imported = import(&mut storage, "猫 猫 犬");
-    save_time(&mut storage, &imported, 1234);
     let completed = prepare(&mut storage, &imported);
     storage.connection.execute_batch("CREATE TRIGGER fail BEFORE INSERT ON reading_occurrences WHEN NEW.token_index = 1 BEGIN SELECT RAISE(ABORT, 'fixture'); END;").unwrap();
     assert!(storage
         .record_effective_page_completion(&completed)
         .is_err());
-    assert_totals(&storage, 0, 0);
+    assert_totals(&storage, 0);
     storage
         .connection
         .execute_batch("DROP TRIGGER fail")
@@ -217,20 +197,19 @@ fn failed_completion_is_invisible_and_concurrent_duplicate_success_counts_once()
                 let mut storage = Storage::open(path).unwrap();
                 barrier.wait();
                 storage.record_effective_page_completion(completed).unwrap();
-                assert_totals(&storage, 3, 1234);
+                assert_totals(&storage, 3);
             });
         }
     });
-    assert_totals(&storage, 3, 1234);
+    assert_totals(&storage, 3);
 }
 
 #[test]
-fn unknown_event_versions_and_corrupt_durations_fail_without_repair() {
+fn unknown_event_versions_fail_without_repair() {
     for sql in [
         "UPDATE reading_completions SET semantics_version = 2",
         "UPDATE completion_analyses SET semantics_version = 2",
         "UPDATE effective_completion_commands SET semantics_version = 3",
-        "UPDATE reading_completions SET active_time_ms = -1",
     ] {
         let database = TestDatabase::new();
         let mut storage = Storage::open(database.path()).unwrap();
@@ -257,31 +236,6 @@ fn unknown_event_versions_and_corrupt_durations_fail_without_repair() {
 }
 
 #[test]
-fn lifetime_time_uses_exact_integers_and_overflow_errors_without_truncating_or_writing() {
-    let database = TestDatabase::new();
-    let mut storage = Storage::open(database.path()).unwrap();
-    let first = import(&mut storage, "猫");
-    save_time(&mut storage, &first, i64::MAX);
-    let completed = prepare(&mut storage, &first);
-    storage
-        .record_effective_page_completion(&completed)
-        .unwrap();
-    assert_totals(&storage, 1, i64::MAX as u64);
-    let second = import(&mut storage, "犬");
-    save_time(&mut storage, &second, 1);
-    let completed = prepare(&mut storage, &second);
-    storage
-        .record_effective_page_completion(&completed)
-        .unwrap();
-    let before = fs::read(database.path()).unwrap();
-    assert!(matches!(
-        storage.lifetime_reading_totals(),
-        Err(StorageError::Sqlite(_))
-    ));
-    assert_eq!(fs::read(database.path()).unwrap(), before);
-}
-
-#[test]
 fn compact_mode_c_reservation_excludes_other_pages_and_keeps_atomic_deletion_safe_retries() {
     let database = TestDatabase::new();
     let mut storage = Storage::open(database.path()).unwrap();
@@ -289,7 +243,6 @@ fn compact_mode_c_reservation_excludes_other_pages_and_keeps_atomic_deletion_saf
         &mut storage,
         &format!("猫\n{}\nUNRELATED_CHAPTER_MARKER", "English ".repeat(1000)),
     );
-    save_time(&mut storage, &imported, 1234);
     let frozen = prepare(&mut storage, &imported);
     let (version, payload): (i64, String) = storage
         .connection
@@ -310,18 +263,8 @@ fn compact_mode_c_reservation_excludes_other_pages_and_keeps_atomic_deletion_saf
     assert!(payload.len() < imported.document.chapter.text.len());
     storage.connection.execute_batch("CREATE TRIGGER fail_receipt BEFORE INSERT ON reading_occurrences BEGIN SELECT RAISE(ABORT, 'fixture'); END;").unwrap();
     assert!(storage.record_effective_page_completion(&frozen).is_err());
-    assert_totals(&storage, 0, 0);
-    assert_eq!(
-        storage
-            .load_pending_reading_time(
-                imported.document.document_id,
-                frozen.completion().departing_position
-            )
-            .unwrap()
-            .pending()
-            .milliseconds(),
-        1234
-    );
+    assert_totals(&storage, 0);
+
     storage
         .connection
         .execute_batch("DROP TRIGGER fail_receipt")
@@ -330,7 +273,7 @@ fn compact_mode_c_reservation_excludes_other_pages_and_keeps_atomic_deletion_saf
         storage.record_effective_page_completion(&frozen).unwrap(),
         AnalyzedCompletionOutcome::Recorded { .. }
     ));
-    assert_totals(&storage, 1, 1234);
+    assert_totals(&storage, 1);
     let mode: String = storage
         .connection
         .query_row("SELECT split_mode FROM completion_analyses", [], |row| {
@@ -347,5 +290,5 @@ fn compact_mode_c_reservation_excludes_other_pages_and_keeps_atomic_deletion_saf
         storage.record_effective_page_completion(&frozen).unwrap(),
         AnalyzedCompletionOutcome::AlreadyRecorded
     );
-    assert_totals(&storage, 1, 1234);
+    assert_totals(&storage, 1);
 }

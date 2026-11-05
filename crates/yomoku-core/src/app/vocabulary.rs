@@ -101,7 +101,7 @@ impl Yomoku {
         model.vocabulary.error = None;
         model.vocabulary_failed_offset = None;
         model.storage_busy = true;
-        model.time_checkpoint_can_wait = false;
+
         render::render().and(
             Command::request_from_shell(StorageOperation::LoadVocabulary { query, offset })
                 .then_send(move |result| Event::VocabularyFinished(id, result)),

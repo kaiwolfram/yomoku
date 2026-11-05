@@ -14,7 +14,6 @@ internal fun verifyStatisticsCodecs(dir: String) {
         check(data.timeframe == timeframe && data.endExclusiveUnixMs == 1_800_000_000_124L)
         check(data.opening == data.buckets.single().values)
         check(data.opening.reading.japaneseOccurrences == ULong.MAX_VALUE)
-        check(data.opening.reading.activeTimeMs == 9_007_199_254_740_993UL)
         check(
             data.opening.statuses == WordStatusCounts(1UL, 2UL, 3UL, 9_007_199_254_740_993UL, 5UL)
         )

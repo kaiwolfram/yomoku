@@ -123,7 +123,7 @@ class AnkiEntrySessionTest {
         send(Event.LoadEffectiveReaderWord(selected))
         val submitted = view()
         check(submitted.effectiveReaderWord?.selection == selected) {
-            "Selection rejected: selected=$selected; tokens=${submitted.effectiveReaderTokens?.identity}; current=${submitted.reader?.anchor}/${submitted.readerAnalysis}; route=${submitted.contentRoute}; settings=${submitted.settingsOpen}; busy=${submitted.storageBusy}/${submitted.readingTimeSavePending}/${submitted.completionSavePending}; word=${submitted.effectiveReaderWord}; status=${submitted.effectiveReaderStatus}"
+            "Selection rejected: selected=$selected; tokens=${submitted.effectiveReaderTokens?.identity}; current=${submitted.reader?.anchor}/${submitted.readerAnalysis}; route=${submitted.contentRoute}; settings=${submitted.settingsOpen}; busy=${submitted.storageBusy}/${submitted.completionSavePending}; word=${submitted.effectiveReaderWord}; status=${submitted.effectiveReaderStatus}"
         }
         await {
             check(it.effectiveReaderWord?.error == null) {

@@ -25,7 +25,7 @@ class StatisticsScreenTest {
     }
 
     @Test
-    fun overviewDrilldownsExactValuesAndAllTimeframeEvents() {
+    fun overviewChartsHaveNoDetailActionsAndAllTimeframeEvents() {
         render()
         compose.onNodeWithTag("statistics_card_KNOWN").assertDoesNotExist()
         compose.onNodeWithTag("statistics_timeframe_LASTYEAR").assertIsSelected()
@@ -53,8 +53,8 @@ class StatisticsScreenTest {
             compose
                 .onNodeWithTag("statistics_scroll")
                 .performScrollToNode(hasTestTag("statistics_card_${chart.name}"))
-            compose.onNodeWithTag("statistics_card_${chart.name}").performClick()
-            compose.onNodeWithTag("statistics_overview").assertIsDisplayed()
+            compose.onNodeWithTag("statistics_card_${chart.name}").assertHasNoClickAction()
+            compose.onNodeWithText("View details").assertDoesNotExist()
             val fixture = statisticsFixture()
             val description =
                 compose.activity.getString(chart.title) +
@@ -70,30 +70,6 @@ class StatisticsScreenTest {
             compose
                 .onNodeWithTag("statistics_chart_${chart.name}")
                 .assertContentDescriptionEquals(description)
-            compose
-                .onNodeWithTag("statistics_scroll")
-                .performScrollToNode(hasTestTag("statistics_opening"))
-            chart.values(statisticsFixture().opening).forEachIndexed { index, value ->
-                compose
-                    .onNodeWithTag("statistics_opening")
-                    .onChildren()
-                    .filter(hasText("${compose.activity.getString(chart.lines[index])}: $value"))
-                    .assertCountEquals(1)
-            }
-            val last = fixture.buckets.last()
-            val bucket = "statistics_bucket_${last.startUnixMs}"
-            compose.onNodeWithTag("statistics_scroll").performScrollToNode(hasTestTag(bucket))
-            chart.values(last.values).forEachIndexed { index, value ->
-                compose
-                    .onNodeWithTag(bucket)
-                    .onChildren()
-                    .filter(hasText("${compose.activity.getString(chart.lines[index])}: $value"))
-                    .assertCountEquals(1)
-            }
-            compose
-                .onNodeWithTag("statistics_scroll")
-                .performScrollToNode(hasTestTag("statistics_overview"))
-            compose.onNodeWithTag("statistics_overview").performClick()
         }
     }
 
@@ -145,17 +121,14 @@ class StatisticsScreenTest {
     }
 
     @Test
-    fun detailBackAndSettingsKeepTheSelectedChart() {
+    fun settingsKeepTheOverview() {
         render()
-        compose.onNodeWithTag("statistics_card_OCCURRENCES").performClick()
-        compose.onNodeWithTag("statistics_overview").assertIsDisplayed()
+        compose.onNodeWithTag("statistics_card_OCCURRENCES").assertIsDisplayed()
         compose.runOnUiThread { frame.value = frame.value.copy(settingsOpen = true) }
         compose.onNodeWithTag("statistics_chart_OCCURRENCES").assertDoesNotExist()
         compose.runOnUiThread { frame.value = frame.value.copy(settingsOpen = false) }
-        compose.onNodeWithTag("statistics_overview").assertIsDisplayed()
-        compose.runOnUiThread { compose.activity.onBackPressedDispatcher.onBackPressed() }
-        compose.onNodeWithTag("statistics_overview").assertDoesNotExist()
         compose.onNodeWithTag("statistics_card_OCCURRENCES").assertIsDisplayed()
+        compose.onNodeWithText("View details").assertDoesNotExist()
     }
 }
 
@@ -187,7 +160,6 @@ private fun statisticsView(): ViewModel {
         libraryDocumentCount = 0UL,
         storageBusy = false,
         contentRoute = ContentRoute.MAIN,
-        readingTimeSavePending = false,
         completionSavePending = false,
         readerFurigana = emptyList(),
     )

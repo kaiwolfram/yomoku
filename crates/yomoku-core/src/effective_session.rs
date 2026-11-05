@@ -110,7 +110,7 @@ struct RetainedPage {
 
 /// Rust-only accepted page command. Sharing the immutable full key makes retry
 /// clones cheap and keeps it alive after movement invalidates shell callbacks.
-/// Construct through the owning session, before dispatch or checkpoint drain.
+/// Construct through the owning session, before dispatch.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct EffectivePageCommand {
     identity: EffectivePageIdentity,

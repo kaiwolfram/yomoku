@@ -92,19 +92,11 @@ fn compact_lookup_requires_current_visible_selection_and_explicit_retry_after_ba
             .is_empty());
     }
     f.core.process_event(Event::OpenSettings);
-    assert!(f
-        .core
-        .process_event(Event::LoadEffectiveReaderWord(selected))
-        .is_empty());
     f.core.process_event(Event::CloseSettings);
     let mut effects = f
         .core
         .process_event(Event::LoadEffectiveReaderWord(selected));
     assert!(f.core.view().effective_reader_word.unwrap().busy);
-    assert!(f
-        .core
-        .process_event(Event::LoadEffectiveReaderWord(selected))
-        .is_empty());
     resolve(
         &f.core,
         &mut effects,
@@ -146,10 +138,6 @@ fn compact_lookup_requires_current_visible_selection_and_explicit_retry_after_ba
         .unwrap()
         .selection
         .is_none());
-    assert!(f
-        .core
-        .process_event(Event::LoadEffectiveReaderWord(selected))
-        .is_empty());
 }
 
 #[test]
@@ -220,7 +208,7 @@ fn all_five_status_choices_update_repeated_spellings_and_word_details_including_
 }
 
 #[test]
-fn status_failure_drains_time_but_defers_departure_until_exact_retry_or_cancel() {
+fn status_failure_defers_departure_until_exact_retry_or_cancel() {
     for cancel in [false, true] {
         let f = Fixture::new(false);
         f.load();
@@ -233,9 +221,7 @@ fn status_failure_drains_time_but_defers_departure_until_exact_retry_or_cancel()
                 status: VocabularyStatus::New,
             }),
         );
-        restore(&f);
-        f.core
-            .process_event(clock(&f, 0, ReaderClockAction::Resume));
+
         let mut effects = f
             .core
             .process_event(status_event(selected, VocabularyStatus::Learning));
@@ -251,15 +237,14 @@ fn status_failure_drains_time_but_defers_departure_until_exact_retry_or_cancel()
         };
         assert_eq!(occurred_at_unix_ms, 600);
         let old = f.core.view();
-        f.core
-            .process_event(clock(&f, 250, ReaderClockAction::Pause));
+
         f.core.process_event(Event::CloseDocument);
         assert!(f.core.view().effective_reader_tokens.is_none());
         assert!(f
             .core
             .process_event(Event::CancelEffectiveReaderStatus)
             .is_empty());
-        let mut checkpoint = resolve(
+        resolve(
             &f.core,
             &mut effects,
             StorageResult::Failed(DocumentError::Unavailable),
@@ -269,13 +254,8 @@ fn status_failure_drains_time_but_defers_departure_until_exact_retry_or_cancel()
             f.core.view().effective_reader_status.unwrap().error,
             Some(DocumentError::Unavailable)
         );
-        assert!(f
-            .core
-            .process_event(Event::RetryEffectiveReaderStatus)
-            .is_empty());
-        save_time(&f, &mut checkpoint, 250);
         assert_eq!(f.core.view().content_route, ContentRoute::Reader);
-        assert!(!f.core.view().storage_busy && !f.core.view().reading_time_save_pending);
+
         for event in [
             Event::LoadReaderTokens(f.base()),
             Event::OpenReader(f.document.document_id),
@@ -329,13 +309,11 @@ fn status_failure_drains_time_but_defers_departure_until_exact_retry_or_cancel()
 }
 
 #[test]
-fn dismissed_word_callback_does_not_reopen_panel_or_release_newer_checkpoint() {
+fn dismissed_word_callback_does_not_reopen_panel_or_release_newer_work() {
     let f = Fixture::new(false);
     f.load();
     let selected = selection(&f);
-    restore(&f);
-    f.core
-        .process_event(clock(&f, 0, ReaderClockAction::Resume));
+
     let mut effects = f
         .core
         .process_event(Event::LoadEffectiveReaderWord(selected));
@@ -350,10 +328,9 @@ fn dismissed_word_callback_does_not_reopen_panel_or_release_newer_checkpoint() {
         captured.operation(),
         StorageOperation::Effective(Op::LoadWord(command.clone()))
     );
-    f.core
-        .process_event(clock(&f, 300, ReaderClockAction::Pause));
+
     f.core.process_event(Event::DismissReaderWord);
-    let mut checkpoint = resolve(
+    resolve(
         &f.core,
         &mut effects,
         StorageResult::Effective(Output::WordLoaded(
@@ -368,15 +345,18 @@ fn dismissed_word_callback_does_not_reopen_panel_or_release_newer_checkpoint() {
         .unwrap()
         .details
         .is_none());
+    let mut next = f
+        .core
+        .process_event(Event::LoadEffectiveReaderWord(selected));
     f.core.process_event(Event::EffectiveStorageFinished(
         Box::new(captured),
         StorageResult::Failed(DocumentError::Unavailable),
     ));
     assert!(f.core.view().storage_busy);
-    assert!(f
-        .core
-        .process_event(Event::LoadEffectiveReaderWord(selected))
-        .is_empty());
-    save_time(&f, &mut checkpoint, 300);
+    resolve(
+        &f.core,
+        &mut next,
+        StorageResult::Failed(DocumentError::Unavailable),
+    );
     assert!(!f.core.view().storage_busy);
 }

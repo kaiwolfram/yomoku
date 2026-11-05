@@ -300,7 +300,6 @@ fn deleting_document_removes_identity_and_reimport_starts_fresh_preserving_histo
             offset: TextOffset::START,
         },
         completed_at_unix_ms: 30,
-        pending_time: Default::default(),
     };
     storage.record_page_completion(completion).unwrap();
     // Test-only deletion; no production delete API or new semantics introduced.

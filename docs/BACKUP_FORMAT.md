@@ -12,9 +12,9 @@ The format is independent of Crux/Bincode/FFI payloads.
 ## Complete local state
 
 The payload is one compact consistent SQLite snapshot of the **initial schema 1**,
-with the [28 application tables](DATA_MODEL.md) and `sqlite_sequence`. It retains
+with the [27 application tables](DATA_MODEL.md) and `sqlite_sequence`. It retains
 original imported bytes, canonical text/images/annotations, analysis identities,
-vocabulary/status history, counted occurrences/completions, time, progress,
+vocabulary/status history, counted occurrences/completions, progress,
 reader settings, default Anki deck, migration journal and ID high-water marks.
 There are no custom entries, segmentation overrides, Anki export journals or
 recovery records. Existing development databases/backups are unsupported.
@@ -28,7 +28,7 @@ Restore has no Anki recovery prerequisite and never replays external writes.
 `Storage::create_backup_snapshot` uses bound `VACUUM main INTO ?1` on a new
 private 0700 directory/0600 file, preserving IDs/sequences while excluding deleted
 free-page contents. Never copy live SQLite/WAL/journal files with filesystem reads.
-The caller must drain reader checkpoints and gate new mutations on the FIFO.
+The caller must drain pending reader mutations and gate new mutations on the FIFO.
 Completed snapshots verify journal/integrity/FKs/page size/zero freelist, sync and
 expose only an owned reader plus schema/length. Existing paths/symlinks are refused.
 Drop/error/cancel attempt cleanup; explicit discard reports failures. Process-death
@@ -207,7 +207,7 @@ See [SQLite untrusted-input guidance](https://www.sqlite.org/security.html),
 ## Replacement remains unfinished
 
 Only complete semantic validation may lead to a fresh session-local confirmation.
-Require explicit complete-replacement confirmation; never merge. Drain checkpoints
+Require explicit complete-replacement confirmation; never merge. Drain pending reader mutations
 and workers, gate new I/O, retire provider/navigation work and old callbacks/handles/
 caches, then atomically activate a synced candidate on the same filesystem with
 correct sidecar handling. Interrupted activation must leave usable old or validated

@@ -126,11 +126,6 @@ pub fn statistics_buckets(
                 .japanese_occurrences
                 .checked_add(delta.japanese_occurrences)
                 .ok_or(InvalidStatisticsHistory)?;
-            values.reading.active_time_ms = values
-                .reading
-                .active_time_ms
-                .checked_add(delta.active_time_ms)
-                .ok_or(InvalidStatisticsHistory)?;
         }
         while statuses
             .peek()

@@ -15,10 +15,6 @@ mod vocabulary;
 mod vocabulary_bulk;
 
 use crate::{
-    active_time::{
-        ActiveReadingTime, ReaderClockAction, ReaderClockSample, ReadingTimeUpdate,
-        SavedReadingTime,
-    },
     completion::{
         AnalyzedCompletionOutcome, CompletionNotice, PageCompletion, PageCompletionIntent,
     },
@@ -121,15 +117,9 @@ pub struct Model {
     page_length: Option<PageLength>,
     reader_typography: Option<ReaderTypography>,
     import_summary: Option<ImportSummary>,
-    reader_time: Option<SavedReadingTime>,
-    restoring_reader_time: bool,
-    pending_time_checkpoint: Option<StorageOperation>,
-    queued_time_checkpoint: Option<ReadingTimeUpdate>,
     deferred_reader_event: Option<Event>,
     completion_notice: Option<CompletionNotice>,
     book_completion_notice: Option<CompletionCommandId>,
-    reader_clock: Option<ActiveReadingTime>,
-    time_checkpoint_can_wait: bool,
     effective_reader: EffectiveReaderSession,
     effective_request: Option<EffectiveReaderRequest>,
 }
@@ -194,25 +184,15 @@ pub enum Event {
     OpenPaste,
     OpenReader(DocumentId),
     CloseDocument,
-    /// Position-only persistence hook; waits for accepted time checkpoints.
+    /// Position-only persistence hook.
     /// Page completion uses a separate command.
     SaveReadingPosition(ReadingPosition),
     SetPageLength(PageLength),
     SetReaderTypography(ReaderTypography),
     DismissImportSummary,
-    /// Explicit preparation for the platform timer; opening itself stays read-only.
-    RestoreReadingTime,
-    /// Coalesce newer absolute durations while a checkpoint is unresolved.
-    CheckpointReadingTime(ReadingTimeUpdate),
-    /// Retry the frozen absolute checkpoint, including its original revision.
-    RetryReadingTimeCheckpoint,
-
     /// Retry preparation or the exact frozen analyzed command after a failure.
     RetryReaderCompletion,
     DismissCompletionNotice,
-    /// Restore first, then supply Android's monotonic clock. Pause before any
-    /// departure/completion; Checkpoint and Pause save absolute durations.
-    ObserveReaderClock(ReaderClockSample),
     /// Position-only backward navigation anchored to the visible page.
     PreviousReaderPage {
         document_id: DocumentId,
@@ -397,10 +377,6 @@ pub struct ViewModel {
     pub page_length: Option<PageLength>,
     pub reader_typography: Option<ReaderTypography>,
     pub import_summary: Option<ImportSummary>,
-    /// Only the committed duration at the current exact reading offset.
-    pub reader_time: Option<ReadingTimeUpdate>,
-    /// Remains true after a failed checkpoint until its exact retry succeeds.
-    pub reading_time_save_pending: bool,
     pub completion_save_pending: bool,
     pub completion_notice: Option<CompletionNotice>,
     /// One newly recorded final-page command, independent of permanent finish state.
@@ -518,16 +494,7 @@ impl App for Yomoku {
                 model,
             );
         }
-        if let Event::ObserveReaderClock(sample) = event {
-            let Some(update) = model.observe_reader_clock(sample) else {
-                return Command::done();
-            };
-            return self.update(Event::CheckpointReadingTime(update), model);
-        }
-        if (model.pending_time_checkpoint.is_some()
-            || model.queued_time_checkpoint.is_some()
-            || model.completion_pending()
-            || model.effective_mutation_pending())
+        if (model.completion_pending() || model.effective_mutation_pending())
             && matches!(
                 event,
                 Event::CloseDocument
@@ -543,82 +510,7 @@ impl App for Yomoku {
             model.invalidate_effective_page();
             return render::render();
         }
-        if let Some(StorageOperation::SaveReadingTime { checkpoint, .. }) =
-            model.pending_time_checkpoint.as_ref()
-        {
-            if let Event::CheckpointReadingTime(update) = &event {
-                // Coalesce without replacing the frozen in-flight retry payload.
-                let newest = model.queued_time_checkpoint.as_ref().unwrap_or(checkpoint);
-                if !model.is_current_time(*update)
-                    || update.pending.milliseconds() <= newest.pending.milliseconds()
-                {
-                    return Command::done();
-                }
-                model.queued_time_checkpoint = Some(*update);
-                return render::render();
-            }
-        }
-        // An unrelated operation may already own the FIFO (e.g. settings reflow).
-        // Keep the greatest absolute checkpoint until its callback, rather than
-        // dropping a platform final save under the normal busy-event policy.
-        if model.storage_busy {
-            if let Event::CheckpointReadingTime(update) = event {
-                if !model.time_checkpoint_can_wait
-                    || model.completion_pending()
-                    || !model.is_current_time(update)
-                {
-                    return Command::done();
-                }
-                let Some(saved) = model.reader_time else {
-                    return Command::done();
-                };
-                let newest = model.queued_time_checkpoint.unwrap_or(saved.value);
-                if update.pending.milliseconds() <= newest.pending.milliseconds() {
-                    return Command::done();
-                }
-                model.queued_time_checkpoint = Some(update);
-                return render::render();
-            }
-        }
         let operation = match &event {
-            Event::RestoreReadingTime => {
-                let Some(reader) = model.reader.as_ref() else {
-                    return Command::done();
-                };
-                if model.reader_time.is_some() {
-                    return Command::done();
-                }
-                Some(StorageOperation::LoadReadingTime {
-                    document_id: reader.document_id,
-                    position: reader.position,
-                })
-            }
-            Event::CheckpointReadingTime(checkpoint) => {
-                let Some(previous) = model.reader_time else {
-                    return Command::done();
-                };
-                if !model.is_current_time(*checkpoint)
-                    || checkpoint.pending.milliseconds() < previous.pending().milliseconds()
-                    || model.queued_time_checkpoint.is_some_and(|queued| {
-                        checkpoint.pending.milliseconds() < queued.pending.milliseconds()
-                    })
-                {
-                    return Command::done();
-                }
-                Some(StorageOperation::SaveReadingTime {
-                    previous,
-                    checkpoint: *checkpoint,
-                })
-            }
-            Event::RetryReadingTimeCheckpoint => {
-                if let Some(operation) = model.pending_time_checkpoint.clone() {
-                    Some(operation)
-                } else if let Some(checkpoint) = model.queued_time_checkpoint {
-                    return self.update(Event::CheckpointReadingTime(checkpoint), model);
-                } else {
-                    return Command::done();
-                }
-            }
             Event::RefreshLibrary => Some(StorageOperation::List),
             Event::SaveDocumentTitle(id) => {
                 let Some(draft) = model.library_rename.as_ref() else {
@@ -713,56 +605,14 @@ impl App for Yomoku {
             _ => None,
         };
         if let Some(operation) = operation {
-            let draining_completion_time = model.completion_pending()
-                && matches!(event, Event::CheckpointReadingTime(checkpoint)
-                if model.queued_time_checkpoint == Some(checkpoint));
             // One in-flight command per session prevents duplicate submissions and
             // stale load/list callbacks from replacing a newer snapshot.
             if model.storage_busy
-                || (model.effective_mutation_pending()
-                    && !matches!(
-                        event,
-                        Event::CheckpointReadingTime(_) | Event::RetryReadingTimeCheckpoint
-                    ))
-                || (model.queued_time_checkpoint.is_some()
-                    && !matches!(
-                        event,
-                        Event::CheckpointReadingTime(_) | Event::RetryReadingTimeCheckpoint
-                    ))
-                || (model.pending_time_checkpoint.is_some()
-                    && !matches!(event, Event::RetryReadingTimeCheckpoint))
-                || (model.completion_pending()
-                    && !matches!(
-                        event,
-                        Event::RetryReaderCompletion | Event::RetryReadingTimeCheckpoint
-                    )
-                    && !draining_completion_time)
+                || model.effective_mutation_pending()
+                || model.completion_pending()
             {
                 return Command::done();
             }
-            if let StorageOperation::SaveReadingTime { checkpoint, .. } = &operation {
-                model.pending_time_checkpoint = Some(operation.clone());
-                if model.queued_time_checkpoint.is_some_and(|queued| {
-                    queued.pending.milliseconds() <= checkpoint.pending.milliseconds()
-                }) {
-                    model.queued_time_checkpoint = None;
-                }
-            }
-            model.restoring_reader_time =
-                matches!(operation, StorageOperation::LoadReadingTime { .. });
-            model.time_checkpoint_can_wait = match &operation {
-                StorageOperation::List
-                | StorageOperation::LoadEffectiveLibraryWordDistributions
-                | StorageOperation::SavePageLength(_)
-                | StorageOperation::SaveReaderTypography(_)
-                | StorageOperation::LoadReadingTime { .. }
-                | StorageOperation::SaveReadingTime { .. } => true,
-                StorageOperation::SaveReadingPosition { position, .. } => model
-                    .reader
-                    .as_ref()
-                    .is_some_and(|reader| reader.position == *position),
-                _ => false,
-            };
             model.storage_busy = true;
             if let StorageOperation::RenameDocument { document_id, title } = &operation {
                 model.pending_document_rename = Some((*document_id, title.clone()));
@@ -842,7 +692,6 @@ impl App for Yomoku {
                 model.clear_reader_word();
                 model.reader_document = None;
                 model.reader_analyses.clear();
-                model.clear_reader_time();
             }
             return render::render()
                 .and(Command::request_from_shell(operation).then_send(Event::StorageFinished));
@@ -912,8 +761,6 @@ impl App for Yomoku {
                 if !model.library_visible()
                     || model.library_selection.is_some()
                     || model.storage_busy
-                    || model.pending_time_checkpoint.is_some()
-                    || model.queued_time_checkpoint.is_some()
                     || model.completion_pending()
                 {
                     return Command::done();
@@ -956,8 +803,6 @@ impl App for Yomoku {
                 if !model.library_visible()
                     || model.library_selection.is_some()
                     || model.storage_busy
-                    || model.pending_time_checkpoint.is_some()
-                    || model.queued_time_checkpoint.is_some()
                     || model.completion_pending()
                 {
                     return Command::done();
@@ -1030,7 +875,6 @@ impl App for Yomoku {
                 model.reader_document = None;
                 model.reader_analyses.clear();
                 model.pending_reader = None;
-                model.clear_reader_time();
             }
             Event::OpenPaste => {
                 model.library_selection = None;
@@ -1049,7 +893,7 @@ impl App for Yomoku {
                 model.reader_document = None;
                 model.reader_analyses.clear();
                 model.pending_reader = None;
-                model.clear_reader_time();
+
                 model.document_error = None;
             }
             Event::CloseDocument => model.close_document(),
@@ -1077,10 +921,8 @@ impl App for Yomoku {
                 {
                     return Command::done();
                 }
-                let failed = matches!(result, StorageResult::Failed(_));
                 model.storage_busy = false;
-                model.time_checkpoint_can_wait = false;
-                let restoring_time = std::mem::take(&mut model.restoring_reader_time);
+
                 let loading_library_words = std::mem::take(&mut model.loading_library_words);
                 let pending_reader = model.pending_reader.take();
                 let document_delete = model.pending_document_delete.take();
@@ -1158,40 +1000,6 @@ impl App for Yomoku {
                         model.reader_typography = Some(typography);
                     }
                     StorageResult::PageLengthSaved(length) => model.apply_page_length(length),
-                    StorageResult::ReadingTimeLoaded(saved) => {
-                        if restoring_time && model.is_current_time(saved.value) {
-                            model.reader_time = Some(saved);
-                        }
-                    }
-                    StorageResult::ReadingTimeSaved(saved) => {
-                        model.pending_time_checkpoint = None;
-                        if model.is_current_time(saved.value) {
-                            model.reader_time = Some(saved);
-                        }
-                        if let Some(checkpoint) = model.queued_time_checkpoint.take() {
-                            // Completion is accepted but has not frozen its total:
-                            // drain this slot before preparing the command.
-                            let operation = StorageOperation::SaveReadingTime {
-                                previous: saved,
-                                checkpoint,
-                            };
-                            model.pending_time_checkpoint = Some(operation.clone());
-                            model.storage_busy = true;
-                            return render::render().and(
-                                Command::request_from_shell(operation)
-                                    .then_send(Event::StorageFinished),
-                            );
-                        }
-                        if model.completion_pending() {
-                            return self.update(Event::RetryReaderCompletion, model);
-                        }
-                        if !model.effective_mutation_pending() {
-                            if let Some(event) = model.deferred_reader_event.take() {
-                                return self.update(event, model);
-                            }
-                        }
-                    }
-
                     StorageResult::Created(document) | StorageResult::Existing(document) => {
                         model.invalidate_library_words();
                         model.import_summary = Some(ImportSummary {
@@ -1218,7 +1026,6 @@ impl App for Yomoku {
                         model.clear_reader_word();
                         model.reader_document = None;
                         model.reader_analyses.clear();
-                        model.clear_reader_time();
                     }
                     StorageResult::Loaded(snapshot) => {
                         if snapshot.validate().is_err() {
@@ -1285,13 +1092,6 @@ impl App for Yomoku {
                         }
                     }
                 }
-                // Reads and atomic manual choices have no frozen retry obligation.
-                // Their failures must still drain final time and deferred departures.
-                if !failed && model.pending_time_checkpoint.is_none() {
-                    if let Some(checkpoint) = model.queued_time_checkpoint {
-                        return self.update(Event::CheckpointReadingTime(checkpoint), model);
-                    }
-                }
             }
             Event::RefreshLibrary
             | Event::SaveDocumentTitle(_)
@@ -1307,12 +1107,8 @@ impl App for Yomoku {
             | Event::SetReaderTypography(_)
             | Event::SetPageLength(_)
             | Event::SaveReadingPosition(_) => unreachable!(),
-            Event::RestoreReadingTime
-            | Event::CheckpointReadingTime(_)
-            | Event::RetryReadingTimeCheckpoint
-            | Event::RetryReaderCompletion
+            Event::RetryReaderCompletion
             | Event::PreviousReaderPage { .. }
-            | Event::ObserveReaderClock(_)
             | Event::CompleteEffectiveReaderPage { .. }
             | Event::LoadEffectiveReaderWord(_)
             | Event::SetEffectiveReaderStatus { .. }
@@ -1395,9 +1191,6 @@ impl App for Yomoku {
             page_length: model.page_length,
             reader_typography: model.reader_typography,
             import_summary: model.import_summary.clone(),
-            reader_time: model.reader_time.map(|saved| saved.value),
-            reading_time_save_pending: model.pending_time_checkpoint.is_some()
-                || model.queued_time_checkpoint.is_some(),
             completion_save_pending: model.completion_pending(),
             completion_notice: model.completion_notice,
             book_completion_notice: model.book_completion_notice,
@@ -1433,8 +1226,6 @@ impl Model {
     fn can_select_library_documents(&self) -> bool {
         self.library_visible()
             && !self.storage_busy
-            && self.pending_time_checkpoint.is_none()
-            && self.queued_time_checkpoint.is_none()
             && !self.completion_pending()
             && self.library_delete_target.is_none()
             && self.library_bulk_delete_targets.is_none()
@@ -1493,52 +1284,8 @@ impl Model {
         self.reader_document = None;
         self.reader_analyses.clear();
         self.pending_reader = None;
-        self.clear_reader_time();
-        self.document_error = None;
-    }
 
-    fn observe_reader_clock(&mut self, sample: ReaderClockSample) -> Option<ReadingTimeUpdate> {
-        let saved = self.reader_time?;
-        if sample.monotonic_ms < 0
-            || sample.document_id != saved.value.document_id
-            || sample.position != saved.position()
-            || !self.is_current_time(saved.value)
-            || self.completion_pending()
-            || self.deferred_reader_event.is_some()
-            || (self.storage_busy
-                && self.pending_time_checkpoint.is_none()
-                && !self.time_checkpoint_can_wait)
-            || (self.settings_open && sample.action != ReaderClockAction::Pause)
-        {
-            return None;
-        }
-        let clock = self
-            .reader_clock
-            .get_or_insert_with(|| ActiveReadingTime::from_pending(saved.pending()));
-        // Explicit absolute checkpoints may coexist with the clock driver. A
-        // higher externally restored duration starts a fresh, paused accumulator.
-        if clock.pending().milliseconds() < saved.pending().milliseconds() {
-            *clock = ActiveReadingTime::from_pending(saved.pending());
-        }
-        let now = sample.monotonic_ms as u64;
-        let pending = match sample.action {
-            ReaderClockAction::Resume => clock.resume(now),
-            ReaderClockAction::Interact => clock.interact(now),
-            ReaderClockAction::Checkpoint => clock.checkpoint(now),
-            ReaderClockAction::Pause => clock.pause(now),
-        }
-        .ok()?;
-        if !matches!(
-            sample.action,
-            ReaderClockAction::Checkpoint | ReaderClockAction::Pause
-        ) || pending.milliseconds() <= saved.pending().milliseconds()
-        {
-            return None;
-        }
-        Some(ReadingTimeUpdate {
-            pending,
-            ..saved.value
-        })
+        self.document_error = None;
     }
 
     fn apply_position(&mut self, document: ReaderDocument) {
@@ -1553,13 +1300,6 @@ impl Model {
                 Ok(reader) => {
                     self.invalidate_effective_page();
                     self.clear_reader_word();
-                    if self.reader_time.is_some_and(|saved| {
-                        saved.value.document_id != reader.document_id
-                            || saved.position() != reader.position
-                    }) {
-                        self.reader_time = None;
-                        self.reader_clock = None;
-                    }
                     self.reader_analysis = self
                         .reader_analyses
                         .iter()
@@ -1588,20 +1328,6 @@ impl Model {
             }
             Err(_) => self.document_error = Some(DocumentError::InvalidDocument),
         }
-    }
-
-    fn is_current_time(&self, value: ReadingTimeUpdate) -> bool {
-        self.content_route == ContentRoute::Reader
-            && self.reader.as_ref().is_some_and(|reader| {
-                reader.document_id == value.document_id && reader.position == value.position
-            })
-    }
-
-    fn clear_reader_time(&mut self) {
-        self.reader_time = None;
-        self.reader_clock = None;
-        self.restoring_reader_time = false;
-        // Checkpoint obligations drain before reader departure reaches here.
     }
 
     fn apply_page_length(&mut self, length: PageLength) {

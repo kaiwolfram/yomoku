@@ -16,8 +16,7 @@ import app.yomoku.shared.ViewModel
 @Composable
 internal fun LibraryRenameDialog(view: ViewModel, dispatch: (Event) -> Unit, enabled: Boolean) {
     val draft = view.libraryRename ?: return
-    val canAct =
-        enabled && !view.storageBusy && !view.readingTimeSavePending && !view.completionSavePending
+    val canAct = enabled && !view.storageBusy && !view.completionSavePending
     AlertDialog(
         onDismissRequest = { if (!view.storageBusy) dispatch(Event.CancelDocumentRename) },
         title = { Text(stringResource(R.string.library_rename)) },

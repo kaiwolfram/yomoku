@@ -2,7 +2,6 @@ use std::sync::Arc;
 
 use super::*;
 use yomoku_core::{
-    active_time::PendingReadingTime,
     completion::{AnalyzedCompletionOutcome, PageCompletion, PageCompletionIntent},
     document::ReaderDocument,
     effective_reader::EffectivePageCompletion,
@@ -119,7 +118,6 @@ impl Fixture {
                     page_length: intent.page_length,
                     departing_position: intent.departing_position,
                     completed_at_unix_ms: intent.completed_at_unix_ms,
-                    pending_time: PendingReadingTime::from_millis(1234).unwrap(),
                 })
                 .unwrap(),
         )
@@ -168,7 +166,7 @@ fn completion_freezes_before_drain_retires_ui_and_rejects_duplicate_forward_acti
     assert!(session.completion_state().pending);
     assert!(!session.completion_state().busy);
     assert!(!session.begin_completion(identity, fixture.intent));
-    // Final checkpoints can drain while accepted provenance survives refresh.
+    // Accepted provenance survives a page refresh before completion dispatch.
     let refreshed = fixture.load(&mut session);
     assert!(session
         .begin_word_load(EffectiveReaderSelection {
@@ -340,7 +338,7 @@ fn commit_retry_keeps_the_same_reservation_and_emits_success_once() {
             panic!("commit only")
         };
         assert!(Arc::ptr_eq(&a, &b));
-        assert_eq!(b.completion().pending_time.milliseconds(), 1234);
+
         assert_eq!(
             b.occurrences()
                 .iter()

@@ -25,8 +25,7 @@ internal fun LibraryAddMenu(
     onImportFiles: (() -> Unit)?,
     enabled: Boolean,
 ) {
-    val canAct =
-        enabled && !view.storageBusy && !view.readingTimeSavePending && !view.completionSavePending
+    val canAct = enabled && !view.storageBusy && !view.completionSavePending
     var expanded by remember(canAct) { mutableStateOf(false) }
     Box {
         IconButton(

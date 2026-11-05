@@ -81,10 +81,8 @@ internal fun SettingsScreen(
         view.ankiExport?.let { AnkiExportPanel(it, dispatch, ankiBrowser) }
         val typography = view.readerTypography
         val typographyEnabled =
-            typography != null &&
-                !view.storageBusy &&
-                !view.readingTimeSavePending &&
-                !view.completionSavePending
+            typography != null && !view.storageBusy && !view.completionSavePending
+
         Text(
             stringResource(R.string.reader_typography_title),
             style = MaterialTheme.typography.titleMedium,
@@ -162,10 +160,8 @@ internal fun SettingsScreen(
                     }
                 val selected = view.pageLength == length
                 val enabled =
-                    !view.storageBusy &&
-                        !view.readingTimeSavePending &&
-                        !view.completionSavePending &&
-                        view.pageLength != null
+                    !view.storageBusy && !view.completionSavePending && view.pageLength != null
+
                 Row(
                     modifier =
                         Modifier.fillMaxWidth()

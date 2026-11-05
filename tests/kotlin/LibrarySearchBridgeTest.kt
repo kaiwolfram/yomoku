@@ -51,7 +51,7 @@ internal fun verifyLibrarySearchBridge() {
                 val view = dispatch(Event.SearchLibraryTitles(query), false)
                 check(view.libraryTitleQuery == query && view.libraryDocumentCount == 2UL)
                 check(view.documents == expected)
-                check(!view.readingTimeSavePending && !view.completionSavePending)
+                check(!view.completionSavePending)
                 check(view.documentError == null)
             }
             dispatch(Event.SearchLibraryTitles("RUST"), false)

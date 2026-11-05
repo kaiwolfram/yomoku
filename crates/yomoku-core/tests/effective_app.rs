@@ -2,7 +2,6 @@ use std::sync::Arc;
 
 use crux_core::Core;
 use yomoku_core::{
-    active_time::{PendingReadingTime, ReaderClockAction, ReaderClockSample, SavedReadingTime},
     analysis::{AnalysisProfile, AnalyzedToken, ChapterAnalysis, SplitMode},
     app::{ContentRoute, Destination, Effect, Event, Model, Yomoku},
     completion::{AnalyzedCompletionOutcome, PageCompletion},
@@ -154,11 +153,7 @@ impl Fixture {
         }
     }
 
-    fn prepare(
-        &self,
-        effects: &mut [Effect],
-        pending: i64,
-    ) -> (Vec<Effect>, Arc<EffectivePageCompletion>) {
+    fn prepare(&self, effects: &mut [Effect]) -> (Vec<Effect>, Arc<EffectivePageCompletion>) {
         let StorageOperation::Effective(Op::PrepareCompletion { intent, command }) =
             operation(effects)
         else {
@@ -175,7 +170,6 @@ impl Fixture {
                     page_length: intent.page_length,
                     departing_position: intent.departing_position,
                     completed_at_unix_ms: intent.completed_at_unix_ms,
-                    pending_time: PendingReadingTime::from_millis(pending).unwrap(),
                 })
                 .unwrap(),
         );
@@ -242,52 +236,6 @@ fn resolve(core: &Core<Yomoku>, effects: &mut [Effect], result: StorageResult) -
     core.resolve(request, result).unwrap()
 }
 
-fn clock(f: &Fixture, at: i64, action: ReaderClockAction) -> Event {
-    let reader = f.core.view().reader.unwrap();
-    Event::ObserveReaderClock(ReaderClockSample {
-        document_id: reader.document_id,
-        position: reader.position,
-        monotonic_ms: at,
-        action,
-    })
-}
-
-fn restore(f: &Fixture) {
-    let reader = f.core.view().reader.unwrap();
-    let mut effects = f.core.process_event(Event::RestoreReadingTime);
-    resolve(
-        &f.core,
-        &mut effects,
-        StorageResult::ReadingTimeLoaded(SavedReadingTime {
-            value: yomoku_core::active_time::ReadingTimeUpdate {
-                document_id: reader.document_id,
-                position: reader.position,
-                pending: PendingReadingTime::from_millis(0).unwrap(),
-            },
-            revision: 0,
-        }),
-    );
-}
-
-fn save_time(f: &Fixture, effects: &mut [Effect], expected: i64) -> Vec<Effect> {
-    let StorageOperation::SaveReadingTime {
-        previous,
-        checkpoint,
-    } = operation(effects)
-    else {
-        panic!("checkpoint")
-    };
-    assert_eq!(checkpoint.pending.milliseconds(), expected);
-    resolve(
-        &f.core,
-        effects,
-        StorageResult::ReadingTimeSaved(SavedReadingTime {
-            value: checkpoint,
-            revision: previous.revision + 1,
-        }),
-    )
-}
-
 #[test]
 fn effective_application_loads_compact_page_and_uses_exact_furigana_without_legacy_writes() {
     let f = Fixture::new(false);
@@ -306,7 +254,7 @@ fn effective_application_loads_compact_page_and_uses_exact_furigana_without_lega
     assert_eq!(view.reader_furigana.len(), 3); // exact analyzed word, never borrowed B for 猫/犬
     let _page = view.reader.unwrap();
     let mut effects = f.core.process_event(f.complete(identity));
-    let (mut effects, prepared) = f.prepare(&mut effects, 0);
+    let (mut effects, prepared) = f.prepare(&mut effects);
     assert!(f.core.view().completion_save_pending);
     assert!(f.core.view().effective_reader_tokens.is_none());
     resolve(
@@ -343,42 +291,13 @@ impl Fixture {
 }
 
 #[test]
-fn completion_freezes_identity_then_drains_both_time_slots_and_retries_exactly_before_departure() {
+fn completion_freezes_identity_and_retries_exactly_before_departure() {
     let f = Fixture::new(true);
     let identity = f.load();
-    restore(&f);
-    f.core
-        .process_event(clock(&f, 0, ReaderClockAction::Resume));
-    let mut first = f
-        .core
-        .process_event(clock(&f, 100, ReaderClockAction::Checkpoint));
-    f.core
-        .process_event(clock(&f, 250, ReaderClockAction::Pause));
-    f.core.process_event(f.complete(identity));
+    let mut preparation = f.core.process_event(f.complete(identity));
     f.core.process_event(Event::CloseDocument);
-    assert!(f.core.view().reading_time_save_pending && f.core.view().completion_save_pending);
+    assert!(f.core.view().completion_save_pending);
     assert!(f.core.view().effective_reader_tokens.is_none());
-    assert!(f
-        .core
-        .process_event(clock(&f, 1000, ReaderClockAction::Resume))
-        .is_empty());
-    let frozen = operation(&first);
-    resolve(
-        &f.core,
-        &mut first,
-        StorageResult::Failed(DocumentError::Unavailable),
-    );
-    f.core.process_event(Event::OpenSettings);
-    assert!(f
-        .core
-        .process_event(Event::SetPageLength(PageLength::Characters250))
-        .is_empty());
-    f.core.process_event(Event::CloseSettings);
-    assert!(!f.core.view().storage_busy && f.core.view().completion_save_pending);
-    let mut retry = f.core.process_event(Event::RetryReadingTimeCheckpoint);
-    assert_eq!(operation(&retry), frozen);
-    let mut second = save_time(&f, &mut retry, 100);
-    let mut preparation = save_time(&f, &mut second, 250);
     let frozen = operation(&preparation);
     resolve(
         &f.core,
@@ -392,7 +311,7 @@ fn completion_freezes_identity_then_drains_both_time_slots_and_retries_exactly_b
         .is_empty());
     let mut retry = f.core.process_event(Event::RetryReaderCompletion);
     assert_eq!(operation(&retry), frozen);
-    let (mut commit, prepared) = f.prepare(&mut retry, 250);
+    let (mut commit, prepared) = f.prepare(&mut retry);
     let frozen = operation(&commit);
     resolve(
         &f.core,
@@ -411,24 +330,20 @@ fn completion_freezes_identity_then_drains_both_time_slots_and_retries_exactly_b
     );
     let view = f.core.view();
     assert_eq!(view.content_route, ContentRoute::Main); // deferred departure waited for exact replay
-    assert!(!view.completion_save_pending && !view.reading_time_save_pending && !view.storage_busy);
+    assert!(!view.completion_save_pending && !view.storage_busy);
+
     assert!(view.completion_notice.is_none() && view.book_completion_notice.is_none());
 }
 
 #[test]
-fn read_failure_and_dismissal_drain_final_time_and_captured_old_callbacks_cannot_release_new_work()
-{
+fn read_failure_and_dismissal_ignore_old_callbacks_without_releasing_new_work() {
     for dismiss in [false, true] {
         let f = Fixture::new(false);
-        restore(&f);
-        f.core
-            .process_event(clock(&f, 0, ReaderClockAction::Resume));
         let mut read = f.core.process_event(Event::LoadReaderTokens(f.base()));
         let StorageOperation::Effective(Op::LoadTokens(request)) = operation(&read) else {
             panic!("tokens")
         };
-        f.core
-            .process_event(clock(&f, 200, ReaderClockAction::Pause));
+        let snapshot = f.snapshot();
         if dismiss {
             f.core.process_event(Event::CloseDocument);
         }
@@ -439,18 +354,32 @@ fn read_failure_and_dismissal_drain_final_time_and_captured_old_callbacks_cannot
             )));
         assert!(f.core.view().storage_busy);
         let result = if dismiss {
-            StorageResult::Effective(Output::TokensLoaded(request, f.snapshot()))
+            StorageResult::Effective(Output::TokensLoaded(request, snapshot))
         } else {
             StorageResult::Failed(DocumentError::Unavailable)
         };
-        let mut checkpoint = resolve(&f.core, &mut read, result);
+        resolve(&f.core, &mut read, result);
+        if dismiss {
+            f.core.process_event(Event::EffectiveStorageFinished(
+                Box::new(EffectiveReaderRequest::Tokens(request)),
+                StorageResult::Failed(DocumentError::InvalidDocument),
+            ));
+            assert!(!f.core.view().storage_busy);
+            assert_eq!(f.core.view().content_route, ContentRoute::Main);
+            continue;
+        }
+        let mut next = f.core.process_event(Event::LoadReaderTokens(f.base()));
         assert!(f.core.view().effective_reader_tokens.is_none());
         f.core.process_event(Event::EffectiveStorageFinished(
             Box::new(EffectiveReaderRequest::Tokens(request)),
             StorageResult::Failed(DocumentError::InvalidDocument),
         ));
-        assert!(f.core.view().storage_busy); // checkpoint still owns this slot
-        save_time(&f, &mut checkpoint, 200);
+        assert!(f.core.view().storage_busy); // the newer read still owns this slot
+        resolve(
+            &f.core,
+            &mut next,
+            StorageResult::Failed(DocumentError::Unavailable),
+        );
         assert!(!f.core.view().storage_busy);
         assert_eq!(
             f.core.view().content_route,

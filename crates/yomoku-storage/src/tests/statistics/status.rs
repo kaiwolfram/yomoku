@@ -189,7 +189,6 @@ fn reads_are_query_only_byte_preserving_and_ignore_pending_and_uncommitted_work(
     let database = TestDatabase::new();
     let mut storage = Storage::open(database.path()).unwrap();
     let imported = import(&mut storage, "猫 犬");
-    save_time(&mut storage, &imported, 1234);
     let completion = prepare(&mut storage, &imported);
     let expected = [point(100, [2, 0, 0, 0, 0])];
     let other = Storage::open(database.path()).unwrap();
@@ -279,7 +278,7 @@ fn unread_manual_status_survives_document_deletion_and_erasure_never_rescans_liv
     status(&mut storage, "食べた", VocabularyStatus::Known, 200);
     let expected = [point(100, [1, 0, 0, 0, 0]), point(200, [0, 0, 0, 1, 0])];
     assert_eq!(storage.vocabulary_status_timeline().unwrap(), expected);
-    assert_totals(&storage, 0, 0);
+    assert_totals(&storage, 0);
     storage
         .delete_document(imported.document.document_id)
         .unwrap();

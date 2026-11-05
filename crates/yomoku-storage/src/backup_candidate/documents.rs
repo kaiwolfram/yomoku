@@ -1,10 +1,7 @@
 //! Canonical ownership and stable live anchors, without format parsing or repair.
 
 use rusqlite::{types::ValueRef, Connection, Row};
-use yomoku_core::{
-    active_time::PendingReadingTime,
-    document::{ChapterId, DocumentId, SourceId, TextOffset},
-};
+use yomoku_core::document::{ChapterId, DocumentId, SourceId, TextOffset};
 
 use super::{check_cancelled, CandidateError};
 
@@ -15,8 +12,6 @@ pub(super) fn check(
     check_sources(connection, cancelled)?;
 
     check_positions(connection, cancelled)?;
-
-    check_pending_time(connection, cancelled)?;
 
     check_cancelled(cancelled)
 }
@@ -103,31 +98,6 @@ fn check_positions(
     }
     // Missing rows are valid for unopened and historical documents. Never add a
     // default row, move an EOF position or reinterpret it as a completion.
-    Ok(())
-}
-
-fn check_pending_time(
-    connection: &Connection,
-    cancelled: &mut impl FnMut() -> bool,
-) -> Result<(), CandidateError> {
-    let mut statement = connection.prepare(
-        "SELECT d.source_id, c.source_id, t.text, p.byte_offset, p.milliseconds, p.revision
-         FROM main.pending_reading_time p JOIN main.documents d ON d.id = p.document_id
-         JOIN main.chapters c ON c.id = p.chapter_id
-         LEFT JOIN main.chapter_texts t ON t.chapter_id = c.id
-         ORDER BY p.document_id, p.chapter_id, p.byte_offset",
-    )?;
-    let mut rows = statement.query([])?;
-    while let Some(row) = rows.next()? {
-        check_cancelled(cancelled)?;
-        check_anchor(row)?;
-        PendingReadingTime::from_millis(row.get(4)?).map_err(|_| CandidateError::InvalidData)?;
-        if row.get::<_, i64>(5)? <= 0 {
-            return Err(CandidateError::InvalidData);
-        }
-        // Keep all anchors across movement/reflow, including zero-duration
-        // revision tombstones and exhausted revisions. Do not replay checkpoints.
-    }
     Ok(())
 }
 

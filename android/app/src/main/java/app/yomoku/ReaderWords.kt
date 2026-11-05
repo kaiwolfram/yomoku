@@ -30,9 +30,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.key.onPreviewKeyEvent
-import androidx.compose.ui.input.pointer.PointerEventPass
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.platform.testTag
@@ -187,29 +184,13 @@ internal fun readerAnnotatedSpans(
 internal fun ReaderWordPanel(
     token: ReaderWordHeader,
     enabled: Boolean,
-    onInteraction: () -> Unit,
     onClose: () -> Unit,
     onStatus: (VocabularyStatus) -> Unit,
     details: @Composable () -> Unit,
 ) {
     val close = {
-        onInteraction()
         onClose()
     }
-    // Sheets/popups have their own window: Activity does not see their input.
-    val interaction =
-        Modifier.pointerInput(onInteraction) {
-                awaitPointerEventScope {
-                    while (true) {
-                        awaitPointerEvent(PointerEventPass.Initial)
-                        onInteraction()
-                    }
-                }
-            }
-            .onPreviewKeyEvent {
-                onInteraction()
-                false
-            }
     val windowSize = LocalWindowInfo.current.containerSize
     val windowHeight = with(LocalDensity.current) { windowSize.height.toDp() }
     val wide = with(LocalDensity.current) { windowSize.width.toDp() >= 600.dp }
@@ -217,7 +198,6 @@ internal fun ReaderWordPanel(
         Column(
             Modifier.heightIn(max = windowHeight * 0.75f)
                 .fillMaxWidth()
-                .then(interaction)
                 .testTag("reader_word_panel")
                 .padding(16.dp)
                 .verticalScroll(rememberScrollState()),
@@ -261,7 +241,6 @@ internal fun ReaderWordPanel(
                                     enabled = enabled && token.vocabulary != null,
                                     role = Role.RadioButton,
                                 ) {
-                                    onInteraction()
                                     onStatus(status)
                                 }
                                 .testTag("word_status_$status")
@@ -296,7 +275,6 @@ internal fun ReaderWordPanel(
                         .fillMaxWidth()
                         .heightIn(max = windowHeight * 0.85f)
                         .padding(16.dp)
-                        .then(interaction)
                         .testTag("word_side_panel"),
             ) {
                 content()
@@ -306,7 +284,7 @@ internal fun ReaderWordPanel(
         ModalBottomSheet(
             onDismissRequest = close,
             sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-            modifier = interaction.testTag("word_bottom_sheet"),
+            modifier = Modifier.testTag("word_bottom_sheet"),
         ) {
             content()
         }
@@ -324,14 +302,12 @@ internal data class ReaderWordHeader(
 internal fun ReaderWordLookupState(
     failed: Boolean,
     enabled: Boolean,
-    onInteraction: () -> Unit,
     onRetry: () -> Unit,
 ) {
     if (failed) {
         Text(stringResource(R.string.word_lookup_failed), Modifier.testTag("word_lookup_error"))
         TextButton(
             onClick = {
-                onInteraction()
                 onRetry()
             },
             enabled = enabled,

@@ -18,9 +18,7 @@ class LibrarySearchTest {
 
     private fun idle() =
         compose.waitUntil(90_000) {
-            !core().view.storageBusy &&
-                !core().view.readingTimeSavePending &&
-                !core().view.completionSavePending
+            !core().view.storageBusy && !core().view.completionSavePending
         }
 
     private fun search(query: String) {

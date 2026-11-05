@@ -1,5 +1,6 @@
 package app.yomoku
 
+import android.database.sqlite.SQLiteDatabase
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import app.yomoku.nativebridge.DictionaryProvider
@@ -229,7 +230,6 @@ class DocumentSessionTest {
                     )
                 assertNull(changed.documentError)
                 assertEquals(page, changed.reader)
-                assertNull(changed.readerTime)
                 assertNull(changed.completionNotice)
                 assertNull(changed.bookCompletionNotice)
                 val expected =
@@ -284,6 +284,74 @@ class DocumentSessionTest {
             )
         } finally {
             instrumentation.runOnMainSync { core.close() }
+        }
+    }
+
+    @Test
+    fun closingRetainsFailedCompletionUntilItsExactRetryCommits() {
+        val directory =
+            File(
+                instrumentation.targetContext.noBackupFilesDir,
+                "completion-close-${System.nanoTime()}",
+            )
+        assertTrue(directory.mkdir())
+        val database = File(directory, "reader.sqlite3")
+        lateinit var core: CoreSession
+        instrumentation.runOnMainSync {
+            core =
+                CoreSession(database.path, sudachiDictionaryProvider(instrumentation.targetContext))
+        }
+        try {
+            awaitIdle(core)
+            val created = dispatch(core, Event.CreatePaste("猫 猫 犬"))
+            val opened = dispatch(core, Event.OpenReader(created.documents.single().documentId))
+            val page = checkNotNull(opened.reader)
+            val loaded =
+                dispatch(
+                    core,
+                    Event.LoadReaderTokens(
+                        ReaderTokenKey(
+                            page.documentId,
+                            page.anchor,
+                            checkNotNull(opened.readerAnalysis),
+                        )
+                    ),
+                )
+            val identity = checkNotNull(loaded.effectiveReaderTokens).identity
+            SQLiteDatabase.openDatabase(database.path, null, SQLiteDatabase.OPEN_READWRITE).use { db
+                ->
+                db.execSQL(
+                    "CREATE TRIGGER fail_close BEFORE INSERT ON reading_completions BEGIN SELECT RAISE(ABORT, 'fixture'); END"
+                )
+                val failed =
+                    dispatch(core, Event.CompleteEffectiveReaderPage(identity, page.position, 500L))
+                assertTrue(failed.completionSavePending)
+                assertNotNull(failed.documentError)
+                instrumentation.runOnMainSync { core.close() }
+                assertFalse(core.isClosed)
+                db.execSQL("DROP TRIGGER fail_close")
+                val deadline = System.nanoTime() + 30_000_000_000L
+                while (true) {
+                    var closed = false
+                    instrumentation.runOnMainSync { closed = core.isClosed }
+                    if (closed) break
+                    check(System.nanoTime() < deadline) {
+                        "Completion did not drain before closing"
+                    }
+                    Thread.sleep(10)
+                }
+                db.rawQuery("SELECT COUNT(*) FROM reading_completions", null).use {
+                    assertTrue(it.moveToFirst())
+                    assertEquals(1L, it.getLong(0))
+                }
+                db.rawQuery("SELECT finished_at_least_once FROM documents", null).use {
+                    assertTrue(it.moveToFirst())
+                    assertEquals(1, it.getInt(0))
+                }
+            }
+        } finally {
+            instrumentation.runOnMainSync { if (!core.isClosed) core.close() }
+            if (core.isClosed) directory.deleteRecursively()
         }
     }
 

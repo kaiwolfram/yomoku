@@ -59,7 +59,6 @@ internal fun YomokuApp(
     view: ViewModel,
     sessionKey: String,
     dispatch: (Event) -> Unit,
-    onReaderInteraction: () -> Unit = {},
     imageLoader: EpubImageLoader? = null,
     coverLoader: EpubCoverLoader? = null,
     libraryActionsEnabled: Boolean = true,
@@ -74,7 +73,6 @@ internal fun YomokuApp(
         Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
     }
     var pasteText by rememberSaveable { mutableStateOf("") }
-    var statisticsDetail by rememberSaveable(sessionKey) { mutableStateOf<String?>(null) }
     val vocabularyScroll =
         rememberSaveable(sessionKey, view.vocabulary.query, saver = LazyListState.Saver) {
             LazyListState()
@@ -204,7 +202,6 @@ internal fun YomokuApp(
                                 view,
                                 sessionKey,
                                 dispatch,
-                                onReaderInteraction,
                                 imageLoader,
                                 ankiBrowser,
                             )
@@ -221,8 +218,6 @@ internal fun YomokuApp(
                             StatisticsScreen(
                                 view,
                                 sessionKey,
-                                statisticsDetail,
-                                { statisticsDetail = it },
                                 dispatch,
                             )
                         else ->
@@ -327,8 +322,6 @@ private fun YomokuPreview() {
                 readerAnalysis = null,
                 pageLength = null,
                 readerTypography = null,
-                readerTime = null,
-                readingTimeSavePending = false,
                 completionSavePending = false,
                 completionNotice = null,
                 bookCompletionNotice = null,

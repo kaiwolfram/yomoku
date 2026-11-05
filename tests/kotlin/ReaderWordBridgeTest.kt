@@ -58,7 +58,7 @@ internal fun verifyReaderWordBridge() {
             val cached = database.readBytes()
             dispatch(bridge, Event.LoadEffectiveReaderWord(selection))
             check(cached.contentEquals(database.readBytes()))
-            check(loaded.reader == page && loaded.readerTime == null && loaded.completionNotice == null)
+            check(loaded.reader == page && loaded.completionNotice == null)
             check(provider.wordCalls.get() == 2)
             check(provider.wordThreads.all { it != Thread.currentThread() })
             val inflected = tokens.tokens.first { it.surface == "食べ" }

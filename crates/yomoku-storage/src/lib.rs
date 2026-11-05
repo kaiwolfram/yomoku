@@ -20,7 +20,6 @@ mod library_words;
 mod reader_documents;
 mod reader_tokens;
 pub mod reader_words;
-mod reading_time;
 mod settings;
 mod srt;
 mod statistics;
@@ -36,7 +35,6 @@ pub use epub::{
 pub use epub_assets::{EpubCoverReference, MAX_EPUB_ASSET_BYTES};
 pub use import_cancellation::ImportCancellation;
 pub use imports::{AnalyzedPaste, PasteImportError, PasteImportOutcome};
-pub use reading_time::SavedReadingTime;
 pub use srt::{SrtImportError, SrtImportOutcome, StoredSrtSource};
 pub use txt::{StoredTxtSource, TxtImportError, TxtImportOutcome};
 
@@ -66,7 +64,6 @@ pub enum StorageError {
     InvalidDocument,
     InvalidSettings,
     InvalidCompletion,
-    InvalidReadingTime,
     InvalidVocabulary,
     InvalidStatistics,
     InvalidAnalysis,
@@ -89,7 +86,6 @@ impl fmt::Display for StorageError {
             Self::InvalidDocument => f.write_str("stored document is inconsistent"),
             Self::InvalidSettings => f.write_str("stored settings are inconsistent"),
             Self::InvalidCompletion => f.write_str("invalid or conflicting page completion"),
-            Self::InvalidReadingTime => f.write_str("invalid or stale pending reading time"),
             Self::InvalidVocabulary => f.write_str("invalid vocabulary value or stored entry"),
             Self::InvalidStatistics => f.write_str("invalid statistics history or calendar date"),
             Self::InvalidAnalysis => f.write_str("invalid analysis or segmentation override"),

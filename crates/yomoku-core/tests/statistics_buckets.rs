@@ -38,12 +38,11 @@ fn date(iso: &str) -> i64 {
     }
 }
 
-fn reading(timestamp: i64, occurrences: u64, time: u64) -> ReadingTimelinePoint {
+fn reading(timestamp: i64, occurrences: u64) -> ReadingTimelinePoint {
     ReadingTimelinePoint {
         completed_at_unix_ms: timestamp,
         totals: LifetimeReadingTotals {
             japanese_occurrences: occurrences,
-            active_time_ms: time,
         },
     }
 }
@@ -127,7 +126,7 @@ fn sunday_and_monday_events_belong_to_different_weekly_end_values() {
     let result = statistics_buckets(
         LastSixMonths,
         date("2025-01-03"),
-        &[reading(monday - 1, 5, 7), reading(monday, 11, 13)],
+        &[reading(monday - 1, 5), reading(monday, 11)],
         &[
             status(monday - 1, [1, 2, 3, 4, 5]),
             status(monday, [2, 3, 4, 5, 6]),
@@ -141,7 +140,6 @@ fn sunday_and_monday_events_belong_to_different_weekly_end_values() {
         previous.values.reading,
         LifetimeReadingTotals {
             japanese_occurrences: 5,
-            active_time_ms: 7
         }
     );
     assert_eq!(previous.values.statuses.known, 4);
@@ -150,7 +148,6 @@ fn sunday_and_monday_events_belong_to_different_weekly_end_values() {
         current.values.reading,
         LifetimeReadingTotals {
             japanese_occurrences: 16,
-            active_time_ms: 20
         }
     );
     assert_eq!(current.values.statuses.known, 5);
@@ -174,8 +171,8 @@ fn leap_days_centuries_and_calendar_year_clamping() {
         AllTime,
         date("2025-01-03"),
         &[
-            reading(date("2024-12-31"), 2, 3),
-            reading(date("2025-01-01"), 5, 7),
+            reading(date("2024-12-31"), 2),
+            reading(date("2025-01-01"), 5),
         ],
         &[],
     )
@@ -191,11 +188,11 @@ fn filters_preserve_lifetime_origin_and_absolute_lines_with_exact_endpoint_owner
     let start = date("2024-02-29");
     let now = date("2024-03-31");
     let readings = [
-        reading(start - 1, 85_000, 100),
-        reading(start, 1_000, 200),
-        reading(now - 1, 13_000, 300),
-        reading(now, 1_000, 400),
-        reading(now + 1, 999, 999),
+        reading(start - 1, 85_000),
+        reading(start, 1_000),
+        reading(now - 1, 13_000),
+        reading(now, 1_000),
+        reading(now + 1, 999),
     ];
     let statuses = [
         status(start - 1, [4, 5, 6, 3, 2]),
@@ -218,7 +215,6 @@ fn filters_preserve_lifetime_origin_and_absolute_lines_with_exact_endpoint_owner
         last.reading,
         LifetimeReadingTotals {
             japanese_occurrences: 100_000,
-            active_time_ms: 1_000
         }
     );
     assert_eq!(last.statuses, statuses[2].counts);
@@ -242,7 +238,7 @@ fn monthly_gaps_carry_values_and_earliest_status_can_precede_reading() {
     let result = statistics_buckets(
         AllTime,
         now,
-        &[reading(date("2024-03-01"), 3, 17)],
+        &[reading(date("2024-03-01"), 3)],
         &[status(date("2024-01-01"), [4, 0, 0, 0, 0])],
     )
     .unwrap();
@@ -260,17 +256,16 @@ fn monthly_gaps_carry_values_and_earliest_status_can_precede_reading() {
 #[test]
 fn epoch_empty_future_only_and_upper_calendar_limit_are_bounded() {
     for frame in [LastMonth, LastSixMonths, LastYear, AllTime] {
-        let result = statistics_buckets(frame, 0, &[reading(1, 99, 99)], &[]).unwrap();
+        let result = statistics_buckets(frame, 0, &[reading(1, 99)], &[]).unwrap();
         assert_eq!(result.start_unix_ms, 0);
         assert_eq!(result.buckets.len(), 1);
         assert_eq!(result.buckets[0].end_exclusive_unix_ms, 1);
         assert_eq!(result.buckets[0].values, Default::default());
     }
     let max = 253_402_300_799_999;
-    let result = statistics_buckets(AllTime, max, &[reading(max, 1, 2)], &[]).unwrap();
+    let result = statistics_buckets(AllTime, max, &[reading(max, 1)], &[]).unwrap();
     assert_eq!(result.buckets.len(), 1);
     assert_eq!(result.buckets[0].end_exclusive_unix_ms, max + 1);
-    assert_eq!(result.buckets[0].values.reading.active_time_ms, 2);
 }
 
 #[test]
@@ -279,10 +274,10 @@ fn invalid_dates_order_and_overflow_fail_without_partial_values() {
         assert!(statistics_buckets(LastYear, now, &[], &[]).is_err());
     }
     for invalid in [
-        vec![reading(-1, 1, 1)],
-        vec![reading(i64::MAX, 1, 1)],
-        vec![reading(1, 1, 1), reading(0, 1, 1)],
-        vec![reading(0, 1, 1), reading(0, 1, 1)],
+        vec![reading(-1, 1)],
+        vec![reading(i64::MAX, 1)],
+        vec![reading(1, 1), reading(0, 1)],
+        vec![reading(0, 1), reading(0, 1)],
     ] {
         assert!(statistics_buckets(LastYear, 2, &invalid, &[]).is_err());
     }
@@ -290,10 +285,7 @@ fn invalid_dates_order_and_overflow_fail_without_partial_values() {
         let points = dates.map(|d| status(d, [0; 5]));
         assert!(statistics_buckets(LastYear, 2, &[], &points).is_err());
     }
-    for increments in [
-        [reading(0, u64::MAX, 0), reading(1, 1, 0)],
-        [reading(0, 0, u64::MAX), reading(1, 0, 1)],
-    ] {
+    for increments in [[reading(0, u64::MAX), reading(1, 1)]] {
         for now in [2, date("2024-03-31")] {
             assert!(statistics_buckets(LastMonth, now, &increments, &[]).is_err());
         }

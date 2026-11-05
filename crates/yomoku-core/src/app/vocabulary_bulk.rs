@@ -145,7 +145,7 @@ impl Yomoku {
         model.vocabulary.bulk_error = None;
         model.vocabulary_bulk_request = Some((id, request));
         model.storage_busy = true;
-        model.time_checkpoint_can_wait = false;
+
         render::render().and(
             Command::request_from_shell(operation)
                 .then_send(move |result| Event::VocabularyBulkFinished(id, result)),

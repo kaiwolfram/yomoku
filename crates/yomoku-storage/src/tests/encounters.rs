@@ -1,5 +1,4 @@
 use yomoku_core::{
-    active_time::PendingReadingTime,
     analysis::SplitMode,
     completion::{AnalyzedCompletionOutcome, PageCompletion},
     document::{AnalysisId, PasteText, PastedDocument},
@@ -30,9 +29,6 @@ fn command(storage: &mut Storage, document: &PastedDocument) -> PageCompletion {
         page_length,
         departing_position,
         completed_at_unix_ms: 500,
-        pending_time: storage
-            .pending_page_time(document.document_id, page, page_length)
-            .unwrap(),
     }
 }
 
@@ -63,17 +59,8 @@ fn entry(storage: &Storage, surface: &str) -> yomoku_core::vocabulary::Vocabular
         .unwrap()
 }
 
-fn save_time(storage: &mut Storage, document: &PastedDocument, ms: i64) -> SavedReadingTime {
-    let token = storage
-        .load_pending_reading_time(document.document_id, position(document, 0))
-        .unwrap();
-    storage
-        .save_pending_reading_time(token, PendingReadingTime::from_millis(ms).unwrap())
-        .unwrap()
-}
-
 #[test]
-fn repetitions_exact_surfaces_all_statuses_and_metadata_commit_with_time_and_position() {
+fn repetitions_exact_surfaces_all_statuses_and_metadata_commit_with_position() {
     let database = TestDatabase::new();
     let mut storage = Storage::open(database.path()).unwrap();
     let imported = storage
@@ -99,7 +86,6 @@ fn repetitions_exact_surfaces_all_statuses_and_metadata_commit_with_time_and_pos
             .set_vocabulary_status(entry(&storage, surface).id, status, 200)
             .unwrap();
     }
-    let checkpoint = save_time(&mut storage, &imported.document, 1234);
     let completion = command(&mut storage, &imported.document);
     assert_eq!(
         storage
@@ -146,23 +132,7 @@ fn repetitions_exact_surfaces_all_statuses_and_metadata_commit_with_time_and_pos
     ] {
         assert_eq!(entry(&storage, surface).status, status);
     }
-    assert_eq!(
-        storage
-            .connection
-            .query_row("SELECT active_time_ms FROM reading_completions", [], |r| {
-                r.get::<_, i64>(0)
-            })
-            .unwrap(),
-        1234
-    );
-    assert_eq!(
-        storage
-            .load_pending_reading_time(imported.document.document_id, checkpoint.position())
-            .unwrap()
-            .pending()
-            .milliseconds(),
-        0
-    );
+
     assert_eq!(
         storage
             .load_paste(imported.document.document_id)
@@ -180,11 +150,10 @@ fn repetitions_exact_surfaces_all_statuses_and_metadata_commit_with_time_and_pos
 }
 
 #[test]
-fn replay_after_reopen_reflow_and_reread_never_moves_progress_or_drains_new_time() {
+fn replay_after_reopen_reflow_and_reread_never_moves_progress() {
     let database = TestDatabase::new();
     let mut storage = Storage::open(database.path()).unwrap();
     let imported = create_import(&mut storage, "猫 猫");
-    save_time(&mut storage, &imported.document, 1000);
     let first = command(&mut storage, &imported.document);
     storage
         .record_analyzed_page_completion(first, imported.analysis_id)
@@ -195,7 +164,6 @@ fn replay_after_reopen_reflow_and_reread_never_moves_progress_or_drains_new_time
             position(&imported.document, 0),
         )
         .unwrap();
-    save_time(&mut storage, &imported.document, 2000);
     let saved = storage.load_paste(imported.document.document_id).unwrap();
     let before = totals(&storage);
     drop(storage);
@@ -214,17 +182,7 @@ fn replay_after_reopen_reflow_and_reread_never_moves_progress_or_drains_new_time
         storage.load_paste(imported.document.document_id).unwrap(),
         saved
     );
-    assert_eq!(
-        storage
-            .pending_page_time(
-                imported.document.document_id,
-                first.page,
-                yomoku_core::pagination::PageLength::Characters250
-            )
-            .unwrap()
-            .milliseconds(),
-        2000
-    );
+
     let reread = command(&mut storage, &imported.document);
     assert_eq!(
         storage
@@ -233,17 +191,7 @@ fn replay_after_reopen_reflow_and_reread_never_moves_progress_or_drains_new_time
         AnalyzedCompletionOutcome::Recorded { newly_known: 0 }
     );
     assert_eq!(count(&storage, "reading_occurrences"), 4);
-    assert_eq!(
-        storage
-            .connection
-            .query_row(
-                "SELECT SUM(active_time_ms) FROM reading_completions",
-                [],
-                |r| r.get::<_, i64>(0)
-            )
-            .unwrap(),
-        3000
-    );
+
     assert_eq!(
         storage
             .connection
@@ -311,7 +259,6 @@ fn every_write_and_deferred_commit_failure_roll_back_all_completion_effects() {
         ("status", "CREATE TRIGGER fail BEFORE UPDATE ON vocabulary BEGIN SELECT RAISE(ABORT, 'fixture'); END;"),
         ("status event", "CREATE TRIGGER fail BEFORE INSERT ON vocabulary_status_events WHEN NEW.cause = 'completion' BEGIN SELECT RAISE(ABORT, 'fixture'); END;"),
         ("second occurrence", "CREATE TRIGGER fail BEFORE INSERT ON reading_occurrences WHEN NEW.token_index = 1 BEGIN SELECT RAISE(ABORT, 'fixture'); END;"),
-        ("time", "CREATE TRIGGER fail BEFORE UPDATE ON pending_reading_time BEGIN SELECT RAISE(ABORT, 'fixture'); END;"),
         ("position insert", "CREATE TRIGGER fail BEFORE INSERT ON reading_positions BEGIN SELECT RAISE(ABORT, 'fixture'); END;"),
         ("position update", "CREATE TRIGGER fail BEFORE UPDATE ON reading_positions BEGIN SELECT RAISE(ABORT, 'fixture'); END;"),
         ("finish marker", "CREATE TRIGGER fail BEFORE UPDATE OF finished_at_least_once ON documents BEGIN SELECT RAISE(ABORT, 'fixture'); END;"),
@@ -322,7 +269,6 @@ fn every_write_and_deferred_commit_failure_roll_back_all_completion_effects() {
         let imported = create_import(&mut storage, "猫 猫 𠮷");
         // Exercise recreation of a deleted vocabulary entry only on actual reading.
         storage.connection.execute("DELETE FROM vocabulary WHERE surface = '𠮷'", []).unwrap();
-        let token = save_time(&mut storage, &imported.document, 1234);
         if stage == "position update" {
             storage.save_reading_position(imported.document.document_id, position(&imported.document, 0)).unwrap();
         }
@@ -335,7 +281,7 @@ fn every_write_and_deferred_commit_failure_roll_back_all_completion_effects() {
         assert_eq!(storage.finished_at_least_once(imported.document.document_id).unwrap(), Some(false), "{stage}");
         assert_eq!(entry(&storage, "猫").status, VocabularyStatus::New, "{stage}");
         assert_eq!(storage.load_paste(imported.document.document_id).unwrap(), saved, "{stage}");
-        assert_eq!(storage.load_pending_reading_time(imported.document.document_id, token.position()).unwrap(), token, "{stage}");
+
         storage.connection.execute_batch("DROP TRIGGER fail").unwrap();
         assert_eq!(storage.record_analyzed_page_completion(completion, imported.analysis_id).unwrap(), AnalyzedCompletionOutcome::Recorded { newly_known: 2 }, "{stage}");
         assert_eq!(count(&storage, "reading_occurrences"), 3);
@@ -491,17 +437,11 @@ fn preparation_freezes_all_page_buckets_and_reserves_only_after_successful_valid
     let mut storage = Storage::open(database.path()).unwrap();
     let imported = create_import(&mut storage, "猫 猫 犬");
     let document = &imported.document;
-    save_time(&mut storage, document, 100);
     let second = position(document, "猫 ".len());
     storage
         .save_reading_position(document.document_id, second)
         .unwrap();
-    let saved = storage
-        .load_pending_reading_time(document.document_id, second)
-        .unwrap();
-    storage
-        .save_pending_reading_time(saved, PendingReadingTime::from_millis(200).unwrap())
-        .unwrap();
+
     let pages = LogicalPages::new(
         std::slice::from_ref(&document.chapter),
         storage.page_length().unwrap(),
@@ -542,7 +482,7 @@ fn preparation_freezes_all_page_buckets_and_reserves_only_after_successful_valid
         .execute_batch("DROP TRIGGER fail")
         .unwrap();
     let prepared = storage.prepare_page_completion(intent).unwrap();
-    assert_eq!(prepared.completion.pending_time.milliseconds(), 300);
+
     assert_eq!(prepared.analysis_id, imported.analysis_id);
     assert_eq!(prepared.completion.completed_at_unix_ms, 1234);
     assert_eq!(totals(&storage), before); // No completion, position, statuses or consumption.

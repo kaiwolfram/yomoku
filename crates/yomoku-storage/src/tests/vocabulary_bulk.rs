@@ -1,6 +1,5 @@
 use rusqlite::types::Value;
 use yomoku_core::{
-    active_time::PendingReadingTime,
     completion::{AnalyzedCompletionOutcome, PageCompletionIntent},
     document::{PasteText, VocabularyId},
     reader::ReaderPage,
@@ -382,12 +381,7 @@ fn deletion_recalculates_original_effective_charts_without_rescan_and_new_appear
         let live = import(&mut storage, "猫 猫 犬", 100);
         let deleted_document = import(&mut storage, "猫 𠮷", 100);
         let intent = intent(&mut storage, &live);
-        let pending = storage
-            .load_pending_reading_time(intent.document_id, intent.departing_position)
-            .unwrap();
-        storage
-            .save_pending_reading_time(pending, PendingReadingTime::from_millis(321).unwrap())
-            .unwrap();
+
         let original = storage.prepare_page_completion(intent).unwrap();
         let key = storage
             .load_effective_reader_tokens(intent.document_id, intent.page)
@@ -414,7 +408,7 @@ fn deletion_recalculates_original_effective_charts_without_rescan_and_new_appear
             .unwrap();
         let before_totals = storage.lifetime_reading_totals().unwrap();
         assert_eq!(before_totals.japanese_occurrences, 3);
-        assert_eq!(before_totals.active_time_ms, 321);
+
         let cat = storage
             .vocabulary_matching_ids(&VocabularyQuery {
                 prefix: "猫".into(),
@@ -459,7 +453,7 @@ fn deletion_recalculates_original_effective_charts_without_rescan_and_new_appear
         );
         let totals = storage.lifetime_reading_totals().unwrap();
         assert_eq!(totals.japanese_occurrences, 1);
-        assert_eq!(totals.active_time_ms, 321);
+
         let timeline = storage.vocabulary_status_timeline().unwrap();
         assert_eq!(timeline[0].counts.new, 2);
         assert_eq!(timeline.last().unwrap().counts.known, 1);

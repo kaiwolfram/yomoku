@@ -1,6 +1,5 @@
 package app.yomoku
 
-import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
@@ -26,8 +25,6 @@ import app.yomoku.shared.*
 internal fun StatisticsScreen(
     view: ViewModel,
     sessionKey: String,
-    detail: String?,
-    selectDetail: (String?) -> Unit,
     dispatch: (Event) -> Unit,
 ) {
     val state = view.statistics
@@ -38,11 +35,8 @@ internal fun StatisticsScreen(
     LaunchedEffect(sessionKey, view.storageBusy, state.query) {
         if (!view.storageBusy) dispatch(Event.LoadStatistics(asOf))
     }
-    val selected = StatisticsChart.entries.find { it.name == detail }
-    BackHandler(enabled = selected != null) { selectDetail(null) }
     val data = state.data
     val scroll = rememberLazyListState()
-    LaunchedEffect(detail) { scroll.scrollToItem(0) }
     LazyColumn(
         Modifier.fillMaxSize().testTag("statistics_scroll"),
         state = scroll,
@@ -70,15 +64,6 @@ internal fun StatisticsScreen(
                 style = MaterialTheme.typography.bodySmall,
             )
         }
-        if (selected != null)
-            item {
-                TextButton(
-                    onClick = { selectDetail(null) },
-                    modifier = Modifier.testTag("statistics_overview"),
-                ) {
-                    Text(stringResource(R.string.statistics_overview))
-                }
-            }
         if (state.loading || (data == null && state.error == null))
             item {
                 LinearProgressIndicator(Modifier.fillMaxWidth().testTag("statistics_loading"))
@@ -104,70 +89,18 @@ internal fun StatisticsScreen(
                     )
                 )
             }
-            items(selected?.let { listOf(it) } ?: StatisticsChart.entries, key = { it.name }) {
-                chart ->
+            items(StatisticsChart.entries, key = { it.name }) { chart ->
                 val dataset = remember(data, chart) { StatisticsDataset(data, chart) }
-                if (selected == null) {
-                    OutlinedCard(
-                        onClick = { selectDetail(chart.name) },
-                        modifier = Modifier.testTag("statistics_card_${chart.name}"),
+                OutlinedCard(modifier = Modifier.testTag("statistics_card_${chart.name}")) {
+                    Column(
+                        Modifier.padding(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
-                        Column(
-                            Modifier.padding(12.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp),
-                        ) {
-                            StatisticsPlot(dataset, chart)
-                            Text(stringResource(R.string.statistics_open_details))
-                        }
+                        StatisticsPlot(dataset, chart)
                     }
-                } else {
-                    StatisticsPlot(dataset, chart)
-                }
-            }
-            if (selected != null) {
-                item {
-                    Text(
-                        stringResource(R.string.statistics_bucket_values),
-                        style = MaterialTheme.typography.titleMedium,
-                    )
-                }
-                item {
-                    StatisticsValueRow(
-                        stringResource(
-                            R.string.statistics_opening,
-                            statisticsDate(data.startUnixMs),
-                        ),
-                        selected,
-                        selected.values(data.opening),
-                        "statistics_opening",
-                    )
-                }
-                items(data.buckets, key = { it.startUnixMs }) { bucket ->
-                    StatisticsValueRow(
-                        "${statisticsDate(bucket.startUnixMs)} – ${statisticsDate(bucket.endExclusiveUnixMs - 1)}",
-                        selected,
-                        selected.values(bucket.values),
-                        "statistics_bucket_${bucket.startUnixMs}",
-                    )
                 }
             }
         }
-    }
-}
-
-@Composable
-private fun StatisticsValueRow(
-    label: String,
-    chart: StatisticsChart,
-    values: List<ULong>,
-    tag: String,
-) {
-    Column(Modifier.fillMaxWidth().testTag(tag)) {
-        Text(label, style = MaterialTheme.typography.titleSmall)
-        values.forEachIndexed { index, value ->
-            Text("${stringResource(chart.lines[index])}: $value")
-        }
-        HorizontalDivider(Modifier.padding(top = 8.dp))
     }
 }
 

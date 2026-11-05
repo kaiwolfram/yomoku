@@ -34,11 +34,7 @@ class ReaderImagesTest {
     private fun awaitReader() {
         compose.waitUntil(60_000) {
             val view = core().view
-            !view.storageBusy &&
-                !view.readingTimeSavePending &&
-                !view.completionSavePending &&
-                view.readerTime != null &&
-                view.effectiveReaderTokens != null
+            !view.storageBusy && !view.completionSavePending && view.effectiveReaderTokens != null
         }
         compose.waitForIdle()
     }
@@ -188,7 +184,7 @@ class ReaderImagesTest {
         assertEquals(first.anchor, core().view.reader!!.anchor)
         compose.runOnUiThread { core().dispatch(Event.OpenSettings) }
         compose.waitUntil(30_000) {
-            !core().view.storageBusy && !core().view.readingTimeSavePending
+            !core().view.storageBusy
         }
         compose.onNodeWithTag("page_length_250").performClick()
         compose.waitUntil(30_000) { !core().view.storageBusy }

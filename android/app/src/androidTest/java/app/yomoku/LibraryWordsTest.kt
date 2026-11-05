@@ -26,7 +26,6 @@ class LibraryWordsTest {
             compose.waitUntil(90_000) {
                 val view = core().view
                 !view.storageBusy &&
-                    !view.readingTimeSavePending &&
                     !view.completionSavePending &&
                     (view.contentRoute != ContentRoute.MAIN ||
                         view.destination != Destination.LIBRARY ||
@@ -48,10 +47,7 @@ class LibraryWordsTest {
         compose.onNodeWithTag("document_${id.value}").performClick()
         compose.waitUntil(90_000) {
             val view = core().view
-            view.reader?.documentId == id &&
-                view.effectiveReaderTokens != null &&
-                view.readerTime != null &&
-                !view.storageBusy
+            view.reader?.documentId == id && view.effectiveReaderTokens != null && !view.storageBusy
         }
         return checkNotNull(core().view.effectiveReaderTokens)
     }

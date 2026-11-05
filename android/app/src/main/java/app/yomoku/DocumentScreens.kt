@@ -60,7 +60,6 @@ internal fun LibraryScreen(
         view.libraryWordDistributions,
         view.libraryWordError,
         view.storageBusy,
-        view.readingTimeSavePending,
         view.completionSavePending,
     ) {
         if (
@@ -68,7 +67,6 @@ internal fun LibraryScreen(
                 view.libraryWordDistributions == null &&
                 view.libraryWordError == null &&
                 !view.storageBusy &&
-                !view.readingTimeSavePending &&
                 !view.completionSavePending
         ) {
             dispatch(Event.LoadLibraryWordDistributions)
@@ -78,11 +76,8 @@ internal fun LibraryScreen(
         remember(view.libraryWordDistributions) {
             view.libraryWordDistributions?.associateBy { it.documentId }
         }
-    val canAct =
-        libraryActionsEnabled &&
-            !view.storageBusy &&
-            !view.readingTimeSavePending &&
-            !view.completionSavePending
+    val canAct = libraryActionsEnabled && !view.storageBusy && !view.completionSavePending
+
     val actionsLabel = stringResource(R.string.library_document_actions)
     LibraryDeleteDialog(view, dispatch, enabled = libraryActionsEnabled)
     LibraryRenameDialog(view, dispatch, enabled = libraryActionsEnabled)
@@ -335,7 +330,6 @@ internal fun ReaderScreen(
     view: ViewModel,
     sessionKey: String,
     dispatch: (Event) -> Unit,
-    onInteraction: () -> Unit,
     imageLoader: EpubImageLoader? = null,
     ankiBrowser: AnkiNoteBrowser? = null,
 ) {
@@ -361,7 +355,6 @@ internal fun ReaderScreen(
         page != null &&
             !view.settingsOpen &&
             !view.storageBusy &&
-            !view.readingTimeSavePending &&
             !view.completionSavePending &&
             effectiveIdle
     val canAdvance =
@@ -427,7 +420,6 @@ internal fun ReaderScreen(
                 view,
                 sessionKey,
                 dispatch,
-                onInteraction,
                 imageLoader,
                 ankiBrowser,
             )
@@ -481,22 +473,10 @@ private fun FinishedCheckmark(modifier: Modifier = Modifier) {
 
 @Composable
 internal fun ReaderSaveRetry(view: ViewModel, dispatch: (Event) -> Unit) {
-    if (
-        view.reader != null &&
-            view.documentError != null &&
-            (view.readingTimeSavePending || view.completionSavePending || view.readerTime == null)
-    ) {
+    if (view.reader != null && view.documentError != null && view.completionSavePending) {
         TextButton(
             enabled = !view.storageBusy,
-            onClick = {
-                dispatch(
-                    when {
-                        view.readingTimeSavePending -> Event.RetryReadingTimeCheckpoint
-                        view.completionSavePending -> Event.RetryReaderCompletion
-                        else -> Event.RestoreReadingTime
-                    }
-                )
-            },
+            onClick = { dispatch(Event.RetryReaderCompletion) },
         ) {
             Text(stringResource(R.string.retry))
         }

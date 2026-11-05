@@ -22,8 +22,7 @@ internal fun LibraryDeleteDialog(view: ViewModel, dispatch: (Event) -> Unit, ena
     val bulk = view.libraryBulkDeleteTargets
     val targets = bulk ?: view.libraryDeleteTarget?.let { listOf(it) } ?: return
     val multiple = targets.size > 1
-    val canAct =
-        enabled && !view.storageBusy && !view.readingTimeSavePending && !view.completionSavePending
+    val canAct = enabled && !view.storageBusy && !view.completionSavePending
     AlertDialog(
         onDismissRequest = { if (!view.storageBusy) dispatch(Event.CancelDocumentDeletion) },
         title = {

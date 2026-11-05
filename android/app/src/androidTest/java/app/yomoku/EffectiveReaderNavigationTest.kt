@@ -83,8 +83,6 @@ class EffectiveReaderNavigationTest {
             contentRoute = ContentRoute.READER,
             reader = page,
             readerAnalysis = analysis,
-            readerTime = ReadingTimeUpdate(page.documentId, page.position, PendingReadingTime(0)),
-            readingTimeSavePending = false,
             completionSavePending = false,
             effectiveReaderTokens = EffectiveReaderPage(identity, listOf(token)),
             effectiveReaderWord = EffectiveReaderWordState(busy = false),

@@ -44,7 +44,7 @@ class AnkiEntryActionTest {
             YomokuTheme {
                 Column {
                     Text("Dictionary")
-                    AnkiEntryAction(entry.value, true, events::add, {})
+                    AnkiEntryAction(entry.value, true, events::add)
                 }
             }
         }
@@ -89,7 +89,6 @@ class AnkiEntryActionTest {
                         ReaderVocabulary(VocabularyId(5), status.value),
                     ),
                     true,
-                    {},
                     {},
                     {
                         events.add(it)

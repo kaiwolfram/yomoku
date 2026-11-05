@@ -1,4 +1,4 @@
-//! Exercise the real middleware/worker, including queued pending-time saves.
+//! Exercise the real middleware/worker, including completion retries.
 use std::{
     convert::Infallible,
     path::PathBuf,

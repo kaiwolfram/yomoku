@@ -3,7 +3,6 @@ use std::{convert::Infallible, fs};
 use rusqlite::Connection;
 use serde_json::json;
 use yomoku_core::{
-    active_time::PendingReadingTime,
     completion::{AnalyzedCompletionOutcome, PageCompletion},
     document::{DocumentId, PasteText, TextAnchor, TextOffset, TextRange},
     pagination::{LogicalPages, PageLength},
@@ -211,13 +210,6 @@ fn complete(storage: &mut Storage, imported: &AnalyzedPaste) -> PageCompletion {
         page_length: storage.page_length().unwrap(),
         departing_position: position(document, 0),
         completed_at_unix_ms: 500,
-        pending_time: storage
-            .pending_page_time(
-                document.document_id,
-                key(imported).page,
-                storage.page_length().unwrap(),
-            )
-            .unwrap(),
     };
     assert!(matches!(
         storage
@@ -295,19 +287,15 @@ fn read_only_details_keep_all_applicable_word_name_views_and_exact_inflected_ide
 }
 
 #[test]
-fn counts_include_repetitions_rereads_and_other_documents_but_never_base_forms_or_partial_time() {
+fn counts_include_repetitions_rereads_and_other_documents_but_never_base_forms_or_incomplete_pages()
+{
     let database = TestDatabase::new();
     let index = dictionary();
     let dictionary = Dictionary::open(index.path()).unwrap();
     let mut storage = Storage::open(database.path()).unwrap();
     let first = import(&mut storage, "試験語だった 試験語だった 試験語");
     let second = import(&mut storage, "試験語だった 試験語");
-    let saved = storage
-        .load_pending_reading_time(first.document.document_id, position(&first.document, 0))
-        .unwrap();
-    storage
-        .save_pending_reading_time(saved, PendingReadingTime::from_millis(5000).unwrap())
-        .unwrap();
+
     assert_eq!(lookup(&mut storage, &dictionary, &first, 0).encountered, 0);
     let command = complete(&mut storage, &first);
     assert_eq!(
@@ -495,9 +483,6 @@ fn reflow_fragments_keep_full_unicode_surface_with_one_lifetime_count() {
             page_length: PageLength::default(),
             departing_position: position(&imported.document, i64::from(page.range.start) as usize),
             completed_at_unix_ms: 500,
-            pending_time: storage
-                .pending_page_time(imported.document.document_id, *page, PageLength::default())
-                .unwrap(),
         };
         storage
             .record_analyzed_page_completion(command, imported.analysis_id)

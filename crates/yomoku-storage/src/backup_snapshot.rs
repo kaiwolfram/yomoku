@@ -92,7 +92,7 @@ impl Storage {
     /// `directory` must be a NEW child of a caller-owned app-private, non-backed-up
     /// parent. Existing directories/files/symlinks are refused, never reused.
     /// Linux/Android permissions are 0700 for the directory and 0600 for the file.
-    /// Call on the storage FIFO after checkpoint drain while mutations are gated.
+    /// Call on the storage FIFO after pending reader mutations drain while new mutations are gated.
     /// SQLite also gives a coherent snapshot with concurrent connections/WAL;
     /// mutations committed after that point are excluded. The source is untouched.
     ///

@@ -46,7 +46,6 @@ class ReaderNavigationTest {
         compose.waitUntil(30_000) {
             val view = core().view
             !view.storageBusy &&
-                !view.readingTimeSavePending &&
                 !view.completionSavePending &&
                 (view.settingsOpen ||
                     view.contentRoute != ContentRoute.MAIN ||
@@ -54,7 +53,7 @@ class ReaderNavigationTest {
                     view.libraryWordError != null) &&
                 (view.settingsOpen ||
                     view.contentRoute != ContentRoute.READER ||
-                    (view.readerTime != null && view.effectiveReaderTokens != null))
+                    view.effectiveReaderTokens != null)
         }
         compose.waitForIdle()
     }
@@ -76,7 +75,7 @@ class ReaderNavigationTest {
         awaitReady()
         val id = core().view.documents.single { it.title == title }.documentId
         compose.runOnUiThread { core().dispatch(Event.OpenReader(id)) }
-        compose.waitUntil(30_000) { !core().view.storageBusy && core().view.readerTime != null }
+        compose.waitUntil(30_000) { !core().view.storageBusy }
         awaitReady()
         return id.value
     }

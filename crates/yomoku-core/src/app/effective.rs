@@ -22,8 +22,6 @@ impl Model {
     fn can_start_effective_page(&self, page: EffectivePageIdentity) -> bool {
         !self.storage_busy
             && !self.settings_open
-            && self.pending_time_checkpoint.is_none()
-            && self.queued_time_checkpoint.is_none()
             && !self.completion_pending()
             && self.deferred_reader_event.is_none()
             && self.current_token_key() == Some(page.base)
@@ -61,8 +59,7 @@ impl Model {
             }
             _ => None,
         };
-        self.reader_time = None;
-        self.reader_clock = None;
+
         self.apply_position(document);
         if final_page {
             self.close_document();
@@ -119,10 +116,7 @@ impl Yomoku {
                 }))
             }
             Event::RetryEffectiveReaderStatus => {
-                if model.storage_busy
-                    || model.pending_time_checkpoint.is_some()
-                    || model.queued_time_checkpoint.is_some()
-                {
+                if model.storage_busy {
                     return Some(Command::done());
                 }
                 let session = &mut model.effective_reader;
@@ -148,8 +142,6 @@ impl Yomoku {
             Event::LoadReaderTokens(base) => {
                 if model.storage_busy
                     || model.settings_open
-                    || model.pending_time_checkpoint.is_some()
-                    || model.queued_time_checkpoint.is_some()
                     || model.completion_pending()
                     || model.effective_mutation_pending()
                     || model.deferred_reader_event.is_some()
@@ -171,9 +163,7 @@ impl Yomoku {
             } => {
                 if model.completion_pending()
                     || model.deferred_reader_event.is_some()
-                    || (model.storage_busy
-                        && model.pending_time_checkpoint.is_none()
-                        && model.queued_time_checkpoint.is_none())
+                    || model.storage_busy
                     || model.content_route != ContentRoute::Reader
                     || model.settings_open
                     || !model.reader.as_ref().is_some_and(|reader| {
@@ -204,17 +194,10 @@ impl Yomoku {
                 model.completion_notice = None;
                 model.book_completion_notice = None;
                 model.document_error = None;
-                if model.pending_time_checkpoint.is_some() || model.queued_time_checkpoint.is_some()
-                {
-                    return Some(render::render());
-                }
                 Some(self.update(Event::RetryReaderCompletion, model))
             }
             Event::RetryReaderCompletion => {
-                if model.storage_busy
-                    || model.pending_time_checkpoint.is_some()
-                    || model.queued_time_checkpoint.is_some()
-                {
+                if model.storage_busy {
                     return Some(Command::done());
                 }
                 let request = model.effective_reader.dispatch_completion();
@@ -232,12 +215,6 @@ impl Yomoku {
         model: &mut Model,
     ) -> Command<Effect, Event> {
         model.storage_busy = true;
-        model.time_checkpoint_can_wait = matches!(
-            request,
-            EffectiveReaderRequest::Tokens(_)
-                | EffectiveReaderRequest::Word(_)
-                | EffectiveReaderRequest::Status(_)
-        );
         model.effective_request = Some(request.clone());
         model.document_error = None;
         render::render().and(
@@ -261,7 +238,7 @@ impl Yomoku {
         // app's FIFO slot. Release only its captured request, never newer work.
         model.effective_request = None;
         model.storage_busy = false;
-        model.time_checkpoint_can_wait = false;
+
         match progress {
             Some(EffectiveReaderProgress::TokensFailed(error)) => {
                 model.document_error = Some(error);
@@ -296,14 +273,9 @@ impl Yomoku {
     }
 
     fn drain_effective(&self, model: &mut Model) -> Command<Effect, Event> {
-        if model.pending_time_checkpoint.is_none() {
-            if let Some(checkpoint) = model.queued_time_checkpoint {
-                return self.update(Event::CheckpointReadingTime(checkpoint), model);
-            }
-            if !model.completion_pending() && !model.effective_mutation_pending() {
-                if let Some(event) = model.deferred_reader_event.take() {
-                    return self.update(event, model);
-                }
+        if !model.completion_pending() && !model.effective_mutation_pending() {
+            if let Some(event) = model.deferred_reader_event.take() {
+                return self.update(event, model);
             }
         }
         render::render()

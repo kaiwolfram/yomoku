@@ -179,10 +179,7 @@ fn complete(router: &EffectRouter, timestamp: i64) -> ViewModel {
 
 #[test]
 fn ordered_reader_worker_crosses_chapters_with_original_analysis_time_and_whole_book_finish() {
-    use yomoku_core::{
-        active_time::{PendingReadingTime, ReadingTimeUpdate},
-        reader::ReaderTokenKey,
-    };
+    use yomoku_core::reader::ReaderTokenKey;
     let database = Database::new();
     let bytes = epub_fixture::book(true, "<p>猫 𠮷 English</p>");
     let mut storage = Storage::open(database.path()).unwrap();
@@ -230,16 +227,6 @@ fn ordered_reader_worker_crosses_chapters_with_original_analysis_time_and_whole_
         .unwrap()
         .tokens
         .is_empty());
-    let restored = dispatch(&router, Event::RestoreReadingTime)
-        .reader_time
-        .unwrap();
-    dispatch(
-        &router,
-        Event::CheckpointReadingTime(ReadingTimeUpdate {
-            pending: PendingReadingTime::from_millis(123).unwrap(),
-            ..restored
-        }),
-    );
     let moved = complete(&router, 10);
     let second = moved.reader.unwrap();
     assert!(second.images.is_empty());
@@ -252,7 +239,7 @@ fn ordered_reader_worker_crosses_chapters_with_original_analysis_time_and_whole_
     );
     assert_eq!(second.position.offset, TextOffset::START);
     assert_eq!(moved.reader_analysis, Some(original.analyses[1].analysis));
-    assert!(moved.reader_time.is_none() && moved.effective_reader_tokens.is_none());
+
     assert!(moved.documents[0].progress_percent > 0 && moved.documents[0].progress_percent < 100);
     assert!(!moved.documents[0].finished_at_least_once);
     let before_previous = totals(&database.path());
@@ -310,17 +297,6 @@ fn ordered_reader_worker_crosses_chapters_with_original_analysis_time_and_whole_
         .iter()
         .all(|token| token.anchor.chapter_id == second.position.chapter_id));
     assert!(tokens.tokens.iter().any(|token| token.surface == "猫"));
-    let restored = dispatch(&router, Event::RestoreReadingTime)
-        .reader_time
-        .unwrap();
-    assert_eq!(restored.pending.milliseconds(), 0);
-    dispatch(
-        &router,
-        Event::CheckpointReadingTime(ReadingTimeUpdate {
-            pending: PendingReadingTime::from_millis(456).unwrap(),
-            ..restored
-        }),
-    );
     let finished = complete(&router, 12);
     assert_eq!(finished.content_route, ContentRoute::Main);
     assert!(finished.reader.is_none() && finished.book_completion_notice.is_some());
@@ -335,15 +311,6 @@ fn ordered_reader_worker_crosses_chapters_with_original_analysis_time_and_whole_
             .chapters,
         original.document.chapters
     );
-    let durations: Vec<i64> = Connection::open(database.path())
-        .unwrap()
-        .prepare("SELECT active_time_ms FROM reading_completions ORDER BY command_id")
-        .unwrap()
-        .query_map([], |row| row.get(0))
-        .unwrap()
-        .collect::<Result<_, _>>()
-        .unwrap();
-    assert_eq!(durations, vec![123, 0, 456]);
     // Ordinary loads retain chapter-2 EOF; a fresh worker explicitly opens at chapter 1.
     let loaded = storage
         .load_document_reader_snapshot(id)
@@ -417,7 +384,6 @@ fn image_only_chapter_worker_can_load_tokens_and_finish_without_words() {
         }),
     );
     assert!(tokens.effective_reader_tokens.unwrap().tokens.is_empty());
-    dispatch(&router, Event::RestoreReadingTime);
     let finished = complete(&router, 11);
     assert!(finished.book_completion_notice.is_some());
     assert!(finished.completion_notice.is_none());

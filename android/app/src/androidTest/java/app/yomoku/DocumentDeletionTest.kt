@@ -25,7 +25,6 @@ class DocumentDeletionTest {
         compose.waitUntil(90_000) {
             val view = core().view
             !view.storageBusy &&
-                !view.readingTimeSavePending &&
                 !view.completionSavePending &&
                 (view.contentRoute != ContentRoute.MAIN ||
                     view.destination != Destination.LIBRARY ||
@@ -43,12 +42,12 @@ class DocumentDeletionTest {
 
     private fun history(db: SQLiteDatabase, id: Long): List<Long> =
         db.rawQuery(
-                "SELECT COUNT(*), COALESCE(SUM(active_time_ms), 0), (SELECT COUNT(*) FROM reading_occurrences o JOIN reading_completions c ON c.command_id = o.command_id WHERE c.document_id = ?) FROM reading_completions WHERE document_id = ?",
+                "SELECT COUNT(*), (SELECT COUNT(*) FROM reading_occurrences o JOIN reading_completions c ON c.command_id = o.command_id WHERE c.document_id = ?) FROM reading_completions WHERE document_id = ?",
                 arrayOf(id.toString(), id.toString()),
             )
             .use {
                 assertTrue(it.moveToFirst())
-                listOf(it.getLong(0), it.getLong(1), it.getLong(2))
+                listOf(it.getLong(0), it.getLong(1))
             }
 
     @Test
@@ -92,9 +91,7 @@ class DocumentDeletionTest {
         compose.onNodeWithTag("document_deletion_dialog").assertDoesNotExist()
         compose.onNodeWithTag("document_${id.value}").performClick()
         compose.waitUntil(90_000) {
-            core().view.effectiveReaderTokens != null &&
-                core().view.readerTime != null &&
-                !core().view.storageBusy
+            core().view.effectiveReaderTokens != null && !core().view.storageBusy
         }
         compose.onNodeWithTag("reader_scroll").performScrollToNode(hasTestTag("next_page"))
         compose.onNodeWithTag("next_page").performClick()
@@ -103,7 +100,7 @@ class DocumentDeletionTest {
         compose.onNodeWithTag("finished_${id.value}", useUnmergedTree = true).assertExists()
         val before = db().use { history(it, id.value) }
         assertEquals(1L, before[0])
-        assertTrue(before[2] >= 3L)
+        assertTrue(before[1] >= 3L)
         db().use {
             it.execSQL(
                 "CREATE TRIGGER fail_ui_document_delete BEFORE DELETE ON documents WHEN OLD.id = ${id.value} BEGIN SELECT RAISE(ABORT, 'fixture'); END"

@@ -19,9 +19,7 @@ class LibraryCoversTest {
 
     private fun idle() =
         compose.waitUntil(90_000) {
-            !core().view.storageBusy &&
-                !core().view.readingTimeSavePending &&
-                !core().view.completionSavePending
+            !core().view.storageBusy && !core().view.completionSavePending
         }
 
     private fun show(id: Long) {
@@ -94,7 +92,7 @@ class LibraryCoversTest {
             assertEquals(reference, core().view.documents.single { it.documentId == id })
             compose.onNodeWithTag("document_${id.value}").performClick()
             compose.waitUntil(60_000) {
-                core().view.reader?.documentId == id && core().view.readerTime != null
+                core().view.reader?.documentId == id
             }
             assertEquals(0L, core().view.reader!!.position.offset.value)
             compose.runOnUiThread { core().dispatch(Event.CloseDocument) }
@@ -145,7 +143,7 @@ class LibraryCoversTest {
                 .assertDoesNotExist()
             compose.onNodeWithTag("document_${id.value}").performClick()
             compose.waitUntil(60_000) {
-                core().view.reader?.documentId == id && core().view.readerTime != null
+                core().view.reader?.documentId == id
             }
             assertNull(core().view.documentError)
             compose.runOnUiThread { core().dispatch(Event.CloseDocument) }

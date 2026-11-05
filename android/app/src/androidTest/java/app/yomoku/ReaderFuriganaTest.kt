@@ -28,16 +28,14 @@ class ReaderFuriganaTest {
     private fun awaitSaved() {
         compose.waitUntil(60_000) {
             val view = core().view
-            !view.storageBusy && !view.readingTimeSavePending && !view.completionSavePending
+            !view.storageBusy && !view.completionSavePending
         }
         compose.waitForIdle()
     }
 
     private fun awaitReader() {
         compose.waitUntil(90_000) {
-            core().view.effectiveReaderTokens != null &&
-                core().view.readerTime != null &&
-                !core().view.storageBusy
+            core().view.effectiveReaderTokens != null && !core().view.storageBusy
         }
         awaitSaved()
     }

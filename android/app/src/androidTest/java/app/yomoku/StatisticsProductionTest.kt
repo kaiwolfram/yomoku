@@ -21,7 +21,6 @@ class StatisticsProductionTest {
         compose.waitUntil(90_000) {
             val view = core().view
             !view.storageBusy &&
-                !view.readingTimeSavePending &&
                 !view.completionSavePending &&
                 (view.destination != Destination.STATISTICS ||
                     view.statistics.data != null ||
@@ -42,7 +41,6 @@ class StatisticsProductionTest {
         compose.runOnUiThread { core().dispatch(Event.OpenReader(id)) }
         compose.waitUntil(90_000) {
             core().view.effectiveReaderTokens?.identity?.base?.documentId == id &&
-                core().view.readerTime != null &&
                 !core().view.storageBusy
         }
         return checkNotNull(core().view.effectiveReaderTokens)
@@ -125,8 +123,7 @@ class StatisticsProductionTest {
             assertEquals(completed.reading.japaneseOccurrences, graph.points.last().values.single())
         }
 
-        compose.onNodeWithTag("statistics_card_OCCURRENCES").performClick()
-        compose.onNodeWithTag("statistics_overview").assertIsDisplayed()
+        compose.onNodeWithTag("statistics_card_OCCURRENCES").assertIsDisplayed()
         val original = core()
         val query = original.view.statistics.query
         compose.activityRule.scenario.recreate()
@@ -134,11 +131,11 @@ class StatisticsProductionTest {
         assertSame(original, core())
         assertEquals(query, core().view.statistics.query)
         assertEquals(StatisticsTimeframe.ALLTIME, core().view.statistics.timeframe)
-        compose.onNodeWithTag("statistics_overview").assertIsDisplayed()
+        compose.onNodeWithTag("statistics_card_OCCURRENCES").assertIsDisplayed()
         compose.onNodeWithText("Settings").performClick()
         compose.onNodeWithText("Back").performClick()
         idle()
-        compose.onNodeWithTag("statistics_overview").assertIsDisplayed()
+        compose.onNodeWithTag("statistics_card_OCCURRENCES").assertIsDisplayed()
         assertEquals(query, core().view.statistics.query)
         assertEquals(completed, totals())
     }

@@ -16,7 +16,7 @@ must match. Unknown/extra schema objects or incompatible versions fail unchanged
 | Vocabulary | Typed exact UTF-8 surface/status/timestamp domains without normalization or dictionary lookups |
 | Compact completion | Strict version-2 payload shape, page command, C analysis/profile/mode, ordered counted occurrence domains, live text/page/analysis and completed-receipt consistency |
 | Content | Source/document/chapter ownership, contiguous chapter ordering, format/text shape, UTF-8 titles/nonblank live text and representable totals |
-| Positions/time | Ownership, scalar boundaries/range including EOF, pending duration/revision domains |
+| Positions | Ownership and scalar boundaries/range including EOF |
 | Analysis | Profile/mode, contiguous indices, range/coverage/scalar/surface/classification/reading/form domains; no analyzer rerun |
 | Import identity | Exact canonical-paste/original-file SHA-256, encoding/format ownership, required file/EPUB headers |
 | TXT/SRT/ruby | Pure saved-encoding derivation matches canonical text and annotations; ruby indices/ranges/readings obey existing contracts |
@@ -37,7 +37,7 @@ consistency also require further review/hostile-data coverage. Schema checks and
 local domains alone are not a restore-ready result.
 
 `SchemaCheckedBackup` remains opaque and exposes no activation authority. App secret
-handoff, confirmation correlation, checkpoint/worker drain, mutation gating, private
+handoff, confirmation correlation, reader mutation/worker drain, mutation gating, private
 crash cleanup, Android descriptors/UI, atomic activation/sidecars and interrupted
 replacement recovery remain unfinished. Cancellation polls between synchronous
 operations/rows; SQL/JSON/parsing/sync are not interruptible and there is no total

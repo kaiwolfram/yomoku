@@ -6,7 +6,6 @@ use std::{
 use rusqlite::types::Value;
 use yomoku_backup::{decrypt_snapshot, encrypt_snapshot, BackupError, Manifest, Password};
 use yomoku_core::{
-    active_time::PendingReadingTime,
     completion::PageCompletionIntent,
     document::{PasteText, TextOffset},
     pagination::PageLength,
@@ -74,12 +73,7 @@ fn complete(storage: &mut Storage, imported: &AnalyzedPaste) {
     let id = imported.document.document_id;
     let snapshot = storage.open_document_reader_snapshot(id).unwrap().unwrap();
     let page = ReaderPage::open_document(&snapshot.document, snapshot.page_length).unwrap();
-    let saved = storage
-        .load_pending_reading_time(id, page.position)
-        .unwrap();
-    storage
-        .save_pending_reading_time(saved, PendingReadingTime::from_millis(1234).unwrap())
-        .unwrap();
+
     let key = storage
         .load_effective_reader_tokens(id, page.anchor)
         .unwrap()
@@ -125,7 +119,7 @@ pub(super) fn populate(storage: &mut Storage) {
         panic!("new paste")
     };
     complete(storage, &live);
-    // A backward reread retains the permanent finish marker and independent time.
+    // A backward reread retains the permanent finish marker.
     let position = yomoku_core::pagination::ReadingPosition {
         source_id: live.document.chapter.source_id,
         chapter_id: live.document.chapter.chapter_id,
@@ -134,12 +128,7 @@ pub(super) fn populate(storage: &mut Storage) {
     storage
         .save_reading_position(live.document.document_id, position)
         .unwrap();
-    let saved = storage
-        .load_pending_reading_time(live.document.document_id, position)
-        .unwrap();
-    storage
-        .save_pending_reading_time(saved, PendingReadingTime::from_millis(9876).unwrap())
-        .unwrap();
+
     // Leave an unfinished frozen reservation too; backups must not replay it.
     let page = ReaderPage::open_document(
         &storage

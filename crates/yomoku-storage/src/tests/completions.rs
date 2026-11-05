@@ -30,7 +30,6 @@ fn command(storage: &mut Storage, document: &PastedDocument) -> PageCompletion {
         page_length,
         departing_position,
         completed_at_unix_ms: 1_792_756_800_123,
-        pending_time: Default::default(),
     }
 }
 

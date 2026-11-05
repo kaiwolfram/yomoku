@@ -217,7 +217,7 @@ fn seed(storage: &mut Storage, config: &Config) {
     }
     let totals = storage.lifetime_reading_totals().unwrap();
     assert_eq!(totals.japanese_occurrences, config.rereads as u64 * 50);
-    assert_eq!(totals.active_time_ms, 0);
+
     let buckets = storage
         .statistics_buckets(StatisticsTimeframe::LastYear, DATE + 100_000)
         .unwrap();

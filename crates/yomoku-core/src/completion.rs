@@ -3,7 +3,6 @@
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    active_time::PendingReadingTime,
     document::{
         AnalysisId, CompletionCommandId, DocumentId, InvalidTextValue, PastedDocument,
         ReaderDocument, TextAnchor,
@@ -22,12 +21,9 @@ pub struct PageCompletion {
     pub page_length: PageLength,
     pub departing_position: ReadingPosition,
     pub completed_at_unix_ms: i64,
-    /// Checkpoint first, then freeze the total belonging to this departing page.
-    pub pending_time: PendingReadingTime,
 }
 
-/// Captured from the visible reader before draining its final checkpoints.
-/// The FIFO then reserves an ID and freezes the whole page's durable time.
+/// Captured from the visible reader; the FIFO reserves an ID for its completion.
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
 pub struct PageCompletionIntent {
@@ -119,7 +115,7 @@ pub enum CompletionOutcome {
     AlreadyRecorded,
 }
 
-/// Analyzed completion is distinct from legacy position/time-only history.
+/// Analyzed completion is distinct from legacy position-only history.
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
 #[repr(C)]

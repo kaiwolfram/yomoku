@@ -29,11 +29,7 @@ class ReaderFormattingTest {
     private fun awaitReader() {
         compose.waitUntil(60_000) {
             val view = core().view
-            !view.storageBusy &&
-                !view.readingTimeSavePending &&
-                !view.completionSavePending &&
-                view.readerTime != null &&
-                view.effectiveReaderTokens != null
+            !view.storageBusy && !view.completionSavePending && view.effectiveReaderTokens != null
         }
         compose.waitForIdle()
     }

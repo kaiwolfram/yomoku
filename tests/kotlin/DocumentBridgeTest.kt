@@ -10,10 +10,7 @@ import app.yomoku.shared.EffectiveReaderSelection
 import app.yomoku.shared.Event
 import app.yomoku.shared.ImportOutcome
 import app.yomoku.shared.PageLength
-import app.yomoku.shared.PendingReadingTime
 import app.yomoku.shared.ReaderAnalysis
-import app.yomoku.shared.ReaderClockAction
-import app.yomoku.shared.ReaderClockSample
 import app.yomoku.shared.ReaderFontSize
 import app.yomoku.shared.ReaderLineSpacing
 import app.yomoku.shared.ReaderTokenKey
@@ -93,7 +90,7 @@ internal fun verifyDocumentBridge() {
                 check(page.anchor.range.end.value == text.toByteArray(Charsets.UTF_8).size.toLong())
                 check(page.position.offset.value == 0L)
                 check(page.pageNumber == 1UL && page.totalPages == 1UL)
-                check(opened.readerTime == null)
+
                 val tokenKey = ReaderTokenKey(id, page.anchor, analysis)
                 val tokensView = listener.dispatch(bridge, Event.LoadReaderTokens(tokenKey))
                 val tokens = checkNotNull(tokensView.effectiveReaderTokens)
@@ -112,7 +109,7 @@ internal fun verifyDocumentBridge() {
                     check(visible == token.surface)
                     check(token.anchor.sourceId == page.anchor.sourceId)
                 }
-                check(tokensView.reader == page && tokensView.readerTime == null)
+
                 check(tokensView.reader == opened.reader && tokensView.completionNotice == null)
                 check(dictionary.calls.get() == 2)
                 val selected = tokens.tokens.first()
@@ -138,7 +135,7 @@ internal fun verifyDocumentBridge() {
                         )
                     val changed = listener.dispatch(bridge, change)
                     check(changed.documentError == null && changed.reader == page)
-                    check(changed.readerTime == null && changed.completionNotice == null)
+
                     check(changed.reader == opened.reader)
                     val expected =
                         tokens.tokens.map { token ->
@@ -163,21 +160,6 @@ internal fun verifyDocumentBridge() {
                     )
                     check(dictionary.calls.get() == 2)
                 }
-                val initialTime =
-                    checkNotNull(listener.dispatch(bridge, Event.RestoreReadingTime).readerTime)
-                check(initialTime.position == page.position && initialTime.pending.value == 0L)
-                val checkpoint = initialTime.copy(pending = PendingReadingTime(321L))
-                val checkpointed =
-                    listener.dispatch(bridge, Event.CheckpointReadingTime(checkpoint))
-                check(checkpointed.readerTime == checkpoint && !checkpointed.readingTimeSavePending)
-                val beforeInvalidTime = bridge.view()
-                val invalidTime =
-                    Event.CheckpointReadingTime(checkpoint.copy(pending = PendingReadingTime(-1L)))
-                check(
-                    runCatching { bridge.update(invalidTime.bincodeSerialize()) }.exceptionOrNull()
-                        is FfiError.InvalidEvent
-                )
-                check(bridge.view().contentEquals(beforeInvalidTime))
                 var saved = loaded
                 for (byte in listOf(text.toByteArray(Charsets.UTF_8).size.toLong(), 5L, 0L, 5L)) {
                     val position = page.position.copy(offset = TextOffset(byte))
@@ -185,7 +167,7 @@ internal fun verifyDocumentBridge() {
                     check(updated.documentError == null)
                     check(updated.reader?.position == position)
                     check(updated.readerAnalysis == analysis)
-                    check(updated.readerTime == null)
+
                     saved = checkNotNull(updated.reader)
                     check(saved.position == position)
                     check(
@@ -197,47 +179,6 @@ internal fun verifyDocumentBridge() {
                 val rejected = listener.dispatch(bridge, Event.SaveReadingPosition(invalid))
                 check(rejected.documentError == DocumentError.INVALIDDOCUMENT)
                 check(rejected.reader == saved)
-                val currentTime =
-                    checkNotNull(listener.dispatch(bridge, Event.RestoreReadingTime).readerTime)
-                check(currentTime.position == saved.position && currentTime.pending.value == 0L)
-                val secondCheckpoint = currentTime.copy(pending = PendingReadingTime(654L))
-                val clock =
-                    ReaderClockSample(id, currentTime.position, 1_000L, ReaderClockAction.RESUME)
-                val resume = Event.ObserveReaderClock(clock)
-                check(Event.bincodeDeserialize(resume.bincodeSerialize()) == resume)
-                bridge.update(resume.bincodeSerialize())
-                bridge.update(
-                    Event.ObserveReaderClock(
-                            clock.copy(monotonicMs = 1_200L, action = ReaderClockAction.INTERACT)
-                        )
-                        .bincodeSerialize()
-                )
-                val periodic =
-                    listener.dispatch(
-                        bridge,
-                        Event.ObserveReaderClock(
-                            clock.copy(monotonicMs = 1_400L, action = ReaderClockAction.CHECKPOINT)
-                        ),
-                    )
-                check(periodic.readerTime?.pending?.value == 400L)
-                check(
-                    listener
-                        .dispatch(
-                            bridge,
-                            Event.ObserveReaderClock(
-                                clock.copy(monotonicMs = 1_654L, action = ReaderClockAction.PAUSE)
-                            ),
-                        )
-                        .readerTime == secondCheckpoint
-                )
-                val pausedView = bridge.view()
-                bridge.update(
-                    Event.ObserveReaderClock(
-                            clock.copy(monotonicMs = 90_000L, action = ReaderClockAction.CHECKPOINT)
-                        )
-                        .bincodeSerialize()
-                )
-                check(bridge.view().contentEquals(pausedView))
                 bridge.update(Event.OpenSettings.bincodeSerialize())
                 for (length in PageLength.entries) {
                     if (ViewModel.bincodeDeserialize(bridge.view()).pageLength == length) continue
@@ -246,7 +187,6 @@ internal fun verifyDocumentBridge() {
                     check(changed.reader?.position == saved.position)
                     check(changed.readerAnalysis == analysis)
                     check(changed.reader == saved)
-                    check(changed.readerTime == secondCheckpoint)
                 }
                 val typographyPage = ViewModel.bincodeDeserialize(bridge.view()).reader
                 for (furigana in listOf(false, true)) {
@@ -261,7 +201,6 @@ internal fun verifyDocumentBridge() {
                             check(changed.readerTypography == typography)
                             check(changed.reader == typographyPage)
                             check(changed.reader == saved && changed.readerAnalysis == analysis)
-                            check(changed.readerTime == secondCheckpoint)
                         }
                     }
                 }
@@ -269,7 +208,7 @@ internal fun verifyDocumentBridge() {
                 bridge.update(Event.CloseDocument.bincodeSerialize())
                 check(ViewModel.bincodeDeserialize(bridge.view()).contentRoute == ContentRoute.MAIN)
                 check(ViewModel.bincodeDeserialize(bridge.view()).readerAnalysis == null)
-                check(ViewModel.bincodeDeserialize(bridge.view()).readerTime == null)
+
                 check(ViewModel.bincodeDeserialize(bridge.view()).readerFurigana.isEmpty())
                 val duplicate = listener.dispatch(bridge, Event.CreatePaste(text))
                 check(duplicate.documents.single().documentId == id)
@@ -316,26 +255,7 @@ internal fun verifyDocumentBridge() {
             check(opened.reader?.text == text)
             check(opened.readerTypography == initial.readerTypography)
             check(opened.readerAnalysis == analysis)
-            check(opened.readerTime == null)
-            val restored =
-                checkNotNull(reopened.dispatch(bridge, Event.RestoreReadingTime).readerTime)
-            check(restored.pending.value == 654L && restored.position == document.position)
-            val freshClock =
-                ReaderClockSample(
-                    document.documentId,
-                    restored.position,
-                    0L,
-                    ReaderClockAction.RESUME,
-                )
-            bridge.update(Event.ObserveReaderClock(freshClock).bincodeSerialize())
-            val resumed =
-                reopened.dispatch(
-                    bridge,
-                    Event.ObserveReaderClock(
-                        freshClock.copy(monotonicMs = 10L, action = ReaderClockAction.PAUSE)
-                    ),
-                )
-            check(resumed.readerTime?.pending?.value == 664L)
+
             check(unavailableDictionary.calls.get() == 0)
             check(ViewModel.bincodeDeserialize(bridge.view()).reader?.position == document.position)
             val page = checkNotNull(opened.reader)
@@ -352,7 +272,7 @@ internal fun verifyDocumentBridge() {
                 )
             val completed = reopened.dispatch(bridge, request, callbackCount = 2)
             check(completed.documentError == null && !completed.completionSavePending)
-            check(completed.readerTime == null && completed.readerAnalysis == null)
+
             check(completed.contentRoute == ContentRoute.MAIN && completed.reader == null)
             check(completed.effectiveReaderTokens == null)
             check(completed.bookCompletionNotice == completed.completionNotice?.commandId)
@@ -373,9 +293,6 @@ internal fun verifyDocumentBridge() {
             val reopenedBook = reopened.dispatch(bridge, Event.OpenReader(document.documentId))
             check(reopenedBook.bookCompletionNotice == null)
             check(reopenedBook.reader?.finishedAtLeastOnce == true)
-            check(
-                reopened.dispatch(bridge, Event.RestoreReadingTime).readerTime?.pending?.value == 0L
-            )
             val rereadPage = checkNotNull(reopenedBook.reader)
             val knownTokens =
                 checkNotNull(

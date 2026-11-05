@@ -453,7 +453,6 @@ fn real_mode_c_import_and_completion_preserve_surfaces_and_duplicate_identity() 
         page_length,
         departing_position,
         completed_at_unix_ms: 50,
-        pending_time: Default::default(),
     };
     assert_eq!(
         storage
@@ -605,7 +604,6 @@ fn real_txt_import_analyzes_only_canonical_text_and_completes_with_original_anch
             offset: page.range.start,
         },
         completed_at_unix_ms: 200,
-        pending_time: Default::default(),
     };
     assert_eq!(
         storage
@@ -756,7 +754,6 @@ fn real_srt_import_analyzes_only_canonical_text_and_completes_with_original_anch
             offset: page.range.start,
         },
         completed_at_unix_ms: 200,
-        pending_time: Default::default(),
     };
     assert_eq!(
         storage
@@ -929,7 +926,6 @@ fn real_epub_import_analyzes_every_canonical_chapter_and_reopens_without_rescan(
     // Exercise the same original real Mode C chapters through the generic reader
     // repositories, without parsing again or keeping an analyzer in the reader.
     use yomoku_core::{
-        active_time::PendingReadingTime,
         completion::{AnalyzedCompletionOutcome, PageCompletionIntent},
         reader::{ReaderAnalysis, ReaderPage},
     };
@@ -960,12 +956,7 @@ fn real_epub_import_analyzes_every_canonical_chapter_and_reopens_without_rescan(
                 .map(|token| token.surface.as_str())
                 .collect::<Vec<_>>()
         );
-        let saved = storage
-            .load_pending_reading_time(id, page.position)
-            .unwrap();
-        storage
-            .save_pending_reading_time(saved, PendingReadingTime::from_millis(75).unwrap())
-            .unwrap();
+
         let command = storage
             .prepare_page_completion(PageCompletionIntent {
                 document_id: id,
@@ -976,7 +967,7 @@ fn real_epub_import_analyzes_every_canonical_chapter_and_reopens_without_rescan(
                 analysis_id: imported.analysis_ids[index],
             })
             .unwrap();
-        assert_eq!(command.completion.pending_time.milliseconds(), 75);
+
         assert!(matches!(
             storage
                 .record_analyzed_page_completion(command.completion, command.analysis_id)

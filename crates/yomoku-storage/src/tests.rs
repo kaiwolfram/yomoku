@@ -30,7 +30,6 @@ mod positions;
 mod reader_documents;
 mod reader_tokens;
 mod reader_words;
-mod reading_time;
 mod settings;
 mod srt;
 mod statistics;
@@ -109,7 +108,6 @@ fn initial_schema_has_only_release_tables_and_reopens_without_writes() {
         "vocabulary",
         "vocabulary_status_events",
         "reading_positions",
-        "pending_reading_time",
         "library_read_clock",
         "completion_commands",
         "effective_completion_commands",
@@ -122,6 +120,15 @@ fn initial_schema_has_only_release_tables_and_reopens_without_writes() {
     ];
     expected.sort();
     assert_eq!(tables, expected);
+    let columns: Vec<String> = storage
+        .connection
+        .prepare("PRAGMA table_info(reading_completions)")
+        .unwrap()
+        .query_map([], |row| row.get(1))
+        .unwrap()
+        .collect::<Result<_, _>>()
+        .unwrap();
+    assert!(!columns.iter().any(|name| name == "active_time_ms"));
     assert_eq!(storage.anki_default_deck().unwrap(), None);
     assert_eq!(
         storage.page_length().unwrap(),

@@ -84,7 +84,6 @@ class ReaderWordDetailsSessionTest {
             assertTrue(details.candidates.names.all { it.entry.names.isNotEmpty() })
             assertEquals(page, loaded.reader)
             assertEquals(opened.reader, loaded.reader)
-            assertNull(loaded.readerTime)
             assertNull(loaded.completionNotice)
             assertEquals(2, wordCalls.get())
             val inflected = tokens.tokens.first { it.surface == "食べ" }

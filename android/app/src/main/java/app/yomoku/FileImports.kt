@@ -131,7 +131,6 @@ internal class FileImports(
         val view = core.view
         if (
             view.storageBusy ||
-                view.readingTimeSavePending ||
                 view.completionSavePending ||
                 view.contentRoute != ContentRoute.MAIN ||
                 view.destination != Destination.LIBRARY ||

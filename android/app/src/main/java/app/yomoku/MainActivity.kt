@@ -4,7 +4,6 @@ import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
-import android.view.MotionEvent
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
@@ -55,7 +54,6 @@ class MainActivity : ComponentActivity() {
                     core.view,
                     core.sessionKey,
                     core::dispatch,
-                    core::onReaderInteraction,
                     core.images,
                     core.covers,
                     libraryActionsEnabled = !fileImports.active,
@@ -97,30 +95,12 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         core.ankiBrowser.attach { startActivity(it) }
-        core.setReaderActive(true)
         core.refreshAnkiSetup()
     }
 
     override fun onPause() {
         core.ankiBrowser.detach()
-        core.setReaderActive(false)
         super.onPause()
-    }
-
-    override fun onUserInteraction() {
-        core.onReaderInteraction()
-        super.onUserInteraction()
-    }
-
-    override fun dispatchTouchEvent(event: MotionEvent): Boolean {
-        // Activity.onUserInteraction covers down/key/trackball; include sustained scrolling.
-        if (event.actionMasked == MotionEvent.ACTION_MOVE) core.onReaderInteraction()
-        return super.dispatchTouchEvent(event)
-    }
-
-    override fun dispatchGenericMotionEvent(event: MotionEvent): Boolean {
-        if (event.actionMasked == MotionEvent.ACTION_SCROLL) core.onReaderInteraction()
-        return super.dispatchGenericMotionEvent(event)
     }
 
     override fun onStop() {

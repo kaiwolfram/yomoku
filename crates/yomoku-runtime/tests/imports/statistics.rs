@@ -1,6 +1,5 @@
 use super::*;
 use yomoku_core::{
-    active_time::PendingReadingTime,
     completion::PageCompletionIntent,
     reader::ReaderPage,
     statistics::{StatisticsBuckets, StatisticsTimeframe as Timeframe},
@@ -27,12 +26,7 @@ fn seed(database: &Database) -> (Storage, yomoku_core::document::DocumentId) {
     let id = imported.document.document_id;
     let snapshot = storage.load_document_reader_snapshot(id).unwrap().unwrap();
     let page = ReaderPage::open_document(&snapshot.document, snapshot.page_length).unwrap();
-    let saved = storage
-        .load_pending_reading_time(id, page.position)
-        .unwrap();
-    storage
-        .save_pending_reading_time(saved, PendingReadingTime::from_millis(4321).unwrap())
-        .unwrap();
+
     let intent = PageCompletionIntent {
         document_id: id,
         page: page.anchor,
@@ -94,7 +88,7 @@ fn statistics_fifo_returns_exact_all_timeframes_without_loading_analyzer_or_writ
         assert_eq!(result, observer.statistics_buckets(frame, NOW).unwrap());
         let last = result.buckets.last().unwrap().values;
         assert_eq!(last.reading.japanese_occurrences, 6);
-        assert_eq!(last.reading.active_time_ms, 4321);
+
         assert_eq!(
             last.statuses,
             yomoku_core::library::WordStatusCounts {
@@ -300,16 +294,7 @@ fn statistics_refreshes_after_reader_status_and_reread_completion() {
             .japanese_occurrences,
         12
     );
-    assert_eq!(
-        refreshed
-            .buckets
-            .last()
-            .unwrap()
-            .values
-            .reading
-            .active_time_ms,
-        4321
-    );
+
     assert!(trace.try_recv().is_err());
     drop((router, lifecycle));
 }
@@ -371,16 +356,7 @@ fn vocabulary_bulk_mutations_invalidate_and_refresh_statistics_library_and_reade
             statistics.buckets.last().unwrap().values.statuses.known,
             expected_count
         );
-        assert_eq!(
-            statistics
-                .buckets
-                .last()
-                .unwrap()
-                .values
-                .reading
-                .active_time_ms,
-            4321
-        );
+
         assert_eq!(
             statistics
                 .buckets
