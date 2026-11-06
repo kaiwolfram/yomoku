@@ -196,8 +196,7 @@ fn library_reads_preserve_literal_rename_and_frozen_bulk_delete_prompts() {
         loaded(&core);
         assert_eq!(core.view().library_rename, draft);
         core.process_event(Event::CancelDocumentRename);
-        core.process_event(Event::ToggleLibraryDocumentSelection(document.document_id));
-        core.process_event(Event::RequestSelectedDocumentDeletion);
+        core.process_event(Event::RequestDocumentDeletion(document.document_id));
         let before = core.view();
         let mut effects = core.process_event(Event::LoadLibraryWordDistributions);
         finish(
@@ -206,16 +205,12 @@ fn library_reads_preserve_literal_rename_and_frozen_bulk_delete_prompts() {
             StorageResult::Failed(DocumentError::Unavailable),
         );
         let after = core.view();
-        assert_eq!(after.library_selection, before.library_selection);
-        assert_eq!(
-            after.library_bulk_delete_targets,
-            before.library_bulk_delete_targets
-        );
+        assert_eq!(after.library_delete_target, before.library_delete_target);
         assert_eq!(after.library_delete_error, before.library_delete_error);
         loaded(&core);
         assert_eq!(
-            core.view().library_bulk_delete_targets,
-            before.library_bulk_delete_targets
+            core.view().library_delete_target,
+            before.library_delete_target
         );
         assert_eq!(core.view().documents, vec![document]);
     }

@@ -63,7 +63,6 @@ fun main(args: Array<String>) {
     verifyLibrarySortBridge()
     verifyLibraryWordsBridge()
     verifyDocumentDeletionBridge()
-    verifyBulkDocumentDeletionBridge()
     verifyDocumentRenameBridge()
     val deadline = System.nanoTime() + 10_000_000_000L
     while (listenerCount() != 0 && System.nanoTime() < deadline) Thread.sleep(5)

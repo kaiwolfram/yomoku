@@ -51,16 +51,6 @@ impl Storage {
     /// provenance, global vocabulary, overrides and completed-reading history.
     /// An absent ID is an idempotent no-op, including an explicit lost-response retry.
     pub fn delete_document(&mut self, document_id: DocumentId) -> Result<(), StorageError> {
-        self.delete_documents(&[document_id])
-    }
-
-    /// Delete one frozen selection in a single transaction. A later document or
-    /// deferred-COMMIT failure rolls back the entire selection. Repeated/absent
-    /// IDs are harmless; use bound statements to avoid SQLite parameter limits.
-    pub fn delete_documents(&mut self, document_ids: &[DocumentId]) -> Result<(), StorageError> {
-        if document_ids.is_empty() {
-            return Ok(());
-        }
         let transaction = self
             .connection
             .transaction_with_behavior(TransactionBehavior::Immediate)?;
@@ -73,10 +63,8 @@ impl Storage {
             // Existing foreign keys remove positions, pending time, file bytes,
             // dedup identities and EPUB assets. Text deletion removes live analyses.
             let mut delete_document = transaction.prepare("DELETE FROM documents WHERE id = ?1")?;
-            for &document_id in document_ids {
-                delete_text.execute([i64::from(document_id)])?;
-                delete_document.execute([i64::from(document_id)])?;
-            }
+            delete_text.execute([i64::from(document_id)])?;
+            delete_document.execute([i64::from(document_id)])?;
         }
         transaction.commit()?;
         Ok(())

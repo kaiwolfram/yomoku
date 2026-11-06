@@ -18,7 +18,6 @@ pub enum StorageOperation {
     List,
 
     DeleteDocument(DocumentId),
-    DeleteDocuments(Vec<DocumentId>),
     RenameDocument {
         document_id: DocumentId,
         title: String,
@@ -112,7 +111,6 @@ pub enum StorageResult {
     Listed(Vec<LibraryDocument>, PageLength, ReaderTypography),
     LibraryWordDistributionsLoaded(Vec<LibraryWordDistribution>),
     DocumentDeleted(DocumentId),
-    DocumentsDeleted(Vec<DocumentId>),
     DocumentRenamed {
         document_id: DocumentId,
         title: String,
