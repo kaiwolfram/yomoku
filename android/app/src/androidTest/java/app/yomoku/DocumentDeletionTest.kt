@@ -174,8 +174,6 @@ class DocumentDeletionTest {
         compose.onNodeWithTag("rename_document_${first.value}").assertIsDisplayed()
         compose.onNodeWithTag("delete_document_${first.value}").assertIsDisplayed()
         compose.onNodeWithTag("rename_document_${second.value}").assertDoesNotExist()
-        compose.onNodeWithTag("library_selected_count").assertDoesNotExist()
-        assertNull(core().view.librarySelection)
         assertEquals(ContentRoute.MAIN, core().view.contentRoute)
         InstrumentationRegistry.getInstrumentation().sendKeyDownUpSync(KeyEvent.KEYCODE_BACK)
         compose.onNodeWithTag("delete_document_${first.value}").assertDoesNotExist()
@@ -185,6 +183,5 @@ class DocumentDeletionTest {
         compose.onNodeWithTag("cancel_document_deletion").performClick()
         compose.onNodeWithTag("document_${first.value}").performClick()
         compose.waitUntil(90_000) { core().view.reader?.documentId == first }
-        assertNull(core().view.librarySelection)
     }
 }

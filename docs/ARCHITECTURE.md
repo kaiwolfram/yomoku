@@ -1,8 +1,7 @@
 # Architecture
 
 The [product specification](PRODUCT_SPEC.md) defines behavior. Yomoku has one
-production reader and one initial release schema. Earlier implementation records
-and measurements remain in [ARCHITECTURE_HISTORY.md](ARCHITECTURE_HISTORY.md).
+production reader and one initial release schema.
 
 ## Ownership
 
@@ -44,6 +43,19 @@ profile and counted occurrences; it omits whole-chapter segmentation. Retry uses
 the same reservation. Completion atomically commits history, status changes
 and position; deletion-safe receipt lookup prevents duplicate counting. Explicit
 rereads use new commands and count again. Previous moves position without counting.
+Reading durations are not collected or persisted.
+
+The worker uses whole-document snapshot/open/position operations and effective
+page/word lookups. Session furigana combines source-preferred ruby with validated
+visible tokens.
+
+| Operation | Production API |
+| --- | --- |
+| Snapshot / explicit entry | `load_document_reader_snapshot` / `open_document_reader_snapshot` |
+| Position | `save_document_reading_position` |
+| Page / selected word | `load_effective_reader_tokens` / `load_effective_reader_word` |
+| Completion | `prepare_effective_page_completion` / `record_effective_page_completion` |
+| Furigana | `EffectiveReaderSession::furigana` |
 
 ## AnkiDroid
 
@@ -64,7 +76,7 @@ See [ANKIDROID_API.md](ANKIDROID_API.md) for provider details.
 
 ## Persistence and builds
 
-The [data model](DATA_MODEL.md) contains 27 application tables. A transactional
+The [data model](DATA_MODEL.md) contains 26 application tables. A transactional
 migration runner/journal remains for future releases; historical development files
 are rejected without clearing them. Bundled dictionaries are separate read-only assets.
 

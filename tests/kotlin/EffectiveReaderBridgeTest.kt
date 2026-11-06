@@ -45,19 +45,30 @@ internal fun verifyEffectiveReaderBridge() {
         )
     }
     try {
-        NativeBridge(directory.resolve("reader.sqlite3").path, listener, HostDictionary()).use { bridge ->
-            val id = checkNotNull(dispatch(bridge, Event.CreatePaste("国家公務員。国家公務員。")).importSummary).documentId
+        NativeBridge(directory.resolve("reader.sqlite3").path, listener, HostDictionary()).use {
+            bridge ->
+            val id =
+                checkNotNull(dispatch(bridge, Event.CreatePaste("国家公務員。国家公務員。")).importSummary)
+                    .documentId
             dispatch(bridge, Event.OpenReader(id))
             val current = reload(bridge)
             val snapshot = checkNotNull(current.effectiveReaderTokens)
             check(snapshot.tokens.map { it.surface } == listOf("国家公務員", "国家公務員"))
-            val selection = EffectiveReaderSelection(snapshot.identity, snapshot.tokens.first().segmentIndex)
-            val word = checkNotNull(dispatch(bridge, Event.LoadEffectiveReaderWord(selection)).effectiveReaderWord?.details)
+            val selection =
+                EffectiveReaderSelection(snapshot.identity, snapshot.tokens.first().segmentIndex)
+            val word =
+                checkNotNull(
+                    dispatch(bridge, Event.LoadEffectiveReaderWord(selection))
+                        .effectiveReaderWord
+                        ?.details
+                )
             check(word.token.surface == "国家公務員")
             val forms = word.candidates.words.flatMap { it.forms }.map { it.form }.toSet()
             check(forms.containsAll(listOf("国家公務員", "国家", "公務員", "公務", "員")))
             check(word.encountered == 0UL)
         }
         println("PASS: Mode C JNI selection and A/B component dictionary lookup")
-    } finally { directory.deleteRecursively() }
+    } finally {
+        directory.deleteRecursively()
+    }
 }

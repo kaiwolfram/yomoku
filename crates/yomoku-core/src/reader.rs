@@ -12,7 +12,7 @@ use crate::{
 };
 
 /// The original stored Mode C base snapshot, independent of the installed engine.
-/// Missing is an explicit legacy state: opening never analyzes or registers words.
+/// Missing is explicit: opening never analyzes or registers words.
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
 #[repr(C)]

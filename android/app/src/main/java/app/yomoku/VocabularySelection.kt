@@ -71,7 +71,7 @@ internal fun VocabularySelectionActions(
                 enabled = enabled && selection.isNotEmpty(),
                 modifier = Modifier.testTag("vocabulary_delete_selected"),
             ) {
-                Text(stringResource(R.string.library_delete_selected))
+                Text(stringResource(R.string.vocabulary_delete_selected))
             }
             TextButton(
                 onClick = { dispatch(Event.CancelVocabularySelection) },

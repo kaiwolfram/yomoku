@@ -1,3 +1,7 @@
+> Historical measurements. These results describe the recorded toolchain and
+> workload; current behavior and schema are defined by [ARCHITECTURE.md](ARCHITECTURE.md)
+> and [DATA_MODEL.md](DATA_MODEL.md).
+
 # Vocabulary Android measurements
 
 The opt-in `VocabularyPerformanceTest` renders the production `YomokuApp` and

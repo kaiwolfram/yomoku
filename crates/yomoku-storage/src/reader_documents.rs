@@ -1,4 +1,4 @@
-//! Whole-document reader repositories, independent of the legacy bridge payload.
+//! Whole-document snapshots and position repositories for production reading.
 
 use rusqlite::{Connection, OptionalExtension, TransactionBehavior};
 use yomoku_core::{

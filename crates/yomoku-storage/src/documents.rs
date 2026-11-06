@@ -45,7 +45,7 @@ impl Storage {
     }
 
     /// Remove live content and Library state atomically, retaining source/chapter
-    /// provenance, global vocabulary, overrides and completed-reading history.
+    /// provenance, global vocabulary and completed-reading history.
     /// An absent ID is an idempotent no-op, including an explicit lost-response retry.
     pub fn delete_document(&mut self, document_id: DocumentId) -> Result<(), StorageError> {
         let transaction = self
@@ -57,7 +57,7 @@ impl Storage {
                 SELECT c.id FROM chapters c JOIN documents d ON d.source_id = c.source_id
                 WHERE d.id = ?1)",
             )?;
-            // Existing foreign keys remove positions, pending time, file bytes,
+            // Existing foreign keys remove positions, file bytes,
             // dedup identities and EPUB assets. Text deletion removes live analyses.
             let mut delete_document = transaction.prepare("DELETE FROM documents WHERE id = ?1")?;
             delete_text.execute([i64::from(document_id)])?;

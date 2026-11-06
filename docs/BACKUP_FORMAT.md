@@ -6,18 +6,23 @@ complete semantic validation and atomic replacement remain **unfinished separate
 release work**. This format is not an end-to-end release/security claim.
 
 Requirements: [PRODUCT_SPEC.md §7](PRODUCT_SPEC.md#7-secure-manual-backup-and-restore).
-Historical experiments/verification are retained in [BACKUP_FORMAT_HISTORY.md](BACKUP_FORMAT_HISTORY.md).
 The format is independent of Crux/Bincode/FFI payloads.
 
 ## Complete local state
 
 The payload is one compact consistent SQLite snapshot of the **initial schema 1**,
-with the [27 application tables](DATA_MODEL.md) and `sqlite_sequence`. It retains
+with the [26 application tables](DATA_MODEL.md) and `sqlite_sequence`. It retains
 original imported bytes, canonical text/images/annotations, analysis identities,
 vocabulary/status history, counted occurrences/completions, progress,
 reader settings, default Anki deck, migration journal and ID high-water marks.
 There are no custom entries, segmentation overrides, Anki export journals or
-recovery records. Existing development databases/backups are unsupported.
+recovery records. SRT cues are transient, while canonical blank-line separators
+and original subtitle bytes remain in the snapshot. Only HTTP(S) EPUB links have
+annotation rows. Reading durations are not saved.
+
+The journal is `0001_simplified_initial_schema`, still schema version 1. Previous
+schema-1 development databases/backups are rejected unchanged; no migration or
+clearing is attempted. The cryptographic envelope and stream format are unchanged.
 
 Bundled dictionaries/fonts/notices, transient routes/selections/callbacks/caches,
 provider permissions/results/active ownership, external Anki collections, file

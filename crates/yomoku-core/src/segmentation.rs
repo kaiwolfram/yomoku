@@ -18,7 +18,7 @@ pub struct ResolvedSegment {
 }
 
 /// Analyzer metadata exists only for an exact span in a validated snapshot.
-/// Its source is retained independently of the rule that selected the boundary.
+/// Metadata retains its immutable analysis identity.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 pub struct SegmentMetadata {
     pub analysis_id: AnalysisId,

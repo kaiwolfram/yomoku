@@ -2,9 +2,9 @@
 
 This inventories current **schema 1** validation. It does not authorize activation.
 See [BACKUP_FORMAT.md](BACKUP_FORMAT.md) and [PRODUCT_SPEC.md §7](PRODUCT_SPEC.md#7-secure-manual-backup-and-restore).
-Historical investigation is retained in [RESTORE_VALIDATION_HISTORY.md](RESTORE_VALIDATION_HISTORY.md).
 Development databases/backups are unsupported; the exact initial schema/journal
-must match. Unknown/extra schema objects or incompatible versions fail unchanged.
+must match `0001_simplified_initial_schema`. Previous schema-1 journals,
+unknown/extra schema objects and incompatible versions fail unchanged.
 
 ## Implemented checks
 
@@ -19,7 +19,7 @@ must match. Unknown/extra schema objects or incompatible versions fail unchanged
 | Positions | Ownership and scalar boundaries/range including EOF |
 | Analysis | Profile/mode, contiguous indices, range/coverage/scalar/surface/classification/reading/form domains; no analyzer rerun |
 | Import identity | Exact canonical-paste/original-file SHA-256, encoding/format ownership, required file/EPUB headers |
-| TXT/SRT/ruby | Pure saved-encoding derivation matches canonical text and annotations; ruby indices/ranges/readings obey existing contracts |
+| TXT/SRT/ruby | Pure saved-encoding derivation matches canonical text and TXT ruby; SRT cue parsing remains transient; ruby indices/ranges/readings obey existing contracts |
 
 Compact reservations contain no whole-chapter segmentation. They retain C provenance
 and counted occurrences; surviving text/analysis validate the frozen page without

@@ -12,22 +12,26 @@ import app.yomoku.shared.ViewModel
 private class Listener : EffectsListener {
     var calls = 0
 
-    override fun onEffects(requests: ByteArray) { calls++ }
-    override fun onError(error: FfiError) { calls++ }
+    override fun onEffects(requests: ByteArray) {
+        calls++
+    }
+
+    override fun onError(error: FfiError) {
+        calls++
+    }
 }
 
 // Inspect the pinned generator's registry to verify native destruction releases
 // the foreign callback. This avoids timing-dependent garbage collection checks.
 private fun listenerCount(): Int {
-    val field = Class.forName("app.yomoku.nativebridge.EffectsListenerMap")
-        .getDeclaredField("map")
+    val field = Class.forName("app.yomoku.nativebridge.EffectsListenerMap").getDeclaredField("map")
     field.isAccessible = true
     return (field.get(null) as Map<*, *>).size
 }
 
 private fun providerCount(): Int {
-    val field = Class.forName("app.yomoku.nativebridge.DictionaryProviderMap")
-        .getDeclaredField("map")
+    val field =
+        Class.forName("app.yomoku.nativebridge.DictionaryProviderMap").getDeclaredField("map")
     field.isAccessible = true
     return (field.get(null) as Map<*, *>).size
 }
@@ -85,14 +89,19 @@ fun main(args: Array<String>) {
                 val view = ViewModel.bincodeDeserialize(viewBytes)
                 check(view.destination == destination)
                 check(view.bincodeSerialize().contentEquals(viewBytes))
-                check(ViewModel.bincodeDeserialize(independent.view()).destination == Destination.LIBRARY)
+                check(
+                    ViewModel.bincodeDeserialize(independent.view()).destination ==
+                        Destination.LIBRARY
+                )
                 expectFailure<FfiError.InvalidResponse> {
                     bridge.resolve(requests.value.single().id, byteArrayOf())
                 }
             }
             for (badEvent in listOf(byteArrayOf(), byteArrayOf(0), ByteArray(8) { -1 })) {
                 expectFailure<FfiError.InvalidEvent> { bridge.update(badEvent) }
-                check(ViewModel.bincodeDeserialize(bridge.view()).destination == Destination.LIBRARY)
+                check(
+                    ViewModel.bincodeDeserialize(bridge.view()).destination == Destination.LIBRARY
+                )
             }
             for (event in listOf(Event.OpenSettings, Event.CloseSettings)) {
                 val bytes = event.bincodeSerialize()
@@ -103,7 +112,9 @@ fun main(args: Array<String>) {
                 check(view.settingsOpen == (event is Event.OpenSettings))
                 check(view.destination == Destination.LIBRARY)
             }
-            expectFailure<FfiError.InvalidResponse> { bridge.resolve(UInt.MAX_VALUE, byteArrayOf()) }
+            expectFailure<FfiError.InvalidResponse> {
+                bridge.resolve(UInt.MAX_VALUE, byteArrayOf())
+            }
             check(listener.calls == 0) // Navigation remains synchronous.
         }
         check(listenerCount() == 1)
@@ -117,11 +128,15 @@ fun main(args: Array<String>) {
         bridge.close()
         check(listenerCount() == 0)
         expectFailure<IllegalStateException> { bridge.view() }
-        expectFailure<IllegalStateException> { bridge.update(Event.SelectDestination(Destination.STATISTICS).bincodeSerialize()) }
+        expectFailure<IllegalStateException> {
+            bridge.update(Event.SelectDestination(Destination.STATISTICS).bincodeSerialize())
+        }
         expectFailure<IllegalStateException> { bridge.resolve(0u, byteArrayOf()) }
     }
     val providerDeadline = System.nanoTime() + 10_000_000_000L
     while (providerCount() != 0 && System.nanoTime() < providerDeadline) Thread.sleep(5)
     check(providerCount() == 0)
-    println("PASS: Kotlin/JNI navigation, codecs, typed errors, isolation and 100 handle lifecycles")
+    println(
+        "PASS: Kotlin/JNI navigation, codecs, typed errors, isolation and 100 handle lifecycles"
+    )
 }

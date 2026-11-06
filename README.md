@@ -9,7 +9,7 @@ words and names in bundled English JMdict/JMnedict dictionaries.
 
 The production reader uses stored Mode C analysis, with A/B dictionary components,
 source/analyzer furigana, word highlights, five vocabulary statuses, EPUB images
-and links. Completion saves occurrences, status changes, time and position
+and links. Completion saves occurrences, status changes and position
 atomically; deliberate rereads count again. Imports retain original bytes and
 canonical content, deduplicate atomically and return to Library.
 
@@ -20,7 +20,8 @@ automatically replayed. There are no custom dictionary entries or Anki export lo
 
 The app is under development. Manual encrypted backup/restore remains unfinished
 release work. Existing development databases and backups are unsupported and are
-rejected without automatic clearing. Nostr/Feed is deferred beyond this release.
+rejected without automatic clearing. Reading durations are not collected or saved.
+Nostr/Feed is no longer planned.
 The [product specification](docs/PRODUCT_SPEC.md) defines scope.
 
 ## Build and verify
@@ -67,6 +68,6 @@ Cargo verification separately from Android native generation.
 
 See [architecture](docs/ARCHITECTURE.md), [data model](docs/DATA_MODEL.md),
 [Anki provider contract](docs/ANKIDROID_API.md) and
-[backup format](docs/BACKUP_FORMAT.md). Historical development evidence and
+[backup format](docs/BACKUP_FORMAT.md). Historical
 [Sudachi measurements](docs/SUDACHI_MEASUREMENTS.md) remain available; they do not
 override current product behavior or establish current device compatibility.

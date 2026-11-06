@@ -75,8 +75,7 @@ impl Storage {
         let transaction = self
             .connection
             .transaction_with_behavior(TransactionBehavior::Immediate)?;
-        // Authenticate the entire frozen command before replay/live checks. Legacy
-        // commands cannot consume an effective ID or bypass its identity on retry.
+        // Authenticate the entire frozen command before receipt/live checks.
         let reserved: Option<(i64, String)> = transaction.query_row(
             "SELECT semantics_version, payload FROM effective_completion_commands WHERE command_id = ?1",
             [i64::from(completion.command_id)], |row| Ok((row.get(0)?, row.get(1)?)),
@@ -96,7 +95,7 @@ impl Storage {
             ":date": completion.completed_at_unix_ms,
         };
         // Replay precedes live-content validation: history remains retry-safe
-        // after progress changes, page reflow and future document deletion.
+        // after progress changes, page reflow and document deletion.
         let existing = transaction
             .query_row(
                 "SELECT semantics_version = 1 AND document_id = :document

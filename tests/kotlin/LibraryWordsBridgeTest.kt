@@ -71,10 +71,10 @@ internal fun verifyLibraryWordsBridge() {
             surfaces.forEachIndexed { index, token ->
                 dispatch(
                     Event.SetEffectiveReaderStatus(
-                            EffectiveReaderSelection(snapshot.identity, token.segmentIndex),
-                            checkNotNull(token.vocabulary).id,
-                            VocabularyStatus.entries[index % 5],
-                            100L + index,
+                        EffectiveReaderSelection(snapshot.identity, token.segmentIndex),
+                        checkNotNull(token.vocabulary).id,
+                        VocabularyStatus.entries[index % 5],
+                        100L + index,
                     ),
                     true,
                 )
@@ -96,7 +96,15 @@ internal fun verifyLibraryWordsBridge() {
             open(ids[1])
             val page = checkNotNull(ViewModel.bincodeDeserialize(bridge.view()).reader)
             bridge.update(
-                Event.CompleteEffectiveReaderPage(checkNotNull(ViewModel.bincodeDeserialize(bridge.view()).effectiveReaderTokens).identity, page.position, 500).bincodeSerialize()
+                Event.CompleteEffectiveReaderPage(
+                        checkNotNull(
+                                ViewModel.bincodeDeserialize(bridge.view()).effectiveReaderTokens
+                            )
+                            .identity,
+                        page.position,
+                        500,
+                    )
+                    .bincodeSerialize()
             )
             repeat(2) {
                 checkNotNull(effects.poll(60, TimeUnit.SECONDS))

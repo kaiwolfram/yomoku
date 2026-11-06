@@ -72,6 +72,7 @@
     <string name="vocabulary_confirm_title">Confirm vocabulary change</string>
     <string name="vocabulary_confirm">Confirm</string>
     <string name="vocabulary_status_confirmation">Change selected words (%1$s) to %2$s?</string>
+    <string name="vocabulary_delete_selected">Delete selected</string>
     <string name="vocabulary_delete_confirmation">Permanently delete selected words (%1$s) and their encounter and status history? Statistics will be recalculated. Existing documents will not recreate these words automatically. This cannot be undone.</string>
     <string name="vocabulary_capture_error">Matching words could not be selected. Retry or cancel.</string>
     <string name="vocabulary_bulk_error">The vocabulary change could not be saved. Retry the same selection or cancel.</string>

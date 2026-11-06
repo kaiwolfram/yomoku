@@ -1,8 +1,8 @@
 # CLI development
 
 Run commands from the repository root. Android Studio is optional. Current
-behavior is defined by [PRODUCT_SPEC.md](PRODUCT_SPEC.md), with historical setup,
-experiments and measurements retained in [DEVELOPMENT_HISTORY.md](DEVELOPMENT_HISTORY.md).
+behavior is defined by [PRODUCT_SPEC.md](PRODUCT_SPEC.md). Performance reports and
+CSV measurements in this directory retain their original measurement context.
 
 ## Tools and assets
 
@@ -32,7 +32,9 @@ Set `JAVA_HOME` to a JDK 17 directory and `ANDROID_HOME` to your SDK. An optiona
 `GRADLE_USER_HOME="$PWD/.local/gradle"` keeps Gradle cache in the checkout. In
 restricted environments, bypass rustup launcher maintenance with the installed
 stable toolchain's `bin` in PATH. Gradle/ADB/emulator need local socket access.
-Do not clear an incompatible database to make a build or trial succeed.
+Do not clear an incompatible database to make a build or trial succeed. The only
+accepted initial journal is `0001_simplified_initial_schema` (schema version 1).
+Use a new disposable AVD for checks that require a fresh installation.
 
 ## Rust verification
 

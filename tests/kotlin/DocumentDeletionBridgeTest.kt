@@ -39,11 +39,18 @@ internal fun verifyDocumentDeletionBridge() {
                         checkNotNull(opened.reader).anchor,
                         checkNotNull(opened.readerAnalysis),
                     )
-                val tokens = checkNotNull(dispatch(Event.LoadReaderTokens(key), 1).effectiveReaderTokens)
+                val tokens =
+                    checkNotNull(dispatch(Event.LoadReaderTokens(key), 1).effectiveReaderTokens)
                 val cat = tokens.tokens.first { it.surface == "猫" }
                 return checkNotNull(
-                    dispatch(Event.LoadEffectiveReaderWord(EffectiveReaderSelection(tokens.identity, cat.segmentIndex)), 1)
-                        .effectiveReaderWord?.details
+                    dispatch(
+                            Event.LoadEffectiveReaderWord(
+                                EffectiveReaderSelection(tokens.identity, cat.segmentIndex)
+                            ),
+                            1,
+                        )
+                        .effectiveReaderWord
+                        ?.details
                 )
             }
             dispatch(Event.RefreshLibrary, 1)
@@ -54,7 +61,20 @@ internal fun verifyDocumentDeletionBridge() {
                     .documentId
             dispatch(Event.OpenReader(first), 1)
             val page = checkNotNull(view().reader)
-            val snapshot = checkNotNull(dispatch(Event.LoadReaderTokens(ReaderTokenKey(first, page.anchor, checkNotNull(view().readerAnalysis))), 1).effectiveReaderTokens)
+            val snapshot =
+                checkNotNull(
+                    dispatch(
+                            Event.LoadReaderTokens(
+                                ReaderTokenKey(
+                                    first,
+                                    page.anchor,
+                                    checkNotNull(view().readerAnalysis),
+                                )
+                            ),
+                            1,
+                        )
+                        .effectiveReaderTokens
+                )
             dispatch(Event.CompleteEffectiveReaderPage(snapshot.identity, page.position, 500), 2)
             val beforeWord = word(second)
             check(beforeWord.encountered == 2UL)

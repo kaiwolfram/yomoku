@@ -73,6 +73,12 @@ fn document_deletion_cleans_all_file_formats_chapters_assets_and_live_dedup_only
         let chapters = rows(&storage, "chapters");
         let vocabulary = rows(&storage, "vocabulary");
         storage.delete_document(id).unwrap();
+        let deleted_bytes = fs::read(database.path()).unwrap();
+        storage.delete_document(id).unwrap();
+        storage
+            .delete_document(DocumentId::try_from(i64::MAX).unwrap())
+            .unwrap();
+        assert_eq!(fs::read(database.path()).unwrap(), deleted_bytes);
         assert_eq!(storage.load_document_reader_snapshot(id).unwrap(), None);
         assert_eq!(
             storage.load_paste(survivor.document_id).unwrap(),

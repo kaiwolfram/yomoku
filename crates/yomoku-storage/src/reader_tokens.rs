@@ -14,8 +14,7 @@ use crate::{
 
 impl Storage {
     /// Read effective visible spans, exact metadata and live exact-surface statuses
-    /// in one transaction. This separate API does not change live reader commands
-    /// or register newly split/merged/deleted surfaces. None means deleted document;
+    /// in one transaction without registering surfaces. None means deleted document;
     /// a snapshot with absent segmentation means missing original Mode C.
     pub fn load_effective_reader_tokens(
         &mut self,

@@ -123,7 +123,7 @@ pub(crate) fn selected_effective_token_in(
         .ok_or(ReaderWordError::InvalidSelection)
 }
 
-/// Identical exact-surface semantics for original and effective selections.
+/// Exact-surface counts and bundled dictionary candidates for a validated selection.
 fn word_details_in(
     connection: &Connection,
     dictionary: &Dictionary,

@@ -51,8 +51,7 @@ pub enum StorageOperation {
     #[serde(skip)]
     #[cfg_attr(feature = "facet_typegen", facet(skip))]
     ApplyVocabularyBulk(crate::vocabulary::VocabularyBulkCommand),
-    /// Native staging read, using the same compact result and app cache gates
-    /// as original B. Activate production with the effective reader consumers.
+    /// Native read of per-document vocabulary distributions for Library.
     #[serde(skip)]
     #[cfg_attr(feature = "facet_typegen", facet(skip))]
     LoadEffectiveLibraryWordDistributions,

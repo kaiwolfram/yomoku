@@ -1,14 +1,14 @@
 # Data model
 
-The authoritative SQL is [0001_initial_schema.sql](../crates/yomoku-storage/migrations/0001_initial_schema.sql).
-The release schema version is **1**, journal name `0001_initial_schema`. It has
-**27 application tables** plus SQLite's internal `sqlite_sequence` table.
-Earlier records are retained in [DATA_MODEL_HISTORY.md](DATA_MODEL_HISTORY.md);
-their development schemas are unsupported.
+The authoritative SQL is [0001_simplified_initial_schema.sql](../crates/yomoku-storage/migrations/0001_simplified_initial_schema.sql).
+The release schema version is **1**, journal name `0001_simplified_initial_schema`. It has
+**26 application tables** plus SQLite's internal `sqlite_sequence` table.
+Earlier development schemas and journals are unsupported, including the previous
+schema-1 journal. They are rejected without migration or modification.
 
 | Area | Tables |
 | --- | --- |
-| Content | `sources`, `chapters`, `documents`, `chapter_texts`, `paste_content_hashes`, `imported_files`, `source_ruby`, `subtitle_cues`, `epub_documents`, `epub_chapters`, `epub_spans`, `epub_assets`, `epub_inline_images` |
+| Content | `sources`, `chapters`, `documents`, `chapter_texts`, `paste_content_hashes`, `imported_files`, `source_ruby`, `epub_documents`, `epub_chapters`, `epub_spans`, `epub_assets`, `epub_inline_images` |
 | Analysis and vocabulary | `chapter_analyses`, `analyzed_tokens`, `vocabulary`, `vocabulary_status_events` |
 | Progress and history | `reading_positions`, `library_read_clock`, `completion_commands`, `effective_completion_commands`, `reading_completions`, `completion_analyses`, `reading_occurrences` |
 | Settings and schema | `reader_settings`, `anki_settings`, `schema_migrations` |
@@ -30,6 +30,13 @@ encoding; EPUB retains asset metadata/bytes and ordered spine chapters. Paste
 SHA-256 is saved in the same transaction as the paste; imported-file identities use
 original bytes. Duplicate imports preserve existing title, status and progress.
 Deletion removes live content while preserving supported historical provenance.
+Only individually confirmed document deletion is supported; vocabulary bulk
+actions retain their separate history-erasure semantics.
+
+SRT cue parsing is transient: canonical text preserves blank-line separators.
+EPUB stores heading/emphasis/strong and HTTP(S) link spans. Internal and unsupported
+links contribute visible text without annotation rows. Original bytes, saved
+encoding/hashes, source ruby, images and history remain durable.
 
 Offsets are UTF-8 byte positions at scalar boundaries, never UTF-16 indices.
 Analysis headers retain engine/dictionary profile and A/B/C mode; indexed tokens
@@ -45,7 +52,9 @@ existing books to register it again. There are no custom dictionary records.
 
 ## Completion
 
-`completion_commands` allocates retry identity. A version-2
+`prepare_effective_page_completion` validates the rendered key and allocates retry
+identity in `completion_commands` within the reservation transaction.
+`record_effective_page_completion` is the sole completion writer. A version-2
 `effective_completion_commands` payload freezes the page command, analysis ID,
 profile, mode C and counted occurrences. It excludes whole-chapter text, token
 segmentation and unrelated chapter content. `completion_analyses` records actual
@@ -56,7 +65,8 @@ One transaction applies occurrence counts, New-to-Known transitions, completion
 history and next position/finish marker. Retry of the
 same command is idempotent, including after content deletion. A deliberate reread
 uses a new command and counts again.
-Previous/reflow preserve exact position without recording completion.
+Previous/reflow preserve exact position without recording completion. No reading
+durations or pending-time state are persisted.
 
 ## Settings
 

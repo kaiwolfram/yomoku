@@ -37,7 +37,16 @@ internal fun verifyDocumentRenameBridge() {
             val id = checkNotNull(dispatch(Event.CreatePaste(text), 1).importSummary).documentId
             dispatch(Event.OpenReader(id), 1)
             val page = checkNotNull(view().reader)
-            val snapshot = checkNotNull(dispatch(Event.LoadReaderTokens(ReaderTokenKey(id, page.anchor, checkNotNull(view().readerAnalysis))), 1).effectiveReaderTokens)
+            val snapshot =
+                checkNotNull(
+                    dispatch(
+                            Event.LoadReaderTokens(
+                                ReaderTokenKey(id, page.anchor, checkNotNull(view().readerAnalysis))
+                            ),
+                            1,
+                        )
+                        .effectiveReaderTokens
+                )
             dispatch(Event.CompleteEffectiveReaderPage(snapshot.identity, page.position, 500), 2)
             dispatch(Event.CreatePaste(text), 1)
             val before = view().documents.single()

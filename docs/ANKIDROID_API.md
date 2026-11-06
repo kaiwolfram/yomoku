@@ -1,9 +1,7 @@
 # AnkiDroid provider contract
 
 Current behavior follows [PRODUCT_SPEC.md §6](PRODUCT_SPEC.md#6-ankidroid-integration).
-Primary API research and prior experiments remain in
-[ANKIDROID_API_HISTORY.md](ANKIDROID_API_HISTORY.md); its durable-recovery design
-is superseded. Research pinned AnkiDroid **2.25.3**; no minimum supported app
+The provider research below pins AnkiDroid **2.25.3**; no minimum supported app
 version is implied by that research. The opt-in installed-provider trial passed
 against 2.25.3 on an API 36 x86_64 emulator, covering setup, Add, external note
 changes, return refresh, browser launch and restart without replay. Other app

@@ -97,7 +97,7 @@ impl ReaderChapterRuby {
     }
 }
 
-/// Borrowed visible fields shared by original/effective ruby projection. This
+/// Borrowed visible fields used by the session ruby projection. This
 /// validates clipped text without cloning a surface or a resolved chapter key.
 pub(crate) struct RubyToken<'a> {
     pub index: u64,

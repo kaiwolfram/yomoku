@@ -31,8 +31,9 @@ internal class HostDictionary : DictionaryProvider {
             FileInputStream(checkNotNull(System.getenv("YOMOKU_SUDACHI_DICTIONARY"))).use { input ->
                 val field = FileDescriptor::class.java.getDeclaredField("fd")
                 field.isAccessible = true
-                val dup = Class.forName("sun.nio.fs.UnixNativeDispatcher")
-                    .getDeclaredMethod("dup", Int::class.javaPrimitiveType)
+                val dup =
+                    Class.forName("sun.nio.fs.UnixNativeDispatcher")
+                        .getDeclaredMethod("dup", Int::class.javaPrimitiveType)
                 dup.isAccessible = true
                 (dup.invoke(null, field.getInt(input.fd)) as Int).toLong() + 1L
             }

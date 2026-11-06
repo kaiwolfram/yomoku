@@ -35,9 +35,8 @@ pub struct EffectiveReaderToken {
     pub vocabulary: Option<ReaderVocabulary>,
 }
 
-/// A separate repository projection until live selection/completion commands can
-/// freeze and validate effective identities together. None segmentation means
-/// missing original C; it never requests analysis or creates vocabulary.
+/// Page lookup with resolved provenance. Missing segmentation means absent
+/// original C; lookup never requests analysis or creates vocabulary.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct EffectiveReaderTokenSnapshot {
     pub document_id: DocumentId,
@@ -48,7 +47,7 @@ pub struct EffectiveReaderTokenSnapshot {
 
 /// Frozen page and complete resolved provenance, deliberately separate from an
 /// original analyzer identity. Live vocabulary/status changes do not invalidate
-/// it; changed boundaries or metadata do. Not yet part of the public UI bridge.
+/// it; changed boundaries or metadata do. Full keys remain native.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 pub struct EffectiveReaderTokenKey {
     pub document_id: DocumentId,
@@ -125,7 +124,7 @@ impl<'a> EffectiveReaderChapter<'a> {
         self.project(page, false)
     }
 
-    /// A future completion owns each whole occurrence on the page containing its
+    /// Completion owns each whole occurrence on the page containing its
     /// start. Repetitions remain separate; this function records no history.
     pub fn completion_tokens_on_page(
         &self,
@@ -193,7 +192,7 @@ fn segment_eligibility(segment: &EffectiveSegment) -> Option<EffectiveTokenEligi
 
 /// Frozen effective completion. Only validated chapter projection can construct
 /// occurrences; statuses are deliberately absent and remain live at commit.
-/// This prerequisite is not yet a public UI/FFI payload.
+/// The native session retains this value; full provenance stays outside UI payloads.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 pub struct EffectivePageCompletion {
     completion: PageCompletion,
