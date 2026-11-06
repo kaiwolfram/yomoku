@@ -84,7 +84,6 @@ fn document_deletion_cleans_all_file_formats_chapters_assets_and_live_dedup_only
         for table in [
             "imported_files",
             "source_ruby",
-            "subtitle_cues",
             "epub_documents",
             "epub_chapters",
             "epub_spans",

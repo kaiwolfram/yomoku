@@ -59,8 +59,11 @@ fn srt_typed_decoding_errors_skip_full_and_manual_choices_retry_without_partial_
     let id = selected.documents[0].document_id;
     assert_eq!(storage.load_paste(id).unwrap().unwrap().chapter.text, "ﾂｩ");
     assert_eq!(
-        storage.load_srt_source(id).unwrap().unwrap().encoding,
-        yomoku_import::txt::TextEncoding::ShiftJis
+        storage_fixture::srt_file(&rusqlite::Connection::open(database.path()).unwrap(), id)
+            .unwrap()
+            .unwrap()
+            .encoding,
+        "shift_jis"
     );
     let unicode = dispatch(
         &router,
@@ -110,7 +113,11 @@ fn srt_duplicate_of_txt_skips_decoding_and_unavailable_full() {
         bytes
     );
     assert!(storage.load_txt_source(id).unwrap().is_some());
-    assert!(storage.load_srt_source(id).unwrap().is_none());
+    assert!(
+        storage_fixture::srt_file(&rusqlite::Connection::open(database.path()).unwrap(), id)
+            .unwrap()
+            .is_none()
+    );
     assert_eq!(srt_totals(&database.path()), before);
     assert!(trace.try_recv().is_err());
     finish_worker(router, lifecycle, &trace);
@@ -139,7 +146,7 @@ fn srt_loader_analysis_and_invalid_output_failures_preserve_completed_files_and_
                 DocumentError::Unavailable
             })
         );
-        assert_eq!(srt_totals(&database.path()), vec![0; 15]);
+        assert_eq!(srt_totals(&database.path()), vec![0; 14]);
     }
     failure.store(0, Ordering::Relaxed);
     let created = dispatch(
@@ -177,7 +184,6 @@ fn srt_each_write_and_commit_failure_is_atomic_through_worker() {
         "documents",
         "chapter_texts",
         "imported_files",
-        "subtitle_cues",
         "chapter_analyses",
         "analyzed_tokens",
         "vocabulary",
@@ -221,14 +227,7 @@ fn srt_each_write_and_commit_failure_is_atomic_through_worker() {
 }
 
 fn srt_totals(path: &PathBuf) -> Vec<i64> {
-    let mut counts = file_totals(path);
-    counts.push(
-        Connection::open(path)
-            .unwrap()
-            .query_row("SELECT COUNT(*) FROM subtitle_cues", [], |row| row.get(0))
-            .unwrap(),
-    );
-    counts
+    file_totals(path)
 }
 
 #[test]
@@ -259,9 +258,17 @@ fn srt_duplicates_preserve_first_interpretation_status_position_and_skip_full_af
     let known = storage
         .set_vocabulary_status(entry.id, VocabularyStatus::Known, 123)
         .unwrap();
-    let source = storage.load_srt_source(id).unwrap().unwrap();
+    let source =
+        storage_fixture::srt_file(&rusqlite::Connection::open(database.path()).unwrap(), id)
+            .unwrap()
+            .unwrap();
     assert_eq!(source.original_bytes, bytes);
-    assert_eq!(source.cues, vec![0..7, 9..28]);
+    assert_eq!(
+        yomoku_import::srt::parse(std::str::from_utf8(bytes).unwrap())
+            .unwrap()
+            .cues,
+        vec![0..7, 9..28]
+    );
     assert_eq!(
         storage.load_paste(id).unwrap().unwrap().chapter.text,
         "猫 猫\n\n｜𠮷《よし》"
@@ -303,7 +310,11 @@ fn srt_duplicates_preserve_first_interpretation_status_position_and_skip_full_af
         storage.load_paste(id).unwrap().unwrap().reading_position,
         Some(position)
     );
-    assert_eq!(storage.load_srt_source(id).unwrap(), Some(source));
+    assert_eq!(
+        storage_fixture::srt_file(&rusqlite::Connection::open(database.path()).unwrap(), id)
+            .unwrap(),
+        Some(source)
+    );
     assert_eq!(storage.vocabulary_entry(&cat).unwrap(), known);
     assert_eq!(srt_totals(&database.path()), before);
     assert!(trace.try_recv().is_err());

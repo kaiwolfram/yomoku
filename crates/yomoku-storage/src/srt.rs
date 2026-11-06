@@ -1,12 +1,12 @@
-//! Atomic original SRT bytes, canonical cue anchors and analyzed registration.
+//! Atomic original SRT bytes, canonical text and analyzed registration.
 
-use std::{error::Error, fmt, ops::Range};
+use std::{error::Error, fmt};
 
-use rusqlite::{OptionalExtension, TransactionBehavior};
+use rusqlite::TransactionBehavior;
 use sha2::{Digest, Sha256};
 use yomoku_core::{
     analysis::ChapterAnalysis,
-    document::{ChapterText, DocumentId, LibraryDocument},
+    document::{ChapterText, LibraryDocument},
 };
 use yomoku_import::{
     srt::{self, EmptySrt},
@@ -14,7 +14,7 @@ use yomoku_import::{
 };
 
 use crate::{
-    documents::{create_single_text_in, load_paste_in},
+    documents::create_single_text_in,
     files::{encoding_name, find_imported_in},
     imports::store_analyzed_document_in,
     AnalyzedPaste, ImportCancellation, Storage, StorageError,
@@ -61,14 +61,6 @@ impl<E> From<StorageError> for SrtImportError<E> {
     fn from(error: StorageError) -> Self {
         Self::Storage(error)
     }
-}
-
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct StoredSrtSource {
-    pub original_bytes: Vec<u8>,
-    pub encoding: TextEncoding,
-    /// Canonical chapter-local UTF-8 bytes; separators are outside each range.
-    pub cues: Vec<Range<usize>>,
 }
 
 impl Storage {
@@ -132,7 +124,6 @@ impl Storage {
             let (encoding, decoded) =
                 decode(original_bytes, selection).map_err(SrtImportError::Decode)?;
             let parsed = srt::parse(&decoded).map_err(SrtImportError::Empty)?;
-            validate_cues(&parsed.text, &parsed.cues)?;
             if cancellation.is_cancelled() {
                 return Ok(None);
             }
@@ -142,26 +133,6 @@ impl Storage {
                  VALUES (?1, ?2, ?3, ?4)",
                 (i64::from(document.document_id), digest.as_slice(), original_bytes, encoding_name(encoding)),
             ).map_err(StorageError::from)?;
-            for (index, cue) in parsed.cues.iter().enumerate() {
-                if cancellation.is_cancelled() {
-                    return Ok(None);
-                }
-                transaction
-                    .execute(
-                        "INSERT INTO subtitle_cues (chapter_id, cue_index, start_byte, end_byte)
-                     VALUES (?1, ?2, ?3, ?4)",
-                        (
-                            i64::from(document.chapter.chapter_id),
-                            to_i64(index)?,
-                            to_i64(cue.start)?,
-                            to_i64(cue.end)?,
-                        ),
-                    )
-                    .map_err(StorageError::from)?;
-            }
-            if cancellation.is_cancelled() {
-                return Ok(None);
-            }
             let analysis = analyze(&document.chapter).map_err(SrtImportError::Analysis)?;
             if cancellation.is_cancelled() {
                 return Ok(None);
@@ -178,92 +149,4 @@ impl Storage {
             Ok(outcome)
         })
     }
-
-    /// Read original bytes/encoding/cues atomically without decoding or analysis.
-    /// None means no live SRT with this ID; inconsistent saved data fails closed.
-    pub fn load_srt_source(
-        &mut self,
-        document_id: DocumentId,
-    ) -> Result<Option<StoredSrtSource>, StorageError> {
-        let transaction = self.connection.transaction()?;
-        let kind: Option<String> = transaction.query_row(
-            "SELECT s.kind FROM documents d JOIN sources s ON s.id = d.source_id WHERE d.id = ?1",
-            [i64::from(document_id)], |row| row.get(0),
-        ).optional()?;
-        if kind.as_deref() != Some("srt") {
-            return Ok(None);
-        }
-        let source = transaction.query_row(
-            "SELECT original_bytes, text_encoding, sha256 FROM imported_files WHERE document_id = ?1",
-            [i64::from(document_id)],
-            |row| Ok((row.get::<_, Vec<u8>>(0)?, row.get::<_, String>(1)?, row.get::<_, Vec<u8>>(2)?)),
-        ).optional()?;
-        let (original_bytes, encoding, digest) = source.ok_or(StorageError::InvalidDocument)?;
-        if Sha256::digest(&original_bytes).as_slice() != digest {
-            return Err(StorageError::InvalidDocument);
-        }
-        let encoding = match encoding.as_str() {
-            "utf8" => TextEncoding::Utf8,
-            "shift_jis" => TextEncoding::ShiftJis,
-            _ => return Err(StorageError::InvalidDocument),
-        };
-        let document =
-            load_paste_in(&transaction, document_id)?.ok_or(StorageError::InvalidDocument)?;
-        let cues = {
-            let mut statement = transaction.prepare(
-                "SELECT cue_index, start_byte, end_byte FROM subtitle_cues
-                 WHERE chapter_id = ?1 ORDER BY cue_index",
-            )?;
-            let rows = statement.query_map([i64::from(document.chapter.chapter_id)], |row| {
-                Ok((
-                    row.get::<_, i64>(0)?,
-                    row.get::<_, i64>(1)?,
-                    row.get::<_, i64>(2)?,
-                ))
-            })?;
-            rows.enumerate()
-                .map(|(index, row)| {
-                    let (stored_index, start, end) = row?;
-                    if stored_index != to_i64(index)? {
-                        return Err(StorageError::InvalidDocument);
-                    }
-                    Ok(
-                        usize::try_from(start).map_err(|_| StorageError::InvalidDocument)?
-                            ..usize::try_from(end).map_err(|_| StorageError::InvalidDocument)?,
-                    )
-                })
-                .collect::<Result<Vec<_>, StorageError>>()?
-        };
-        validate_cues(&document.chapter.text, &cues)?;
-        transaction.commit()?;
-        Ok(Some(StoredSrtSource {
-            original_bytes,
-            encoding,
-            cues,
-        }))
-    }
-}
-
-fn validate_cues(text: &str, cues: &[Range<usize>]) -> Result<(), StorageError> {
-    let mut end = 0;
-    for (index, cue) in cues.iter().enumerate() {
-        let gap = if index == 0 { "" } else { "\n\n" };
-        if cue.is_empty()
-            || text.get(end..cue.start) != Some(gap)
-            || text
-                .get(cue.clone())
-                .is_none_or(|text| text.trim().is_empty())
-        {
-            return Err(StorageError::InvalidDocument);
-        }
-        end = cue.end;
-    }
-    if cues.is_empty() || end != text.len() {
-        return Err(StorageError::InvalidDocument);
-    }
-    Ok(())
-}
-
-fn to_i64(value: usize) -> Result<i64, StorageError> {
-    i64::try_from(value).map_err(|_| StorageError::InvalidDocument)
 }

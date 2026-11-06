@@ -135,14 +135,6 @@ CREATE TABLE source_ruby (
     PRIMARY KEY (chapter_id, ruby_index)
 ) STRICT;
 
-CREATE TABLE subtitle_cues (
-    chapter_id INTEGER NOT NULL REFERENCES chapter_texts(chapter_id) ON DELETE CASCADE,
-    cue_index INTEGER NOT NULL CHECK (cue_index >= 0),
-    start_byte INTEGER NOT NULL CHECK (start_byte >= 0),
-    end_byte INTEGER NOT NULL CHECK (end_byte > start_byte),
-    PRIMARY KEY (chapter_id, cue_index)
-) STRICT;
-
 CREATE TABLE "sources" (
     id INTEGER PRIMARY KEY AUTOINCREMENT CHECK (id > 0),
     kind TEXT NOT NULL CHECK (kind IN ('paste', 'txt', 'srt', 'epub')),
@@ -191,12 +183,12 @@ CREATE TABLE epub_spans (
     span_index INTEGER NOT NULL CHECK (span_index >= 0),
     start_byte INTEGER NOT NULL CHECK (start_byte >= 0),
     end_byte INTEGER NOT NULL CHECK (end_byte > start_byte),
-    kind TEXT NOT NULL CHECK (kind IN ('heading', 'emphasis', 'strong', 'external', 'inert')),
+    kind TEXT NOT NULL CHECK (kind IN ('heading', 'emphasis', 'strong', 'external')),
     heading_level INTEGER,
     target TEXT,
     CHECK ((kind = 'heading' AND heading_level IS NOT NULL AND heading_level BETWEEN 1 AND 6 AND target IS NULL)
         OR (kind IN ('emphasis', 'strong') AND heading_level IS NULL AND target IS NULL)
-        OR (kind IN ('external', 'inert') AND heading_level IS NULL AND target IS NOT NULL)),
+        OR (kind = 'external' AND heading_level IS NULL AND target IS NOT NULL)),
     PRIMARY KEY (chapter_id, span_index)
 ) STRICT;
 

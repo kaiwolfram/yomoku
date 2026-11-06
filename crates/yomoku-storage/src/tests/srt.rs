@@ -37,7 +37,6 @@ fn totals(storage: &Storage) -> Vec<i64> {
         "documents",
         "chapter_texts",
         "imported_files",
-        "subtitle_cues",
         "chapter_analyses",
         "analyzed_tokens",
         "vocabulary",
@@ -62,7 +61,7 @@ fn srt_original_bytes_cues_analysis_and_title_survive_read_only_reopen() {
     let imported = created(
         storage
             .import_analyzed_srt(bytes, "字幕.srt", None, 123, |chapter| {
-                assert_eq!(totals(&observer), vec![0; 15]);
+                assert_eq!(totals(&observer), vec![0; 14]);
                 assert_eq!(chapter.text, canonical);
                 fixture(chapter)
             })
@@ -86,11 +85,9 @@ fn srt_original_bytes_cues_analysis_and_title_survive_read_only_reopen() {
         })
         .unwrap();
     assert_eq!(kind, ("srt".into(), "字幕.srt".into()));
-    let split = canonical.find("\n\n").unwrap();
-    let source = StoredSrtSource {
+    let source = SrtFile {
         original_bytes: bytes.to_vec(),
         encoding: TextEncoding::Utf8,
-        cues: vec![0..split, split + 2..canonical.len()],
     };
     drop(storage);
     let mut storage = Storage::open(database.path()).unwrap();
@@ -100,9 +97,7 @@ fn srt_original_bytes_cues_analysis_and_title_survive_read_only_reopen() {
         .pragma_update(None, "query_only", true)
         .unwrap();
     assert_eq!(
-        storage
-            .load_srt_source(imported.document.document_id)
-            .unwrap(),
+        srt_file(&storage.connection, imported.document.document_id).unwrap(),
         Some(source)
     );
     assert_eq!(
@@ -167,8 +162,7 @@ fn srt_duplicate_bypasses_decoding_and_preserves_progress_and_status() {
         assert_eq!(totals(&storage), before);
     }
     assert_eq!(
-        storage
-            .load_srt_source(saved.document_id)
+        srt_file(&storage.connection, saved.document_id)
             .unwrap()
             .unwrap()
             .encoding,
@@ -226,8 +220,7 @@ fn srt_identity_is_original_bytes_shared_with_txt_and_separate_from_paste() {
         panic!("separate paste identity")
     };
     assert_eq!(count(&storage, "documents"), 4);
-    assert!(storage
-        .load_srt_source(txt.document.document_id)
+    assert!(srt_file(&storage.connection, txt.document.document_id)
         .unwrap()
         .is_none());
 }
@@ -250,8 +243,7 @@ fn srt_decodes_shift_jis_and_requires_explicit_ambiguous_choice() {
     );
     assert_eq!(imported.document.chapter.text, "あ");
     assert_eq!(
-        storage
-            .load_srt_source(imported.document.document_id)
+        srt_file(&storage.connection, imported.document.document_id)
             .unwrap()
             .unwrap()
             .encoding,
@@ -395,7 +387,6 @@ fn srt_each_write_and_commit_failure_rolls_back_all_rows_and_ids() {
         "documents",
         "chapter_texts",
         "imported_files",
-        "subtitle_cues",
         "chapter_analyses",
         "analyzed_tokens",
         "vocabulary",
@@ -454,11 +445,12 @@ fn srt_each_write_and_commit_failure_rolls_back_all_rows_and_ids() {
         );
         assert_eq!(retried.registered_surfaces, 2);
         drop(storage);
-        assert!(Storage::open(database.path())
-            .unwrap()
-            .load_srt_source(retried.document.document_id)
-            .unwrap()
-            .is_some());
+        assert!(srt_file(
+            &Storage::open(database.path()).unwrap().connection,
+            retried.document.document_id
+        )
+        .unwrap()
+        .is_some());
     }
 }
 
@@ -598,7 +590,6 @@ fn srt_concurrent_creators_reference_one_committed_document() {
     assert_eq!(creates, 1);
     assert_eq!(documents[0], documents[1]);
     let storage = Storage::open(database.path()).unwrap();
-    assert_eq!(count(&storage, "subtitle_cues"), 2);
     assert_eq!(count(&storage, "vocabulary_status_events"), 2);
 }
 
@@ -644,10 +635,8 @@ fn srt_delete_reimport_discards_live_data_and_preserves_provenance_and_status() 
             [i64::from(old.document.chapter.chapter_id)],
         )
         .unwrap();
-    assert_eq!(count(&storage, "subtitle_cues"), 0);
     assert_eq!(count(&storage, "imported_files"), 0);
-    assert!(storage
-        .load_srt_source(old.document.document_id)
+    assert!(srt_file(&storage.connection, old.document.document_id)
         .unwrap()
         .is_none());
     let new = created(
@@ -674,45 +663,18 @@ fn srt_delete_reimport_discards_live_data_and_preserves_provenance_and_status() 
     );
 }
 
-#[test]
-fn srt_corrupt_original_identity_or_cue_anchors_fail_without_repair() {
-    for corruption in [
-        "UPDATE imported_files SET original_bytes = X'00'",
-        "DELETE FROM imported_files",
-        "DELETE FROM subtitle_cues",
-        "UPDATE subtitle_cues SET start_byte = 1 WHERE cue_index = 0",
-        "UPDATE subtitle_cues SET end_byte = 999 WHERE cue_index = 1",
-        "DELETE FROM subtitle_cues WHERE cue_index = 1",
-        "UPDATE subtitle_cues SET cue_index = cue_index + 2",
-        "UPDATE subtitle_cues SET start_byte = 0 WHERE cue_index = 1",
-    ] {
-        let database = TestDatabase::new();
-        let mut storage = Storage::open(database.path()).unwrap();
-        let bytes = "𠮷\n\n猫".as_bytes();
-        let imported = created(
-            storage
-                .import_analyzed_srt(bytes, "bad.srt", Some(TextEncoding::Utf8), 1, fixture)
-                .unwrap(),
-        );
-        storage.connection.execute_batch(corruption).unwrap();
-        let before = fs::read(database.path()).unwrap();
-        assert!(
-            matches!(
-                storage.load_srt_source(imported.document.document_id),
-                Err(StorageError::InvalidDocument)
-            ),
-            "{corruption}"
-        );
-        assert_eq!(fs::read(database.path()).unwrap(), before);
-        if corruption.contains("original_bytes") {
-            assert!(matches!(
-                storage.find_imported_file(bytes),
-                Err(StorageError::InvalidDocument)
-            ));
-            assert!(matches!(
-                storage.import_analyzed_srt(bytes, "retry.srt", None, 2, no_analysis),
-                Err(SrtImportError::Storage(StorageError::InvalidDocument))
-            ));
-        }
-    }
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct SrtFile {
+    original_bytes: Vec<u8>,
+    encoding: yomoku_import::txt::TextEncoding,
+}
+fn srt_file(
+    connection: &rusqlite::Connection,
+    id: yomoku_core::document::DocumentId,
+) -> rusqlite::Result<Option<SrtFile>> {
+    use rusqlite::OptionalExtension;
+    connection.query_row("SELECT f.original_bytes, f.text_encoding FROM imported_files f JOIN documents d ON d.id = f.document_id JOIN sources s ON s.id = d.source_id WHERE d.id = ?1 AND s.kind = 'srt'", [i64::from(id)], |row| {
+        let encoding: String = row.get(1)?;
+        Ok(SrtFile { original_bytes: row.get(0)?, encoding: match encoding.as_str() { "utf8" => yomoku_import::txt::TextEncoding::Utf8, "shift_jis" => yomoku_import::txt::TextEncoding::ShiftJis, _ => panic!("unexpected fixture encoding") } })
+    }).optional()
 }

@@ -129,13 +129,8 @@ fn nested_emphasis_headings_and_links_keep_exact_unicode_ranges() {
     assert_eq!(spans[0], ("見出し", &SpanKind::Heading(6)));
     assert!(spans.contains(&("食べ𠮷😀る", &SpanKind::Emphasis)));
     assert!(spans.contains(&("べ𠮷😀", &SpanKind::Strong)));
-    assert_eq!(
-        spans
-            .iter()
-            .filter(|(_, kind)| matches!(kind, SpanKind::InertLink(_)))
-            .count(),
-        4
-    );
+    assert!(chapter.text.contains("注内部危険メール外部"));
+    assert_eq!(spans.len(), 4);
     assert!(spans.contains(&(
         "外部",
         &SpanKind::ExternalLink("HTTPS://example.org/".to_owned())

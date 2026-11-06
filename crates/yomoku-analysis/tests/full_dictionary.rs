@@ -736,16 +736,16 @@ fn real_srt_import_analyzes_only_canonical_text_and_completes_with_original_anch
         .map(|token| Surface::new(&token.surface).unwrap())
         .collect();
     assert_eq!(imported.registered_surfaces, unique.len());
-    let source = storage
-        .load_srt_source(document.document_id)
-        .unwrap()
-        .unwrap();
+    let source = storage_fixture::srt_file(
+        &rusqlite::Connection::open(&path).unwrap(),
+        document.document_id,
+    )
+    .unwrap()
+    .unwrap();
     assert_eq!(source.original_bytes, bytes);
-    assert_eq!(source.cues.len(), 2);
-    assert_eq!(&canonical[source.cues[0].clone()], "猫と猫が食べた。");
     assert_eq!(
-        &canonical[source.cues[1].clone()],
-        "国家公務員。𠮷 English 📖\0"
+        canonical.split("\n\n").collect::<Vec<_>>(),
+        ["猫と猫が食べた。", "国家公務員。𠮷 English 📖\0"]
     );
     for surface in &unique {
         assert_eq!(
@@ -806,7 +806,11 @@ fn real_srt_import_analyzes_only_canonical_text_and_completes_with_original_anch
     drop(storage);
     let mut storage = Storage::open(&path).unwrap();
     assert_eq!(
-        storage.load_srt_source(document.document_id).unwrap(),
+        storage_fixture::srt_file(
+            &rusqlite::Connection::open(&path).unwrap(),
+            document.document_id
+        )
+        .unwrap(),
         Some(source)
     );
     let SrtImportOutcome::Existing(existing) = storage

@@ -426,3 +426,22 @@ fn backup_candidate_checks_compact_reservation_provenance_occurrences_and_shape(
         check_rejected(&database, 1, CandidateError::InvalidData);
     }
 }
+
+#[test]
+fn previous_initial_journal_and_schema_are_rejected_without_changing_source_files() {
+    let database = TestDatabase::new();
+    let mut storage = Storage::open(database.path()).unwrap();
+    super::backup_snapshot::populate(&mut storage);
+    storage.connection.execute_batch("UPDATE schema_migrations SET name = '0001_initial_schema'; CREATE TABLE subtitle_cues (chapter_id INTEGER, cue_index INTEGER, start_byte INTEGER, end_byte INTEGER);").unwrap();
+    let before = fs::read(database.path()).unwrap();
+    assert!(matches!(
+        Storage::open(database.path()),
+        Err(StorageError::InvalidMigrationHistory)
+    ));
+    assert_eq!(fs::read(database.path()).unwrap(), before);
+    assert!(storage
+        .create_backup_snapshot(database.0.join("old-snapshot"), || false)
+        .is_err());
+    assert_eq!(fs::read(database.path()).unwrap(), before);
+    check_rejected(&database, 1, CandidateError::InvalidDatabase);
+}

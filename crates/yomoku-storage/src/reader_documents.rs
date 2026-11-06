@@ -146,7 +146,7 @@ pub(crate) fn load_reader_document_in(
                     let spans = item
                         .spans
                         .iter()
-                        .filter_map(|span| {
+                        .map(|span| {
                             let style = match &span.kind {
                                 SpanKind::Heading(level) => ReaderTextStyle::Heading(*level),
                                 SpanKind::Emphasis => ReaderTextStyle::Emphasis,
@@ -154,21 +154,14 @@ pub(crate) fn load_reader_document_in(
                                 SpanKind::ExternalLink(target) => {
                                     ReaderTextStyle::ExternalLink(target.clone())
                                 }
-                                // Internal/other links do not acquire navigation or styling.
-                                SpanKind::InertLink(_) => return None,
                             };
-                            Some((|| {
-                                Ok(ReaderTextSpan {
-                                    range: TextRange {
-                                        start: TextOffset::at(
-                                            &item.chapter.text,
-                                            span.range.start,
-                                        )?,
-                                        end: TextOffset::at(&item.chapter.text, span.range.end)?,
-                                    },
-                                    style,
-                                })
-                            })())
+                            Ok(ReaderTextSpan {
+                                range: TextRange {
+                                    start: TextOffset::at(&item.chapter.text, span.range.start)?,
+                                    end: TextOffset::at(&item.chapter.text, span.range.end)?,
+                                },
+                                style,
+                            })
                         })
                         .collect::<Result<Vec<_>, yomoku_core::document::InvalidTextValue>>()
                         .map_err(|_| StorageError::InvalidDocument)?;

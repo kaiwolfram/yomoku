@@ -47,7 +47,6 @@ pub enum SpanKind {
     Strong,
     /// Only HTTP(S) website links can later become interactive.
     ExternalLink(String),
-    InertLink(String),
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]

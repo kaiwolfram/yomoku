@@ -190,34 +190,6 @@ fn backup_candidate_formats_reject_missing_extra_changed_or_invalid_txt_ruby() {
 }
 
 #[test]
-fn backup_candidate_formats_reject_missing_extra_changed_or_foreign_srt_cues() {
-    {
-        let version = 1;
-        for sql in [
-            "DELETE FROM subtitle_cues",
-            "DELETE FROM subtitle_cues WHERE cue_index = 1",
-            "UPDATE subtitle_cues SET cue_index = cue_index + 10",
-            "UPDATE subtitle_cues SET start_byte = 1 WHERE cue_index = 0",
-            "UPDATE subtitle_cues SET end_byte = 9999 WHERE cue_index = 0",
-            "UPDATE subtitle_cues SET start_byte = 0 WHERE cue_index = 1",
-            "INSERT INTO subtitle_cues VALUES (4, 2, 0, 4)",
-            "INSERT INTO subtitle_cues VALUES (1, 0, 2, 5)",
-            "INSERT INTO subtitle_cues VALUES (3, 0, 0, 4)",
-        ] {
-            let (database, storage) = setup();
-            storage.connection.execute_batch(sql).unwrap();
-            check_rejected(&database, version as u32, CandidateError::InvalidData);
-        }
-    }
-    let (database, storage) = setup();
-    storage
-        .connection
-        .execute_batch("INSERT INTO subtitle_cues VALUES (5, 0, 0, 3)")
-        .unwrap();
-    check_rejected(&database, 1, CandidateError::InvalidData);
-}
-
-#[test]
 fn backup_candidate_formats_validate_epub_ruby_ranges_without_reinterpreting_readings() {
     for sql in [
         "UPDATE source_ruby SET ruby_index = 10 WHERE chapter_id = 5",

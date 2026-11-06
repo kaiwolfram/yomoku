@@ -206,13 +206,10 @@ impl Output {
                 "h6" => Some(SpanKind::Heading(6)),
                 "em" | "i" => Some(SpanKind::Emphasis),
                 "strong" | "b" => Some(SpanKind::Strong),
-                "a" => node.attribute("href").map(|href| {
-                    if website(href) {
-                        SpanKind::ExternalLink(href.to_owned())
-                    } else {
-                        SpanKind::InertLink(href.to_owned())
-                    }
-                }),
+                "a" => node
+                    .attribute("href")
+                    .filter(|href| website(href))
+                    .map(|href| SpanKind::ExternalLink(href.to_owned())),
                 _ => None,
             };
             if let Some(kind) = kind {

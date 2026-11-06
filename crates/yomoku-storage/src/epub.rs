@@ -287,7 +287,6 @@ fn store_content(
             SpanKind::Emphasis => ("emphasis", None, None),
             SpanKind::Strong => ("strong", None, None),
             SpanKind::ExternalLink(target) => ("external", None, Some(target)),
-            SpanKind::InertLink(target) => ("inert", None, Some(target)),
         };
         connection.execute("INSERT INTO epub_spans (chapter_id, span_index, start_byte, end_byte, kind, heading_level, target) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
             (id, number(index)?, number(span.range.start)?, number(span.range.end)?, kind, level, target))?;
@@ -504,7 +503,6 @@ fn read_content(
             ("emphasis", None, None) => SpanKind::Emphasis,
             ("strong", None, None) => SpanKind::Strong,
             ("external", None, Some(target)) if website(&target) => SpanKind::ExternalLink(target),
-            ("inert", None, Some(target)) => SpanKind::InertLink(target),
             _ => return Err(StorageError::InvalidDocument),
         };
         content.spans.push(EpubSpan {

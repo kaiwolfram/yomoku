@@ -18,19 +18,6 @@ pub(super) fn check(
     check_files(connection, cancelled)?;
     check_ruby(connection, cancelled)?;
 
-    // Each SRT's full cue list is compared below. Reject foreign ownership
-    // separately so an otherwise valid cue on a TXT/paste/EPUB cannot hide.
-    let mut statement = connection.prepare(
-        "SELECT s.kind FROM main.subtitle_cues q
-             JOIN main.chapters c ON c.id = q.chapter_id
-             JOIN main.sources s ON s.id = c.source_id",
-    )?;
-    let mut rows = statement.query([])?;
-    while let Some(row) = rows.next()? {
-        check_cancelled(cancelled)?;
-        require(text(row, 0)? == "srt")?;
-    }
-
     let mut statement = connection.prepare(
         "SELECT s.kind, e.document_id FROM main.documents d
              JOIN main.sources s ON s.id = d.source_id
@@ -127,21 +114,6 @@ fn check_files(
                 let parsed = srt::parse(&decoded).map_err(|_| CandidateError::InvalidData)?;
                 check_cancelled(cancelled)?;
                 require(parsed.text == canonical)?;
-                let mut cues = connection.prepare(
-                    "SELECT cue_index, start_byte, end_byte FROM main.subtitle_cues
-                     WHERE chapter_id = ?1 ORDER BY cue_index",
-                )?;
-                let mut cues = cues.query([chapter])?;
-                for (index, expected) in parsed.cues.iter().enumerate() {
-                    check_cancelled(cancelled)?;
-                    let cue = cues.next()?.ok_or(CandidateError::InvalidData)?;
-                    require(
-                        cue.get::<_, i64>(0)? == to_i64(index)?
-                            && cue.get::<_, i64>(1)? == to_i64(expected.start)?
-                            && cue.get::<_, i64>(2)? == to_i64(expected.end)?,
-                    )?;
-                }
-                require(cues.next()?.is_none())?;
             }
             _ => return Err(CandidateError::InvalidData),
         }

@@ -63,7 +63,7 @@ fn record(
     storage: &mut Storage,
     command: &yomoku_core::effective_reader::EffectivePageCompletion,
 ) -> AnalyzedCompletionOutcome {
-    storage.record_effective_page_completion(&command).unwrap()
+    storage.record_effective_page_completion(command).unwrap()
 }
 
 fn set_position(storage: &mut Storage, document: &ReaderDocument, position: ReadingPosition) {
