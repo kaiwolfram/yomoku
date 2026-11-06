@@ -11,7 +11,7 @@ mod effective;
 
 fn import(storage: &mut Storage, text: &str) -> AnalyzedPaste {
     storage
-        .create_analyzed_paste(&PasteText::new(text.into()).unwrap(), 100, fixture)
+        .analyzed_fixture(&PasteText::new(text.into()).unwrap(), 100, fixture)
         .unwrap()
 }
 
@@ -158,7 +158,7 @@ fn library_words_distinguish_missing_analysis_zero_words_and_deleted_documents()
     let database = TestDatabase::new();
     let mut storage = Storage::open(database.path()).unwrap();
     let legacy = storage
-        .create_paste(&PasteText::new("猫".into()).unwrap())
+        .unanalyzed_fixture(&PasteText::new("猫".into()).unwrap())
         .unwrap();
     import(&mut storage, "English 。 📖");
     let deleted = import(&mut storage, "犬");

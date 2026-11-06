@@ -5,12 +5,9 @@ use yomoku_core::document::{
     ChapterId, ChapterText, DocumentId, LibraryDocument, PasteText, PastedDocument, SourceId,
     TextOffset,
 };
-use yomoku_core::{
-    pagination::ReadingPosition,
-    reader::{progress_percent, ReaderSnapshot},
-};
+use yomoku_core::{pagination::ReadingPosition, reader::progress_percent};
 
-use crate::{analysis::read_reader_analysis, settings::read_page_length, Storage, StorageError};
+use crate::{Storage, StorageError};
 
 impl Storage {
     /// Change only the live Library title, preserving literal spelling and all
@@ -171,18 +168,6 @@ impl Storage {
         .collect()
     }
 
-    /// Persist one paste atomically. This does not tokenize/register vocabulary,
-    /// deduplicate imports or start reading; the runtime import pipeline adds those.
-    /// There is deliberately no content-edit operation.
-    pub fn create_paste(&mut self, text: &PasteText) -> Result<PastedDocument, StorageError> {
-        let transaction = self
-            .connection
-            .transaction_with_behavior(TransactionBehavior::Immediate)?;
-        let document = create_paste_in(&transaction, text)?;
-        transaction.commit()?;
-        Ok(document)
-    }
-
     /// Read a consistent snapshot. None means the Library document is absent;
     /// missing provenance/text for an existing document is an error.
     pub fn load_paste(
@@ -193,82 +178,6 @@ impl Storage {
         let document = load_paste_in(&transaction, document_id)?;
         transaction.commit()?;
         Ok(document)
-    }
-
-    /// Read the exact position, preset and original stored Mode C identity
-    /// together. This never invokes an analyzer, scans tokens or writes data.
-    pub fn load_reader_snapshot(
-        &mut self,
-        document_id: DocumentId,
-    ) -> Result<Option<ReaderSnapshot>, StorageError> {
-        let transaction = self.connection.transaction()?;
-        let Some(document) = load_paste_in(&transaction, document_id)? else {
-            return Ok(None);
-        };
-        let snapshot = ReaderSnapshot {
-            page_length: read_page_length(&transaction)?,
-            analysis: read_reader_analysis(&transaction, document.chapter.chapter_id)?,
-            document,
-        };
-        transaction.commit()?;
-        Ok(Some(snapshot))
-    }
-
-    /// Explicit reader entry records Library recency. A finished book starts at
-    /// page 1 with the reset
-    /// persisted in the same transaction as the returned snapshot. Ordinary
-    /// reads and completion reloads must keep using the read-only load methods.
-    pub fn open_reader_snapshot(
-        &mut self,
-        document_id: DocumentId,
-    ) -> Result<Option<ReaderSnapshot>, StorageError> {
-        let transaction = self
-            .connection
-            .transaction_with_behavior(TransactionBehavior::Immediate)?;
-        let Some(mut document) = load_paste_in(&transaction, document_id)? else {
-            return Ok(None);
-        };
-        if document.finished_at_least_once {
-            let start = ReadingPosition {
-                source_id: document.chapter.source_id,
-                chapter_id: document.chapter.chapter_id,
-                offset: TextOffset::START,
-            };
-            if document.reading_position != Some(start) {
-                write_position_in(&transaction, document_id, start)?;
-                document.reading_position = Some(start);
-            }
-        }
-        let snapshot = ReaderSnapshot {
-            page_length: read_page_length(&transaction)?,
-            analysis: read_reader_analysis(&transaction, document.chapter.chapter_id)?,
-            document,
-        };
-        record_reader_entry_in(&transaction, document_id)?;
-        transaction.commit()?;
-        Ok(Some(snapshot))
-    }
-
-    /// Save only current position. No completion/history/status changes occur.
-    /// Validate ownership and scalar boundaries before replacing the previous row.
-    pub fn save_reading_position(
-        &mut self,
-        document_id: DocumentId,
-        position: ReadingPosition,
-    ) -> Result<Option<PastedDocument>, StorageError> {
-        let transaction = self
-            .connection
-            .transaction_with_behavior(TransactionBehavior::Immediate)?;
-        let Some(mut document) = load_paste_in(&transaction, document_id)? else {
-            return Ok(None);
-        };
-        position
-            .validate(&document.chapter)
-            .map_err(|_| StorageError::InvalidDocument)?;
-        write_position_in(&transaction, document_id, position)?;
-        transaction.commit()?;
-        document.reading_position = Some(position);
-        Ok(Some(document))
     }
 }
 

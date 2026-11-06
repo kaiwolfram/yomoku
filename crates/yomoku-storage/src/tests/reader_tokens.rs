@@ -20,7 +20,7 @@ fn anchor(chapter: &ChapterText, start: usize, end: usize) -> TextAnchor {
 
 fn import(storage: &mut Storage, text: &str) -> AnalyzedPaste {
     storage
-        .create_analyzed_paste(&PasteText::new(text.into()).unwrap(), 100, fixture)
+        .analyzed_fixture(&PasteText::new(text.into()).unwrap(), 100, fixture)
         .unwrap()
 }
 
@@ -32,7 +32,7 @@ fn repeated_and_cross_document_surfaces_refresh_globally_without_registration_or
     let second = import(&mut storage, "猫 食べる");
     let mut writer = Storage::open(database.path()).unwrap();
     let before_change = storage
-        .load_reader_tokens(
+        .load_effective_reader_tokens(
             first.document.document_id,
             anchor(
                 &first.document.chapter,
@@ -61,7 +61,7 @@ fn repeated_and_cross_document_surfaces_refresh_globally_without_registration_or
             .unwrap();
         let before = fs::read(database.path()).unwrap();
         let result = storage
-            .load_reader_tokens(
+            .load_effective_reader_tokens(
                 document.document_id,
                 anchor(&document.chapter, 0, document.chapter.text.len()),
             )
@@ -94,7 +94,7 @@ fn deleted_or_never_registered_vocabulary_stays_absent_while_base_tokens_survive
         .execute("DELETE FROM vocabulary WHERE surface = '猫'", [])
         .unwrap();
     let legacy = storage
-        .create_paste(&PasteText::new("猫".into()).unwrap())
+        .unanalyzed_fixture(&PasteText::new("猫".into()).unwrap())
         .unwrap();
     storage
         .store_chapter_analysis(
@@ -109,7 +109,7 @@ fn deleted_or_never_registered_vocabulary_stays_absent_while_base_tokens_survive
     let before = fs::read(database.path()).unwrap();
     for document in [&imported.document, &legacy] {
         let result = storage
-            .load_reader_tokens(
+            .load_effective_reader_tokens(
                 document.document_id,
                 anchor(&document.chapter, 0, document.chapter.text.len()),
             )
@@ -154,11 +154,15 @@ fn page_fragments_reflow_with_full_token_identity_and_fresh_status() {
         let mut visible = String::new();
         for page in pages.pages() {
             let result = storage
-                .load_reader_tokens(document.document_id, *page)
+                .load_effective_reader_tokens(document.document_id, *page)
                 .unwrap()
                 .unwrap();
             assert_eq!(
-                result.analysis,
+                result
+                    .segmentation
+                    .as_ref()
+                    .map(|s| s.original_analysis_id)
+                    .map_or(ReaderAnalysis::Missing, ReaderAnalysis::Available),
                 ReaderAnalysis::Available(imported.analysis_id)
             );
             assert_eq!(result.tokens.len(), 1);
@@ -226,7 +230,7 @@ fn invalid_page_or_corrupt_original_analysis_and_status_fail_without_repair_or_f
             anchor(&document.chapter, 0, 0),
         ] {
             assert!(matches!(
-                storage.load_reader_tokens(document.document_id, invalid),
+                storage.load_effective_reader_tokens(document.document_id, invalid),
                 Err(StorageError::InvalidAnalysis)
             ));
         }
@@ -241,7 +245,7 @@ fn invalid_page_or_corrupt_original_analysis_and_status_fail_without_repair_or_f
             .pragma_update(None, "query_only", true)
             .unwrap();
         let before = fs::read(database.path()).unwrap();
-        let result = storage.load_reader_tokens(document.document_id, page);
+        let result = storage.load_effective_reader_tokens(document.document_id, page);
         if sql.contains("vocabulary SET status") {
             assert!(matches!(result, Err(StorageError::InvalidVocabulary)));
         } else {

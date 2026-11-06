@@ -48,7 +48,7 @@ fn history(storage: &Storage) -> Vec<Vec<Vec<Value>>> {
 
 fn import(storage: &mut Storage, text: &str, date: i64) -> AnalyzedPaste {
     storage
-        .create_analyzed_paste(&PasteText::new(text.into()).unwrap(), date, |chapter| {
+        .analyzed_fixture(&PasteText::new(text.into()).unwrap(), date, |chapter| {
             let mut analysis = imports::fixture(chapter).unwrap();
             for token in &mut analysis.tokens {
                 if token.is_japanese {

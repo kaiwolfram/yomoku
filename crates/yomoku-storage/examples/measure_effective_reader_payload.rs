@@ -59,7 +59,8 @@ fn main() {
             chapter: chapter.clone(),
             reading_position: None,
         };
-        let page = ReaderPage::open(&document, PageLength::default()).unwrap();
+        let page =
+            ReaderPage::open_document(&(document.clone().into()), PageLength::default()).unwrap();
         let key = EffectiveReaderTokenKey {
             document_id: document.document_id,
             page: page.anchor,

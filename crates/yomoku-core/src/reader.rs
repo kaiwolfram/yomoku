@@ -3,10 +3,9 @@
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    analysis::{ChapterAnalysis, InvalidAnalysis, SplitMode},
     document::{
-        AnalysisId, ChapterId, ChapterText, DocumentId, InvalidTextValue, LibraryDocument,
-        PastedDocument, ReaderDocument, TextAnchor, TextOffset, TextRange, VocabularyId,
+        AnalysisId, ChapterId, DocumentId, InvalidTextValue, LibraryDocument, PastedDocument,
+        ReaderDocument, TextAnchor, VocabularyId,
     },
     pagination::{LogicalPages, PageLength, ReadingPosition},
     vocabulary::VocabularyStatus,
@@ -22,18 +21,7 @@ pub enum ReaderAnalysis {
     Missing,
 }
 
-/// Document/finish state, settings and analysis identity from one consistent snapshot.
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
-#[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
-pub struct ReaderSnapshot {
-    pub document: PastedDocument,
-    pub page_length: PageLength,
-    pub analysis: ReaderAnalysis,
-}
-
 /// Ordered whole-document text and every chapter's original Mode C identity.
-/// Used by the application and worker; the legacy ReaderSnapshot remains only
-/// for callers of the historical single-text storage APIs.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
 pub struct DocumentReaderSnapshot {
@@ -82,106 +70,11 @@ pub struct ReaderTokenKey {
     pub analysis: ReaderAnalysis,
 }
 
-/// One read-only page lookup. Echoed identities let asynchronous callers discard
-/// results for a departed page or a different base analysis.
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
-#[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
-pub struct ReaderTokenSnapshot {
-    pub document_id: DocumentId,
-    pub page: TextAnchor,
-    pub analysis: ReaderAnalysis,
-    pub tokens: Vec<ReaderToken>,
-}
-
-impl ReaderTokenSnapshot {
-    pub fn key(&self) -> ReaderTokenKey {
-        ReaderTokenKey {
-            document_id: self.document_id,
-            page: self.page,
-            analysis: self.analysis,
-        }
-    }
-}
-
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
 pub struct ReaderVocabulary {
     pub id: VocabularyId,
     pub status: VocabularyStatus,
-}
-
-/// An explicit choice for an existing visible global entry. Lookup itself never
-/// creates a choice; the page/base identity rejects stale UI callbacks.
-#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
-#[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
-pub struct ReaderStatusChange {
-    pub key: ReaderTokenKey,
-    pub vocabulary_id: VocabularyId,
-    pub status: VocabularyStatus,
-    pub occurred_at_unix_ms: i64,
-}
-
-/// A selectable Japanese occurrence, retaining its whole original surface even
-/// when only part is visible. display_range counts UTF-8 bytes in the page text;
-/// anchor counts UTF-8 bytes in the chapter. Neither uses Compose UTF-16 indices.
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
-#[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
-pub struct ReaderToken {
-    pub token_index: u64,
-    pub anchor: TextAnchor,
-    pub display_range: TextRange,
-    pub surface: String,
-    pub reading: Option<String>,
-    pub dictionary_form: Option<String>,
-    /// Missing/deleted entries stay absent; lookup must never register them.
-    pub vocabulary: Option<ReaderVocabulary>,
-}
-
-/// Project visible Japanese spans without changing analysis or vocabulary.
-/// Storage attaches current global entries in the same read transaction.
-/// Unlike completion's start-based ownership, visibility includes a crossing
-/// token on both pages. Selecting either fragment identifies the same full token.
-pub fn reader_tokens_on_page(
-    chapter: &ChapterText,
-    analysis: &ChapterAnalysis,
-    page: TextAnchor,
-) -> Result<Vec<ReaderToken>, InvalidAnalysis> {
-    analysis.validate(chapter)?;
-    if analysis.mode != SplitMode::C || page.slice(chapter).map_err(|_| InvalidAnalysis)?.is_empty()
-    {
-        return Err(InvalidAnalysis);
-    }
-    analysis
-        .tokens
-        .iter()
-        .enumerate()
-        .filter(|(_, token)| {
-            token.is_japanese
-                && token.anchor.range.start < page.range.end
-                && token.anchor.range.end > page.range.start
-        })
-        .map(|(index, token)| {
-            let start = token.anchor.range.start.max(page.range.start);
-            let end = token.anchor.range.end.min(page.range.end);
-            Ok(ReaderToken {
-                token_index: u64::try_from(index).map_err(|_| InvalidAnalysis)?,
-                anchor: token.anchor,
-                display_range: TextRange {
-                    start: TextOffset::try_from(i64::from(start) - i64::from(page.range.start))
-                        .map_err(|_| InvalidAnalysis)?,
-                    end: TextOffset::try_from(i64::from(end) - i64::from(page.range.start))
-                        .map_err(|_| InvalidAnalysis)?,
-                },
-                surface: token.surface.clone(),
-                reading: token.reading.clone(),
-                dictionary_form: token
-                    .dictionary_form
-                    .as_ref()
-                    .map(|s| s.as_str().to_owned()),
-                vocabulary: None,
-            })
-        })
-        .collect()
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -251,43 +144,6 @@ impl ReaderPage {
                 .unwrap_or_default(),
         })
     }
-
-    /// Project the supplied exact position. Explicit finished-book reopening is
-    /// a separate storage operation; reflow/completion reloads must not reset it.
-    pub fn open(document: &PastedDocument, length: PageLength) -> Result<Self, InvalidTextValue> {
-        Self::at(
-            document,
-            document.reading_position.unwrap_or(ReadingPosition {
-                source_id: document.chapter.source_id,
-                chapter_id: document.chapter.chapter_id,
-                offset: TextOffset::START,
-            }),
-            length,
-        )
-    }
-
-    pub fn at(
-        document: &PastedDocument,
-        position: ReadingPosition,
-        length: PageLength,
-    ) -> Result<Self, InvalidTextValue> {
-        let pages = LogicalPages::new(std::slice::from_ref(&document.chapter), length)?;
-        let page_index = pages.page_at(position)?;
-        let anchor = pages.pages()[page_index];
-        Ok(Self {
-            document_id: document.document_id,
-            title: document.title.clone(),
-            finished_at_least_once: document.finished_at_least_once,
-            text: anchor.slice(&document.chapter)?.to_owned(),
-            anchor,
-            position,
-            page_number: page_index as u64 + 1,
-            total_pages: pages.pages().len() as u64,
-            formatting: Vec::new(),
-            images: Vec::new(),
-            source_ruby: Vec::new(),
-        })
-    }
 }
 
 impl ReaderDocument {
@@ -344,35 +200,5 @@ impl PastedDocument {
                 i64::try_from(self.chapter.text.len()).map_err(|_| InvalidTextValue)?,
             )?,
         })
-    }
-}
-
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
-#[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
-pub struct ReaderWordDetails {
-    /// Echo the page/base identity and complete selected token for cancellation.
-    pub key: ReaderTokenKey,
-    pub token: ReaderToken,
-    /// Lifetime completed-reading occurrences for this exact surface only.
-    pub encountered: u64,
-    /// Complete source data plus applicable indices, separately for words/names.
-    /// Callers must respect the applicable views when displaying definitions.
-    pub candidates: crate::dictionary::DictionaryCandidates,
-}
-
-/// A transient selection within the loaded original Mode C token snapshot.
-#[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, Eq)]
-#[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
-pub struct ReaderWordSelection {
-    pub key: ReaderTokenKey,
-    pub token_index: u64,
-}
-
-impl ReaderWordDetails {
-    pub fn selection(&self) -> ReaderWordSelection {
-        ReaderWordSelection {
-            key: self.key,
-            token_index: self.token.token_index,
-        }
     }
 }

@@ -1,4 +1,6 @@
-//! Exercise the real middleware/worker, including completion retries.
+#[path = "../../../../tests/support/storage.rs"]
+mod storage_fixture;
+// Exercise the real middleware/worker, including completion retries.
 use std::{
     convert::Infallible,
     path::PathBuf,
@@ -127,11 +129,15 @@ impl Fixture {
         std::fs::create_dir(&directory).unwrap();
         let mut storage = Storage::open(directory.join("user.sqlite3")).unwrap();
         let imported = storage
-            .create_analyzed_paste(
+            .import_analyzed_paste(
                 &PasteText::new("食べた 食べた 猫 English 。 𠮷か\u{3099}\0".into()).unwrap(),
                 100,
                 analysis,
             )
+            .map(|outcome| match outcome {
+                yomoku_storage::PasteImportOutcome::Created(value) => value,
+                _ => panic!("expected fresh import"),
+            })
             .unwrap();
         for mode in [SplitMode::A, SplitMode::B] {
             let mut component = analysis(&imported.document.chapter).unwrap();
@@ -274,10 +280,11 @@ fn effective_worker_missing_foreign_and_deleted_pages_fail_without_analysis_or_r
     let fixture = Fixture::new();
     let router = fixture.router();
     let mut session = EffectiveReaderSession::default();
-    let legacy = fixture
-        .storage()
-        .create_paste(&PasteText::new("猫".into()).unwrap())
-        .unwrap();
+    let legacy = storage_fixture::unanalyzed(
+        &mut fixture.storage(),
+        fixture.path(),
+        &PasteText::new("猫".into()).unwrap(),
+    );
     let base = ReaderTokenKey {
         document_id: legacy.document_id,
         page: TextAnchor {

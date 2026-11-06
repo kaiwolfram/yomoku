@@ -18,13 +18,14 @@ fn saves_current_offset_in_both_directions_with_exact_unicode_and_reopen() {
     let database = TestDatabase::new();
     let mut storage = Storage::open(database.path()).unwrap();
     let document = storage
-        .create_paste(&PasteText::new("𠮷\0か\u{3099}\r\n終".into()).unwrap())
+        .unanalyzed_fixture(&PasteText::new("𠮷\0か\u{3099}\r\n終".into()).unwrap())
         .unwrap();
     assert_eq!(storage.list_documents().unwrap()[0].progress_percent, 0);
     for (byte, percent) in [(16, 100), (5, 31), (4, 25), (0, 0), (11, 68)] {
         let expected = position(&document, byte);
         let saved = storage
-            .save_reading_position(document.document_id, expected)
+            .save_document_reading_position(document.document_id, expected)
+            .map(|value| value.map(crate::tests::as_paste))
             .unwrap()
             .unwrap();
         assert_eq!(saved.reading_position, Some(expected));
@@ -47,11 +48,12 @@ fn rejects_foreign_out_of_range_and_split_scalar_positions_preserving_previous_r
     let database = TestDatabase::new();
     let mut storage = Storage::open(database.path()).unwrap();
     let document = storage
-        .create_paste(&PasteText::new("𠮷本文".into()).unwrap())
+        .unanalyzed_fixture(&PasteText::new("𠮷本文".into()).unwrap())
         .unwrap();
     let previous = position(&document, 4);
     let expected = storage
-        .save_reading_position(document.document_id, previous)
+        .save_document_reading_position(document.document_id, previous)
+        .map(|value| value.map(crate::tests::as_paste))
         .unwrap();
     for invalid in [
         ReadingPosition {
@@ -72,13 +74,16 @@ fn rejects_foreign_out_of_range_and_split_scalar_positions_preserving_previous_r
         },
     ] {
         assert!(matches!(
-            storage.save_reading_position(document.document_id, invalid),
+            storage
+                .save_document_reading_position(document.document_id, invalid)
+                .map(|value| value.map(crate::tests::as_paste)),
             Err(StorageError::InvalidDocument)
         ));
         assert_eq!(storage.load_paste(document.document_id).unwrap(), expected);
     }
     assert!(storage
-        .save_reading_position(DocumentId::try_from(i64::MAX).unwrap(), previous)
+        .save_document_reading_position(DocumentId::try_from(i64::MAX).unwrap(), previous)
+        .map(|value| value.map(crate::tests::as_paste))
         .unwrap()
         .is_none());
 }
@@ -92,15 +97,15 @@ fn insert_update_and_commit_failures_leave_previous_position_and_allow_retry() {
     ] {
         let database = TestDatabase::new();
         let mut storage = Storage::open(database.path()).unwrap();
-        let document = storage.create_paste(&PasteText::new("𠮷本文".into()).unwrap()).unwrap();
+        let document = storage.unanalyzed_fixture(&PasteText::new("𠮷本文".into()).unwrap()).unwrap();
         let expected = if stage == "insert" { document.clone() } else {
-            storage.save_reading_position(document.document_id, position(&document, 4)).unwrap().unwrap()
+            storage.save_document_reading_position(document.document_id, position(&document, 4)).map(|value| value.map(crate::tests::as_paste)).unwrap().unwrap()
         };
         storage.connection.execute_batch(trigger).unwrap();
-        assert!(matches!(storage.save_reading_position(document.document_id, position(&document, 7)), Err(StorageError::Sqlite(_))), "{stage}");
+        assert!(matches!(storage.save_document_reading_position(document.document_id, position(&document, 7)).map(|value| value.map(crate::tests::as_paste)), Err(StorageError::Sqlite(_))), "{stage}");
         assert_eq!(storage.load_paste(document.document_id).unwrap(), Some(expected));
         storage.connection.execute_batch("DROP TRIGGER fail_position").unwrap();
-        assert!(storage.save_reading_position(document.document_id, position(&document, 7)).unwrap().is_some());
+        assert!(storage.save_document_reading_position(document.document_id, position(&document, 7)).map(|value| value.map(crate::tests::as_paste)).unwrap().is_some());
     }
 }
 
@@ -109,10 +114,11 @@ fn corrupt_position_is_rejected_without_repair_and_document_deletion_removes_onl
     let database = TestDatabase::new();
     let mut storage = Storage::open(database.path()).unwrap();
     let document = storage
-        .create_paste(&PasteText::new("𠮷本文".into()).unwrap())
+        .unanalyzed_fixture(&PasteText::new("𠮷本文".into()).unwrap())
         .unwrap();
     storage
-        .save_reading_position(document.document_id, position(&document, 4))
+        .save_document_reading_position(document.document_id, position(&document, 4))
+        .map(|value| value.map(crate::tests::as_paste))
         .unwrap();
     storage
         .connection

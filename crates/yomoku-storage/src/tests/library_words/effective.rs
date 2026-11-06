@@ -21,7 +21,7 @@ fn effective_library_words_distinguish_missing_b_from_zero_and_empty_library() {
         .unwrap()
         .is_empty());
     let legacy = storage
-        .create_paste(&PasteText::new("猫".into()).unwrap())
+        .unanalyzed_fixture(&PasteText::new("猫".into()).unwrap())
         .unwrap();
     let mut alternate = fixture(&legacy.chapter).unwrap();
     for mode in [SplitMode::A, SplitMode::B] {

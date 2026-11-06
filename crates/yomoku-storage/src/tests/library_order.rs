@@ -3,7 +3,7 @@ use yomoku_core::{document::PasteText, library::LibrarySort};
 
 fn create(storage: &mut Storage, text: &str) -> yomoku_core::document::PastedDocument {
     storage
-        .create_paste(&PasteText::new(text.into()).unwrap())
+        .unanalyzed_fixture(&PasteText::new(text.into()).unwrap())
         .unwrap()
 }
 
@@ -34,7 +34,7 @@ fn recency_changes_only_on_successful_explicit_entry_and_survives_reopen() {
         .unwrap();
     assert_eq!(first_open.last_read_sequence, Some(1));
     storage
-        .open_reader_snapshot(second.document_id)
+        .open_document_reader_snapshot(second.document_id)
         .unwrap()
         .unwrap();
     assert_eq!(
@@ -66,7 +66,9 @@ fn recency_changes_only_on_successful_explicit_entry_and_survives_reopen() {
             .unwrap()
             .unwrap();
         assert_eq!(loaded.last_read_sequence, Some(3));
-        storage.load_reader_snapshot(second.document_id).unwrap();
+        storage
+            .load_document_reader_snapshot(second.document_id)
+            .unwrap();
         let listed = storage.list_documents().unwrap();
         assert_eq!(
             LibrarySort::LastRead.project(&listed, "")[0].document_id,

@@ -6,6 +6,7 @@ use std::{
         Arc, Barrier,
     },
 };
+use yomoku_core::document::{PasteText, PastedDocument};
 
 use super::*;
 
@@ -265,4 +266,55 @@ fn migration_failure_rolls_back_schema_journal_and_data_without_disabling_foreig
     migrate(&mut connection, &steps).unwrap();
     assert!(connection.table_exists(None, "future_fixture").unwrap());
     assert_eq!(history(&database.path()).len(), 2);
+}
+
+impl Storage {
+    /// Seed deliberately missing analysis for storage integrity fixtures.
+    fn unanalyzed_fixture(&mut self, text: &PasteText) -> Result<PastedDocument, StorageError> {
+        let transaction = self
+            .connection
+            .transaction_with_behavior(TransactionBehavior::Immediate)?;
+        let document = crate::documents::create_paste_in(&transaction, text)?;
+        transaction.commit()?;
+        Ok(document)
+    }
+}
+
+impl Storage {
+    /// Seed independent imports, including identical text, without deduplication.
+    fn analyzed_fixture<E>(
+        &mut self,
+        text: &PasteText,
+        registered_at_unix_ms: i64,
+        analyze: impl FnOnce(
+            &yomoku_core::document::ChapterText,
+        ) -> Result<yomoku_core::analysis::ChapterAnalysis, E>,
+    ) -> Result<AnalyzedPaste, PasteImportError<E>> {
+        if registered_at_unix_ms < 0 {
+            return Err(StorageError::InvalidVocabulary.into());
+        }
+        let transaction = self
+            .connection
+            .transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)
+            .map_err(StorageError::from)?;
+        let imported = crate::imports::analyze_document_in(
+            &transaction,
+            crate::documents::create_paste_in(&transaction, text)?,
+            registered_at_unix_ms,
+            analyze,
+        )?;
+        transaction.commit().map_err(StorageError::from)?;
+        Ok(imported)
+    }
+}
+
+fn as_paste(document: yomoku_core::document::ReaderDocument) -> PastedDocument {
+    assert_eq!(document.chapters.len(), 1);
+    PastedDocument {
+        document_id: document.document_id,
+        title: document.title,
+        finished_at_least_once: document.finished_at_least_once,
+        reading_position: document.reading_position,
+        chapter: document.chapters.into_iter().next().unwrap(),
+    }
 }

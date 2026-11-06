@@ -33,7 +33,7 @@ fn status(storage: &mut Storage, surface: &str, status: VocabularyStatus, timest
 
 fn import_linked(storage: &mut Storage, text: &str) -> AnalyzedPaste {
     storage
-        .create_analyzed_paste(&PasteText::new(text.into()).unwrap(), 100, |chapter| {
+        .analyzed_fixture(&PasteText::new(text.into()).unwrap(), 100, |chapter| {
             let mut analysis = fixture(chapter).unwrap();
             for token in &mut analysis.tokens {
                 if token.is_japanese {
@@ -71,7 +71,7 @@ fn import_registration_jumps_preserve_unique_unicode_surfaces_and_all_five_statu
     status(&mut storage, "食べた", Familiar, 300);
     assert_eq!(storage.vocabulary_status_timeline().unwrap(), expected);
     storage
-        .create_analyzed_paste(&PasteText::new("犬 猫".into()).unwrap(), 400, fixture)
+        .analyzed_fixture(&PasteText::new("犬 猫".into()).unwrap(), 400, fixture)
         .unwrap();
     assert_eq!(
         storage.vocabulary_status_timeline().unwrap(),
@@ -165,7 +165,7 @@ fn document_deletion_preserves_timeline_and_vocabulary_erasure_recalculates_all_
     assert_eq!(storage.vocabulary_status_timeline().unwrap(), expected);
     // Only an explicit later import registers the erased surface, with a new ID.
     storage
-        .create_analyzed_paste(&PasteText::new("猫 犬".into()).unwrap(), 800, fixture)
+        .analyzed_fixture(&PasteText::new("猫 犬".into()).unwrap(), 800, fixture)
         .unwrap();
     let new_cat = storage
         .vocabulary_entry(&Surface::new("猫").unwrap())
@@ -462,7 +462,7 @@ fn status_events_keep_one_snapshot_across_concurrent_erasure_and_new_generations
         .unwrap();
     writer.delete_vocabulary_entries(&[cat.id]).unwrap();
     writer
-        .create_analyzed_paste(&PasteText::new("猫".into()).unwrap(), 300, |chapter| {
+        .analyzed_fixture(&PasteText::new("猫".into()).unwrap(), 300, |chapter| {
             let mut analysis = fixture(chapter).unwrap();
             analysis.tokens[0].dictionary_form = Some(Surface::new("別の形").unwrap());
             Ok::<_, std::convert::Infallible>(analysis)

@@ -15,7 +15,7 @@ fn setup() -> (TestDatabase, Storage) {
     let mut storage = Storage { connection };
     for _ in 0..2 {
         storage
-            .create_paste(&PasteText::new("\n か\u{3099}𠮷\0\r\n".into()).unwrap())
+            .unanalyzed_fixture(&PasteText::new("\n か\u{3099}𠮷\0\r\n".into()).unwrap())
             .unwrap();
     }
 

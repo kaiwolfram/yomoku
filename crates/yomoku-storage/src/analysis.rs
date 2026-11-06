@@ -4,7 +4,6 @@ use yomoku_core::{
     document::{AnalysisId, ChapterId, ChapterText, SourceId, TextAnchor, TextOffset, TextRange},
     effective_reader::EffectiveReaderChapter,
     reader::ReaderAnalysis,
-    segmentation::{resolve_segmentation, ChapterSegmentation, EffectiveChapterSegmentation},
     vocabulary::Surface,
 };
 
@@ -66,45 +65,6 @@ impl Storage {
     ) -> Result<bool, StorageError> {
         Ok(self.connection.query_row("SELECT EXISTS(SELECT 1 FROM chapter_analyses WHERE chapter_id = ?1 AND engine_revision = ?2 AND dictionary_revision = ?3 AND split_mode = ?4)",
             (i64::from(chapter), &profile.engine_revision, &profile.dictionary_revision, encode_mode(mode)), |row| row.get(0))?)
-    }
-
-    /// Read the pinned original Mode C plus active global/relevant local rules
-    /// atomically. Missing B stays missing; this never analyzes, registers words,
-    /// changes the reader's current projection or writes completed-reading data.
-    pub fn load_chapter_segmentation(
-        &mut self,
-        chapter_id: ChapterId,
-    ) -> Result<Option<ChapterSegmentation>, StorageError> {
-        let transaction = self.connection.transaction()?;
-        let chapter = read_chapter(&transaction, chapter_id)?;
-        let ReaderAnalysis::Available(id) = read_reader_analysis(&transaction, chapter_id)? else {
-            transaction.commit()?;
-            return Ok(None);
-        };
-        let original = read_analysis(&transaction, id)?.ok_or(StorageError::InvalidAnalysis)?;
-        let segments =
-            resolve_segmentation(&chapter, &original).map_err(|_| StorageError::InvalidAnalysis)?;
-        transaction.commit()?;
-        Ok(Some(ChapterSegmentation {
-            original_analysis_id: id,
-            segments,
-        }))
-    }
-
-    /// Read effective boundaries and exact-span analyzer metadata in one
-    /// transaction. Only stored A/C snapshots with the pinned original profile
-    /// are eligible. Missing metadata remains explicit: no analyzer is loaded
-    /// and no vocabulary, reading history or reader state is changed.
-    pub fn load_effective_chapter_segmentation(
-        &mut self,
-        chapter_id: ChapterId,
-    ) -> Result<Option<EffectiveChapterSegmentation>, StorageError> {
-        let transaction = self.connection.transaction()?;
-        let chapter = read_chapter(&transaction, chapter_id)?;
-        let effective = read_effective_reader_chapter_in(&transaction, &chapter)?
-            .map(EffectiveReaderChapter::into_segmentation);
-        transaction.commit()?;
-        Ok(effective)
     }
 
     /// Persist a validated immutable base snapshot. Identical retries reuse its ID;

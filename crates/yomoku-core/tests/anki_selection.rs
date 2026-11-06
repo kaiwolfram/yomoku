@@ -20,8 +20,8 @@ fn range(text: &str, start: usize, end: usize) -> TextRange {
 
 struct Fixture {
     chapter: ChapterText,
-    page: ReaderTokenSnapshot,
-    details: ReaderWordDetails,
+    page: EffectiveReaderPage,
+    details: EffectiveWordDetails,
 }
 
 impl Fixture {
@@ -37,8 +37,9 @@ impl Fixture {
             range: range(text, 0, text.len()),
         };
         let start = text.rfind(surface).unwrap();
-        let token = ReaderToken {
-            token_index: 7,
+        let token = EffectivePageToken {
+            eligibility: EffectiveTokenEligibility::AnalyzerJapanese,
+            segment_index: 19,
             anchor: TextAnchor {
                 range: range(text, start, start + surface.len()),
                 ..page
@@ -52,14 +53,23 @@ impl Fixture {
                 status: VocabularyStatus::Learning,
             }),
         };
-        let page = ReaderTokenSnapshot {
-            document_id: 4.try_into().unwrap(),
-            page,
-            analysis: ReaderAnalysis::Available(5.try_into().unwrap()),
+        let page = EffectiveReaderPage {
+            identity: EffectivePageIdentity {
+                revision: 11,
+                base: ReaderTokenKey {
+                    document_id: 4.try_into().unwrap(),
+                    page,
+                    analysis: ReaderAnalysis::Available(5.try_into().unwrap()),
+                },
+            },
             tokens: vec![token.clone()],
         };
-        let details = ReaderWordDetails {
-            key: page.key(),
+        let details = EffectiveWordDetails {
+            dictionary_sources: vec![],
+            selection: EffectiveReaderSelection {
+                page: page.identity,
+                segment_index: token.segment_index,
+            },
             token,
             encountered: 47,
             candidates: DictionaryCandidates {
@@ -82,33 +92,12 @@ impl Fixture {
     }
 
     fn effective(&self) -> (EffectiveReaderPage, EffectiveWordDetails) {
-        let original = &self.page.tokens[0];
-        let token = EffectivePageToken {
-            segment_index: 19,
-            anchor: original.anchor,
-            display_range: original.display_range,
-            surface: original.surface.clone(),
-            eligibility: EffectiveTokenEligibility::AnalyzerJapanese,
-            reading: original.reading.clone(),
-            dictionary_form: original.dictionary_form.clone(),
-            vocabulary: original.vocabulary,
-        };
-        let page = EffectiveReaderPage {
-            identity: EffectivePageIdentity {
-                revision: 11,
-                base: self.page.key(),
-            },
-            tokens: vec![token.clone()],
-        };
-        let details = EffectiveWordDetails {
-            selection: EffectiveReaderSelection {
-                page: page.identity,
-                segment_index: token.segment_index,
-            },
-            token,
-            encountered: self.details.encountered,
-            candidates: self.details.candidates.clone(),
-            dictionary_sources: Vec::new(),
+        let page = self.page.clone();
+        let mut details = self.details.clone();
+        details.token = page.tokens[0].clone();
+        details.selection = EffectiveReaderSelection {
+            page: page.identity,
+            segment_index: details.token.segment_index,
         };
         (page, details)
     }
@@ -301,9 +290,9 @@ fn sentence_uses_full_chapter_when_page_only_displays_part_of_word() {
     let mut f = Fixture::new("前。猫と𠮷野家です。次。", "𠮷野家");
     let start = f.chapter.text.find('野').unwrap();
     let end = start + "野".len();
-    f.page.page.range = range(&f.chapter.text, start, end);
+    f.page.identity.base.page.range = range(&f.chapter.text, start, end);
     f.page.tokens[0].display_range = range("野", 0, "野".len());
-    f.details.key = f.page.key();
+    f.details.selection.page = f.page.identity;
     f.details.token = f.page.tokens[0].clone();
     assert_eq!(
         f.note().unwrap().fields()[3],

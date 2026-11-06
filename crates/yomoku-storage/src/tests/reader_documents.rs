@@ -92,7 +92,7 @@ fn all_formats_have_complete_read_only_snapshots_with_original_analysis_ids() {
     let database = TestDatabase::new();
     let mut storage = Storage::open(database.path()).unwrap();
     let paste = storage
-        .create_analyzed_paste(&PasteText::new("猫 𠮷\0".into()).unwrap(), 1, fixture)
+        .analyzed_fixture(&PasteText::new("猫 𠮷\0".into()).unwrap(), 1, fixture)
         .unwrap();
     let txt = match storage
         .import_analyzed_txt(
@@ -122,7 +122,7 @@ fn all_formats_have_complete_read_only_snapshots_with_original_analysis_ids() {
     };
     let epub = import(&mut storage, "<p>犬 犬 𠮷 か&#x3099;</p>");
     let missing = storage
-        .create_paste(&PasteText::new("旧本".into()).unwrap())
+        .unanalyzed_fixture(&PasteText::new("旧本".into()).unwrap())
         .unwrap();
     storage.save_page_length(PageLength::Characters750).unwrap();
     let before = fs::read(database.path()).unwrap();
@@ -216,11 +216,6 @@ fn all_formats_have_complete_read_only_snapshots_with_original_analysis_ids() {
         .unwrap()
         .is_none());
     assert_eq!(fs::read(database.path()).unwrap(), before);
-    // The legacy wire shape continues to reject multi-chapter books explicitly.
-    assert!(matches!(
-        storage.load_reader_snapshot(epub.document.document_id),
-        Err(StorageError::InvalidDocument)
-    ));
 }
 
 #[test]
@@ -305,7 +300,7 @@ fn source_ruby_survives_txt_epub_reopen_reflow_and_position_saves_without_writes
             assert_eq!(page.position, exact);
             assert_eq!(page.source_ruby, annotations.ruby);
             let tokens = storage
-                .load_reader_tokens(id, page.anchor)
+                .load_effective_reader_tokens(id, page.anchor)
                 .unwrap()
                 .unwrap();
             assert_eq!(tokens.page, page.anchor);
@@ -383,7 +378,7 @@ fn source_ruby_is_independent_of_status_deleted_vocabulary_and_missing_analysis(
     .unwrap();
     assert_eq!(page.source_ruby[0].reading, "ソースねこ");
     assert!(storage
-        .load_reader_tokens(id, page.anchor)
+        .load_effective_reader_tokens(id, page.anchor)
         .unwrap()
         .unwrap()
         .tokens
@@ -517,14 +512,21 @@ fn all_presets_complete_chapters_in_order_with_exact_tokens_progress_and_finish(
             assert_eq!(page.anchor, *anchor);
             assert_eq!(page.page_number, index as u64 + 1);
             set_position(&mut storage, &before.document, page.position);
-            let tokens = storage.load_reader_tokens(id, *anchor).unwrap().unwrap();
+            let tokens = storage
+                .load_effective_reader_tokens(id, *anchor)
+                .unwrap()
+                .unwrap();
             let chapter_index = document
                 .chapters
                 .iter()
                 .position(|chapter| chapter.chapter_id == anchor.chapter_id)
                 .unwrap();
             assert_eq!(
-                tokens.analysis,
+                tokens
+                    .segmentation
+                    .as_ref()
+                    .map(|s| s.original_analysis_id)
+                    .map_or(ReaderAnalysis::Missing, ReaderAnalysis::Available),
                 ReaderAnalysis::Available(imported.analysis_ids[chapter_index])
             );
             occurrences += tokens
@@ -669,7 +671,9 @@ fn foreign_chapters_scalar_splits_wrong_analysis_and_missing_analysis_fail_witho
         assert!(storage.save_document_reading_position(id, bad).is_err());
     }
     let foreign = ReaderPage::open_document(&other, PageLength::default()).unwrap();
-    assert!(storage.load_reader_tokens(id, foreign.anchor).is_err());
+    assert!(storage
+        .load_effective_reader_tokens(id, foreign.anchor)
+        .is_err());
 
     for wrong in [a.analysis_ids[1], b.analysis_ids[0]] {
         assert!(matches!(
@@ -697,10 +701,17 @@ fn foreign_chapters_scalar_splits_wrong_analysis_and_missing_analysis_fail_witho
         ReaderPage::at_document(&document, position(&document, 1, 0), PageLength::default())
             .unwrap();
     let tokens = storage
-        .load_reader_tokens(id, second.anchor)
+        .load_effective_reader_tokens(id, second.anchor)
         .unwrap()
         .unwrap();
-    assert_eq!(tokens.analysis, ReaderAnalysis::Missing);
+    assert_eq!(
+        tokens
+            .segmentation
+            .as_ref()
+            .map(|s| s.original_analysis_id)
+            .map_or(ReaderAnalysis::Missing, ReaderAnalysis::Available),
+        ReaderAnalysis::Missing
+    );
     assert!(tokens.tokens.is_empty());
     record(&mut storage, command);
     let second_command = yomoku_core::completion::PageCompletion {
@@ -899,7 +910,7 @@ fn invalid_saved_book_content_or_extra_single_text_chapters_never_truncate_or_re
             }
             _ => {
                 let paste = storage
-                    .create_paste(&PasteText::new("猫".into()).unwrap())
+                    .unanalyzed_fixture(&PasteText::new("猫".into()).unwrap())
                     .unwrap();
                 id = paste.document_id;
                 storage
@@ -963,7 +974,7 @@ fn image_only_final_chapter_completes_with_zero_new_words() {
         ReaderPage::open_document(&snapshot(&mut storage, id).document, PageLength::default())
             .unwrap();
     assert!(storage
-        .load_reader_tokens(id, page.anchor)
+        .load_effective_reader_tokens(id, page.anchor)
         .unwrap()
         .unwrap()
         .tokens

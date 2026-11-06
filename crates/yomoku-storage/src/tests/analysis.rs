@@ -2,7 +2,7 @@ use yomoku_core::{
     analysis::{AnalysisProfile, AnalyzedToken, ChapterAnalysis, SplitMode},
     document::{ChapterText, PasteText, TextAnchor, TextOffset, TextRange},
     pagination::{PageLength, ReadingPosition},
-    reader::{ReaderAnalysis, ReaderSnapshot},
+    reader::{DocumentReaderSnapshot, ReaderAnalysis},
     vocabulary::Surface,
 };
 
@@ -58,7 +58,7 @@ fn reader_snapshot_pins_original_mode_b_with_exact_position_and_preset_after_reo
     let database = TestDatabase::new();
     let mut storage = Storage::open(database.path()).unwrap();
     let mut document = storage
-        .create_paste(&PasteText::new("𠮷が食べた。\r\nABC\0e\u{301}📖".into()).unwrap())
+        .unanalyzed_fixture(&PasteText::new("𠮷が食べた。\r\nABC\0e\u{301}📖".into()).unwrap())
         .unwrap();
     let chapter_id = document.chapter.chapter_id;
     let mut snapshot = analysis(&document.chapter);
@@ -85,7 +85,8 @@ fn reader_snapshot_pins_original_mode_b_with_exact_position_and_preset_after_reo
         offset: TextOffset::try_from(4).unwrap(), // after supplementary Unicode
     };
     storage
-        .save_reading_position(document.document_id, position)
+        .save_document_reading_position(document.document_id, position)
+        .map(|value| value.map(crate::tests::as_paste))
         .unwrap();
     document.reading_position = Some(position);
     storage.save_page_length(PageLength::Characters750).unwrap();
@@ -97,11 +98,18 @@ fn reader_snapshot_pins_original_mode_b_with_exact_position_and_preset_after_reo
         .unwrap();
     let before = fs::read(database.path()).unwrap();
     assert_eq!(
-        storage.load_reader_snapshot(document.document_id).unwrap(),
-        Some(ReaderSnapshot {
-            document,
+        storage
+            .load_document_reader_snapshot(document.document_id)
+            .unwrap(),
+        Some(DocumentReaderSnapshot {
+            analyses: vec![yomoku_core::reader::ReaderChapterAnalysis {
+                chapter_id,
+                analysis: ReaderAnalysis::Available(original)
+            }],
+            last_read_sequence: None,
+            typography: Default::default(),
+            document: document.into(),
             page_length: PageLength::Characters750,
-            analysis: ReaderAnalysis::Available(original),
         })
     );
     assert_eq!(fs::read(database.path()).unwrap(), before);
@@ -118,7 +126,7 @@ fn reader_snapshot_rejects_corrupt_identity_or_settings_without_fallback_or_repa
         let database = TestDatabase::new();
         let mut storage = Storage::open(database.path()).unwrap();
         let document = storage
-            .create_paste(&PasteText::new("猫".into()).unwrap())
+            .unanalyzed_fixture(&PasteText::new("猫".into()).unwrap())
             .unwrap();
         let mut snapshot = analysis(&document.chapter);
         storage
@@ -132,7 +140,7 @@ fn reader_snapshot_rejects_corrupt_identity_or_settings_without_fallback_or_repa
             .store_chapter_analysis(document.chapter.chapter_id, &snapshot)
             .unwrap();
         let before = fs::read(database.path()).unwrap();
-        let result = storage.load_reader_snapshot(document.document_id);
+        let result = storage.load_document_reader_snapshot(document.document_id);
         if sql == "DELETE FROM reader_settings" {
             assert!(matches!(result, Err(StorageError::InvalidSettings)));
         } else {
@@ -147,7 +155,7 @@ fn stores_versioned_modes_exact_unicode_and_reopens_without_mutating_snapshots()
     let database = TestDatabase::new();
     let mut storage = Storage::open(database.path()).unwrap();
     let document = storage
-        .create_paste(&PasteText::new("𠮷が食べた。\r\nABC\0e\u{301}📖".into()).unwrap())
+        .unanalyzed_fixture(&PasteText::new("𠮷が食べた。\r\nABC\0e\u{301}📖".into()).unwrap())
         .unwrap();
     let mut expected = analysis(&document.chapter);
     expected.tokens[0].is_japanese = true;
@@ -214,7 +222,7 @@ fn analysis_statement_and_commit_failures_roll_back_and_retry() {
     ] {
         let database = TestDatabase::new();
         let mut storage = Storage::open(database.path()).unwrap();
-        let document = storage.create_paste(&PasteText::new("日本語".into()).unwrap()).unwrap();
+        let document = storage.unanalyzed_fixture(&PasteText::new("日本語".into()).unwrap()).unwrap();
         let expected = analysis(&document.chapter);
         storage.connection.execute_batch("CREATE TEMP TABLE deferred_parent (id INTEGER PRIMARY KEY);
             CREATE TEMP TABLE deferred_child (id INTEGER REFERENCES deferred_parent(id) DEFERRABLE INITIALLY DEFERRED);").unwrap();

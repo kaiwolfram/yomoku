@@ -1,5 +1,7 @@
-//! Explicit data tests: tools/test-sudachi.sh. Ordinary workspace checks need no
-//! 315 MiB dictionary and report these as ignored, never silently skip them.
+#[path = "../../../tests/support/storage.rs"]
+mod storage_fixture;
+// Explicit data tests: tools/test-sudachi.sh. Ordinary workspace checks need no
+// 315 MiB dictionary and report these as ignored, never silently skip them.
 
 use std::{path::PathBuf, sync::OnceLock};
 use yomoku_analysis::{Analyzer, DICTIONARY_REVISION, ENGINE_REVISION};
@@ -243,9 +245,8 @@ fn real_snapshots_persist_all_modes_and_reopen_without_source_changes() {
     let path = directory.join("analysis.sqlite3");
     let mut storage = Storage::open(&path).unwrap();
     let text = "国家公務員。\r\nｶﾞｯﾂﾎﾟｰｽﾞと𰻞📖\0猫";
-    let document = storage
-        .create_paste(&PasteText::new(text.into()).unwrap())
-        .unwrap();
+    let document =
+        storage_fixture::unanalyzed(&mut storage, &path, &PasteText::new(text.into()).unwrap());
     let mut saved = Vec::new();
     for mode in [SplitMode::A, SplitMode::C, SplitMode::B] {
         let result = analyzer().analyze_mode(&document.chapter, mode).unwrap();
@@ -408,11 +409,15 @@ fn real_mode_c_import_and_completion_preserve_surfaces_and_duplicate_identity() 
     // halfwidth/rare-kanji forms, without changing import state.
     let before_lookup = std::fs::read(&path).unwrap();
     let lookup = storage
-        .load_reader_tokens(imported.document.document_id, page)
+        .load_effective_reader_tokens(imported.document.document_id, page)
         .unwrap()
         .unwrap();
     assert_eq!(
-        lookup.analysis,
+        lookup
+            .segmentation
+            .as_ref()
+            .map(|s| s.original_analysis_id)
+            .map_or(ReaderAnalysis::Missing, ReaderAnalysis::Available),
         ReaderAnalysis::Available(imported.analysis_id)
     );
     let japanese: Vec<_> = expected
@@ -423,12 +428,19 @@ fn real_mode_c_import_and_completion_preserve_surfaces_and_duplicate_identity() 
         .collect();
     assert_eq!(lookup.tokens.len(), japanese.len());
     for (actual, (index, token)) in lookup.tokens.iter().zip(japanese) {
-        assert_eq!(actual.token_index, index as u64);
+        assert_eq!(actual.segment_index, index as u64);
         assert_eq!(actual.anchor, token.anchor);
         assert_eq!(actual.surface, token.surface);
-        assert_eq!(actual.reading, token.reading);
         assert_eq!(
-            actual.dictionary_form.as_deref(),
+            actual.metadata.as_ref().and_then(|m| m.reading.clone()),
+            token.reading
+        );
+        assert_eq!(
+            actual
+                .metadata
+                .as_ref()
+                .and_then(|m| m.dictionary_form.as_ref().map(|s| s.as_str().to_owned()))
+                .as_deref(),
             token.dictionary_form.as_ref().map(Surface::as_str)
         );
         assert_eq!(
@@ -480,7 +492,7 @@ fn real_mode_c_import_and_completion_preserve_surfaces_and_duplicate_identity() 
         .unwrap();
     let before_lookup = std::fs::read(&path).unwrap();
     let lookup = storage
-        .load_reader_tokens(imported.document.document_id, page)
+        .load_effective_reader_tokens(imported.document.document_id, page)
         .unwrap()
         .unwrap();
     assert!(lookup
@@ -494,7 +506,7 @@ fn real_mode_c_import_and_completion_preserve_surfaces_and_duplicate_identity() 
     );
     assert_eq!(std::fs::read(&path).unwrap(), before_lookup);
     storage
-        .save_reading_position(imported.document.document_id, departing_position)
+        .save_document_reading_position(imported.document.document_id, departing_position)
         .unwrap();
     let reread = PageCompletion {
         command_id: storage.new_completion_command_id().unwrap(),
@@ -578,11 +590,15 @@ fn real_txt_import_analyzes_only_canonical_text_and_completes_with_original_anch
     let pages = LogicalPages::new(std::slice::from_ref(&document.chapter), page_length).unwrap();
     let page = pages.pages()[0];
     let tokens = storage
-        .load_reader_tokens(document.document_id, page)
+        .load_effective_reader_tokens(document.document_id, page)
         .unwrap()
         .unwrap();
     assert_eq!(
-        tokens.analysis,
+        tokens
+            .segmentation
+            .as_ref()
+            .map(|s| s.original_analysis_id)
+            .map_or(ReaderAnalysis::Missing, ReaderAnalysis::Available),
         ReaderAnalysis::Available(imported.analysis_id)
     );
     assert_eq!(
@@ -645,7 +661,7 @@ fn real_txt_import_analyzes_only_canonical_text_and_completes_with_original_anch
     );
     assert_eq!(
         storage
-            .open_reader_snapshot(document.document_id)
+            .open_document_reader_snapshot(document.document_id)
             .unwrap()
             .unwrap()
             .document
@@ -728,11 +744,15 @@ fn real_srt_import_analyzes_only_canonical_text_and_completes_with_original_anch
     let pages = LogicalPages::new(std::slice::from_ref(&document.chapter), page_length).unwrap();
     let page = pages.pages()[0];
     let tokens = storage
-        .load_reader_tokens(document.document_id, page)
+        .load_effective_reader_tokens(document.document_id, page)
         .unwrap()
         .unwrap();
     assert_eq!(
-        tokens.analysis,
+        tokens
+            .segmentation
+            .as_ref()
+            .map(|s| s.original_analysis_id)
+            .map_or(ReaderAnalysis::Missing, ReaderAnalysis::Available),
         ReaderAnalysis::Available(imported.analysis_id)
     );
     assert_eq!(
@@ -795,7 +815,7 @@ fn real_srt_import_analyzes_only_canonical_text_and_completes_with_original_anch
     );
     assert_eq!(
         storage
-            .open_reader_snapshot(document.document_id)
+            .open_document_reader_snapshot(document.document_id)
             .unwrap()
             .unwrap()
             .document
@@ -936,11 +956,15 @@ fn real_epub_import_analyzes_every_canonical_chapter_and_reopens_without_rescan(
         assert_eq!(page.page_number, index as u64 + 1);
         assert_eq!(page.total_pages, 2);
         let tokens = storage
-            .load_reader_tokens(id, page.anchor)
+            .load_effective_reader_tokens(id, page.anchor)
             .unwrap()
             .unwrap();
         assert_eq!(
-            tokens.analysis,
+            tokens
+                .segmentation
+                .as_ref()
+                .map(|s| s.original_analysis_id)
+                .map_or(ReaderAnalysis::Missing, ReaderAnalysis::Available),
             ReaderAnalysis::Available(imported.analysis_ids[index])
         );
         assert_eq!(

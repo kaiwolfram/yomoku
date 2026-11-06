@@ -65,7 +65,7 @@ impl Storage {
     /// Atomically deduplicate exact pasted UTF-8 bytes before analyzing a new
     /// document. The callback is never invoked for an existing document.
     /// Hashes are committed atomically with every new paste.
-    /// Like create_analyzed_paste, this must run on a worker with a ready analyzer.
+    /// Run on a worker with a ready analyzer.
     pub fn import_analyzed_paste<E>(
         &mut self,
         text: &PasteText,
@@ -104,31 +104,6 @@ impl Storage {
         };
         transaction.commit().map_err(StorageError::from)?;
         Ok(outcome)
-    }
-
-    /// Allocate canonical source/chapter IDs, analyze, then commit text, a Mode C
-    /// snapshot and unique Japanese registrations together. Run on an I/O worker.
-    /// The callback must reuse an already loaded analyzer; it runs while holding
-    /// the write transaction and must not perform database work or publish IDs.
-    /// Any error rolls back the whole import, including newly allocated IDs.
-    /// This repository entry point does not deduplicate documents or start reading.
-    pub fn create_analyzed_paste<E>(
-        &mut self,
-        text: &PasteText,
-        registered_at_unix_ms: i64,
-        analyze: impl FnOnce(&ChapterText) -> Result<ChapterAnalysis, E>,
-    ) -> Result<AnalyzedPaste, PasteImportError<E>> {
-        if registered_at_unix_ms < 0 {
-            return Err(StorageError::InvalidVocabulary.into());
-        }
-        let transaction = self
-            .connection
-            .transaction_with_behavior(TransactionBehavior::Immediate)
-            .map_err(StorageError::from)?;
-        let imported =
-            create_analyzed_paste_in(&transaction, text, registered_at_unix_ms, analyze)?;
-        transaction.commit().map_err(StorageError::from)?;
-        Ok(imported)
     }
 }
 

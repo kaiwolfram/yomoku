@@ -380,7 +380,7 @@ fn backup_candidate_checks_compact_reservation_provenance_occurrences_and_shape(
         let database = TestDatabase::new();
         let mut storage = Storage::open(database.path()).unwrap();
         let imported = storage
-            .create_analyzed_paste(
+            .analyzed_fixture(
                 &PasteText::new("猫 犬".into()).unwrap(),
                 0,
                 imports::fixture,

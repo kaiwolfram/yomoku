@@ -35,7 +35,7 @@ fn backup_candidate_controls_reject_malformed_or_missing_allocation_counters() {
         let database = TestDatabase::new();
         let mut storage = Storage::open(database.path()).unwrap();
         storage
-            .create_paste(&PasteText::new("本文".into()).unwrap())
+            .unanalyzed_fixture(&PasteText::new("本文".into()).unwrap())
             .unwrap();
         storage.connection.execute_batch(sql).unwrap();
         check_rejected(&database, 1, CandidateError::InvalidData);
@@ -49,7 +49,7 @@ fn backup_candidate_controls_reject_library_clock_regression_and_tied_ordinals()
         let mut storage = Storage::open(database.path()).unwrap();
         for title in ["一", "二"] {
             storage
-                .create_paste(&PasteText::new(title.into()).unwrap())
+                .unanalyzed_fixture(&PasteText::new(title.into()).unwrap())
                 .unwrap();
         }
         storage.connection.execute_batch(if duplicate {

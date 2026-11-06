@@ -11,7 +11,7 @@ const MAR_31: i64 = 1_711_843_200_000;
 
 fn import(storage: &mut Storage, text: &str) -> AnalyzedPaste {
     storage
-        .create_analyzed_paste(&PasteText::new(text.into()).unwrap(), 100, |chapter| {
+        .analyzed_fixture(&PasteText::new(text.into()).unwrap(), 100, |chapter| {
             let mut analysis = fixture(chapter).unwrap();
             for token in &mut analysis.tokens {
                 if token.is_japanese {
@@ -173,7 +173,7 @@ fn deletions_recalculate_buckets_without_rescanning_and_fresh_generations_start_
     assert_eq!(erased.opening.statuses.known, 1);
 
     let reimported = storage
-        .create_analyzed_paste(&PasteText::new("猫 猫 犬".into()).unwrap(), MAR_31, fixture)
+        .analyzed_fixture(&PasteText::new("猫 猫 犬".into()).unwrap(), MAR_31, fixture)
         .unwrap();
     let fresh = buckets(&mut storage, LastMonth);
     assert_eq!(fresh.opening, erased.opening);

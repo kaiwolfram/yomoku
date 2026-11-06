@@ -7,7 +7,7 @@ fn every_preset_is_global_durable_and_does_not_change_documents_or_positions() {
     let database = TestDatabase::new();
     let mut storage = Storage::open(database.path()).unwrap();
     let document = storage
-        .create_paste(&PasteText::new("𠮷本文".into()).unwrap())
+        .unanalyzed_fixture(&PasteText::new("𠮷本文".into()).unwrap())
         .unwrap();
     let position = yomoku_core::pagination::ReadingPosition {
         source_id: document.chapter.source_id,
@@ -15,7 +15,8 @@ fn every_preset_is_global_durable_and_does_not_change_documents_or_positions() {
         offset: yomoku_core::document::TextOffset::at(&document.chapter.text, 4).unwrap(),
     };
     let expected = storage
-        .save_reading_position(document.document_id, position)
+        .save_document_reading_position(document.document_id, position)
+        .map(|value| value.map(crate::tests::as_paste))
         .unwrap();
     for length in PageLength::ALL {
         assert_eq!(storage.save_page_length(length).unwrap(), length);
@@ -77,7 +78,7 @@ fn all_typography_preferences_persist_without_changing_logical_pages_or_document
     let database = TestDatabase::new();
     let mut storage = Storage::open(database.path()).unwrap();
     let document = storage
-        .create_paste(&PasteText::new("𠮷本文。\n".repeat(300)).unwrap())
+        .unanalyzed_fixture(&PasteText::new("𠮷本文。\n".repeat(300)).unwrap())
         .unwrap();
     let before = storage
         .load_document_reader_snapshot(document.document_id)

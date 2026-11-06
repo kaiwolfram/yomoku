@@ -83,7 +83,8 @@ fn duplicate_reopens_existing_title_position_status_and_analysis_without_writes(
         offset: TextOffset::at(input.as_str(), "猫 犬".len()).unwrap(),
     };
     let expected = storage
-        .save_reading_position(imported.document.document_id, position)
+        .save_document_reading_position(imported.document.document_id, position)
+        .map(|value| value.map(crate::tests::as_paste))
         .unwrap()
         .unwrap();
     let before = state(&storage);
@@ -220,7 +221,7 @@ fn analyzer_validation_and_indexing_errors_leave_previous_imports_intact() {
             .import_analyzed_paste(&text("猫"), 10, fixture)
             .unwrap(),
     );
-    storage.create_paste(&text("既存")).unwrap();
+    storage.unanalyzed_fixture(&text("既存")).unwrap();
     let before = state(&storage);
     let error = storage.import_analyzed_paste(&text("犬"), 20, |_| Err("typed failure"));
     assert!(matches!(

@@ -66,7 +66,7 @@ fn document_deletion_cleans_all_file_formats_chapters_assets_and_live_dedup_only
         let mut storage = Storage::open(database.path()).unwrap();
         let id = import_file(&mut storage, kind);
         let survivor = storage
-            .create_paste(&PasteText::new("残る本文".into()).unwrap())
+            .unanalyzed_fixture(&PasteText::new("残る本文".into()).unwrap())
             .unwrap();
         let original = storage.load_document_reader_snapshot(id).unwrap().unwrap();
         let provenance = rows(&storage, "sources");

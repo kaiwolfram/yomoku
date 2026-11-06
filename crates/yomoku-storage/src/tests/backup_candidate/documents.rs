@@ -167,13 +167,13 @@ fn backup_candidate_documents_preserve_renames_literal_text_and_deleted_sources(
     let mut storage = Storage::open(database.path()).unwrap();
     let literal = "\n　か\u{3099}𠮷\0<&>\r\n ";
     let document = storage
-        .create_paste(&PasteText::new(literal.into()).unwrap())
+        .unanalyzed_fixture(&PasteText::new(literal.into()).unwrap())
         .unwrap();
     storage
         .rename_document(document.document_id, " renamed\0 title ")
         .unwrap();
     let erased = storage
-        .create_paste(&PasteText::new("erased".into()).unwrap())
+        .unanalyzed_fixture(&PasteText::new("erased".into()).unwrap())
         .unwrap();
     storage.delete_document(erased.document_id).unwrap();
     // Retained multi-chapter EPUB provenance needs no live text/format records.
@@ -222,7 +222,7 @@ fn backup_candidate_documents_preserve_full_i64_identities() {
                 .unwrap();
         }
         let document = storage
-            .create_paste(&PasteText::new("𠮷".into()).unwrap())
+            .unanalyzed_fixture(&PasteText::new("𠮷".into()).unwrap())
             .unwrap();
         assert_eq!(i64::from(document.document_id), id);
         assert_eq!(i64::from(document.chapter.source_id), id);

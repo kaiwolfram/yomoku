@@ -8,7 +8,9 @@ fn setup() -> (TestDatabase, Storage) {
     migrate(&mut connection, MIGRATIONS).unwrap();
     let mut storage = Storage { connection };
     let document = storage
-        .create_paste(&PasteText::new(" \n猫 𠮷 か\u{3099} English 。 📖 \0\r\n　".into()).unwrap())
+        .unanalyzed_fixture(
+            &PasteText::new(" \n猫 𠮷 か\u{3099} English 。 📖 \0\r\n　".into()).unwrap(),
+        )
         .unwrap();
     let analysis = super::super::imports::fixture(&document.chapter).unwrap();
     storage
@@ -115,7 +117,7 @@ fn backup_candidate_analyses_preserve_every_populated_prefix_all_modes_and_liter
                 .unwrap();
         }
         storage
-            .create_paste(&PasteText::new("legacy without analysis".into()).unwrap())
+            .unanalyzed_fixture(&PasteText::new("legacy without analysis".into()).unwrap())
             .unwrap();
         let before = fs::read(database.path()).unwrap();
         let expected = super::super::backup_snapshot::state(&storage.connection);

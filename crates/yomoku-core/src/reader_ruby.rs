@@ -3,7 +3,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::document::{ChapterId, ChapterText, InvalidTextValue, TextOffset, TextRange};
-use crate::reader::{ReaderAnalysis, ReaderPage, ReaderTokenKey, ReaderTokenSnapshot};
+use crate::reader::ReaderPage;
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
@@ -94,55 +94,6 @@ impl ReaderChapterRuby {
                 })
             })
             .collect()
-    }
-}
-
-impl ReaderPage {
-    /// Source bases own every overlapping analyzer token. Never guess how to
-    /// divide an analyzer reading around source ruby or across a logical page.
-    /// Missing, stale or malformed analyzer snapshots leave source ruby usable.
-    pub fn furigana(
-        &self,
-        analysis: ReaderAnalysis,
-        snapshot: Option<&ReaderTokenSnapshot>,
-    ) -> Result<Vec<ReaderRuby>, InvalidTextValue> {
-        validate_ruby(&self.text, &self.source_ruby)?;
-        let Some(snapshot) = snapshot.filter(|snapshot| self.valid_ruby_tokens(analysis, snapshot))
-        else {
-            return Ok(self.source_ruby.clone());
-        };
-        Ok(source_preferred_ruby(
-            &self.source_ruby,
-            snapshot.tokens.iter().filter_map(|token| {
-                token.reading.as_ref().map(|reading| ReaderRuby {
-                    range: token.display_range,
-                    reading: reading.clone(),
-                })
-            }),
-        ))
-    }
-
-    fn valid_ruby_tokens(&self, analysis: ReaderAnalysis, snapshot: &ReaderTokenSnapshot) -> bool {
-        let key = ReaderTokenKey {
-            document_id: self.document_id,
-            page: self.anchor,
-            analysis,
-        };
-        if snapshot.key() != key
-            || (analysis == ReaderAnalysis::Missing && !snapshot.tokens.is_empty())
-        {
-            return false;
-        }
-        valid_page_tokens(
-            self,
-            snapshot.tokens.iter().map(|token| RubyToken {
-                index: token.token_index,
-                anchor: token.anchor,
-                display_range: token.display_range,
-                surface: &token.surface,
-                reading: token.reading.as_deref(),
-            }),
-        )
     }
 }
 

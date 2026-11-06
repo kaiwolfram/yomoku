@@ -7,18 +7,16 @@ use rusqlite::Connection;
 use yomoku_core::{
     dictionary::DictionaryCandidates,
     effective_reader::{EffectiveReaderToken, EffectiveReaderTokenKey, EffectiveReaderWordDetails},
-    reader::{ReaderToken, ReaderTokenKey, ReaderVocabulary},
+    reader::ReaderVocabulary,
 };
 
 use crate::{
     dictionary::{Dictionary, DictionaryError},
-    reader_tokens::{load_effective_reader_tokens_in, load_reader_tokens_in},
+    reader_tokens::load_effective_reader_tokens_in,
     Storage, StorageError,
 };
 
 const COUNT_SQL: &str = "SELECT COUNT(*) FROM reading_occurrences WHERE vocabulary_id = ?1";
-
-pub use yomoku_core::reader::ReaderWordDetails;
 
 #[derive(Debug)]
 pub enum ReaderWordError {
@@ -61,42 +59,6 @@ impl From<DictionaryError> for ReaderWordError {
 }
 
 impl Storage {
-    /// Resolve a selected original Mode C token, live status and lifetime count
-    /// from one consistent user-state read transaction. Surface/base forms come
-    /// from validated stored analysis, never from caller-supplied text. Includes
-    /// crossing-page fragments under their full original token identity.
-    ///
-    /// None means the document was deleted. Missing/stale analysis or a token
-    /// outside the supplied page is InvalidSelection. Dictionary failures fail
-    /// the entire lookup and are distinguishable from successful empty matches.
-    /// No analyzer loading, registration, status, position or encounter writes.
-    pub fn load_reader_word(
-        &mut self,
-        dictionary: &Dictionary,
-        key: ReaderTokenKey,
-        token_index: u64,
-    ) -> Result<Option<ReaderWordDetails>, ReaderWordError> {
-        let transaction = self.connection.transaction().map_err(StorageError::from)?;
-        let Some(token) = selected_token_in(&transaction, key, token_index)? else {
-            return Ok(None);
-        };
-        let (encountered, candidates) = word_details_in(
-            &transaction,
-            dictionary,
-            &token.surface,
-            token.dictionary_form.as_deref(),
-            token.vocabulary,
-            &[],
-        )?;
-        transaction.commit().map_err(StorageError::from)?;
-        Ok(Some(ReaderWordDetails {
-            key,
-            token,
-            encountered,
-            candidates,
-        }))
-    }
-
     /// Read a currently resolved effective Japanese segment. The whole frozen
     /// resolution is compared before using its index, so metadata changes cannot
     /// silently select a different word.
@@ -157,25 +119,6 @@ pub(crate) fn selected_effective_token_in(
         .tokens
         .into_iter()
         .find(|token| token.segment_index == segment_index)
-        .map(Some)
-        .ok_or(ReaderWordError::InvalidSelection)
-}
-
-pub(crate) fn selected_token_in(
-    connection: &Connection,
-    key: ReaderTokenKey,
-    token_index: u64,
-) -> Result<Option<ReaderToken>, ReaderWordError> {
-    let Some(snapshot) = load_reader_tokens_in(connection, key.document_id, key.page)? else {
-        return Ok(None);
-    };
-    if snapshot.key() != key {
-        return Err(ReaderWordError::InvalidSelection);
-    }
-    snapshot
-        .tokens
-        .into_iter()
-        .find(|token| token.token_index == token_index)
         .map(Some)
         .ok_or(ReaderWordError::InvalidSelection)
 }

@@ -171,7 +171,11 @@ fn seed(storage: &mut Storage, config: &Config) {
         .collect::<Vec<_>>()
         .join(" ");
     let imported = storage
-        .create_analyzed_paste(&PasteText::new(text).unwrap(), DATE, analysis)
+        .import_analyzed_paste(&PasteText::new(text).unwrap(), DATE, analysis)
+        .map(|outcome| match outcome {
+            yomoku_storage::PasteImportOutcome::Created(value) => value,
+            _ => panic!("expected fresh import"),
+        })
         .unwrap();
     let snapshot = storage
         .load_document_reader_snapshot(imported.document.document_id)

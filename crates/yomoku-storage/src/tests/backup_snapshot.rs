@@ -100,7 +100,7 @@ const HIGH_WATER: i64 = 9_007_199_254_740_993;
 
 pub(super) fn populate(storage: &mut Storage) {
     let deleted = storage
-        .create_analyzed_paste(&PasteText::new("猫 猫 犬 𠮷".into()).unwrap(), 100, fixture)
+        .analyzed_fixture(&PasteText::new("猫 猫 犬 𠮷".into()).unwrap(), 100, fixture)
         .unwrap();
     let _chapter = &deleted.document.chapter;
 
@@ -126,7 +126,8 @@ pub(super) fn populate(storage: &mut Storage) {
         offset: TextOffset::START,
     };
     storage
-        .save_reading_position(live.document.document_id, position)
+        .save_document_reading_position(live.document.document_id, position)
+        .map(|value| value.map(crate::tests::as_paste))
         .unwrap();
 
     // Leave an unfinished frozen reservation too; backups must not replay it.
@@ -250,7 +251,7 @@ fn full_state_encrypted_round_trip_preserves_every_table_and_remains_usable() {
     assert_eq!(restored.lifetime_reading_totals().unwrap(), totals);
     assert_eq!(restored.vocabulary_status_timeline().unwrap(), timeline);
     let imported = restored
-        .create_analyzed_paste(
+        .analyzed_fixture(
             &PasteText::new("復元後の新規語".into()).unwrap(),
             2000,
             fixture,
@@ -284,7 +285,7 @@ fn compact_snapshot_removes_deleted_free_page_content_and_leaves_source_untouche
         .unwrap();
     let marker = "deleted-body-marker-927c929a";
     let document = storage
-        .create_paste(&PasteText::new(format!("削除本文\n{}", marker.repeat(10000))).unwrap())
+        .unanalyzed_fixture(&PasteText::new(format!("削除本文\n{}", marker.repeat(10000))).unwrap())
         .unwrap();
     storage.delete_document(document.document_id).unwrap();
     let before = fs::read(database.path()).unwrap();
@@ -315,7 +316,7 @@ fn wal_snapshot_includes_committed_wal_and_excludes_uncommitted_work() {
         .execute_batch("PRAGMA journal_mode = WAL; PRAGMA wal_autocheckpoint = 0")
         .unwrap();
     let committed = storage
-        .create_paste(&PasteText::new("WALの本文𠮷".into()).unwrap())
+        .unanalyzed_fixture(&PasteText::new("WALの本文𠮷".into()).unwrap())
         .unwrap();
     let writer = Connection::open(database.path()).unwrap();
     writer.execute_batch("BEGIN IMMEDIATE; UPDATE documents SET title = 'uncommitted'; UPDATE reader_settings SET page_length = 250").unwrap();
@@ -499,7 +500,7 @@ fn bad_password_tampering_and_output_failure_leave_live_database_intact() {
     let database = TestDatabase::new();
     let mut storage = Storage::open(database.path()).unwrap();
     storage
-        .create_paste(&PasteText::new("保護される本文".repeat(30000)).unwrap())
+        .unanalyzed_fixture(&PasteText::new("保護される本文".repeat(30000)).unwrap())
         .unwrap();
     let before = fs::read(database.path()).unwrap();
     let directory = database.0.join("snapshot");

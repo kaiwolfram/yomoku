@@ -1,5 +1,7 @@
-//! Exercise the activation candidate through serialized shell events/views, not
-//! direct Core updates. Native requests/results still stay inside the FIFO.
+#[path = "../../../tests/support/storage.rs"]
+mod storage_fixture;
+// Exercise the activation candidate through serialized shell events/views, not
+// direct Core updates. Native requests/results still stay inside the FIFO.
 use crux_core::bridge::{BincodeFfiFormat, FfiFormat, Request};
 use rusqlite::Connection;
 use std::{
@@ -75,11 +77,15 @@ impl Fixture {
         std::fs::create_dir(&directory).unwrap();
         let id = Storage::open(directory.join("user.sqlite3"))
             .unwrap()
-            .create_analyzed_paste(
+            .import_analyzed_paste(
                 &PasteText::new("東京 東京 ヌヌ𠮷か\u{3099}\0".into()).unwrap(),
                 100,
                 analysis,
             )
+            .map(|outcome| match outcome {
+                yomoku_storage::PasteImportOutcome::Created(value) => value,
+                _ => panic!("expected fresh import"),
+            })
             .unwrap()
             .document
             .document_id;
@@ -206,10 +212,11 @@ impl Harness {
 #[test]
 fn serialized_missing_analysis_and_legacy_commands_fail_closed() {
     let f = Fixture::new();
-    let missing = Storage::open(f.path())
-        .unwrap()
-        .create_paste(&PasteText::new("未解析".into()).unwrap())
-        .unwrap();
+    let missing = storage_fixture::unanalyzed(
+        &mut Storage::open(f.path()).unwrap(),
+        f.path(),
+        &PasteText::new("未解析".into()).unwrap(),
+    );
     let h = f.bridge();
     let loaded = h.load(missing.document_id);
     let page = loaded.effective_reader_tokens.as_ref().unwrap();

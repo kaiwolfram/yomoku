@@ -12,7 +12,7 @@ type OccurrenceColumns = (i64, String, i64, i64, Option<String>, Option<String>)
 
 fn create_import(storage: &mut Storage, text: &str) -> AnalyzedPaste {
     storage
-        .create_analyzed_paste(&PasteText::new(text.into()).unwrap(), 100, analyze)
+        .analyzed_fixture(&PasteText::new(text.into()).unwrap(), 100, analyze)
         .unwrap()
 }
 
@@ -64,7 +64,7 @@ fn repetitions_exact_surfaces_all_statuses_and_metadata_commit_with_position() {
     let database = TestDatabase::new();
     let mut storage = Storage::open(database.path()).unwrap();
     let imported = storage
-        .create_analyzed_paste(
+        .analyzed_fixture(
             &PasteText::new("猫 猫 食べた 食べる 𠮷 が か\u{3099} English 。 📖 \0".into())
                 .unwrap(),
             100,
@@ -159,10 +159,11 @@ fn replay_after_reopen_reflow_and_reread_never_moves_progress() {
         .record_analyzed_page_completion(first, imported.analysis_id)
         .unwrap();
     storage
-        .save_reading_position(
+        .save_document_reading_position(
             imported.document.document_id,
             position(&imported.document, 0),
         )
+        .map(|value| value.map(crate::tests::as_paste))
         .unwrap();
     let saved = storage.load_paste(imported.document.document_id).unwrap();
     let before = totals(&storage);
@@ -270,7 +271,7 @@ fn every_write_and_deferred_commit_failure_roll_back_all_completion_effects() {
         // Exercise recreation of a deleted vocabulary entry only on actual reading.
         storage.connection.execute("DELETE FROM vocabulary WHERE surface = '𠮷'", []).unwrap();
         if stage == "position update" {
-            storage.save_reading_position(imported.document.document_id, position(&imported.document, 0)).unwrap();
+            storage.save_document_reading_position(imported.document.document_id, position(&imported.document, 0)).map(|value| value.map(crate::tests::as_paste)).unwrap();
         }
         let completion = command(&mut storage, &imported.document);
         let before = totals(&storage);
@@ -439,7 +440,8 @@ fn preparation_freezes_all_page_buckets_and_reserves_only_after_successful_valid
     let document = &imported.document;
     let second = position(document, "猫 ".len());
     storage
-        .save_reading_position(document.document_id, second)
+        .save_document_reading_position(document.document_id, second)
+        .map(|value| value.map(crate::tests::as_paste))
         .unwrap();
 
     let pages = LogicalPages::new(

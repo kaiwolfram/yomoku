@@ -17,12 +17,6 @@ pub struct ResolvedSegment {
     pub original_token_index: Option<usize>,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
-pub struct ChapterSegmentation {
-    pub original_analysis_id: AnalysisId,
-    pub segments: Vec<ResolvedSegment>,
-}
-
 /// Analyzer metadata exists only for an exact span in a validated snapshot.
 /// Its source is retained independently of the rule that selected the boundary.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]

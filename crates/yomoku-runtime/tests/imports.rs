@@ -1,3 +1,5 @@
+#[path = "../../../tests/support/storage.rs"]
+mod storage_fixture;
 use std::{
     path::PathBuf,
     rc::Rc,
@@ -248,15 +250,19 @@ fn drain_trace(trace: &mpsc::Receiver<Trace>) -> Vec<Trace> {
 fn reader_open_restores_stored_identity_and_legacy_missing_without_loading_analyzer() {
     let database = Database::new();
     let mut storage = Storage::open(database.path()).unwrap();
-    let analyzed = storage
-        .create_paste(&PasteText::new("猫 𠮷".into()).unwrap())
-        .unwrap();
+    let analyzed = storage_fixture::unanalyzed(
+        &mut storage,
+        database.path(),
+        &PasteText::new("猫 𠮷".into()).unwrap(),
+    );
     let identity = storage
         .store_chapter_analysis(analyzed.chapter.chapter_id, &fixture(&analyzed.chapter))
         .unwrap();
-    let legacy = storage
-        .create_paste(&PasteText::new("昔の本文".into()).unwrap())
-        .unwrap();
+    let legacy = storage_fixture::unanalyzed(
+        &mut storage,
+        database.path(),
+        &PasteText::new("昔の本文".into()).unwrap(),
+    );
     for _ in 0..2 {
         // fresh worker/session also needs no dictionary
         let Factory { loader, trace, .. } = Factory::new(true, None);
@@ -746,11 +752,11 @@ fn cancel_bypasses_blocked_analysis_retains_completed_files_and_retries_fresh(
     assert_eq!(file_totals(&database.path()), before);
     assert_eq!(
         observer
-            .load_reader_snapshot(first.document_id)
+            .load_document_reader_snapshot(first.document_id)
             .unwrap()
             .unwrap()
             .document,
-        first
+        first.clone().into()
     );
     assert_eq!(
         observer

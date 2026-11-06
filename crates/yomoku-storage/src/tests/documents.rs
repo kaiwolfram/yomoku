@@ -40,7 +40,7 @@ fn persists_exact_paste_title_ids_and_unicode_anchors_across_reopens() {
         "引用'\"; DROP TABLE documents;--\0\n次",
     ] {
         let input = paste(text);
-        let document = storage.create_paste(&input).unwrap();
+        let document = storage.unanalyzed_fixture(&input).unwrap();
         assert_eq!(document.title, input.initial_title());
         assert_eq!(document.chapter.text, text);
         let original_title: String = storage
@@ -84,7 +84,7 @@ fn rolls_back_every_insert_stage_without_changing_existing_documents_or_sequence
     for table in ["sources", "chapters", "documents", "chapter_texts"] {
         let database = TestDatabase::new();
         let mut storage = Storage::open(database.path()).unwrap();
-        let existing = storage.create_paste(&paste("保持\n本文")).unwrap();
+        let existing = storage.unanalyzed_fixture(&paste("保持\n本文")).unwrap();
         let before_sequences = sequences(&storage);
         storage
             .connection
@@ -94,7 +94,7 @@ fn rolls_back_every_insert_stage_without_changing_existing_documents_or_sequence
             ))
             .unwrap();
         assert!(matches!(
-            storage.create_paste(&paste("失敗\n𠮷")),
+            storage.unanalyzed_fixture(&paste("失敗\n𠮷")),
             Err(StorageError::Sqlite(_))
         ));
         assert_eq!(row_counts(&storage), [1; 4]);
@@ -114,7 +114,7 @@ fn rolls_back_every_insert_stage_without_changing_existing_documents_or_sequence
             .connection
             .execute_batch("DROP TRIGGER fail_paste")
             .unwrap();
-        storage.create_paste(&paste("再試行\n本文")).unwrap();
+        storage.unanalyzed_fixture(&paste("再試行\n本文")).unwrap();
         assert_eq!(row_counts(&storage), [2; 4]);
     }
 }
@@ -123,7 +123,7 @@ fn rolls_back_every_insert_stage_without_changing_existing_documents_or_sequence
 fn commit_failure_also_rolls_back_all_content_and_id_allocations() {
     let database = TestDatabase::new();
     let mut storage = Storage::open(database.path()).unwrap();
-    let existing = storage.create_paste(&paste("保存済み")).unwrap();
+    let existing = storage.unanalyzed_fixture(&paste("保存済み")).unwrap();
     let before_sequences = sequences(&storage);
     storage
         .connection
@@ -136,7 +136,7 @@ fn commit_failure_also_rolls_back_all_content_and_id_allocations() {
         )
         .unwrap();
     assert!(matches!(
-        storage.create_paste(&paste("コミット失敗")),
+        storage.unanalyzed_fixture(&paste("コミット失敗")),
         Err(StorageError::Sqlite(_))
     ));
     assert_eq!(row_counts(&storage), [1; 4]);
@@ -159,7 +159,7 @@ fn commit_failure_also_rolls_back_all_content_and_id_allocations() {
         .connection
         .execute_batch("DROP TRIGGER fail_commit")
         .unwrap();
-    storage.create_paste(&paste("再試行")).unwrap();
+    storage.unanalyzed_fixture(&paste("再試行")).unwrap();
     assert_eq!(row_counts(&storage), [2; 4]);
 }
 
@@ -167,7 +167,9 @@ fn commit_failure_also_rolls_back_all_content_and_id_allocations() {
 fn deleted_committed_ids_are_not_reused_after_reopening() {
     let database = TestDatabase::new();
     let mut storage = Storage::open(database.path()).unwrap();
-    let deleted = storage.create_paste(&paste("削除される本文")).unwrap();
+    let deleted = storage
+        .unanalyzed_fixture(&paste("削除される本文"))
+        .unwrap();
     // Simulate later deletion: remove live content/entry, retain anchor provenance.
     storage
         .connection
@@ -177,7 +179,9 @@ fn deleted_committed_ids_are_not_reused_after_reopening() {
     assert_eq!(storage.load_paste(deleted.document_id).unwrap(), None);
     drop(storage);
     let mut storage = Storage::open(database.path()).unwrap();
-    let reimported = storage.create_paste(&paste("削除される本文")).unwrap();
+    let reimported = storage
+        .unanalyzed_fixture(&paste("削除される本文"))
+        .unwrap();
     assert!(reimported.document_id > deleted.document_id);
     assert!(reimported.chapter.source_id > deleted.chapter.source_id);
     assert!(reimported.chapter.chapter_id > deleted.chapter.chapter_id);
@@ -201,7 +205,7 @@ fn deleted_committed_ids_are_not_reused_after_reopening() {
         .unwrap();
     drop(storage);
     let mut storage = Storage::open(database.path()).unwrap();
-    let next = storage.create_paste(&paste("新しい本文")).unwrap();
+    let next = storage.unanalyzed_fixture(&paste("新しい本文")).unwrap();
     assert!(next.document_id > reimported.document_id);
     assert!(next.chapter.source_id > reimported.chapter.source_id);
     assert!(next.chapter.chapter_id > reimported.chapter.chapter_id);
@@ -217,7 +221,7 @@ fn missing_document_is_distinct_from_missing_or_invalid_canonical_content() {
             .unwrap(),
         None
     );
-    let document = storage.create_paste(&paste("本文")).unwrap();
+    let document = storage.unanalyzed_fixture(&paste("本文")).unwrap();
     storage
         .connection
         .execute("UPDATE chapter_texts SET text = '  '", [])
@@ -240,7 +244,9 @@ fn missing_document_is_distinct_from_missing_or_invalid_canonical_content() {
 fn live_title_is_separate_from_canonical_text_and_historical_title() {
     let database = TestDatabase::new();
     let mut storage = Storage::open(database.path()).unwrap();
-    let document = storage.create_paste(&paste("元の題名\n本文")).unwrap();
+    let document = storage
+        .unanalyzed_fixture(&paste("元の題名\n本文"))
+        .unwrap();
     assert!(storage
         .rename_document(document.document_id, "新しい題名")
         .unwrap());
@@ -267,7 +273,7 @@ fn concurrent_pastes_allocate_distinct_complete_documents() {
                     let mut storage = Storage::open(path).unwrap();
                     barrier.wait();
                     storage
-                        .create_paste(&paste(&format!("題名{index}\n𠮷")))
+                        .unanalyzed_fixture(&paste(&format!("題名{index}\n𠮷")))
                         .unwrap()
                 })
             })
@@ -319,7 +325,7 @@ fn each_identity_uses_its_own_full_width_sqlite_allocation() {
          ('sources', 9007199254740992), ('chapters', 9223372036854775806), ('documents', 41);",
         )
         .unwrap();
-    let document = storage.create_paste(&paste("大きなID𠮷")).unwrap();
+    let document = storage.unanalyzed_fixture(&paste("大きなID𠮷")).unwrap();
     assert_eq!(i64::from(document.document_id), 42);
     assert_eq!(i64::from(document.chapter.source_id), (1 << 53) + 1);
     assert_eq!(i64::from(document.chapter.chapter_id), i64::MAX);
@@ -335,7 +341,7 @@ fn each_identity_uses_its_own_full_width_sqlite_allocation() {
 fn exhausted_document_ids_fail_atomically_without_reusing_ids() {
     let database = TestDatabase::new();
     let mut storage = Storage::open(database.path()).unwrap();
-    let existing = storage.create_paste(&paste("最後の保存")).unwrap();
+    let existing = storage.unanalyzed_fixture(&paste("最後の保存")).unwrap();
     storage
         .connection
         .execute(
@@ -345,7 +351,7 @@ fn exhausted_document_ids_fail_atomically_without_reusing_ids() {
         .unwrap();
     let before_sequences = sequences(&storage);
     assert!(matches!(
-        storage.create_paste(&paste("割当失敗")),
+        storage.unanalyzed_fixture(&paste("割当失敗")),
         Err(StorageError::Sqlite(_))
     ));
     assert_eq!(row_counts(&storage), [1; 4]);
@@ -357,7 +363,7 @@ fn exhausted_document_ids_fail_atomically_without_reusing_ids() {
         Some(existing)
     );
     assert!(matches!(
-        storage.create_paste(&paste("再試行")),
+        storage.unanalyzed_fixture(&paste("再試行")),
         Err(StorageError::Sqlite(_))
     ));
     assert_eq!(row_counts(&storage), [1; 4]);

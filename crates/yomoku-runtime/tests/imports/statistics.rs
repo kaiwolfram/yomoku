@@ -11,7 +11,7 @@ const DAY: i64 = 86_400_000;
 fn seed(database: &Database) -> (Storage, yomoku_core::document::DocumentId) {
     let mut storage = Storage::open(database.path()).unwrap();
     let imported = storage
-        .create_analyzed_paste(
+        .import_analyzed_paste(
             &PasteText::new("猫 猫 犬 鳥 魚 𠮷".into()).unwrap(),
             NOW - 400 * DAY,
             |chapter| {
@@ -22,6 +22,10 @@ fn seed(database: &Database) -> (Storage, yomoku_core::document::DocumentId) {
                 Ok::<_, DocumentError>(analysis)
             },
         )
+        .map(|outcome| match outcome {
+            yomoku_storage::PasteImportOutcome::Created(value) => value,
+            _ => panic!("expected fresh import"),
+        })
         .unwrap();
     let id = imported.document.document_id;
     let snapshot = storage.load_document_reader_snapshot(id).unwrap().unwrap();

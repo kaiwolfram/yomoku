@@ -178,7 +178,7 @@ fn single_chapter_adapter_preserves_legacy_projection_and_completion() {
             };
             assert_eq!(
                 ReaderPage::open_document(&document, length).unwrap(),
-                ReaderPage::open(&paste, length).unwrap()
+                ReaderPage::open_document(&(paste.clone().into()), length).unwrap()
             );
             assert_eq!(
                 document.library_summary().unwrap(),

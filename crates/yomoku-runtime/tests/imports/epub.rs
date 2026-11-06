@@ -1,3 +1,5 @@
+#[path = "../../../../tests/support/storage.rs"]
+mod storage_fixture;
 use super::*;
 use yomoku_core::{app::ImportOutcome, imports::EpubImport};
 
@@ -356,10 +358,11 @@ fn cancel_in_later_chapter_discards_earlier_chapter_assets_registrations_and_all
     });
     let (router, lifecycle) = import_router(database.path(), loader).unwrap();
     // Seed a committed file without using this analyzer.
-    Storage::open(database.path())
-        .unwrap()
-        .create_paste(&PasteText::new("prior".into()).unwrap())
-        .unwrap();
+    storage_fixture::unanalyzed(
+        &mut Storage::open(database.path()).unwrap(),
+        database.path(),
+        &PasteText::new("prior".into()).unwrap(),
+    );
     let prior = dispatch(&router, Event::RefreshLibrary).documents;
     let before = counts(&database.path());
     let bytes = epub_fixture::book(true, "<p>犬 𠮷</p>");

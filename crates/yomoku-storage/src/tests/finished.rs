@@ -9,13 +9,13 @@ use super::{positions::position, *};
 
 fn paste(storage: &mut Storage, text: &str) -> PastedDocument {
     storage
-        .create_paste(&PasteText::new(text.to_owned()).unwrap())
+        .unanalyzed_fixture(&PasteText::new(text.to_owned()).unwrap())
         .unwrap()
 }
 
 fn command(storage: &mut Storage, document: &PastedDocument) -> PageCompletion {
     let page_length = storage.page_length().unwrap();
-    let page = ReaderPage::open(document, page_length).unwrap();
+    let page = ReaderPage::open_document(&document.clone().into(), page_length).unwrap();
     PageCompletion {
         command_id: storage.new_completion_command_id().unwrap(),
         document_id: document.document_id,
@@ -45,7 +45,8 @@ fn finished_marker_survives_backward_position_reflow_reopen_and_each_reread() {
     for length in [PageLength::Characters250, PageLength::Characters1500] {
         storage.save_page_length(length).unwrap();
         let previous = storage
-            .save_reading_position(document.document_id, position(&document, 0))
+            .save_document_reading_position(document.document_id, position(&document, 0))
+            .map(|value| value.map(crate::tests::as_paste))
             .unwrap()
             .unwrap();
         assert_eq!(storage.list_documents().unwrap()[0].progress_percent, 0);
@@ -96,10 +97,11 @@ fn position_at_eof_without_completion_never_marks_finished() {
     let mut storage = Storage::open(database.path()).unwrap();
     let document = paste(&mut storage, "猫𠮷\0終");
     storage
-        .save_reading_position(
+        .save_document_reading_position(
             document.document_id,
             position(&document, document.chapter.text.len()),
         )
+        .map(|value| value.map(crate::tests::as_paste))
         .unwrap();
     assert_eq!(storage.list_documents().unwrap()[0].progress_percent, 100);
     assert_eq!(
@@ -225,7 +227,7 @@ fn explicit_finished_open_resets_durably_but_loads_and_completion_reloads_keep_p
     let database = TestDatabase::new();
     let mut storage = Storage::open(database.path()).unwrap();
     let imported = storage
-        .create_analyzed_paste(
+        .analyzed_fixture(
             &PasteText::new(format!("{}\n終𠮷\0", "猫".repeat(1600))).unwrap(),
             1,
             super::imports::fixture,
@@ -234,11 +236,19 @@ fn explicit_finished_open_resets_durably_but_loads_and_completion_reloads_keep_p
     let document = imported.document;
     let id = document.document_id;
     let eof = position(&document, document.chapter.text.len());
-    let unfinished = storage.save_reading_position(id, eof).unwrap().unwrap();
+    let unfinished = storage
+        .save_document_reading_position(id, eof)
+        .map(|value| value.map(crate::tests::as_paste))
+        .unwrap()
+        .unwrap();
     // Position-only EOF must still reopen exactly, without a checkmark.
     assert_eq!(
-        storage.open_reader_snapshot(id).unwrap().unwrap().document,
-        unfinished
+        storage
+            .open_document_reader_snapshot(id)
+            .unwrap()
+            .unwrap()
+            .document,
+        unfinished.clone().into()
     );
     let final_page = command(&mut storage, &unfinished);
     storage.record_page_completion(final_page).unwrap();
@@ -246,8 +256,12 @@ fn explicit_finished_open_resets_durably_but_loads_and_completion_reloads_keep_p
     assert!(completed.finished_at_least_once);
     assert_eq!(completed.reading_position, Some(eof));
     assert_eq!(
-        storage.load_reader_snapshot(id).unwrap().unwrap().document,
-        completed
+        storage
+            .load_document_reader_snapshot(id)
+            .unwrap()
+            .unwrap()
+            .document,
+        completed.clone().into()
     );
     assert!(storage.list_documents().unwrap()[0].finished_at_least_once);
     assert_eq!(storage.list_documents().unwrap()[0].progress_percent, 100);
@@ -257,17 +271,24 @@ fn explicit_finished_open_resets_durably_but_loads_and_completion_reloads_keep_p
         let partial = position(&document, 3);
 
         // A finished reread can save a partial-page position before reopening at page 1.
-        storage.save_reading_position(id, partial).unwrap();
+        storage
+            .save_document_reading_position(id, partial)
+            .map(|value| value.map(crate::tests::as_paste))
+            .unwrap();
 
         let before = storage.load_paste(id).unwrap().unwrap();
         assert_eq!(
-            storage.load_reader_snapshot(id).unwrap().unwrap().document,
-            before
+            storage
+                .load_document_reader_snapshot(id)
+                .unwrap()
+                .unwrap()
+                .document,
+            before.clone().into()
         );
-        let opened = storage.open_reader_snapshot(id).unwrap().unwrap();
+        let opened = storage.open_document_reader_snapshot(id).unwrap().unwrap();
         assert_eq!(opened.page_length, length);
         assert_eq!(
-            opened.analysis,
+            opened.analyses[0].analysis,
             ReaderAnalysis::Available(imported.analysis_id)
         );
         assert_eq!(
@@ -275,12 +296,15 @@ fn explicit_finished_open_resets_durably_but_loads_and_completion_reloads_keep_p
             Some(position(&document, 0))
         );
         assert!(opened.document.finished_at_least_once);
-        let page = ReaderPage::open(&opened.document, length).unwrap();
+        let page = ReaderPage::open_document(&opened.document, length).unwrap();
         assert_eq!(page.page_number, 1);
         assert!(page.finished_at_least_once);
         drop(storage);
         storage = Storage::open(database.path()).unwrap();
-        assert_eq!(storage.load_paste(id).unwrap(), Some(opened.document));
+        assert_eq!(
+            storage.load_paste(id).unwrap(),
+            Some(crate::tests::as_paste(opened.document))
+        );
 
         let summary = &storage.list_documents().unwrap()[0];
         assert!(summary.finished_at_least_once);
@@ -300,7 +324,7 @@ fn explicit_finished_open_resets_durably_but_loads_and_completion_reloads_keep_p
         .unwrap();
     assert_eq!(count, 1);
     assert!(storage
-        .open_reader_snapshot(DocumentId::try_from(i64::MAX).unwrap())
+        .open_document_reader_snapshot(DocumentId::try_from(i64::MAX).unwrap())
         .unwrap()
         .is_none());
 }
@@ -316,16 +340,18 @@ fn finished_open_write_or_commit_failure_preserves_snapshot_and_retry_resets_onc
         let document = paste(&mut storage, "猫𠮷\0終");
         let completion = command(&mut storage, &document);
         storage.record_page_completion(completion).unwrap();
-        let before = storage.load_reader_snapshot(document.document_id).unwrap().unwrap();
+        let before = storage.load_document_reader_snapshot(document.document_id).unwrap().unwrap();
         storage.connection.execute_batch(trigger).unwrap();
-        assert!(matches!(storage.open_reader_snapshot(document.document_id), Err(StorageError::Sqlite(_))));
-        assert_eq!(storage.load_reader_snapshot(document.document_id).unwrap(), Some(before));
+        assert!(matches!(storage.open_document_reader_snapshot(document.document_id), Err(StorageError::Sqlite(_))));
+        assert_eq!(storage.load_document_reader_snapshot(document.document_id).unwrap(), Some(before));
         storage.connection.execute_batch("DROP TRIGGER fail_open").unwrap();
-        let opened = storage.open_reader_snapshot(document.document_id).unwrap().unwrap();
+        let opened = storage.open_document_reader_snapshot(document.document_id).unwrap().unwrap();
         assert_eq!(opened.document.reading_position, Some(position(&document, 0)));
         assert!(opened.document.finished_at_least_once);
         // Once at page 1, duplicate opens need no additional position write.
         storage.connection.execute_batch("CREATE TRIGGER fail_open BEFORE INSERT ON reading_positions BEGIN SELECT RAISE(ABORT, 'fixture'); END;").unwrap();
-        assert_eq!(storage.open_reader_snapshot(document.document_id).unwrap(), Some(opened));
+        let reopened = storage.open_document_reader_snapshot(document.document_id).unwrap().unwrap();
+        assert_eq!(reopened.document, opened.document);
+        assert!(reopened.last_read_sequence > opened.last_read_sequence);
     }
 }

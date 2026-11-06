@@ -1,3 +1,5 @@
+#[path = "../../../../tests/support/storage.rs"]
+mod storage_fixture;
 use super::*;
 use yomoku_core::reader::ReaderTokenKey;
 use yomoku_core::{app::ImportOutcome, pagination::ReadingPosition};
@@ -407,9 +409,11 @@ fn corrupt_ordered_reader_load_fails_without_truncation_or_analysis_and_next_rea
     else {
         panic!("new EPUB")
     };
-    let valid = storage
-        .create_paste(&PasteText::new("later 𠮷".into()).unwrap())
-        .unwrap();
+    let valid = storage_fixture::unanalyzed(
+        &mut storage,
+        database.path(),
+        &PasteText::new("later 𠮷".into()).unwrap(),
+    );
     let connection = Connection::open(database.path()).unwrap();
     connection
         .execute(

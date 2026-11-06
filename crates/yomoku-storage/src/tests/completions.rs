@@ -8,7 +8,7 @@ use super::{positions::position, *};
 
 fn fixture(storage: &mut Storage) -> PastedDocument {
     storage
-        .create_paste(
+        .unanalyzed_fixture(
             &PasteText::new(format!(
                 "{}\n{}\n終𠮷\0",
                 "語".repeat(500),
@@ -69,7 +69,8 @@ fn duplicates_count_once_rereads_count_again_and_previous_only_changes_position(
         );
     }
     let previous = storage
-        .save_reading_position(document.document_id, position(&document, 0))
+        .save_document_reading_position(document.document_id, position(&document, 0))
+        .map(|value| value.map(crate::tests::as_paste))
         .unwrap()
         .unwrap();
     assert_eq!(count(&storage), 1);
@@ -117,7 +118,7 @@ fn event_position_and_commit_failures_roll_back_together_and_same_id_can_retry()
         let mut storage = Storage::open(database.path()).unwrap();
         let mut document = fixture(&mut storage);
         if stage == "position update" {
-            document = storage.save_reading_position(document.document_id, position(&document, 3)).unwrap().unwrap();
+            document = storage.save_document_reading_position(document.document_id, position(&document, 3)).map(|value| value.map(crate::tests::as_paste)).unwrap().unwrap();
         }
         let completion = command(&mut storage, &document);
         storage.connection.execute_batch(sql).unwrap();

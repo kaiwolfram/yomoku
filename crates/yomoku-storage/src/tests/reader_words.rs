@@ -4,9 +4,11 @@ use rusqlite::Connection;
 use serde_json::json;
 use yomoku_core::{
     completion::{AnalyzedCompletionOutcome, PageCompletion},
-    document::{DocumentId, PasteText, TextAnchor, TextOffset, TextRange},
+    document::{PasteText, TextAnchor, TextOffset, TextRange},
+    effective_reader::{
+        EffectiveReaderChapter, EffectiveReaderTokenKey, EffectiveReaderWordDetails,
+    },
     pagination::{LogicalPages, PageLength},
-    reader::{ReaderAnalysis, ReaderTokenKey},
     vocabulary::{Surface, VocabularyStatus},
 };
 
@@ -98,14 +100,15 @@ fn epub_selected_word_keeps_chapter_analysis_dictionary_live_status_and_lifetime
         .unwrap()
         .unwrap();
     let page = ReaderPage::open_document(&document, PageLength::default()).unwrap();
-    let key = ReaderTokenKey {
-        document_id: id,
-        page: page.anchor,
-        analysis: ReaderAnalysis::Available(imported.analysis_ids[1]),
-    };
+    let key = storage
+        .load_effective_reader_tokens(id, page.anchor)
+        .unwrap()
+        .unwrap()
+        .key()
+        .unwrap();
     let before = fs::read(database.path()).unwrap();
     let details = storage
-        .load_reader_word(&dictionary, key, 0)
+        .load_effective_reader_word(&dictionary, &key, 0)
         .unwrap()
         .unwrap();
     assert_eq!(details.encountered, 0);
@@ -116,17 +119,6 @@ fn epub_selected_word_keeps_chapter_analysis_dictionary_live_status_and_lifetime
         VocabularyStatus::New
     );
     assert_eq!(fs::read(database.path()).unwrap(), before);
-    assert!(matches!(
-        storage.load_reader_word(
-            &dictionary,
-            ReaderTokenKey {
-                analysis: ReaderAnalysis::Available(imported.analysis_ids[0]),
-                ..key
-            },
-            0
-        ),
-        Err(ReaderWordError::InvalidSelection)
-    ));
     let command = storage
         .prepare_page_completion(PageCompletionIntent {
             document_id: id,
@@ -144,7 +136,7 @@ fn epub_selected_word_keeps_chapter_analysis_dictionary_live_status_and_lifetime
         AnalyzedCompletionOutcome::Recorded { newly_known: 1 }
     );
     let details = storage
-        .load_reader_word(&dictionary, key, 0)
+        .load_effective_reader_word(&dictionary, &key, 0)
         .unwrap()
         .unwrap();
     assert_eq!(details.encountered, 2);
@@ -160,7 +152,7 @@ fn epub_selected_word_keeps_chapter_analysis_dictionary_live_status_and_lifetime
         )
         .unwrap();
     let updated = storage
-        .load_reader_word(&dictionary, key, 1)
+        .load_effective_reader_word(&dictionary, &key, 1)
         .unwrap()
         .unwrap();
     assert_eq!(updated.encountered, 2);
@@ -170,24 +162,37 @@ fn epub_selected_word_keeps_chapter_analysis_dictionary_live_status_and_lifetime
     );
 }
 
+fn word_analysis(
+    chapter: &yomoku_core::document::ChapterText,
+) -> Result<yomoku_core::analysis::ChapterAnalysis, Infallible> {
+    let mut analysis = fixture(chapter)?;
+    for token in &mut analysis.tokens {
+        if token.surface == "試験語だった" {
+            token.reading = Some("シケンゴダッタ".into());
+            token.dictionary_form = Some(Surface::new("試験語").unwrap());
+        }
+    }
+    Ok::<_, Infallible>(analysis)
+}
+
 fn import(storage: &mut Storage, text: &str) -> AnalyzedPaste {
     storage
-        .create_analyzed_paste(&PasteText::new(text.into()).unwrap(), 100, |chapter| {
-            let mut analysis = fixture(chapter)?;
-            for token in &mut analysis.tokens {
-                if token.surface == "試験語だった" {
-                    token.reading = Some("シケンゴダッタ".into());
-                    token.dictionary_form = Some(Surface::new("試験語").unwrap());
-                }
-            }
-            Ok::<_, Infallible>(analysis)
+        .analyzed_fixture(&PasteText::new(text.into()).unwrap(), 100, |chapter| {
+            word_analysis(chapter)
         })
         .unwrap()
 }
 
-fn key(imported: &AnalyzedPaste) -> ReaderTokenKey {
+fn key(imported: &AnalyzedPaste) -> EffectiveReaderTokenKey {
     let chapter = &imported.document.chapter;
-    ReaderTokenKey {
+    EffectiveReaderTokenKey {
+        segmentation: EffectiveReaderChapter::resolve(
+            chapter,
+            imported.analysis_id,
+            &word_analysis(chapter).unwrap(),
+        )
+        .unwrap()
+        .into_segmentation(),
         document_id: imported.document.document_id,
         page: TextAnchor {
             source_id: chapter.source_id,
@@ -197,7 +202,6 @@ fn key(imported: &AnalyzedPaste) -> ReaderTokenKey {
                 end: TextOffset::at(&chapter.text, chapter.text.len()).unwrap(),
             },
         },
-        analysis: ReaderAnalysis::Available(imported.analysis_id),
     }
 }
 
@@ -225,9 +229,9 @@ fn lookup(
     dictionary: &Dictionary,
     imported: &AnalyzedPaste,
     index: u64,
-) -> ReaderWordDetails {
+) -> EffectiveReaderWordDetails {
     storage
-        .load_reader_word(dictionary, key(imported), index)
+        .load_effective_reader_word(dictionary, &key(imported), index)
         .unwrap()
         .unwrap()
 }
@@ -240,10 +244,11 @@ fn read_only_details_keep_all_applicable_word_name_views_and_exact_inflected_ide
     let mut storage = Storage::open(database.path()).unwrap();
     let imported = import(&mut storage, "試験語だった 試験語");
     storage
-        .save_reading_position(
+        .save_document_reading_position(
             imported.document.document_id,
             position(&imported.document, 1 + "試験語だった".len()),
         )
+        .map(|value| value.map(crate::tests::as_paste))
         .unwrap();
     drop(storage);
     let mut storage = Storage::open(database.path()).unwrap();
@@ -255,9 +260,16 @@ fn read_only_details_keep_all_applicable_word_name_views_and_exact_inflected_ide
     let index_before = fs::read(index.path()).unwrap();
     let details = lookup(&mut storage, &dictionary, &imported, 0);
     assert_eq!(details.key, key(&imported));
-    assert_eq!(details.token.token_index, 0);
+    assert_eq!(details.token.segment_index, 0);
     assert_eq!(details.token.surface, "試験語だった");
-    assert_eq!(details.token.reading.as_deref(), Some("シケンゴダッタ"));
+    assert_eq!(
+        details
+            .token
+            .metadata
+            .as_ref()
+            .and_then(|m| m.reading.as_deref()),
+        Some("シケンゴダッタ")
+    );
     assert_eq!(details.encountered, 0);
     assert_eq!(
         details.token.vocabulary.unwrap().status,
@@ -309,7 +321,8 @@ fn counts_include_repetitions_rereads_and_other_documents_but_never_base_forms_o
     assert_eq!(lookup(&mut storage, &dictionary, &second, 0).encountered, 2);
     complete(&mut storage, &second);
     storage
-        .save_reading_position(first.document.document_id, position(&first.document, 0))
+        .save_document_reading_position(first.document.document_id, position(&first.document, 0))
+        .map(|value| value.map(crate::tests::as_paste))
         .unwrap();
     complete(&mut storage, &first);
     drop(storage);
@@ -352,7 +365,7 @@ fn document_deletion_preserves_counts_vocabulary_deletion_erases_them_without_lo
         .id;
     storage.delete_document(first.document.document_id).unwrap();
     assert!(storage
-        .load_reader_word(&dictionary, key(&first), 0)
+        .load_effective_reader_word(&dictionary, &key(&first), 0)
         .unwrap()
         .is_none());
     assert_eq!(lookup(&mut storage, &dictionary, &second, 0).encountered, 2);
@@ -377,89 +390,6 @@ fn document_deletion_preserves_counts_vocabulary_deletion_erases_them_without_lo
     let fresh = lookup(&mut storage, &dictionary, &second, 0);
     assert_ne!(fresh.token.vocabulary.unwrap().id, old_id);
     assert_eq!(fresh.encountered, 1);
-}
-
-#[test]
-fn stale_missing_foreign_non_japanese_and_off_page_selections_are_rejected() {
-    let database = TestDatabase::new();
-    let index = dictionary();
-    let dictionary = Dictionary::open(index.path()).unwrap();
-    let mut storage = Storage::open(database.path()).unwrap();
-    let imported = import(&mut storage, "English 試験語 猫");
-    let other = import(&mut storage, "犬");
-    for index in [0, 3, u64::MAX] {
-        assert!(matches!(
-            storage.load_reader_word(&dictionary, key(&imported), index),
-            Err(ReaderWordError::InvalidSelection)
-        ));
-    }
-    for analysis in [
-        ReaderAnalysis::Missing,
-        ReaderAnalysis::Available(other.analysis_id),
-    ] {
-        assert!(matches!(
-            storage.load_reader_word(
-                &dictionary,
-                ReaderTokenKey {
-                    analysis,
-                    ..key(&imported)
-                },
-                1
-            ),
-            Err(ReaderWordError::InvalidSelection)
-        ));
-    }
-    let mut page_key = key(&imported);
-    page_key.page.range.end =
-        TextOffset::at(&imported.document.chapter.text, "English 試験語".len()).unwrap();
-    assert!(matches!(
-        storage.load_reader_word(&dictionary, page_key, 2),
-        Err(ReaderWordError::InvalidSelection)
-    ));
-    assert_eq!(
-        storage
-            .load_reader_word(&dictionary, page_key, 1)
-            .unwrap()
-            .unwrap()
-            .token
-            .surface,
-        "試験語"
-    );
-    let foreign = ReaderTokenKey {
-        document_id: other.document.document_id,
-        ..key(&imported)
-    };
-    assert!(matches!(
-        storage.load_reader_word(&dictionary, foreign, 1),
-        Err(ReaderWordError::Storage(StorageError::InvalidAnalysis))
-    ));
-    let missing = ReaderTokenKey {
-        document_id: DocumentId::try_from(i64::MAX).unwrap(),
-        ..key(&imported)
-    };
-    assert!(storage
-        .load_reader_word(&dictionary, missing, 1)
-        .unwrap()
-        .is_none());
-    let legacy = storage
-        .create_paste(&PasteText::new("猫".into()).unwrap())
-        .unwrap();
-    let legacy_key = ReaderTokenKey {
-        document_id: legacy.document_id,
-        page: TextAnchor {
-            source_id: legacy.chapter.source_id,
-            chapter_id: legacy.chapter.chapter_id,
-            range: TextRange {
-                start: 0.try_into().unwrap(),
-                end: 3.try_into().unwrap(),
-            },
-        },
-        analysis: ReaderAnalysis::Missing,
-    };
-    assert!(matches!(
-        storage.load_reader_word(&dictionary, legacy_key, 0),
-        Err(ReaderWordError::InvalidSelection)
-    ));
 }
 
 #[test]
@@ -498,9 +428,9 @@ fn reflow_fragments_keep_full_unicode_surface_with_one_lifetime_count() {
         let mut fragments = String::new();
         for page in pages.pages() {
             let details = storage
-                .load_reader_word(
+                .load_effective_reader_word(
                     &dictionary,
-                    ReaderTokenKey {
+                    &EffectiveReaderTokenKey {
                         page: *page,
                         ..key(&imported)
                     },
@@ -573,7 +503,7 @@ fn corrupt_dictionary_fails_whole_lookup_and_can_retry_without_user_state_change
     let before = fs::read(database.path()).unwrap();
     let corrupt_before = fs::read(index.path()).unwrap();
     assert!(matches!(
-        storage.load_reader_word(&dictionary, key(&imported), 0),
+        storage.load_effective_reader_word(&dictionary, &key(&imported), 0),
         Err(ReaderWordError::Dictionary(_))
     ));
     assert_eq!(fs::read(database.path()).unwrap(), before);

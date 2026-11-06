@@ -355,12 +355,12 @@ fn txt_atomic_canonical_ruby_original_bytes_analysis_and_filename_survive_reopen
     );
     assert!(storage.find_imported_txt(b"missing").unwrap().is_none());
     let snapshot = storage
-        .load_reader_snapshot(imported.document.document_id)
+        .load_document_reader_snapshot(imported.document.document_id)
         .unwrap()
         .unwrap();
-    assert_eq!(snapshot.document, imported.document);
+    assert_eq!(crate::tests::as_paste(snapshot.document), imported.document);
     assert_eq!(
-        snapshot.analysis,
+        snapshot.analyses[0].analysis,
         ReaderAnalysis::Available(imported.analysis_id)
     );
     assert_eq!(
@@ -391,7 +391,8 @@ fn txt_existing_bypasses_decoding_and_preserves_title_progress_analysis_and_stat
         .set_vocabulary_status(entry.id, VocabularyStatus::Ignored, 2)
         .unwrap();
     let saved = storage
-        .save_reading_position(id, position(&imported.document, 2))
+        .save_document_reading_position(id, position(&imported.document, 2))
+        .map(|value| value.map(crate::tests::as_paste))
         .unwrap()
         .unwrap();
     storage

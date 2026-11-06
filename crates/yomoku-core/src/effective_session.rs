@@ -125,10 +125,6 @@ impl EffectivePageCommand {
     pub fn key(&self) -> &EffectiveReaderTokenKey {
         &self.key
     }
-
-    pub fn shared_key(&self) -> Arc<EffectiveReaderTokenKey> {
-        Arc::clone(&self.key)
-    }
 }
 
 /// A visible eligible selection authenticated before accepting a word

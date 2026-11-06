@@ -1,0 +1,52 @@
+use yomoku_core::{
+    analysis::{AnalysisProfile, AnalyzedToken, ChapterAnalysis, SplitMode},
+    document::{PasteText, PastedDocument, TextAnchor, TextOffset, TextRange},
+};
+use yomoku_storage::{PasteImportOutcome, Storage};
+
+pub fn unanalyzed(
+    storage: &mut Storage,
+    path: impl AsRef<std::path::Path>,
+    text: &PasteText,
+) -> PastedDocument {
+    let imported = storage
+        .import_analyzed_paste(text, 0, |chapter| {
+            Ok::<_, std::convert::Infallible>(ChapterAnalysis {
+                profile: AnalysisProfile {
+                    engine_revision: "fixture@1".into(),
+                    dictionary_revision: "fixture@1".into(),
+                },
+                mode: SplitMode::C,
+                tokens: vec![AnalyzedToken {
+                    anchor: TextAnchor {
+                        source_id: chapter.source_id,
+                        chapter_id: chapter.chapter_id,
+                        range: TextRange {
+                            start: TextOffset::START,
+                            end: TextOffset::at(&chapter.text, chapter.text.len()).unwrap(),
+                        },
+                    },
+                    surface: chapter.text.clone(),
+                    is_japanese: false,
+                    reading: None,
+                    dictionary_form: None,
+                }],
+            })
+        })
+        .unwrap();
+    let document = match imported {
+        PasteImportOutcome::Created(value) => value.document,
+        _ => panic!("fresh fixture"),
+    };
+    let connection = rusqlite::Connection::open(path).unwrap();
+    connection
+        .pragma_update(None, "foreign_keys", true)
+        .unwrap();
+    connection
+        .execute(
+            "DELETE FROM chapter_analyses WHERE chapter_id = ?1",
+            [i64::from(document.chapter.chapter_id)],
+        )
+        .unwrap();
+    document
+}

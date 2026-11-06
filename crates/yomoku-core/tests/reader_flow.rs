@@ -57,7 +57,8 @@ fn reopening_uses_containing_page_but_keeps_exact_saved_offset_including_eof() {
             offset: TextOffset::at(&document.chapter.text, byte).unwrap(),
         };
         document.reading_position = Some(position);
-        let page = ReaderPage::open(&document, PageLength::default()).unwrap();
+        let page =
+            ReaderPage::open_document(&(document.clone().into()), PageLength::default()).unwrap();
         assert_eq!(page.page_number, 2);
         assert_eq!(page.text, "次の段落。");
         assert_eq!(page.position, position);
@@ -301,7 +302,7 @@ fn settings_reflow_preserves_exact_position_for_all_presets_and_leaves_progress_
             assert_eq!(core.view().page_length, Some(new));
             assert_eq!(
                 core.view().reader,
-                Some(ReaderPage::at(&document, position, new).unwrap())
+                Some(ReaderPage::at_document(&(document.clone().into()), position, new).unwrap())
             );
             assert_eq!(core.view().reader.unwrap().position, position);
             assert_eq!(core.view().documents, progress);

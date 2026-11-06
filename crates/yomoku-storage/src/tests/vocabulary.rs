@@ -87,7 +87,7 @@ fn all_statuses_survive_registration_from_another_document_and_deletion() {
     let mut storage = Storage::open(database.path()).unwrap();
     let input = ["新しい", "学ぶ", "慣れる", "知る", "無視"].map(surface);
     let text = PasteText::new("新しい 学ぶ 慣れる 知る 無視".into()).unwrap();
-    storage.create_paste(&text).unwrap();
+    storage.unanalyzed_fixture(&text).unwrap();
     storage.register_vocabulary(&input, 10).unwrap();
     let statuses = [
         VocabularyStatus::New,
@@ -107,7 +107,7 @@ fn all_statuses_survive_registration_from_another_document_and_deletion() {
                 .unwrap()
         })
         .collect();
-    let second = storage.create_paste(&text).unwrap();
+    let second = storage.unanalyzed_fixture(&text).unwrap();
     assert_eq!(storage.register_vocabulary(&input, 30).unwrap(), 0);
     assert_eq!(counts(&storage), (5, 9));
     // Simulate the future document deletion; no production delete operation.

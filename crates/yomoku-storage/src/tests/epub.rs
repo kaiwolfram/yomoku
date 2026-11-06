@@ -264,7 +264,7 @@ fn epub_duplicates_preserve_live_state_skip_parser_and_share_original_file_ident
         matches!(storage.import_analyzed_epub(b"English", "", 4, no_analysis).unwrap(), EpubImportOutcome::Existing(existing) if existing == txt.document.library_summary().unwrap())
     );
     let paste = storage
-        .create_paste(&PasteText::new("English".into()).unwrap())
+        .unanalyzed_fixture(&PasteText::new("English".into()).unwrap())
         .unwrap();
     assert_ne!(paste.document_id, txt.document.document_id);
     let different_bytes = book(true, "<p>猫 猫 犬 English</p><!--same text-->");
@@ -336,7 +336,7 @@ fn epub_analysis_failure_in_later_chapter_and_invalid_input_discard_only_current
     let database = TestDatabase::new();
     let mut storage = Storage::open(database.path()).unwrap();
     storage
-        .create_analyzed_paste(&PasteText::new("保存".into()).unwrap(), 1, fixture)
+        .analyzed_fixture(&PasteText::new("保存".into()).unwrap(), 1, fixture)
         .unwrap();
     let before = totals(&storage);
     let seq = sequences(&storage);
@@ -416,7 +416,7 @@ fn epub_every_write_and_deferred_commit_failure_roll_back_all_chapters_assets_an
         let database = TestDatabase::new();
         let mut storage = Storage::open(database.path()).unwrap();
         storage
-            .create_analyzed_paste(&PasteText::new("保存".into()).unwrap(), 1, fixture)
+            .analyzed_fixture(&PasteText::new("保存".into()).unwrap(), 1, fixture)
             .unwrap();
         let before = totals(&storage);
         let seq = sequences(&storage);
@@ -459,7 +459,7 @@ fn epub_cancel_during_second_analysis_rolls_back_first_chapter_and_preserves_pri
     let database = TestDatabase::new();
     let mut storage = Storage::open(database.path()).unwrap();
     storage
-        .create_analyzed_paste(&PasteText::new("保存".into()).unwrap(), 1, fixture)
+        .analyzed_fixture(&PasteText::new("保存".into()).unwrap(), 1, fixture)
         .unwrap();
     let before = totals(&storage);
     let seq = sequences(&storage);
@@ -729,7 +729,7 @@ fn epub_library_progress_counts_preceding_chapters_and_rejects_foreign_positions
         preceding += chapter.chapter.text.len();
     }
     let foreign = storage
-        .create_paste(&PasteText::new("other".into()).unwrap())
+        .unanalyzed_fixture(&PasteText::new("other".into()).unwrap())
         .unwrap();
     crate::documents::write_position_in(
         &storage.connection,
@@ -870,7 +870,7 @@ fn epub_cover_reference_absence_scopes_and_reimport_do_not_reuse_ids() {
             .unwrap(),
     );
     let plain = storage
-        .create_paste(&PasteText::new("plain".into()).unwrap())
+        .unanalyzed_fixture(&PasteText::new("plain".into()).unwrap())
         .unwrap();
     storage
         .connection
@@ -964,7 +964,7 @@ fn epub_asset_keys_are_document_scoped_and_deleted_documents_stay_missing() {
             .unwrap(),
     );
     let plain = storage
-        .create_paste(&PasteText::new("plain".into()).unwrap())
+        .unanalyzed_fixture(&PasteText::new("plain".into()).unwrap())
         .unwrap();
     let asset = image_asset("OPS/images/挿絵.png");
     // Same key in another book must not supply bytes for the requested book.

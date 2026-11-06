@@ -34,7 +34,7 @@ fn surfaces(rows: &[VocabularyRow]) -> Vec<&str> {
 
 fn import(storage: &mut Storage, text: &str) -> AnalyzedPaste {
     storage
-        .create_analyzed_paste(&PasteText::new(text.into()).unwrap(), 100, fixture)
+        .analyzed_fixture(&PasteText::new(text.into()).unwrap(), 100, fixture)
         .unwrap()
 }
 
@@ -169,7 +169,7 @@ fn prefix_never_matches_reading_or_dictionary_form_and_lookup_never_registers() 
     let database = TestDatabase::new();
     let mut storage = Storage::open(database.path()).unwrap();
     storage
-        .create_analyzed_paste(&PasteText::new("食べた".into()).unwrap(), 1, |chapter| {
+        .analyzed_fixture(&PasteText::new("食べた".into()).unwrap(), 1, |chapter| {
             let mut analysis = fixture(chapter).unwrap();
             analysis.tokens[0].reading = Some("タベタ".into());
             analysis.tokens[0].dictionary_form = Some(Surface::new("食べる").unwrap());

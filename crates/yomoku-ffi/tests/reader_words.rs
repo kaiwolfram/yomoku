@@ -42,7 +42,7 @@ impl Fixture {
     fn seed(&self) -> yomoku_core::document::DocumentId {
         let mut storage = Storage::open(self.user()).unwrap();
         let imported = storage
-            .create_analyzed_paste(
+            .import_analyzed_paste(
                 &PasteText::new("東京 東京 未収録".into()).unwrap(),
                 100,
                 |chapter| {
@@ -79,6 +79,10 @@ impl Fixture {
                     })
                 },
             )
+            .map(|outcome| match outcome {
+                yomoku_storage::PasteImportOutcome::Created(value) => value,
+                _ => panic!("expected fresh import"),
+            })
             .unwrap();
         for mode in [SplitMode::A, SplitMode::B] {
             let mut analysis = storage

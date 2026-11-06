@@ -195,7 +195,7 @@ fn document_rename_rejects_blank_and_missing_ids_and_rolls_back_statement_or_com
     ] {
         let database = TestDatabase::new();
         let mut storage = Storage::open(database.path()).unwrap();
-        let document = storage.create_paste(&PasteText::new("原本\n本文".into()).unwrap()).unwrap();
+        let document = storage.unanalyzed_fixture(&PasteText::new("原本\n本文".into()).unwrap()).unwrap();
         for blank in ["", " \n\t\u{3000}"] {
             assert!(matches!(storage.rename_document(document.document_id, blank), Err(StorageError::InvalidDocument)));
         }

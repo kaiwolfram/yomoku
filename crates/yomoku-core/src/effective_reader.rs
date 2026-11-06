@@ -6,11 +6,8 @@ use crate::{
     analysis::{ChapterAnalysis, InvalidAnalysis},
     completion::PageCompletion,
     dictionary::DictionaryCandidates,
-    document::{
-        AnalysisId, ChapterText, DocumentId, InvalidTextValue, TextAnchor, TextOffset, TextRange,
-    },
+    document::{AnalysisId, ChapterText, DocumentId, TextAnchor, TextOffset, TextRange},
     reader::ReaderVocabulary,
-    reader_ruby::{source_preferred_ruby, ReaderChapterRuby, ReaderRuby},
     segmentation::{
         resolve_effective_segmentation, EffectiveChapterSegmentation, EffectiveSegment,
         SegmentMetadata,
@@ -135,30 +132,6 @@ impl<'a> EffectiveReaderChapter<'a> {
         page: TextAnchor,
     ) -> Result<Vec<EffectiveReaderToken>, InvalidAnalysis> {
         self.project(page, true)
-    }
-
-    /// Source ruby wins over exact-span analyzer readings.
-    /// The validated chapter owns metadata, independently of live vocabulary.
-    /// Crossing bases retain the complete reading on every intersecting page.
-    pub fn furigana_on_page(
-        &self,
-        page: TextAnchor,
-        source: Option<&ReaderChapterRuby>,
-    ) -> Result<Vec<ReaderRuby>, InvalidTextValue> {
-        let tokens = self.tokens_on_page(page).map_err(|_| InvalidTextValue)?;
-        let source = source
-            .map(|source| source.on_page(self.chapter, page.range))
-            .transpose()?
-            .unwrap_or_default();
-        Ok(source_preferred_ruby(
-            &source,
-            tokens.into_iter().filter_map(|token| {
-                token.metadata?.reading.map(|reading| ReaderRuby {
-                    range: token.display_range,
-                    reading,
-                })
-            }),
-        ))
     }
 
     fn project(

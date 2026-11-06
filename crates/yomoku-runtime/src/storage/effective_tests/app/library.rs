@@ -1,3 +1,5 @@
+#[path = "../../../../../../tests/support/storage.rs"]
+mod storage_fixture;
 use super::*;
 use yomoku_core::library::WordStatusCounts;
 
@@ -12,13 +14,18 @@ fn read(router: &AppRouter, fixture: &Fixture) -> ViewModel {
 #[test]
 fn effective_application_fifo_library_missing_zero_corrupt_explicit_retry_and_deleted_document() {
     let fixture = Fixture::new();
-    let missing = fixture
-        .storage()
-        .create_paste(&PasteText::new("未解析".into()).unwrap())
-        .unwrap();
+    let missing = storage_fixture::unanalyzed(
+        &mut fixture.storage(),
+        fixture.path(),
+        &PasteText::new("未解析".into()).unwrap(),
+    );
     let zero = fixture
         .storage()
-        .create_analyzed_paste(&PasteText::new("English 。".into()).unwrap(), 200, analysis)
+        .import_analyzed_paste(&PasteText::new("English 。".into()).unwrap(), 200, analysis)
+        .map(|outcome| match outcome {
+            yomoku_storage::PasteImportOutcome::Created(value) => value,
+            _ => panic!("expected fresh import"),
+        })
         .unwrap();
     let router = router(&fixture);
     let view = read(&router, &fixture);

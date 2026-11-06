@@ -77,7 +77,7 @@ fn analyzed_import_registers_unique_japanese_surfaces_and_reopens_exact_snapshot
     let observer = Storage::open(database.path()).unwrap();
     let text = PasteText::new("猫 猫\r\n𠮷 が か\u{3099} English 。 📖 \0".into()).unwrap();
     let imported = storage
-        .create_analyzed_paste(&text, 123, |chapter| {
+        .analyzed_fixture(&text, 123, |chapter| {
             // Another connection cannot see any partial document or registration.
             assert_eq!(totals(&observer), vec![0; 11]);
             assert_eq!(chapter.text, text.as_str());
@@ -142,7 +142,7 @@ fn analyzed_import_preserves_every_existing_status_date_id_and_history() {
     }
     let events = count(&storage, "vocabulary_status_events");
     let imported = storage
-        .create_analyzed_paste(
+        .analyzed_fixture(
             &PasteText::new("猫 犬 鳥 魚 馬 𠮷 猫".into()).unwrap(),
             30,
             fixture,
@@ -164,7 +164,7 @@ fn analyzer_errors_invalid_output_and_invalid_dates_leave_no_partial_import() {
     let mut storage = Storage::open(database.path()).unwrap();
     let text = PasteText::new("猫 𠮷".into()).unwrap();
     let before = totals(&storage);
-    let error = storage.create_analyzed_paste(&text, 1, |_| {
+    let error = storage.analyzed_fixture(&text, 1, |_| {
         Err::<ChapterAnalysis, _>("analyzer unavailable")
     });
     assert!(matches!(
@@ -172,7 +172,7 @@ fn analyzer_errors_invalid_output_and_invalid_dates_leave_no_partial_import() {
         Err(PasteImportError::Analysis("analyzer unavailable"))
     ));
     for variant in 0..6 {
-        let result = storage.create_analyzed_paste(&text, 1, |chapter| {
+        let result = storage.analyzed_fixture(&text, 1, |chapter| {
             let mut analysis = fixture(chapter).unwrap();
             match variant {
                 0 => analysis.mode = SplitMode::A,
@@ -190,10 +190,9 @@ fn analyzer_errors_invalid_output_and_invalid_dates_leave_no_partial_import() {
         ));
         assert_eq!(totals(&storage), before);
     }
-    let result =
-        storage.create_analyzed_paste(&text, -1, |_| -> Result<ChapterAnalysis, Infallible> {
-            panic!("invalid date must precede analysis")
-        });
+    let result = storage.analyzed_fixture(&text, -1, |_| -> Result<ChapterAnalysis, Infallible> {
+        panic!("invalid date must precede analysis")
+    });
     assert!(matches!(
         result,
         Err(PasteImportError::Storage(StorageError::InvalidVocabulary))
@@ -201,7 +200,7 @@ fn analyzer_errors_invalid_output_and_invalid_dates_leave_no_partial_import() {
     assert_eq!(totals(&storage), before);
     assert_eq!(
         storage
-            .create_analyzed_paste(&text, 1, fixture)
+            .analyzed_fixture(&text, 1, fixture)
             .unwrap()
             .registered_surfaces,
         2
@@ -240,7 +239,7 @@ fn every_import_write_and_final_commit_failure_roll_back_and_retry() {
         let text = PasteText::new("猫 犬 𠮷".into()).unwrap();
         assert!(
             matches!(
-                storage.create_analyzed_paste(&text, 20, fixture),
+                storage.analyzed_fixture(&text, 20, fixture),
                 Err(PasteImportError::Storage(StorageError::Sqlite(_)))
             ),
             "{table}"
@@ -250,7 +249,7 @@ fn every_import_write_and_final_commit_failure_roll_back_and_retry() {
             .connection
             .execute_batch("DROP TRIGGER fail_import;")
             .unwrap();
-        let imported = storage.create_analyzed_paste(&text, 20, fixture).unwrap();
+        let imported = storage.analyzed_fixture(&text, 20, fixture).unwrap();
         assert_eq!(imported.registered_surfaces, 2);
         drop(storage);
         let mut reopened = Storage::open(database.path()).unwrap();
@@ -281,7 +280,7 @@ fn concurrent_imports_share_global_surfaces_with_independent_anchors() {
                     "𠮷 猫 猫"
                 };
                 storage
-                    .create_analyzed_paste(&PasteText::new(text.into()).unwrap(), 50, fixture)
+                    .analyzed_fixture(&PasteText::new(text.into()).unwrap(), 50, fixture)
                     .unwrap()
             })
         })
@@ -321,7 +320,7 @@ fn non_japanese_import_stores_analysis_without_vocabulary_or_encounters() {
     let database = TestDatabase::new();
     let mut storage = Storage::open(database.path()).unwrap();
     let imported = storage
-        .create_analyzed_paste(
+        .analyzed_fixture(
             &PasteText::new("English 。 📖 \0".into()).unwrap(),
             0,
             fixture,
