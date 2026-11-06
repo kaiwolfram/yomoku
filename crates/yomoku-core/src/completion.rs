@@ -4,8 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     document::{
-        AnalysisId, CompletionCommandId, DocumentId, InvalidTextValue, PastedDocument,
-        ReaderDocument, TextAnchor,
+        AnalysisId, CompletionCommandId, DocumentId, InvalidTextValue, ReaderDocument, TextAnchor,
     },
     pagination::{LogicalPages, PageLength, ReadingPosition},
 };
@@ -32,13 +31,6 @@ pub struct PageCompletionIntent {
     pub page_length: PageLength,
     pub departing_position: ReadingPosition,
     pub completed_at_unix_ms: i64,
-    pub analysis_id: AnalysisId,
-}
-
-#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
-#[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
-pub struct AnalyzedPageCompletion {
-    pub completion: PageCompletion,
     pub analysis_id: AnalysisId,
 }
 
@@ -76,46 +68,9 @@ impl PageCompletion {
             offset: next.map_or(self.page.range.end, |page| page.range.start),
         })
     }
-
-    /// Validate the exact departing page/position against a single-unit paste.
-    /// The final page advances to EOF before the core returns to Library.
-    pub fn next_position(
-        self,
-        document: &PastedDocument,
-    ) -> Result<ReadingPosition, InvalidTextValue> {
-        if self.document_id != document.document_id || self.completed_at_unix_ms < 0 {
-            return Err(InvalidTextValue);
-        }
-        self.page.slice(&document.chapter)?;
-        self.departing_position.validate(&document.chapter)?;
-        let current = document.reading_position.unwrap_or(ReadingPosition {
-            source_id: document.chapter.source_id,
-            chapter_id: document.chapter.chapter_id,
-            offset: crate::document::TextOffset::START,
-        });
-        if self.departing_position != current {
-            return Err(InvalidTextValue);
-        }
-        let pages = LogicalPages::new(std::slice::from_ref(&document.chapter), self.page_length)?;
-        if pages.pages()[pages.page_at(current)?] != self.page {
-            return Err(InvalidTextValue);
-        }
-        Ok(ReadingPosition {
-            source_id: self.page.source_id,
-            chapter_id: self.page.chapter_id,
-            offset: self.page.range.end,
-        })
-    }
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum CompletionOutcome {
-    Recorded,
-    /// No effects, including no position write. A late retry cannot move a reader.
-    AlreadyRecorded,
-}
-
-/// Analyzed completion is distinct from legacy position-only history.
+/// Result of recording one reserved effective completion.
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
 #[repr(C)]

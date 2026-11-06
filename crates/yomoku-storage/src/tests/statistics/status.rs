@@ -88,9 +88,9 @@ fn original_effective_completions_rereads_and_manual_demotions_share_the_same_ti
     status(&mut storage, "犬", Ignored, 200);
     status(&mut storage, "𠮷", Learning, 200);
     let intent = intent(&mut storage, &imported);
-    let completion = storage.prepare_page_completion(intent).unwrap();
+    let completion = storage.prepare_fixture_completion(intent).unwrap();
     storage
-        .record_analyzed_page_completion(completion.completion, completion.analysis_id)
+        .record_effective_page_completion(&completion)
         .unwrap();
     let expected = [
         point(100, [3, 0, 0, 0, 0]),
@@ -99,7 +99,7 @@ fn original_effective_completions_rereads_and_manual_demotions_share_the_same_ti
     ];
     assert_eq!(storage.vocabulary_status_timeline().unwrap(), expected);
     storage
-        .record_analyzed_page_completion(completion.completion, completion.analysis_id)
+        .record_effective_page_completion(&completion)
         .unwrap();
     assert_eq!(storage.vocabulary_status_timeline().unwrap(), expected);
     storage
@@ -249,9 +249,9 @@ fn frozen_completion_dates_and_regressing_clocks_do_not_break_status_history() {
     let imported = import(&mut storage, "猫");
     let mut frozen_intent = intent(&mut storage, &imported);
     frozen_intent.completed_at_unix_ms = 50;
-    let completion = storage.prepare_page_completion(frozen_intent).unwrap();
+    let completion = storage.prepare_fixture_completion(frozen_intent).unwrap();
     storage
-        .record_analyzed_page_completion(completion.completion, completion.analysis_id)
+        .record_effective_page_completion(&completion)
         .unwrap();
     status(&mut storage, "猫", VocabularyStatus::Learning, 75);
     assert_eq!(

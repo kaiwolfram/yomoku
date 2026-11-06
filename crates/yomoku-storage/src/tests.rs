@@ -318,3 +318,46 @@ fn as_paste(document: yomoku_core::document::ReaderDocument) -> PastedDocument {
         chapter: document.chapters.into_iter().next().unwrap(),
     }
 }
+
+impl Storage {
+    fn prepare_fixture_completion(
+        &mut self,
+        intent: yomoku_core::completion::PageCompletionIntent,
+    ) -> Result<yomoku_core::effective_reader::EffectivePageCompletion, StorageError> {
+        let key = self
+            .load_effective_reader_tokens(intent.document_id, intent.page)?
+            .and_then(|s| s.key())
+            .ok_or(StorageError::InvalidAnalysis)?;
+        self.prepare_effective_page_completion(intent, &key)
+    }
+}
+
+fn reserve_current(
+    storage: &mut Storage,
+    id: yomoku_core::document::DocumentId,
+    date: i64,
+) -> yomoku_core::effective_reader::EffectivePageCompletion {
+    let snapshot = storage.load_document_reader_snapshot(id).unwrap().unwrap();
+    let page =
+        yomoku_core::reader::ReaderPage::open_document(&snapshot.document, snapshot.page_length)
+            .unwrap();
+    let yomoku_core::reader::ReaderAnalysis::Available(analysis_id) = snapshot
+        .analyses
+        .iter()
+        .find(|a| a.chapter_id == page.anchor.chapter_id)
+        .unwrap()
+        .analysis
+    else {
+        panic!("fixture analysis")
+    };
+    storage
+        .prepare_fixture_completion(yomoku_core::completion::PageCompletionIntent {
+            document_id: id,
+            page: page.anchor,
+            departing_position: page.position,
+            page_length: snapshot.page_length,
+            analysis_id,
+            completed_at_unix_ms: date,
+        })
+        .unwrap()
+}

@@ -2,64 +2,15 @@ use std::collections::BTreeSet;
 
 use rusqlite::Connection;
 use yomoku_core::{
-    analysis::SplitMode,
     completion::PageCompletion,
-    document::{AnalysisId, ChapterText},
     effective_reader::EffectivePageCompletion,
     vocabulary::{status_after_completion, Surface},
 };
 
 use crate::{
-    analysis::read_analysis,
     vocabulary::{encode_status, read_entry_by_surface, register_vocabulary_in},
     StorageError,
 };
-
-pub(crate) fn record_occurrences_in(
-    connection: &Connection,
-    chapter: &ChapterText,
-    completion: PageCompletion,
-    analysis_id: AnalysisId,
-) -> Result<usize, StorageError> {
-    let analysis = read_analysis(connection, analysis_id)?.ok_or(StorageError::InvalidAnalysis)?;
-    let tokens = analysis
-        .japanese_tokens_on_page(chapter, completion.page)
-        .map_err(|_| StorageError::InvalidAnalysis)?;
-    // No live-analysis FK: deleting a document must not erase historical identity.
-    connection.execute(
-        "INSERT INTO completion_analyses
-         (command_id, semantics_version, analysis_id, engine_revision, dictionary_revision, split_mode)
-         VALUES (?1, 1, ?2, ?3, ?4, ?5)",
-        (i64::from(completion.command_id), i64::from(analysis_id),
-         &analysis.profile.engine_revision, &analysis.profile.dictionary_revision,
-         match analysis.mode { SplitMode::A => "a", SplitMode::B => "b", SplitMode::C => "c" }),
-    )?;
-    let surfaces = tokens
-        .iter()
-        .map(|(_, token)| Surface::new(&token.surface))
-        .collect::<Result<BTreeSet<_>, _>>()
-        .map_err(|_| StorageError::InvalidAnalysis)?;
-    let newly_known = register_completed_surfaces_in(connection, &surfaces, completion)?;
-    let mut insert = connection.prepare(
-        "INSERT INTO reading_occurrences
-         (command_id, token_index, vocabulary_id, start_byte, end_byte, surface, reading, dictionary_form)
-         SELECT ?1, ?2, id, ?3, ?4, ?5, ?6, ?7 FROM vocabulary WHERE surface = ?5",
-    )?;
-    // Enumerate the complete analysis so token_index retains original provenance,
-    // including gaps for non-Japanese tokens and tokens belonging to other pages.
-    for (index, token) in tokens {
-        insert.execute((
-            i64::from(completion.command_id),
-            i64::try_from(index).map_err(|_| StorageError::InvalidAnalysis)?,
-            i64::from(token.anchor.range.start),
-            i64::from(token.anchor.range.end),
-            &token.surface,
-            &token.reading,
-            token.dictionary_form.as_ref().map(Surface::as_str),
-        ))?;
-    }
-    Ok(newly_known)
-}
 
 /// Shares exact-surface registration and New-only transitions across reader projections.
 fn register_completed_surfaces_in(

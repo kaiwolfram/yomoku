@@ -285,7 +285,7 @@ fn real_mode_c_import_and_completion_preserve_surfaces_and_duplicate_identity() 
     use std::collections::BTreeSet;
     use yomoku_analysis::AnalysisError;
     use yomoku_core::{
-        completion::{AnalyzedCompletionOutcome, PageCompletion},
+        completion::{AnalyzedCompletionOutcome, PageCompletionIntent},
         document::PasteText,
         pagination::{LogicalPages, PageLength, ReadingPosition},
         reader::ReaderAnalysis,
@@ -458,17 +458,21 @@ fn real_mode_c_import_and_completion_preserve_surfaces_and_duplicate_identity() 
         chapter_id: page.chapter_id,
         offset: page.range.start,
     };
-    let completion = PageCompletion {
-        command_id: storage.new_completion_command_id().unwrap(),
-        document_id: imported.document.document_id,
-        page,
-        page_length,
-        departing_position,
-        completed_at_unix_ms: 50,
-    };
+    let completion = storage_fixture::prepare(
+        &mut storage,
+        PageCompletionIntent {
+            analysis_id: imported.analysis_id,
+            document_id: imported.document.document_id,
+            page,
+            page_length,
+            departing_position,
+            completed_at_unix_ms: 50,
+        },
+    )
+    .unwrap();
     assert_eq!(
         storage
-            .record_analyzed_page_completion(completion, imported.analysis_id)
+            .record_effective_page_completion(&completion)
             .unwrap(),
         AnalyzedCompletionOutcome::Recorded {
             newly_known: (surfaces.len() - 1) as u64
@@ -476,7 +480,7 @@ fn real_mode_c_import_and_completion_preserve_surfaces_and_duplicate_identity() 
     );
     assert_eq!(
         storage
-            .record_analyzed_page_completion(completion, imported.analysis_id)
+            .record_effective_page_completion(&completion)
             .unwrap(),
         AnalyzedCompletionOutcome::AlreadyRecorded
     );
@@ -508,15 +512,20 @@ fn real_mode_c_import_and_completion_preserve_surfaces_and_duplicate_identity() 
     storage
         .save_document_reading_position(imported.document.document_id, departing_position)
         .unwrap();
-    let reread = PageCompletion {
-        command_id: storage.new_completion_command_id().unwrap(),
-        completed_at_unix_ms: 60,
-        ..completion
-    };
+    let reread = storage_fixture::prepare(
+        &mut storage,
+        PageCompletionIntent {
+            analysis_id: imported.analysis_id,
+            completed_at_unix_ms: 60,
+            document_id: completion.completion().document_id,
+            page: completion.completion().page,
+            page_length: completion.completion().page_length,
+            departing_position: completion.completion().departing_position,
+        },
+    )
+    .unwrap();
     assert_eq!(
-        storage
-            .record_analyzed_page_completion(reread, imported.analysis_id)
-            .unwrap(),
+        storage.record_effective_page_completion(&reread).unwrap(),
         AnalyzedCompletionOutcome::Recorded { newly_known: 0 }
     );
     drop(storage);
@@ -528,7 +537,7 @@ fn real_mode_c_import_and_completion_preserve_surfaces_and_duplicate_identity() 
 fn real_txt_import_analyzes_only_canonical_text_and_completes_with_original_anchors() {
     use std::collections::BTreeSet;
     use yomoku_core::{
-        completion::{AnalyzedCompletionOutcome, PageCompletion},
+        completion::{AnalyzedCompletionOutcome, PageCompletionIntent},
         pagination::{LogicalPages, PageLength, ReadingPosition},
         reader::ReaderAnalysis,
         vocabulary::{Surface, VocabularyStatus},
@@ -609,21 +618,25 @@ fn real_txt_import_analyzes_only_canonical_text_and_completes_with_original_anch
             .count(),
         2
     );
-    let completion = PageCompletion {
-        command_id: storage.new_completion_command_id().unwrap(),
-        document_id: document.document_id,
-        page,
-        page_length,
-        departing_position: ReadingPosition {
-            source_id: page.source_id,
-            chapter_id: page.chapter_id,
-            offset: page.range.start,
+    let completion = storage_fixture::prepare(
+        &mut storage,
+        PageCompletionIntent {
+            analysis_id: imported.analysis_id,
+            document_id: document.document_id,
+            page,
+            page_length,
+            departing_position: ReadingPosition {
+                source_id: page.source_id,
+                chapter_id: page.chapter_id,
+                offset: page.range.start,
+            },
+            completed_at_unix_ms: 200,
         },
-        completed_at_unix_ms: 200,
-    };
+    )
+    .unwrap();
     assert_eq!(
         storage
-            .record_analyzed_page_completion(completion, imported.analysis_id)
+            .record_effective_page_completion(&completion)
             .unwrap(),
         AnalyzedCompletionOutcome::Recorded {
             newly_known: unique.len() as u64
@@ -655,7 +668,7 @@ fn real_txt_import_analyzes_only_canonical_text_and_completes_with_original_anch
     assert_eq!(existing, completed.library_summary().unwrap());
     assert_eq!(
         storage
-            .record_analyzed_page_completion(completion, imported.analysis_id)
+            .record_effective_page_completion(&completion)
             .unwrap(),
         AnalyzedCompletionOutcome::AlreadyRecorded
     );
@@ -679,7 +692,7 @@ fn real_txt_import_analyzes_only_canonical_text_and_completes_with_original_anch
 fn real_srt_import_analyzes_only_canonical_text_and_completes_with_original_anchors() {
     use std::collections::BTreeSet;
     use yomoku_core::{
-        completion::{AnalyzedCompletionOutcome, PageCompletion},
+        completion::{AnalyzedCompletionOutcome, PageCompletionIntent},
         pagination::{LogicalPages, PageLength, ReadingPosition},
         reader::ReaderAnalysis,
         vocabulary::{Surface, VocabularyStatus},
@@ -763,21 +776,25 @@ fn real_srt_import_analyzes_only_canonical_text_and_completes_with_original_anch
             .count(),
         2
     );
-    let completion = PageCompletion {
-        command_id: storage.new_completion_command_id().unwrap(),
-        document_id: document.document_id,
-        page,
-        page_length,
-        departing_position: ReadingPosition {
-            source_id: page.source_id,
-            chapter_id: page.chapter_id,
-            offset: page.range.start,
+    let completion = storage_fixture::prepare(
+        &mut storage,
+        PageCompletionIntent {
+            analysis_id: imported.analysis_id,
+            document_id: document.document_id,
+            page,
+            page_length,
+            departing_position: ReadingPosition {
+                source_id: page.source_id,
+                chapter_id: page.chapter_id,
+                offset: page.range.start,
+            },
+            completed_at_unix_ms: 200,
         },
-        completed_at_unix_ms: 200,
-    };
+    )
+    .unwrap();
     assert_eq!(
         storage
-            .record_analyzed_page_completion(completion, imported.analysis_id)
+            .record_effective_page_completion(&completion)
             .unwrap(),
         AnalyzedCompletionOutcome::Recorded {
             newly_known: unique.len() as u64
@@ -809,7 +826,7 @@ fn real_srt_import_analyzes_only_canonical_text_and_completes_with_original_anch
     assert_eq!(existing, completed.library_summary().unwrap());
     assert_eq!(
         storage
-            .record_analyzed_page_completion(completion, imported.analysis_id)
+            .record_effective_page_completion(&completion)
             .unwrap(),
         AnalyzedCompletionOutcome::AlreadyRecorded
     );
@@ -981,21 +998,21 @@ fn real_epub_import_analyzes_every_canonical_chapter_and_reopens_without_rescan(
                 .collect::<Vec<_>>()
         );
 
-        let command = storage
-            .prepare_page_completion(PageCompletionIntent {
+        let command = storage_fixture::prepare(
+            &mut storage,
+            PageCompletionIntent {
                 document_id: id,
                 page: page.anchor,
                 page_length: snapshot.page_length,
                 departing_position: page.position,
                 completed_at_unix_ms: 300,
                 analysis_id: imported.analysis_ids[index],
-            })
-            .unwrap();
+            },
+        )
+        .unwrap();
 
         assert!(matches!(
-            storage
-                .record_analyzed_page_completion(command.completion, command.analysis_id)
-                .unwrap(),
+            storage.record_effective_page_completion(&command).unwrap(),
             AnalyzedCompletionOutcome::Recorded { .. }
         ));
         assert_eq!(
@@ -1004,9 +1021,7 @@ fn real_epub_import_analyzes_every_canonical_chapter_and_reopens_without_rescan(
         );
         let after = storage.load_document_reader_snapshot(id).unwrap();
         assert_eq!(
-            storage
-                .record_analyzed_page_completion(command.completion, command.analysis_id)
-                .unwrap(),
+            storage.record_effective_page_completion(&command).unwrap(),
             AnalyzedCompletionOutcome::AlreadyRecorded
         );
         assert_eq!(storage.load_document_reader_snapshot(id).unwrap(), after);

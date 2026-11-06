@@ -2,7 +2,7 @@ use std::{convert::Infallible, sync::atomic::AtomicUsize};
 
 use yomoku_core::{
     analysis::ChapterAnalysis,
-    completion::{CompletionOutcome, PageCompletion},
+    completion::AnalyzedCompletionOutcome,
     document::{PasteText, TextOffset},
     pagination::{LogicalPages, ReadingPosition},
     vocabulary::{Surface, VocabularyStatus},
@@ -288,21 +288,25 @@ fn deleting_document_removes_identity_and_reimport_starts_fresh_preserving_histo
         .set_vocabulary_status(entry.id, VocabularyStatus::Known, 20)
         .unwrap();
     let page_length = storage.page_length().unwrap();
-    let completion = PageCompletion {
-        command_id: storage.new_completion_command_id().unwrap(),
-        document_id: doc.document_id,
-        page: LogicalPages::new(std::slice::from_ref(&doc.chapter), page_length)
-            .unwrap()
-            .pages()[0],
-        page_length,
-        departing_position: ReadingPosition {
-            source_id: doc.chapter.source_id,
-            chapter_id: doc.chapter.chapter_id,
-            offset: TextOffset::START,
-        },
-        completed_at_unix_ms: 30,
-    };
-    storage.record_page_completion(completion).unwrap();
+    let completion = storage
+        .prepare_fixture_completion(yomoku_core::completion::PageCompletionIntent {
+            analysis_id: imported.analysis_id,
+            document_id: doc.document_id,
+            page: LogicalPages::new(std::slice::from_ref(&doc.chapter), page_length)
+                .unwrap()
+                .pages()[0],
+            page_length,
+            departing_position: ReadingPosition {
+                source_id: doc.chapter.source_id,
+                chapter_id: doc.chapter.chapter_id,
+                offset: TextOffset::START,
+            },
+            completed_at_unix_ms: 30,
+        })
+        .unwrap();
+    storage
+        .record_effective_page_completion(&completion)
+        .unwrap();
     // Test-only deletion; no production delete API or new semantics introduced.
     storage
         .connection
@@ -320,8 +324,10 @@ fn deleting_document_removes_identity_and_reimport_starts_fresh_preserving_histo
     assert_eq!(fresh.registered_surfaces, 0);
     assert_eq!(storage.vocabulary_entry(&cat).unwrap(), known);
     assert_eq!(
-        storage.record_page_completion(completion).unwrap(),
-        CompletionOutcome::AlreadyRecorded
+        storage
+            .record_effective_page_completion(&completion)
+            .unwrap(),
+        AnalyzedCompletionOutcome::AlreadyRecorded
     );
     assert_eq!(storage.list_documents().unwrap()[0].progress_percent, 0);
 }

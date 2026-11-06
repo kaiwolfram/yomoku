@@ -187,7 +187,7 @@ fn single_chapter_adapter_preserves_legacy_projection_and_completion() {
             let command = completion(&document, length);
             assert_eq!(
                 command.next_document_position(&document),
-                command.next_position(&paste)
+                command.next_document_position(&paste.clone().into())
             );
         }
     }

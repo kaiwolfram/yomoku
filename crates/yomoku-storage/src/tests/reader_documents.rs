@@ -1,5 +1,5 @@
 use yomoku_core::{
-    completion::{AnalyzedCompletionOutcome, AnalyzedPageCompletion, PageCompletionIntent},
+    completion::{AnalyzedCompletionOutcome, PageCompletionIntent},
     document::{DocumentId, PasteText, ReaderDocument, TextOffset},
     pagination::{LogicalPages, PageLength, ReadingPosition},
     reader::{DocumentReaderSnapshot, ReaderAnalysis, ReaderPage},
@@ -32,7 +32,10 @@ fn position(document: &ReaderDocument, index: usize, offset: usize) -> ReadingPo
     }
 }
 
-fn prepare(storage: &mut Storage, id: DocumentId) -> AnalyzedPageCompletion {
+fn prepare(
+    storage: &mut Storage,
+    id: DocumentId,
+) -> yomoku_core::effective_reader::EffectivePageCompletion {
     let snapshot = snapshot(storage, id);
     let page = ReaderPage::open_document(&snapshot.document, snapshot.page_length).unwrap();
     let ReaderAnalysis::Available(analysis_id) = snapshot
@@ -45,7 +48,7 @@ fn prepare(storage: &mut Storage, id: DocumentId) -> AnalyzedPageCompletion {
         panic!("missing fixture analysis")
     };
     storage
-        .prepare_page_completion(PageCompletionIntent {
+        .prepare_fixture_completion(PageCompletionIntent {
             document_id: id,
             page: page.anchor,
             page_length: snapshot.page_length,
@@ -56,10 +59,11 @@ fn prepare(storage: &mut Storage, id: DocumentId) -> AnalyzedPageCompletion {
         .unwrap()
 }
 
-fn record(storage: &mut Storage, command: AnalyzedPageCompletion) -> AnalyzedCompletionOutcome {
-    storage
-        .record_analyzed_page_completion(command.completion, command.analysis_id)
-        .unwrap()
+fn record(
+    storage: &mut Storage,
+    command: &yomoku_core::effective_reader::EffectivePageCompletion,
+) -> AnalyzedCompletionOutcome {
+    storage.record_effective_page_completion(&command).unwrap()
 }
 
 fn set_position(storage: &mut Storage, document: &ReaderDocument, position: ReadingPosition) {
@@ -536,7 +540,7 @@ fn all_presets_complete_chapters_in_order_with_exact_tokens_progress_and_finish(
                 .count() as i64;
             let command = prepare(&mut storage, id);
 
-            let outcome = record(&mut storage, command);
+            let outcome = record(&mut storage, &command);
             let AnalyzedCompletionOutcome::Recorded { newly_known } = outcome else {
                 panic!("expected new completion")
             };
@@ -550,7 +554,7 @@ fn all_presets_complete_chapters_in_order_with_exact_tokens_progress_and_finish(
             );
 
             assert_eq!(
-                record(&mut storage, command),
+                record(&mut storage, &command),
                 AnalyzedCompletionOutcome::AlreadyRecorded
             );
             assert_eq!(snapshot(&mut storage, id), after);
@@ -585,7 +589,7 @@ fn all_presets_complete_chapters_in_order_with_exact_tokens_progress_and_finish(
         assert_eq!(storage.list_documents().unwrap()[0].progress_percent, 0);
         let reread = prepare(&mut storage, id);
         assert_eq!(
-            record(&mut storage, reread),
+            record(&mut storage, &reread),
             AnalyzedCompletionOutcome::Recorded { newly_known: 0 }
         );
         assert!(counts(&storage)[2] > occurrences);
@@ -598,7 +602,7 @@ fn all_presets_complete_chapters_in_order_with_exact_tokens_progress_and_finish(
         );
         assert!(reopened.document.finished_at_least_once);
         assert_eq!(
-            record(&mut storage, final_command.unwrap()),
+            record(&mut storage, final_command.as_ref().unwrap()),
             AnalyzedCompletionOutcome::AlreadyRecorded
         );
         assert_eq!(snapshot(&mut storage, id), reopened);
@@ -607,7 +611,7 @@ fn all_presets_complete_chapters_in_order_with_exact_tokens_progress_and_finish(
             .execute("DELETE FROM documents WHERE id = ?1", [i64::from(id)])
             .unwrap();
         assert_eq!(
-            record(&mut storage, final_command.unwrap()),
+            record(&mut storage, final_command.as_ref().unwrap()),
             AnalyzedCompletionOutcome::AlreadyRecorded
         );
         assert!(storage.load_document_reader_snapshot(id).unwrap().is_none());
@@ -637,7 +641,7 @@ fn reflow_keeps_chapter_position_and_completion_advances_only_the_departing_chap
         .unwrap();
     let command = prepare(&mut storage, id);
 
-    record(&mut storage, command);
+    record(&mut storage, &command);
     assert_eq!(
         snapshot(&mut storage, id).document.reading_position,
         Some(second_start)
@@ -646,7 +650,7 @@ fn reflow_keeps_chapter_position_and_completion_advances_only_the_departing_chap
     drop(storage);
     let mut storage = Storage::open(database.path()).unwrap();
     let second = prepare(&mut storage, id);
-    record(&mut storage, second);
+    record(&mut storage, &second);
     assert!(snapshot(&mut storage, id).document.finished_at_least_once);
 }
 
@@ -677,8 +681,15 @@ fn foreign_chapters_scalar_splits_wrong_analysis_and_missing_analysis_fail_witho
 
     for wrong in [a.analysis_ids[1], b.analysis_ids[0]] {
         assert!(matches!(
-            storage.record_analyzed_page_completion(command.completion, wrong),
-            Err(StorageError::InvalidAnalysis)
+            storage.prepare_fixture_completion(PageCompletionIntent {
+                analysis_id: wrong,
+                document_id: id,
+                page: command.completion().page,
+                page_length: command.completion().page_length,
+                departing_position: command.completion().departing_position,
+                completed_at_unix_ms: 100
+            }),
+            Err(StorageError::InvalidCompletion)
         ));
     }
     assert_eq!(counts(&storage), before);
@@ -713,16 +724,17 @@ fn foreign_chapters_scalar_splits_wrong_analysis_and_missing_analysis_fail_witho
         ReaderAnalysis::Missing
     );
     assert!(tokens.tokens.is_empty());
-    record(&mut storage, command);
-    let second_command = yomoku_core::completion::PageCompletion {
-        command_id: storage.new_completion_command_id().unwrap(),
-        page: second.anchor,
-        departing_position: second.position,
-        ..command.completion
-    };
+    record(&mut storage, &command);
     let before = snapshot(&mut storage, id);
     assert!(storage
-        .record_analyzed_page_completion(second_command, a.analysis_ids[1])
+        .prepare_fixture_completion(PageCompletionIntent {
+            document_id: id,
+            page: second.anchor,
+            departing_position: second.position,
+            page_length: before.page_length,
+            completed_at_unix_ms: 100,
+            analysis_id: command.key().segmentation.original_analysis_id,
+        })
         .is_err());
     assert_eq!(snapshot(&mut storage, id), before);
 }
@@ -762,7 +774,7 @@ fn completion_write_and_commit_failures_roll_back_history_status_position_and_fi
         }
         assert!(
             matches!(
-                storage.record_analyzed_page_completion(command.completion, command.analysis_id),
+                storage.record_effective_page_completion(&command),
                 Err(StorageError::Sqlite(_))
             ),
             "{table}"
@@ -781,7 +793,7 @@ fn completion_write_and_commit_failures_roll_back_history_status_position_and_fi
             .execute_batch("DROP TRIGGER fail_reader")
             .unwrap();
         assert_eq!(
-            record(&mut storage, command),
+            record(&mut storage, &command),
             AnalyzedCompletionOutcome::Recorded { newly_known: 1 }
         );
         assert!(snapshot(&mut storage, id).document.finished_at_least_once);
@@ -800,7 +812,7 @@ fn explicit_finished_open_rolls_back_on_reset_analysis_or_commit_failure_then_re
             .save_document_reading_position(id, position(&document, 1, 0))
             .unwrap();
         let command = prepare(&mut storage, id);
-        record(&mut storage, command);
+        record(&mut storage, &command);
         let before = snapshot(&mut storage, id);
         match failure {
             "write" => storage.connection.execute_batch("CREATE TRIGGER fail_open BEFORE UPDATE ON reading_positions BEGIN SELECT RAISE(ABORT, 'fixture'); END;").unwrap(),
@@ -964,7 +976,7 @@ fn image_only_final_chapter_completes_with_zero_new_words() {
     let id = imported.document.document_id;
     let document = snapshot(&mut storage, id).document;
     let first = prepare(&mut storage, id);
-    record(&mut storage, first);
+    record(&mut storage, &first);
     assert!(!snapshot(&mut storage, id).document.finished_at_least_once);
     assert_eq!(
         snapshot(&mut storage, id).document.reading_position,
@@ -981,7 +993,7 @@ fn image_only_final_chapter_completes_with_zero_new_words() {
         .is_empty());
     let final_page = prepare(&mut storage, id);
     assert_eq!(
-        record(&mut storage, final_page),
+        record(&mut storage, &final_page),
         AnalyzedCompletionOutcome::Recorded { newly_known: 0 }
     );
     assert!(snapshot(&mut storage, id).document.finished_at_least_once);

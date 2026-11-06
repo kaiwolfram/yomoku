@@ -45,7 +45,7 @@ fn document_rename_preserves_all_content_provenance_history_time_statuses_and_du
     let page = ReaderPage::open_document(&snapshot.document, snapshot.page_length).unwrap();
 
     let prepared = storage
-        .prepare_page_completion(PageCompletionIntent {
+        .prepare_fixture_completion(PageCompletionIntent {
             document_id: id,
             page: page.anchor,
             page_length: snapshot.page_length,
@@ -54,9 +54,7 @@ fn document_rename_preserves_all_content_provenance_history_time_statuses_and_du
             analysis_id: imported.analysis_id,
         })
         .unwrap();
-    storage
-        .record_analyzed_page_completion(prepared.completion, prepared.analysis_id)
-        .unwrap();
+    storage.record_effective_page_completion(&prepared).unwrap();
     storage
         .save_document_reading_position(id, page.position)
         .unwrap();

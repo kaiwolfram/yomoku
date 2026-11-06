@@ -141,7 +141,7 @@ pub(super) fn populate(storage: &mut Storage) {
     )
     .unwrap();
     storage
-        .prepare_page_completion(PageCompletionIntent {
+        .prepare_fixture_completion(PageCompletionIntent {
             document_id: live.document.document_id,
             page: page.anchor,
             page_length: storage.page_length().unwrap(),
@@ -268,7 +268,11 @@ fn full_state_encrypted_round_trip_preserves_every_table_and_remains_usable() {
     );
     assert_eq!(i64::from(imported.analysis_id), HIGH_WATER + 1);
     assert_eq!(
-        i64::from(restored.new_completion_command_id().unwrap()),
+        i64::from(
+            crate::tests::reserve_current(&mut restored, imported.document.document_id, 500)
+                .completion()
+                .command_id
+        ),
         HIGH_WATER + 1
     );
     assert_ne!(fs::read(database.path()).unwrap(), before); // explicit source setting write

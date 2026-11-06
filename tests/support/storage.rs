@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use yomoku_core::{
     analysis::{AnalysisProfile, AnalyzedToken, ChapterAnalysis, SplitMode},
     document::{PasteText, PastedDocument, TextAnchor, TextOffset, TextRange},
@@ -49,4 +51,15 @@ pub fn unanalyzed(
         )
         .unwrap();
     document
+}
+
+pub fn prepare(
+    storage: &mut Storage,
+    intent: yomoku_core::completion::PageCompletionIntent,
+) -> Result<yomoku_core::effective_reader::EffectivePageCompletion, yomoku_storage::StorageError> {
+    let key = storage
+        .load_effective_reader_tokens(intent.document_id, intent.page)?
+        .and_then(|s| s.key())
+        .ok_or(yomoku_storage::StorageError::InvalidAnalysis)?;
+    storage.prepare_effective_page_completion(intent, &key)
 }

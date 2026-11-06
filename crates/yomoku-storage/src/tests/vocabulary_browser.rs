@@ -72,14 +72,10 @@ fn complete(storage: &mut Storage, imported: &AnalyzedPaste, date: i64, effectiv
             AnalyzedCompletionOutcome::AlreadyRecorded
         );
     } else {
-        let frozen = storage.prepare_page_completion(intent).unwrap();
-        storage
-            .record_analyzed_page_completion(frozen.completion, frozen.analysis_id)
-            .unwrap();
+        let frozen = storage.prepare_fixture_completion(intent).unwrap();
+        storage.record_effective_page_completion(&frozen).unwrap();
         assert_eq!(
-            storage
-                .record_analyzed_page_completion(frozen.completion, frozen.analysis_id)
-                .unwrap(),
+            storage.record_effective_page_completion(&frozen).unwrap(),
             AnalyzedCompletionOutcome::AlreadyRecorded
         );
     }

@@ -184,19 +184,26 @@ fn seed(storage: &mut Storage, config: &Config) {
     let page = ReaderPage::open_document(&snapshot.document, snapshot.page_length).unwrap();
     assert_eq!(page.text, imported.document.chapter.text);
     for index in 0..config.rereads {
+        let key = storage
+            .load_effective_reader_tokens(imported.document.document_id, page.anchor)
+            .unwrap()
+            .unwrap()
+            .key()
+            .unwrap();
         let frozen = storage
-            .prepare_page_completion(PageCompletionIntent {
-                document_id: imported.document.document_id,
-                page: page.anchor,
-                page_length: snapshot.page_length,
-                departing_position: page.position,
-                completed_at_unix_ms: DATE + index as i64 + 1,
-                analysis_id: imported.analysis_id,
-            })
+            .prepare_effective_page_completion(
+                PageCompletionIntent {
+                    document_id: imported.document.document_id,
+                    page: page.anchor,
+                    page_length: snapshot.page_length,
+                    departing_position: page.position,
+                    completed_at_unix_ms: DATE + index as i64 + 1,
+                    analysis_id: imported.analysis_id,
+                },
+                &key,
+            )
             .unwrap();
-        storage
-            .record_analyzed_page_completion(frozen.completion, frozen.analysis_id)
-            .unwrap();
+        storage.record_effective_page_completion(&frozen).unwrap();
         storage
             .save_document_reading_position(imported.document.document_id, page.position)
             .unwrap();

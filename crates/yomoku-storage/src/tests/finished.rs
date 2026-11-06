@@ -1,5 +1,5 @@
 use yomoku_core::{
-    completion::{CompletionOutcome, PageCompletion},
+    completion::AnalyzedCompletionOutcome,
     document::{DocumentId, PasteText, PastedDocument},
     pagination::PageLength,
     reader::ReaderPage,
@@ -9,25 +9,41 @@ use super::{positions::position, *};
 
 fn paste(storage: &mut Storage, text: &str) -> PastedDocument {
     storage
-        .unanalyzed_fixture(&PasteText::new(text.to_owned()).unwrap())
+        .analyzed_fixture(
+            &PasteText::new(text.to_owned()).unwrap(),
+            0,
+            super::imports::fixture,
+        )
+        .unwrap()
+        .document
+}
+
+fn command(
+    storage: &mut Storage,
+    document: &PastedDocument,
+) -> yomoku_core::effective_reader::EffectivePageCompletion {
+    let snapshot = storage
+        .load_document_reader_snapshot(document.document_id)
+        .unwrap()
+        .unwrap();
+    let page =
+        yomoku_core::reader::ReaderPage::open_document(&snapshot.document, snapshot.page_length)
+            .unwrap();
+    let yomoku_core::reader::ReaderAnalysis::Available(analysis_id) = snapshot.analyses[0].analysis
+    else {
+        panic!("fixture analysis")
+    };
+    storage
+        .prepare_fixture_completion(yomoku_core::completion::PageCompletionIntent {
+            document_id: document.document_id,
+            page: page.anchor,
+            page_length: snapshot.page_length,
+            departing_position: page.position,
+            completed_at_unix_ms: 500,
+            analysis_id,
+        })
         .unwrap()
 }
-
-fn command(storage: &mut Storage, document: &PastedDocument) -> PageCompletion {
-    let page_length = storage.page_length().unwrap();
-    let page = ReaderPage::open_document(&document.clone().into(), page_length).unwrap();
-    PageCompletion {
-        command_id: storage.new_completion_command_id().unwrap(),
-        document_id: document.document_id,
-        page: page.anchor,
-        page_length,
-        departing_position: page.position,
-        completed_at_unix_ms: 500,
-    }
-}
-
-// Seed precisely the pre-marker history shape without running the newer writer
-// against an old schema. This is not a production completion path.
 
 #[test]
 fn finished_marker_survives_backward_position_reflow_reopen_and_each_reread() {
@@ -41,7 +57,7 @@ fn finished_marker_survives_backward_position_reflow_reopen_and_each_reread() {
         Some(false)
     );
     let first = command(&mut storage, &document);
-    storage.record_page_completion(first).unwrap();
+    storage.record_effective_page_completion(&first).unwrap();
     for length in [PageLength::Characters250, PageLength::Characters1500] {
         storage.save_page_length(length).unwrap();
         let previous = storage
@@ -61,8 +77,8 @@ fn finished_marker_survives_backward_position_reflow_reopen_and_each_reread() {
         storage = Storage::open(database.path()).unwrap();
         let before = storage.load_paste(document.document_id).unwrap();
         assert_eq!(
-            storage.record_page_completion(first).unwrap(),
-            CompletionOutcome::AlreadyRecorded
+            storage.record_effective_page_completion(&first).unwrap(),
+            AnalyzedCompletionOutcome::AlreadyRecorded
         );
         assert_eq!(storage.load_paste(document.document_id).unwrap(), before);
         assert_eq!(
@@ -72,10 +88,13 @@ fn finished_marker_survives_backward_position_reflow_reopen_and_each_reread() {
             Some(true)
         );
         let reread = command(&mut storage, &previous);
-        assert_ne!(reread.command_id, first.command_id);
+        assert_ne!(
+            reread.completion().command_id,
+            first.completion().command_id
+        );
         assert_eq!(
-            storage.record_page_completion(reread).unwrap(),
-            CompletionOutcome::Recorded
+            storage.record_effective_page_completion(&reread).unwrap(),
+            AnalyzedCompletionOutcome::Recorded { newly_known: 0 }
         );
         assert_eq!(
             storage
@@ -132,7 +151,9 @@ fn deletion_reimport_and_late_replay_preserve_history_without_restoring_marker()
     let mut storage = Storage::open(database.path()).unwrap();
     let document = paste(&mut storage, "猫𠮷\0終");
     let completion = command(&mut storage, &document);
-    storage.record_page_completion(completion).unwrap();
+    storage
+        .record_effective_page_completion(&completion)
+        .unwrap();
     // No production deletion API is introduced by this repository slice.
     storage
         .connection
@@ -151,8 +172,10 @@ fn deletion_reimport_and_late_replay_preserve_history_without_restoring_marker()
     let reimport = paste(&mut storage, &document.chapter.text);
     assert_ne!(reimport.document_id, document.document_id);
     assert_eq!(
-        storage.record_page_completion(completion).unwrap(),
-        CompletionOutcome::AlreadyRecorded
+        storage
+            .record_effective_page_completion(&completion)
+            .unwrap(),
+        AnalyzedCompletionOutcome::AlreadyRecorded
     );
     assert_eq!(
         storage
@@ -186,10 +209,13 @@ fn concurrent_final_callbacks_commit_one_history_row_and_one_marker() {
             .map(|_| {
                 let barrier = Arc::clone(&barrier);
                 let path = database.path();
+                let completion = completion.clone();
                 scope.spawn(move || {
                     let mut storage = Storage::open(path).unwrap();
                     barrier.wait();
-                    let outcome = storage.record_page_completion(completion).unwrap();
+                    let outcome = storage
+                        .record_effective_page_completion(&completion)
+                        .unwrap();
                     assert_eq!(
                         storage
                             .finished_at_least_once(document.document_id)
@@ -208,14 +234,14 @@ fn concurrent_final_callbacks_commit_one_history_row_and_one_marker() {
     assert_eq!(
         results
             .iter()
-            .filter(|&&o| o == CompletionOutcome::Recorded)
+            .filter(|&&o| o == AnalyzedCompletionOutcome::Recorded { newly_known: 1 })
             .count(),
         1
     );
     assert_eq!(
         results
             .iter()
-            .filter(|&&o| o == CompletionOutcome::AlreadyRecorded)
+            .filter(|&&o| o == AnalyzedCompletionOutcome::AlreadyRecorded)
             .count(),
         3
     );
@@ -251,7 +277,9 @@ fn explicit_finished_open_resets_durably_but_loads_and_completion_reloads_keep_p
         unfinished.clone().into()
     );
     let final_page = command(&mut storage, &unfinished);
-    storage.record_page_completion(final_page).unwrap();
+    storage
+        .record_effective_page_completion(&final_page)
+        .unwrap();
     let completed = storage.load_paste(id).unwrap().unwrap();
     assert!(completed.finished_at_least_once);
     assert_eq!(completed.reading_position, Some(eof));
@@ -310,8 +338,10 @@ fn explicit_finished_open_resets_durably_but_loads_and_completion_reloads_keep_p
         assert!(summary.finished_at_least_once);
         assert_eq!(summary.progress_percent, 0);
         assert_eq!(
-            storage.record_page_completion(final_page).unwrap(),
-            CompletionOutcome::AlreadyRecorded
+            storage
+                .record_effective_page_completion(&final_page)
+                .unwrap(),
+            AnalyzedCompletionOutcome::AlreadyRecorded
         );
         assert_eq!(
             storage.load_paste(id).unwrap().unwrap().reading_position,
@@ -339,7 +369,7 @@ fn finished_open_write_or_commit_failure_preserves_snapshot_and_retry_resets_onc
         let mut storage = Storage::open(database.path()).unwrap();
         let document = paste(&mut storage, "猫𠮷\0終");
         let completion = command(&mut storage, &document);
-        storage.record_page_completion(completion).unwrap();
+        storage.record_effective_page_completion(&completion).unwrap();
         let before = storage.load_document_reader_snapshot(document.document_id).unwrap().unwrap();
         storage.connection.execute_batch(trigger).unwrap();
         assert!(matches!(storage.open_document_reader_snapshot(document.document_id), Err(StorageError::Sqlite(_))));

@@ -3,7 +3,7 @@ use std::{convert::Infallible, fs};
 use rusqlite::Connection;
 use serde_json::json;
 use yomoku_core::{
-    completion::{AnalyzedCompletionOutcome, PageCompletion},
+    completion::AnalyzedCompletionOutcome,
     document::{PasteText, TextAnchor, TextOffset, TextRange},
     effective_reader::{
         EffectiveReaderChapter, EffectiveReaderTokenKey, EffectiveReaderWordDetails,
@@ -120,7 +120,7 @@ fn epub_selected_word_keeps_chapter_analysis_dictionary_live_status_and_lifetime
     );
     assert_eq!(fs::read(database.path()).unwrap(), before);
     let command = storage
-        .prepare_page_completion(PageCompletionIntent {
+        .prepare_fixture_completion(PageCompletionIntent {
             document_id: id,
             page: page.anchor,
             page_length: PageLength::default(),
@@ -130,9 +130,7 @@ fn epub_selected_word_keeps_chapter_analysis_dictionary_live_status_and_lifetime
         })
         .unwrap();
     assert_eq!(
-        storage
-            .record_analyzed_page_completion(command.completion, command.analysis_id)
-            .unwrap(),
+        storage.record_effective_page_completion(&command).unwrap(),
         AnalyzedCompletionOutcome::Recorded { newly_known: 1 }
     );
     let details = storage
@@ -205,20 +203,23 @@ fn key(imported: &AnalyzedPaste) -> EffectiveReaderTokenKey {
     }
 }
 
-fn complete(storage: &mut Storage, imported: &AnalyzedPaste) -> PageCompletion {
+fn complete(
+    storage: &mut Storage,
+    imported: &AnalyzedPaste,
+) -> yomoku_core::effective_reader::EffectivePageCompletion {
     let document = &imported.document;
-    let command = PageCompletion {
-        command_id: storage.new_completion_command_id().unwrap(),
-        document_id: document.document_id,
-        page: key(imported).page,
-        page_length: storage.page_length().unwrap(),
-        departing_position: position(document, 0),
-        completed_at_unix_ms: 500,
-    };
+    let command = storage
+        .prepare_fixture_completion(yomoku_core::completion::PageCompletionIntent {
+            analysis_id: imported.analysis_id,
+            document_id: document.document_id,
+            page: key(imported).page,
+            page_length: storage.page_length().unwrap(),
+            departing_position: position(document, 0),
+            completed_at_unix_ms: 500,
+        })
+        .unwrap();
     assert!(matches!(
-        storage
-            .record_analyzed_page_completion(command, imported.analysis_id)
-            .unwrap(),
+        storage.record_effective_page_completion(&command).unwrap(),
         AnalyzedCompletionOutcome::Recorded { .. }
     ));
     command
@@ -311,9 +312,7 @@ fn counts_include_repetitions_rereads_and_other_documents_but_never_base_forms_o
     assert_eq!(lookup(&mut storage, &dictionary, &first, 0).encountered, 0);
     let command = complete(&mut storage, &first);
     assert_eq!(
-        storage
-            .record_analyzed_page_completion(command, first.analysis_id)
-            .unwrap(),
+        storage.record_effective_page_completion(&command).unwrap(),
         AnalyzedCompletionOutcome::AlreadyRecorded
     );
     assert_eq!(lookup(&mut storage, &dictionary, &first, 0).encountered, 2);
@@ -406,17 +405,20 @@ fn reflow_fragments_keep_full_unicode_surface_with_one_lifetime_count() {
     // Complete each actual logical page: a crossing token belongs only to its start page.
     let pages = LogicalPages::new(std::slice::from_ref(chapter), PageLength::default()).unwrap();
     for page in pages.pages() {
-        let command = PageCompletion {
-            command_id: storage.new_completion_command_id().unwrap(),
-            document_id: imported.document.document_id,
-            page: *page,
-            page_length: PageLength::default(),
-            departing_position: position(&imported.document, i64::from(page.range.start) as usize),
-            completed_at_unix_ms: 500,
-        };
-        storage
-            .record_analyzed_page_completion(command, imported.analysis_id)
+        let command = storage
+            .prepare_fixture_completion(yomoku_core::completion::PageCompletionIntent {
+                analysis_id: imported.analysis_id,
+                document_id: imported.document.document_id,
+                page: *page,
+                page_length: PageLength::default(),
+                departing_position: position(
+                    &imported.document,
+                    i64::from(page.range.start) as usize,
+                ),
+                completed_at_unix_ms: 500,
+            })
             .unwrap();
+        storage.record_effective_page_completion(&command).unwrap();
     }
     storage
         .connection

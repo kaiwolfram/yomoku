@@ -79,10 +79,8 @@ fn original_and_effective_completions_keep_repetitions_rereads_statuses_and_exac
             .unwrap();
     }
     let first_intent = intent(&mut storage, &imported);
-    let original = storage.prepare_page_completion(first_intent).unwrap();
-    storage
-        .record_analyzed_page_completion(original.completion, original.analysis_id)
-        .unwrap();
+    let original = storage.prepare_fixture_completion(first_intent).unwrap();
+    storage.record_effective_page_completion(&original).unwrap();
     assert_totals(&storage, 7);
     storage
         .save_document_reading_position(
@@ -92,9 +90,7 @@ fn original_and_effective_completions_keep_repetitions_rereads_statuses_and_exac
         .unwrap();
     // Replaying old success cannot count the incomplete reread.
     assert_eq!(
-        storage
-            .record_analyzed_page_completion(original.completion, original.analysis_id)
-            .unwrap(),
+        storage.record_effective_page_completion(&original).unwrap(),
         AnalyzedCompletionOutcome::AlreadyRecorded
     );
     assert_totals(&storage, 7);

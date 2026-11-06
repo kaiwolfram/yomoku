@@ -353,8 +353,8 @@ fn later_delete_cascade_and_commit_failures_preserve_history_charts_and_exact_re
         let mut storage = Storage::open(database.path()).unwrap();
         let imported = import(&mut storage, "猫 猫 犬", 100);
         let intent = intent(&mut storage, &imported);
-        let command = storage.prepare_page_completion(intent).unwrap();
-        storage.record_analyzed_page_completion(command.completion, command.analysis_id).unwrap();
+        let command = storage.prepare_fixture_completion(intent).unwrap();
+        storage.record_effective_page_completion(&command).unwrap();
         let ids = storage.vocabulary_matching_ids(&VocabularyQuery::default()).unwrap();
         storage.connection.execute_batch(sql).unwrap();
         let before = history(&storage);
@@ -375,30 +375,15 @@ fn later_delete_cascade_and_commit_failures_preserve_history_charts_and_exact_re
 
 #[test]
 fn deletion_recalculates_original_effective_charts_without_rescan_and_new_appearance_is_new() {
-    for effective in [false, true] {
+    {
         let database = TestDatabase::new();
         let mut storage = Storage::open(database.path()).unwrap();
         let live = import(&mut storage, "猫 猫 犬", 100);
         let deleted_document = import(&mut storage, "猫 𠮷", 100);
         let intent = intent(&mut storage, &live);
 
-        let original = storage.prepare_page_completion(intent).unwrap();
-        let key = storage
-            .load_effective_reader_tokens(intent.document_id, intent.page)
-            .unwrap()
-            .unwrap()
-            .key()
-            .unwrap();
-        let frozen = storage
-            .prepare_effective_page_completion(intent, &key)
-            .unwrap();
-        let complete = |storage: &mut Storage| {
-            if effective {
-                storage.record_effective_page_completion(&frozen)
-            } else {
-                storage.record_analyzed_page_completion(original.completion, original.analysis_id)
-            }
-        };
+        let frozen = storage.prepare_fixture_completion(intent).unwrap();
+        let complete = |storage: &mut Storage| storage.record_effective_page_completion(&frozen);
         assert_eq!(
             complete(&mut storage).unwrap(),
             AnalyzedCompletionOutcome::Recorded { newly_known: 2 }
@@ -520,9 +505,9 @@ fn deletion_recalculates_original_effective_charts_without_rescan_and_new_appear
         assert_eq!(rows[0].last_seen_unix_ms, None);
         let mut new_intent = intent;
         new_intent.completed_at_unix_ms = 1000;
-        let new_command = storage.prepare_page_completion(new_intent).unwrap();
+        let new_command = storage.prepare_fixture_completion(new_intent).unwrap();
         storage
-            .record_analyzed_page_completion(new_command.completion, new_command.analysis_id)
+            .record_effective_page_completion(&new_command)
             .unwrap();
         assert_eq!(
             storage

@@ -39,10 +39,8 @@ fn seed(database: &Database) -> (Storage, yomoku_core::document::DocumentId) {
         completed_at_unix_ms: NOW - 60 * DAY,
         analysis_id: imported.analysis_id,
     };
-    let command = storage.prepare_page_completion(intent).unwrap();
-    storage
-        .record_analyzed_page_completion(command.completion, command.analysis_id)
-        .unwrap();
+    let command = storage_fixture::prepare(&mut storage, intent).unwrap();
+    storage.record_effective_page_completion(&command).unwrap();
     for (surface, status) in [
         ("猫", VocabularyStatus::New),
         ("犬", VocabularyStatus::Learning),

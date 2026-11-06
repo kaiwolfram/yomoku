@@ -1,7 +1,6 @@
 use yomoku_core::{
-    analysis::SplitMode,
-    completion::{AnalyzedCompletionOutcome, PageCompletion},
-    document::{AnalysisId, PasteText, PastedDocument},
+    completion::AnalyzedCompletionOutcome,
+    document::{PasteText, PastedDocument},
     pagination::LogicalPages,
     vocabulary::{Surface, VocabularyStatus},
 };
@@ -16,20 +15,31 @@ fn create_import(storage: &mut Storage, text: &str) -> AnalyzedPaste {
         .unwrap()
 }
 
-fn command(storage: &mut Storage, document: &PastedDocument) -> PageCompletion {
-    let document = storage.load_paste(document.document_id).unwrap().unwrap();
-    let page_length = storage.page_length().unwrap();
-    let pages = LogicalPages::new(std::slice::from_ref(&document.chapter), page_length).unwrap();
-    let departing_position = document.reading_position.unwrap_or(position(&document, 0));
-    let page = pages.pages()[pages.page_at(departing_position).unwrap()];
-    PageCompletion {
-        command_id: storage.new_completion_command_id().unwrap(),
-        document_id: document.document_id,
-        page,
-        page_length,
-        departing_position,
-        completed_at_unix_ms: 500,
-    }
+fn command(
+    storage: &mut Storage,
+    document: &PastedDocument,
+) -> yomoku_core::effective_reader::EffectivePageCompletion {
+    let snapshot = storage
+        .load_document_reader_snapshot(document.document_id)
+        .unwrap()
+        .unwrap();
+    let page =
+        yomoku_core::reader::ReaderPage::open_document(&snapshot.document, snapshot.page_length)
+            .unwrap();
+    let yomoku_core::reader::ReaderAnalysis::Available(analysis_id) = snapshot.analyses[0].analysis
+    else {
+        panic!("fixture analysis")
+    };
+    storage
+        .prepare_fixture_completion(yomoku_core::completion::PageCompletionIntent {
+            document_id: document.document_id,
+            page: page.anchor,
+            page_length: snapshot.page_length,
+            departing_position: page.position,
+            completed_at_unix_ms: 500,
+            analysis_id,
+        })
+        .unwrap()
 }
 
 fn count(storage: &Storage, table: &str) -> i64 {
@@ -89,7 +99,7 @@ fn repetitions_exact_surfaces_all_statuses_and_metadata_commit_with_position() {
     let completion = command(&mut storage, &imported.document);
     assert_eq!(
         storage
-            .record_analyzed_page_completion(completion, imported.analysis_id)
+            .record_effective_page_completion(&completion)
             .unwrap(),
         AnalyzedCompletionOutcome::Recorded { newly_known: 2 }
     );
@@ -120,7 +130,12 @@ fn repetitions_exact_surfaces_all_statuses_and_metadata_commit_with_position() {
         assert!(["猫", "か\u{3099}"].contains(&surface.as_str()));
         assert_eq!(
             (old.as_str(), new.as_str(), date, id),
-            ("new", "known", 500, i64::from(completion.command_id))
+            (
+                "new",
+                "known",
+                500,
+                i64::from(completion.completion().command_id)
+            )
         );
     }
     for (surface, status) in [
@@ -141,7 +156,7 @@ fn repetitions_exact_surfaces_all_statuses_and_metadata_commit_with_position() {
             .reading_position
             .unwrap()
             .offset,
-        completion.page.range.end
+        completion.completion().page.range.end
     );
     drop(storage);
     let storage = Storage::open(database.path()).unwrap();
@@ -155,9 +170,7 @@ fn replay_after_reopen_reflow_and_reread_never_moves_progress() {
     let mut storage = Storage::open(database.path()).unwrap();
     let imported = create_import(&mut storage, "猫 猫");
     let first = command(&mut storage, &imported.document);
-    storage
-        .record_analyzed_page_completion(first, imported.analysis_id)
-        .unwrap();
+    storage.record_effective_page_completion(&first).unwrap();
     storage
         .save_document_reading_position(
             imported.document.document_id,
@@ -173,9 +186,7 @@ fn replay_after_reopen_reflow_and_reread_never_moves_progress() {
         .save_page_length(yomoku_core::pagination::PageLength::Characters250)
         .unwrap();
     assert_eq!(
-        storage
-            .record_analyzed_page_completion(first, imported.analysis_id)
-            .unwrap(),
+        storage.record_effective_page_completion(&first).unwrap(),
         AnalyzedCompletionOutcome::AlreadyRecorded
     );
     assert_eq!(totals(&storage), before);
@@ -186,9 +197,7 @@ fn replay_after_reopen_reflow_and_reread_never_moves_progress() {
 
     let reread = command(&mut storage, &imported.document);
     assert_eq!(
-        storage
-            .record_analyzed_page_completion(reread, imported.analysis_id)
-            .unwrap(),
+        storage.record_effective_page_completion(&reread).unwrap(),
         AnalyzedCompletionOutcome::Recorded { newly_known: 0 }
     );
     assert_eq!(count(&storage, "reading_occurrences"), 4);
@@ -218,11 +227,12 @@ fn concurrent_duplicate_commands_create_one_set_of_occurrences_and_promotions() 
             .map(|_| {
                 let barrier = Arc::clone(&barrier);
                 let path = database.path();
+                let completion = completion.clone();
                 scope.spawn(move || {
                     let mut storage = Storage::open(path).unwrap();
                     barrier.wait();
                     storage
-                        .record_analyzed_page_completion(completion, imported.analysis_id)
+                        .record_effective_page_completion(&completion)
                         .unwrap()
                 })
             })
@@ -277,70 +287,17 @@ fn every_write_and_deferred_commit_failure_roll_back_all_completion_effects() {
         let before = totals(&storage);
         let saved = storage.load_paste(imported.document.document_id).unwrap();
         storage.connection.execute_batch(sql).unwrap();
-        assert!(matches!(storage.record_analyzed_page_completion(completion, imported.analysis_id), Err(StorageError::Sqlite(_))), "{stage}");
+        assert!(matches!(storage.record_effective_page_completion(&completion), Err(StorageError::Sqlite(_))), "{stage}");
         assert_eq!(totals(&storage), before, "{stage}");
         assert_eq!(storage.finished_at_least_once(imported.document.document_id).unwrap(), Some(false), "{stage}");
         assert_eq!(entry(&storage, "猫").status, VocabularyStatus::New, "{stage}");
         assert_eq!(storage.load_paste(imported.document.document_id).unwrap(), saved, "{stage}");
 
         storage.connection.execute_batch("DROP TRIGGER fail").unwrap();
-        assert_eq!(storage.record_analyzed_page_completion(completion, imported.analysis_id).unwrap(), AnalyzedCompletionOutcome::Recorded { newly_known: 2 }, "{stage}");
+        assert_eq!(storage.record_effective_page_completion(&completion).unwrap(), AnalyzedCompletionOutcome::Recorded { newly_known: 2 }, "{stage}");
         assert_eq!(count(&storage, "reading_occurrences"), 3);
         assert_eq!(storage.finished_at_least_once(imported.document.document_id).unwrap(), Some(true), "{stage}");
     }
-}
-
-#[test]
-fn frozen_analysis_identity_rejects_missing_foreign_corrupt_and_changed_snapshots() {
-    let database = TestDatabase::new();
-    let mut storage = Storage::open(database.path()).unwrap();
-    let imported = create_import(&mut storage, "猫 猫");
-    let other = create_import(&mut storage, "猫 猫");
-    let completion = command(&mut storage, &imported.document);
-    let before = totals(&storage);
-    for invalid in [AnalysisId::try_from(i64::MAX).unwrap(), other.analysis_id] {
-        assert!(matches!(
-            storage.record_analyzed_page_completion(completion, invalid),
-            Err(StorageError::InvalidAnalysis)
-        ));
-        assert_eq!(totals(&storage), before);
-    }
-    storage.connection.execute("UPDATE analyzed_tokens SET surface = '違う' WHERE analysis_id = ?1 AND token_index = 0", [i64::from(imported.analysis_id)]).unwrap();
-    assert!(matches!(
-        storage.record_analyzed_page_completion(completion, imported.analysis_id),
-        Err(StorageError::InvalidAnalysis)
-    ));
-    assert_eq!(totals(&storage), before);
-    storage
-        .connection
-        .execute(
-            "UPDATE analyzed_tokens SET surface = '猫' WHERE analysis_id = ?1 AND token_index = 0",
-            [i64::from(imported.analysis_id)],
-        )
-        .unwrap();
-    let mut alternate = analyze(&imported.document.chapter).unwrap();
-    alternate.mode = SplitMode::A;
-    let alternate = storage
-        .store_chapter_analysis(imported.document.chapter.chapter_id, &alternate)
-        .unwrap();
-    storage
-        .record_analyzed_page_completion(completion, imported.analysis_id)
-        .unwrap();
-    assert!(matches!(
-        storage.record_analyzed_page_completion(completion, alternate),
-        Err(StorageError::InvalidCompletion)
-    ));
-    assert!(matches!(
-        storage.record_page_completion(completion),
-        Err(StorageError::InvalidCompletion)
-    ));
-    // Legacy events cannot be upgraded by replaying an old ID with new semantics.
-    let legacy = command(&mut storage, &other.document);
-    storage.record_page_completion(legacy).unwrap();
-    assert!(matches!(
-        storage.record_analyzed_page_completion(legacy, other.analysis_id),
-        Err(StorageError::InvalidCompletion)
-    ));
 }
 
 #[test]
@@ -350,7 +307,7 @@ fn document_deletion_retains_occurrences_but_vocabulary_deletion_erases_only_its
     let imported = create_import(&mut storage, "猫 猫 𠮷");
     let completion = command(&mut storage, &imported.document);
     storage
-        .record_analyzed_page_completion(completion, imported.analysis_id)
+        .record_effective_page_completion(&completion)
         .unwrap();
     storage
         .delete_document(imported.document.document_id)
@@ -361,7 +318,7 @@ fn document_deletion_retains_occurrences_but_vocabulary_deletion_erases_only_its
     let mut storage = Storage::open(database.path()).unwrap();
     assert_eq!(
         storage
-            .record_analyzed_page_completion(completion, imported.analysis_id)
+            .record_effective_page_completion(&completion)
             .unwrap(),
         AnalyzedCompletionOutcome::AlreadyRecorded
     );
@@ -376,7 +333,7 @@ fn document_deletion_retains_occurrences_but_vocabulary_deletion_erases_only_its
     // Replays do not recreate deleted vocabulary or encounters.
     assert_eq!(
         storage
-            .record_analyzed_page_completion(completion, imported.analysis_id)
+            .record_effective_page_completion(&completion)
             .unwrap(),
         AnalyzedCompletionOutcome::AlreadyRecorded
     );
@@ -396,7 +353,7 @@ fn completion_reregisters_only_deleted_surfaces_on_the_departing_page() {
     let completion = command(&mut storage, &imported.document);
     assert_eq!(
         storage
-            .record_analyzed_page_completion(completion, imported.analysis_id)
+            .record_effective_page_completion(&completion)
             .unwrap(),
         AnalyzedCompletionOutcome::Recorded { newly_known: 1 }
     );
@@ -405,7 +362,7 @@ fn completion_reregisters_only_deleted_surfaces_on_the_departing_page() {
     assert_ne!(recreated.id, old_id);
     assert_eq!(
         recreated.registered_at_unix_ms,
-        completion.completed_at_unix_ms
+        completion.completion().completed_at_unix_ms
     );
     assert_eq!(recreated.status, VocabularyStatus::Known);
     assert!(storage
@@ -422,7 +379,7 @@ fn non_japanese_completion_has_explicit_analyzed_identity_without_status_changes
     let completion = command(&mut storage, &imported.document);
     assert_eq!(
         storage
-            .record_analyzed_page_completion(completion, imported.analysis_id)
+            .record_effective_page_completion(&completion)
             .unwrap(),
         AnalyzedCompletionOutcome::Recorded { newly_known: 0 }
     );
@@ -472,35 +429,34 @@ fn preparation_freezes_all_page_buckets_and_reserves_only_after_successful_valid
             ..intent
         },
     ] {
-        assert!(storage.prepare_page_completion(invalid).is_err());
+        assert!(storage.prepare_fixture_completion(invalid).is_err());
         assert_eq!(count(&storage, "completion_commands"), 0);
         assert_eq!(totals(&storage), before);
     }
     storage.connection.execute_batch("CREATE TRIGGER fail BEFORE INSERT ON completion_commands BEGIN SELECT RAISE(ABORT, 'fixture'); END;").unwrap();
-    assert!(storage.prepare_page_completion(intent).is_err());
+    assert!(storage.prepare_fixture_completion(intent).is_err());
     assert_eq!(count(&storage, "completion_commands"), 0);
     storage
         .connection
         .execute_batch("DROP TRIGGER fail")
         .unwrap();
-    let prepared = storage.prepare_page_completion(intent).unwrap();
+    let prepared = storage.prepare_fixture_completion(intent).unwrap();
 
-    assert_eq!(prepared.analysis_id, imported.analysis_id);
-    assert_eq!(prepared.completion.completed_at_unix_ms, 1234);
+    assert_eq!(
+        prepared.key().segmentation.original_analysis_id,
+        imported.analysis_id
+    );
+    assert_eq!(prepared.completion().completed_at_unix_ms, 1234);
     assert_eq!(totals(&storage), before); // No completion, position, statuses or consumption.
     assert_eq!(count(&storage, "completion_commands"), 1);
     assert_eq!(
-        storage
-            .record_analyzed_page_completion(prepared.completion, prepared.analysis_id)
-            .unwrap(),
+        storage.record_effective_page_completion(&prepared).unwrap(),
         AnalyzedCompletionOutcome::Recorded { newly_known: 2 }
     );
     drop(storage);
     let mut storage = Storage::open(database.path()).unwrap();
     assert_eq!(
-        storage
-            .record_analyzed_page_completion(prepared.completion, prepared.analysis_id)
-            .unwrap(),
+        storage.record_effective_page_completion(&prepared).unwrap(),
         AnalyzedCompletionOutcome::AlreadyRecorded
     );
 }

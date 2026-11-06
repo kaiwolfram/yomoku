@@ -42,14 +42,10 @@ fn complete_at(storage: &mut Storage, imported: &AnalyzedPaste, timestamp: i64, 
             AnalyzedCompletionOutcome::AlreadyRecorded
         );
     } else {
-        let command = storage.prepare_page_completion(intent).unwrap();
-        storage
-            .record_analyzed_page_completion(command.completion, command.analysis_id)
-            .unwrap();
+        let command = storage.prepare_fixture_completion(intent).unwrap();
+        storage.record_effective_page_completion(&command).unwrap();
         assert_eq!(
-            storage
-                .record_analyzed_page_completion(command.completion, command.analysis_id)
-                .unwrap(),
+            storage.record_effective_page_completion(&command).unwrap(),
             AnalyzedCompletionOutcome::AlreadyRecorded
         );
     }
@@ -125,23 +121,19 @@ fn buckets_keep_original_effective_rereads_lifetime_origin_and_all_lines_read_on
 }
 
 #[test]
-fn imports_unused_reservations_and_legacy_history_add_no_reading() {
+fn imports_and_unused_reservations_add_no_reading() {
     let database = TestDatabase::new();
     let mut storage = Storage::open(database.path()).unwrap();
     assert_eq!(buckets(&mut storage, AllTime).buckets.len(), 1);
     let imported = import(&mut storage, "猫 猫 犬");
     prepare(&mut storage, &imported);
-    let legacy = import(&mut storage, "𠮷");
-    let command_intent = intent(&mut storage, &legacy);
-    let command = storage.prepare_page_completion(command_intent).unwrap();
-    storage.record_page_completion(command.completion).unwrap();
     let result = buckets(&mut storage, LastMonth);
-    assert_eq!(result.opening.statuses.new, 3);
+    assert_eq!(result.opening.statuses.new, 2);
     assert!(result
         .buckets
         .iter()
         .all(|b| b.values.reading == LifetimeReadingTotals::default()));
-    assert!(result.buckets.iter().all(|b| b.values.statuses.new == 3));
+    assert!(result.buckets.iter().all(|b| b.values.statuses.new == 2));
 }
 
 #[test]
