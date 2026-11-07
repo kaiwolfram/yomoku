@@ -18,7 +18,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -223,7 +222,6 @@ internal fun LibraryScreen(
 
 @Composable
 private fun LibrarySortMenu(sort: LibrarySort, onSort: (LibrarySort) -> Unit) {
-    var expanded by remember { mutableStateOf(false) }
     val labels =
         mapOf(
             LibrarySort.LASTREAD to R.string.library_sort_last_read,
@@ -253,45 +251,14 @@ private fun LibrarySortMenu(sort: LibrarySort, onSort: (LibrarySort) -> Unit) {
                 LibrarySort.LASTREADASCENDING,
                 LibrarySort.IMPORTDATEASCENDING,
             )
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Box {
-            TextButton(
-                onClick = { expanded = true },
-                modifier = Modifier.testTag("library_sort"),
-            ) {
-                Text(
-                    stringResource(R.string.library_sort, stringResource(labels.getValue(baseSort)))
-                )
-            }
-            DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-                labels.forEach { (option, label) ->
-                    DropdownMenuItem(
-                        text = { Text(stringResource(label)) },
-                        onClick = {
-                            expanded = false
-                            onSort(option)
-                        },
-                        modifier = Modifier.testTag("library_sort_${option.name}"),
-                    )
-                }
-            }
-        }
-        IconButton(
-            onClick = { onSort(reverseSort) },
-            modifier = Modifier.testTag("library_reverse_sort"),
-        ) {
-            Icon(
-                painterResource(
-                    if (ascending) R.drawable.ic_arrow_up else R.drawable.ic_arrow_down
-                ),
-                contentDescription =
-                    stringResource(
-                        if (ascending) R.string.library_sort_ascending
-                        else R.string.library_sort_descending
-                    ),
-            )
-        }
-    }
+    SortControls(
+        labels = labels,
+        baseSort = baseSort,
+        ascending = ascending,
+        tag = "library",
+        onReverse = { onSort(reverseSort) },
+        onSort = onSort,
+    )
 }
 
 @Composable

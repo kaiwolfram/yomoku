@@ -24,6 +24,10 @@ fn vocabulary_fifo_pages_match_repository_and_never_load_analyzer_or_write() {
         VocabularySort::Frequency,
         VocabularySort::LastSeen,
         VocabularySort::Alphabetical,
+        VocabularySort::Oldest,
+        VocabularySort::FrequencyAscending,
+        VocabularySort::LastSeenAscending,
+        VocabularySort::AlphabeticalDescending,
     ] {
         let query = VocabularyQuery {
             sort,

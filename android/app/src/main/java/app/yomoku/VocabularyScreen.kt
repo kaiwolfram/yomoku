@@ -73,7 +73,6 @@ internal fun VocabularyScreen(
         }
     }
     Column(Modifier.fillMaxSize()) {
-        if (selection != null) VocabularySelectionActions(view, dispatch, canSelect)
         LazyColumn(
             modifier = Modifier.weight(1f).testTag("vocabulary_scroll"),
             state = scroll,
@@ -101,6 +100,7 @@ internal fun VocabularyScreen(
                             }
                     },
                 )
+                if (selection != null) VocabularySelectionActions(view, dispatch, canSelect)
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     VocabularyStatus.entries.forEach { status ->
                         FilterChip(
@@ -189,7 +189,6 @@ private fun VocabularySortMenu(
     enabled: Boolean,
     onSort: (VocabularySort) -> Unit,
 ) {
-    var expanded by remember { mutableStateOf(false) }
     val labels =
         mapOf(
             VocabularySort.NEWEST to R.string.vocabulary_sort_newest,
@@ -197,26 +196,39 @@ private fun VocabularySortMenu(
             VocabularySort.LASTSEEN to R.string.vocabulary_sort_last_seen,
             VocabularySort.ALPHABETICAL to R.string.vocabulary_sort_alphabetical,
         )
-    Box {
-        TextButton(
-            onClick = { expanded = true },
-            enabled = enabled,
-            modifier = Modifier.testTag("vocabulary_sort"),
-        ) {
-            Text(stringResource(R.string.library_sort, stringResource(labels.getValue(sort))))
+    val base =
+        when (sort) {
+            VocabularySort.OLDEST -> VocabularySort.NEWEST
+            VocabularySort.FREQUENCYASCENDING -> VocabularySort.FREQUENCY
+            VocabularySort.LASTSEENASCENDING -> VocabularySort.LASTSEEN
+            VocabularySort.ALPHABETICALDESCENDING -> VocabularySort.ALPHABETICAL
+            else -> sort
         }
-        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-            labels.forEach { (option, label) ->
-                DropdownMenuItem(
-                    text = { Text(stringResource(label)) },
-                    onClick = {
-                        expanded = false
-                        onSort(option)
-                    },
-                    enabled = enabled,
-                    modifier = Modifier.testTag("vocabulary_sort_${option.name}"),
-                )
-            }
+    val reverse =
+        when (sort) {
+            VocabularySort.NEWEST -> VocabularySort.OLDEST
+            VocabularySort.OLDEST -> VocabularySort.NEWEST
+            VocabularySort.FREQUENCY -> VocabularySort.FREQUENCYASCENDING
+            VocabularySort.FREQUENCYASCENDING -> VocabularySort.FREQUENCY
+            VocabularySort.LASTSEEN -> VocabularySort.LASTSEENASCENDING
+            VocabularySort.LASTSEENASCENDING -> VocabularySort.LASTSEEN
+            VocabularySort.ALPHABETICAL -> VocabularySort.ALPHABETICALDESCENDING
+            VocabularySort.ALPHABETICALDESCENDING -> VocabularySort.ALPHABETICAL
         }
-    }
+    SortControls(
+        labels = labels,
+        baseSort = base,
+        ascending =
+            sort in
+                listOf(
+                    VocabularySort.OLDEST,
+                    VocabularySort.FREQUENCYASCENDING,
+                    VocabularySort.LASTSEENASCENDING,
+                    VocabularySort.ALPHABETICAL,
+                ),
+        tag = "vocabulary",
+        enabled = enabled,
+        onReverse = { onSort(reverse) },
+        onSort = onSort,
+    )
 }

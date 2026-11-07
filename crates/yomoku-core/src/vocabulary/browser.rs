@@ -16,6 +16,10 @@ pub enum VocabularySort {
     Frequency,
     LastSeen,
     Alphabetical,
+    Oldest,
+    FrequencyAscending,
+    LastSeenAscending,
+    AlphabeticalDescending,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]

@@ -21,6 +21,10 @@ pub fn exchange(dir: &Path, writing: bool) -> Result<(), Box<dyn Error>> {
         VocabularySort::Frequency,
         VocabularySort::LastSeen,
         VocabularySort::Alphabetical,
+        VocabularySort::Oldest,
+        VocabularySort::FrequencyAscending,
+        VocabularySort::LastSeenAscending,
+        VocabularySort::AlphabeticalDescending,
     ]
     .into_iter()
     .enumerate()

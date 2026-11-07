@@ -85,7 +85,7 @@ class VocabularyProductionTest {
     }
 
     private fun requestStatus(status: VocabularyStatus) {
-        compose.onNodeWithTag("vocabulary_change_status").performClick()
+        compose.onNodeWithTag("vocabulary_change_status").performScrollTo().performClick()
         compose.onNodeWithTag("vocabulary_bulk_status_${status.name}").performClick()
         compose.onNodeWithTag("vocabulary_bulk_dialog").assertIsDisplayed()
     }
@@ -115,7 +115,7 @@ class VocabularyProductionTest {
             assertEquals(listOf(hidden), core().view.vocabulary.selection)
             search(prefix + "match-")
             assertEquals(100, core().view.vocabulary.rows.size)
-            compose.onNodeWithTag("vocabulary_select_all").performClick()
+            compose.onNodeWithTag("vocabulary_select_all").performScrollTo().performClick()
             idle()
             val selected = (ids + hidden).sortedBy { it.value }
             assertEquals(selected, core().view.vocabulary.selection)
@@ -197,10 +197,10 @@ class VocabularyProductionTest {
             compose
                 .onNodeWithTag("vocabulary_row_${core().view.vocabulary.rows.first().id.value}")
                 .performTouchInput { longClick() }
-            compose.onNodeWithTag("vocabulary_select_all").performClick()
+            compose.onNodeWithTag("vocabulary_select_all").performScrollTo().performClick()
             idle()
             assertEquals(206, core().view.vocabulary.selection?.size)
-            compose.onNodeWithTag("vocabulary_delete_selected").performClick()
+            compose.onNodeWithTag("vocabulary_delete_selected").performScrollTo().performClick()
             val deletion = checkNotNull(core().view.vocabulary.confirmation)
             sql {
                 it.execSQL(
@@ -266,7 +266,7 @@ class VocabularyProductionTest {
                 .performTouchInput { longClick() }
             sql { it.execSQL("ALTER TABLE vocabulary RENAME TO vocabulary_capture_unavailable") }
             renamed = true
-            compose.onNodeWithTag("vocabulary_select_all").performClick()
+            compose.onNodeWithTag("vocabulary_select_all").performScrollTo().performClick()
             idle()
             assertNotNull(core().view.vocabulary.bulkError)
             assertNull(core().view.vocabulary.confirmation)
@@ -281,7 +281,7 @@ class VocabularyProductionTest {
             assertEquals(3, core().view.vocabulary.selection?.size)
             sql { it.execSQL("ALTER TABLE vocabulary RENAME TO vocabulary_capture_unavailable") }
             renamed = true
-            compose.onNodeWithTag("vocabulary_select_all").performClick()
+            compose.onNodeWithTag("vocabulary_select_all").performScrollTo().performClick()
             idle()
             assertNotNull(core().view.vocabulary.bulkError)
             compose.runOnUiThread { compose.activity.onBackPressedDispatcher.onBackPressed() }
@@ -365,13 +365,19 @@ class VocabularyProductionTest {
             compose.onNodeWithText("No matching words.").assertIsDisplayed()
             compose.onNodeWithTag("vocabulary_status_NEW").performClick()
             idle()
-            VocabularySort.entries.forEach { sort ->
-                compose.onNodeWithTag("vocabulary_sort").performClick()
-                compose.onNodeWithTag("vocabulary_sort_${sort.name}").performClick()
-                idle()
-                assertEquals(sort, core().view.vocabulary.query.sort)
-                assertEquals(surfaces.first(), core().view.vocabulary.rows.single().surface)
-            }
+            listOf(
+                    VocabularySort.NEWEST,
+                    VocabularySort.FREQUENCY,
+                    VocabularySort.LASTSEEN,
+                    VocabularySort.ALPHABETICAL,
+                )
+                .forEach { sort ->
+                    compose.onNodeWithTag("vocabulary_sort").performClick()
+                    compose.onNodeWithTag("vocabulary_sort_${sort.name}").performClick()
+                    idle()
+                    assertEquals(sort, core().view.vocabulary.query.sort)
+                    assertEquals(surfaces.first(), core().view.vocabulary.rows.single().surface)
+                }
             compose.onNodeWithText("Settings").performClick()
             sql { it.execSQL("ALTER TABLE vocabulary RENAME TO vocabulary_browser_unavailable") }
             renamed = true
@@ -476,7 +482,7 @@ class VocabularyProductionTest {
         visit()
         search("猫")
         compose.onNodeWithTag("vocabulary_row_${cat.id.value}").performClick()
-        compose.onNodeWithTag("vocabulary_delete_selected").performClick()
+        compose.onNodeWithTag("vocabulary_delete_selected").performScrollTo().performClick()
         compose.onNodeWithTag("vocabulary_confirm_bulk").performClick()
         idle()
         assertFalse(core().view.vocabulary.rows.any { it.id == cat.id })

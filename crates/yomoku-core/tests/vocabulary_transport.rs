@@ -190,6 +190,10 @@ fn filters_are_sets_all_sorts_and_literal_prefix_survive_navigation() {
             VocabularySort::Frequency,
             VocabularySort::LastSeen,
             VocabularySort::Alphabetical,
+            VocabularySort::Oldest,
+            VocabularySort::FrequencyAscending,
+            VocabularySort::LastSeenAscending,
+            VocabularySort::AlphabeticalDescending,
         ] {
             let q = VocabularyQuery {
                 prefix: " 𠮷e\u{301}\0_%".into(),

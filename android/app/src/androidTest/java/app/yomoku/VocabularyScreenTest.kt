@@ -69,11 +69,22 @@ class VocabularyScreenTest {
             compose.onNodeWithTag("vocabulary_status_${status.name}").performClick()
         }
         assertEquals(VocabularyStatus.entries, frame.value.vocabulary.query.statuses)
-        VocabularySort.entries.forEach { sort ->
-            compose.onNodeWithTag("vocabulary_sort").performClick()
-            compose.onNodeWithTag("vocabulary_sort_${sort.name}").performClick()
-            assertEquals(sort, (events.last() as Event.SetVocabularyQuery).value.sort)
-        }
+        listOf(
+                VocabularySort.NEWEST,
+                VocabularySort.FREQUENCY,
+                VocabularySort.LASTSEEN,
+                VocabularySort.ALPHABETICAL,
+            )
+            .forEach { sort ->
+                compose.onNodeWithTag("vocabulary_sort").performClick()
+                compose.onNodeWithTag("vocabulary_sort_${sort.name}").performClick()
+                assertEquals(sort, (events.last() as Event.SetVocabularyQuery).value.sort)
+                compose.onNodeWithTag("vocabulary_reverse_sort").performClick()
+                assertNotEquals(sort, frame.value.vocabulary.query.sort)
+                compose.onNodeWithTag("vocabulary_sort").performClick()
+                compose.onNodeWithTag("vocabulary_sort_${sort.name}").performClick()
+                assertEquals(sort, frame.value.vocabulary.query.sort)
+            }
     }
 
     @Test
@@ -212,6 +223,11 @@ class VocabularyScreenTest {
                     )
             )
         render()
+        val search = compose.onNodeWithTag("vocabulary_search").getUnclippedBoundsInRoot()
+        val actions = compose.onNodeWithTag("vocabulary_selected_count").getUnclippedBoundsInRoot()
+        val filters = compose.onNodeWithTag("vocabulary_status_NEW").getUnclippedBoundsInRoot()
+        assertTrue(search.bottom <= actions.top)
+        assertTrue(actions.bottom <= filters.top)
         compose.onNodeWithTag("vocabulary_scroll").performScrollToKey(Long.MAX_VALUE)
         compose.onNodeWithTag("vocabulary_row_${Long.MAX_VALUE}").assertIsSelected()
         compose.onNodeWithTag("vocabulary_row_7").assertIsNotSelected()
@@ -259,10 +275,10 @@ class VocabularyScreenTest {
         compose.onNodeWithTag("vocabulary_scroll").performScrollToKey(1L)
         compose.onNodeWithTag("vocabulary_row_1").assertIsSelected().performClick()
         assertEquals(Event.ToggleVocabularySelection(VocabularyId(1)), events.last())
-        compose.onNodeWithTag("vocabulary_select_all").performClick()
+        compose.onNodeWithTag("vocabulary_select_all").performScrollTo().performClick()
         assertEquals(Event.SelectAllVocabulary, events.last())
         VocabularyStatus.entries.forEach { status ->
-            compose.onNodeWithTag("vocabulary_change_status").performClick()
+            compose.onNodeWithTag("vocabulary_change_status").performScrollTo().performClick()
             val before = System.currentTimeMillis()
             compose.onNodeWithTag("vocabulary_bulk_status_${status.name}").performClick()
             val requested =
@@ -290,7 +306,7 @@ class VocabularyScreenTest {
                     frame.value.copy(vocabulary = frame.value.vocabulary.copy(confirmation = null))
             }
         }
-        compose.onNodeWithTag("vocabulary_delete_selected").performClick()
+        compose.onNodeWithTag("vocabulary_delete_selected").performScrollTo().performClick()
         assertEquals(Event.RequestVocabularyBulkAction(VocabularyBulkAction.Delete), events.last())
         compose.runOnUiThread { compose.activity.onBackPressedDispatcher.onBackPressed() }
         compose.waitForIdle()

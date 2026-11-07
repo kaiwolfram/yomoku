@@ -569,7 +569,16 @@ fn metric_pages_keep_exact_histories_ties_filters_and_unread_rows_across_boundar
         .pragma_update(None, "query_only", true)
         .unwrap();
     let before = fs::read(database.path()).unwrap();
-    for sort in [VocabularySort::Frequency, VocabularySort::LastSeen] {
+    for sort in [
+        VocabularySort::Frequency,
+        VocabularySort::LastSeen,
+        VocabularySort::FrequencyAscending,
+        VocabularySort::LastSeenAscending,
+        VocabularySort::Newest,
+        VocabularySort::Oldest,
+        VocabularySort::Alphabetical,
+        VocabularySort::AlphabeticalDescending,
+    ] {
         for prefix in ["", "語0", "語1", "不存在"] {
             for statuses in [
                 VocabularyQuery::default().statuses,
@@ -590,12 +599,34 @@ fn metric_pages_keep_exact_histories_ties_filters_and_unread_rows_across_boundar
                     .collect();
                 matching.sort_by(|a, b| {
                     let metric = match sort {
-                        VocabularySort::Frequency => b.encountered_count.cmp(&a.encountered_count),
-                        _ => b.last_seen_unix_ms.cmp(&a.last_seen_unix_ms),
+                        VocabularySort::Frequency | VocabularySort::FrequencyAscending => {
+                            b.encountered_count.cmp(&a.encountered_count)
+                        }
+                        VocabularySort::LastSeen | VocabularySort::LastSeenAscending => {
+                            b.last_seen_unix_ms.cmp(&a.last_seen_unix_ms)
+                        }
+                        VocabularySort::Alphabetical | VocabularySort::AlphabeticalDescending => {
+                            return if sort == VocabularySort::Alphabetical {
+                                a.surface.cmp(&b.surface)
+                            } else {
+                                b.surface.cmp(&a.surface)
+                            }
+                        }
+                        _ => std::cmp::Ordering::Equal,
                     };
-                    metric
+                    let order = metric
                         .then_with(|| b.registered_at_unix_ms.cmp(&a.registered_at_unix_ms))
-                        .then_with(|| b.id.cmp(&a.id))
+                        .then_with(|| b.id.cmp(&a.id));
+                    if matches!(
+                        sort,
+                        VocabularySort::FrequencyAscending
+                            | VocabularySort::LastSeenAscending
+                            | VocabularySort::Oldest
+                    ) {
+                        order.reverse()
+                    } else {
+                        order
+                    }
                 });
                 for offset in [0, 100, 200, 300] {
                     let page = storage.vocabulary_page(&query, offset).unwrap();

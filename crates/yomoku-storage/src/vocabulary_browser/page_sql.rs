@@ -3,7 +3,14 @@
 use yomoku_core::vocabulary::{VocabularySort, VOCABULARY_PAGE_SIZE};
 
 pub(crate) fn page_sql(sort: VocabularySort, predicate: &str) -> String {
-    let order = match sort {
+    let (base, reverse) = match sort {
+        VocabularySort::Oldest => (VocabularySort::Newest, true),
+        VocabularySort::FrequencyAscending => (VocabularySort::Frequency, true),
+        VocabularySort::LastSeenAscending => (VocabularySort::LastSeen, true),
+        VocabularySort::AlphabeticalDescending => (VocabularySort::Alphabetical, true),
+        value => (value, false),
+    };
+    let order = match base {
         VocabularySort::Newest => "v.registered_at_unix_ms DESC, v.id DESC",
         VocabularySort::Frequency => {
             "encountered_count DESC, v.registered_at_unix_ms DESC, v.id DESC"
@@ -12,7 +19,18 @@ pub(crate) fn page_sql(sort: VocabularySort, predicate: &str) -> String {
             "last_seen_unix_ms DESC, v.registered_at_unix_ms DESC, v.id DESC"
         }
         VocabularySort::Alphabetical => "v.surface COLLATE BINARY ASC",
+        _ => unreachable!("reverse sorts mapped to base"),
     };
+    // Reverse every key; SQLite's implicit NULL placement reverses with it.
+    let order = if reverse {
+        order
+            .replace("DESC", "TEMP")
+            .replace("ASC", "DESC")
+            .replace("TEMP", "ASC")
+    } else {
+        order.to_owned()
+    };
+    let sort = base;
     // Only the sorting metric belongs in candidate selection. Defer the other
     // summary and provenance probes until after LIMIT/OFFSET, and reuse the
     // selected metric. OFFSET and explicit inner/outer order prevent flattening.

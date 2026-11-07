@@ -106,8 +106,9 @@ If a chosen library does not support a required capability or architecture in cu
 
 - Separate top-level **Vocabulary** screen.
 - Search by **written-surface prefix** only, indexed; no reading/lemma/full-text search.
-- Default sort newest registration first; alternatives frequency, last seen, alphabetical.
+- Default sort newest registration first; alternatives frequency, last seen, alphabetical. The arrow reverses the complete ordering; choosing a criterion restores its default direction (descending metrics, ascending alphabetical).
 - Filter by five statuses; show total matching count; query 100 at a time with infinite scroll.
+- Search scrolls with the list, above selection actions, filters, sorting and matching count.
 - Select All is available only after entering selection mode, not below Matching Words. It targets **every matching row, including results not loaded on screen**. Bulk change status or permanently delete with confirmation. Record status change events; enforce delete/history semantics above.
 
 ## 5. Historical Feed/Nostr requirements (no longer planned)
