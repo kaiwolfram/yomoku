@@ -99,6 +99,7 @@ fn starts_in_library() {
     assert_eq!(
         core.view(),
         ViewModel {
+            anki_added_notice: None,
             anki_settings: Default::default(),
             anki_setup: Default::default(),
             anki_entries: Vec::new(),

@@ -135,6 +135,7 @@ class StatisticsScreenTest {
 private fun statisticsView(): ViewModel {
     val data = statisticsFixture()
     return ViewModel(
+        ankiAddedNotice = null,
         ankiSettings = AnkiSettingsView(AnkiSettingsPhase.UNLOADED, null, null),
         ankiSetup = app.yomoku.shared.AnkiSetupPhase.Unchecked,
         ankiEntries = emptyList(),

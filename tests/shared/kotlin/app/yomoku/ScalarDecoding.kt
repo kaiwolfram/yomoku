@@ -148,6 +148,7 @@ internal fun scalarIds(size: Int): List<VocabularyId> =
 
 internal fun frozenScalarView(ids: List<VocabularyId>): ViewModel =
     ViewModel(
+        ankiAddedNotice = null,
         ankiSettings = AnkiSettingsView(AnkiSettingsPhase.UNLOADED, null, null),
         ankiSetup = app.yomoku.shared.AnkiSetupPhase.Unchecked,
         ankiEntries = emptyList(),

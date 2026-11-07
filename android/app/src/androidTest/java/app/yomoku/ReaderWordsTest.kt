@@ -148,18 +148,10 @@ class ReaderWordsTest {
                 }
         for (span in catRanges) {
             val link = text.getLinkAnnotations(span.start, span.end).single().item
-            val dark =
-                compose.activity.resources.configuration.uiMode and
-                    android.content.res.Configuration.UI_MODE_NIGHT_MASK ==
-                    android.content.res.Configuration.UI_MODE_NIGHT_YES
             assertEquals(androidx.compose.ui.text.TextLinkStyles(), link.styles)
-            assertEquals(
-                vocabularyBackground(status, dark),
-                text.spanStyles
-                    .first { it.start == span.start && it.end == span.end }
-                    .item
-                    .background,
-            )
+            val highlights = text.getStringAnnotations(READER_HIGHLIGHT, span.start, span.end)
+            if (status == VocabularyStatus.KNOWN) assertTrue(highlights.isEmpty())
+            else assertEquals(status.name, highlights.single().item)
         }
     }
 

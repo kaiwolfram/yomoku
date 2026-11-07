@@ -62,6 +62,7 @@ class EffectiveReaderNavigationTest {
                 null,
             )
         return ViewModel(
+            ankiAddedNotice = null,
             ankiSettings = AnkiSettingsView(AnkiSettingsPhase.UNLOADED, null, null),
             ankiSetup = app.yomoku.shared.AnkiSetupPhase.Unchecked,
             ankiEntries = emptyList(),
@@ -268,5 +269,41 @@ class EffectiveReaderNavigationTest {
         compose.onNodeWithTag("reader_word_panel").assertDoesNotExist()
         click("next_page")
         assertEquals(3, events.filterIsInstance<Event.CompleteEffectiveReaderPage>().size)
+    }
+
+    @Test
+    fun longTitleUsesOneLineAccessibleBackAndCounterStaysCenteredForFinish() {
+        frame.value =
+            frame.value.copy(reader = frame.value.reader!!.copy(title = "長い本の題名".repeat(30)))
+        show()
+        val layouts = mutableListOf<androidx.compose.ui.text.TextLayoutResult>()
+        compose.onNodeWithTag("screen_title").performSemanticsAction(
+            SemanticsActions.GetTextLayoutResult
+        ) {
+            it(layouts)
+        }
+        assertEquals(1, layouts.single().lineCount)
+        assertTrue(layouts.single().isLineEllipsized(0))
+        fun checkCounter() {
+            compose.onNodeWithTag("page_counter").performScrollTo()
+            val reader = compose.onNodeWithTag("reader_scroll").fetchSemanticsNode().boundsInRoot
+            val counter = compose.onNodeWithTag("page_counter").fetchSemanticsNode().boundsInRoot
+            assertEquals(reader.center.x, counter.center.x, 1f)
+            val previous = compose.onNodeWithTag("previous_page").getUnclippedBoundsInRoot()
+            val next = compose.onNodeWithTag("next_page").getUnclippedBoundsInRoot()
+            assertEquals(
+                (previous.right - previous.left).value,
+                (next.right - next.left).value,
+                0.5f,
+            )
+        }
+        checkCounter()
+        compose.runOnUiThread {
+            frame.value = frame.value.copy(reader = frame.value.reader!!.copy(pageNumber = 3UL))
+        }
+        compose.onNodeWithText("Finish Book").assertExists()
+        checkCounter()
+        compose.onNodeWithContentDescription("Back").performClick()
+        assertEquals(Event.CloseDocument, events.last())
     }
 }

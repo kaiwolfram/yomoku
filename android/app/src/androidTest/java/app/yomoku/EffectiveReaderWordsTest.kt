@@ -76,6 +76,7 @@ class EffectiveReaderWordsTest {
                 )
             }
         return ViewModel(
+            ankiAddedNotice = null,
             ankiSettings = AnkiSettingsView(AnkiSettingsPhase.UNLOADED, null, null),
             ankiSetup = app.yomoku.shared.AnkiSetupPhase.Unchecked,
             ankiEntries = emptyList(),
@@ -396,18 +397,11 @@ class EffectiveReaderWordsTest {
                         frame.value.effectiveReaderTokens!!,
                     )!!
                     .filter { it.token.surface == "猫" }
-            for (cat in cats) assertEquals(
-                vocabularyBackground(
-                    status,
-                    compose.activity.resources.configuration.uiMode and
-                        android.content.res.Configuration.UI_MODE_NIGHT_MASK ==
-                        android.content.res.Configuration.UI_MODE_NIGHT_YES,
-                ),
-                text.spanStyles
-                    .first { it.start == cat.start && it.end == cat.end }
-                    .item
-                    .background,
-            )
+            for (cat in cats) {
+                val highlights = text.getStringAnnotations(READER_HIGHLIGHT, cat.start, cat.end)
+                if (status == VocabularyStatus.KNOWN) assertTrue(highlights.isEmpty())
+                else assertEquals(status.name, highlights.single().item)
+            }
         }
         compose.runOnUiThread {
             val tokens =

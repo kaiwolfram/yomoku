@@ -1,5 +1,6 @@
 package app.yomoku
 
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -21,7 +22,9 @@ import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.LineHeightStyle
 import androidx.compose.ui.unit.TextUnit
+import androidx.compose.ui.unit.dp
 import app.yomoku.shared.ReaderRuby
+import app.yomoku.shared.VocabularyStatus
 
 internal data class ReaderDisplayRuby(val start: Int, val end: Int, val reading: String) {
     fun clip(start: Int, end: Int): ReaderDisplayRuby? {
@@ -130,7 +133,7 @@ internal fun ReaderRubyText(
     modifier: Modifier = Modifier,
 ) {
     if (ruby.isEmpty()) {
-        Text(text, style = style, modifier = modifier)
+        ReaderHighlightedText(text, style, modifier)
         return
     }
     val measurer = rememberTextMeasurer()
@@ -176,7 +179,7 @@ internal fun ReaderRubyText(
                 LineHeightStyle(LineHeightStyle.Alignment.Bottom, LineHeightStyle.Trim.None),
         )
     var layout by remember(text, rubyStyle) { mutableStateOf<TextLayoutResult?>(null) }
-    Text(
+    ReaderHighlightedText(
         text,
         style = rubyStyle,
         onTextLayout = { layout = it },
@@ -192,6 +195,48 @@ internal fun ReaderRubyText(
                             drawText(reading, topLeft = origin)
                         }
                     }
+                }
+            },
+    )
+}
+
+@Composable
+private fun ReaderHighlightedText(
+    text: AnnotatedString,
+    style: TextStyle,
+    modifier: Modifier,
+    onTextLayout: (TextLayoutResult) -> Unit = {},
+) {
+    var layout by remember(text, style) { mutableStateOf<TextLayoutResult?>(null) }
+    val dark = isSystemInDarkTheme()
+    Text(
+        text,
+        style = style,
+        onTextLayout = {
+            layout = it
+            onTextLayout(it)
+        },
+        modifier =
+            modifier.drawWithCache {
+                val highlights =
+                    layout
+                        ?.let { result ->
+                            text.getStringAnnotations(READER_HIGHLIGHT, 0, text.length).flatMap {
+                                range ->
+                                val color =
+                                    vocabularyBackground(VocabularyStatus.valueOf(range.item), dark)
+                                readerHighlightRects(result, range.start, range.end, 1.dp.toPx())
+                                    .map { it to color }
+                            }
+                        }
+                        .orEmpty()
+                onDrawWithContent {
+                    for ((rect, color) in highlights) drawRect(
+                        color,
+                        Offset(rect.left, rect.top),
+                        rect.size,
+                    )
+                    drawContent()
                 }
             },
     )

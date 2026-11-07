@@ -218,3 +218,45 @@ fn incompatible_ambiguous_and_partial_model_observations_never_authorize_writes(
         );
     }
 }
+
+#[test]
+fn confirmed_add_notice_is_consumed_once_and_duplicate_or_uncertain_results_are_silent() {
+    let (mut model, _) = ready();
+    let mut command = dispatch(&mut model);
+    let done = callback(&mut command, AnkiLiveResult::NoteAdded(88));
+    update(&mut model, done.clone());
+    let notice = Yomoku.view(&model).anki_added_notice.unwrap();
+    update(&mut model, Event::DismissAnkiAddedNotice(notice + 1));
+    assert_eq!(Yomoku.view(&model).anki_added_notice, Some(notice));
+    update(&mut model, Event::DismissAnkiAddedNotice(notice));
+    update(&mut model, done);
+    assert_eq!(Yomoku.view(&model).anki_added_notice, None);
+    for result in [
+        AnkiLiveResult::NoteExisting(vec![88]),
+        AnkiLiveResult::NoteUncertain(None),
+        AnkiLiveResult::NoteUncertain(Some(88)),
+        AnkiLiveResult::NoSubmission,
+        AnkiLiveResult::NoteAdded(-1),
+    ] {
+        let (mut model, _) = ready();
+        let mut command = dispatch(&mut model);
+        let done = callback(&mut command, result);
+        update(&mut model, done.clone());
+        update(&mut model, done);
+        assert_eq!(Yomoku.view(&model).anki_added_notice, None);
+    }
+}
+
+#[test]
+fn confirmed_notice_renders_even_if_originating_export_is_no_longer_visible() {
+    let (mut model, _) = ready();
+    let mut command = dispatch(&mut model);
+    let done = callback(&mut command, AnkiLiveResult::NoteAdded(88));
+    model.prepared_anki_export = None;
+    model.anki_entries.clear();
+    let mut finished = Yomoku.update(done, &mut model);
+    assert!(finished
+        .effects()
+        .any(|effect| matches!(effect, Effect::Render(_))));
+    assert!(Yomoku.view(&model).anki_added_notice.is_some());
+}

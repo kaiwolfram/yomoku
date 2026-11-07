@@ -213,4 +213,5 @@
     <string name="anki_model_ready">Anki is ready. Cards show the word on the front, with readings, definitions and the highlighted source sentence on the back.</string>
     <string name="anki_model_missing">Create the built-in Yomoku card format to finish setup. Existing cards will be preserved.</string>
     <string name="anki_model_unchecked">Select a default deck and check the card format.</string>
+    <string name="anki_added_toast">Added to AnkiDroid.</string>
 </resources>

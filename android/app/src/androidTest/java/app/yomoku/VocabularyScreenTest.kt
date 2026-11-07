@@ -358,6 +358,7 @@ private fun vocabularyRow(id: Long) =
 
 private fun vocabularyView() =
     ViewModel(
+        ankiAddedNotice = null,
         ankiSettings = AnkiSettingsView(AnkiSettingsPhase.UNLOADED, null, null),
         ankiSetup = app.yomoku.shared.AnkiSetupPhase.Unchecked,
         ankiEntries = emptyList(),

@@ -409,7 +409,7 @@ internal fun ReaderScreen(
                 TextButton(
                     onClick = previous,
                     enabled = canGoBack,
-                    modifier = Modifier.testTag("previous_page"),
+                    modifier = Modifier.weight(1f).testTag("previous_page"),
                 ) {
                     Text(stringResource(R.string.previous_page))
                 }
@@ -424,7 +424,7 @@ internal fun ReaderScreen(
                 TextButton(
                     onClick = next,
                     enabled = canAdvance,
-                    modifier = Modifier.testTag("next_page"),
+                    modifier = Modifier.weight(1f).testTag("next_page"),
                 ) {
                     Text(
                         stringResource(

@@ -10,6 +10,7 @@ import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -53,7 +54,7 @@ class NavigationTest {
             compose.onNodeWithTag("navigation_settings").performClick().assertIsSelected()
             compose.onNodeWithTag("screen_title").assertTextEquals("Settings")
             compose.onNodeWithTag(navigationTag).assertIsDisplayed()
-            compose.onNodeWithText("Back").assertDoesNotExist()
+            compose.onNodeWithContentDescription("Back").assertDoesNotExist()
             compose.onNode(hasText(title) and hasClickAction()).assertIsNotSelected()
             compose.runOnUiThread { compose.activity.onBackPressedDispatcher.onBackPressed() }
             compose.onNodeWithTag("screen_title").assertTextEquals(title)
@@ -81,7 +82,7 @@ class NavigationTest {
                 core.dispatch(Event.SetPageLength(app.yomoku.shared.PageLength.CHARACTERS1500))
             }
             compose.waitUntil(30_000) { !core.view.storageBusy }
-            compose.onNodeWithText("Back").assertDoesNotExist()
+            compose.onNodeWithContentDescription("Back").assertDoesNotExist()
             for (size in listOf(250, 500, 750, 1000)) {
                 compose.onNodeWithTag("page_length_$size").performScrollTo().assertExists()
             }

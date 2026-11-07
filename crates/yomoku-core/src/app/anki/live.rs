@@ -118,6 +118,17 @@ impl Yomoku {
                 {
                     return Some(Command::done());
                 }
+                if matches!(
+                    callback.outcome(),
+                    crate::anki::AnkiLiveOutcome::Note(crate::anki::AnkiSubmissionOutcome::Added(
+                        _
+                    ))
+                ) {
+                    if let Some(id) = model.anki_notice_sequence.checked_add(1) {
+                        model.anki_notice_sequence = id;
+                        model.anki_added_notice = Some(id);
+                    }
+                }
                 live.progress = AnkiLiveProgress::Finished;
                 live.callback = Some(*callback.clone());
                 if model.anki_setup.live_deck.is_some() {

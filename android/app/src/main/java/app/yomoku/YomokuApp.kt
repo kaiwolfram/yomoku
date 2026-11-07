@@ -1,6 +1,5 @@
 package app.yomoku
 
-import android.widget.Toast
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Row
@@ -13,13 +12,13 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationRail
 import androidx.compose.material3.NavigationRailItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -33,6 +32,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import app.yomoku.shared.AnkiSettingsPhase
@@ -69,9 +69,10 @@ internal fun YomokuApp(
     onImportBook: (() -> Unit)? = null,
 ) {
     val context = LocalContext.current
-    ReaderCompletionToast(view, dispatch) { message ->
-        Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
-    }
+    val toasts = androidx.compose.runtime.remember(context) { AppToasts(context) }
+    androidx.compose.runtime.DisposableEffect(toasts) { onDispose { toasts.cancel() } }
+    ReaderCompletionToast(view, dispatch, toasts::show)
+    AnkiAddedToast(view, dispatch, toasts::show)
     var pasteText by rememberSaveable { mutableStateOf("") }
     val vocabularyScroll =
         rememberSaveable(sessionKey, view.vocabulary.query, saver = LazyListState.Saver) {
@@ -102,6 +103,8 @@ internal fun YomokuApp(
                                     view.reader?.title ?: stringResource(R.string.reader_title)
                                 else -> stringResource(view.destination.titleResource())
                             },
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.testTag("screen_title"),
                         )
                     },
@@ -116,8 +119,11 @@ internal fun YomokuApp(
                     },
                     navigationIcon = {
                         if (!view.settingsOpen && !mainContent) {
-                            TextButton(onClick = { dispatch(Event.CloseDocument) }) {
-                                Text(stringResource(R.string.back))
+                            IconButton(onClick = { dispatch(Event.CloseDocument) }) {
+                                Icon(
+                                    painterResource(R.drawable.ic_arrow_back),
+                                    contentDescription = stringResource(R.string.back),
+                                )
                             }
                         }
                     },
@@ -280,6 +286,7 @@ private fun YomokuPreview() {
     YomokuTheme {
         YomokuApp(
             ViewModel(
+                ankiAddedNotice = null,
                 ankiSettings = AnkiSettingsView(AnkiSettingsPhase.UNLOADED, null, null),
                 ankiSetup = app.yomoku.shared.AnkiSetupPhase.Unchecked,
                 ankiEntries = emptyList(),
@@ -322,5 +329,17 @@ private fun YomokuPreview() {
             sessionKey = "preview",
             dispatch = {},
         )
+    }
+}
+
+@Composable
+internal fun AnkiAddedToast(view: ViewModel, dispatch: (Event) -> Unit, show: (String) -> Unit) {
+    val notice = view.ankiAddedNotice
+    val message = stringResource(R.string.anki_added_toast)
+    LaunchedEffect(notice) {
+        if (notice != null) {
+            dispatch(Event.DismissAnkiAddedNotice(notice))
+            show(message)
+        }
     }
 }

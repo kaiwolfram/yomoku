@@ -166,7 +166,7 @@ class ReaderImagesTest {
         }
         tapWord("猫")
         compose.onNodeWithTag("word_surface").assertTextEquals("猫")
-        compose.onNodeWithText("Close").performClick()
+        instrumentation.sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_BACK)
         compose.activityRule.scenario.recreate()
         awaitReader()
         awaitImages(2)

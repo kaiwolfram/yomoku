@@ -80,6 +80,8 @@ pub struct Model {
     prepared_anki_export: Option<crate::anki::AnkiExport>,
     anki_preparation_sequence: u64,
     anki_live: Option<crate::anki::AnkiLiveState>,
+    anki_added_notice: Option<u64>,
+    anki_notice_sequence: u64,
     anki_export_preflight: Option<crate::anki::AnkiPreflight>,
     vocabulary: crate::vocabulary::VocabularyState,
     vocabulary_request: Option<vocabulary::VocabularyRequest>,
@@ -182,6 +184,7 @@ pub enum Event {
     /// Retry preparation or the exact frozen analyzed command after a failure.
     RetryReaderCompletion,
     DismissCompletionNotice,
+    DismissAnkiAddedNotice(u64),
     /// Position-only backward navigation anchored to the visible page.
     PreviousReaderPage {
         document_id: DocumentId,
@@ -334,6 +337,8 @@ pub struct ViewModel {
     pub anki_settings: crate::anki::AnkiSettingsView,
     pub anki_setup: crate::anki::AnkiSetupPhase,
     pub anki_entries: Vec<crate::anki::AnkiEntryView>,
+    /// Transient, confirmed provider insertion; consume before displaying.
+    pub anki_added_notice: Option<u64>,
     /// Session-owned frozen export status; observed IDs carry no callback authority.
     pub anki_export: Option<crate::anki::AnkiExportView>,
     pub vocabulary: crate::vocabulary::VocabularyState,
@@ -401,6 +406,7 @@ impl App for Yomoku {
             model.anki_export_view(),
             model.anki_entries_view(),
             model.anki_setup.phase.clone(),
+            model.anki_added_notice,
         );
         if let Some(command) = self.update_anki(&event, model) {
             if anki_before
@@ -408,6 +414,7 @@ impl App for Yomoku {
                     model.anki_export_view(),
                     model.anki_entries_view(),
                     model.anki_setup.phase.clone(),
+                    model.anki_added_notice,
                 )
             {
                 return command.and(render::render());
@@ -797,6 +804,11 @@ impl App for Yomoku {
             Event::DismissReaderWord => model.clear_reader_word(),
             Event::CloseSettings => model.settings_open = false,
             Event::DismissImportSummary => model.import_summary = None,
+            Event::DismissAnkiAddedNotice(id) => {
+                if model.anki_added_notice == Some(id) {
+                    model.anki_added_notice = None;
+                }
+            }
             Event::DismissCompletionNotice => model.completion_notice = None,
             Event::DismissBookCompletionNotice(id) => {
                 if model.book_completion_notice == Some(id) {
@@ -1041,6 +1053,7 @@ impl App for Yomoku {
 
     fn view(&self, model: &Model) -> ViewModel {
         ViewModel {
+            anki_added_notice: model.anki_added_notice,
             anki_settings: model.anki_settings.clone(),
             anki_setup: model.anki_setup.phase.clone(),
             anki_entries: model.anki_entries_view(),

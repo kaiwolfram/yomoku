@@ -8,6 +8,7 @@ import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -182,7 +183,7 @@ class PasteReaderTest {
         assertReaderText(second)
         assertReaderAtTop()
         val percent = core().view.documents.single { it.documentId == id }.progressPercent
-        compose.onNodeWithText("Back").performClick()
+        compose.onNodeWithContentDescription("Back").performClick()
         compose.onNodeWithTag("library_documents").performScrollToKey(id.value)
         compose
             .onNodeWithTag("progress_${id.value}", useUnmergedTree = true)
@@ -198,7 +199,7 @@ class PasteReaderTest {
         awaitStorage()
         assertReaderText(first)
         assertReaderAtTop()
-        compose.onNodeWithText("Back").performClick()
+        compose.onNodeWithContentDescription("Back").performClick()
         compose.onNodeWithTag("library_documents").performScrollToKey(id.value)
         compose.onNodeWithTag("progress_${id.value}", useUnmergedTree = true).assertTextEquals("0%")
     }
@@ -303,7 +304,7 @@ class PasteReaderTest {
         compose.onNodeWithTag(documentTag).performScrollTo().performClick()
         awaitStorage()
         compose.onNodeWithTag("reader_text").assertIsDisplayed().assertTextEquals(firstPage)
-        compose.onNodeWithText("Back").performClick()
+        compose.onNodeWithContentDescription("Back").performClick()
         compose.onNodeWithTag("screen_title").assertTextEquals("Library")
     }
 }

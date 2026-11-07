@@ -97,13 +97,10 @@ class ReaderWordSpansTest {
         assertEquals(2, links.size)
         assertTrue(links.all { it.item.styles == TextLinkStyles() })
         assertEquals(
-            Color(0xFFA9CCFF),
-            text.spanStyles.first { it.start == 3 && it.end == 7 }.item.background,
+            VocabularyStatus.NEW.name,
+            text.getStringAnnotations(READER_HIGHLIGHT, 3, 7).single().item,
         )
-        assertEquals(
-            Color.Unspecified,
-            text.spanStyles.first { it.start == 8 && it.end == 9 }.item.background,
-        )
+        assertTrue(text.getStringAnnotations(READER_HIGHLIGHT, 8, 9).isEmpty())
         links.first().item.linkInteractionListener!!.onClick(links.first().item)
         assertEquals(listOf(7UL), taps)
 
@@ -265,8 +262,8 @@ class ReaderWordSpansTest {
             }
         )
         assertTrue(
-            text.spanStyles.any {
-                it.item.background == Color(0xFFA9CCFF) && it.start == 0 && it.end == 6
+            text.getStringAnnotations(READER_HIGHLIGHT, 0, text.length).any {
+                it.item == VocabularyStatus.NEW.name && it.start == 0 && it.end == 6
             }
         )
         val links = text.getLinkAnnotations(0, text.length)

@@ -149,11 +149,9 @@ internal fun readerAnnotatedSpans(
         }
     }
     for ((index, status, start, end) in tokens) {
-        addStyle(
-            SpanStyle(background = vocabularyBackground(status, dark)),
-            start,
-            end,
-        )
+        if (status != null && status != VocabularyStatus.KNOWN) {
+            addStringAnnotation(READER_HIGHLIGHT, status.name, start, end)
+        }
         // Source website links own their tap area; the remaining token fragments
         // retain their owning selection identity and vocabulary highlight.
         for (range in readerUncoveredRanges(start, end, external)) {
@@ -229,7 +227,19 @@ internal fun ReaderWordPanel(
                                         Modifier.border(
                                             2.dp,
                                             MaterialTheme.colorScheme.onSurface.copy(alpha = 0.65f),
-                                            RoundedCornerShape(50),
+                                            when (status) {
+                                                VocabularyStatus.NEW ->
+                                                    RoundedCornerShape(
+                                                        topStartPercent = 50,
+                                                        bottomStartPercent = 50,
+                                                    )
+                                                VocabularyStatus.IGNORED ->
+                                                    RoundedCornerShape(
+                                                        topEndPercent = 50,
+                                                        bottomEndPercent = 50,
+                                                    )
+                                                else -> RoundedCornerShape(0)
+                                            },
                                         )
                                     else Modifier
                                 )
