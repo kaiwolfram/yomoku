@@ -1,8 +1,9 @@
 # Data model
 
-The authoritative SQL is [0001_simplified_initial_schema.sql](../crates/yomoku-storage/migrations/0001_simplified_initial_schema.sql).
-The release schema version is **1**, journal name `0001_simplified_initial_schema`. It has
-**26 application tables** plus SQLite's internal `sqlite_sequence` table.
+The authoritative SQL is [migration 1](../crates/yomoku-storage/migrations/0001_simplified_initial_schema.sql)
+and [migration 2](../crates/yomoku-storage/migrations/0002_statistics_timeframe.sql).
+The release schema version is **2**, with journal entries `0001_simplified_initial_schema`
+and `0002_statistics_timeframe`. It has **27 application tables** plus SQLite's internal `sqlite_sequence` table.
 Earlier development schemas and journals are unsupported, including the previous
 schema-1 journal. They are rejected without migration or modification.
 
@@ -11,15 +12,16 @@ schema-1 journal. They are rejected without migration or modification.
 | Content | `sources`, `chapters`, `documents`, `chapter_texts`, `paste_content_hashes`, `imported_files`, `source_ruby`, `epub_documents`, `epub_chapters`, `epub_spans`, `epub_assets`, `epub_inline_images` |
 | Analysis and vocabulary | `chapter_analyses`, `analyzed_tokens`, `vocabulary`, `vocabulary_status_events` |
 | Progress and history | `reading_positions`, `library_read_clock`, `completion_commands`, `effective_completion_commands`, `reading_completions`, `completion_analyses`, `reading_occurrences` |
-| Settings and schema | `reader_settings`, `anki_settings`, `schema_migrations` |
+| Settings and schema | `reader_settings`, `anki_settings`, `statistics_settings`, `schema_migrations` |
 
 ## Initialization and compatibility
 
 The small migration runner opens an immediate transaction, reads the journal and
-applies the initial schema once. Concurrent opens serialize. Foreign keys are
+applies missing bundled migrations once. Version 1 upgrades without changing reader
+settings, vocabulary or history. Concurrent opens serialize. Foreign keys are
 enabled on every repository connection. Unknown, future and historical development
 journals are errors. The runner does not reset incompatible databases, delete user
-files or backfill development data. Future published upgrades can add migrations.
+files or backfill development data. Additional upgrades can add migrations.
 Backup candidates must match the exact trusted schema and journal before adoption.
 
 ## Content and analysis
@@ -95,3 +97,14 @@ bundled dictionaries and all transient provider/session state. Incompatible
 pre-release databases/backups are rejected without clearing them. Restoring never
 replays Anki writes and has no Anki recovery gate. Full manual encrypted restore
 is unfinished; [RESTORE_VALIDATION.md](RESTORE_VALIDATION.md) states its limits.
+
+## Statistics preference
+
+Migration 2 adds `statistics_settings`, a required singleton (`id = 1`) with a
+validated timeframe: `last_week`, `last_month`, `last_six_months`, `last_year`, or
+`all_time`. New and upgraded databases default to `last_year`. Native typed
+read/save effects share the SQLite FIFO; one preference request runs at a time,
+coalescing later selections even after navigation. Statistics Retry retries failed
+preference operations. Missing or invalid settings are errors and are never repaired.
+Backup validation uses the candidate version's exact schema and singleton set,
+then upgrades a supported version-1 candidate only in its private copy.

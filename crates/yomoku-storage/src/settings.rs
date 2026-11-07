@@ -93,3 +93,56 @@ pub(crate) fn read_page_length(
         .find(|length| Some(length.characters() as i64) == value)
         .ok_or(StorageError::InvalidSettings)
 }
+
+impl Storage {
+    pub fn statistics_timeframe(
+        &self,
+    ) -> Result<yomoku_core::statistics::StatisticsTimeframe, StorageError> {
+        read_statistics_timeframe(&self.connection)
+    }
+
+    pub fn save_statistics_timeframe(
+        &mut self,
+        timeframe: yomoku_core::statistics::StatisticsTimeframe,
+    ) -> Result<yomoku_core::statistics::StatisticsTimeframe, StorageError> {
+        use yomoku_core::statistics::StatisticsTimeframe::*;
+        let transaction = self
+            .connection
+            .transaction_with_behavior(TransactionBehavior::Immediate)?;
+        read_statistics_timeframe(&transaction)?;
+        let value = match timeframe {
+            LastWeek => "last_week",
+            LastMonth => "last_month",
+            LastSixMonths => "last_six_months",
+            LastYear => "last_year",
+            AllTime => "all_time",
+        };
+        transaction.execute(
+            "UPDATE statistics_settings SET timeframe = ?1 WHERE id = 1",
+            [value],
+        )?;
+        transaction.commit()?;
+        Ok(timeframe)
+    }
+}
+
+fn read_statistics_timeframe(
+    connection: &rusqlite::Connection,
+) -> Result<yomoku_core::statistics::StatisticsTimeframe, StorageError> {
+    use yomoku_core::statistics::StatisticsTimeframe::*;
+    let value: Option<String> = connection
+        .query_row(
+            "SELECT timeframe FROM statistics_settings WHERE id = 1",
+            [],
+            |row| row.get(0),
+        )
+        .optional()?;
+    match value.as_deref() {
+        Some("last_week") => Ok(LastWeek),
+        Some("last_month") => Ok(LastMonth),
+        Some("last_six_months") => Ok(LastSixMonths),
+        Some("last_year") => Ok(LastYear),
+        Some("all_time") => Ok(AllTime),
+        _ => Err(StorageError::InvalidSettings),
+    }
+}

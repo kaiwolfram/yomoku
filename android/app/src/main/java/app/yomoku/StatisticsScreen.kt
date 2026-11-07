@@ -4,6 +4,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.*
@@ -20,7 +21,6 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import app.yomoku.shared.*
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun StatisticsScreen(
     view: ViewModel,
@@ -44,8 +44,22 @@ internal fun StatisticsScreen(
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         item {
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                StatisticsTimeframe.entries.forEach { timeframe ->
+            val timeframeScroll =
+                rememberLazyListState(
+                    initialFirstVisibleItemIndex =
+                        StatisticsTimeframe.entries.indexOf(state.timeframe)
+                )
+            LaunchedEffect(state.timeframe) {
+                timeframeScroll.animateScrollToItem(
+                    StatisticsTimeframe.entries.indexOf(state.timeframe)
+                )
+            }
+            LazyRow(
+                state = timeframeScroll,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.fillMaxWidth().testTag("statistics_timeframes"),
+            ) {
+                items(StatisticsTimeframe.entries, key = { it.name }) { timeframe ->
                     FilterChip(
                         selected = state.timeframe == timeframe,
                         onClick = {
@@ -192,6 +206,7 @@ private fun StatisticsPlot(dataset: StatisticsDataset, chart: StatisticsChart) {
 
 private fun StatisticsTimeframe.label(): Int =
     when (this) {
+        StatisticsTimeframe.LASTWEEK -> R.string.statistics_week
         StatisticsTimeframe.LASTMONTH -> R.string.statistics_month
         StatisticsTimeframe.LASTSIXMONTHS -> R.string.statistics_six_months
         StatisticsTimeframe.LASTYEAR -> R.string.statistics_year
@@ -200,6 +215,7 @@ private fun StatisticsTimeframe.label(): Int =
 
 private fun StatisticsTimeframe.grouping(): Int =
     when (this) {
+        StatisticsTimeframe.LASTWEEK,
         StatisticsTimeframe.LASTMONTH -> R.string.statistics_daily
         StatisticsTimeframe.LASTSIXMONTHS,
         StatisticsTimeframe.LASTYEAR -> R.string.statistics_weekly

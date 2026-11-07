@@ -1,7 +1,7 @@
 # Architecture
 
 The [product specification](PRODUCT_SPEC.md) defines behavior. Yomoku has one
-production reader and one initial release schema.
+production reader and a versioned release schema.
 
 ## Ownership
 
@@ -76,8 +76,8 @@ See [ANKIDROID_API.md](ANKIDROID_API.md) for provider details.
 
 ## Persistence and builds
 
-The [data model](DATA_MODEL.md) contains 26 application tables. A transactional
-migration runner/journal remains for future releases; historical development files
+The [data model](DATA_MODEL.md) contains 27 application tables. A transactional
+migration runner/journal upgrades supported version-1 data to version 2; historical development files
 are rejected without clearing them. Bundled dictionaries are separate read-only assets.
 
 Gradle debug/release variants select matching Rust profiles and separate generated

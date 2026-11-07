@@ -291,3 +291,51 @@ fn invalid_dates_order_and_overflow_fail_without_partial_values() {
         }
     }
 }
+
+#[test]
+fn last_week_is_seven_utc_dates_with_lifetime_opening_and_inclusive_cutoff() {
+    for now in [
+        date("2024-03-01") + DAY / 2,
+        date("2025-01-03"),
+        date("2024-01-01") + DAY - 1,
+    ] {
+        let start = (now / DAY - 6) * DAY;
+        let result = statistics_buckets(
+            LastWeek,
+            now,
+            &[
+                reading(start - 1, 4),
+                reading(start, 2),
+                reading(now, 3),
+                reading(now + 1, 99),
+            ],
+            &[
+                status(start - 1, [1, 2, 3, 4, 5]),
+                status(now, [0, 2, 3, 5, 5]),
+            ],
+        )
+        .unwrap();
+        assert_eq!(result.start_unix_ms, start);
+        assert_eq!(result.end_exclusive_unix_ms, now + 1);
+        assert_eq!(result.buckets.len(), 7);
+        assert_eq!(result.opening.reading.japanese_occurrences, 4);
+        assert_eq!(result.opening.statuses.new, 1);
+        assert_eq!(result.buckets[0].values.reading.japanese_occurrences, 6);
+        assert_eq!(result.buckets[6].values.reading.japanese_occurrences, 9);
+        assert_eq!(result.buckets[6].values.statuses.known, 5);
+        for (index, bucket) in result.buckets.iter().enumerate() {
+            assert_eq!(bucket.start_unix_ms, start + index as i64 * DAY);
+            assert_eq!(
+                bucket.end_exclusive_unix_ms,
+                (start + (index + 1) as i64 * DAY).min(now + 1)
+            );
+        }
+    }
+    assert_eq!(
+        statistics_buckets(LastWeek, 0, &[], &[])
+            .unwrap()
+            .buckets
+            .len(),
+        1
+    );
+}

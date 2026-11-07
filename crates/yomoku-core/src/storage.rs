@@ -66,6 +66,12 @@ pub enum StorageOperation {
     LoadAnkiSettings,
     #[serde(skip)]
     #[cfg_attr(feature = "facet_typegen", facet(skip))]
+    LoadStatisticsTimeframe,
+    #[serde(skip)]
+    #[cfg_attr(feature = "facet_typegen", facet(skip))]
+    SaveStatisticsTimeframe(crate::statistics::StatisticsTimeframe),
+    #[serde(skip)]
+    #[cfg_attr(feature = "facet_typegen", facet(skip))]
     SaveAnkiDefaultDeck(
         #[cfg_attr(feature = "facet_typegen", facet(opaque))] Option<crate::anki::AnkiDeckId>,
     ),
@@ -130,6 +136,12 @@ pub enum StorageResult {
     #[serde(skip)]
     #[cfg_attr(feature = "facet_typegen", facet(skip))]
     StatisticsLoaded(Box<crate::statistics::StatisticsBuckets>),
+    #[serde(skip)]
+    #[cfg_attr(feature = "facet_typegen", facet(skip))]
+    StatisticsTimeframeLoaded(crate::statistics::StatisticsTimeframe),
+    #[serde(skip)]
+    #[cfg_attr(feature = "facet_typegen", facet(skip))]
+    StatisticsTimeframeSaved(crate::statistics::StatisticsTimeframe),
     #[serde(skip)]
     #[cfg_attr(feature = "facet_typegen", facet(skip))]
     VocabularyLoaded(crate::vocabulary::VocabularyPage),

@@ -267,6 +267,7 @@ internal class CoreSession(
     init {
         dispatch(Event.RefreshLibrary)
         dispatch(Event.LoadAnkiSettings)
+        dispatch(Event.LoadStatisticsTimeframe)
     }
 
     fun dispatch(event: Event) {

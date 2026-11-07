@@ -311,6 +311,14 @@ fn execute(
             .map(StorageResult::Loaded)
             .ok_or(DocumentError::NotFound),
 
+        StorageOperation::LoadStatisticsTimeframe => storage
+            .statistics_timeframe()
+            .map(StorageResult::StatisticsTimeframeLoaded)
+            .map_err(map_error),
+        StorageOperation::SaveStatisticsTimeframe(timeframe) => storage
+            .save_statistics_timeframe(timeframe)
+            .map(StorageResult::StatisticsTimeframeSaved)
+            .map_err(map_error),
         StorageOperation::LoadAnkiSettings => storage
             .anki_default_deck()
             .map(StorageResult::AnkiSettingsLoaded)

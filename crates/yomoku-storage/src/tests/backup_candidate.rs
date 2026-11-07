@@ -76,8 +76,8 @@ fn backup_candidate_encrypted_full_state_retains_every_table_and_journal() {
     let checked = staging
         .check_schema(manifest.schema_version(), manifest.sqlite_len(), || false)
         .unwrap();
-    assert_eq!(checked.original_schema(), 1);
-    assert_eq!(checked.schema_version(), 1);
+    assert_eq!(checked.original_schema(), 2);
+    assert_eq!(checked.schema_version(), 2);
     // Test-only access; the production opaque result exposes no file or SQL.
     let copy = Connection::open(directory.join("snapshot.sqlite3")).unwrap();
     assert_eq!(super::backup_snapshot::state(&copy), before);
@@ -90,7 +90,7 @@ fn backup_candidate_encrypted_full_state_retains_every_table_and_journal() {
 #[test]
 fn backup_candidate_checks_initial_schema_only_in_private_copy() {
     {
-        let version = 1;
+        let version = 2;
         let database = TestDatabase::new();
         let mut connection = Connection::open(database.path()).unwrap();
         migrate(&mut connection, MIGRATIONS).unwrap();
@@ -101,9 +101,9 @@ fn backup_candidate_checks_initial_schema_only_in_private_copy() {
             .check_schema(version as u32, before.len() as u64, || false)
             .unwrap_or_else(|error| panic!("version {version}: {error}"));
         assert_eq!(checked.original_schema(), version as u32);
-        assert_eq!(checked.schema_version(), 1);
+        assert_eq!(checked.schema_version(), 2);
         let copy = Storage::open(directory.join("snapshot.sqlite3")).unwrap();
-        assert_eq!(copy.schema_version().unwrap(), 1);
+        assert_eq!(copy.schema_version().unwrap(), 2);
         assert_eq!(
             copy.page_length().unwrap(),
             yomoku_core::pagination::PageLength::default()
@@ -135,7 +135,7 @@ fn backup_candidate_rejects_unsupported_or_disagreeing_manifest_and_journal() {
         let database = TestDatabase::new();
         let storage = Storage::open(database.path()).unwrap();
         storage.connection.execute_batch(sql).unwrap();
-        check_rejected(&database, 1, CandidateError::InvalidDatabase);
+        check_rejected(&database, 2, CandidateError::InvalidDatabase);
     }
 }
 
@@ -150,7 +150,7 @@ fn backup_candidate_rejects_view_impersonating_migration_journal_before_querying
          CREATE VIEW schema_migrations AS SELECT * FROM stolen;",
         )
         .unwrap();
-    check_rejected(&database, 1, CandidateError::InvalidDatabase);
+    check_rejected(&database, 2, CandidateError::InvalidDatabase);
 }
 
 #[test]
@@ -165,7 +165,7 @@ fn backup_candidate_rejects_malformed_schema_without_leaking_sql() {
         )
         .unwrap();
     drop(storage);
-    check_rejected(&database, 1, CandidateError::Sqlite);
+    check_rejected(&database, 2, CandidateError::Sqlite);
     assert_eq!(
         CandidateError::Sqlite.to_string(),
         "backup candidate SQLite operation failed"
@@ -229,7 +229,7 @@ fn backup_candidate_rejects_bad_header_length_wal_and_trailing_bytes() {
     ] {
         let directory = database.0.join(format!("bad-{index}"));
         assert!(matches!(
-            candidate(&directory, &bytes).check_schema(1, declared, || false),
+            candidate(&directory, &bytes).check_schema(2, declared, || false),
             Err(CandidateError::InvalidDatabase)
         ));
         assert!(!directory.exists());
@@ -240,7 +240,7 @@ fn backup_candidate_rejects_bad_header_length_wal_and_trailing_bytes() {
 #[test]
 fn backup_candidate_cancellation_at_every_poll_cleans_current_copy() {
     {
-        let version = 1;
+        let version = 2;
         let database = TestDatabase::new();
         let mut connection = Connection::open(database.path()).unwrap();
         migrate(&mut connection, MIGRATIONS).unwrap();
@@ -347,7 +347,7 @@ fn backup_candidate_io_failures_before_sqlite_open_clean_owned_directory() {
         let directory = database.0.join(format!("io-{stop}"));
         let staging = candidate(&directory, &before);
         let mut calls = 0;
-        let result = staging.check_schema(1, before.len() as u64, || {
+        let result = staging.check_schema(2, before.len() as u64, || {
             calls += 1;
             if calls == stop {
                 fs::remove_file(directory.join("snapshot.sqlite3")).unwrap();
@@ -415,7 +415,7 @@ fn backup_candidate_checks_compact_reservation_provenance_occurrences_and_shape(
             )
             .unwrap();
         storage.record_effective_page_completion(&frozen).unwrap();
-        accept_unchanged(&database, 1);
+        accept_unchanged(&database, 2);
         storage
             .connection
             .execute(
@@ -423,7 +423,7 @@ fn backup_candidate_checks_compact_reservation_provenance_occurrences_and_shape(
                 [],
             )
             .unwrap();
-        check_rejected(&database, 1, CandidateError::InvalidData);
+        check_rejected(&database, 2, CandidateError::InvalidData);
     }
 }
 
@@ -432,7 +432,7 @@ fn previous_initial_journal_and_schema_are_rejected_without_changing_source_file
     let database = TestDatabase::new();
     let mut storage = Storage::open(database.path()).unwrap();
     super::backup_snapshot::populate(&mut storage);
-    storage.connection.execute_batch("UPDATE schema_migrations SET name = '0001_initial_schema'; CREATE TABLE subtitle_cues (chapter_id INTEGER, cue_index INTEGER, start_byte INTEGER, end_byte INTEGER);").unwrap();
+    storage.connection.execute_batch("UPDATE schema_migrations SET name = '0001_initial_schema' WHERE version = 1; CREATE TABLE subtitle_cues (chapter_id INTEGER, cue_index INTEGER, start_byte INTEGER, end_byte INTEGER);").unwrap();
     let before = fs::read(database.path()).unwrap();
     assert!(matches!(
         Storage::open(database.path()),
@@ -443,5 +443,32 @@ fn previous_initial_journal_and_schema_are_rejected_without_changing_source_file
         .create_backup_snapshot(database.0.join("old-snapshot"), || false)
         .is_err());
     assert_eq!(fs::read(database.path()).unwrap(), before);
-    check_rejected(&database, 1, CandidateError::InvalidDatabase);
+    check_rejected(&database, 2, CandidateError::InvalidDatabase);
+}
+
+#[test]
+fn version_one_candidate_upgrades_only_private_copy_with_default_timeframe() {
+    let database = TestDatabase::new();
+    let mut connection = Connection::open(database.path()).unwrap();
+    migrate(&mut connection, &MIGRATIONS[..1]).unwrap();
+    connection
+        .execute("UPDATE reader_settings SET page_length = 750", [])
+        .unwrap();
+    drop(connection);
+    let before = fs::read(database.path()).unwrap();
+    let directory = database.0.join("upgrade");
+    let checked = candidate(&directory, &before)
+        .check_schema(1, before.len() as u64, || false)
+        .unwrap();
+    assert_eq!(checked.original_schema(), 1);
+    assert_eq!(checked.schema_version(), 2);
+    let upgraded = Storage::open(directory.join("snapshot.sqlite3")).unwrap();
+    assert_eq!(
+        upgraded.statistics_timeframe().unwrap(),
+        yomoku_core::statistics::StatisticsTimeframe::LastYear
+    );
+    assert_eq!(upgraded.page_length().unwrap().characters(), 750);
+    drop(upgraded);
+    checked.discard().unwrap();
+    assert_eq!(fs::read(database.path()).unwrap(), before);
 }

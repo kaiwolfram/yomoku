@@ -60,32 +60,39 @@ fn seed(database: &Database) -> (Storage, yomoku_core::document::DocumentId) {
 }
 
 fn read(router: &EffectRouter, frame: Timeframe) -> StatisticsBuckets {
-    let view = dispatch(
-        router,
+    let (sender, receiver) = mpsc::channel();
+    router.update(
         Event::SetStatisticsTimeframe {
             timeframe: frame,
             as_of_unix_ms: NOW,
         },
+        move |_| {
+            let _ = sender.send(());
+        },
     );
+    while router.view().storage_busy {
+        receiver.recv_timeout(TIMEOUT).unwrap();
+    }
+    let view = router.view();
     assert_eq!(view.statistics.error, None);
     assert!(!view.statistics.loading);
     view.statistics.data.unwrap()
 }
 
 #[test]
-fn statistics_fifo_returns_exact_all_timeframes_without_loading_analyzer_or_writing() {
+fn statistics_fifo_returns_exact_all_timeframes_and_persists_choice_without_loading_analyzer() {
     let database = Database::new();
     let (mut observer, id) = seed(&database);
     let Factory { loader, trace, .. } = Factory::new(false, None);
     let (router, lifecycle) = import_router(database.path(), loader).unwrap();
     router.update(Event::SelectDestination(Destination::Statistics), |_| {});
     for frame in [
+        Timeframe::LastWeek,
         Timeframe::LastYear,
         Timeframe::LastMonth,
         Timeframe::LastSixMonths,
         Timeframe::AllTime,
     ] {
-        let before = std::fs::read(database.path()).unwrap();
         let result = read(&router, frame);
         assert_eq!(result, observer.statistics_buckets(frame, NOW).unwrap());
         let last = result.buckets.last().unwrap().values;
@@ -105,7 +112,7 @@ fn statistics_fifo_returns_exact_all_timeframes_without_loading_analyzer_or_writ
         if frame == Timeframe::LastMonth {
             assert_eq!(result.opening.reading.japanese_occurrences, 6);
         }
-        assert_eq!(std::fs::read(database.path()).unwrap(), before);
+        assert_eq!(observer.statistics_timeframe().unwrap(), frame);
         assert!(trace.try_recv().is_err());
     }
     let retained = router.view().statistics.data.unwrap();
@@ -118,6 +125,8 @@ fn statistics_fifo_returns_exact_all_timeframes_without_loading_analyzer_or_writ
         ..
     } = Factory::new(false, None);
     let (reopened, reopened_lifecycle) = import_router(database.path(), loader).unwrap();
+    dispatch(&reopened, Event::LoadStatisticsTimeframe);
+    assert_eq!(reopened.view().statistics.timeframe, Timeframe::AllTime);
     reopened.update(Event::SelectDestination(Destination::Statistics), |_| {});
     assert_eq!(read(&reopened, Timeframe::AllTime), retained);
     let cat = observer

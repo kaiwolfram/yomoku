@@ -13,7 +13,16 @@ pub(super) fn check(
     cancelled: &mut impl FnMut() -> bool,
 ) -> Result<(), CandidateError> {
     check_sequences(connection, reference, cancelled)?;
-    for table in ["reader_settings", "library_read_clock", "anki_settings"] {
+    for table in [
+        "reader_settings",
+        "library_read_clock",
+        "anki_settings",
+        "statistics_settings",
+    ] {
+        // Older supported snapshots do not yet have the timeframe singleton.
+        if !reference.table_exists(Some("main"), table)? {
+            continue;
+        }
         check_cancelled(cancelled)?;
 
         // These identifiers are bundled constants. CHECK(id = 1) and value

@@ -22,7 +22,15 @@ fn resolve(core: &Core<Yomoku>, effects: &mut [Effect], result: StorageResult) -
     let request = effects
         .iter_mut()
         .find_map(|effect| match effect {
-            Effect::Storage(request) => Some(request),
+            Effect::Storage(request)
+                if !matches!(
+                    request.operation,
+                    StorageOperation::SaveStatisticsTimeframe(_)
+                        | StorageOperation::LoadStatisticsTimeframe
+                ) =>
+            {
+                Some(request)
+            }
             _ => None,
         })
         .expect("storage request");
@@ -37,7 +45,15 @@ fn loaded(query: StatisticsQuery) -> StorageResult {
 
 fn operation(effects: &[Effect]) -> Option<&StorageOperation> {
     effects.iter().find_map(|effect| match effect {
-        Effect::Storage(request) => Some(&request.operation),
+        Effect::Storage(request)
+            if !matches!(
+                request.operation,
+                StorageOperation::SaveStatisticsTimeframe(_)
+                    | StorageOperation::LoadStatisticsTimeframe
+            ) =>
+        {
+            Some(&request.operation)
+        }
         _ => None,
     })
 }

@@ -4,7 +4,12 @@ use super::*;
 
 #[test]
 fn backup_candidate_controls_require_singletons_before_private_migration() {
-    for table in ["reader_settings", "library_read_clock", "anki_settings"] {
+    for table in [
+        "reader_settings",
+        "library_read_clock",
+        "anki_settings",
+        "statistics_settings",
+    ] {
         let database = TestDatabase::new();
         let mut connection = Connection::open(database.path()).unwrap();
         migrate(&mut connection, MIGRATIONS).unwrap();
@@ -12,7 +17,7 @@ fn backup_candidate_controls_require_singletons_before_private_migration() {
             .execute(&format!("DELETE FROM {table}"), [])
             .unwrap();
         drop(connection);
-        check_rejected(&database, 1, CandidateError::InvalidData);
+        check_rejected(&database, 2, CandidateError::InvalidData);
     }
 }
 
@@ -38,7 +43,7 @@ fn backup_candidate_controls_reject_malformed_or_missing_allocation_counters() {
             .unanalyzed_fixture(&PasteText::new("本文".into()).unwrap())
             .unwrap();
         storage.connection.execute_batch(sql).unwrap();
-        check_rejected(&database, 1, CandidateError::InvalidData);
+        check_rejected(&database, 2, CandidateError::InvalidData);
     }
 }
 
@@ -57,7 +62,7 @@ fn backup_candidate_controls_reject_library_clock_regression_and_tied_ordinals()
         } else {
             "UPDATE documents SET last_read_sequence = id; UPDATE library_read_clock SET sequence = 1"
         }).unwrap();
-        check_rejected(&database, 1, CandidateError::InvalidData);
+        check_rejected(&database, 2, CandidateError::InvalidData);
     }
     let database = TestDatabase::new();
     let storage = Storage::open(database.path()).unwrap();
@@ -65,5 +70,5 @@ fn backup_candidate_controls_reject_library_clock_regression_and_tied_ordinals()
         .connection
         .execute("UPDATE library_read_clock SET sequence = ?1", [i64::MAX])
         .unwrap();
-    accept_unchanged(&database, 1);
+    accept_unchanged(&database, 2);
 }

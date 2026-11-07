@@ -30,6 +30,9 @@ class StatisticsScreenTest {
         compose.onNodeWithTag("statistics_card_KNOWN").assertDoesNotExist()
         compose.onNodeWithTag("statistics_timeframe_LASTYEAR").assertIsSelected()
         StatisticsTimeframe.entries.forEach { timeframe ->
+            compose
+                .onNodeWithTag("statistics_timeframes")
+                .performScrollToNode(hasTestTag("statistics_timeframe_${timeframe.name}"))
             compose.onNodeWithTag("statistics_timeframe_${timeframe.name}").performClick()
             val event = events.last() as Event.SetStatisticsTimeframe
             assertEquals(timeframe, event.timeframe)

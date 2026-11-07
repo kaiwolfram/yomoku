@@ -22,7 +22,7 @@ fn setup() -> (TestDatabase, Storage) {
 #[test]
 fn backup_candidate_analyses_reject_gaps_overlaps_missing_tokens_and_wrong_exact_surfaces() {
     {
-        let version = 1;
+        let version = 2;
         for sql in [
             "DELETE FROM analyzed_tokens",
             "DELETE FROM analyzed_tokens WHERE token_index = 1",
@@ -45,7 +45,7 @@ fn backup_candidate_analyses_reject_gaps_overlaps_missing_tokens_and_wrong_exact
 #[test]
 fn backup_candidate_analyses_reject_blank_and_invalid_utf8_profiles_and_metadata() {
     {
-        let version = 1;
+        let version = 2;
         for sql in [
             "UPDATE chapter_analyses SET engine_revision = '　\n'",
             "UPDATE chapter_analyses SET dictionary_revision = '　\n'",
@@ -88,9 +88,9 @@ fn backup_candidate_analyses_apply_existing_japanese_surface_domain_without_clas
             (japanese, i64::from(id)),
         ).unwrap();
         if japanese {
-            check_rejected(&database, 1, CandidateError::InvalidData);
+            check_rejected(&database, 2, CandidateError::InvalidData);
         } else {
-            accept_unchanged(&database, 1);
+            accept_unchanged(&database, 2);
         }
     }
 }
@@ -98,7 +98,7 @@ fn backup_candidate_analyses_apply_existing_japanese_surface_domain_without_clas
 #[test]
 fn backup_candidate_analyses_preserve_every_populated_prefix_all_modes_and_literal_metadata() {
     {
-        let version = 1;
+        let version = 2;
         let (database, mut storage) = setup();
         let mut analysis = storage
             .chapter_analysis(1.try_into().unwrap())
@@ -165,14 +165,14 @@ fn backup_candidate_analyses_preserve_full_i64_ids_and_missing_analysis() {
         );
         // Explicit legacy absence remains valid without synthesizing a replacement.
         storage.connection.execute_batch("DELETE FROM analyzed_tokens WHERE analysis_id = 1; DELETE FROM chapter_analyses WHERE id = 1").unwrap();
-        accept_unchanged(&database, 1);
+        accept_unchanged(&database, 2);
     }
 }
 
 #[test]
 fn backup_candidate_analyses_cancel_every_validation_poll() {
     {
-        let version = 1;
+        let version = 2;
         let (database, _storage) = setup();
         let bytes = fs::read(database.path()).unwrap();
         let mut polls = 0;

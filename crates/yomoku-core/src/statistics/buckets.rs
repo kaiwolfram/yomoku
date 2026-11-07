@@ -13,6 +13,7 @@ const MAX_DATE_MS: i64 = 253_402_300_799_999;
 #[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
 #[repr(C)]
 pub enum StatisticsTimeframe {
+    LastWeek,
     LastMonth,
     LastSixMonths,
     #[default]
@@ -90,6 +91,7 @@ pub fn statistics_buckets(
     )?;
     let today = Date::from_day(as_of_unix_ms / DAY_MS);
     let start = match timeframe {
+        StatisticsTimeframe::LastWeek => (as_of_unix_ms / DAY_MS - 6) * DAY_MS,
         StatisticsTimeframe::LastMonth => today.months_before(1).day_number() * DAY_MS,
         StatisticsTimeframe::LastSixMonths => today.months_before(6).day_number() * DAY_MS,
         StatisticsTimeframe::LastYear => today.months_before(12).day_number() * DAY_MS,
@@ -142,7 +144,7 @@ pub fn statistics_buckets(
     while cursor < end {
         let day = cursor / DAY_MS;
         let boundary = match timeframe {
-            StatisticsTimeframe::LastMonth => (day + 1) * DAY_MS,
+            StatisticsTimeframe::LastWeek | StatisticsTimeframe::LastMonth => (day + 1) * DAY_MS,
             StatisticsTimeframe::LastSixMonths | StatisticsTimeframe::LastYear => {
                 // 1970-01-01 was Thursday, index 3 when Monday is zero.
                 (day + 7 - (day + 3).rem_euclid(7)) * DAY_MS

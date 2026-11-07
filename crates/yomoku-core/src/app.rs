@@ -11,6 +11,7 @@ use serde::{Deserialize, Serialize};
 mod anki;
 mod effective;
 mod statistics;
+mod statistics_preference;
 mod vocabulary;
 mod vocabulary_bulk;
 
@@ -92,6 +93,11 @@ pub struct Model {
     statistics: crate::statistics::StatisticsState,
     statistics_request: Option<(u64, crate::statistics::StatisticsQuery)>,
     statistics_request_sequence: u64,
+    statistics_preference_request: Option<(u64, Option<crate::statistics::StatisticsTimeframe>)>,
+    statistics_preference_sequence: u64,
+    statistics_preference_loaded: bool,
+    statistics_preference_dirty: bool,
+    statistics_preference_error: Option<DocumentError>,
     destination: Destination,
     settings_open: bool,
     documents: Vec<LibraryDocument>,
@@ -243,6 +249,7 @@ pub enum Event {
     },
     /// Read local preferences at startup or in Settings; never queries the provider.
     LoadAnkiSettings,
+    LoadStatisticsTimeframe,
     /// Save a positive signed-64 deck preference, or explicitly clear it.
     SetAnkiDefaultDeck(Option<i64>),
     /// Read back authoritative local settings after failure or a lost response.
@@ -329,6 +336,9 @@ pub enum Event {
     #[serde(skip)]
     #[cfg_attr(feature = "facet_typegen", facet(skip))]
     AbandonAnkiLive,
+    #[serde(skip)]
+    #[cfg_attr(feature = "facet_typegen", facet(skip))]
+    StatisticsTimeframeFinished(u64, StorageResult),
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -435,6 +445,9 @@ impl App for Yomoku {
         }
         if let Event::StatisticsFinished(request_id, result) = event {
             return self.finish_statistics(request_id, result, model);
+        }
+        if let Some(command) = self.update_statistics_preference(&event, model) {
+            return command;
         }
         if let Some(command) = self.update_statistics(&event, model) {
             return command;
@@ -872,6 +885,8 @@ impl App for Yomoku {
                     // never through this uncaptured callback envelope.
                     StorageResult::Effective(_)
                     | StorageResult::StatisticsLoaded(_)
+                    | StorageResult::StatisticsTimeframeLoaded(_)
+                    | StorageResult::StatisticsTimeframeSaved(_)
                     | StorageResult::VocabularyLoaded(_)
                     | StorageResult::VocabularyMatchingIds(_)
                     | StorageResult::VocabularyBulkApplied(_)
@@ -1021,6 +1036,8 @@ impl App for Yomoku {
             | Event::RetryVocabularyBulkAction
             | Event::CancelVocabularyBulkAction
             | Event::LoadStatistics { .. }
+            | Event::LoadStatisticsTimeframe
+            | Event::StatisticsTimeframeFinished(..)
             | Event::SetStatisticsTimeframe { .. }
             | Event::RetryStatistics
             | Event::StatisticsFinished(..)
@@ -1059,7 +1076,11 @@ impl App for Yomoku {
             anki_entries: model.anki_entries_view(),
             anki_export: model.anki_export_view(),
             vocabulary: model.vocabulary.clone(),
-            statistics: model.statistics.clone(),
+            statistics: {
+                let mut state = model.statistics.clone();
+                state.error = state.error.or(model.statistics_preference_error);
+                state
+            },
             destination: model.destination,
             settings_open: model.settings_open,
             documents: model

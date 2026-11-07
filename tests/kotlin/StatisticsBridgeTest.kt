@@ -88,9 +88,8 @@ internal fun verifyStatisticsBridge() {
             )
             dispatch(bridge, Event.SelectDestination(Destination.STATISTICS))
             val calls = dictionary.calls.get()
-            val before = database.readBytes()
             StatisticsTimeframe.entries.forEach { timeframe ->
-                val result = dispatch(bridge, Event.SetStatisticsTimeframe(timeframe, asOf), 1)
+                val result = dispatch(bridge, Event.SetStatisticsTimeframe(timeframe, asOf), 2)
                 val data = checkNotNull(result.statistics.data)
                 check(result.statistics.error == null && !result.statistics.loading)
                 check(data.buckets.last().values.reading.japaneseOccurrences == 3UL)
@@ -98,7 +97,7 @@ internal fun verifyStatisticsBridge() {
                     data.buckets.last().values.statuses == WordStatusCounts(0UL, 0UL, 0UL, 2UL, 0UL)
                 )
                 check(data.endExclusiveUnixMs == asOf + 1)
-                check(database.readBytes().contentEquals(before) && dictionary.calls.get() == calls)
+                check(dictionary.calls.get() == calls)
                 retained = data
             }
             dispatch(bridge, Event.OpenSettings)
@@ -110,6 +109,8 @@ internal fun verifyStatisticsBridge() {
         }
         val calls = dictionary.calls.get()
         NativeBridge(database.path, listener, dictionary).use { bridge ->
+            val restored = dispatch(bridge, Event.LoadStatisticsTimeframe, 1)
+            check(restored.statistics.timeframe == StatisticsTimeframe.ALLTIME)
             dispatch(bridge, Event.SelectDestination(Destination.STATISTICS))
             val prior = checkNotNull(retained)
             val result =

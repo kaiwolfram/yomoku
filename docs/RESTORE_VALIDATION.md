@@ -1,9 +1,11 @@
 # Restore candidate validation
 
-This inventories current **schema 1** validation. It does not authorize activation.
+This inventories current **schema 2** validation. It does not authorize activation.
 See [BACKUP_FORMAT.md](BACKUP_FORMAT.md) and [PRODUCT_SPEC.md §7](PRODUCT_SPEC.md#7-secure-manual-backup-and-restore).
 Development databases/backups are unsupported; the exact initial schema/journal
-must match `0001_simplified_initial_schema`. Previous schema-1 journals,
+must start with `0001_simplified_initial_schema`; schema 2 also requires
+`0002_statistics_timeframe`. Supported schema-1 candidates upgrade in the private
+copy after validation. Previous schema-1 journals,
 unknown/extra schema objects and incompatible versions fail unchanged.
 
 ## Implemented checks
@@ -12,7 +14,7 @@ unknown/extra schema objects and incompatible versions fail unchanged.
 | --- | --- |
 | Container | Complete frame/final-tag/EOF authentication, exact manifest length/schema; private owned staging |
 | SQLite | Header/page/length limits, hardened no-CREATE connection, exact trusted schema objects/journal, integrity/CHECK/index/FK validation |
-| Controls | Required reader/deck/recency singletons, recency ordering, trusted AUTOINCREMENT sequence domains and surviving issued-ID lower bounds |
+| Controls | Version-aware required reader/deck/recency/statistics singletons, recency ordering, trusted AUTOINCREMENT sequence domains and surviving issued-ID lower bounds |
 | Vocabulary | Typed exact UTF-8 surface/status/timestamp domains without normalization or dictionary lookups |
 | Compact completion | Strict version-2 payload shape, page command, C analysis/profile/mode, ordered counted occurrence domains, live text/page/analysis and completed-receipt consistency |
 | Content | Source/document/chapter ownership, contiguous chapter ordering, format/text shape, UTF-8 titles/nonblank live text and representable totals |

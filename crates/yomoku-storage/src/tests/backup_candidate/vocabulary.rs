@@ -10,7 +10,7 @@ fn prefix() -> (TestDatabase, Connection) {
 #[test]
 fn backup_candidate_vocabulary_rejects_blank_surfaces_in_initial_schema() {
     {
-        let version = 1;
+        let version = 2;
         for blank in [" ", "\t\r\n", "\u{85}\u{a0}", "\u{2003}\u{3000}"] {
             let (database, connection) = prefix();
             connection

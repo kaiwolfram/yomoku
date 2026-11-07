@@ -19,6 +19,7 @@ pub fn exchange(dir: &Path, writing: bool) -> Result<(), Box<dyn Error>> {
         fs::create_dir_all(dir)?;
     }
     for (index, timeframe) in [
+        StatisticsTimeframe::LastWeek,
         StatisticsTimeframe::LastMonth,
         StatisticsTimeframe::LastSixMonths,
         StatisticsTimeframe::LastYear,

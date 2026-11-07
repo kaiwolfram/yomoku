@@ -95,7 +95,7 @@ If a chosen library does not support a required capability or architecture in cu
 
 - Design schema around immutable, dated **status-change events**, **reading-completion events**, **every Japanese surface occurrence encountered on completed pages/posts**, and source identity/provenance. History matters more than cached counters; use migration-safe IDs and explicit versioned semantics.
 - Multiple occurrences of a word on one completed page count multiple times. Re-reading counts again. Avoid duplicate counting on accidental repeated click/gesture. Non-Japanese content and punctuation aren't included in Japanese word counts.
-- Statistics: one overview with two charts; no detail pages or drilldown actions. Timeframes: **last month**, **last six months**, **last year (default)**, **all time**; group **daily / weekly / weekly / monthly** respectively.
+- Statistics: one overview with two charts; no detail pages or drilldown actions. Timeframes in one horizontally scrolling row: **last week**, **last month**, **last six months**, **last year (default)**, **all time**; group **daily / daily / weekly / weekly / monthly** respectively. Last week includes today and the preceding six UTC dates, through the supplied current instant. Persist the selected timeframe across restarts and keep its chip visible on entry.
 - Graph 1: **cumulative lifetime Japanese word occurrences read**. Time filter changes visible x-range but **not** origin of cumulative y-values (e.g. 85k→100k for last month).
 - Graph 2: **five distinct time-series lines** of absolute number of registered word surfaces in each status, with statuses' graph colors; import-time registration causes jumps in New.
 - There are **two charts only**: cumulative reading occurrences and the five vocabulary statuses. No separate **Known forms** chart or distinct dictionary-form count. Keep the Known status line in Graph 2 and dictionary-form metadata required by reader/dictionary/history workflows.
@@ -148,7 +148,7 @@ they must not drive implementation unless the user explicitly reopens this scope
 - Password-encrypted archive with a well-reviewed authenticated design (e.g. **Argon2id** KDF and **AEAD** encryption); record schema/format version, salt/nonce/KDF parameters. Do not invent home-grown cryptography or log secrets.
 - Restore is a **complete replacement, never merge**. Authenticate/decrypt and validate backup before destructive work, warn and confirm before replacement, swap atomically/transactionally as possible. An incorrect password/corrupt backup must **leave existing installation intact**.
 - Anki export history and recovery records are excluded from saved data and backups. Restoring a Yomoku backup does not require Anki recovery. Restoring never replays external writes.
-- Existing development databases and backups are unsupported. Incompatible databases produce an error and are never automatically cleared. The first release uses one initial schema with a migration journal for future releases.
+- Existing development databases and backups are unsupported. Incompatible databases produce an error and are never automatically cleared. The first release uses an initial schema with a migration journal; migration 2 preserves supported version-1 data and adds the Statistics timeframe preference.
 - Tests: correct password round trip, bad password, tampering, interrupted restore, new version/backward-compatible schema strategy, and complete state restoration.
 
 ## 8. UX and other confirmed decisions

@@ -164,3 +164,78 @@ fn corrupt_typography_is_rejected_without_writes_or_silent_repair() {
         assert_eq!(fs::read(database.path()).unwrap(), before);
     }
 }
+
+#[test]
+fn statistics_timeframe_migrates_v1_preserves_settings_and_reopens() {
+    use yomoku_core::statistics::StatisticsTimeframe::*;
+    let database = TestDatabase::new();
+    let mut connection = Connection::open(database.path()).unwrap();
+    migrate(&mut connection, &MIGRATIONS[..1]).unwrap();
+    connection
+        .execute("UPDATE reader_settings SET page_length = 750", [])
+        .unwrap();
+    drop(connection);
+    let mut storage = Storage::open(database.path()).unwrap();
+    assert_eq!(storage.schema_version().unwrap(), 2);
+    assert_eq!(storage.statistics_timeframe().unwrap(), LastYear);
+    assert_eq!(storage.page_length().unwrap().characters(), 750);
+    for value in [LastWeek, LastMonth, LastSixMonths, LastYear, AllTime] {
+        assert_eq!(storage.save_statistics_timeframe(value).unwrap(), value);
+        drop(storage);
+        storage = Storage::open(database.path()).unwrap();
+        assert_eq!(storage.statistics_timeframe().unwrap(), value);
+    }
+    assert!(storage
+        .connection
+        .execute(
+            "INSERT INTO statistics_settings VALUES (2, 'last_year')",
+            []
+        )
+        .is_err());
+    assert!(storage
+        .connection
+        .execute("UPDATE statistics_settings SET timeframe = 'unknown'", [])
+        .is_err());
+    storage
+        .connection
+        .execute("DELETE FROM statistics_settings", [])
+        .unwrap();
+    assert!(matches!(
+        storage.statistics_timeframe(),
+        Err(StorageError::InvalidSettings)
+    ));
+    assert!(matches!(
+        storage.save_statistics_timeframe(LastWeek),
+        Err(StorageError::InvalidSettings)
+    ));
+}
+
+#[test]
+fn statistics_timeframe_write_failure_keeps_previous_value_and_can_retry() {
+    use yomoku_core::statistics::StatisticsTimeframe::*;
+    let database = TestDatabase::new();
+    let mut storage = Storage::open(database.path()).unwrap();
+    storage.connection.execute_batch("CREATE TRIGGER fail_timeframe BEFORE UPDATE ON statistics_settings BEGIN SELECT RAISE(ABORT, 'fixture'); END;").unwrap();
+    assert!(matches!(
+        storage.save_statistics_timeframe(LastWeek),
+        Err(StorageError::Sqlite(_))
+    ));
+    assert_eq!(storage.statistics_timeframe().unwrap(), LastYear);
+    assert!(storage.connection.is_autocommit());
+    storage
+        .connection
+        .execute_batch("DROP TRIGGER fail_timeframe")
+        .unwrap();
+    assert_eq!(
+        storage.save_statistics_timeframe(LastWeek).unwrap(),
+        LastWeek
+    );
+    drop(storage);
+    assert_eq!(
+        Storage::open(database.path())
+            .unwrap()
+            .statistics_timeframe()
+            .unwrap(),
+        LastWeek
+    );
+}
