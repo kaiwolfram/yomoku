@@ -107,7 +107,7 @@ class ReaderNavigationTest {
     }
 
     @Test
-    fun controlsAndSwipesPersistBothDirectionsResetScrollAndCountOnlyForward() {
+    fun buttonsPersistBothDirectionsResetScrollAndCountOnlyForwardWhileSwipesDoNothing() {
         val id = openDocument()
         database().use { db ->
             compose.onNodeWithTag("previous_page").performScrollTo().assertIsNotEnabled()
@@ -147,14 +147,18 @@ class ReaderNavigationTest {
             compose.onNodeWithTag("reader_scroll").performTouchInput { swipeUp() }
             assertEquals(1UL, core().view.reader!!.pageNumber)
             assertEquals(1L, completions(db, id))
-            // Swipes do not require reaching the content bottom.
-            awaitReady()
+            // Horizontal swipes leave both the page and its completion history unchanged.
             compose.onNodeWithTag("reader_scroll").performTouchInput { swipeLeft() }
+            compose.onNodeWithTag("reader_scroll").performTouchInput { swipeRight() }
+            awaitReady()
+            assertEquals(1UL, core().view.reader!!.pageNumber)
+            assertEquals(1L, completions(db, id))
+            compose.onNodeWithTag("next_page").performScrollTo().performClick()
             awaitReady()
             assertEquals(2UL, core().view.reader!!.pageNumber)
             assertTop()
             assertEquals(2L, completions(db, id)) // deliberate reread
-            compose.onNodeWithTag("reader_scroll").performTouchInput { swipeRight() }
+            compose.onNodeWithTag("previous_page").performScrollTo().performClick()
             awaitReady()
             assertEquals(1UL, core().view.reader!!.pageNumber)
             assertTop()

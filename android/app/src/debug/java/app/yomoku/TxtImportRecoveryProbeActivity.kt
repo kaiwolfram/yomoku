@@ -47,13 +47,7 @@ class TxtImportRecoveryProbeActivity : ComponentActivity() {
                             started = true
                             if (phase == "before") {
                                 check(core.view.documents.isEmpty())
-                                imports.start(
-                                    listOf(
-                                        fixture(run, "finished"),
-                                        fixture(run, "unfinished", gated = true),
-                                        fixture(run, "remaining"),
-                                    )
-                                )
+                                imports.start(fixture(run, "finished"))
                             } else {
                                 val before = JSONObject(File(directory, "before.json").readText())
                                 check(before.getInt("pid") != Process.myPid())
@@ -61,8 +55,7 @@ class TxtImportRecoveryProbeActivity : ComponentActivity() {
                                 check(core.view.documents.single().title == "$run-finished.txt")
                                 check(core.view.contentRoute == ContentRoute.MAIN)
                                 check(core.view.reader == null)
-                                check(!imports.active && imports.results.isEmpty())
-                                check(imports.totalFiles == 0)
+                                check(!imports.active && imports.result == null)
                                 check(!foregroundService())
                                 val notifications =
                                     getSystemService(NotificationManager::class.java)
@@ -79,13 +72,18 @@ class TxtImportRecoveryProbeActivity : ComponentActivity() {
                         }
                         if (
                             phase == "before" &&
+                                !imports.active &&
+                                imports.result?.outcome == ImportOutcome.CREATED
+                        ) {
+                            imports.start(fixture(run, "unfinished", gated = true))
+                        }
+                        if (
+                            phase == "before" &&
                                 imports.active &&
-                                imports.results.size == 1 &&
                                 imports.filename == "$run-unfinished.txt" &&
                                 foregroundService()
                         ) {
-                            check(imports.results.single().outcome == ImportOutcome.CREATED)
-                            check(imports.totalFiles == 3)
+                            check(core.view.documents.single().title == "$run-finished.txt")
                             publish("PASS", documents = core.view.documents.size)
                             return // Keep the real provider read and service alive for SIGKILL.
                         }
@@ -124,8 +122,7 @@ class TxtImportRecoveryProbeActivity : ComponentActivity() {
                 .put("pid", Process.myPid())
                 .put("documents", documents)
                 .put("active", imports.active)
-                .put("processed", imports.results.size)
-                .put("total", imports.totalFiles)
+                .put("has_result", imports.result != null)
                 .put("foreground_service", foregroundService())
                 .put(
                     "notifications_enabled",

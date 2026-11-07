@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""SIGKILL an actual background TXT batch; verify committed files and no resume.
+"""SIGKILL an actual background TXT import; verify committed files and no resume.
 
 Install current debug and androidTest APKs first. Uses an isolated database, the
 test APK's gated URI provider and a debug-only DUMP-protected Activity. Tests both
@@ -107,9 +107,9 @@ def main():
                     raise RuntimeError("Notification/channel permission differs from requested mode")
                 if phase == "before":
                     if not (measured["active"] and measured["foreground_service"]
-                            and measured["processed"] == 1 and measured["total"] == 3
+                            and not measured["has_result"]
                             and measured["documents"] == 1):
-                        raise RuntimeError(f"Expected one committed + one blocked + one queued: {measured}")
+                        raise RuntimeError(f"Expected a previous committed import and one blocked import: {measured}")
                     device("input", "keyevent", "KEYCODE_HOME")
                     pid = str(measured["pid"])
                     if pid not in processes():
@@ -122,9 +122,9 @@ def main():
                               f"{directory}/before-closed.json", check=False).returncode == 0:
                         raise RuntimeError("Import closed gracefully before death")
                 elif (measured["active"] or measured["foreground_service"]
-                      or measured["processed"] != 0 or measured["total"] != 0
+                      or measured["has_result"]
                       or measured["documents"] != 1):
-                    raise RuntimeError(f"Batch resumed or committed file lost: {measured}")
+                    raise RuntimeError(f"Import resumed or committed file lost: {measured}")
             if pair["before"]["pid"] == pair["after"]["pid"]:
                 raise RuntimeError("Probe reused the original process")
             pair["status"] = "PASS"
@@ -139,7 +139,7 @@ def main():
         device("pm", "grant" if originally_granted else "revoke", PACKAGE, PERMISSION)
         report_path.write_text(json.dumps(report, indent=2) + "\n")
     device("am", "start", "-W", "-n", f"{PACKAGE}/.MainActivity")
-    print(f"PASS: committed TXT retained, unfinished batch absent. Report: {report_path}")
+    print(f"PASS: committed TXT retained, unfinished import absent. Report: {report_path}")
 
 
 if __name__ == "__main__":

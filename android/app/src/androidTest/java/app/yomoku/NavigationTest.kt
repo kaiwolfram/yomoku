@@ -13,6 +13,7 @@ import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.lifecycle.ViewModelProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.yomoku.shared.Destination
@@ -52,8 +53,9 @@ class NavigationTest {
             compose.onNodeWithTag("navigation_settings").performClick().assertIsSelected()
             compose.onNodeWithTag("screen_title").assertTextEquals("Settings")
             compose.onNodeWithTag(navigationTag).assertIsDisplayed()
+            compose.onNodeWithText("Back").assertDoesNotExist()
             compose.onNode(hasText(title) and hasClickAction()).assertIsNotSelected()
-            compose.onNodeWithText("Back").performClick()
+            compose.runOnUiThread { compose.activity.onBackPressedDispatcher.onBackPressed() }
             compose.onNodeWithTag("screen_title").assertTextEquals(title)
         }
         compose.onNodeWithText("Settings").performClick()
@@ -65,6 +67,37 @@ class NavigationTest {
             compose.onNode(hasText(title) and hasClickAction()).performClick().assertIsSelected()
             compose.onNodeWithTag("screen_title").assertTextEquals(title)
             compose.onNodeWithTag("navigation_settings").assertIsNotSelected()
+        }
+    }
+
+    @Test
+    fun settingsExposesOnlyFourPageLengthsAndRetainsLegacyValue() {
+        val core = ViewModelProvider(compose.activity)[CoreSessionOwner::class.java].session
+        compose.waitUntil(30_000) { !core.view.storageBusy && core.view.pageLength != null }
+        val original = core.view.pageLength!!
+        try {
+            compose.onNodeWithTag("navigation_settings").performClick()
+            compose.runOnUiThread {
+                core.dispatch(Event.SetPageLength(app.yomoku.shared.PageLength.CHARACTERS1500))
+            }
+            compose.waitUntil(30_000) { !core.view.storageBusy }
+            compose.onNodeWithText("Back").assertDoesNotExist()
+            for (size in listOf(250, 500, 750, 1000)) {
+                compose.onNodeWithTag("page_length_$size").performScrollTo().assertExists()
+            }
+            compose.onNodeWithTag("page_length_1500").assertDoesNotExist()
+            assertEquals(app.yomoku.shared.PageLength.CHARACTERS1500, core.view.pageLength)
+            compose.activityRule.scenario.recreate()
+            assertEquals(app.yomoku.shared.PageLength.CHARACTERS1500, core.view.pageLength)
+            compose.onNode(hasText("Library") and hasClickAction()).performClick()
+            compose.onNodeWithTag("screen_title").assertTextEquals("Library")
+        } finally {
+            compose.runOnUiThread {
+                core.dispatch(Event.OpenSettings)
+                core.dispatch(Event.SetPageLength(original))
+            }
+            compose.waitUntil(30_000) { !core.view.storageBusy }
+            compose.runOnUiThread { core.dispatch(Event.CloseSettings) }
         }
     }
 
@@ -85,7 +118,7 @@ class NavigationTest {
         }
         compose.onNodeWithTag("screen_title").assertTextEquals("Settings")
         compose.onNodeWithTag("navigation_settings").assertIsSelected()
-        compose.onNodeWithText("Back").performClick()
+        compose.runOnUiThread { compose.activity.onBackPressedDispatcher.onBackPressed() }
         compose.onNodeWithTag("screen_title").assertTextEquals("Vocabulary")
         compose.activityRule.scenario.close()
         compose.runOnUiThread {

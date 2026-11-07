@@ -188,9 +188,6 @@ internal fun ReaderWordPanel(
     onStatus: (VocabularyStatus) -> Unit,
     details: @Composable () -> Unit,
 ) {
-    val close = {
-        onClose()
-    }
     val windowSize = LocalWindowInfo.current.containerSize
     val windowHeight = with(LocalDensity.current) { windowSize.height.toDp() }
     val wide = with(LocalDensity.current) { windowSize.width.toDp() >= 600.dp }
@@ -241,7 +238,7 @@ internal fun ReaderWordPanel(
                                     enabled = enabled && token.vocabulary != null,
                                     role = Role.RadioButton,
                                 ) {
-                                    onStatus(status)
+                                    if (selected) onClose() else onStatus(status)
                                 }
                                 .testTag("word_status_$status")
                                 .padding(horizontal = 2.dp, vertical = 12.dp),
@@ -256,14 +253,13 @@ internal fun ReaderWordPanel(
                     }
                 }
             }
-            TextButton(onClick = close) { Text(stringResource(R.string.close)) }
             details()
         }
     }
     if (wide) {
         Popup(
             alignment = Alignment.TopEnd,
-            onDismissRequest = close,
+            onDismissRequest = onClose,
             properties = PopupProperties(focusable = true),
         ) {
             Surface(
@@ -282,7 +278,7 @@ internal fun ReaderWordPanel(
         }
     } else {
         ModalBottomSheet(
-            onDismissRequest = close,
+            onDismissRequest = onClose,
             sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
             modifier = Modifier.testTag("word_bottom_sheet"),
         ) {

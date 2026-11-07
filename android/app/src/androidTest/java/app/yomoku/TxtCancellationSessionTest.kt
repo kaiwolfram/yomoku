@@ -63,7 +63,7 @@ class TxtCancellationSessionTest {
     }
 
     @Test
-    fun nativeCancellationReturnsDuringBlockedLoadButBatchAwaitsOutcomeBeforeFreshRetry() {
+    fun nativeCancellationReturnsDuringBlockedLoadButImportAwaitsOutcomeBeforeFreshRetry() {
         val directory = File(context.cacheDir, "txt-cancel-load-${System.nanoTime()}")
         assertTrue(directory.mkdir())
         val entered = CountDownLatch(1)
@@ -84,7 +84,7 @@ class TxtCancellationSessionTest {
         val remaining = fixture("remaining.txt", "残りの本。")
         try {
             await { !core.view.storageBusy }
-            main { imports.start(listOf(first, remaining)) }
+            main { imports.start(first) }
             assertTrue(entered.await(30, TimeUnit.SECONDS))
             main {
                 imports.cancel()
@@ -96,22 +96,22 @@ class TxtCancellationSessionTest {
                 assertTrue(core.view.storageBusy)
                 assertTrue(imports.active)
                 assertTrue(imports.cancelling)
-                assertEquals(1, imports.currentFileNumber)
-                imports.start(listOf(remaining)) // Cannot replace an unsettled attempt.
-                assertEquals(2, imports.totalFiles)
+                assertEquals("cancelled.srt", imports.filename)
+                imports.start(remaining) // Cannot replace an unsettled attempt.
+                assertEquals("cancelled.srt", imports.filename)
             }
             release.countDown()
             await { !imports.active && !core.view.storageBusy }
             main {
-                assertTrue(imports.results.isEmpty())
+                assertNull(imports.result)
                 assertTrue(core.view.documents.isEmpty())
                 assertNull(core.view.documentError)
                 assertNull(core.view.importSummary)
-                imports.start(listOf(first)) // Fresh cancellation handle for explicit retry.
+                imports.start(first) // Fresh cancellation handle for explicit retry.
             }
             await { !imports.active && !core.view.storageBusy }
             main {
-                assertEquals(ImportOutcome.CREATED, imports.results.single().outcome)
+                assertEquals(ImportOutcome.CREATED, imports.result?.outcome)
                 assertEquals("cancelled.srt", core.view.documents.single().title)
                 assertNull(core.view.reader)
             }
@@ -151,12 +151,9 @@ class TxtCancellationSessionTest {
             await { !core.view.storageBusy }
             main {
                 imports.start(
-                    listOf(
-                        FileImportFixtures.uri(
-                            "completed.epub",
-                            FileImportFixtures.epub("completed EPUB"),
-                        ),
-                        fixture("discarded.srt", "犬。"),
+                    FileImportFixtures.uri(
+                        "completed.epub",
+                        FileImportFixtures.epub("completed EPUB"),
                     )
                 )
             }
@@ -164,14 +161,13 @@ class TxtCancellationSessionTest {
             main { imports.cancel() }
             // The accepted file can finish before the separate cancellation executor runs.
             loadRelease.countDown()
-            await { !core.view.storageBusy && imports.results.isNotEmpty() }
+            await { !core.view.storageBusy && imports.result != null }
             main {
                 assertTrue(imports.active)
                 assertTrue(imports.cancelling)
-                assertEquals(ImportOutcome.CREATED, imports.results.single().outcome)
+                assertEquals(ImportOutcome.CREATED, imports.result?.outcome)
                 assertEquals("completed EPUB", core.view.documents.single().title)
-                assertEquals(1, imports.currentFileNumber) // Still settling the first file.
-                assertEquals(0.5f, imports.progress)
+                assertEquals("completed.epub", imports.filename)
                 assertNull(core.view.importSummary)
                 assertNull(core.view.documentError)
                 // Owner teardown still cannot release a handle with a queued direct native call.
@@ -197,8 +193,7 @@ class TxtCancellationSessionTest {
             main {
                 assertEquals("completed EPUB", core.view.documents.single().title)
                 assertFalse(imports.active)
-                assertTrue(imports.results.isEmpty())
-                assertEquals(0, imports.totalFiles)
+                assertNull(imports.result)
             }
         } finally {
             loadRelease.countDown()

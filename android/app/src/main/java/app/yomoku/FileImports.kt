@@ -76,7 +76,7 @@ private data class FileInput(
         }
 }
 
-/** Only platform URI reads and sequencing live here. Rust owns every per-file transaction. */
+/** Only platform URI reads and coordination live here. Rust owns the import transaction. */
 internal class FileImports(
     private val resolver: ContentResolver,
     private val core: CoreSession,
@@ -85,11 +85,9 @@ internal class FileImports(
     private val handler = Handler(Looper.getMainLooper())
     private var reader = Executors.newSingleThreadExecutor()
     @Volatile private var readGeneration = 0L
-    private val queue = ArrayDeque<Uri>()
     private var closed = false
     private var waitingForCore = false
     private var cancellationReturned = false
-    private var cancellingFileNumber = 0
     private var input: FileInput? = null
     var active by mutableStateOf(false)
         private set
@@ -103,21 +101,10 @@ internal class FileImports(
     var filename by mutableStateOf("")
         private set
 
-    var totalFiles by mutableStateOf(0)
-        private set
-
-    val currentFileNumber: Int
-        get() = if (!active) 0 else if (cancelling) cancellingFileNumber else results.size + 1
-
-    // Count terminal outcomes, including errors, duplicates and skips. Never estimate
-    // byte/analyzer progress or count an encoding prompt/retry as a completed file.
-    val progress: Float
-        get() = if (totalFiles == 0) 0f else results.size.toFloat() / totalFiles
-
     var encodingError: DocumentError? by mutableStateOf(null)
         private set
 
-    var results: List<FileImportResult> by mutableStateOf(emptyList())
+    var result: FileImportResult? by mutableStateOf(null)
         private set
 
     init {
@@ -125,9 +112,9 @@ internal class FileImports(
         core.onViewChanged = { handler.post { receive() } }
     }
 
-    fun start(uris: List<Uri>) {
+    fun start(uri: Uri) {
         checkMainThread()
-        if (closed || active || uris.isEmpty()) return
+        if (closed || active) return
         val view = core.view
         if (
             view.storageBusy ||
@@ -137,24 +124,13 @@ internal class FileImports(
                 view.settingsOpen
         )
             return
-        results = emptyList()
-        totalFiles = uris.size
+        result = null
         core.dispatch(Event.DismissImportSummary)
-        queue.addAll(uris)
         active = true
-        next()
-    }
-
-    private fun next() {
         input = null
         choosingEncoding = false
         encodingError = null
-        if (queue.isEmpty()) {
-            completeBatch()
-            return
-        }
         val generation = ++readGeneration
-        val uri = queue.removeFirst()
         filename = uri.lastPathSegment.orEmpty()
         refreshNotifications()
         reader.execute {
@@ -222,8 +198,7 @@ internal class FileImports(
         val summary = core.view.importSummary
         if (cancelling) {
             // A completed COMMIT wins cancellation. A rolled-back/encoding attempt adds no row.
-            if (summary != null)
-                results = results + FileImportResult(filename, summary.outcome, summary.title)
+            if (summary != null) result = FileImportResult(filename, summary.outcome, summary.title)
             core.dispatch(Event.DismissImportSummary)
             refreshNotifications()
             settleCancellation()
@@ -258,30 +233,22 @@ internal class FileImports(
         submit()
     }
 
-    fun skipEncoding() {
-        checkMainThread()
-        if (!closed && !cancelling && choosingEncoding)
-            finish(FileImportResult(filename, message = R.string.import_file_skipped))
-    }
-
     private fun finish(result: FileImportResult) {
-        results = results + result
-        next()
+        this.result = result
+        complete()
     }
 
     fun cancel() {
         checkMainThread()
         if (closed || !active || cancelling) return
-        cancellingFileNumber = currentFileNumber
         cancelling = true
         choosingEncoding = false
         encodingError = null
-        queue.clear()
         input = null
         refreshNotifications()
         ++readGeneration
         // A provider can ignore interruption. Retire its executor and ignore all late callbacks;
-        // a fresh batch must not wait behind that provider's blocked read/query.
+        // a fresh import must not wait behind that provider's blocked read/query.
         reader.shutdownNow()
         reader = Executors.newSingleThreadExecutor()
         cancellationReturned = !waitingForCore
@@ -295,24 +262,25 @@ internal class FileImports(
     }
 
     private fun settleCancellation() {
-        if (cancellationReturned && !waitingForCore) completeBatch()
+        if (cancellationReturned && !waitingForCore) complete()
     }
 
-    private fun completeBatch() {
-        observer?.finished(results.size, totalFiles, cancelling)
+    private fun complete() {
+        observer?.finished(result)
         active = false
         cancelling = false
+        choosingEncoding = false
+        encodingError = null
         filename = ""
         input = null
-        // Clear transient errors; completed outcomes stay in the retained batch summary.
+        // Clear transient errors; retain the terminal outcome for the result dialog.
         core.dispatch(Event.RefreshLibrary)
     }
 
     fun dismissSummary() {
         checkMainThread()
         if (!active) {
-            results = emptyList()
-            totalFiles = 0
+            result = null
         }
     }
 
@@ -322,9 +290,6 @@ internal class FileImports(
             observer?.update(
                 FileImportProgress(
                     filename,
-                    currentFileNumber,
-                    results.size,
-                    totalFiles,
                     choosingEncoding,
                     cancelling,
                 )
@@ -336,12 +301,10 @@ internal class FileImports(
         closed = true
         ++readGeneration
         core.onViewChanged = null
-        queue.clear()
         input = null
         reader.shutdownNow()
         observer?.close()
-        // Already accepted Rust work still drains through CoreSession.close(). No batch is
-        // persisted.
+        // Already accepted Rust work still drains through CoreSession.close(). No import resumes.
     }
 
     private fun checkMainThread() {

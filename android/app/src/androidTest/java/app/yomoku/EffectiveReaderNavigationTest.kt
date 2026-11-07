@@ -104,7 +104,7 @@ class EffectiveReaderNavigationTest {
         events.filterIsInstance<Event.CompleteEffectiveReaderPage>().last()
 
     @Test
-    fun appUsesEffectiveWordsAndFrozenCompactCompletionForButtonsSwipesAndFinish() {
+    fun appUsesButtonsForCompactCompletionAndIgnoresHorizontalSwipes() {
         show()
         compose.onNodeWithTag("bottom_navigation").assertDoesNotExist()
         compose.onNodeWithTag("navigation_rail").assertDoesNotExist()
@@ -126,7 +126,8 @@ class EffectiveReaderNavigationTest {
             ),
             events.single(),
         )
-        compose.onNodeWithText("Close").performScrollTo().performClick()
+        androidx.test.platform.app.InstrumentationRegistry.getInstrumentation()
+            .sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_BACK)
         click("next_page")
         val page = frame.value.reader!!
         assertEquals(frame.value.effectiveReaderTokens!!.identity, complete().identity)
@@ -137,15 +138,15 @@ class EffectiveReaderNavigationTest {
             Event.PreviousReaderPage(page.documentId, page.anchor, page.position),
             events.last(),
         )
+        val beforeSwipes = events.toList()
         compose.onNodeWithTag("reader_scroll").performTouchInput { swipeLeft() }
-        assertEquals(2, events.filterIsInstance<Event.CompleteEffectiveReaderPage>().size)
         compose.onNodeWithTag("reader_scroll").performTouchInput { swipeRight() }
-        assertTrue(events.last() is Event.PreviousReaderPage)
+        assertEquals(beforeSwipes, events)
         compose.runOnUiThread {
             frame.value = frame.value.copy(reader = page.copy(pageNumber = 3UL))
         }
         compose.onNodeWithText("Finish Book").performScrollTo().performClick()
-        assertEquals(3, events.filterIsInstance<Event.CompleteEffectiveReaderPage>().size)
+        assertEquals(2, events.filterIsInstance<Event.CompleteEffectiveReaderPage>().size)
     }
 
     @Test
@@ -215,7 +216,7 @@ class EffectiveReaderNavigationTest {
     }
 
     @Test
-    fun retainedButtonSemanticsAndSwipesUseCurrentRevisionAndGates() {
+    fun retainedButtonSemanticsUseCurrentRevisionAndGates() {
         show()
         fun nextAction() =
             compose
@@ -250,8 +251,8 @@ class EffectiveReaderNavigationTest {
                         snapshot.copy(identity = snapshot.identity.copy(revision = 2UL))
                 )
         }
-        // Swipes must observe the new identity even when page geometry has not changed.
-        compose.onNodeWithTag("reader_scroll").performTouchInput { swipeLeft() }
+        // The button must use the new identity even when page geometry has not changed.
+        click("next_page")
         assertEquals(2UL, complete().identity.revision)
         val text =
             compose

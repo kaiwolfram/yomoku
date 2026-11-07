@@ -66,7 +66,7 @@ internal fun YomokuApp(
     checkAnkiProvider: () -> Unit = {},
     requestAnkiPermission: () -> Unit = {},
     ankiBrowser: AnkiNoteBrowser? = null,
-    onImportFiles: (() -> Unit)? = null,
+    onImportBook: (() -> Unit)? = null,
 ) {
     val context = LocalContext.current
     ReaderCompletionToast(view, dispatch) { message ->
@@ -111,19 +111,12 @@ internal fun YomokuApp(
                                 !view.settingsOpen &&
                                 view.destination == Destination.LIBRARY
                         ) {
-                            LibraryAddMenu(view, dispatch, onImportFiles, libraryActionsEnabled)
+                            LibraryAddMenu(view, dispatch, onImportBook, libraryActionsEnabled)
                         }
                     },
                     navigationIcon = {
-                        if (view.settingsOpen || !mainContent) {
-                            TextButton(
-                                onClick = {
-                                    dispatch(
-                                        if (view.settingsOpen) Event.CloseSettings
-                                        else Event.CloseDocument
-                                    )
-                                }
-                            ) {
+                        if (!view.settingsOpen && !mainContent) {
+                            TextButton(onClick = { dispatch(Event.CloseDocument) }) {
                                 Text(stringResource(R.string.back))
                             }
                         }

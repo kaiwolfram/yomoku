@@ -12,12 +12,10 @@ import android.content.ServiceConnection
 import android.content.pm.ServiceInfo
 import android.os.Binder
 import android.os.IBinder
+import app.yomoku.shared.ImportOutcome
 
 internal data class FileImportProgress(
     val filename: String,
-    val current: Int,
-    val processed: Int,
-    val total: Int,
     val choosingEncoding: Boolean,
     val cancelling: Boolean,
 )
@@ -26,7 +24,8 @@ internal data class FileImportProgress(
 internal interface FileImportObserver : AutoCloseable {
     fun update(progress: FileImportProgress)
 
-    fun finished(processed: Int, total: Int, cancelled: Boolean)
+    /** A null result means cancellation completed without a committed outcome. */
+    fun finished(result: FileImportResult?)
 }
 
 /** The lease and callbacks exist only in this process; there is no restartable work. */
@@ -80,7 +79,7 @@ internal class ImportNotifications(context: Context, private val interrupt: () -
         }
         manager.cancel(WAIT_ID)
         if (!started && !progress.cancelling && (previous == null || previous.choosingEncoding)) {
-            // Start only for a user-started batch/encoding choice. Never restart on a timer,
+            // Start only for a user-started import/encoding choice. Never restart on a timer,
             // boot, service redelivery, process launch or background notification update.
             try {
                 context.startForegroundService(Intent(context, ImportService::class.java))
@@ -105,7 +104,7 @@ internal class ImportNotifications(context: Context, private val interrupt: () -
             manager.notify(PROGRESS_ID, progressNotification(context, progress))
     }
 
-    override fun finished(processed: Int, total: Int, cancelled: Boolean) {
+    override fun finished(result: FileImportResult?) {
         progress = null
         releaseService()
         manager.cancel(PROGRESS_ID)
@@ -116,11 +115,28 @@ internal class ImportNotifications(context: Context, private val interrupt: () -
                 notification(context)
                     .setContentTitle(
                         context.getString(
-                            if (cancelled) R.string.import_cancelled else R.string.import_complete
+                            if (result == null) R.string.import_cancelled
+                            else R.string.import_complete
                         )
                     )
                     .setContentText(
-                        context.getString(R.string.import_files_processed, processed, total)
+                        when {
+                            result == null -> ""
+                            result.error != null ->
+                                context.getString(result.error.messageResource())
+                            result.message != null -> context.getString(result.message)
+                            result.outcome == ImportOutcome.EXISTING ->
+                                context.getString(
+                                    R.string.import_existing,
+                                    result.title ?: result.filename,
+                                )
+                            result.outcome == ImportOutcome.CREATED ->
+                                context.getString(
+                                    R.string.import_created,
+                                    result.title ?: result.filename,
+                                )
+                            else -> context.getString(R.string.error_storage_unavailable)
+                        }
                     )
                     .setAutoCancel(true)
                     .build(),
@@ -169,7 +185,10 @@ class ImportService : Service() {
         super.onCreate()
         startForeground(
             ImportNotifications.PROGRESS_ID,
-            notification(this).setContentTitle(getString(R.string.import_files)).build(),
+            notification(this)
+                .setContentTitle(getString(R.string.import_book))
+                .setProgress(0, 0, true)
+                .build(),
             ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC,
         )
     }
@@ -213,17 +232,14 @@ private fun progressNotification(context: Context, progress: FileImportProgress)
         when {
             progress.cancelling -> context.getString(R.string.import_cancelling)
             progress.choosingEncoding -> context.getString(R.string.import_choose_encoding)
-            else ->
-                context.getString(R.string.import_current_file, progress.current, progress.total)
+            else -> context.getString(R.string.import_book)
         }
-    val detail =
-        "${progress.filename}\n" +
-            context.getString(R.string.import_files_processed, progress.processed, progress.total)
+    val detail = progress.filename
     return notification(context)
         .setContentTitle(title)
         .setContentText(detail)
         .setStyle(Notification.BigTextStyle().bigText(detail))
-        .setProgress(progress.total, progress.processed, false)
+        .setProgress(0, 0, true)
         .setOngoing(!progress.choosingEncoding)
         .build()
 }

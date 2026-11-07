@@ -87,7 +87,7 @@ class PasteReaderTest {
             compose.onNodeWithTag("page_length_500").performScrollTo().performClick()
             awaitStorage()
             compose.onNodeWithTag("page_length_500").assertIsSelected()
-            compose.onNodeWithText("Back").performClick()
+            compose.runOnUiThread { compose.activity.onBackPressedDispatcher.onBackPressed() }
 
             val title = "Reflow ${System.nanoTime()}"
             val paragraph = "${"𠮷".repeat(249)}。\n"
@@ -121,30 +121,30 @@ class PasteReaderTest {
             compose.onNodeWithTag("page_length_250").assertIsSelected()
             compose.activityRule.scenario.recreate()
             compose.onNodeWithTag("page_length_250").assertIsSelected()
-            compose.onNodeWithText("Back").performClick()
+            compose.runOnUiThread { compose.activity.onBackPressedDispatcher.onBackPressed() }
             assertEquals(position, core().view.reader!!.position)
             assertEquals(2UL, core().view.reader!!.pageNumber)
             compose.onNodeWithTag("reader_text").assertTextEquals(paragraph)
             assertReaderAtTop()
 
             compose.runOnUiThread { core().dispatch(Event.OpenSettings) }
-            compose.onNodeWithTag("page_length_1500").performScrollTo().performClick()
+            compose.onNodeWithTag("page_length_1000").performScrollTo().performClick()
             awaitStorage()
-            compose.onNodeWithText("Back").performClick()
+            compose.runOnUiThread { compose.activity.onBackPressedDispatcher.onBackPressed() }
             assertEquals(position, core().view.reader!!.position)
             assertEquals(1UL, core().view.reader!!.pageNumber)
-            assertReaderText("$title\n" + paragraph.repeat(6))
+            assertReaderText("$title\n" + paragraph.repeat(4))
             assertReaderAtTop()
             assertEquals(
                 progress,
                 core().view.documents.single { it.documentId == id }.progressPercent,
             )
-            compose.onNodeWithText("Back").performClick()
+            compose.runOnUiThread { compose.activity.onBackPressedDispatcher.onBackPressed() }
             compose.onNodeWithTag("library_documents").performScrollToKey(id.value)
             compose.onNodeWithTag("document_${id.value}").performScrollTo().performClick()
             awaitStorage()
             assertEquals(position, core().view.reader!!.position)
-            assertEquals(PageLength.CHARACTERS1500, core().view.pageLength)
+            assertEquals(PageLength.CHARACTERS1000, core().view.pageLength)
             assertReaderAtTop()
         } finally {
             compose.runOnUiThread { core().dispatch(Event.OpenSettings) }
@@ -210,10 +210,10 @@ class PasteReaderTest {
         val firstPage = "$title\n${"𠮷".repeat(500)}\n"
         val text = firstPage + "次の段落。"
         compose.onNodeWithText("Paste text").assertDoesNotExist()
-        compose.onNodeWithText("Import files").assertDoesNotExist()
+        compose.onNodeWithText("Import book").assertDoesNotExist()
         compose.onNodeWithTag("library_add").performClick()
         compose.onNodeWithText("Paste text").assertIsDisplayed()
-        compose.onNodeWithText("Import files").assertIsDisplayed()
+        compose.onNodeWithText("Import book").assertIsDisplayed()
         InstrumentationRegistry.getInstrumentation().sendKeyDownUpSync(KeyEvent.KEYCODE_BACK)
         compose.onNodeWithText("Paste text").assertDoesNotExist()
         compose.onNodeWithTag("library_add").performClick()
@@ -262,7 +262,9 @@ class PasteReaderTest {
             .onNodeWithTag("import_summary_message")
             .assertTextEquals("Already in Library: $title")
         compose.onNodeWithText("Settings").performClick()
-        compose.onNodeWithText("Back").performClick()
+        compose.onNodeWithTag("screen_title").assertTextEquals("Settings")
+        compose.runOnUiThread { compose.activity.onBackPressedDispatcher.onBackPressed() }
+        compose.onNodeWithTag("screen_title").assertTextEquals("Library")
         compose
             .onNodeWithTag("import_summary_message")
             .assertTextEquals("Already in Library: $title")

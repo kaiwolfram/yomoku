@@ -127,7 +127,6 @@ internal fun VocabularyScreen(
                         stringResource(R.string.vocabulary_matches, state.matchingCount.toString()),
                         modifier = Modifier.testTag("vocabulary_count"),
                     )
-                if (selection == null) VocabularySelectAll(view, dispatch, canSelect)
             }
             items(state.rows, key = { it.id.value }) { row ->
                 val isSelected = selection?.containsSortedVocabularyId(row.id) == true

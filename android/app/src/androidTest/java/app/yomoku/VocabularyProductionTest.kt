@@ -23,6 +23,11 @@ class VocabularyProductionTest {
             val view = core().view
             !view.storageBusy &&
                 !view.completionSavePending &&
+                (view.destination != Destination.LIBRARY ||
+                    view.settingsOpen ||
+                    view.contentRoute != ContentRoute.MAIN ||
+                    view.libraryWordDistributions != null ||
+                    view.libraryWordError != null) &&
                 (view.destination != Destination.VOCABULARY ||
                     view.settingsOpen ||
                     view.contentRoute != ContentRoute.MAIN ||
@@ -45,7 +50,14 @@ class VocabularyProductionTest {
 
     private fun sql(action: (SQLiteDatabase) -> Unit) {
         SQLiteDatabase.openDatabase(
-                java.io.File(compose.activity.filesDir, "yomoku.sqlite3").path,
+                java.io
+                    .File(
+                        androidx.test.platform.app.InstrumentationRegistry.getInstrumentation()
+                            .targetContext
+                            .filesDir,
+                        "yomoku.sqlite3",
+                    )
+                    .path,
                 null,
                 SQLiteDatabase.OPEN_READWRITE,
             )
@@ -96,7 +108,9 @@ class VocabularyProductionTest {
             }
             compose.onNodeWithTag("vocabulary_selected_count").assertTextEquals("Selected words: 1")
             compose.onNodeWithText("Settings").performClick()
-            compose.onNodeWithText("Back").performClick()
+            compose.onNodeWithTag("screen_title").assertTextEquals("Settings")
+            compose.runOnUiThread { compose.activity.onBackPressedDispatcher.onBackPressed() }
+            compose.onNodeWithTag("screen_title").assertTextEquals("Vocabulary")
             idle()
             assertEquals(listOf(hidden), core().view.vocabulary.selection)
             search(prefix + "match-")
@@ -180,6 +194,9 @@ class VocabularyProductionTest {
                         assertEquals(date, it.getLong(2))
                     }
             }
+            compose
+                .onNodeWithTag("vocabulary_row_${core().view.vocabulary.rows.first().id.value}")
+                .performTouchInput { longClick() }
             compose.onNodeWithTag("vocabulary_select_all").performClick()
             idle()
             assertEquals(206, core().view.vocabulary.selection?.size)
@@ -243,6 +260,10 @@ class VocabularyProductionTest {
         try {
             visit()
             search(prefix)
+            compose.onNodeWithTag("vocabulary_select_all").assertDoesNotExist()
+            compose
+                .onNodeWithTag("vocabulary_row_${core().view.vocabulary.rows.first().id.value}")
+                .performTouchInput { longClick() }
             sql { it.execSQL("ALTER TABLE vocabulary RENAME TO vocabulary_capture_unavailable") }
             renamed = true
             compose.onNodeWithTag("vocabulary_select_all").performClick()
@@ -328,7 +349,9 @@ class VocabularyProductionTest {
             compose.onNodeWithTag("vocabulary_row_$last").assertIsDisplayed()
             compose.onNodeWithText("Settings").performClick()
             compose.onNodeWithTag("vocabulary_scroll").assertDoesNotExist()
-            compose.onNodeWithText("Back").performClick()
+            compose.onNodeWithTag("screen_title").assertTextEquals("Settings")
+            compose.runOnUiThread { compose.activity.onBackPressedDispatcher.onBackPressed() }
+            compose.onNodeWithTag("screen_title").assertTextEquals("Vocabulary")
             idle()
             compose.onNodeWithTag("vocabulary_row_$last").assertIsDisplayed()
 
@@ -352,7 +375,9 @@ class VocabularyProductionTest {
             compose.onNodeWithText("Settings").performClick()
             sql { it.execSQL("ALTER TABLE vocabulary RENAME TO vocabulary_browser_unavailable") }
             renamed = true
-            compose.onNodeWithText("Back").performClick()
+            compose.onNodeWithTag("screen_title").assertTextEquals("Settings")
+            compose.runOnUiThread { compose.activity.onBackPressedDispatcher.onBackPressed() }
+            compose.onNodeWithTag("screen_title").assertTextEquals("Vocabulary")
             idle()
             // A query change starts a new read, which fails while the table is absent.
             search(prefix)
@@ -361,7 +386,9 @@ class VocabularyProductionTest {
             sql { it.execSQL("ALTER TABLE vocabulary_browser_unavailable RENAME TO vocabulary") }
             renamed = false
             compose.onNodeWithText("Settings").performClick()
-            compose.onNodeWithText("Back").performClick()
+            compose.onNodeWithTag("screen_title").assertTextEquals("Settings")
+            compose.runOnUiThread { compose.activity.onBackPressedDispatcher.onBackPressed() }
+            compose.onNodeWithTag("screen_title").assertTextEquals("Vocabulary")
             idle()
             assertNotNull(core().view.vocabulary.error)
             compose.onNodeWithTag("vocabulary_retry").performClick()

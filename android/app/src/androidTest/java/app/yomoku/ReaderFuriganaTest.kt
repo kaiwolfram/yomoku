@@ -163,7 +163,8 @@ class ReaderFuriganaTest {
                 assertEquals(selection, core().view.effectiveReaderWord?.selection)
                 assertEquals(readings, core().view.readerFurigana)
             }
-            compose.onNodeWithText("Close").performClick()
+            androidx.test.platform.app.InstrumentationRegistry.getInstrumentation()
+                .sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_BACK)
             val instrumentation = InstrumentationRegistry.getInstrumentation()
             val monitor =
                 instrumentation.addMonitor(
@@ -189,7 +190,8 @@ class ReaderFuriganaTest {
             val after = page.text.indexOf('\uFFFC') + 1
             tap("reader_text_$after", "犬")
             compose.onNodeWithTag("word_surface").assertTextEquals("犬")
-            compose.onNodeWithText("Close").performClick()
+            androidx.test.platform.app.InstrumentationRegistry.getInstrumentation()
+                .sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_BACK)
             compose.activityRule.scenario.recreate()
             awaitReader()
             assertEquals(page, core().view.reader)

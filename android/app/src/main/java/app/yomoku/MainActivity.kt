@@ -27,8 +27,8 @@ class MainActivity : ComponentActivity() {
             fileImports.refreshNotifications()
         }
     private val filePicker =
-        registerForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
-            fileImports.start(uris)
+        registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+            if (uri != null) fileImports.start(uri)
         }
     private val ankiPermissionRequest =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->

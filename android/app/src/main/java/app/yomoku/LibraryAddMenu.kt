@@ -22,7 +22,7 @@ import app.yomoku.shared.ViewModel
 internal fun LibraryAddMenu(
     view: ViewModel,
     dispatch: (Event) -> Unit,
-    onImportFiles: (() -> Unit)?,
+    onImportBook: (() -> Unit)?,
     enabled: Boolean,
 ) {
     val canAct = enabled && !view.storageBusy && !view.completionSavePending
@@ -46,12 +46,12 @@ internal fun LibraryAddMenu(
                     dispatch(Event.OpenPaste)
                 },
             )
-            if (onImportFiles != null) {
+            if (onImportBook != null) {
                 DropdownMenuItem(
-                    text = { Text(stringResource(R.string.import_files)) },
+                    text = { Text(stringResource(R.string.import_book)) },
                     onClick = {
                         expanded = false
-                        onImportFiles()
+                        onImportBook()
                     },
                 )
             }

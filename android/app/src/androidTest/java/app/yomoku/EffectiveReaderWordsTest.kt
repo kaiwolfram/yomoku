@@ -252,8 +252,16 @@ class EffectiveReaderWordsTest {
             .performScrollTo()
             .assertTextEquals("Encountered ${ULong.MAX_VALUE} times")
         compose.onNodeWithTag("word_no_match").assertExists()
-        for (status in VocabularyStatus.entries) {
+        val selectedStatus = frame.value.effectiveReaderTokens!!.tokens.first().vocabulary!!.status
+        compose.onNodeWithText("Close").assertDoesNotExist()
+        val beforeDismiss = events.size
+        click("word_status_$selectedStatus")
+        compose.onNodeWithTag("reader_word_panel").assertDoesNotExist()
+        assertEquals(listOf(Event.DismissReaderWord), events.drop(beforeDismiss))
+        tap()
+        for (status in VocabularyStatus.entries.filter { it != selectedStatus }) {
             click("word_status_$status")
+            compose.onNodeWithTag("reader_word_panel").assertExists()
             val event = events.last() as Event.SetEffectiveReaderStatus
             assertEquals(selection, event.selection)
             assertEquals(VocabularyId(Long.MAX_VALUE), event.vocabularyId)
@@ -346,7 +354,8 @@ class EffectiveReaderWordsTest {
             .assertIsNotEnabled()
         click("effective_status_retry")
         assertEquals(Event.RetryEffectiveReaderStatus, events.last())
-        compose.onNodeWithText("Close").performScrollTo().performClick()
+        androidx.test.platform.app.InstrumentationRegistry.getInstrumentation()
+            .sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_BACK)
         tap(2)
         assertEquals(1, events.filterIsInstance<Event.LoadEffectiveReaderWord>().size)
         compose.runOnUiThread { frame.value = frame.value.copy(storageBusy = true) }

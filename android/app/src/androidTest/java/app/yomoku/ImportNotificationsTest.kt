@@ -66,25 +66,28 @@ class ImportNotificationsTest {
     }
 
     @Test
-    fun backgroundBatchUpdatesProgressAndCompletionAndTapKeepsReaderClosed() {
+    fun backgroundImportUsesIndeterminateProgressAndCompletionAndTapKeepsReaderClosed() {
         val prefix = "notifications-${System.nanoTime()}"
-        val first = FileImportFixtures.uri("$prefix-first.epub", FileImportFixtures.epub(prefix))
-        val blocked = fixture("$prefix-second.srt", "\uFEFF$prefix second 猫。".toByteArray(), prefix)
-        val third = fixture("$prefix-third.txt", "\uFEFF$prefix third 猫。".toByteArray())
+        val blocked =
+            FileImportFixtures.uri("$prefix.epub", FileImportFixtures.epub(prefix), prefix)
         val imports = owner().fileImports
         try {
-            compose.runOnIdle { imports.start(listOf(first, blocked, third)) }
+            compose.runOnIdle { imports.start(blocked) }
             compose.waitUntil(90_000) {
-                imports.results.size == 1 &&
+                notice(ImportNotifications.PROGRESS_ID)
+                    ?.extras
+                    ?.getBoolean(Notification.EXTRA_PROGRESS_INDETERMINATE) == true &&
                     notice(ImportNotifications.PROGRESS_ID)
                         ?.extras
-                        ?.getInt(Notification.EXTRA_PROGRESS) == 1
+                        ?.getString(Notification.EXTRA_TEXT)
+                        ?.contains("$prefix.epub") == true
             }
             assertTrue(foregroundService())
             val progress = checkNotNull(notice(ImportNotifications.PROGRESS_ID))
-            assertEquals("File 2 of 3", progress.extras.getString(Notification.EXTRA_TITLE))
-            assertTrue(progress.extras.getString(Notification.EXTRA_TEXT)!!.contains("second.srt"))
-            assertEquals(3, progress.extras.getInt(Notification.EXTRA_PROGRESS_MAX))
+            assertEquals("Import book", progress.extras.getString(Notification.EXTRA_TITLE))
+            assertTrue(
+                progress.extras.getString(Notification.EXTRA_TEXT)!!.contains("$prefix.epub")
+            )
             compose.activityRule.scenario.recreate()
             assertSame(imports, owner().fileImports)
             compose.activityRule.scenario.moveToState(Lifecycle.State.CREATED)
@@ -95,20 +98,58 @@ class ImportNotificationsTest {
                     notice(ImportNotifications.COMPLETE_ID) != null &&
                     !foregroundService()
             }
-            assertEquals(3, imports.results.size)
+            assertEquals(app.yomoku.shared.ImportOutcome.CREATED, imports.result?.outcome)
             assertNull(notice(ImportNotifications.PROGRESS_ID))
             val completed = checkNotNull(notice(ImportNotifications.COMPLETE_ID))
             assertEquals("Import complete", completed.extras.getString(Notification.EXTRA_TITLE))
-            assertEquals("Processed: 3 of 3", completed.extras.getString(Notification.EXTRA_TEXT))
+            assertEquals("Imported: $prefix", completed.extras.getString(Notification.EXTRA_TEXT))
             completed.contentIntent.send()
             compose.waitUntil(30_000) {
                 compose.activity.lifecycle.currentState == Lifecycle.State.RESUMED
             }
             assertNull(owner().session.view.reader)
-            assertEquals(3, owner().fileImports.results.size)
+            assertEquals(imports.result, owner().fileImports.result)
             compose.runOnIdle { imports.dismissSummary() }
         } finally {
             context.contentResolver.call(blocked, "release", prefix, null)
+        }
+    }
+
+    @Test
+    fun terminalNotificationsDescribeTheSingleOutcome() {
+        val observer = ImportNotifications(context) {}
+        try {
+            val outcomes =
+                listOf(
+                    FileImportResult(
+                        "book.epub",
+                        app.yomoku.shared.ImportOutcome.CREATED,
+                        "Book",
+                    ) to "Imported: Book",
+                    FileImportResult(
+                        "duplicate.epub",
+                        app.yomoku.shared.ImportOutcome.EXISTING,
+                        "Book",
+                    ) to "Already in Library: Book",
+                    FileImportResult("unreadable.txt", message = R.string.import_file_unreadable) to
+                        context.getString(R.string.import_file_unreadable),
+                )
+            for ((result, text) in outcomes) {
+                compose.runOnIdle { observer.finished(result) }
+                compose.waitUntil(30_000) {
+                    notice(ImportNotifications.COMPLETE_ID)
+                        ?.extras
+                        ?.getString(Notification.EXTRA_TEXT) == text
+                }
+                val completed = checkNotNull(notice(ImportNotifications.COMPLETE_ID))
+                assertEquals(
+                    "Import complete",
+                    completed.extras.getString(Notification.EXTRA_TITLE),
+                )
+                assertEquals(text, completed.extras.getString(Notification.EXTRA_TEXT))
+            }
+        } finally {
+            compose.runOnIdle { observer.close() }
         }
     }
 
@@ -130,7 +171,7 @@ class ImportNotificationsTest {
                 override fun onServiceDisconnected(name: ComponentName) {}
             }
         try {
-            compose.runOnIdle { imports.start(listOf(ambiguous)) }
+            compose.runOnIdle { imports.start(ambiguous) }
             compose.waitUntil(30_000) {
                 imports.choosingEncoding &&
                     notice(ImportNotifications.WAIT_ID) != null &&
@@ -156,7 +197,7 @@ class ImportNotificationsTest {
                     .extras
                     .getString(Notification.EXTRA_TITLE),
             )
-            compose.runOnIdle { imports.start(listOf(blocked, ambiguous)) }
+            compose.runOnIdle { imports.start(blocked) }
             compose.waitUntil(30_000) { foregroundService() }
             compose.runOnIdle {
                 bound =
@@ -177,7 +218,7 @@ class ImportNotificationsTest {
                     !foregroundService() &&
                     notice(ImportNotifications.PROGRESS_ID) == null
             }
-            assertTrue(imports.results.isEmpty())
+            assertNull(imports.result)
             assertFalse(owner().session.view.documents.any { it.title.startsWith(prefix) })
             assertNull(notice(ImportNotifications.PROGRESS_ID))
             compose.runOnIdle { imports.refreshNotifications() }

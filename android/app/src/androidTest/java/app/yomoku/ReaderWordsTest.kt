@@ -185,9 +185,13 @@ class ReaderWordsTest {
             assertCats(VocabularyStatus.NEW)
             assertEquals(baseline, count(db, eventsSql))
             assertEquals(0, count(db, readingSql))
+            compose.onNodeWithText("Close").assertDoesNotExist()
+            compose.onNodeWithTag("word_status_NEW").performClick()
+            compose.onNodeWithTag("reader_word_panel").assertDoesNotExist()
+            assertEquals(baseline, count(db, eventsSql))
+            tapSurface("猫")
             for (status in
                 listOf(
-                    VocabularyStatus.NEW,
                     VocabularyStatus.LEARNING,
                     VocabularyStatus.FAMILIAR,
                     VocabularyStatus.KNOWN,
@@ -222,7 +226,8 @@ class ReaderWordsTest {
             assertCats(VocabularyStatus.LEARNING)
             assertNull(core().view.effectiveReaderStatus?.error)
             assertEquals(baseline + 6, count(db, eventsSql))
-            compose.onNodeWithText("Close").performScrollTo().performClick()
+            androidx.test.platform.app.InstrumentationRegistry.getInstrumentation()
+                .sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_BACK)
             compose.onNodeWithTag("reader_word_panel").assertDoesNotExist()
             compose.runOnUiThread { core().dispatch(Event.LoadReaderTokens(key())) }
             awaitWords()
@@ -249,7 +254,8 @@ class ReaderWordsTest {
         val supplementarySurface =
             core().view.effectiveReaderTokens!!.tokens.first { it.surface.contains("𠮷") }.surface
         tapSurface(supplementarySurface)
-        compose.onNodeWithText("Close").performScrollTo().performClick()
+        androidx.test.platform.app.InstrumentationRegistry.getInstrumentation()
+            .sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_BACK)
         val cat =
             core().view.effectiveReaderTokens!!.tokens.first { it.surface == "猫" }.vocabulary!!
         database().use { db ->
@@ -388,7 +394,8 @@ class ReaderWordsTest {
             assertTrue(entered.await(30, TimeUnit.SECONDS))
             assertNull(session.view.effectiveReaderWord?.details)
             compose.onNodeWithText("Loading dictionary…").assertExists()
-            compose.onNodeWithText("Close").performScrollTo().performClick()
+            androidx.test.platform.app.InstrumentationRegistry.getInstrumentation()
+                .sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_BACK)
             compose.onNodeWithTag("reader_word_panel").assertDoesNotExist()
             assertNull(session.view.effectiveReaderWord?.selection)
             release.countDown()

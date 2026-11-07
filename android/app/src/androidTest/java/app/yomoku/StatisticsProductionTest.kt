@@ -133,7 +133,9 @@ class StatisticsProductionTest {
         assertEquals(StatisticsTimeframe.ALLTIME, core().view.statistics.timeframe)
         compose.onNodeWithTag("statistics_card_OCCURRENCES").assertIsDisplayed()
         compose.onNodeWithText("Settings").performClick()
-        compose.onNodeWithText("Back").performClick()
+        compose.onNodeWithTag("screen_title").assertTextEquals("Settings")
+        compose.runOnUiThread { compose.activity.onBackPressedDispatcher.onBackPressed() }
+        compose.onNodeWithTag("screen_title").assertTextEquals("Statistics")
         idle()
         compose.onNodeWithTag("statistics_card_OCCURRENCES").assertIsDisplayed()
         assertEquals(query, core().view.statistics.query)

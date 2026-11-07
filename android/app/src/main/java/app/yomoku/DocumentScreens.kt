@@ -2,7 +2,6 @@ package app.yomoku
 
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -34,8 +33,6 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -380,30 +377,10 @@ internal fun ReaderScreen(
             dispatch(Event.PreviousReaderPage(page.documentId, page.anchor, page.position))
         }
     }
-    val currentNext by rememberUpdatedState(next)
-    val currentPrevious by rememberUpdatedState(previous)
-    val swipeThreshold = with(LocalDensity.current) { 48.dp.toPx() }
     Column(
         modifier =
             Modifier.widthIn(max = 720.dp)
                 .fillMaxSize()
-                .pointerInput(sessionKey, page, canNavigate) {
-                    var horizontal = 0f
-                    detectHorizontalDragGestures(
-                        onDragStart = { horizontal = 0f },
-                        onDragCancel = { horizontal = 0f },
-                        onDragEnd = {
-                            if (horizontal <= -swipeThreshold) currentNext()
-                            else if (horizontal >= swipeThreshold) currentPrevious()
-                        },
-                        onHorizontalDrag = { change, amount ->
-                            if (canNavigate) {
-                                change.consume()
-                                horizontal += amount
-                            }
-                        },
-                    )
-                }
                 .verticalScroll(scroll)
                 .testTag("reader_scroll")
                 .padding(24.dp),

@@ -279,7 +279,8 @@ class ReaderTypographySettingsTest {
                         }
                         .surface,
                 )
-                compose.onNodeWithText("Close").performClick()
+                androidx.test.platform.app.InstrumentationRegistry.getInstrumentation()
+                    .sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_BACK)
                 assertEquals(page, core().view.reader)
             }
         } finally {

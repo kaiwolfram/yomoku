@@ -149,15 +149,13 @@ internal fun SettingsScreen(
         )
         Text(stringResource(R.string.page_length_description))
         Column(Modifier.selectableGroup()) {
-            for (length in PageLength.entries) {
-                val characters =
-                    when (length) {
-                        PageLength.CHARACTERS250 -> 250
-                        PageLength.CHARACTERS500 -> 500
-                        PageLength.CHARACTERS750 -> 750
-                        PageLength.CHARACTERS1000 -> 1000
-                        PageLength.CHARACTERS1500 -> 1500
-                    }
+            for ((length, characters) in
+                listOf(
+                    PageLength.CHARACTERS250 to 250,
+                    PageLength.CHARACTERS500 to 500,
+                    PageLength.CHARACTERS750 to 750,
+                    PageLength.CHARACTERS1000 to 1000,
+                )) {
                 val selected = view.pageLength == length
                 val enabled =
                     !view.storageBusy && !view.completionSavePending && view.pageLength != null

@@ -243,6 +243,7 @@ class VocabularyScreenTest {
                     )
             )
         render()
+        compose.onNodeWithTag("vocabulary_select_all").assertDoesNotExist()
         compose.onNodeWithTag("vocabulary_row_1").performTouchInput { longClick() }
         assertEquals(Event.ToggleVocabularySelection(VocabularyId(1)), events.last())
         compose.runOnUiThread {
