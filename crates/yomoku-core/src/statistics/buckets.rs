@@ -13,10 +13,10 @@ const MAX_DATE_MS: i64 = 253_402_300_799_999;
 #[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
 #[repr(C)]
 pub enum StatisticsTimeframe {
+    #[default]
     LastWeek,
     LastMonth,
     LastSixMonths,
-    #[default]
     LastYear,
     AllTime,
 }

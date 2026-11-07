@@ -16,7 +16,7 @@ fn prefix() -> (TestDatabase, Connection) {
 #[test]
 fn backup_candidate_documents_require_complete_live_text_and_deleted_provenance() {
     {
-        let version = 2;
+        let version = 1;
         for sql in [
             "DELETE FROM chapter_texts WHERE chapter_id = 1",
             "DELETE FROM chapter_texts WHERE chapter_id = 1; DELETE FROM chapters WHERE id = 1",
@@ -38,7 +38,7 @@ fn backup_candidate_documents_require_complete_live_text_and_deleted_provenance(
 #[test]
 fn backup_candidate_documents_require_contiguous_and_format_appropriate_chapters() {
     {
-        let version = 2;
+        let version = 1;
         for sql in [
             "UPDATE chapters SET chapter_index = 2 WHERE id = 1",
             "INSERT INTO chapters (source_id, chapter_index) VALUES (1, 1);
@@ -69,14 +69,14 @@ fn backup_candidate_documents_require_contiguous_and_format_appropriate_chapters
             .unwrap();
         connection.execute_batch(sql).unwrap();
         drop(connection);
-        check_rejected(&database, 2, CandidateError::InvalidData);
+        check_rejected(&database, 1, CandidateError::InvalidData);
     }
 }
 
 #[test]
 fn backup_candidate_documents_reject_invalid_utf8_and_nontext_canonical_fields() {
     {
-        let version = 2;
+        let version = 1;
         for sql in [
             "UPDATE sources SET original_title = CAST(X'ff' AS TEXT) WHERE id = 1",
             "UPDATE documents SET title = CAST(X'ff' AS TEXT) WHERE id = 1",
@@ -100,7 +100,7 @@ fn backup_candidate_documents_reject_invalid_utf8_and_nontext_canonical_fields()
 #[test]
 fn backup_candidate_documents_check_position_ownership_range_and_scalar_boundaries() {
     {
-        let version = 2;
+        let version = 1;
         for (chapter, offset) in [(2, 0), (1, 3), (1, 5), (1, 999), (1, i64::MAX)] {
             let (database, connection) = prefix();
             connection
@@ -118,7 +118,7 @@ fn backup_candidate_documents_check_position_ownership_range_and_scalar_boundari
 #[test]
 fn backup_candidate_documents_migrate_all_populated_prefixes_without_repairing_legacy_positions() {
     {
-        let version = 2;
+        let version = 1;
         let (database, connection) = prefix();
         let literal = "\n 𠮷か\u{3099}。\r\n";
 
@@ -184,7 +184,7 @@ fn backup_candidate_documents_preserve_renames_literal_text_and_deleted_sources(
          INSERT INTO chapters (source_id, chapter_index) VALUES (2, 1);",
         )
         .unwrap();
-    accept_unchanged(&database, 2);
+    accept_unchanged(&database, 1);
 }
 
 #[test]
@@ -203,7 +203,7 @@ fn backup_candidate_documents_accept_every_scalar_position_including_eof() {
             .unwrap();
 
         drop(connection);
-        accept_unchanged(&database, 2);
+        accept_unchanged(&database, 1);
     }
 }
 
@@ -232,14 +232,14 @@ fn backup_candidate_documents_preserve_full_i64_identities() {
             .execute("INSERT INTO reading_positions VALUES (?1, ?1, 4)", [id])
             .unwrap();
 
-        accept_unchanged(&database, 2);
+        accept_unchanged(&database, 1);
     }
 }
 
 #[test]
 fn backup_candidate_documents_cancel_every_populated_validation_poll() {
     {
-        let version = 2;
+        let version = 1;
         let (database, connection) = prefix();
         connection
             .execute_batch("INSERT INTO reading_positions VALUES (1, 1, 0)")

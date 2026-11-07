@@ -63,15 +63,15 @@ fn enter(core: &Core<Yomoku>) {
 }
 
 #[test]
-fn default_year_is_lazy_retained_and_identical_loads_never_duplicate() {
+fn default_week_is_lazy_retained_and_identical_loads_never_duplicate() {
     for core in cores() {
-        assert_eq!(core.view().statistics.timeframe, Timeframe::LastYear);
+        assert_eq!(core.view().statistics.timeframe, Timeframe::LastWeek);
         assert_eq!(core.view().statistics.data, None);
         assert!(core
             .process_event(Event::LoadStatistics { as_of_unix_ms: NOW })
             .is_empty());
         enter(&core);
-        let q = query(Timeframe::LastYear, NOW);
+        let q = query(Timeframe::LastWeek, NOW);
         let mut effects = core.process_event(Event::LoadStatistics { as_of_unix_ms: NOW });
         assert_eq!(
             operation(&effects),
@@ -109,7 +109,7 @@ fn failures_require_explicit_retry_and_freeze_the_original_cutoff() {
             StorageResult::Failed(DocumentError::Unavailable),
         );
         enter(&core);
-        let q = query(Timeframe::LastYear, NOW);
+        let q = query(Timeframe::LastWeek, NOW);
         let mut effects = core.process_event(Event::LoadStatistics { as_of_unix_ms: NOW });
         resolve(
             &core,
@@ -140,7 +140,7 @@ fn failures_require_explicit_retry_and_freeze_the_original_cutoff() {
 fn rapid_changes_coalesce_and_discard_old_successes_and_failures() {
     for core in cores() {
         enter(&core);
-        let first = query(Timeframe::LastYear, NOW);
+        let first = query(Timeframe::LastWeek, NOW);
         let mut effects = core.process_event(Event::LoadStatistics { as_of_unix_ms: NOW });
         for timeframe in [
             Timeframe::LastMonth,
@@ -190,7 +190,7 @@ fn rapid_changes_coalesce_and_discard_old_successes_and_failures() {
 fn stale_callback_cannot_release_new_request_even_with_identical_query() {
     for core in cores() {
         enter(&core);
-        let q = query(Timeframe::LastYear, NOW);
+        let q = query(Timeframe::LastWeek, NOW);
         let mut first = core.process_event(Event::LoadStatistics { as_of_unix_ms: NOW });
         resolve(&core, &mut first, loaded(q));
         core.process_event(Event::SelectDestination(Destination::Library));
@@ -228,7 +228,7 @@ fn hidden_requests_and_unrelated_busy_work_are_not_replaced() {
                 as_of_unix_ms: NOW
             })
             .is_empty());
-        assert_eq!(core.view().statistics.timeframe, Timeframe::LastYear);
+        assert_eq!(core.view().statistics.timeframe, Timeframe::LastWeek);
         resolve(
             &core,
             &mut unrelated,
@@ -262,14 +262,14 @@ fn return_refreshes_external_mutations_and_invalidates_an_inflight_old_cutoff() 
             as_of_unix_ms: NOW + 100,
         });
         assert!(operation(&changed).is_none());
-        let mut next = resolve(&core, &mut first, loaded(query(Timeframe::LastYear, NOW)));
-        let q = query(Timeframe::LastYear, NOW + 100);
+        let mut next = resolve(&core, &mut first, loaded(query(Timeframe::LastWeek, NOW)));
+        let q = query(Timeframe::LastWeek, NOW + 100);
         assert_eq!(operation(&next), Some(&StorageOperation::LoadStatistics(q)));
         resolve(&core, &mut next, loaded(q));
         core.process_event(Event::SelectDestination(Destination::Library));
         enter(&core);
         assert_eq!(core.view().statistics.data, None);
-        assert_eq!(core.view().statistics.timeframe, Timeframe::LastYear);
+        assert_eq!(core.view().statistics.timeframe, Timeframe::LastWeek);
     }
 }
 
@@ -294,7 +294,7 @@ fn changed_query_rejects_mismatched_results_and_does_not_launch_hidden_followup(
             as_of_unix_ms: NOW,
         });
         core.process_event(Event::SelectDestination(Destination::Library));
-        let next = resolve(&core, &mut effects, loaded(query(Timeframe::LastYear, NOW)));
+        let next = resolve(&core, &mut effects, loaded(query(Timeframe::LastWeek, NOW)));
         assert!(operation(&next).is_none());
         assert!(!core.view().statistics.loading && !core.view().storage_busy);
         assert_eq!(core.view().statistics.data, None);
@@ -342,7 +342,7 @@ fn settings_close_can_resume_an_unattempted_coalesced_query() {
             as_of_unix_ms: NOW,
         });
         core.process_event(Event::OpenSettings);
-        let next = resolve(&core, &mut effects, loaded(query(Timeframe::LastYear, NOW)));
+        let next = resolve(&core, &mut effects, loaded(query(Timeframe::LastWeek, NOW)));
         assert!(operation(&next).is_none());
         assert!(!core.view().storage_busy);
         assert!(core

@@ -10,7 +10,7 @@ The format is independent of Crux/Bincode/FFI payloads.
 
 ## Complete local state
 
-The payload is one compact consistent SQLite snapshot of the **current schema 2**,
+The payload is one compact consistent SQLite snapshot of the **initial schema 1**,
 with the [27 application tables](DATA_MODEL.md) and `sqlite_sequence`. It retains
 original imported bytes, canonical text/images/annotations, analysis identities,
 vocabulary/status history, counted occurrences/completions, progress,
@@ -20,9 +20,8 @@ recovery records. SRT cues are transient, while canonical blank-line separators
 and original subtitle bytes remain in the snapshot. Only HTTP(S) EPUB links have
 annotation rows. Reading durations are not saved.
 
-The journal starts with `0001_simplified_initial_schema` and adds
-`0002_statistics_timeframe`. Supported schema-1 backups are validated against their
-original schema, then upgraded in a private copy. Earlier development journals are
+The journal is `0001_simplified_initial_schema`, schema version 1, including the
+Statistics timeframe preference. Earlier development schemas and journals are
 rejected unchanged; no clearing is attempted. The cryptographic envelope and stream format are unchanged.
 
 Bundled dictionaries/fonts/notices, transient routes/selections/callbacks/caches,

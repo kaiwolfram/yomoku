@@ -76,9 +76,9 @@ See [ANKIDROID_API.md](ANKIDROID_API.md) for provider details.
 
 ## Persistence and builds
 
-The [data model](DATA_MODEL.md) contains 27 application tables. A transactional
-migration runner/journal upgrades supported version-1 data to version 2; historical development files
-are rejected without clearing them. Bundled dictionaries are separate read-only assets.
+The [data model](DATA_MODEL.md) contains 27 application tables. The initial schema
+includes the Statistics preference. A transactional migration runner/journal remains
+for future releases; historical development files are rejected without clearing them. Bundled dictionaries are separate read-only assets.
 
 Gradle debug/release variants select matching Rust profiles and separate generated
 outputs. Native generation tasks serialize and use a cross-process lock because

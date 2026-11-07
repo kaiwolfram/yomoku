@@ -71,7 +71,7 @@ fn accept_prefix(database: &TestDatabase, version: usize) {
 #[test]
 fn backup_candidate_formats_preserve_exact_files_annotations_and_paste_hashes() {
     {
-        let version = 2;
+        let version = 1;
         let (database, storage) = setup();
         drop(storage);
         accept_prefix(&database, version);
@@ -81,7 +81,7 @@ fn backup_candidate_formats_preserve_exact_files_annotations_and_paste_hashes() 
 #[test]
 fn backup_candidate_formats_reject_wrong_paste_hashes_and_file_hash_ownership() {
     {
-        let version = 2;
+        let version = 1;
         for sql in [
             "UPDATE paste_content_hashes SET sha256 = zeroblob(32)",
             "UPDATE chapter_texts SET text = 'different literal bytes' WHERE chapter_id = 1",
@@ -100,14 +100,14 @@ fn backup_candidate_formats_reject_wrong_paste_hashes_and_file_hash_ownership() 
                 [document],
             )
             .unwrap();
-        check_rejected(&database, 2, CandidateError::InvalidData);
+        check_rejected(&database, 1, CandidateError::InvalidData);
     }
 }
 
 #[test]
 fn backup_candidate_formats_require_file_records_matching_kind_encoding_and_exact_digest() {
     {
-        let version = 2;
+        let version = 1;
         for sql in [
             "DELETE FROM imported_files WHERE document_id = 3",
             "UPDATE imported_files SET sha256 = zeroblob(32) WHERE document_id = 3",
@@ -135,7 +135,7 @@ fn backup_candidate_formats_require_file_records_matching_kind_encoding_and_exac
             storage.connection.execute_batch("DELETE FROM epub_inline_images; DELETE FROM epub_spans; DELETE FROM epub_chapters; DELETE FROM epub_assets;").unwrap();
         }
         storage.connection.execute_batch(sql).unwrap();
-        check_rejected(&database, 2, CandidateError::InvalidData);
+        check_rejected(&database, 1, CandidateError::InvalidData);
     }
 }
 
@@ -156,14 +156,14 @@ fn backup_candidate_formats_reject_undecodable_or_different_text_even_with_updat
                 (bytes, Sha256::digest(bytes).as_slice(), document),
             )
             .unwrap();
-        check_rejected(&database, 2, CandidateError::InvalidData);
+        check_rejected(&database, 1, CandidateError::InvalidData);
     }
 }
 
 #[test]
 fn backup_candidate_formats_reject_missing_extra_changed_or_invalid_txt_ruby() {
     {
-        let version = 2;
+        let version = 1;
         for sql in [
             "DELETE FROM source_ruby WHERE chapter_id = 3",
             "DELETE FROM source_ruby WHERE chapter_id = 3 AND ruby_index = 1",
@@ -186,7 +186,7 @@ fn backup_candidate_formats_reject_missing_extra_changed_or_invalid_txt_ruby() {
         .connection
         .execute_batch("INSERT INTO source_ruby VALUES (4, 0, 0, 4, 'foreign')")
         .unwrap();
-    check_rejected(&database, 2, CandidateError::InvalidData);
+    check_rejected(&database, 1, CandidateError::InvalidData);
 }
 
 #[test]
@@ -200,7 +200,7 @@ fn backup_candidate_formats_validate_epub_ruby_ranges_without_reinterpreting_rea
     ] {
         let (database, storage) = setup();
         storage.connection.execute_batch(sql).unwrap();
-        check_rejected(&database, 2, CandidateError::InvalidData);
+        check_rejected(&database, 1, CandidateError::InvalidData);
     }
     let (database, storage) = setup();
     storage
@@ -210,7 +210,7 @@ fn backup_candidate_formats_validate_epub_ruby_ranges_without_reinterpreting_rea
             ["　\0\n"],
         )
         .unwrap();
-    accept_unchanged(&database, 2);
+    accept_unchanged(&database, 1);
 }
 
 #[test]
@@ -240,13 +240,13 @@ fn backup_candidate_formats_preserve_explicit_shift_jis_renames_and_deleted_file
     for id in [4, 5] {
         storage.delete_document(id.try_into().unwrap()).unwrap();
     }
-    accept_unchanged(&database, 2);
+    accept_unchanged(&database, 1);
 }
 
 #[test]
 fn backup_candidate_formats_cancel_all_populated_validation_and_hash_chunk_boundaries() {
     {
-        let version = 2;
+        let version = 1;
         let (database, storage) = setup();
         // Multiple hash chunks, with no decoder allocation for a paste.
         let large = "か".repeat(710000);

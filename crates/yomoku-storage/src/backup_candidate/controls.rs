@@ -19,10 +19,6 @@ pub(super) fn check(
         "anki_settings",
         "statistics_settings",
     ] {
-        // Older supported snapshots do not yet have the timeframe singleton.
-        if !reference.table_exists(Some("main"), table)? {
-            continue;
-        }
         check_cancelled(cancelled)?;
 
         // These identifiers are bundled constants. CHECK(id = 1) and value

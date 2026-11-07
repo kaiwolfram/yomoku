@@ -1,9 +1,8 @@
 # Data model
 
-The authoritative SQL is [migration 1](../crates/yomoku-storage/migrations/0001_simplified_initial_schema.sql)
-and [migration 2](../crates/yomoku-storage/migrations/0002_statistics_timeframe.sql).
-The release schema version is **2**, with journal entries `0001_simplified_initial_schema`
-and `0002_statistics_timeframe`. It has **27 application tables** plus SQLite's internal `sqlite_sequence` table.
+The authoritative SQL is [0001_simplified_initial_schema.sql](../crates/yomoku-storage/migrations/0001_simplified_initial_schema.sql).
+The release schema version is **1**, journal name `0001_simplified_initial_schema`.
+It has **27 application tables** plus SQLite's internal `sqlite_sequence` table.
 Earlier development schemas and journals are unsupported, including the previous
 schema-1 journal. They are rejected without migration or modification.
 
@@ -17,8 +16,7 @@ schema-1 journal. They are rejected without migration or modification.
 ## Initialization and compatibility
 
 The small migration runner opens an immediate transaction, reads the journal and
-applies missing bundled migrations once. Version 1 upgrades without changing reader
-settings, vocabulary or history. Concurrent opens serialize. Foreign keys are
+applies the initial schema once. Concurrent opens serialize. Foreign keys are
 enabled on every repository connection. Unknown, future and historical development
 journals are errors. The runner does not reset incompatible databases, delete user
 files or backfill development data. Additional upgrades can add migrations.
@@ -100,11 +98,10 @@ is unfinished; [RESTORE_VALIDATION.md](RESTORE_VALIDATION.md) states its limits.
 
 ## Statistics preference
 
-Migration 2 adds `statistics_settings`, a required singleton (`id = 1`) with a
+The initial schema includes `statistics_settings`, a required singleton (`id = 1`) with a
 validated timeframe: `last_week`, `last_month`, `last_six_months`, `last_year`, or
-`all_time`. New and upgraded databases default to `last_year`. Native typed
+`all_time`. New databases default to `last_week`. Native typed
 read/save effects share the SQLite FIFO; one preference request runs at a time,
 coalescing later selections even after navigation. Statistics Retry retries failed
 preference operations. Missing or invalid settings are errors and are never repaired.
-Backup validation uses the candidate version's exact schema and singleton set,
-then upgrades a supported version-1 candidate only in its private copy.
+Backup validation requires the exact initial schema and all settings singletons.

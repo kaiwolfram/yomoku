@@ -28,7 +28,7 @@ class StatisticsScreenTest {
     fun overviewChartsHaveNoDetailActionsAndAllTimeframeEvents() {
         render()
         compose.onNodeWithTag("statistics_card_KNOWN").assertDoesNotExist()
-        compose.onNodeWithTag("statistics_timeframe_LASTYEAR").assertIsSelected()
+        compose.onNodeWithTag("statistics_timeframe_LASTWEEK").assertIsSelected()
         StatisticsTimeframe.entries.forEach { timeframe ->
             compose
                 .onNodeWithTag("statistics_timeframes")
@@ -81,7 +81,7 @@ class StatisticsScreenTest {
         frame.value =
             frame.value.copy(
                 storageBusy = true,
-                statistics = StatisticsState(StatisticsTimeframe.LASTYEAR, loading = false),
+                statistics = StatisticsState(StatisticsTimeframe.LASTWEEK, loading = false),
             )
         render()
         compose.waitForIdle()
@@ -98,8 +98,8 @@ class StatisticsScreenTest {
                 frame.value.copy(
                     statistics =
                         StatisticsState(
-                            StatisticsTimeframe.LASTYEAR,
-                            StatisticsQuery(StatisticsTimeframe.LASTYEAR, requested.asOfUnixMs),
+                            StatisticsTimeframe.LASTWEEK,
+                            StatisticsQuery(StatisticsTimeframe.LASTWEEK, requested.asOfUnixMs),
                             false,
                             DocumentError.UNAVAILABLE,
                         )
@@ -151,8 +151,8 @@ private fun statisticsView(): ViewModel {
             ),
         statistics =
             StatisticsState(
-                StatisticsTimeframe.LASTYEAR,
-                StatisticsQuery(StatisticsTimeframe.LASTYEAR, data.endExclusiveUnixMs - 1),
+                StatisticsTimeframe.LASTWEEK,
+                StatisticsQuery(StatisticsTimeframe.LASTWEEK, data.endExclusiveUnixMs - 1),
                 false,
                 data = data,
             ),

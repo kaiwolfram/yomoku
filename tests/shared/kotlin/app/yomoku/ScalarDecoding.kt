@@ -185,7 +185,7 @@ internal fun frozenScalarView(ids: List<VocabularyId>): ViewModel =
                     ),
                 bulkError = DocumentError.UNAVAILABLE,
             ),
-        statistics = StatisticsState(StatisticsTimeframe.LASTYEAR, loading = false),
+        statistics = StatisticsState(StatisticsTimeframe.LASTWEEK, loading = false),
         destination = Destination.VOCABULARY,
         settingsOpen = false,
         documents = emptyList(),

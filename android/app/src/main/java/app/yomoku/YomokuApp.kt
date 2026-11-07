@@ -301,7 +301,7 @@ private fun YomokuPreview() {
                         selectingAll = false,
                         loading = false,
                     ),
-                statistics = StatisticsState(StatisticsTimeframe.LASTYEAR, loading = false),
+                statistics = StatisticsState(StatisticsTimeframe.LASTWEEK, loading = false),
                 destination = Destination.LIBRARY,
                 settingsOpen = false,
                 documents = emptyList(),

@@ -29,7 +29,7 @@ internal fun verifyStatisticsCodecs(dir: String) {
         val bytes = File(dir, "statistics-state-$index.bin").readBytes()
         val view = ViewModel.bincodeDeserialize(bytes)
         check(view.statistics.data == null && view.statistics.query == null)
-        check(view.statistics.timeframe == StatisticsTimeframe.LASTYEAR)
+        check(view.statistics.timeframe == StatisticsTimeframe.LASTWEEK)
         check(view.statistics.loading == (index == 1))
         check(view.statistics.error == if (index == 2) DocumentError.INVALIDDOCUMENT else null)
         check(view.bincodeSerialize().contentEquals(bytes))

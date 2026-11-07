@@ -142,9 +142,9 @@ mod tests {
         finish(
             &mut model,
             1,
-            StorageResult::StatisticsTimeframeLoaded(LastWeek),
+            StorageResult::StatisticsTimeframeLoaded(LastYear),
         );
-        assert_eq!(model.statistics.timeframe, LastWeek);
+        assert_eq!(model.statistics.timeframe, LastYear);
         assert!(update(&mut model, Event::LoadStatisticsTimeframe).is_empty());
 
         let mut model = Model::default();
@@ -265,18 +265,18 @@ fn explicit_default_choice_wins_over_late_startup_restore() {
     ));
     drop(Yomoku.update(
         Event::SetStatisticsTimeframe {
-            timeframe: LastYear,
+            timeframe: LastWeek,
             as_of_unix_ms: 100,
         },
         &mut model,
     ));
     drop(Yomoku.update(
-        Event::StatisticsTimeframeFinished(1, StorageResult::StatisticsTimeframeLoaded(LastWeek)),
+        Event::StatisticsTimeframeFinished(1, StorageResult::StatisticsTimeframeLoaded(LastYear)),
         &mut model,
     ));
-    assert_eq!(model.statistics.timeframe, LastYear);
+    assert_eq!(model.statistics.timeframe, LastWeek);
     assert_eq!(
         model.statistics_preference_request,
-        Some((2, Some(LastYear)))
+        Some((2, Some(LastWeek)))
     );
 }

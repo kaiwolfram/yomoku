@@ -40,7 +40,7 @@ internal fun verifyStatisticsBridge() {
             dispatch(bridge, Event.SelectDestination(Destination.STATISTICS))
             check(
                 ViewModel.bincodeDeserialize(bridge.view()).statistics.timeframe ==
-                    StatisticsTimeframe.LASTYEAR
+                    StatisticsTimeframe.LASTWEEK
             )
             // Invalid dates remain statistics-only errors; Retry keeps the cutoff.
             val invalid = dispatch(bridge, Event.LoadStatistics(-1), 1)

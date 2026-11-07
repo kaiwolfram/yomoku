@@ -88,7 +88,7 @@ fn history(path: &Path) -> Vec<(i64, String)> {
 fn initial_schema_has_only_release_tables_and_reopens_without_writes() {
     let database = TestDatabase::new();
     let storage = Storage::open(database.path()).unwrap();
-    assert_eq!(storage.schema_version().unwrap(), 2);
+    assert_eq!(storage.schema_version().unwrap(), 1);
     let tables: Vec<String> = storage.connection.prepare("SELECT name FROM sqlite_schema WHERE type = 'table' AND name NOT GLOB 'sqlite_*' ORDER BY name").unwrap().query_map([], |r| r.get(0)).unwrap().collect::<Result<_, _>>().unwrap();
     let mut expected = vec![
         "sources",
@@ -141,10 +141,7 @@ fn initial_schema_has_only_release_tables_and_reopens_without_writes() {
     );
     assert_eq!(
         history(&database.path()),
-        [
-            (1, "0001_simplified_initial_schema".into()),
-            (2, "0002_statistics_timeframe".into())
-        ]
+        [(1, "0001_simplified_initial_schema".into())]
     );
     assert_eq!(
         storage
@@ -166,7 +163,7 @@ fn initial_schema_has_only_release_tables_and_reopens_without_writes() {
     let bytes = fs::read(database.path()).unwrap();
     for _ in 0..3 {
         let storage = Storage::open(database.path()).unwrap();
-        assert_eq!(storage.schema_version().unwrap(), 2);
+        assert_eq!(storage.schema_version().unwrap(), 1);
         assert!(storage
             .connection
             .pragma_query_value(None, "foreign_keys", |r| r.get::<_, bool>(0))
@@ -185,16 +182,13 @@ fn concurrent_initialization_records_initial_schema_once() {
             let path = database.path();
             scope.spawn(move || {
                 barrier.wait();
-                assert_eq!(Storage::open(path).unwrap().schema_version().unwrap(), 2);
+                assert_eq!(Storage::open(path).unwrap().schema_version().unwrap(), 1);
             });
         }
     });
     assert_eq!(
         history(&database.path()),
-        [
-            (1, "0001_simplified_initial_schema".into()),
-            (2, "0002_statistics_timeframe".into())
-        ]
+        [(1, "0001_simplified_initial_schema".into())]
     );
 }
 

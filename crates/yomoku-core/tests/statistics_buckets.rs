@@ -63,7 +63,7 @@ fn status(timestamp: i64, counts: [u64; 5]) -> StatusTimelinePoint {
 
 #[test]
 fn defaults_rolling_calendar_months_and_partial_today() {
-    assert_eq!(StatisticsTimeframe::default(), LastYear);
+    assert_eq!(StatisticsTimeframe::default(), LastWeek);
     let now = date("2024-03-31") + DAY / 2;
     for (frame, start) in [
         (LastMonth, "2024-02-29"),

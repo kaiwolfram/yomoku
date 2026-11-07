@@ -166,7 +166,7 @@ fn corrupt_typography_is_rejected_without_writes_or_silent_repair() {
 }
 
 #[test]
-fn statistics_timeframe_migrates_v1_preserves_settings_and_reopens() {
+fn statistics_timeframe_defaults_to_last_week_and_reopens_with_other_settings() {
     use yomoku_core::statistics::StatisticsTimeframe::*;
     let database = TestDatabase::new();
     let mut connection = Connection::open(database.path()).unwrap();
@@ -176,8 +176,8 @@ fn statistics_timeframe_migrates_v1_preserves_settings_and_reopens() {
         .unwrap();
     drop(connection);
     let mut storage = Storage::open(database.path()).unwrap();
-    assert_eq!(storage.schema_version().unwrap(), 2);
-    assert_eq!(storage.statistics_timeframe().unwrap(), LastYear);
+    assert_eq!(storage.schema_version().unwrap(), 1);
+    assert_eq!(storage.statistics_timeframe().unwrap(), LastWeek);
     assert_eq!(storage.page_length().unwrap().characters(), 750);
     for value in [LastWeek, LastMonth, LastSixMonths, LastYear, AllTime] {
         assert_eq!(storage.save_statistics_timeframe(value).unwrap(), value);
@@ -217,18 +217,18 @@ fn statistics_timeframe_write_failure_keeps_previous_value_and_can_retry() {
     let mut storage = Storage::open(database.path()).unwrap();
     storage.connection.execute_batch("CREATE TRIGGER fail_timeframe BEFORE UPDATE ON statistics_settings BEGIN SELECT RAISE(ABORT, 'fixture'); END;").unwrap();
     assert!(matches!(
-        storage.save_statistics_timeframe(LastWeek),
+        storage.save_statistics_timeframe(LastYear),
         Err(StorageError::Sqlite(_))
     ));
-    assert_eq!(storage.statistics_timeframe().unwrap(), LastYear);
+    assert_eq!(storage.statistics_timeframe().unwrap(), LastWeek);
     assert!(storage.connection.is_autocommit());
     storage
         .connection
         .execute_batch("DROP TRIGGER fail_timeframe")
         .unwrap();
     assert_eq!(
-        storage.save_statistics_timeframe(LastWeek).unwrap(),
-        LastWeek
+        storage.save_statistics_timeframe(LastYear).unwrap(),
+        LastYear
     );
     drop(storage);
     assert_eq!(
@@ -236,6 +236,6 @@ fn statistics_timeframe_write_failure_keeps_previous_value_and_can_retry() {
             .unwrap()
             .statistics_timeframe()
             .unwrap(),
-        LastWeek
+        LastYear
     );
 }

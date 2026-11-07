@@ -237,3 +237,9 @@ CREATE UNIQUE INDEX vocabulary_completion_status_once
 INSERT INTO reader_settings VALUES (1, 500, 16, 150, 0);
 INSERT INTO library_read_clock VALUES (1, 0);
 INSERT INTO anki_settings VALUES (1, NULL);
+
+CREATE TABLE statistics_settings (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    timeframe TEXT NOT NULL CHECK (timeframe IN ('last_week', 'last_month', 'last_six_months', 'last_year', 'all_time'))
+) STRICT;
+INSERT INTO statistics_settings (id, timeframe) VALUES (1, 'last_week');

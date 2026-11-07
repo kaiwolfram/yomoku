@@ -80,7 +80,7 @@ class StatisticsDatasetTest {
 }
 
 internal fun statisticsFixture(
-    timeframe: StatisticsTimeframe = StatisticsTimeframe.LASTYEAR
+    timeframe: StatisticsTimeframe = StatisticsTimeframe.LASTWEEK
 ): StatisticsBuckets {
     val start = 1_700_000_000_000L
     val opening =
