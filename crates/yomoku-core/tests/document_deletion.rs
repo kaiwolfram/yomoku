@@ -66,7 +66,6 @@ fn document_deletion_requires_visible_frozen_target_and_explicit_matching_confir
     assert!(core
         .process_event(Event::ConfirmDocumentDeletion(id(2)))
         .is_empty());
-    core.process_event(Event::SearchLibraryTitles("2".into()));
     core.process_event(Event::SortLibrary(yomoku_core::library::LibrarySort::Title));
     assert_eq!(
         core.view().library_delete_target,
@@ -78,9 +77,9 @@ fn document_deletion_requires_visible_frozen_target_and_explicit_matching_confir
         .process_event(Event::ConfirmDocumentDeletion(id(1)))
         .is_empty());
     assert!(core
-        .process_event(Event::RequestDocumentDeletion(id(1)))
+        .process_event(Event::RequestDocumentDeletion(id(999)))
         .is_empty());
-    assert_eq!(core.view().library_document_count, 2);
+    assert_eq!(core.view().documents.len(), 2);
 }
 
 #[test]
@@ -97,16 +96,12 @@ fn document_deletion_success_updates_full_library_counts_and_rejects_double_subm
         .process_event(Event::RequestDocumentDeletion(id(2)))
         .is_empty());
     assert!(core.process_event(Event::CancelDocumentDeletion).is_empty());
-    core.process_event(Event::SearchLibraryTitles("1".into()));
     finish(&core, &mut effects, StorageResult::DocumentDeleted(id(1)));
     let view = core.view();
     assert!(!view.storage_busy);
     assert!(view.library_delete_target.is_none());
-    assert!(view.documents.is_empty());
-    assert_eq!(view.library_document_count, 1);
+    assert_eq!(view.documents.len(), 1);
     assert!(view.library_word_distributions.is_none());
-    assert_eq!(view.library_title_query, "1");
-    core.process_event(Event::SearchLibraryTitles(String::new()));
     assert_eq!(core.view().documents[0].document_id, id(2));
 }
 
@@ -131,7 +126,7 @@ fn document_deletion_failure_retains_confirmation_for_explicit_retry_and_separat
     assert_eq!(view.library_delete_error, Some(DocumentError::Unavailable));
     assert_eq!(view.document_error, Some(DocumentError::EmptyPaste));
     assert_eq!(view.library_delete_target, target);
-    assert_eq!(view.library_document_count, 2);
+    assert_eq!(view.documents.len(), 2);
     assert!(!view.storage_busy);
     assert!(core
         .process_event(Event::DismissImportSummary)
@@ -140,7 +135,7 @@ fn document_deletion_failure_retains_confirmation_for_explicit_retry_and_separat
     let mut effects = core.process_event(Event::ConfirmDocumentDeletion(id(1)));
     assert_eq!(core.view().library_delete_error, None);
     finish(&core, &mut effects, StorageResult::DocumentDeleted(id(1)));
-    assert_eq!(core.view().library_document_count, 1);
+    assert_eq!(core.view().documents.len(), 1);
 }
 
 #[test]
@@ -174,10 +169,24 @@ fn document_deletion_navigation_retires_prompts_and_late_callbacks_only_remove_t
     core.process_event(Event::SelectDestination(Destination::Vocabulary));
     finish(&core, &mut effects, StorageResult::DocumentDeleted(id(1)));
     assert_eq!(core.view().destination, Destination::Vocabulary);
-    assert_eq!(core.view().library_document_count, 1);
+    assert_eq!(core.view().documents.len(), 1);
     let core = loaded();
     core.process_event(Event::RequestDocumentDeletion(id(1)));
     let mut effects = core.process_event(Event::ConfirmDocumentDeletion(id(1)));
     finish(&core, &mut effects, StorageResult::DocumentDeleted(id(2)));
-    assert_eq!(core.view().library_document_count, 2);
+    assert_eq!(core.view().documents.len(), 2);
+}
+
+#[test]
+fn deletion_to_one_and_zero_preserves_sort_for_future_imports() {
+    use yomoku_core::library::LibrarySort;
+    let core = loaded();
+    core.process_event(Event::SortLibrary(LibrarySort::TitleDescending));
+    for (target, remaining) in [(id(1), 1), (id(2), 0)] {
+        core.process_event(Event::RequestDocumentDeletion(target));
+        let mut effects = core.process_event(Event::ConfirmDocumentDeletion(target));
+        finish(&core, &mut effects, StorageResult::DocumentDeleted(target));
+        assert_eq!(core.view().documents.len(), remaining);
+        assert_eq!(core.view().library_sort, LibrarySort::TitleDescending);
+    }
 }

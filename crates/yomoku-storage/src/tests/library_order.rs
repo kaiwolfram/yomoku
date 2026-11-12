@@ -71,7 +71,7 @@ fn recency_changes_only_on_successful_explicit_entry_and_survives_reopen() {
             .unwrap();
         let listed = storage.list_documents().unwrap();
         assert_eq!(
-            LibrarySort::LastRead.project(&listed, "")[0].document_id,
+            LibrarySort::LastRead.project(&listed)[0].document_id,
             first.document_id
         );
     }

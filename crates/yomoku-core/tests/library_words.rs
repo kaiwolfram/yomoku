@@ -50,11 +50,10 @@ fn loaded(core: &Core<Yomoku>) {
 }
 
 #[test]
-fn library_words_are_core_owned_and_search_sort_settings_preserve_the_snapshot() {
+fn library_words_are_core_owned_and_sort_settings_preserve_the_snapshot() {
     for core in cores() {
         loaded(&core);
         for event in [
-            Event::SearchLibraryTitles("literal".into()),
             Event::SortLibrary(LibrarySort::Title),
             Event::OpenSettings,
             Event::CloseSettings,
@@ -121,8 +120,8 @@ fn library_words_failures_are_separate_and_retries_do_not_replace_other_work() {
         assert!(core
             .process_event(Event::LoadLibraryWordDistributions)
             .is_empty());
-        // Search can still update presentation without taking the outstanding read.
-        core.process_event(Event::SearchLibraryTitles("本".into()));
+        // Sorting can still update presentation without taking the outstanding read.
+        core.process_event(Event::SortLibrary(LibrarySort::Title));
         finish(
             &core,
             &mut effects,
@@ -134,7 +133,7 @@ fn library_words_failures_are_separate_and_retries_do_not_replace_other_work() {
             Some(DocumentError::InvalidDocument)
         );
         assert_eq!(core.view().document_error, Some(DocumentError::Unavailable));
-        assert_eq!(core.view().library_title_query, "本");
+        assert_eq!(core.view().library_sort, LibrarySort::Title);
         loaded(&core);
         assert_eq!(core.view().library_word_error, None);
         let mut refresh = core.process_event(Event::RefreshLibrary);

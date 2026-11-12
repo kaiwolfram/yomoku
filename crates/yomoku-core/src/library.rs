@@ -32,7 +32,7 @@ pub struct WordStatusCounts {
 #[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
 pub struct LibraryWordDistribution {
     pub document_id: DocumentId,
-    /// None when any chapter lacks its original B analysis. Some(all zero) is
+    /// None when any chapter lacks its original C analysis. Some(all zero) is
     /// an analyzed document with no remaining registered Japanese surfaces.
     pub counts: Option<WordStatusCounts>,
 }
@@ -53,17 +53,13 @@ pub enum LibrarySort {
 }
 
 impl LibrarySort {
-    pub fn project(self, documents: &[LibraryDocument], query: &str) -> Vec<LibraryDocument> {
-        let query = query.to_lowercase();
+    pub fn project(self, documents: &[LibraryDocument]) -> Vec<LibraryDocument> {
         // Decorate once, so case folding is not repeated for every comparison.
-        let mut matching: Vec<_> = documents
+        let mut ordered: Vec<_> = documents
             .iter()
-            .filter_map(|document| {
-                let title = document.title.to_lowercase();
-                (query.is_empty() || title.contains(&query)).then_some((document, title))
-            })
+            .map(|document| (document, document.title.to_lowercase()))
             .collect();
-        matching.sort_by(|(left, left_title), (right, right_title)| {
+        ordered.sort_by(|(left, left_title), (right, right_title)| {
             match self {
                 Self::LastRead | Self::LastReadAscending => {
                     right.last_read_sequence.cmp(&left.last_read_sequence)
@@ -77,9 +73,9 @@ impl LibrarySort {
             self,
             Self::LastReadAscending | Self::TitleDescending | Self::ImportDateAscending
         ) {
-            matching.reverse();
+            ordered.reverse();
         }
-        matching
+        ordered
             .into_iter()
             .map(|(document, _)| document.clone())
             .collect()

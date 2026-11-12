@@ -51,9 +51,8 @@ fn rename_requires_visible_target_keeps_literal_draft_and_cancel_is_read_only() 
     assert!(core
         .process_event(Event::SaveDocumentTitle(id(1)))
         .is_empty());
-    core.process_event(Event::SearchLibraryTitles("1".into()));
     assert!(core
-        .process_event(Event::RequestDocumentRename(id(2)))
+        .process_event(Event::RequestDocumentRename(id(999)))
         .is_empty());
     core.process_event(Event::RequestDocumentRename(id(1)));
     assert_eq!(core.view().library_rename.unwrap().title, "本 1");
@@ -72,12 +71,10 @@ fn rename_requires_visible_target_keeps_literal_draft_and_cancel_is_read_only() 
             title: "wrong".into()
         })
         .is_empty());
-    core.process_event(Event::SearchLibraryTitles("2".into()));
     core.process_event(Event::SortLibrary(LibrarySort::Title));
     assert_eq!(core.view().library_rename.unwrap().title, title);
     core.process_event(Event::CancelDocumentRename);
     assert!(core.view().library_rename.is_none());
-    core.process_event(Event::SearchLibraryTitles(String::new()));
     let mut after = core.view().documents;
     after.sort_by_key(|d| d.document_id);
     let mut before = before;
@@ -95,7 +92,6 @@ fn rename_updates_matching_full_library_and_sort_without_changing_progress_or_co
         StorageResult::LibraryWordDistributionsLoaded(vec![]),
     );
     let before = core.view().documents;
-    core.process_event(Event::SearchLibraryTitles("1".into()));
     core.process_event(Event::RequestDocumentRename(id(1)));
     for blank in ["", " \n\t\u{3000}"] {
         core.process_event(Event::EditDocumentTitle {
@@ -133,11 +129,9 @@ fn rename_updates_matching_full_library_and_sort_without_changing_progress_or_co
         },
     );
     assert!(!core.view().storage_busy);
-    assert!(core.view().documents.is_empty());
+    assert_eq!(core.view().documents.len(), 2);
     assert!(core.view().library_rename.is_none());
     assert_eq!(core.view().library_word_distributions, Some(vec![]));
-    assert_eq!(core.view().library_document_count, 2);
-    core.process_event(Event::SearchLibraryTitles(String::new()));
     core.process_event(Event::SortLibrary(LibrarySort::Title));
     let renamed = core.view().documents[0].clone();
     assert_eq!(

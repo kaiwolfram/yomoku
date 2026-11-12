@@ -34,10 +34,9 @@
     <string name="vocabulary_title">Vocabulary</string>
     <string name="settings_title">Settings</string>
     <string name="back">Back</string>
-    <string name="library_empty">No documents yet.</string>
-    <string name="library_search_titles">Search titles</string>
-    <string name="library_clear_search">Clear</string>
-    <string name="library_search_empty">No matching titles.</string>
+    <string name="library_empty_hint">Tap + to import a book or paste text.</string>
+    <string name="library_empty">No documents yet</string>
+    <string name="clear_search">Clear</string>
     <string name="statistics_empty">No reading history yet.</string>
     <string name="statistics_occurrences">Japanese words read</string>
     <string name="statistics_statuses">Word statuses</string>

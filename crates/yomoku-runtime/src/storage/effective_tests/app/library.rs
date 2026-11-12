@@ -53,7 +53,10 @@ fn effective_application_fifo_library_missing_zero_corrupt_explicit_retry_and_de
     assert!(failed.document_error.is_none());
     fixture.sql().execute("UPDATE analyzed_tokens SET surface = '食べた' WHERE analysis_id = ?1 AND token_index = 0", [i64::from(fixture.imported.analysis_id)]).unwrap();
     // Repair alone never retries. Presentation-only events preserve the error.
-    let view = dispatch(&router, AppEvent::SearchLibraryTitles("本".into()));
+    let view = dispatch(
+        &router,
+        AppEvent::SortLibrary(yomoku_core::library::LibrarySort::Title),
+    );
     assert_eq!(view.library_word_error, failed.library_word_error);
     let view = read(&router, &fixture);
     assert!(view.library_word_error.is_none());

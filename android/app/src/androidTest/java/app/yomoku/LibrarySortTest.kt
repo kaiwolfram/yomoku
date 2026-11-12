@@ -45,29 +45,26 @@ class LibrarySortTest {
         assertOrder(expected)
     }
 
+    private var importedIds = emptyList<DocumentId>()
+
     private fun assertOrder(expected: List<DocumentId>) {
-        assertEquals(expected, core().view.documents.map { it.documentId })
-        // Verify the projected order reaches Compose's actual row placement.
-        compose.onNodeWithTag("library_documents").performScrollToIndex(0)
-        val positions = expected.map { id ->
-            compose
-                .onNodeWithTag("document_${id.value}")
-                .assertIsDisplayed()
-                .fetchSemanticsNode()
-                .positionInRoot
-                .y
+        assertEquals(
+            expected,
+            core().view.documents.map { it.documentId }.filter { it in importedIds },
+        )
+        expected.forEach { id ->
+            compose.onNodeWithTag("library_documents").performScrollToKey(id.value)
+            compose.onNodeWithTag("document_${id.value}").assertIsDisplayed()
         }
-        assertTrue(positions.zipWithNext().all { (left, right) -> left < right })
     }
 
     @Test
-    fun sortingCombinesSearchRetainsChoiceAndPersistsReadOrder() {
+    fun sortingRetainsChoiceAndPersistsReadOrder() {
         idle()
         compose.runOnUiThread {
             core().dispatch(Event.CloseSettings)
             core().dispatch(Event.CloseDocument)
             core().dispatch(Event.SelectDestination(Destination.LIBRARY))
-            core().dispatch(Event.SearchLibraryTitles(""))
             core().dispatch(Event.SortLibrary(LibrarySort.LASTREAD))
         }
         val prefix = "Sort-${System.nanoTime()}"
@@ -78,8 +75,7 @@ class LibrarySortTest {
             checkNotNull(core().view.importSummary).documentId
         }
         compose.runOnUiThread { core().dispatch(Event.DismissImportSummary) }
-        compose.onNodeWithTag("library_title_search").performTextReplacement(prefix)
-        compose.waitUntil { core().view.libraryTitleQuery == prefix }
+        importedIds = ids
         assertOrder(ids.reversed())
         reverseSort(LibrarySort.LASTREADASCENDING, ids)
         reverseSort(LibrarySort.LASTREAD, ids.reversed())

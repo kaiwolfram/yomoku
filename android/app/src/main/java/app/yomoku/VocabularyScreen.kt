@@ -96,7 +96,7 @@ internal fun VocabularyScreen(
                                 enabled = enabled,
                                 modifier = Modifier.testTag("vocabulary_clear_search"),
                             ) {
-                                Text(stringResource(R.string.library_clear_search))
+                                Text(stringResource(R.string.clear_search))
                             }
                     },
                 )

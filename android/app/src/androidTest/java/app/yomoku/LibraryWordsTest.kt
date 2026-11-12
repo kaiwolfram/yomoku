@@ -99,7 +99,6 @@ class LibraryWordsTest {
             core().dispatch(Event.CloseSettings)
             core().dispatch(Event.CloseDocument)
             core().dispatch(Event.SelectDestination(Destination.LIBRARY))
-            core().dispatch(Event.SearchLibraryTitles(""))
         }
         idle()
         val prefix = "Distribution-${System.nanoTime()}"
@@ -113,7 +112,6 @@ class LibraryWordsTest {
             }
         compose.runOnUiThread {
             core().dispatch(Event.DismissImportSummary)
-            core().dispatch(Event.SearchLibraryTitles(prefix))
         }
         val snapshot = open(ids[0])
 

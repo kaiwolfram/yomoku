@@ -57,7 +57,6 @@ class DocumentDeletionTest {
             core().dispatch(Event.CloseSettings)
             core().dispatch(Event.CloseDocument)
             core().dispatch(Event.SelectDestination(Destination.LIBRARY))
-            core().dispatch(Event.SearchLibraryTitles(""))
         }
         idle()
         val title = "Deletion-${System.nanoTime()}"
@@ -72,7 +71,6 @@ class DocumentDeletionTest {
         val remainingId = checkNotNull(core().view.importSummary).documentId
         compose.runOnUiThread {
             core().dispatch(Event.DismissImportSummary)
-            core().dispatch(Event.SearchLibraryTitles(title))
         }
         compose.onNodeWithTag("document_${id.value}").performTouchInput { longClick() }
         compose.onNodeWithTag("delete_document_${id.value}").performClick()
@@ -124,9 +122,8 @@ class DocumentDeletionTest {
         compose.onNodeWithTag("confirm_document_deletion").performClick()
         compose.waitUntil(90_000) { core().view.libraryDeleteTarget == null }
         idle()
-        assertEquals(title, core().view.libraryTitleQuery)
         compose.onNodeWithTag("document_${id.value}").assertDoesNotExist()
-        compose.onNodeWithTag("library_empty_message").assertTextEquals("No matching titles.")
+        assertTrue(core().view.documents.any { it.documentId == remainingId })
         assertEquals(before, db().use { history(it, id.value) })
         db().use {
             it.rawQuery(
@@ -141,7 +138,7 @@ class DocumentDeletionTest {
         idle()
         val newId = checkNotNull(core().view.importSummary).documentId
         assertTrue(newId.value > id.value)
-        val newDocument = core().view.documents.single()
+        val newDocument = core().view.documents.single { it.documentId == newId }
         assertEquals(0UL, newDocument.progressPercent)
         assertFalse(newDocument.finishedAtLeastOnce)
         assertNull(newDocument.lastReadSequence)
@@ -159,7 +156,6 @@ class DocumentDeletionTest {
             core().dispatch(Event.CloseSettings)
             core().dispatch(Event.CloseDocument)
             core().dispatch(Event.SelectDestination(Destination.LIBRARY))
-            core().dispatch(Event.SearchLibraryTitles(prefix))
             core().dispatch(Event.CreatePaste("$prefix first\n猫"))
         }
         idle()

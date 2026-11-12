@@ -63,7 +63,6 @@ fun main(args: Array<String>) {
     verifyEpubImportBridge()
     verifyReaderWordBridge()
     verifyEffectiveReaderBridge()
-    verifyLibrarySearchBridge()
     verifyLibrarySortBridge()
     verifyLibraryWordsBridge()
     verifyDocumentDeletionBridge()

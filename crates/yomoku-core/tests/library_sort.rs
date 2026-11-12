@@ -64,7 +64,7 @@ fn sort_orders_recent_readers_then_newest_unopened_and_has_stable_unicode_title_
         (LibrarySort::TitleDescending, vec![4, 1, 2, 3]),
         (LibrarySort::ImportDateAscending, vec![1, 2, 3, 4]),
     ] {
-        let projected = sort.project(&documents, "");
+        let projected = sort.project(&documents);
         assert_eq!(ids(&projected), expected);
         for document in projected {
             assert_eq!(
@@ -74,29 +74,15 @@ fn sort_orders_recent_readers_then_newest_unopened_and_has_stable_unicode_title_
                 Some(&document)
             );
         }
-        assert_eq!(
-            ids(&sort.project(&documents, "AlPhA")),
-            match sort {
-                LibrarySort::LastRead
-                | LibrarySort::TitleDescending
-                | LibrarySort::ImportDateAscending => vec![2, 3],
-                _ => vec![3, 2],
-            }
-        );
-        assert_eq!(ids(&sort.project(&documents, "か\u{3099}\0")), vec![4]);
-        assert!(sort.project(&documents, "no result").is_empty());
     }
     assert_eq!(ids(&documents), vec![1, 2, 3, 4]);
     let mut wide = documents.clone();
     wide[0].last_read_sequence = Some(i64::MAX);
-    assert_eq!(
-        ids(&LibrarySort::LastRead.project(&wide, "")),
-        vec![1, 2, 3, 4]
-    );
+    assert_eq!(ids(&LibrarySort::LastRead.project(&wide)), vec![1, 2, 3, 4]);
 }
 
 #[test]
-fn sort_is_read_only_retained_with_search_across_refresh_errors_navigation_and_recreation() {
+fn sort_is_read_only_retained_across_refresh_errors_navigation_and_recreation() {
     let core = Core::<Yomoku>::new();
     load(&core);
     assert_eq!(core.view().library_sort, LibrarySort::LastRead);
@@ -109,8 +95,7 @@ fn sort_is_read_only_retained_with_search_across_refresh_errors_navigation_and_r
         &mut effects,
         StorageResult::Failed(DocumentError::Unavailable),
     );
-    core.process_event(Event::SearchLibraryTitles("alpha".into()));
-    assert_eq!(ids(&core.view().documents), vec![2, 3]);
+    assert_eq!(ids(&core.view().documents), vec![4, 1, 2, 3]);
     assert_eq!(core.view().document_error, Some(DocumentError::Unavailable));
     for event in [
         Event::OpenSettings,
@@ -122,10 +107,9 @@ fn sort_is_read_only_retained_with_search_across_refresh_errors_navigation_and_r
     ] {
         core.process_event(event);
         assert_eq!(core.view().library_sort, LibrarySort::TitleDescending);
-        assert_eq!(core.view().library_title_query, "alpha");
     }
     load(&core);
-    assert_eq!(ids(&core.view().documents), vec![2, 3]);
+    assert_eq!(ids(&core.view().documents), vec![4, 1, 2, 3]);
     assert_eq!(
         Core::<Yomoku>::new().view().library_sort,
         LibrarySort::LastRead

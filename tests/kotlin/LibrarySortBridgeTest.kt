@@ -56,14 +56,8 @@ internal fun verifyLibrarySortBridge() {
                     listOf(imported[2], imported[1], imported[0])
             )
             check(
-                dispatch(Event.SearchLibraryTitles("ALPHA")).documents ==
-                    listOf(imported[2], imported[1])
+                dispatch(Event.SortLibrary(LibrarySort.IMPORTDATE)).documents == imported.reversed()
             )
-            check(
-                dispatch(Event.SortLibrary(LibrarySort.IMPORTDATE)).documents ==
-                    listOf(imported[2], imported[1])
-            )
-            dispatch(Event.SearchLibraryTitles(""))
             dispatch(Event.OpenSettings)
             check(dispatch(Event.CloseSettings).librarySort == LibrarySort.IMPORTDATE)
             check(dispatch(Event.RefreshLibrary, true).documents == imported.reversed())

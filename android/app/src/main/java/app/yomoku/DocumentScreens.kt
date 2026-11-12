@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -35,6 +36,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import app.yomoku.shared.DocumentError
 import app.yomoku.shared.Event
@@ -111,108 +113,127 @@ internal fun LibraryScreen(
                 Text(stringResource(R.string.retry))
             }
         }
-        OutlinedTextField(
-            value = view.libraryTitleQuery,
-            onValueChange = { dispatch(Event.SearchLibraryTitles(it)) },
-            label = { Text(stringResource(R.string.library_search_titles)) },
-            singleLine = true,
-            trailingIcon = {
-                if (view.libraryTitleQuery.isNotEmpty()) {
-                    TextButton(
-                        onClick = { dispatch(Event.SearchLibraryTitles("")) },
-                        modifier = Modifier.testTag("clear_library_search"),
-                    ) {
-                        Text(stringResource(R.string.library_clear_search))
-                    }
-                }
-            },
-            modifier = Modifier.fillMaxWidth().testTag("library_title_search"),
-        )
-        LibrarySortMenu(view.librarySort) { dispatch(Event.SortLibrary(it)) }
-        if (!view.storageBusy && view.documents.isEmpty() && view.documentError == null) {
-            Text(
-                stringResource(
-                    if (view.libraryDocumentCount == 0UL) R.string.library_empty
-                    else R.string.library_search_empty
-                ),
-                modifier = Modifier.testTag("library_empty_message"),
-            )
+        if (view.documents.size >= 2) {
+            LibrarySortMenu(view.librarySort) { dispatch(Event.SortLibrary(it)) }
         }
-        LazyColumn(modifier = Modifier.weight(1f).testTag("library_documents")) {
-            items(view.documents, key = { it.documentId.value }) { document ->
-                var menuExpanded by
-                    remember(view.libraryTitleQuery, view.librarySort, canAct) {
-                        mutableStateOf(false)
-                    }
-                Box {
-                    Row(
-                        modifier =
-                            Modifier.fillMaxWidth()
-                                .combinedClickable(
-                                    enabled = !view.storageBusy,
-                                    onLongClickLabel = actionsLabel,
-                                    onLongClick = { if (canAct) menuExpanded = true },
-                                    onClick = { dispatch(Event.OpenReader(document.documentId)) },
-                                )
-                                .padding(vertical = 8.dp)
-                                .testTag("document_${document.documentId.value}"),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        LibraryCover(document.documentId.value, coverLoader)
-                        Column(Modifier.weight(1f)) {
-                            Row(
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                Text(
-                                    document.title,
-                                    style = MaterialTheme.typography.titleMedium,
-                                    modifier = Modifier.weight(1f),
-                                )
-                                if (document.finishedAtLeastOnce) {
-                                    FinishedCheckmark(
-                                        Modifier.testTag("finished_${document.documentId.value}")
+        if (!view.storageBusy && view.documents.isEmpty() && view.documentError == null) {
+            Box(
+                modifier = Modifier.fillMaxWidth().weight(1f).testTag("library_empty_area"),
+                contentAlignment = Alignment.Center,
+            ) {
+                Column(
+                    modifier = Modifier.widthIn(max = 320.dp).testTag("library_empty_state"),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                ) {
+                    Icon(
+                        painterResource(R.drawable.ic_library),
+                        contentDescription = null,
+                        modifier = Modifier.size(48.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Text(
+                        stringResource(R.string.library_empty),
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.testTag("library_empty_message"),
+                    )
+                    Text(
+                        stringResource(R.string.library_empty_hint),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.testTag("library_empty_hint"),
+                    )
+                }
+            }
+        } else {
+            LazyColumn(modifier = Modifier.weight(1f).testTag("library_documents")) {
+                items(view.documents, key = { it.documentId.value }) { document ->
+                    var menuExpanded by
+                        remember(view.librarySort, canAct) {
+                            mutableStateOf(false)
+                        }
+                    Box {
+                        Row(
+                            modifier =
+                                Modifier.fillMaxWidth()
+                                    .combinedClickable(
+                                        enabled = !view.storageBusy,
+                                        onLongClickLabel = actionsLabel,
+                                        onLongClick = { if (canAct) menuExpanded = true },
+                                        onClick = {
+                                            dispatch(Event.OpenReader(document.documentId))
+                                        },
                                     )
+                                    .padding(vertical = 8.dp)
+                                    .testTag("document_${document.documentId.value}"),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            LibraryCover(document.documentId.value, coverLoader)
+                            Column(Modifier.weight(1f)) {
+                                Row(
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    Text(
+                                        document.title,
+                                        style = MaterialTheme.typography.titleMedium,
+                                        modifier = Modifier.weight(1f),
+                                    )
+                                    if (document.finishedAtLeastOnce) {
+                                        FinishedCheckmark(
+                                            Modifier.testTag(
+                                                "finished_${document.documentId.value}"
+                                            )
+                                        )
+                                    }
                                 }
+                                Text(
+                                    stringResource(
+                                        R.string.reading_progress,
+                                        document.progressPercent.toLong(),
+                                    ),
+                                    modifier =
+                                        Modifier.testTag("progress_${document.documentId.value}"),
+                                )
+                                LibraryWordBar(
+                                    distributions?.get(document.documentId)?.counts,
+                                    loading =
+                                        distributions == null && view.libraryWordError == null,
+                                    documentId = document.documentId.value,
+                                )
                             }
-                            Text(
-                                stringResource(
-                                    R.string.reading_progress,
-                                    document.progressPercent.toLong(),
-                                ),
+                        }
+                        DropdownMenu(
+                            expanded = menuExpanded && canAct,
+                            onDismissRequest = { menuExpanded = false },
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.library_rename)) },
+                                onClick = {
+                                    menuExpanded = false
+                                    dispatch(Event.RequestDocumentRename(document.documentId))
+                                },
                                 modifier =
-                                    Modifier.testTag("progress_${document.documentId.value}"),
+                                    Modifier.testTag(
+                                        "rename_document_${document.documentId.value}"
+                                    ),
                             )
-                            LibraryWordBar(
-                                distributions?.get(document.documentId)?.counts,
-                                loading = distributions == null && view.libraryWordError == null,
-                                documentId = document.documentId.value,
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.library_delete)) },
+                                onClick = {
+                                    menuExpanded = false
+                                    dispatch(Event.RequestDocumentDeletion(document.documentId))
+                                },
+                                modifier =
+                                    Modifier.testTag(
+                                        "delete_document_${document.documentId.value}"
+                                    ),
                             )
                         }
-                    }
-                    DropdownMenu(
-                        expanded = menuExpanded && canAct,
-                        onDismissRequest = { menuExpanded = false },
-                    ) {
-                        DropdownMenuItem(
-                            text = { Text(stringResource(R.string.library_rename)) },
-                            onClick = {
-                                menuExpanded = false
-                                dispatch(Event.RequestDocumentRename(document.documentId))
-                            },
-                            modifier =
-                                Modifier.testTag("rename_document_${document.documentId.value}"),
-                        )
-                        DropdownMenuItem(
-                            text = { Text(stringResource(R.string.library_delete)) },
-                            onClick = {
-                                menuExpanded = false
-                                dispatch(Event.RequestDocumentDeletion(document.documentId))
-                            },
-                            modifier =
-                                Modifier.testTag("delete_document_${document.documentId.value}"),
-                        )
                     }
                 }
             }

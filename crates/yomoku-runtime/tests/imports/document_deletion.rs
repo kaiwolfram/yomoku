@@ -18,7 +18,7 @@ fn confirmed_document_deletion_runs_on_fifo_without_analysis_and_retries_transac
         failed.library_delete_error,
         Some(DocumentError::Unavailable)
     );
-    assert_eq!(failed.library_document_count, 1);
+    assert_eq!(failed.documents.len(), 1);
     assert!(Storage::open(database.path())
         .unwrap()
         .load_document_reader_snapshot(id)
@@ -27,7 +27,7 @@ fn confirmed_document_deletion_runs_on_fifo_without_analysis_and_retries_transac
     connection.execute_batch("DROP TRIGGER fail").unwrap();
     let deleted = dispatch(&router, Event::ConfirmDocumentDeletion(id));
     assert!(deleted.library_delete_target.is_none());
-    assert_eq!(deleted.library_document_count, 0);
+    assert_eq!(deleted.documents.len(), 0);
     let mut storage = Storage::open(database.path()).unwrap();
     assert!(storage.load_document_reader_snapshot(id).unwrap().is_none());
     assert_eq!(

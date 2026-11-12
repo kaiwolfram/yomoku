@@ -55,7 +55,6 @@ class DocumentRenameTest {
             core().dispatch(Event.CloseSettings)
             core().dispatch(Event.CloseDocument)
             core().dispatch(Event.SelectDestination(Destination.LIBRARY))
-            core().dispatch(Event.SearchLibraryTitles(""))
         }
         idle()
         val originalTitle = "Rename-${System.nanoTime()}"
@@ -65,8 +64,8 @@ class DocumentRenameTest {
         val id = checkNotNull(core().view.importSummary).documentId
         compose.runOnUiThread {
             core().dispatch(Event.DismissImportSummary)
-            core().dispatch(Event.SearchLibraryTitles(originalTitle))
         }
+        compose.onNodeWithTag("library_documents").performScrollToKey(id.value)
         compose.onNodeWithTag("document_${id.value}").performClick()
         compose.waitUntil(90_000) {
             core().view.effectiveReaderTokens != null && !core().view.storageBusy
@@ -75,7 +74,7 @@ class DocumentRenameTest {
         compose.onNodeWithTag("next_page").performClick()
         compose.waitUntil(90_000) { core().view.contentRoute == ContentRoute.MAIN }
         idle()
-        val before = core().view.documents.single()
+        val before = core().view.documents.single { it.documentId == id }
         val history = sourceAndHistory(id.value)
         val counts = core().view.libraryWordDistributions
         assertTrue(before.finishedAtLeastOnce)
@@ -94,7 +93,7 @@ class DocumentRenameTest {
         compose.onNodeWithTag("document_title_draft").assertTextContains(title)
         compose.onNodeWithTag("cancel_document_rename").performClick()
         assertNull(core().view.libraryRename)
-        assertEquals(before, core().view.documents.single())
+        assertEquals(before, core().view.documents.single { it.documentId == id })
         assertEquals(history, sourceAndHistory(id.value))
         db().use {
             it.execSQL(
@@ -110,7 +109,7 @@ class DocumentRenameTest {
             compose
                 .onNodeWithText("Could not rename this document. Retry or cancel.")
                 .assertIsDisplayed()
-            assertEquals(before, core().view.documents.single())
+            assertEquals(before, core().view.documents.single { it.documentId == id })
             compose.activityRule.scenario.recreate()
             compose.waitForIdle()
             compose.onNodeWithTag("document_title_draft").assertTextContains(title)
@@ -121,9 +120,8 @@ class DocumentRenameTest {
         compose.onNodeWithTag("save_document_title").performClick()
         compose.waitUntil(90_000) { core().view.libraryRename == null }
         idle()
-        assertEquals(originalTitle, core().view.libraryTitleQuery)
-        compose.onNodeWithTag("library_empty_message").assertTextEquals("No matching titles.")
-        compose.onNodeWithTag("clear_library_search").performClick()
+        compose.onNodeWithTag("library_documents").performScrollToKey(id.value)
+        compose.onNodeWithTag("document_${id.value}").assertIsDisplayed()
         idle()
         val renamed = core().view.documents.single { it.documentId == id }
         assertEquals(before.copy(title = title), renamed)
@@ -137,8 +135,8 @@ class DocumentRenameTest {
         assertEquals(title, summary.title)
         compose.runOnUiThread {
             core().dispatch(Event.DismissImportSummary)
-            core().dispatch(Event.SearchLibraryTitles(title))
         }
+        compose.onNodeWithTag("library_documents").performScrollToKey(id.value)
         compose.onNodeWithTag("document_${id.value}").performClick()
         compose.waitUntil(90_000) { core().view.reader != null && !core().view.storageBusy }
         assertEquals(title, core().view.reader?.title)

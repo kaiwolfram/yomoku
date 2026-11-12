@@ -121,7 +121,7 @@ internal fun verifyDocumentDeletionBridge() {
             bridge.update(Event.RefreshLibrary.bincodeSerialize())
             checkNotNull(effects.poll(60, TimeUnit.SECONDS))
             val view = ViewModel.bincodeDeserialize(bridge.view())
-            check(view.libraryDocumentCount == 2UL && view.libraryDeleteTarget == null)
+            check(view.documents.size == 2 && view.libraryDeleteTarget == null)
             check(view.documents.none { it.finishedAtLeastOnce })
         }
     } finally {

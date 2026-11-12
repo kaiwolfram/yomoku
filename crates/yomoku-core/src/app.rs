@@ -101,7 +101,6 @@ pub struct Model {
     destination: Destination,
     settings_open: bool,
     documents: Vec<LibraryDocument>,
-    library_title_query: String,
     library_sort: LibrarySort,
     library_word_distributions: Option<Vec<LibraryWordDistribution>>,
     library_word_error: Option<DocumentError>,
@@ -162,8 +161,6 @@ pub enum Event {
     RefreshLibrary,
     /// Read-only lazy refresh when Library is visible; retries are explicit.
     LoadLibraryWordDistributions,
-    /// Literal, Unicode-lowercase substring search over Library titles only.
-    SearchLibraryTitles(String),
     SortLibrary(LibrarySort),
     /// Freeze one visible Library entry for explicit confirmation.
     RequestDocumentDeletion(DocumentId),
@@ -355,14 +352,10 @@ pub struct ViewModel {
     pub statistics: crate::statistics::StatisticsState,
     pub destination: Destination,
     pub settings_open: bool,
-    /// Matching titles in the selected Library order; an empty query shows all.
+    /// All documents in the selected Library order.
     pub documents: Vec<LibraryDocument>,
-    /// Session-local query; the model retains the complete unfiltered Library.
-    pub library_title_query: String,
     /// Session-local selection; read recency itself is durable.
     pub library_sort: LibrarySort,
-    /// Unfiltered count distinguishes an empty Library from an empty search.
-    pub library_document_count: u64,
     pub library_word_distributions: Option<Vec<LibraryWordDistribution>>,
     pub library_word_error: Option<DocumentError>,
     pub library_delete_target: Option<LibraryDocument>,
@@ -686,7 +679,7 @@ impl App for Yomoku {
                 }
                 let Some(target) = model
                     .library_sort
-                    .project(&model.documents, &model.library_title_query)
+                    .project(&model.documents)
                     .into_iter()
                     .find(|entry| entry.document_id == id)
                 else {
@@ -724,7 +717,7 @@ impl App for Yomoku {
                 }
                 let Some(target) = model
                     .library_sort
-                    .project(&model.documents, &model.library_title_query)
+                    .project(&model.documents)
                     .into_iter()
                     .find(|entry| entry.document_id == id)
                 else {
@@ -739,15 +732,6 @@ impl App for Yomoku {
                     return Command::done();
                 }
                 model.clear_library_delete();
-            }
-            Event::SearchLibraryTitles(query) => {
-                if model.destination != Destination::Library
-                    || model.content_route != ContentRoute::Main
-                    || model.settings_open
-                {
-                    return Command::done();
-                }
-                model.library_title_query = query;
             }
             Event::SortLibrary(sort) => {
                 if model.destination != Destination::Library
@@ -1083,17 +1067,13 @@ impl App for Yomoku {
             },
             destination: model.destination,
             settings_open: model.settings_open,
-            documents: model
-                .library_sort
-                .project(&model.documents, &model.library_title_query),
-            library_title_query: model.library_title_query.clone(),
+            documents: model.library_sort.project(&model.documents),
             library_sort: model.library_sort,
             library_word_distributions: model.library_word_distributions.clone(),
             library_word_error: model.library_word_error,
             library_delete_target: model.library_delete_target.clone(),
             library_delete_error: model.library_delete_error,
             library_rename: model.library_rename.clone(),
-            library_document_count: model.documents.len() as u64,
             storage_busy: model.storage_busy,
             document_error: model.document_error,
             content_route: model.content_route,

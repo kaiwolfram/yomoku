@@ -90,9 +90,8 @@ internal fun verifyLibraryWordsBridge() {
                     surfaces.indices.count { it % 5 == 4 }.toULong(),
                 )
             check(first.map { it.counts } == listOf(expected, expected))
-            dispatch(Event.SearchLibraryTitles("a"))
+            dispatch(Event.SortLibrary(LibrarySort.TITLE))
             check(ViewModel.bincodeDeserialize(bridge.view()).libraryWordDistributions == first)
-            dispatch(Event.SearchLibraryTitles(""))
             open(ids[1])
             val page = checkNotNull(ViewModel.bincodeDeserialize(bridge.view()).reader)
             bridge.update(
