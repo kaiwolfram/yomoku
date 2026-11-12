@@ -2,7 +2,7 @@
 
 use crate::{FfiError, YomokuBridge};
 use std::{fs::File, os::fd::FromRawFd, sync::Arc};
-use yomoku_analysis::{Analyzer, DICTIONARY_REVISION, ENGINE_REVISION};
+use yomoku_analysis::{AnalysisError, Analyzer};
 use yomoku_core::{
     analysis::{AnalysisProfile, ChapterAnalysis, SplitMode},
     document::{ChapterText, DocumentId},
@@ -26,14 +26,12 @@ impl PasteAnalyzer for NativeAnalyzer {
         mode: SplitMode,
         profile: &AnalysisProfile,
     ) -> Result<ChapterAnalysis, DocumentError> {
-        if profile.engine_revision != ENGINE_REVISION
-            || profile.dictionary_revision != DICTIONARY_REVISION
-        {
-            return Err(DocumentError::Unavailable);
-        }
         self.0
-            .analyze_mode(chapter, mode)
-            .map_err(|_| DocumentError::InvalidDocument)
+            .analyze_components(chapter, mode, profile)
+            .map_err(|error| match error {
+                AnalysisError::UnsupportedProfile => DocumentError::Unavailable,
+                _ => DocumentError::InvalidDocument,
+            })
     }
 }
 

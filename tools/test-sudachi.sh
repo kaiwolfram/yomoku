@@ -17,3 +17,4 @@ for storage in owned mapped; do
     YOMOKU_SUDACHI_STORAGE="$storage" cargo test -p yomoku-analysis --test full_dictionary --locked --offline -- --ignored
     YOMOKU_SUDACHI_STORAGE="$storage" cargo test -p yomoku-runtime --test imports --locked --offline -- --ignored
 done
+cargo test -p yomoku-ffi --test effective_reader --locked --offline -- --ignored

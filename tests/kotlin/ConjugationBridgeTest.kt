@@ -1,0 +1,130 @@
+package app.yomoku.tests
+
+import app.yomoku.nativebridge.EffectsListener
+import app.yomoku.nativebridge.FfiError
+import app.yomoku.nativebridge.NativeBridge
+import app.yomoku.shared.*
+import java.nio.file.Files
+import java.util.concurrent.LinkedBlockingQueue
+import java.util.concurrent.TimeUnit
+
+internal fun verifyConjugationBridge() {
+    val directory = Files.createTempDirectory("yomoku-conjugations-").toFile()
+    val callbacks = LinkedBlockingQueue<ByteArray>()
+    val listener =
+        object : EffectsListener {
+            override fun onEffects(requests: ByteArray) {
+                callbacks.add(requests)
+            }
+
+            override fun onError(error: FfiError) {
+                throw error
+            }
+        }
+    val database = directory.resolve("reader.sqlite3")
+    fun current(bridge: NativeBridge) = ViewModel.bincodeDeserialize(bridge.view())
+    fun dispatch(bridge: NativeBridge, event: Event, count: Int = 1): ViewModel {
+        bridge.update(event.bincodeSerialize())
+        repeat(count) { checkNotNull(callbacks.poll(60, TimeUnit.SECONDS)) }
+        return current(bridge).also { check(!it.storageBusy && it.documentError == null) }
+    }
+    fun tokens(bridge: NativeBridge): EffectiveReaderPage {
+        val view = current(bridge)
+        val page = checkNotNull(view.reader)
+        return checkNotNull(
+            dispatch(
+                    bridge,
+                    Event.LoadReaderTokens(
+                        ReaderTokenKey(
+                            page.documentId,
+                            page.anchor,
+                            checkNotNull(view.readerAnalysis),
+                        )
+                    ),
+                )
+                .effectiveReaderTokens
+        )
+    }
+    fun word(bridge: NativeBridge, page: EffectiveReaderPage): EffectiveWordDetails {
+        val token = page.tokens.first { it.surface == "食べました" }
+        return checkNotNull(
+            dispatch(
+                    bridge,
+                    Event.LoadEffectiveReaderWord(
+                        EffectiveReaderSelection(page.identity, token.segmentIndex)
+                    ),
+                )
+                .effectiveReaderWord
+                ?.details
+        )
+    }
+    try {
+        lateinit var id: DocumentId
+        NativeBridge(database.path, listener, HostDictionary()).use { bridge ->
+            // Repeated joined forms occur on separate logical pages.
+            val text = "x".repeat(497) + ". 食べました。\n食べました。"
+            id = checkNotNull(dispatch(bridge, Event.CreatePaste(text)).importSummary).documentId
+            dispatch(bridge, Event.OpenReader(id))
+            val first = tokens(bridge)
+            check(first.tokens.map { it.surface } == listOf("食べました"))
+            val token = first.tokens.single()
+            check(token.dictionaryForm == "食べる")
+            val entry = checkNotNull(token.vocabulary)
+            dispatch(
+                bridge,
+                Event.SetEffectiveReaderStatus(
+                    EffectiveReaderSelection(first.identity, token.segmentIndex),
+                    entry.id,
+                    VocabularyStatus.LEARNING,
+                    100L,
+                ),
+            )
+            val updated = tokens(bridge)
+            val details = word(bridge, updated)
+            check(details.encountered == 0UL)
+            check(details.candidates.surface == "食べました")
+            check(details.candidates.dictionaryForm == "食べる")
+            check(details.candidates.words.flatMap { it.forms }.any { it.form == "食べる" })
+            check(details.dictionarySources.map { it.form }.containsAll(listOf("食べ", "まし", "た")))
+            val position = checkNotNull(current(bridge).reader).position
+            dispatch(bridge, Event.CompleteEffectiveReaderPage(updated.identity, position, 200L), 2)
+            val second = tokens(bridge)
+            check(
+                second.tokens.all {
+                    it.surface == "食べました" &&
+                        it.vocabulary?.id == entry.id &&
+                        it.vocabulary.status == VocabularyStatus.LEARNING
+                }
+            )
+            check(word(bridge, second).encountered == 1UL)
+            dispatch(
+                bridge,
+                Event.CompleteEffectiveReaderPage(
+                    second.identity,
+                    checkNotNull(current(bridge).reader).position,
+                    300L,
+                ),
+                2,
+            )
+            val library = dispatch(bridge, Event.LoadLibraryWordDistributions)
+            check(
+                library.libraryWordDistributions?.single()?.counts ==
+                    WordStatusCounts(0UL, 1UL, 0UL, 0UL, 0UL)
+            )
+            val duplicate = dispatch(bridge, Event.CreatePaste(text))
+            check(duplicate.importSummary?.outcome == ImportOutcome.EXISTING)
+            check(duplicate.importSummary.documentId == id)
+        }
+        NativeBridge(database.path, listener, HostDictionary()).use { bridge ->
+            dispatch(bridge, Event.OpenReader(id))
+            val page = tokens(bridge)
+            check(page.tokens.single().vocabulary?.status == VocabularyStatus.LEARNING)
+            check(word(bridge, page).encountered == 2UL)
+        }
+        println(
+            "PASS: joined conjugation JNI identity, base/components, cross-page counts, status, Library and reopen"
+        )
+    } finally {
+        directory.deleteRecursively()
+    }
+}

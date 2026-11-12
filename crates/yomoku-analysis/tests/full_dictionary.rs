@@ -118,13 +118,13 @@ fn inflected_surfaces_stay_distinct_from_analyzer_forms() {
     let result = analyze("食べる。食べた。食べます。", SplitMode::C);
     assert_eq!(
         surfaces(&result),
-        ["食べる", "。", "食べ", "た", "。", "食べ", "ます", "。"]
+        ["食べる", "。", "食べた", "。", "食べます", "。"]
     );
     let verb = &result.tokens[2];
     assert!(verb.is_japanese);
     assert_eq!(verb.dictionary_form.as_ref().unwrap().as_str(), "食べる");
-    assert_eq!(verb.reading.as_deref(), Some("タベ"));
-    // Raw analyzer boundaries are retained; merging conjugations is separate work.
+    assert_eq!(verb.reading.as_deref(), Some("タベタ"));
+    // Written conjugations remain distinct entries with the head’s base form.
     assert_ne!(
         verb.surface,
         verb.dictionary_form.as_ref().unwrap().as_str()
@@ -1047,5 +1047,318 @@ fn real_epub_import_analyzes_every_canonical_chapter_and_reopens_without_rescan(
     assert!(opened.document.finished_at_least_once);
     assert_eq!(storage.list_documents().unwrap()[0].progress_percent, 0);
     drop(storage);
+    std::fs::remove_dir_all(directory).unwrap();
+}
+
+#[test]
+#[ignore = "requires pinned Sudachi Full; run tools/test-sudachi.sh"]
+fn joined_conjugations_keep_head_forms_readings_and_raw_ab_components() {
+    for (text, base, reading) in [
+        ("できません", "できる", "デキマセン"),
+        ("食べました", "食べる", "タベマシタ"),
+        ("食べなかった", "食べる", "タベナカッタ"),
+        ("高くない", "高い", "タカクナイ"),
+        ("高くなかった", "高い", "タカクナカッタ"),
+        ("高かった", "高い", "タカカッタ"),
+        ("食べられた", "食べる", "タベラレタ"),
+        ("書かせた", "書く", "カカセタ"),
+        (
+            "食べさせられませんでした",
+            "食べる",
+            "タベサセラレマセンデシタ",
+        ),
+        ("読んだ", "読む", "ヨンダ"),
+        ("高いです", "高い", "タカイデス"),
+        ("食べたい", "食べる", "タベタイ"),
+        ("食べている", "食べる", "タベテイル"),
+        ("食べていた", "食べる", "タベテイタ"),
+        ("食べてしまった", "食べる", "タベテシマッタ"),
+        (
+            "食べておいてくれませんでした",
+            "食べる",
+            "タベテオイテクレマセンデシタ",
+        ),
+        ("読んでみる", "読む", "ヨンデミル"),
+        ("読んである", "読む", "ヨンデアル"),
+        ("泳いでいった", "泳ぐ", "オヨイデイッタ"),
+        ("見て来た", "見る", "ミテキタ"),
+        ("買ってあげた", "買う", "カッテアゲタ"),
+        ("食べてもらった", "食べる", "タベテモラッタ"),
+    ] {
+        let result = analyze(text, SplitMode::C);
+        assert_eq!(surfaces(&result), [text], "{text}");
+        let token = &result.tokens[0];
+        assert_eq!(
+            token.dictionary_form.as_ref().unwrap().as_str(),
+            base,
+            "{text}"
+        );
+        assert_eq!(token.reading.as_deref(), Some(reading), "{text}");
+        for mode in [SplitMode::A, SplitMode::B] {
+            let raw = analyze(text, mode);
+            assert!(raw.tokens.len() > 1, "{text}: {mode:?}");
+            assert_eq!(
+                raw.tokens
+                    .iter()
+                    .map(|t| t.surface.as_str())
+                    .collect::<String>(),
+                text
+            );
+        }
+    }
+}
+
+#[test]
+#[ignore = "requires pinned Sudachi Full; run tools/test-sudachi.sh"]
+fn joining_stops_at_particles_independent_words_gaps_and_sentence_boundaries() {
+    for (text, expected) in [
+        ("食べるたび。", vec!["食べる", "たび", "。"]),
+        ("食べてやる。", vec!["食べ", "て", "やる", "。"]),
+        ("食べてほしい。", vec!["食べ", "て", "ほしい", "。"]),
+        ("食べれば。", vec!["食べれ", "ば", "。"]),
+        ("食べてはいる。", vec!["食べ", "ては", "いる", "。"]),
+        ("食べて走った。", vec!["食べ", "て", "走った", "。"]),
+        (
+            "本がある。庭にいる。",
+            vec!["本", "が", "ある", "。", "庭", "に", "いる", "。"],
+        ),
+        (
+            "空を見る。東京へ行く。家に来る。",
+            vec![
+                "空", "を", "見る", "。", "東京", "へ", "行く", "。", "家", "に", "来る", "。",
+            ],
+        ),
+        ("食べ ました", vec!["食べ", "まし", "た"]),
+        ("食べ、ました", vec!["食べ", "、", "まし", "た"]),
+        ("食べ。ました", vec!["食べ", "。", "まし", "た"]),
+        ("食べ\nました", vec!["食べ", "まし", "た"]),
+        ("食べて　いる", vec!["食べ", "て", "いる"]),
+        ("高く\tない", vec!["高く", "ない"]),
+        ("です。ます。", vec!["です", "。", "ます", "。"]),
+    ] {
+        assert_eq!(surfaces(&analyze(text, SplitMode::C)), expected, "{text}");
+    }
+    let text = "𠮷📖e\u{301}か\u{3099}\0\r\n食べました　高くない\t食べてしまった。";
+    let result = analyze(text, SplitMode::C);
+    for surface in ["食べました", "高くない", "食べてしまった"] {
+        let token = result
+            .tokens
+            .iter()
+            .find(|token| token.surface == surface)
+            .unwrap();
+        assert_eq!(
+            i64::from(token.anchor.range.start),
+            text.find(surface).unwrap() as i64
+        );
+        assert_eq!(
+            i64::from(token.anchor.range.end),
+            (text.find(surface).unwrap() + surface.len()) as i64
+        );
+    }
+}
+
+#[test]
+#[ignore = "requires pinned Sudachi Full; run tools/test-sudachi.sh"]
+fn previous_profile_supports_uncached_raw_components_but_cannot_be_retokenized() {
+    use yomoku_analysis::{AnalysisError, LEGACY_ENGINE_REVISION};
+    use yomoku_core::analysis::AnalysisProfile;
+    let input = chapter("食べました。国家公務員。");
+    let mut profile = AnalysisProfile {
+        engine_revision: LEGACY_ENGINE_REVISION.into(),
+        dictionary_revision: DICTIONARY_REVISION.into(),
+    };
+    for mode in [SplitMode::A, SplitMode::B] {
+        let legacy = analyzer()
+            .analyze_components(&input, mode, &profile)
+            .unwrap();
+        assert_eq!(legacy.profile, profile);
+        assert_eq!(&surfaces(&legacy)[..4], &["食べ", "まし", "た", "。"]);
+        assert_eq!(
+            legacy.tokens,
+            analyzer().analyze_mode(&input, mode).unwrap().tokens
+        );
+    }
+    assert!(matches!(
+        analyzer().analyze_components(&input, SplitMode::C, &profile),
+        Err(AnalysisError::UnsupportedProfile)
+    ));
+    profile.engine_revision = "unknown".into();
+    assert!(matches!(
+        analyzer().analyze_components(&input, SplitMode::A, &profile),
+        Err(AnalysisError::UnsupportedProfile)
+    ));
+    profile.engine_revision = ENGINE_REVISION.into();
+    profile.dictionary_revision = "unknown".into();
+    assert!(matches!(
+        analyzer().analyze_components(&input, SplitMode::B, &profile),
+        Err(AnalysisError::UnsupportedProfile)
+    ));
+}
+
+#[test]
+#[ignore = "requires pinned Sudachi Full; run tools/test-sudachi.sh"]
+fn joined_surfaces_register_once_retain_status_and_count_once_across_pages() {
+    use yomoku_core::{
+        completion::{AnalyzedCompletionOutcome, PageCompletionIntent},
+        document::PasteText,
+        library::WordStatusCounts,
+        pagination::{LogicalPages, PageLength, ReadingPosition},
+        vocabulary::{Surface, VocabularyStatus},
+    };
+    use yomoku_storage::{PasteImportOutcome, Storage};
+    let directory = std::env::temp_dir().join(format!(
+        "yomoku-joined-pages-{}-{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    ));
+    std::fs::create_dir(&directory).unwrap();
+    let path = directory.join("reader.sqlite3");
+    let mut storage = Storage::open(&path).unwrap();
+    let surface = Surface::new("食べました").unwrap();
+    storage
+        .register_vocabulary(std::slice::from_ref(&surface), 10)
+        .unwrap();
+    let entry = storage.vocabulary_entry(&surface).unwrap().unwrap();
+    let familiar = storage
+        .set_vocabulary_status(entry.id, VocabularyStatus::Familiar, 20)
+        .unwrap()
+        .unwrap();
+    let text = PasteText::new(format!("{}. 食べました。\n食べました。", "x".repeat(497))).unwrap();
+    let PasteImportOutcome::Created(imported) = storage
+        .import_analyzed_paste(&text, 30, |chapter| analyzer().analyze(chapter))
+        .unwrap()
+    else {
+        panic!("expected new import")
+    };
+    assert_eq!(imported.registered_surfaces, 0);
+    assert_eq!(
+        storage.vocabulary_entry(&surface).unwrap(),
+        Some(familiar.clone())
+    );
+    for component in ["食べ", "まし", "た", "食べる"] {
+        assert!(storage
+            .vocabulary_entry(&Surface::new(component).unwrap())
+            .unwrap()
+            .is_none());
+    }
+    let snapshot = storage
+        .chapter_analysis(imported.analysis_id)
+        .unwrap()
+        .unwrap();
+    assert_eq!(
+        snapshot
+            .tokens
+            .iter()
+            .filter(|token| token.is_japanese)
+            .map(|token| token.surface.as_str())
+            .collect::<Vec<_>>(),
+        ["食べました", "食べました"]
+    );
+    let page_length = PageLength::default();
+    let layout = LogicalPages::new(
+        std::slice::from_ref(&imported.document.chapter),
+        page_length,
+    )
+    .unwrap();
+    assert_eq!(layout.pages().len(), 2);
+    let first = snapshot
+        .tokens
+        .iter()
+        .find(|token| token.is_japanese)
+        .unwrap();
+    assert!(first.anchor.range.start < layout.pages()[0].range.end);
+    assert!(first.anchor.range.end <= layout.pages()[0].range.end);
+    let sql = rusqlite::Connection::open(&path).unwrap();
+    for (index, page) in layout.pages().iter().copied().enumerate() {
+        let loaded = storage
+            .load_effective_reader_tokens(imported.document.document_id, page)
+            .unwrap()
+            .unwrap();
+        assert!(
+            loaded
+                .tokens
+                .iter()
+                .all(|token| token.surface == "食べました"
+                    && token.vocabulary.unwrap().id == entry.id)
+        );
+        let completion = storage_fixture::prepare(
+            &mut storage,
+            PageCompletionIntent {
+                analysis_id: imported.analysis_id,
+                document_id: imported.document.document_id,
+                page,
+                page_length,
+                departing_position: ReadingPosition {
+                    source_id: page.source_id,
+                    chapter_id: page.chapter_id,
+                    offset: page.range.start,
+                },
+                completed_at_unix_ms: 40 + index as i64,
+            },
+        )
+        .unwrap();
+        assert_eq!(
+            storage
+                .record_effective_page_completion(&completion)
+                .unwrap(),
+            AnalyzedCompletionOutcome::Recorded { newly_known: 0 }
+        );
+        assert_eq!(
+            storage
+                .record_effective_page_completion(&completion)
+                .unwrap(),
+            AnalyzedCompletionOutcome::AlreadyRecorded
+        );
+        let count: i64 = sql
+            .query_row(
+                "SELECT COUNT(*) FROM reading_occurrences WHERE surface = '食べました'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(count, index as i64 + 1);
+        let total: i64 = sql
+            .query_row("SELECT COUNT(*) FROM reading_occurrences", [], |row| {
+                row.get(0)
+            })
+            .unwrap();
+        assert_eq!(total, count);
+    }
+    assert_eq!(
+        storage.effective_library_word_distributions().unwrap()[0].counts,
+        Some(WordStatusCounts {
+            familiar: 1,
+            ..Default::default()
+        })
+    );
+    assert_eq!(storage.vocabulary_entry(&surface).unwrap(), Some(familiar));
+    let duplicate = storage
+        .import_analyzed_paste(
+            &text,
+            50,
+            |_| -> Result<_, yomoku_analysis::AnalysisError> {
+                panic!("duplicate must not reanalyze")
+            },
+        )
+        .unwrap();
+    assert!(matches!(duplicate, PasteImportOutcome::Existing(_)));
+    drop(sql);
+    drop(storage);
+    let mut reopened = Storage::open(&path).unwrap();
+    assert_eq!(
+        reopened
+            .chapter_analysis(imported.analysis_id)
+            .unwrap()
+            .unwrap(),
+        snapshot
+    );
+    assert_eq!(
+        reopened.vocabulary_entry(&surface).unwrap().unwrap().status,
+        VocabularyStatus::Familiar
+    );
+    drop(reopened);
     std::fs::remove_dir_all(directory).unwrap();
 }

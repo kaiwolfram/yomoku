@@ -156,6 +156,50 @@ class ReaderWordsTest {
     }
 
     @Test
+    fun conjugationsHighlightAndSelectWholeSurfacesWithHeadDictionaryForms() {
+        compose.waitUntil(60_000) { !core().view.storageBusy }
+        val forms = listOf("できません", "食べました", "高くない", "食べている", "食べてしまった")
+        compose.runOnUiThread {
+            core()
+                .dispatch(
+                    Event.CreatePaste(
+                        "Conjugations-${System.nanoTime()}\n" + forms.joinToString("。")
+                    )
+                )
+        }
+        compose.waitUntil(60_000) { !core().view.storageBusy }
+        val id = checkNotNull(core().view.importSummary).documentId
+        compose.runOnUiThread { core().dispatch(Event.OpenReader(id)) }
+        awaitWords()
+        assertEquals(forms, core().view.effectiveReaderTokens!!.tokens.map { it.surface })
+        for ((index, surface) in forms.withIndex()) {
+            tapSurface(surface)
+            val details = checkNotNull(core().view.effectiveReaderWord?.details)
+            assertEquals(surface, details.token.surface)
+            assertEquals(
+                listOf("できる", "食べる", "高い", "食べる", "食べる")[index],
+                details.token.dictionaryForm,
+            )
+            assertTrue(details.candidates.words.isNotEmpty())
+            compose.onNodeWithTag("word_status_LEARNING").performClick()
+            awaitWords()
+            assertEquals(
+                VocabularyStatus.LEARNING,
+                core()
+                    .view
+                    .effectiveReaderTokens!!
+                    .tokens
+                    .single { it.surface == surface }
+                    .vocabulary!!
+                    .status,
+            )
+            androidx.test.platform.app.InstrumentationRegistry.getInstrumentation()
+                .sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_BACK)
+            compose.onNodeWithTag("reader_word_panel").assertDoesNotExist()
+        }
+    }
+
+    @Test
     fun tappingAndFiveChoicesPersistWithoutLookupHistoryAndFailedChoiceCanRepeat() {
         val id = openDocument()
         val original = core().view.reader!!
@@ -305,7 +349,7 @@ class ReaderWordsTest {
             awaitWords()
             compose.onNodeWithTag("reader_word_panel").assertDoesNotExist()
             assertNull(core().view.effectiveReaderWord?.selection)
-            tapSurface("食べ")
+            tapSurface("食べた")
             assertEquals("食べる", core().view.effectiveReaderWord!!.details!!.token.dictionaryForm)
             compose.onNodeWithTag("word_definitions").assertExists()
             assertTrue(

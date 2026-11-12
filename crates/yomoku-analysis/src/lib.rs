@@ -1,5 +1,7 @@
 //! Offline Sudachi adapter. No SQLite, UI, registration or reading side effects.
 
+mod conjugations;
+
 use std::{fs, path::Path, sync::LazyLock};
 
 use regex::Regex;
@@ -17,8 +19,11 @@ use yomoku_core::{
     vocabulary::Surface,
 };
 
-pub const ENGINE_REVISION: &str =
+pub const LEGACY_ENGINE_REVISION: &str =
     "sudachi.rs@5de0410b6edfd428fc510cc9763440772e9619d5+android-loader-v1;yomoku-adapter-v1;embedded-defaults";
+/// Version 2 joins conjugations in production C while preserving raw A/B.
+pub const ENGINE_REVISION: &str =
+    "sudachi.rs@5de0410b6edfd428fc510cc9763440772e9619d5+android-loader-v1;yomoku-adapter-v2-conjugations;embedded-defaults";
 pub const DICTIONARY_SHA256: &str =
     "7c797531dea76f06b629fad39cb3a5bdb3a9e54c67ef3d9a869e61418426a7d1";
 pub const DICTIONARY_REVISION: &str =
@@ -30,6 +35,7 @@ pub enum AnalysisError {
     DictionaryMismatch,
     Engine(SudachiError),
     InvalidOutput,
+    UnsupportedProfile,
 }
 
 impl std::fmt::Display for AnalysisError {
@@ -38,6 +44,9 @@ impl std::fmt::Display for AnalysisError {
             Self::Io(error) => write!(f, "cannot read Sudachi Full dictionary: {error}"),
             Self::DictionaryMismatch => f.write_str("Sudachi Full dictionary checksum mismatch"),
             Self::Engine(error) => write!(f, "Sudachi analysis failed: {error}"),
+            Self::UnsupportedProfile => {
+                f.write_str("unsupported dictionary component analysis profile")
+            }
             Self::InvalidOutput => {
                 f.write_str("Sudachi output cannot preserve exact source anchors")
             }
@@ -104,9 +113,31 @@ impl Analyzer {
         Ok(Self { dictionary })
     }
 
-    /// Default Mode B, independently of any future UI preference.
+    /// Production Mode C with joined conjugations for new imports.
     pub fn analyze(&self, chapter: &ChapterText) -> Result<ChapterAnalysis, AnalysisError> {
         self.analyze_mode(chapter, SplitMode::default())
+    }
+
+    /// A/B semantics and dictionary bytes are unchanged from version 1. Honor
+    /// its profile for lazy components of existing books; never regenerate old C.
+    pub fn analyze_components(
+        &self,
+        chapter: &ChapterText,
+        mode: SplitMode,
+        profile: &AnalysisProfile,
+    ) -> Result<ChapterAnalysis, AnalysisError> {
+        if mode == SplitMode::C
+            || !matches!(
+                profile.engine_revision.as_str(),
+                ENGINE_REVISION | LEGACY_ENGINE_REVISION
+            )
+            || profile.dictionary_revision != DICTIONARY_REVISION
+        {
+            return Err(AnalysisError::UnsupportedProfile);
+        }
+        let mut analysis = self.analyze_mode(chapter, mode)?;
+        analysis.profile = profile.clone();
+        Ok(analysis)
     }
 
     pub fn analyze_mode(
@@ -138,6 +169,7 @@ impl Analyzer {
             tokenizer.reset().push_str(&remaining[..length]);
             tokenizer.do_tokenize()?;
             morphemes.collect_results(&mut tokenizer)?;
+            let mut sentence = Vec::new();
             for morpheme in morphemes.iter() {
                 let start = base + morpheme.begin();
                 let end = base + morpheme.end();
@@ -156,7 +188,7 @@ impl Analyzer {
                 let is_japanese =
                     is_japanese_word(surface, morpheme.part_of_speech(), morpheme.is_oov());
                 let resolved = is_japanese && !morpheme.is_oov();
-                tokens.push(AnalyzedToken {
+                let token = AnalyzedToken {
                     anchor: TextAnchor {
                         source_id: chapter.source_id,
                         chapter_id: chapter.chapter_id,
@@ -176,7 +208,19 @@ impl Analyzer {
                     dictionary_form: resolved
                         .then(|| Surface::new(morpheme.dictionary_form()).ok())
                         .flatten(),
-                });
+                };
+                if mode == SplitMode::C {
+                    sentence.push(conjugations::Morpheme {
+                        token,
+                        pos: morpheme.part_of_speech().to_vec(),
+                        normalized_form: morpheme.normalized_form().to_owned(),
+                    });
+                } else {
+                    tokens.push(token);
+                }
+            }
+            if mode == SplitMode::C {
+                tokens.extend(conjugations::join(sentence));
             }
             base += length;
         }

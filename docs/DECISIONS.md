@@ -140,3 +140,13 @@ Supporting contracts: [Rust Android targets](https://doc.rust-lang.org/rustc/pla
 [page-size alignment](https://developer.android.com/guide/practices/page-sizes),
 [AGP built-in Kotlin](https://developer.android.com/build/migrate-to-built-in-kotlin) and
 [emulator CLI](https://developer.android.com/studio/run/emulator-commandline).
+
+## Joined conjugations for new imports
+
+The version-2 analysis adapter joins adjacent Mode C verb/adjective conjugations
+and allowlisted non-independent `て`/`で` helper chains using the pinned Sudachi
+POS and conjugation metadata. Exact surfaces/spans remain the vocabulary and
+completion identity; the head supplies the base form. A/B remain raw for lookup.
+No stored C snapshot or history is rewritten. Version-1 lazy A/B analysis stays
+supported because its engine, dictionary, configuration and raw analysis semantics
+are unchanged; unsupported profiles fail closed.

@@ -240,3 +240,164 @@ fn serialized_missing_analysis_and_legacy_commands_fail_closed() {
     assert_eq!(std::fs::read(f.path()).unwrap(), before);
     assert_eq!(f.count("reading_completions"), 0);
 }
+
+#[test]
+#[ignore = "requires pinned Sudachi Full; run tools/test-sudachi.sh"]
+fn native_previous_profile_book_lazily_loads_components_without_changing_boundaries() {
+    use std::{fs::File, os::fd::IntoRawFd};
+    use yomoku_analysis::{Analyzer, LEGACY_ENGINE_REVISION};
+    use yomoku_core::{effective_session::EffectiveReaderSelection, vocabulary::VocabularyStatus};
+    use yomoku_ffi::native::{DictionaryProvider, EffectsListener, NativeBridge};
+
+    struct Provider(PathBuf, PathBuf);
+    impl DictionaryProvider for Provider {
+        fn open_verified_dictionary(&self) -> i64 {
+            i64::from(File::open(&self.0).unwrap().into_raw_fd()) + 1
+        }
+        fn verified_word_dictionary_path(&self) -> String {
+            self.1.to_str().unwrap().into()
+        }
+    }
+    struct Listener(mpsc::Sender<Result<Vec<u8>, FfiError>>);
+    impl EffectsListener for Listener {
+        fn on_effects(&self, bytes: Vec<u8>) {
+            self.0.send(Ok(bytes)).unwrap();
+        }
+        fn on_error(&self, error: FfiError) {
+            self.0.send(Err(error)).unwrap();
+        }
+    }
+    let f = Fixture::new();
+    let full = std::env::var_os("YOMOKU_SUDACHI_DICTIONARY")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| {
+            PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .join("../../.local/sudachi/full-20261015/system_full.dic")
+        });
+    let engine = Analyzer::open_full(&full).unwrap();
+    let mut storage = Storage::open(f.path()).unwrap();
+    let yomoku_storage::PasteImportOutcome::Created(imported) = storage
+        .import_analyzed_paste(
+            &PasteText::new("食べました。".into()).unwrap(),
+            100,
+            |chapter| {
+                // For this fixture raw B and original raw C are identical. Pin the
+                // exact old surfaces and profile; no component cache is supplied.
+                let mut original = engine.analyze_mode(chapter, SplitMode::B)?;
+                assert_eq!(
+                    original
+                        .tokens
+                        .iter()
+                        .map(|t| t.surface.as_str())
+                        .collect::<Vec<_>>(),
+                    ["食べ", "まし", "た", "。"]
+                );
+                original.mode = SplitMode::C;
+                original.profile.engine_revision = LEGACY_ENGINE_REVISION.into();
+                Ok::<_, yomoku_analysis::AnalysisError>(original)
+            },
+        )
+        .unwrap()
+    else {
+        panic!("expected new fixture")
+    };
+    let original = storage
+        .chapter_analysis(imported.analysis_id)
+        .unwrap()
+        .unwrap();
+    let surface = Surface::new("食べ").unwrap();
+    let entry = storage.vocabulary_entry(&surface).unwrap().unwrap();
+    storage
+        .set_vocabulary_status(entry.id, VocabularyStatus::Familiar, 200)
+        .unwrap();
+    for mode in [SplitMode::A, SplitMode::B] {
+        assert!(!storage
+            .has_component_analysis(
+                imported.document.chapter.chapter_id,
+                &original.profile,
+                mode
+            )
+            .unwrap());
+    }
+    drop(storage);
+    drop(engine);
+    let words = f.directory.join("words.sqlite3");
+    let index = Connection::open(&words).unwrap();
+    index.execute("INSERT INTO entries VALUES ('JMdict',2,?1)", [r#"{"kanji":[{"text":"食べる"}],"readings":[{"text":"たべる"}],"senses":[{"glosses":[{"text":"eat","lang":"eng"}]}]}"#]).unwrap();
+    index
+        .execute("INSERT INTO forms VALUES ('食べる','JMdict',2)", [])
+        .unwrap();
+    drop(index);
+    let (tx, rx) = mpsc::channel();
+    let bridge = NativeBridge::new(
+        f.path().to_str().unwrap().into(),
+        Box::new(Listener(tx)),
+        Box::new(Provider(full, words)),
+    )
+    .unwrap();
+    let dispatch = |event: Event| -> ViewModel {
+        let mut bytes = Vec::new();
+        BincodeFfiFormat::serialize(&mut bytes, &event).unwrap();
+        renders(&bridge.update(&bytes).unwrap());
+        renders(&rx.recv_timeout(Duration::from_secs(60)).unwrap().unwrap());
+        let view: ViewModel = BincodeFfiFormat::deserialize(&bridge.view().unwrap()).unwrap();
+        assert!(!view.storage_busy);
+        assert_eq!(view.document_error, None);
+        view
+    };
+    let opened = dispatch(Event::OpenReader(imported.document.document_id));
+    let loaded = dispatch(Event::LoadReaderTokens(ReaderTokenKey {
+        document_id: imported.document.document_id,
+        page: opened.reader.unwrap().anchor,
+        analysis: opened.reader_analysis.unwrap(),
+    }));
+    let page = loaded.effective_reader_tokens.unwrap();
+    assert_eq!(
+        page.tokens
+            .iter()
+            .map(|t| t.surface.as_str())
+            .collect::<Vec<_>>(),
+        ["食べ", "まし", "た"]
+    );
+    let selected = &page.tokens[0];
+    assert_eq!(
+        selected.vocabulary.unwrap().status,
+        VocabularyStatus::Familiar
+    );
+    let view = dispatch(Event::LoadEffectiveReaderWord(EffectiveReaderSelection {
+        page: page.identity,
+        segment_index: selected.segment_index,
+    }));
+    let details = view.effective_reader_word.unwrap().details.unwrap();
+    assert_eq!(details.token.surface, "食べ");
+    assert_eq!(
+        details.candidates.dictionary_form.as_deref(),
+        Some("食べる")
+    );
+    assert!(!details.candidates.words.is_empty());
+    let mut storage = Storage::open(f.path()).unwrap();
+    assert_eq!(
+        storage
+            .chapter_analysis(imported.analysis_id)
+            .unwrap()
+            .unwrap(),
+        original
+    );
+    for mode in [SplitMode::A, SplitMode::B] {
+        assert!(storage
+            .has_component_analysis(
+                imported.document.chapter.chapter_id,
+                &original.profile,
+                mode
+            )
+            .unwrap());
+    }
+    assert!(storage
+        .vocabulary_entry(&Surface::new("食べました").unwrap())
+        .unwrap()
+        .is_none());
+    assert_eq!(
+        storage.vocabulary_entry(&surface).unwrap().unwrap().status,
+        VocabularyStatus::Familiar
+    );
+}

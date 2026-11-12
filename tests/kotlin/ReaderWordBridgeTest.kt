@@ -92,7 +92,7 @@ internal fun verifyReaderWordBridge() {
                 check(loaded.reader == page && loaded.completionNotice == null)
                 check(provider.wordCalls.get() == 2)
                 check(provider.wordThreads.all { it != Thread.currentThread() })
-                val inflected = tokens.tokens.first { it.surface == "食べ" }
+                val inflected = tokens.tokens.first { it.surface == "食べた" }
                 val inflectedDetails =
                     checkNotNull(
                         dispatch(
@@ -107,7 +107,7 @@ internal fun verifyReaderWordBridge() {
                             .effectiveReaderWord
                             ?.details
                     )
-                check(inflectedDetails.token.surface == "食べ")
+                check(inflectedDetails.token.surface == "食べた")
                 check(inflectedDetails.token.dictionaryForm == "食べる")
                 check(inflectedDetails.candidates.dictionaryForm == "食べる")
                 check(inflectedDetails.candidates.words.isNotEmpty())

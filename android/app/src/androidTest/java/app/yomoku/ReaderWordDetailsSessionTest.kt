@@ -86,7 +86,7 @@ class ReaderWordDetailsSessionTest {
             assertEquals(opened.reader, loaded.reader)
             assertNull(loaded.completionNotice)
             assertEquals(2, wordCalls.get())
-            val inflected = tokens.tokens.first { it.surface == "食べ" }
+            val inflected = tokens.tokens.first { it.surface == "食べた" }
             val baseDetails =
                 dispatch(
                         core,

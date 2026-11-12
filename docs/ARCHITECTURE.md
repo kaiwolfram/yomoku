@@ -24,7 +24,11 @@ Lifecycle background events release Full after queued work, without eager reload
 ## Production reader
 
 `Model::default()` owns an `EffectiveReaderSession`. Stored Mode C analysis is
-the reader's segmentation. A/B analyses remain available for dictionary components;
+the reader's segmentation. For new imports the version-2 adapter joins conjugated
+verb/adjective endings and allowlisted non-independent helper chains before storage;
+existing C snapshots remain immutable. Raw A/B components can still be generated
+under the original version-1 profile with the unchanged pinned engine/dictionary.
+A/B analyses remain available for dictionary components;
 they do not select another reader. The native session retains chapter data and
 validates each page. The shell receives a compact page and revision identity;
 selections contain that identity and a segment index. Stale callbacks cannot attach
