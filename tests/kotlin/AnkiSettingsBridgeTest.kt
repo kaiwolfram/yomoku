@@ -34,9 +34,18 @@ internal fun verifyAnkiSettingsBridge(fixtures: String) {
             Event.CheckAnkiSetup,
             Event.CreateAnkiModel,
             Event.LoadReaderAnkiEntries(entrySelection),
-            Event.AddReaderAnkiEntry(entrySelection, AnkiEntryKey.Word(Long.MAX_VALUE)),
-            Event.AddReaderAnkiEntry(entrySelection, AnkiEntryKey.Name(9007199254740993L)),
-            Event.AddReaderAnkiEntry(entrySelection, AnkiEntryKey.Word(1)),
+            Event.AddReaderAnkiEntry(
+                entrySelection,
+                AnkiEntryKey.Word(Long.MAX_VALUE, ReadingMatch(0UL, 0UL)),
+            ),
+            Event.AddReaderAnkiEntry(
+                entrySelection,
+                AnkiEntryKey.Name(9007199254740993L, ReadingMatch(0UL, 0UL)),
+            ),
+            Event.AddReaderAnkiEntry(
+                entrySelection,
+                AnkiEntryKey.Word(1, ReadingMatch(0UL, 0UL)),
+            ),
         )
     for ((index, expected) in entryActions.withIndex()) {
         val bytes = root.resolve("anki-entry-action-$index.bin").readBytes()
@@ -56,7 +65,14 @@ internal fun verifyAnkiSettingsBridge(fixtures: String) {
         val view =
             AnkiEntryView.bincodeDeserialize(root.resolve("anki-entry-view-$index.bin").readBytes())
         check(
-            view == AnkiEntryView(entrySelection, AnkiEntryKey.Word(Long.MAX_VALUE), "𠮷<&", phase)
+            view ==
+                AnkiEntryView(
+                    entrySelection,
+                    AnkiEntryKey.Word(Long.MAX_VALUE, ReadingMatch(0UL, 0UL)),
+                    "𠮷<&",
+                    "よし",
+                    phase,
+                )
         )
         root.resolve("anki-entry-view-$index-return.bin").writeBytes(view.bincodeSerialize())
     }

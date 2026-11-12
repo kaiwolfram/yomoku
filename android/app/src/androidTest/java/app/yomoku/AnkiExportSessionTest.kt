@@ -241,8 +241,8 @@ class AnkiExportSessionTest {
     private fun entryTag(entry: AnkiEntryView): String =
         "anki_entry_" +
             when (val key = entry.key) {
-                is AnkiEntryKey.Word -> "word_${key.value}"
-                is AnkiEntryKey.Name -> "name_${key.value}"
+                is AnkiEntryKey.Word -> ankiEntryTag(key)
+                is AnkiEntryKey.Name -> ankiEntryTag(key)
             }
 
     @Test

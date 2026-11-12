@@ -93,8 +93,9 @@ class AnkiNoteBrowserTest {
                 AnkiSelection.Effective(
                     EffectiveReaderSelection(EffectivePageIdentity(1UL, key), 0UL)
                 ),
-                AnkiEntryKey.Word(5),
+                AnkiEntryKey.Word(5, ReadingMatch(0UL, 0UL)),
                 "猫",
+                "ねこ",
                 AnkiEntryPhase.Existing(listOf(Long.MAX_VALUE, 9007199254740993L)),
             )
         main {

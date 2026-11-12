@@ -25,7 +25,7 @@ class AnkiLiveWorkerTest {
             "{{Surface}}",
             "{{Sentence}}",
         )
-    private val operation = AnkiLiveOperation.CreateModel("𠮷猫", Long.MAX_VALUE, layout)
+    private val operation = AnkiLiveOperation.CreateModel("𠮷猫", "ねこ", Long.MAX_VALUE, layout)
 
     @Test
     fun invokesOnceOffMainAndDeliversOnlyThroughMainQueue() {
@@ -167,6 +167,7 @@ class AnkiLiveWorkerTest {
         val note =
             AnkiLiveOperation.InsertNote(
                 "𠮷猫",
+                "",
                 listOf("𠮷猫", "", "", "sentence"),
                 Long.MAX_VALUE,
                 9007199254740993L,

@@ -91,8 +91,16 @@ fn prepare(
     if display != expected_display {
         return Err(InvalidTextValue);
     }
-    let (headword, reading, meanings, form) = if let Some(key) = entry {
-        entry_content(candidates, key)?
+    let content = entry
+        .map(|key| entry_content(candidates, key))
+        .transpose()?;
+    let (headword, reading, meanings, form) = if let Some(content) = &content {
+        (
+            content.headword.clone(),
+            content.reading.clone(),
+            Vec::new(),
+            content.form.clone(),
+        )
     } else {
         let (reading, meanings) = definitions(candidates, analyzer_reading)?;
         (surface.to_owned(), reading, meanings, surface.to_owned())
@@ -120,13 +128,17 @@ fn prepare(
         start: (i64::from(target.range.start) - i64::from(sentence.start)).try_into()?,
         end: (i64::from(target.range.end) - i64::from(sentence.start)).try_into()?,
     };
-    AnkiNote::with_occurrence(
+    let mut note = AnkiNote::with_occurrence(
         &Surface::new(&headword).map_err(|_| InvalidTextValue)?,
         &reading,
         &meanings.iter().map(String::as_str).collect::<Vec<_>>(),
         text,
         local,
-    )
+    )?;
+    if let Some(content) = content {
+        note.fields[2] = content.meanings;
+    }
+    Ok(note)
 }
 
 // Same lightweight punctuation rules as pagination, plus canonical hard lines.
@@ -277,61 +289,75 @@ fn push_meaning(values: &mut Vec<String>, translations: &[Translation]) {
     }
 }
 
+struct EntryContent {
+    headword: String,
+    reading: String,
+    meanings: String,
+    form: String,
+}
+
 fn entry_content(
     candidates: &DictionaryCandidates,
     key: super::AnkiEntryKey,
-) -> Result<(String, String, Vec<String>, String), InvalidTextValue> {
+) -> Result<EntryContent, InvalidTextValue> {
     use super::AnkiEntryKey;
-    let mut meanings = Vec::new();
-    let mut readings = Vec::new();
-    let (headword, form) = match key {
-        AnkiEntryKey::Word(id) => {
+    let (entry_id, pair) = match key {
+        AnkiEntryKey::Word { entry_id, reading } | AnkiEntryKey::Name { entry_id, reading } => {
+            (entry_id, reading)
+        }
+    };
+    if entry_id <= 0 {
+        return Err(InvalidTextValue);
+    }
+    let mut senses = String::new();
+    let (kanji, readings, form, dictionary) = match key {
+        AnkiEntryKey::Word { .. } => {
             let candidate = candidates
                 .words
                 .iter()
-                .find(|c| c.entry_id == id && id > 0)
+                .find(|c| c.entry_id == entry_id)
                 .ok_or(InvalidTextValue)?;
-            let first = candidate.forms.first().ok_or(InvalidTextValue)?;
-            let pair = &first.matches.first().ok_or(InvalidTextValue)?.reading;
             for form in &candidate.forms {
                 if form.matches.is_empty() || form.matches != candidate.entry.matches(&form.form) {
                     return Err(InvalidTextValue);
                 }
             }
-            let headword = pair
-                .spelling_index
-                .map(|i| candidate.entry.kanji[i].text.clone())
-                .unwrap_or_else(|| candidate.entry.readings[pair.reading_index].text.clone());
-            for (i, reading) in candidate.entry.readings.iter().enumerate() {
-                if candidate
-                    .forms
-                    .iter()
-                    .flat_map(|f| &f.matches)
-                    .any(|m| m.reading.reading_index == i)
-                {
-                    push_unique(&mut readings, &reading.text);
-                }
-            }
+            let form = candidate
+                .forms
+                .iter()
+                .find(|f| f.matches.iter().any(|m| m.reading == pair))
+                .ok_or(InvalidTextValue)?;
             for (i, sense) in candidate.entry.senses.iter().enumerate() {
                 if candidate
                     .forms
                     .iter()
                     .flat_map(|f| &f.matches)
-                    .any(|m| m.sense_indices.contains(&i))
+                    .any(|m| m.reading == pair && m.sense_indices.contains(&i))
                 {
-                    push_meaning(&mut meanings, &sense.glosses);
+                    let labels: Vec<_> = sense
+                        .pos
+                        .iter()
+                        .chain(&sense.field)
+                        .chain(&sense.misc)
+                        .chain(&sense.dial)
+                        .cloned()
+                        .collect();
+                    senses.push_str(&sense_html(&labels, &sense.glosses, &sense.s_inf));
                 }
             }
-            (headword, first.form.clone())
+            (
+                &candidate.entry.kanji,
+                &candidate.entry.readings,
+                &form.form,
+                "JMdict",
+            )
         }
-        AnkiEntryKey::Name(id) => {
+        AnkiEntryKey::Name { .. } => {
             let candidate = candidates
                 .names
                 .iter()
-                .find(|c| c.entry_id == id && id > 0)
+                .find(|c| c.entry_id == entry_id)
                 .ok_or(InvalidTextValue)?;
-            let first = candidate.forms.first().ok_or(InvalidTextValue)?;
-            let pair = first.matches.first().ok_or(InvalidTextValue)?;
             for form in &candidate.forms {
                 if form.matches.is_empty()
                     || form.matches
@@ -344,25 +370,64 @@ fn entry_content(
                     return Err(InvalidTextValue);
                 }
             }
-            let headword = pair
-                .spelling_index
-                .map(|i| candidate.entry.kanji[i].text.clone())
-                .unwrap_or_else(|| candidate.entry.readings[pair.reading_index].text.clone());
-            for (i, reading) in candidate.entry.readings.iter().enumerate() {
-                if candidate
-                    .forms
-                    .iter()
-                    .flat_map(|f| &f.matches)
-                    .any(|m| m.reading_index == i)
-                {
-                    push_unique(&mut readings, &reading.text);
-                }
-            }
+            let form = candidate
+                .forms
+                .iter()
+                .find(|f| f.matches.contains(&pair))
+                .ok_or(InvalidTextValue)?;
             for group in &candidate.entry.names {
-                push_meaning(&mut meanings, &group.translations);
+                senses.push_str(&sense_html(&group.name_type, &group.translations, &[]));
             }
-            (headword, first.form.clone())
+            (
+                &candidate.entry.kanji,
+                &candidate.entry.readings,
+                &form.form,
+                "JMnedict",
+            )
         }
     };
-    Ok((headword, readings.join("、"), meanings, form))
+    // The pair must occur in validated matches before indexing the immutable payload.
+    let reading = readings
+        .get(pair.reading_index)
+        .ok_or(InvalidTextValue)?
+        .text
+        .clone();
+    let headword = match pair.spelling_index {
+        Some(index) => kanji.get(index).ok_or(InvalidTextValue)?.text.clone(),
+        None => reading.clone(),
+    };
+    Ok(EntryContent {
+        headword,
+        reading,
+        meanings: format!("<div class=\"yomoku-dictionary\">{dictionary}</div><ol>{senses}</ol>"),
+        form: form.clone(),
+    })
+}
+
+fn sense_html(labels: &[String], glosses: &[Translation], notes: &[String]) -> String {
+    let mut meanings = Vec::new();
+    push_meaning(&mut meanings, glosses);
+    if meanings.is_empty() {
+        return String::new();
+    }
+    let mut html = String::from("<li>");
+    let mut unique_labels = Vec::new();
+    for label in labels {
+        push_unique(&mut unique_labels, label);
+    }
+    if !unique_labels.is_empty() {
+        html.push_str(&format!(
+            "<i class=\"yomoku-labels\">({})</i> ",
+            super::escape(&unique_labels.join(", "))
+        ));
+    }
+    html.push_str(&super::escape(&meanings.join("; ")));
+    for note in notes {
+        html.push_str(&format!(
+            "<div class=\"yomoku-note\">{}</div>",
+            super::escape(note)
+        ));
+    }
+    html.push_str("</li>");
+    html
 }

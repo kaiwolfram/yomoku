@@ -257,11 +257,12 @@ internal class AnkiProviderReader(
      * text or Yomoku's exact escaping; arbitrary HTML, alternate entities and combined fields are
      * not decoded into identities. Never normalize, trim, case-fold or use a checksum alone.
      */
-    fun duplicates(surface: String): AnkiReadResult<List<AnkiProviderNoteId>> =
+    fun duplicates(surface: String, reading: String): AnkiReadResult<List<AnkiProviderNoteId>> =
         read(AnkiReadError.DuplicateLookupFailed) {
-            host()
+            val packageName = host()
             // Android SQLite string transport cannot establish lossless identity for embedded NUL.
-            if (surface.isEmpty() || '\u0000' in surface) fail(AnkiReadError.InvalidResponse)
+            if (surface.isEmpty() || '\u0000' in surface || '\u0000' in reading)
+                fail(AnkiReadError.InvalidResponse)
             val candidates = linkedSetOf(escapeSurface(surface))
             if (surface.none { it in "&<>[]\u001f" }) candidates.add(surface)
             val selection =
@@ -277,24 +278,72 @@ internal class AnkiProviderReader(
                     arguments,
                     null,
                 ) ?: fail(AnkiReadError.DuplicateLookupFailed)
-            try {
-                val id = cursor.getColumnIndexOrThrow("_id")
-                val model = cursor.getColumnIndexOrThrow("mid")
-                val fields = cursor.getColumnIndexOrThrow("flds")
-                val notes = linkedSetOf<AnkiProviderNoteId>()
-                while (cursor.moveToNext()) {
-                    val noteId = AnkiProviderNoteId(cursor.positiveId(id))
-                    cursor.positiveId(model)
-                    val first = cursor.requiredString(fields).substringBefore('\u001f')
-                    // Verify returned rows independently of SQL filtering/provider
-                    // implementation.
-                    if (first in candidates) notes.add(noteId)
+            val rows =
+                try {
+                    val id = cursor.getColumnIndexOrThrow("_id")
+                    val model = cursor.getColumnIndexOrThrow("mid")
+                    val fields = cursor.getColumnIndexOrThrow("flds")
+                    val notes =
+                        mutableListOf<
+                            Triple<AnkiProviderNoteId, AnkiProviderModelId, List<String>>
+                        >()
+                    while (cursor.moveToNext()) {
+                        val noteId = AnkiProviderNoteId(cursor.positiveId(id))
+                        val modelId = AnkiProviderModelId(cursor.positiveId(model))
+                        val content = cursor.requiredString(fields).split('\u001f')
+                        val first = content.first()
+                        // Verify returned rows independently of SQL filtering/provider
+                        // implementation.
+                        if (first in candidates) notes.add(Triple(noteId, modelId, content))
+                    }
+                    notes.toList()
+                } finally {
+                    cursor.close()
                 }
-                notes.toList()
-            } finally {
-                cursor.close()
+            val indices = mutableMapOf<AnkiProviderModelId, Int?>()
+            val readings = setOf(reading, escapeSurface(reading))
+            val matches = linkedSetOf<AnkiProviderNoteId>()
+            for ((noteId, modelId, fields) in rows) {
+                if (host() != packageName) fail(AnkiReadError.ProviderUnavailable)
+                if (!indices.containsKey(modelId)) {
+                    indices[modelId] = readingFieldIndex(modelId)
+                }
+                val index = indices[modelId] ?: continue
+                if (fields.getOrNull(index) in readings) matches.add(noteId)
             }
+            if (host() != packageName) fail(AnkiReadError.ProviderUnavailable)
+            matches.toList()
         }
+
+    /** Resolve the named field from each external model; never assume its position. */
+    private fun readingFieldIndex(modelId: AnkiProviderModelId): Int? {
+        val cursor =
+            resolver.query(
+                uri("models").buildUpon().appendPath(modelId.value.toString()).build(),
+                arrayOf("_id", "field_names"),
+                null,
+                null,
+                null,
+            ) ?: fail(AnkiReadError.DuplicateLookupFailed)
+        return try {
+            val id = cursor.getColumnIndexOrThrow("_id")
+            val names = cursor.getColumnIndexOrThrow("field_names")
+            if (!cursor.moveToNext() || cursor.positiveId(id) != modelId.value)
+                fail(AnkiReadError.InvalidResponse)
+            val fields = cursor.requiredString(names).split('\u001f')
+            if (
+                fields.any { it.isEmpty() } ||
+                    fields.toSet().size != fields.size ||
+                    cursor.moveToNext()
+            )
+                fail(AnkiReadError.InvalidResponse)
+            val indices = fields.indices.filter { fields[it].equals("Reading", ignoreCase = true) }
+            if (indices.size > 1) fail(AnkiReadError.InvalidResponse)
+            indices.singleOrNull()
+        } finally {
+            cursor.close()
+        }
+    }
 
     /**
      * Resolve the supported browser link only in the current provider's package. Does not launch.

@@ -29,7 +29,7 @@ pub use submission::*;
 /// These are original templates, not copied Yomitan assets. Android must verify
 /// a stored model's complete layout before reusing it; never overwrite a user's
 /// unrelated model based only on its name.
-pub const MODEL_NAME: &str = "Yomoku v2";
+pub const MODEL_NAME: &str = "Yomoku";
 pub const FIELD_NAMES: [&str; 4] = ["Surface", "Reading", "Meanings", "Sentence"];
 pub const CARD_NAME: &str = "Japanese word";
 pub const QUESTION_FORMAT: &str = r#"<div class="yomoku-surface">{{Surface}}</div>"#;
@@ -38,12 +38,16 @@ pub const ANSWER_FORMAT: &str = r#"{{FrontSide}}
 {{#Reading}}<div class="yomoku-reading">{{Reading}}</div>{{/Reading}}
 {{#Meanings}}<div class="yomoku-meanings">{{Meanings}}</div>{{/Meanings}}
 <div class="yomoku-sentence">{{Sentence}}</div>"#;
-pub const CSS: &str = r#".card { font-family: sans-serif; font-size: 20px; line-height: 1.6; text-align: left; color: #263238; background: #fafafa; padding: 24px; }
+pub const CSS: &str = r#".card { font-family: sans-serif; font-size: 20px; line-height: 1.5; text-align: left; color: #263238; background: #fafafa; padding: 16px; }
 .card.nightMode, .nightMode .card { color: #e8eaed; background: #202124; }
-ol { padding-left: 1.5em; }
+ol { padding-left: 1.5em; margin: 0.4em 0; }
+li { margin: 0.35em 0; }
 hr { border: 0; border-top: 1px solid #8886; margin: 1em 0; }
 .yomoku-surface { font-size: 1.8em; text-align: center; white-space: pre-wrap; }
-.yomoku-reading, .yomoku-meanings, .yomoku-sentence { white-space: pre-wrap; }
+.yomoku-reading { font-size: 1.15em; text-align: center; margin-bottom: 0.75em; }
+.yomoku-dictionary, .yomoku-labels, .yomoku-note { font-size: 0.85em; opacity: 0.8; }
+.yomoku-dictionary { font-weight: bold; }
+.yomoku-reading, .yomoku-meanings li, .yomoku-sentence { white-space: pre-wrap; }
 .yomoku-sentence { margin-top: 1em; }
 .yomoku-target { font-weight: bold; text-decoration: underline; }"#;
 
@@ -52,6 +56,7 @@ hr { border: 0; border-top: 1px solid #8886; margin: 1em 0; }
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct AnkiNote {
     surface: Surface,
+    reading: String,
     fields: [String; 4],
 }
 
@@ -107,6 +112,7 @@ impl AnkiNote {
         };
         Ok(Self {
             surface: surface.clone(),
+            reading: reading.into(),
             fields: [
                 escape(surface.as_str()),
                 escape(reading),
@@ -118,6 +124,14 @@ impl AnkiNote {
 
     pub fn surface(&self) -> &Surface {
         &self.surface
+    }
+
+    pub fn reading(&self) -> &str {
+        &self.reading
+    }
+
+    pub fn same_identity(&self, other: &Self) -> bool {
+        self.surface == other.surface && self.reading == other.reading
     }
 
     pub fn fields(&self) -> &[String; 4] {

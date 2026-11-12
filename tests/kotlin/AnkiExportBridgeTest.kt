@@ -198,6 +198,7 @@ internal fun verifyAnkiExportBridge() {
                                 liveOperation ==
                                     AnkiLiveOperation.CreateModel(
                                         "猫",
+                                        operation.reading,
                                         Long.MAX_VALUE,
                                         operation.layout,
                                     )

@@ -15,6 +15,7 @@ use super::{
 pub enum AnkiLiveOperation {
     InsertNote {
         surface: String,
+        reading: String,
         fields: Vec<String>,
         deck_id: i64,
         model_id: i64,
@@ -22,6 +23,7 @@ pub enum AnkiLiveOperation {
     },
     CreateModel {
         surface: String,
+        reading: String,
         deck_id: i64,
         layout: Box<AnkiReadModelLayout>,
     },
@@ -48,10 +50,16 @@ pub enum AnkiLiveResult {
 impl AnkiLiveInvocation {
     /// Creation also rechecks the frozen export's surface and deck immediately
     /// before submission. Neither value is recovered from a journal ID.
-    pub(crate) fn operation(&self, surface: String, deck_id: i64) -> AnkiLiveOperation {
+    pub(crate) fn operation(
+        &self,
+        surface: String,
+        reading: String,
+        deck_id: i64,
+    ) -> AnkiLiveOperation {
         match self.intent() {
             AnkiLiveIntent::Note(note) => AnkiLiveOperation::InsertNote {
                 surface: note.note().surface().as_str().into(),
+                reading: note.note().reading().into(),
                 fields: note.note().fields().to_vec(),
                 deck_id: note.deck().into(),
                 model_id: note.model().into(),
@@ -59,6 +67,7 @@ impl AnkiLiveInvocation {
             },
             AnkiLiveIntent::Model(model) => AnkiLiveOperation::CreateModel {
                 surface,
+                reading,
                 deck_id,
                 layout: Box::new(model.layout().into()),
             },

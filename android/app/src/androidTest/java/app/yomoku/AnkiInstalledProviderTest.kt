@@ -67,7 +67,7 @@ class AnkiInstalledProviderTest {
         val deck = value(provider.decks()).first { !it.filtered }.id
         assertTrue(
             "Use a fresh disposable collection with no cat notes",
-            value(provider.duplicates("猫")).isEmpty(),
+            value(provider.duplicates("猫", "ねこ")).isEmpty(),
         )
         val directory =
             File(context.noBackupFilesDir, "installed-anki-${System.nanoTime()}").apply { mkdirs() }
@@ -162,15 +162,53 @@ class AnkiInstalledProviderTest {
             val existing = phase { it is AnkiEntryPhase.Existing }.phase as AnkiEntryPhase.Existing
             assertEquals(1, writes.get())
             val noteId = existing.value.single()
-            assertEquals(listOf(AnkiProviderNoteId(noteId)), value(provider.duplicates("猫")))
+            assertEquals(listOf(AnkiProviderNoteId(noteId)), value(provider.duplicates("猫", "ねこ")))
             val intent =
                 checkNotNull(value(provider.existingNoteIntent(AnkiProviderNoteId(noteId))))
             context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            // The real provider must permit identical first fields when readings differ.
+            val template = checkNotNull(inserted.get())
+            val trialNotes = mutableListOf<Uri>()
+            try {
+                for (reading in listOf("せい", "なま")) {
+                    assertTrue(value(provider.duplicates("生", reading)).isEmpty())
+                    val operation =
+                        template.copy(
+                            surface = "生",
+                            reading = reading,
+                            fields =
+                                listOf(
+                                    "生",
+                                    reading,
+                                    "<ol><li>life</li></ol>",
+                                    "<strong>生</strong>。",
+                                ),
+                        )
+                    val added = dispatcher.invoke(operation) as AnkiLiveResult.NoteAdded
+                    trialNotes.add(
+                        Uri.parse("content://${AnkiProviderReader.AUTHORITY}/notes/${added.value}")
+                    )
+                    assertEquals(
+                        listOf(AnkiProviderNoteId(added.value)),
+                        value(provider.duplicates("生", reading)),
+                    )
+                    assertEquals(
+                        AnkiLiveResult.NoteExisting(listOf(added.value)),
+                        dispatcher.invoke(operation),
+                    )
+                }
+                assertNotEquals(
+                    value(provider.duplicates("生", "せい")),
+                    value(provider.duplicates("生", "なま")),
+                )
+            } finally {
+                trialNotes.forEach { context.contentResolver.delete(it, null, null) }
+            }
             val noteUri = Uri.parse("content://${AnkiProviderReader.AUTHORITY}/notes/$noteId")
             assertTrue(context.contentResolver.delete(noteUri, null, null) > 0)
             refresh()
             phase { it == AnkiEntryPhase.Add }
-            assertTrue(value(provider.duplicates("猫")).isEmpty())
+            assertTrue(value(provider.duplicates("猫", "ねこ")).isEmpty())
             val frozen = checkNotNull(inserted.get())
             val external =
                 checkNotNull(

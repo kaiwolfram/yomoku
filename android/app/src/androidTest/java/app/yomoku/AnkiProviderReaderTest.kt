@@ -68,6 +68,10 @@ class AnkiProviderReaderTest {
         var lastProjection: List<String>? = null
         var lastSelection: String? = null
         var lastArguments: List<String>? = null
+        var lastNoteProjection: List<String>? = null
+        var lastNoteUri: Uri? = null
+        var lastNoteSelection: String? = null
+        var lastNoteArguments: List<String>? = null
         val models = linkedMapOf<Long, Array<Any?>>()
         val templates = linkedMapOf<Long, List<Array<Any?>>>()
         val inserts = mutableListOf<Pair<Uri, ContentValues>>()
@@ -95,6 +99,12 @@ class AnkiProviderReaderTest {
             lastProjection = projection?.toList()
             lastSelection = selection
             lastArguments = args?.toList()
+            if (uri.lastPathSegment == "notes_v2") {
+                lastNoteProjection = projection?.toList()
+                lastNoteUri = uri
+                lastNoteSelection = selection
+                lastNoteArguments = args?.toList()
+            }
             operations.add("query:${uri.path}")
             beforeQuery?.invoke(uri)
             val cursor = queryRows(uri, projection, selection, args, order)
@@ -190,8 +200,12 @@ class AnkiProviderReaderTest {
             first: String,
             model: Long = 1,
             deck: Long = 1,
-            rest: String = "meaning",
+            rest: String = "ねこ",
         ) {
+            models.putIfAbsent(
+                model,
+                arrayOf(model, "External", "Surface\u001fReading", 1L, "", 0L, 0L),
+            )
             database.execSQL(
                 "INSERT INTO notes VALUES(?, ?, ?, ?)",
                 arrayOf<Any?>(id, model, "$first\u001f$rest", deck),
@@ -224,7 +238,7 @@ class AnkiProviderReaderTest {
         // copies of the core's HTML/CSS constants.
         val layout =
             AnkiProviderModelLayout(
-                "Yomoku v1",
+                "Yomoku",
                 listOf("Surface", "Reading", "Meanings", "Sentence"),
                 ".card { color: black; }",
                 "Japanese word",
@@ -305,7 +319,16 @@ class AnkiProviderReaderTest {
                 ),
             deckId: Long = Long.MAX_VALUE,
             modelId: Long = 7,
-        ) = AnkiProviderNoteRequest(surface, fields, AnkiProviderModelId(modelId), deckId, layout)
+            reading: String = "ねこ",
+        ) =
+            AnkiProviderNoteRequest(
+                surface,
+                reading,
+                fields,
+                AnkiProviderModelId(modelId),
+                deckId,
+                layout,
+            )
 
         fun enableNoteInsertion(id: Long = Long.MAX_VALUE) {
             model()
@@ -341,6 +364,7 @@ class AnkiProviderReaderTest {
         val request = noteRequest("𠮷猫")
         return AnkiLiveOperation.InsertNote(
             request.surface,
+            request.reading,
             request.joinedFields.split('\u001f'),
             request.deckId,
             request.modelId.value,
@@ -349,7 +373,7 @@ class AnkiProviderReaderTest {
     }
 
     private fun Fixture.liveModel(): AnkiLiveOperation.CreateModel =
-        AnkiLiveOperation.CreateModel("𠮷猫", Long.MAX_VALUE, modelLayout())
+        AnkiLiveOperation.CreateModel("𠮷猫", "ねこ", Long.MAX_VALUE, modelLayout())
 
     private fun Fixture.dispatch(operation: AnkiLiveOperation): AnkiLiveResult =
         AnkiLiveDispatcher(ContentResolver.wrap(provider), environment).invoke(operation)
@@ -464,7 +488,8 @@ class AnkiProviderReaderTest {
             layout.answerFormat,
         )
 
-    private fun Fixture.preflight() = AnkiPreflightOperation("𠮷猫", Long.MAX_VALUE, modelLayout())
+    private fun Fixture.preflight() =
+        AnkiPreflightOperation("𠮷猫", "ねこ", Long.MAX_VALUE, modelLayout())
 
     @Test
     fun typedPreflightKeepsDecksExactDuplicatesAndAllNamedModelsWithoutWrites() {
@@ -475,8 +500,8 @@ class AnkiProviderReaderTest {
             )
             f.provider.database.execSQL("INSERT INTO decks VALUES(1, 'Filtered', 1)")
             f.provider.database.execSQL(
-                "INSERT INTO notes VALUES(?, 7, ?, 1)",
-                arrayOf<Any?>(Long.MAX_VALUE, "𠮷猫\u001fmeaning"),
+                "INSERT INTO notes VALUES(?, 1, ?, 1)",
+                arrayOf<Any?>(Long.MAX_VALUE, "𠮷猫\u001fねこ"),
             )
             f.model(9007199254740993L)
             f.model(Long.MAX_VALUE)
@@ -500,7 +525,7 @@ class AnkiProviderReaderTest {
             )
             assertEquals(result, AnkiPreflightResult.bincodeDeserialize(result.bincodeSerialize()))
             assertEquals(before, f.provider.rows())
-            assertFalse(f.provider.operations.contains("query:/models/1"))
+            assertFalse(f.provider.operations.contains("query:/models/1/templates"))
             assertTrue(f.provider.inserts.isEmpty())
             assertTrue(f.provider.updates.isEmpty())
         }
@@ -540,7 +565,8 @@ class AnkiProviderReaderTest {
                 }
                 assertEquals(
                     AnkiPreflightResult.Failed(
-                        if (path == "/notes_v2") AnkiExportError.DUPLICATELOOKUPFAILED
+                        if (path in listOf("/notes_v2", "/models/7"))
+                            AnkiExportError.DUPLICATELOOKUPFAILED
                         else AnkiExportError.COLLECTIONUNAVAILABLE
                     ),
                     AnkiPreflightReader(f.reader).read(f.preflight()),
@@ -1019,13 +1045,13 @@ class AnkiProviderReaderTest {
             repeat(2) {
                 assertEquals(
                     AnkiReadResult.Value(emptyList<AnkiProviderNoteId>()),
-                    f.reader.duplicates(result.request.surface),
+                    f.reader.duplicates(result.request.surface, result.request.reading),
                 )
             }
             f.provider.note(9, "猫", model = 88, deck = 99)
             assertEquals(
                 AnkiReadResult.Value(listOf(AnkiProviderNoteId(9))),
-                f.reader.duplicates(result.request.surface),
+                f.reader.duplicates(result.request.surface, result.request.reading),
             )
             assertEquals("猫\u001fねこ\u001f\u001f猫。<strong>猫</strong>。", result.request.joinedFields)
             assertEquals(Long.MAX_VALUE, result.request.deckId)
@@ -1040,7 +1066,7 @@ class AnkiProviderReaderTest {
             val raw = "<&\"'>[sound:猫.mp3]\u001f"
             val escaped = "&lt;&amp;&quot;&#39;&gt;&#91;sound:猫.mp3&#93;&#31;"
             val fields = mutableListOf(escaped, "", "", "sentence")
-            val request = f.noteRequest(surface = raw, fields = fields)
+            val request = f.noteRequest(surface = raw, fields = fields, reading = "")
             fields[3] = "changed"
             assertEquals("$escaped\u001f\u001f\u001fsentence", request.joinedFields)
             for (bad in
@@ -1650,12 +1676,12 @@ class AnkiProviderReaderTest {
         Fixture().use { f ->
             val supported = f.environment.info!!
             f.environment.info = null
-            failed(AnkiReadError.ProviderUnavailable, f.reader.duplicates("猫"))
+            failed(AnkiReadError.ProviderUnavailable, f.reader.duplicates("猫", "ねこ"))
             f.environment.info = supported
             supported.metaData = null
             failed(AnkiReadError.UnsupportedProvider, f.reader.decks())
             supported.metaData = Bundle().apply { putInt(AnkiProviderReader.SPEC_KEY, 1) }
-            failed(AnkiReadError.UnsupportedProvider, f.reader.duplicates("猫"))
+            failed(AnkiReadError.UnsupportedProvider, f.reader.duplicates("猫", "ねこ"))
             supported.metaData.putInt(AnkiProviderReader.SPEC_KEY, 2)
             supported.enabled = false
             failed(AnkiReadError.ProviderUnavailable, f.reader.availability())
@@ -1667,18 +1693,18 @@ class AnkiProviderReaderTest {
             failed(AnkiReadError.ProviderUnavailable, f.reader.availability())
             supported.applicationInfo.enabled = true
             f.environment.permitted = false
-            failed(AnkiReadError.PermissionDenied, f.reader.duplicates("猫"))
+            failed(AnkiReadError.PermissionDenied, f.reader.duplicates("猫", "ねこ"))
             assertEquals(0, f.provider.queries)
             f.environment.permitted = true
             assertEquals("test.anki.host", value(f.reader.availability()))
-            assertTrue(value(f.reader.duplicates("猫")).isEmpty())
+            assertTrue(value(f.reader.duplicates("猫", "ねこ")).isEmpty())
             f.environment.permitted = false
             failed(AnkiReadError.PermissionDenied, f.reader.decks())
             f.environment.permitted = true
             supported.metaData.putInt(AnkiProviderReader.SPEC_KEY, 1)
             assertEquals(
                 AnkiReadResult.Failed(AnkiReadError.UnsupportedProvider),
-                f.reader.duplicates("猫"),
+                f.reader.duplicates("猫", "ねこ"),
             )
             assertEquals(1, f.provider.queries)
         }
@@ -1722,6 +1748,64 @@ class AnkiProviderReaderTest {
     }
 
     @Test
+    fun duplicateIdentityRequiresTheNamedReadingAcrossModelsAndDoesNotSplitReadings() {
+        Fixture().use { f ->
+            f.provider.note(1, "生", model = 11, rest = "せい")
+            f.provider.note(2, "生", model = 12, rest = "なま")
+            f.provider.note(3, "生", model = 13, rest = "meaning\u001fせい")
+            f.provider.models[13]!![2] = "Expression\u001fMeaning\u001freading"
+            f.provider.note(4, "生", model = 14, rest = "せい")
+            f.provider.models[14]!![2] = "Expression\u001fMeaning"
+            f.provider.note(5, "生", model = 15, rest = "せい、なま")
+            assertEquals(
+                listOf(AnkiProviderNoteId(1), AnkiProviderNoteId(3)),
+                value(f.reader.duplicates("生", "せい")),
+            )
+            assertEquals(listOf(AnkiProviderNoteId(2)), value(f.reader.duplicates("生", "なま")))
+            assertTrue(value(f.reader.duplicates("生", "セイ")).isEmpty())
+            assertTrue(value(f.reader.duplicates("生", " せい")).isEmpty())
+            f.provider.note(6, "生", model = 16, rest = "&lt;reading&gt;")
+            assertEquals(
+                listOf(AnkiProviderNoteId(6)),
+                value(f.reader.duplicates("生", "<reading>")),
+            )
+            f.provider.queryResult = { uri, cursor ->
+                if (uri.pathSegments.first() == "models") {
+                    cursor?.close()
+                    null
+                } else cursor
+            }
+            failed(AnkiReadError.DuplicateLookupFailed, f.reader.duplicates("生", "せい"))
+        }
+    }
+
+    @Test
+    fun finalInsertionCheckDistinguishesReadingsAndRejectsMismatchedFrozenFields() {
+        Fixture().use { f ->
+            f.enableNoteInsertion()
+            f.provider.note(8, "猫", rest = "びょう")
+            assertTrue(f.inserter.insert(f.noteRequest()) is AnkiNoteInsertionResult.Inserted)
+            assertEquals(
+                listOf(AnkiProviderNoteId(Long.MAX_VALUE)),
+                value(f.reader.duplicates("猫", "ねこ")),
+            )
+            assertEquals(listOf(AnkiProviderNoteId(8)), value(f.reader.duplicates("猫", "びょう")))
+            assertTrue(f.inserter.insert(f.noteRequest()) is AnkiNoteInsertionResult.Existing)
+            assertEquals(1, f.provider.inserts.size)
+            assertThrows(IllegalArgumentException::class.java) {
+                AnkiProviderNoteRequest(
+                    "猫",
+                    "びょう",
+                    listOf("猫", "ねこ", "", ""),
+                    AnkiProviderModelId(7),
+                    Long.MAX_VALUE,
+                    f.layout,
+                )
+            }
+        }
+    }
+
+    @Test
     fun duplicatesRetainEveryExactMatchAcrossModelsAndDecksReadOnly() {
         Fixture().use { f ->
             f.provider.note(Long.MAX_VALUE, "猫", model = 5, deck = 8)
@@ -1731,15 +1815,15 @@ class AnkiProviderReaderTest {
             val before = f.provider.rows()
             assertEquals(
                 setOf(AnkiProviderNoteId(7), AnkiProviderNoteId(Long.MAX_VALUE)),
-                value(f.reader.duplicates("猫")).toSet(),
+                value(f.reader.duplicates("猫", "ねこ")).toSet(),
             )
-            assertEquals(listOf("_id", "mid", "flds"), f.provider.lastProjection)
+            assertEquals(listOf("_id", "mid", "flds"), f.provider.lastNoteProjection)
             assertEquals(
                 "content://${AnkiProviderReader.AUTHORITY}/notes_v2",
-                f.provider.lastUri.toString(),
+                f.provider.lastNoteUri.toString(),
             )
-            assertFalse(f.provider.lastSelection!!.contains("mid"))
-            assertFalse(f.provider.lastSelection!!.contains("did"))
+            assertFalse(f.provider.lastNoteSelection!!.contains("mid"))
+            assertFalse(f.provider.lastNoteSelection!!.contains("did"))
             assertEquals(before, f.provider.rows())
         }
     }
@@ -1772,13 +1856,16 @@ class AnkiProviderReaderTest {
             surfaces.forEachIndexed { index, surface ->
                 assertEquals(
                     listOf(AnkiProviderNoteId(index.toLong() + 1)),
-                    value(f.reader.duplicates(surface)),
+                    value(f.reader.duplicates(surface, "ねこ")),
                 )
             }
-            assertTrue(value(f.reader.duplicates("ねこ")).isEmpty())
+            assertTrue(value(f.reader.duplicates("ねこ", "ねこ")).isEmpty())
             // For a literal-markup surface, only the escaped representation proves identity.
             f.provider.note(104, "&lt;b&gt;猫&lt;/b&gt;")
-            assertEquals(listOf(AnkiProviderNoteId(104)), value(f.reader.duplicates("<b>猫</b>")))
+            assertEquals(
+                listOf(AnkiProviderNoteId(104)),
+                value(f.reader.duplicates("<b>猫</b>", "ねこ")),
+            )
         }
     }
 
@@ -1788,21 +1875,21 @@ class AnkiProviderReaderTest {
             val raw = "<&\"'>[sound:猫.mp3]\u001f"
             val escaped = "&lt;&amp;&quot;&#39;&gt;&#91;sound:猫.mp3&#93;&#31;"
             f.provider.note(1, escaped)
-            assertEquals(listOf(AnkiProviderNoteId(1)), value(f.reader.duplicates(raw)))
-            assertFalse(f.provider.lastSelection!!.contains(raw))
+            assertEquals(listOf(AnkiProviderNoteId(1)), value(f.reader.duplicates(raw, "ねこ")))
+            assertFalse(f.provider.lastNoteSelection!!.contains(raw))
             val quoted = "猫' OR 1=1 --_%"
             f.provider.note(2, quoted)
             f.provider.note(3, "猫&#39; OR 1=1 --_%")
             f.provider.note(4, "unrelated")
             assertEquals(
                 setOf(AnkiProviderNoteId(2), AnkiProviderNoteId(3)),
-                value(f.reader.duplicates(quoted)).toSet(),
+                value(f.reader.duplicates(quoted, "ねこ")).toSet(),
             )
-            assertTrue(f.provider.lastArguments!!.contains(quoted))
-            assertFalse(f.provider.lastSelection!!.contains(quoted))
+            assertTrue(f.provider.lastNoteArguments!!.contains(quoted))
+            assertFalse(f.provider.lastNoteSelection!!.contains(quoted))
             val queries = f.provider.queries
-            failed(AnkiReadError.InvalidResponse, f.reader.duplicates("猫\u0000犬"))
-            failed(AnkiReadError.InvalidResponse, f.reader.duplicates(""))
+            failed(AnkiReadError.InvalidResponse, f.reader.duplicates("猫\u0000犬", "ねこ"))
+            failed(AnkiReadError.InvalidResponse, f.reader.duplicates("", "ねこ"))
             assertEquals(queries, f.provider.queries)
         }
     }
@@ -1811,16 +1898,16 @@ class AnkiProviderReaderTest {
     fun nullDeniedTransportAndUnconfiguredCollectionAreNeverEmptyResults() {
         Fixture().use { f ->
             f.provider.replacement = { null }
-            failed(AnkiReadError.DuplicateLookupFailed, f.reader.duplicates("猫"))
+            failed(AnkiReadError.DuplicateLookupFailed, f.reader.duplicates("猫", "ねこ"))
             failed(AnkiReadError.CollectionUnavailable, f.reader.decks())
             f.provider.replacement = { throw SecurityException("revoked after gate") }
-            failed(AnkiReadError.PermissionDenied, f.reader.duplicates("猫"))
+            failed(AnkiReadError.PermissionDenied, f.reader.duplicates("猫", "ねこ"))
             f.provider.replacement = {
                 throw IllegalStateException("unconfigured/locked collection")
             }
             failed(AnkiReadError.CollectionUnavailable, f.reader.decks())
             f.provider.replacement = { throw android.os.DeadObjectException() }
-            failed(AnkiReadError.DuplicateLookupFailed, f.reader.duplicates("猫"))
+            failed(AnkiReadError.DuplicateLookupFailed, f.reader.duplicates("猫", "ねこ"))
         }
     }
 
@@ -1837,22 +1924,27 @@ class AnkiProviderReaderTest {
                 )) {
                 val cursor = MatrixCursor(arrayOf("_id", "mid", "flds")).apply { addRow(row) }
                 f.provider.replacement = { cursor }
-                failed(AnkiReadError.InvalidResponse, f.reader.duplicates("猫"))
+                failed(AnkiReadError.InvalidResponse, f.reader.duplicates("猫", "ねこ"))
                 assertTrue(cursor.isClosed)
             }
             val cursor = MatrixCursor(arrayOf("_id"))
             f.provider.replacement = { cursor }
-            failed(AnkiReadError.InvalidResponse, f.reader.duplicates("猫"))
+            failed(AnkiReadError.InvalidResponse, f.reader.duplicates("猫", "ねこ"))
             assertTrue(cursor.isClosed)
             // Even if a provider ignores the predicate, compare the entire first field locally.
             f.provider.replacement = {
-                MatrixCursor(arrayOf("_id", "mid", "flds")).apply {
-                    addRow(arrayOf<Any?>(7L, 1L, "犬\u001f猫"))
-                    addRow(arrayOf<Any?>(8L, 2L, "猫\u001fmeaning"))
-                    addRow(arrayOf<Any?>(8L, 2L, "猫\u001fmeaning"))
-                }
+                if (f.provider.lastUri?.pathSegments?.first() == "models") {
+                    MatrixCursor(arrayOf("_id", "field_names")).apply {
+                        addRow(arrayOf<Any?>(2L, "Surface\u001fReading"))
+                    }
+                } else
+                    MatrixCursor(arrayOf("_id", "mid", "flds")).apply {
+                        addRow(arrayOf<Any?>(7L, 1L, "犬\u001f猫"))
+                        addRow(arrayOf<Any?>(8L, 2L, "猫\u001fねこ"))
+                        addRow(arrayOf<Any?>(8L, 2L, "猫\u001fねこ"))
+                    }
             }
-            assertEquals(listOf(AnkiProviderNoteId(8)), value(f.reader.duplicates("猫")))
+            assertEquals(listOf(AnkiProviderNoteId(8)), value(f.reader.duplicates("猫", "ねこ")))
         }
     }
 
@@ -1883,7 +1975,7 @@ class AnkiProviderReaderTest {
                         }
                     }
                 f.provider.replacement = { cursor }
-                failed(AnkiReadError.DuplicateLookupFailed, f.reader.duplicates("猫"))
+                failed(AnkiReadError.DuplicateLookupFailed, f.reader.duplicates("猫", "ねこ"))
                 assertTrue(closed)
             }
         }
@@ -1916,13 +2008,13 @@ class AnkiProviderReaderTest {
             repeat(2) {
                 assertEquals(
                     AnkiReadResult.Value(emptyList<AnkiProviderNoteId>()),
-                    f.reader.duplicates("猫"),
+                    f.reader.duplicates("猫", "ねこ"),
                 )
             }
             f.provider.replacement = { null }
             assertEquals(
                 AnkiReadResult.Failed(AnkiReadError.DuplicateLookupFailed),
-                f.reader.duplicates("猫"),
+                f.reader.duplicates("猫", "ねこ"),
             )
             f.provider.replacement = null
             f.provider.note(7, "猫", model = 9, deck = 10)
@@ -1930,7 +2022,7 @@ class AnkiProviderReaderTest {
             val before = f.provider.rows()
             assertEquals(
                 AnkiReadResult.Value(listOf(AnkiProviderNoteId(7), AnkiProviderNoteId(8))),
-                f.reader.duplicates("猫"),
+                f.reader.duplicates("猫", "ねこ"),
             )
             assertEquals(before, f.provider.rows())
         }
@@ -1989,7 +2081,7 @@ class AnkiProviderReaderTest {
                         { f.reader.models() },
                         { f.reader.modelMatches(AnkiProviderModelId(7), f.layout) },
                         { f.reader.decks() },
-                        { f.reader.duplicates("猫") },
+                        { f.reader.duplicates("猫", "ねこ") },
                         { f.reader.existingNoteIntent(AnkiProviderNoteId(7)) },
                         { f.creator.create(f.layout) },
                     )

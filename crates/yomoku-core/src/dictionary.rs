@@ -110,7 +110,7 @@ pub struct NameEntry {
 /// Indices refer to the original ordered payload, which remains intact.
 /// A kana query can select multiple spelling/reading pairs. `None` denotes a
 /// kana-only reading, including re_nokanji; it cannot satisfy a stagk restriction.
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
 pub struct ReadingMatch {
     pub spelling_index: Option<usize>,

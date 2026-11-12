@@ -36,6 +36,7 @@ internal class AnkiLiveDispatcher(resolver: ContentResolver, environment: AnkiPr
                 val request =
                     AnkiProviderNoteRequest(
                         operation.surface,
+                        operation.reading,
                         operation.fields,
                         AnkiProviderModelId(operation.modelId),
                         operation.deckId,
@@ -56,6 +57,7 @@ internal class AnkiLiveDispatcher(resolver: ContentResolver, environment: AnkiPr
                     reader.read(
                         AnkiPreflightOperation(
                             operation.surface,
+                            operation.reading,
                             operation.deckId,
                             operation.layout,
                         )
@@ -86,7 +88,7 @@ internal class AnkiLiveDispatcher(resolver: ContentResolver, environment: AnkiPr
                             val decks = provider.decks()
                             val duplicates =
                                 if (operation.surface.isEmpty()) AnkiReadResult.Value(emptyList())
-                                else provider.duplicates(operation.surface)
+                                else provider.duplicates(operation.surface, operation.reading)
                             decks is AnkiReadResult.Value &&
                                 decks.value.any { it.id == operation.deckId && !it.filtered } &&
                                 duplicates is AnkiReadResult.Value &&

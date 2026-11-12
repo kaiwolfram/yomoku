@@ -9,6 +9,7 @@ import android.os.Looper
 /** Frozen provider transport; core owns content/layout and the in-memory operation. */
 internal class AnkiProviderNoteRequest(
     val surface: String,
+    val reading: String,
     fields: List<String>,
     val modelId: AnkiProviderModelId,
     val deckId: Long,
@@ -18,9 +19,11 @@ internal class AnkiProviderNoteRequest(
 
     init {
         require(surface.isNotEmpty() && '\u0000' !in surface)
+        require('\u0000' !in reading)
         require(deckId > 0)
         require(fields.size == 4 && fields.none { '\u001f' in it || '\u0000' in it })
         require(fields[0] == AnkiProviderReader.escapeSurface(surface))
+        require(fields[1] == AnkiProviderReader.escapeSurface(reading))
         joinedFields = fields.joinToString("\u001f")
     }
 }
@@ -79,7 +82,7 @@ internal class AnkiProviderNoteInserter(
             if (deck == null || deck.filtered) fail(AnkiNoteInsertionError.DeckUnavailable)
             sameHost(host)
             // Last collection read before submission. No supported atomic check-and-add exists.
-            val existing = value(reader.duplicates(request.surface))
+            val existing = value(reader.duplicates(request.surface, request.reading))
             sameHost(host)
             if (existing.isNotEmpty()) return AnkiNoteInsertionResult.Existing(existing)
             val values =

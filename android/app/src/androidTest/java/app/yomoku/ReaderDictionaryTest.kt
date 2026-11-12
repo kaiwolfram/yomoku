@@ -3,11 +3,36 @@ package app.yomoku
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.yomoku.shared.*
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
 class ReaderDictionaryTest {
+    @Test
+    fun priorityRequiresAQualifyingTagSharedByTheSelectedPair() {
+        val pair = ReadingMatch(0UL, 0UL)
+        fun spelling(tags: List<String>) = listOf(Spelling("生", emptyList(), tags))
+        fun reading(tags: List<String>) =
+            listOf(Reading("せい", false, emptyList(), emptyList(), tags))
+        for (tag in listOf("ichi1", "news1", "gai1", "spec1", "spec2")) {
+            assertTrue(dictionaryHighPriority(spelling(listOf(tag)), reading(listOf(tag)), pair))
+            assertTrue(
+                dictionaryHighPriority(emptyList(), reading(listOf(tag)), ReadingMatch(null, 0UL))
+            )
+        }
+        assertFalse(
+            dictionaryHighPriority(spelling(listOf("ichi1")), reading(listOf("news1")), pair)
+        )
+        assertFalse(dictionaryHighPriority(spelling(listOf("spec1")), reading(emptyList()), pair))
+        for (tag in listOf("news2", "ichi2", "gai2", "nf01", "unknown")) {
+            assertFalse(dictionaryHighPriority(spelling(listOf(tag)), reading(listOf(tag)), pair))
+        }
+        val spellings = spelling(emptyList()) + Spelling("別", emptyList(), listOf("spec1"))
+        assertFalse(dictionaryHighPriority(spellings, reading(listOf("spec1")), pair))
+    }
+
     @Test
     fun applicableViewsKeepAllLicensedReadingsAndHideOtherSpellingsAndSenses() {
         val sense =

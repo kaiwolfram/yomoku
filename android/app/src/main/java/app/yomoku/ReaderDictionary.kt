@@ -4,13 +4,17 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.size
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import app.yomoku.shared.AnkiEntryKey
@@ -85,25 +89,18 @@ internal fun ReaderDictionary(
         )
         for (candidate in candidates.words) {
             HorizontalDivider()
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    candidate.forms
-                        .flatMap { it.matches }
-                        .map {
-                            dictionaryReadingLabel(
-                                candidate.entry.kanji,
-                                candidate.entry.readings,
-                                it.reading,
-                            )
-                        }
-                        .distinct()
-                        .joinToString("、"),
-                    style = MaterialTheme.typography.titleSmall,
-                    modifier = Modifier.weight(1f),
+            val pairs = candidate.forms.flatMap { it.matches }.map { it.reading }.distinct()
+            for (pair in pairs) {
+                val key = AnkiEntryKey.Word(candidate.entryId, pair)
+                DictionaryHeadword(
+                    candidate.entry.kanji,
+                    candidate.entry.readings,
+                    pair,
+                    dictionaryHighPriority(candidate.entry.kanji, candidate.entry.readings, pair),
+                    action = { action(key) },
                 )
-                action(AnkiEntryKey.Word(candidate.entryId))
+                notice(key)
             }
-            notice(AnkiEntryKey.Word(candidate.entryId))
             var number = 0
             for ((index, sense) in candidate.entry.senses.withIndex()) {
                 val readings = applicableSenseReadings(candidate, index)
@@ -152,22 +149,17 @@ internal fun ReaderDictionary(
         )
         for (candidate in candidates.names) {
             HorizontalDivider()
-            val readings =
-                candidate.forms
-                    .flatMap { it.matches }
-                    .map {
-                        dictionaryReadingLabel(candidate.entry.kanji, candidate.entry.readings, it)
-                    }
-                    .distinct()
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    readings.joinToString("、"),
-                    style = MaterialTheme.typography.titleSmall,
-                    modifier = Modifier.weight(1f),
+            for (pair in candidate.forms.flatMap { it.matches }.distinct()) {
+                val key = AnkiEntryKey.Name(candidate.entryId, pair)
+                DictionaryHeadword(
+                    candidate.entry.kanji,
+                    candidate.entry.readings,
+                    pair,
+                    false,
+                    action = { action(key) },
                 )
-                action(AnkiEntryKey.Name(candidate.entryId))
+                notice(key)
             }
-            notice(AnkiEntryKey.Name(candidate.entryId))
             for ((index, group) in candidate.entry.names.withIndex()) {
                 Column(
                     verticalArrangement = Arrangement.spacedBy(4.dp),
@@ -183,5 +175,48 @@ internal fun ReaderDictionary(
                 }
             }
         }
+    }
+}
+
+/** Match Yomitan's JMdict importer: priority belongs to the selected pair. */
+internal fun dictionaryHighPriority(
+    kanji: List<Spelling>,
+    readings: List<Reading>,
+    pair: ReadingMatch,
+): Boolean {
+    val priority = setOf("ichi1", "news1", "gai1", "spec1", "spec2")
+    val readingTags = readings[pair.readingIndex.toInt()].rePri
+    val tags =
+        pair.spellingIndex?.let { kanji[it.toInt()].kePri.intersect(readingTags.toSet()) }
+            ?: readingTags
+    return tags.any { it in priority }
+}
+
+@Composable
+private fun DictionaryHeadword(
+    kanji: List<Spelling>,
+    readings: List<Reading>,
+    pair: ReadingMatch,
+    highPriority: Boolean,
+    action: @Composable () -> Unit,
+) {
+    Row(
+        Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Text(
+            dictionaryReadingLabel(kanji, readings, pair),
+            style = MaterialTheme.typography.titleSmall,
+            modifier = Modifier.weight(1f),
+        )
+        if (highPriority)
+            Icon(
+                painterResource(R.drawable.ic_dictionary_priority),
+                contentDescription = stringResource(R.string.dictionary_high_priority),
+                tint = Color(0xFFD49A14),
+                modifier = Modifier.size(16.dp),
+            )
+        action()
     }
 }

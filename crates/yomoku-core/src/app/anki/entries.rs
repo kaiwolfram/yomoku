@@ -59,7 +59,7 @@ impl Model {
             _ => return,
         };
         for state in &mut self.anki_entries {
-            if state.request.export().note().surface() == export.note().surface() {
+            if state.request.export().note().same_identity(export.note()) {
                 state.result = Some(result.clone());
             }
         }
@@ -86,19 +86,7 @@ impl Model {
                 &details.candidates
             }
         };
-        Some(
-            candidates
-                .words
-                .iter()
-                .map(|e| AnkiEntryKey::Word(e.entry_id))
-                .chain(
-                    candidates
-                        .names
-                        .iter()
-                        .map(|e| AnkiEntryKey::Name(e.entry_id)),
-                )
-                .collect(),
-        )
+        Some(AnkiEntryKey::for_candidates(candidates))
     }
 
     pub(in crate::app) fn anki_entries_view(&self) -> Vec<AnkiEntryView> {
@@ -126,7 +114,7 @@ impl Model {
                     return None;
                 }
                 let phase = if let Some(active) = &self.prepared_anki_export {
-                    if active.note().surface() == export.note().surface() {
+                    if active.note().same_identity(export.note()) {
                         self.anki_export_view().map(|view| match view.phase {
                             AnkiExportPhase::Existing(ids) => AnkiEntryPhase::Existing(ids),
                             AnkiExportPhase::NoteAdded(id) => AnkiEntryPhase::Existing(vec![id]),
@@ -159,6 +147,7 @@ impl Model {
                     selection: export.selection(),
                     key,
                     headword: export.note().surface().as_str().into(),
+                    reading: export.note().reading().into(),
                     phase,
                 })
             })
@@ -195,6 +184,7 @@ impl Yomoku {
                 // A model check has no selected word and never checks empty-word duplicates.
                 let operation = AnkiPreflightOperation {
                     surface: String::new(),
+                    reading: String::new(),
                     deck_id: deck,
                     layout: Box::new((&AnkiModelLayout::yomoku()).into()),
                 };
@@ -339,7 +329,7 @@ impl Yomoku {
                     return Some(Command::done());
                 }
                 if model.prepared_anki_export.as_ref().is_some_and(|active| {
-                    active.entry.is_some() && active.note().surface() == export.note().surface()
+                    active.entry.is_some() && active.note().same_identity(export.note())
                 }) {
                     // Repeated taps cannot restart even a completed or uncertain operation.
                     return Some(Command::done());
@@ -485,7 +475,13 @@ mod tests {
             &mut model,
             Event::AddReaderAnkiEntry {
                 selection,
-                entry: AnkiEntryKey::Word(1),
+                entry: AnkiEntryKey::Word {
+                    entry_id: 1,
+                    reading: crate::dictionary::ReadingMatch {
+                        spelling_index: Some(0),
+                        reading_index: 0,
+                    },
+                },
             },
         );
         assert!(model.prepared_anki_export.is_none() && model.anki_live.is_none());
@@ -495,7 +491,13 @@ mod tests {
             &mut model,
             Event::AddReaderAnkiEntry {
                 selection,
-                entry: AnkiEntryKey::Word(1),
+                entry: AnkiEntryKey::Word {
+                    entry_id: 1,
+                    reading: crate::dictionary::ReadingMatch {
+                        spelling_index: Some(0),
+                        reading_index: 0,
+                    },
+                },
             },
         );
         assert!(model.prepared_anki_export.is_some());
@@ -559,11 +561,11 @@ mod tests {
         assert_eq!(model.anki_entries.len(), 2);
         assert_eq!(
             model.anki_entries[0].request.export().note().fields()[2],
-            "<ol><li>cat &amp; feline</li></ol>"
+            "<div class=\"yomoku-dictionary\">JMdict</div><ol><li>cat &amp; feline</li></ol>"
         );
         assert_eq!(
             model.anki_entries[1].request.export().note().fields()[2],
-            "<ol><li>different entry</li></ol>"
+            "<div class=\"yomoku-dictionary\">JMdict</div><ol><li>different entry</li></ol>"
         );
         for index in 0..2 {
             let request = model.anki_entries[index].request.clone();
@@ -577,7 +579,13 @@ mod tests {
             &mut model,
             Event::AddReaderAnkiEntry {
                 selection,
-                entry: AnkiEntryKey::Word(1),
+                entry: AnkiEntryKey::Word {
+                    entry_id: 1,
+                    reading: crate::dictionary::ReadingMatch {
+                        spelling_index: Some(0),
+                        reading_index: 0,
+                    },
+                },
             },
         );
         let prepared = model.prepared_anki_export.clone().unwrap();
@@ -585,7 +593,13 @@ mod tests {
             &mut model,
             Event::AddReaderAnkiEntry {
                 selection,
-                entry: AnkiEntryKey::Word(2),
+                entry: AnkiEntryKey::Word {
+                    entry_id: 2,
+                    reading: crate::dictionary::ReadingMatch {
+                        spelling_index: Some(0),
+                        reading_index: 0,
+                    },
+                },
             },
         );
         assert_eq!(model.prepared_anki_export.as_ref(), Some(&prepared));
@@ -649,9 +663,27 @@ mod tests {
             AnkiEntryPhase::Failed(AnkiExportError::PermissionDenied)
         );
         for entry in [
-            AnkiEntryKey::Word(1),
-            AnkiEntryKey::Word(2),
-            AnkiEntryKey::Name(1),
+            AnkiEntryKey::Word {
+                entry_id: 1,
+                reading: crate::dictionary::ReadingMatch {
+                    spelling_index: Some(0),
+                    reading_index: 0,
+                },
+            },
+            AnkiEntryKey::Word {
+                entry_id: 2,
+                reading: crate::dictionary::ReadingMatch {
+                    spelling_index: Some(0),
+                    reading_index: 0,
+                },
+            },
+            AnkiEntryKey::Name {
+                entry_id: 1,
+                reading: crate::dictionary::ReadingMatch {
+                    spelling_index: Some(0),
+                    reading_index: 0,
+                },
+            },
         ] {
             update(&mut model, Event::AddReaderAnkiEntry { selection, entry });
         }
@@ -687,6 +719,97 @@ mod tests {
         assert_eq!(model.anki_setup.phase, AnkiSetupPhase::Ready);
         assert!(model.anki_export_gate_open());
         assert!(model.anki_export_view().is_none());
+    }
+
+    #[test]
+    fn reading_specific_actions_filter_senses_and_only_share_identical_pairs() {
+        let (mut model, selection) = configured();
+        let mut word = candidate(1, "猫", "ねこ", "cat & feline");
+        let mut other_reading = word.entry.readings[0].clone();
+        other_reading.text = "びょう".into();
+        word.entry.readings.push(other_reading);
+        word.entry.senses[0].stagr = vec!["ねこ".into()];
+        word.entry.senses[0].pos = vec!["noun <label>".into()];
+        word.entry.senses[0].s_inf = vec!["literal [sound:cat.mp3] & note".into()];
+        let mut other_sense = word.entry.senses[0].clone();
+        other_sense.stagr = vec!["びょう".into()];
+        other_sense.glosses[0].text = "other reading".into();
+        word.entry.senses.push(other_sense);
+        word.forms[0].matches = word.entry.matches("猫");
+        // Repeated source/base matches must not create another button or sense.
+        word.forms.push(word.forms[0].clone());
+        super::test_support::set_candidates(
+            &mut model,
+            vec![
+                word,
+                candidate(2, "猫", "ねこ", "same pair in another entry"),
+            ],
+        );
+        update(&mut model, Event::LoadReaderAnkiEntries(selection));
+        assert_eq!(model.anki_entries.len(), 3);
+        let exports: Vec<_> = model
+            .anki_entries
+            .iter()
+            .map(|state| state.request.export().clone())
+            .collect();
+        let fields = exports[0].note().fields();
+        assert_eq!(fields[1], "ねこ");
+        assert!(fields[2]
+            .contains("<i class=\"yomoku-labels\">(noun &lt;label&gt;)</i> cat &amp; feline"));
+        assert!(fields[2].contains("literal &#91;sound:cat.mp3&#93; &amp; note"));
+        assert!(!fields[2].contains("other reading"));
+        assert_eq!(exports[1].note().reading(), "びょう");
+        assert!(!exports[1].note().fields()[2].contains("cat &amp; feline"));
+        assert!(exports[0].note().same_identity(exports[2].note()));
+        assert!(!exports[0].note().same_identity(exports[1].note()));
+        for index in 0..3 {
+            let request = model.anki_entries[index].request.clone();
+            assert_eq!(
+                request.operation().reading,
+                request.export().note().reading()
+            );
+            update(
+                &mut model,
+                Event::AnkiEntryChecked(Box::new(request), observation(vec![], true)),
+            );
+        }
+        for (index, id) in [(1, 81), (0, 82)] {
+            update(
+                &mut model,
+                Event::AddReaderAnkiEntry {
+                    selection,
+                    entry: exports[index].entry.unwrap(),
+                },
+            );
+            let request = model.pending_anki_export_preflight().unwrap().clone();
+            update(
+                &mut model,
+                Event::AnkiExportPreflightProviderFinished(
+                    Box::new(request),
+                    observation(vec![], true),
+                ),
+            );
+            acknowledge_live(&mut model, AnkiLiveResult::NoteAdded(id));
+            let views = model.anki_entries_view();
+            assert_eq!(views[1].phase, AnkiEntryPhase::Existing(vec![81]));
+            if index == 1 {
+                assert_eq!(views[0].phase, AnkiEntryPhase::Add);
+                assert_eq!(views[2].phase, AnkiEntryPhase::Add);
+            } else {
+                assert_eq!(views[0].phase, AnkiEntryPhase::Existing(vec![82]));
+                assert_eq!(views[2].phase, AnkiEntryPhase::Existing(vec![82]));
+            }
+        }
+        let invalid = AnkiEntryKey::Word {
+            entry_id: 1,
+            reading: crate::dictionary::ReadingMatch {
+                spelling_index: Some(99),
+                reading_index: 0,
+            },
+        };
+        assert!(model
+            .project_anki_export(selection, 7.try_into().unwrap(), Some(invalid))
+            .is_none());
     }
 
     #[test]
@@ -729,7 +852,13 @@ mod tests {
             page,
             details.selection,
             &details,
-            Some(AnkiEntryKey::Word(1)),
+            Some(AnkiEntryKey::Word {
+                entry_id: 1,
+                reading: crate::dictionary::ReadingMatch {
+                    spelling_index: Some(0),
+                    reading_index: 0,
+                },
+            }),
         )
         .unwrap();
         assert_eq!(note.fields()[0], "𠮷");
@@ -744,7 +873,13 @@ mod tests {
             page,
             bad.selection,
             &bad,
-            Some(AnkiEntryKey::Word(1))
+            Some(AnkiEntryKey::Word {
+                entry_id: 1,
+                reading: crate::dictionary::ReadingMatch {
+                    spelling_index: Some(0),
+                    reading_index: 0
+                }
+            })
         )
         .is_err());
     }

@@ -31,7 +31,7 @@ internal class AnkiPreflightReader(private val provider: AnkiProviderReader) {
             val notes =
                 if (operation.surface.isEmpty()) emptyList()
                 else
-                    when (val result = provider.duplicates(operation.surface)) {
+                    when (val result = provider.duplicates(operation.surface, operation.reading)) {
                         is AnkiReadResult.Failed -> return failure(result.error)
                         is AnkiReadResult.Value -> result.value.map { it.value }
                     }

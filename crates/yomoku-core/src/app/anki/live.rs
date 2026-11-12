@@ -56,25 +56,26 @@ impl Yomoku {
                 return self.update_anki_live(&Event::BeginAnkiLive, model);
             }
             Event::DispatchAnkiLive => {
-                let (surface, deck_id) = if let Some(export) = model.prepared_anki_export.as_ref() {
-                    (
-                        export.note().surface().as_str().to_owned(),
-                        export.deck().into(),
-                    )
-                } else if let Some(deck) = model.anki_setup.live_deck {
-                    (String::new(), deck)
-                } else {
-                    return Some(Command::done());
-                };
+                let (surface, reading, deck_id) =
+                    if let Some(export) = model.prepared_anki_export.as_ref() {
+                        (
+                            export.note().surface().as_str().to_owned(),
+                            export.note().reading().to_owned(),
+                            export.deck().into(),
+                        )
+                    } else if let Some(deck) = model.anki_setup.live_deck {
+                        (String::new(), String::new(), deck)
+                    } else {
+                        return Some(Command::done());
+                    };
                 let Some(invocation) = model.take_anki_live_invocation() else {
                     return Some(Command::done());
                 };
                 return Some(
-                    Command::request_from_shell(invocation.operation(surface, deck_id)).then_send(
-                        move |result| {
+                    Command::request_from_shell(invocation.operation(surface, reading, deck_id))
+                        .then_send(move |result| {
                             Event::FinishAnkiLive(Box::new(invocation.complete_provider(result)))
-                        },
-                    ),
+                        }),
                 );
             }
             Event::BeginAnkiLive => {

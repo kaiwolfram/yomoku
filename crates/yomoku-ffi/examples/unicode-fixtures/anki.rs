@@ -40,15 +40,33 @@ pub fn exchange(dir: &Path, writing: bool) -> Result<(), Box<dyn Error>> {
         Event::LoadReaderAnkiEntries(entry_selection),
         Event::AddReaderAnkiEntry {
             selection: entry_selection,
-            entry: yomoku_core::anki::AnkiEntryKey::Word(i64::MAX),
+            entry: yomoku_core::anki::AnkiEntryKey::Word {
+                entry_id: i64::MAX,
+                reading: yomoku_core::dictionary::ReadingMatch {
+                    spelling_index: Some(0),
+                    reading_index: 0,
+                },
+            },
         },
         Event::AddReaderAnkiEntry {
             selection: entry_selection,
-            entry: yomoku_core::anki::AnkiEntryKey::Name(9007199254740993),
+            entry: yomoku_core::anki::AnkiEntryKey::Name {
+                entry_id: 9007199254740993,
+                reading: yomoku_core::dictionary::ReadingMatch {
+                    spelling_index: Some(0),
+                    reading_index: 0,
+                },
+            },
         },
         Event::AddReaderAnkiEntry {
             selection: entry_selection,
-            entry: yomoku_core::anki::AnkiEntryKey::Word(1),
+            entry: yomoku_core::anki::AnkiEntryKey::Word {
+                entry_id: 1,
+                reading: yomoku_core::dictionary::ReadingMatch {
+                    spelling_index: Some(0),
+                    reading_index: 0,
+                },
+            },
         },
     ]
     .into_iter()
@@ -76,8 +94,15 @@ pub fn exchange(dir: &Path, writing: bool) -> Result<(), Box<dyn Error>> {
     {
         let view = yomoku_core::anki::AnkiEntryView {
             selection: entry_selection,
-            key: yomoku_core::anki::AnkiEntryKey::Word(i64::MAX),
+            key: yomoku_core::anki::AnkiEntryKey::Word {
+                entry_id: i64::MAX,
+                reading: yomoku_core::dictionary::ReadingMatch {
+                    spelling_index: Some(0),
+                    reading_index: 0,
+                },
+            },
             headword: "𠮷<&".into(),
+            reading: "よし".into(),
             phase,
         };
         let bytes = super::encode(&view);
@@ -180,6 +205,7 @@ pub fn exchange(dir: &Path, writing: bool) -> Result<(), Box<dyn Error>> {
     // data, Unicode and signed-64 IDs. Native callbacks remain unexposed.
     let operation = AnkiPreflightOperation {
         surface: "𠮷猫".into(),
+        reading: "よしねこ".into(),
         deck_id: i64::MAX,
         layout: Box::new((&layout).into()),
     };
@@ -216,9 +242,10 @@ pub fn exchange(dir: &Path, writing: bool) -> Result<(), Box<dyn Error>> {
     let operations = [
         AnkiLiveOperation::InsertNote {
             surface: "𠮷猫".into(),
+            reading: "よしねこ".into(),
             fields: vec![
                 "𠮷猫".into(),
-                "ねこ".into(),
+                "よしねこ".into(),
                 "<ol><li>cat</li></ol>".into(),
                 "<strong>𠮷猫</strong>。".into(),
             ],
@@ -228,6 +255,7 @@ pub fn exchange(dir: &Path, writing: bool) -> Result<(), Box<dyn Error>> {
         },
         AnkiLiveOperation::CreateModel {
             surface: "𠮷猫".into(),
+            reading: "よしねこ".into(),
             deck_id: i64::MAX,
             layout: Box::new((&layout).into()),
         },

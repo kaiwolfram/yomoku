@@ -26,9 +26,9 @@ pub struct AnkiPreflightModel {
     pub matches_layout: bool,
 }
 
-/// Supply only after all provider/spec/permission, deck, exact-surface duplicate
+/// Supply only after all provider/spec/permission, deck, exact headword/reading duplicate
 /// and model reads succeed. Lists must be complete; discard all partial results
-/// on any read failure. Duplicate IDs must have verified exact first fields,
+/// on any read failure. Duplicate IDs must have verified exact first fields and readings,
 /// across all models/decks. No inferred absence from failed queries is allowed.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
@@ -45,6 +45,7 @@ pub struct AnkiPreflightObservation {
 pub struct AnkiPreflightOperation {
     /// Empty only for Settings/startup model validation; never a note identity.
     pub surface: String,
+    pub reading: String,
     pub deck_id: i64,
     pub layout: Box<AnkiReadModelLayout>,
 }
@@ -94,6 +95,7 @@ impl AnkiPreflightRequest {
     pub fn operation(&self) -> AnkiPreflightOperation {
         AnkiPreflightOperation {
             surface: self.export().note().surface().as_str().to_owned(),
+            reading: self.export().note().reading().to_owned(),
             deck_id: self.export().deck().into(),
             layout: Box::new(self.export().layout().into()),
         }

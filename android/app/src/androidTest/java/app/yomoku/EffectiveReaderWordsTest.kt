@@ -183,13 +183,43 @@ class EffectiveReaderWordsTest {
     private fun exposeDictionaryAnki(selection: AnkiSelection) {
         compose.runOnUiThread {
             val candidate =
-                WordCandidate(1, WordEntry(emptyList(), emptyList(), emptyList()), emptyList())
+                WordCandidate(
+                    1,
+                    WordEntry(
+                        listOf(Spelling("猫", emptyList(), emptyList())),
+                        listOf(Reading("ねこ", false, emptyList(), emptyList(), emptyList())),
+                        listOf(
+                            Sense(
+                                emptyList(),
+                                emptyList(),
+                                emptyList(),
+                                emptyList(),
+                                emptyList(),
+                                emptyList(),
+                                emptyList(),
+                                emptyList(),
+                                emptyList(),
+                                emptyList(),
+                                listOf(Translation("cat", "eng", null, null)),
+                            )
+                        ),
+                    ),
+                    listOf(
+                        WordFormMatch("猫", listOf(WordMatch(ReadingMatch(0UL, 0UL), listOf(0UL))))
+                    ),
+                )
             frame.value =
                 frame.value.copy(
                     ankiSetup = AnkiSetupPhase.Ready,
                     ankiEntries =
                         listOf(
-                            AnkiEntryView(selection, AnkiEntryKey.Word(1), "猫", AnkiEntryPhase.Add)
+                            AnkiEntryView(
+                                selection,
+                                AnkiEntryKey.Word(1, ReadingMatch(0UL, 0UL)),
+                                "猫",
+                                "ねこ",
+                                AnkiEntryPhase.Add,
+                            )
                         ),
                     effectiveReaderWord =
                         frame.value.effectiveReaderWord?.let {
@@ -219,13 +249,16 @@ class EffectiveReaderWordsTest {
         tap(2)
         val selected = frame.value.effectiveReaderWord!!.selection!!
         exposeDictionaryAnki(AnkiSelection.Effective(selected))
-        click("anki_entry_word_1")
+        click("anki_entry_word_1_0_0")
         assertEquals(
-            Event.AddReaderAnkiEntry(AnkiSelection.Effective(selected), AnkiEntryKey.Word(1)),
+            Event.AddReaderAnkiEntry(
+                AnkiSelection.Effective(selected),
+                AnkiEntryKey.Word(1, ReadingMatch(0UL, 0UL)),
+            ),
             events.last(),
         )
         compose.runOnUiThread { frame.value = frame.value.copy(storageBusy = true) }
-        compose.onNodeWithTag("anki_entry_word_1").assertIsNotEnabled()
+        compose.onNodeWithTag("anki_entry_word_1_0_0").assertIsNotEnabled()
         compose.runOnUiThread { frame.value = frame.value.copy(storageBusy = false) }
         val before = events.size
         compose.waitForIdle()

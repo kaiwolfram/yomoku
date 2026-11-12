@@ -20,7 +20,7 @@ import org.junit.runner.RunWith
 class AnkiEntrySessionTest {
     private val instrumentation = InstrumentationRegistry.getInstrumentation()
     private lateinit var core: CoreSession
-    private val notes = ConcurrentHashMap<String, List<Long>>()
+    private val notes = ConcurrentHashMap<Pair<String, String>, List<Long>>()
     private val writes = AtomicInteger()
 
     private fun send(event: Event) = instrumentation.runOnMainSync { core.dispatch(event) }
@@ -51,11 +51,11 @@ class AnkiEntrySessionTest {
                     sudachiDictionaryProvider(instrumentation.targetContext),
                     readAnkiPreflight = { operation ->
                         assertNotEquals(Looper.getMainLooper(), Looper.myLooper())
-                        assertEquals("Yomoku v2", operation.layout.name)
+                        assertEquals("Yomoku", operation.layout.name)
                         AnkiPreflightResult.Complete(
                             AnkiPreflightObservation(
                                 listOf(AnkiPreflightDeck(7, false)),
-                                notes[operation.surface].orEmpty(),
+                                notes[operation.surface to operation.reading].orEmpty(),
                                 listOf(AnkiPreflightModel(9, operation.layout.name, true)),
                             )
                         )
@@ -85,7 +85,7 @@ class AnkiEntrySessionTest {
                         assertTrue(note.fields[2].contains("cat"))
                         assertEquals("<strong class=\"yomoku-target\">猫</strong>。", note.fields[3])
                         writes.incrementAndGet()
-                        notes[note.surface] = listOf(88L)
+                        notes[note.surface to note.reading] = listOf(88L)
                         AnkiLiveResult.NoteAdded(88)
                     },
                 )

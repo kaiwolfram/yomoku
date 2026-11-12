@@ -1,12 +1,14 @@
 package app.yomoku
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -15,6 +17,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
@@ -70,15 +73,12 @@ internal fun AnkiEntryAction(
         stringResource(
             if (existing) R.string.anki_entry_open
             else if (failed) R.string.anki_entry_retry else R.string.anki_entry_add,
-            entry.headword,
+            if (entry.headword == entry.reading) entry.headword
+            else "${entry.headword}【${entry.reading}】",
         )
-    val entryTag =
-        when (val key = entry.key) {
-            is AnkiEntryKey.Word -> "word_${key.value}"
-            is AnkiEntryKey.Name -> "name_${key.value}"
-        }
+    val entryTag = ankiEntryTag(entry.key)
     Column {
-        FilledIconButton(
+        IconButton(
             onClick = {
                 when {
                     existing -> browser?.openEntry(entry)
@@ -88,33 +88,39 @@ internal fun AnkiEntryAction(
                 }
             },
             enabled = enabled && !busy && !uncertain && (!existing || browser != null),
-            colors =
-                IconButtonDefaults.filledIconButtonColors(
-                    containerColor =
-                        when {
-                            existing -> Color(if (dark) 0xFF744052 else 0xFFF7C9D9)
-                            failed || uncertain -> MaterialTheme.colorScheme.errorContainer
-                            else -> Color(if (dark) 0xFF285C3B else 0xFFB6E6BE)
-                        },
-                    contentColor =
-                        if (existing) Color(if (dark) 0xFF91BBFF else 0xFF245DB2)
-                        else MaterialTheme.colorScheme.onSurface,
-                ),
             modifier = Modifier.size(48.dp).testTag("anki_entry_$entryTag"),
         ) {
-            if (busy)
-                CircularProgressIndicator(
-                    Modifier.size(18.dp).semantics { contentDescription = label },
-                    strokeWidth = 2.dp,
-                )
-            else
-                Icon(
-                    painterResource(
-                        if (existing) R.drawable.ic_anki_book else R.drawable.ic_anki_add
+            val color =
+                when {
+                    existing -> Color(if (dark) 0xFF744052 else 0xFFF7C9D9)
+                    failed || uncertain -> MaterialTheme.colorScheme.errorContainer
+                    else -> Color(if (dark) 0xFF285C3B else 0xFFB6E6BE)
+                }
+            Box(
+                Modifier.size(32.dp)
+                    .background(
+                        color.copy(alpha = if (enabled && !busy && !uncertain) 1f else 0.5f),
+                        CircleShape,
                     ),
-                    contentDescription = label,
-                    modifier = Modifier.size(20.dp),
-                )
+                contentAlignment = Alignment.Center,
+            ) {
+                if (busy)
+                    CircularProgressIndicator(
+                        Modifier.size(14.dp).semantics { contentDescription = label },
+                        strokeWidth = 2.dp,
+                    )
+                else
+                    Icon(
+                        painterResource(
+                            if (existing) R.drawable.ic_anki_book else R.drawable.ic_anki_add
+                        ),
+                        contentDescription = label,
+                        tint =
+                            if (existing) Color(if (dark) 0xFF91BBFF else 0xFF245DB2)
+                            else MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.size(16.dp),
+                    )
+            }
         }
     }
 }
@@ -150,3 +156,11 @@ internal fun AnkiEntryNotice(entry: AnkiEntryView?, browser: AnkiNoteBrowser? = 
             style = MaterialTheme.typography.bodySmall,
         )
 }
+
+internal fun ankiEntryTag(key: AnkiEntryKey): String =
+    when (key) {
+        is AnkiEntryKey.Word ->
+            "word_${key.entryId}_${key.reading.spellingIndex ?: "kana"}_${key.reading.readingIndex}"
+        is AnkiEntryKey.Name ->
+            "name_${key.entryId}_${key.reading.spellingIndex ?: "kana"}_${key.reading.readingIndex}"
+    }

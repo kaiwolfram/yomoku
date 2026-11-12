@@ -68,7 +68,7 @@ internal fun verifyAnkiProtocol(fixtures: String) {
         AnkiPreflightOperation.bincodeDeserialize(
             root.resolve("anki-preflight-operation.bin").readBytes()
         )
-    check(preflight == AnkiPreflightOperation("𠮷猫", Long.MAX_VALUE, frozen))
+    check(preflight == AnkiPreflightOperation("𠮷猫", "よしねこ", Long.MAX_VALUE, frozen))
     root.resolve("anki-preflight-operation-return.bin").writeBytes(preflight.bincodeSerialize())
     for (i in 0..1) {
         val result =
@@ -93,11 +93,13 @@ internal fun verifyAnkiProtocol(fixtures: String) {
         if (operation is AnkiLiveOperation.InsertNote) {
             check(
                 operation.surface == "𠮷猫" &&
+                    operation.reading == "よしねこ" &&
                     operation.deckId == Long.MAX_VALUE &&
                     operation.modelId == 9007199254740993L
             )
             check(operation.layout == frozen && operation.fields.size == 4)
-        } else check(operation == AnkiLiveOperation.CreateModel("𠮷猫", Long.MAX_VALUE, frozen))
+        } else
+            check(operation == AnkiLiveOperation.CreateModel("𠮷猫", "よしねこ", Long.MAX_VALUE, frozen))
         root.resolve("anki-live-operation-$i-return.bin").writeBytes(operation.bincodeSerialize())
     }
     val liveResults =
