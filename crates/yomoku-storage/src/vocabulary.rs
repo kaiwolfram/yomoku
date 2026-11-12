@@ -75,7 +75,8 @@ impl Storage {
         Ok(())
     }
 
-    /// Permanently erase one confirmed, frozen selection and its status events,
+    /// Historical-data helper, intentionally absent from app events and FFI.
+    /// Permanently erase a frozen selection and its status events,
     /// occurrences and dictionary-form links in a single transaction. Retain
     /// page completions/time/provenance and all live content/analysis. No rescan
     /// or re-registration occurs. Absent/repeated IDs are idempotent no-ops.

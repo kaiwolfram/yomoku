@@ -65,15 +65,6 @@ internal fun VocabularySelectionActions(
                 }
             }
             TextButton(
-                onClick = {
-                    dispatch(Event.RequestVocabularyBulkAction(VocabularyBulkAction.Delete))
-                },
-                enabled = enabled && selection.isNotEmpty(),
-                modifier = Modifier.testTag("vocabulary_delete_selected"),
-            ) {
-                Text(stringResource(R.string.vocabulary_delete_selected))
-            }
-            TextButton(
                 onClick = { dispatch(Event.CancelVocabularySelection) },
                 enabled = enabled,
                 modifier = Modifier.testTag("vocabulary_cancel_selection"),
@@ -106,13 +97,6 @@ internal fun VocabularyBulkDialog(view: ViewModel, dispatch: (Event) -> Unit) {
             Column {
                 if (command != null) {
                     when (val action = command.action) {
-                        VocabularyBulkAction.Delete ->
-                            Text(
-                                stringResource(
-                                    R.string.vocabulary_delete_confirmation,
-                                    command.ids.size.toString(),
-                                )
-                            )
                         is VocabularyBulkAction.SetStatus ->
                             Text(
                                 stringResource(

@@ -260,6 +260,8 @@ class VocabularyScreenTest {
             )
         render()
         compose.onNodeWithTag("vocabulary_select_all").assertDoesNotExist()
+        compose.onNodeWithTag("vocabulary_row_1").performClick()
+        assertEquals(Event.OpenVocabularyWord(VocabularyId(1)), events.last())
         compose.onNodeWithTag("vocabulary_row_1").performTouchInput { longClick() }
         assertEquals(Event.ToggleVocabularySelection(VocabularyId(1)), events.last())
         compose.runOnUiThread {
@@ -306,8 +308,7 @@ class VocabularyScreenTest {
                     frame.value.copy(vocabulary = frame.value.vocabulary.copy(confirmation = null))
             }
         }
-        compose.onNodeWithTag("vocabulary_delete_selected").performScrollTo().performClick()
-        assertEquals(Event.RequestVocabularyBulkAction(VocabularyBulkAction.Delete), events.last())
+        compose.onNodeWithTag("vocabulary_delete_selected").assertDoesNotExist()
         compose.runOnUiThread { compose.activity.onBackPressedDispatcher.onBackPressed() }
         compose.waitForIdle()
         assertEquals(Event.CancelVocabularySelection, events.last())
@@ -333,16 +334,16 @@ class VocabularyScreenTest {
         assertEquals(Event.RetryVocabularySelection, events.last())
         compose.onNodeWithTag("vocabulary_cancel_bulk").performClick()
         assertEquals(Event.CancelVocabularySelection, events.last())
-        val command = VocabularyBulkCommand(listOf(VocabularyId(1)), VocabularyBulkAction.Delete)
+        val command =
+            VocabularyBulkCommand(
+                listOf(VocabularyId(1)),
+                VocabularyBulkAction.SetStatus(VocabularyStatus.KNOWN, 999L),
+            )
         compose.runOnUiThread {
             frame.value =
                 frame.value.copy(vocabulary = frame.value.vocabulary.copy(confirmation = command))
         }
-        compose
-            .onNodeWithText(
-                "Permanently delete selected words (1) and their encounter and status history? Statistics will be recalculated. Existing documents will not recreate these words automatically. This cannot be undone."
-            )
-            .assertExists()
+        compose.onNodeWithText("Change selected words (1) to Known?").assertExists()
         compose.onNodeWithTag("vocabulary_confirm_bulk").performClick()
         assertEquals(Event.RetryVocabularyBulkAction, events.last())
         val count = events.size
@@ -366,6 +367,80 @@ class VocabularyScreenTest {
         compose.onNodeWithTag("vocabulary_confirm_bulk").assertDoesNotExist()
         compose.onNodeWithTag("vocabulary_cancel_bulk").assertIsNotEnabled()
         assertEquals(count, events.size)
+    }
+
+    @Test
+    fun wordSheetSharesLookupAndStatusControlsAndRetainsDismissedWriteRetry() {
+        val row = vocabularyRow(1).copy(encounteredCount = 7UL)
+        frame.value =
+            frame.value.copy(
+                vocabulary =
+                    frame.value.vocabulary.copy(
+                        matchingCount = 1UL,
+                        rows = listOf(row),
+                        word = VocabularyWordState(row, error = DocumentError.UNAVAILABLE),
+                    )
+            )
+        render()
+        compose.onNodeWithTag("word_surface").assertTextEquals(row.surface)
+        compose.onNodeWithTag("word_lookup_error").assertExists()
+        compose.onNodeWithTag("retry_word_details").performClick()
+        assertEquals(Event.RetryVocabularyWord, events.last())
+        compose.onNodeWithTag("word_status_NEW").performClick()
+        assertEquals(Event.DismissVocabularyWord, events.last())
+        compose.runOnUiThread {
+            frame.value =
+                frame.value.copy(
+                    vocabulary =
+                        frame.value.vocabulary.copy(
+                            word =
+                                VocabularyWordState(
+                                    row,
+                                    DictionaryCandidates(
+                                        row.surface,
+                                        words = emptyList(),
+                                        names = emptyList(),
+                                    ),
+                                )
+                        )
+                )
+        }
+        compose.onNodeWithTag("word_encountered").assertTextEquals("Encountered 7 times")
+        compose.onNodeWithTag("word_no_match").assertExists()
+        compose.onNodeWithTag("vocabulary_delete_selected").assertDoesNotExist()
+        val before = System.currentTimeMillis()
+        compose.onNodeWithTag("word_status_LEARNING").performClick()
+        val command = (events.last() as Event.SetVocabularyWordStatus).value
+        assertEquals(row.id, command.id)
+        assertEquals(VocabularyStatus.LEARNING, command.status)
+        assertTrue(command.occurredAtUnixMs in before..System.currentTimeMillis())
+        compose.onNodeWithTag("vocabulary_bulk_dialog").assertDoesNotExist()
+        compose.runOnUiThread {
+            frame.value =
+                frame.value.copy(
+                    vocabulary =
+                        frame.value.vocabulary.copy(
+                            wordStatus = command,
+                            wordStatusError = DocumentError.UNAVAILABLE,
+                        )
+                )
+        }
+        compose.onNodeWithTag("word_status_KNOWN").assertIsNotEnabled()
+        compose.onNodeWithTag("vocabulary_word_status_retry").performClick()
+        assertEquals(Event.RetryVocabularyWordStatus, events.last())
+        compose.onNodeWithTag("vocabulary_word_status_cancel").performClick()
+        assertEquals(Event.CancelVocabularyWordStatus, events.last())
+        androidx.test.platform.app.InstrumentationRegistry.getInstrumentation()
+            .sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_BACK)
+        compose.waitForIdle()
+        assertEquals(Event.DismissVocabularyWord, events.last())
+        compose.runOnUiThread {
+            frame.value = frame.value.copy(vocabulary = frame.value.vocabulary.copy(word = null))
+        }
+        compose.onNodeWithTag("vocabulary_word_status_retry").performClick()
+        assertEquals(Event.RetryVocabularyWordStatus, events.last())
+        compose.onNodeWithTag("vocabulary_word_status_cancel").performClick()
+        assertEquals(Event.CancelVocabularyWordStatus, events.last())
     }
 }
 

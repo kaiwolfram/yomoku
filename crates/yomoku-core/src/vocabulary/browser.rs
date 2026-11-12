@@ -88,6 +88,10 @@ pub struct VocabularyState {
     pub selecting_all: bool,
     pub confirmation: Option<VocabularyBulkCommand>,
     pub bulk_error: Option<crate::storage::DocumentError>,
+    pub word: Option<VocabularyWordState>,
+    /// Accepted writes survive sheet dismissal; Retry keeps this exact payload.
+    pub word_status: Option<VocabularyWordStatusCommand>,
+    pub word_status_error: Option<crate::storage::DocumentError>,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, Eq)]
@@ -98,7 +102,6 @@ pub enum VocabularyBulkAction {
         status: VocabularyStatus,
         occurred_at_unix_ms: i64,
     },
-    Delete,
 }
 
 /// Confirmation and Retry always use these exact IDs/action/date, never a query.
@@ -120,4 +123,28 @@ impl VocabularyQuery {
             .collect();
         self
     }
+}
+
+/// A temporary dictionary lookup, independent of any source book.
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
+pub struct VocabularyWordState {
+    pub row: VocabularyRow,
+    pub candidates: Option<crate::dictionary::DictionaryCandidates>,
+    pub error: Option<crate::storage::DocumentError>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
+pub struct VocabularyWordDetails {
+    pub row: VocabularyRow,
+    pub candidates: crate::dictionary::DictionaryCandidates,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
+pub struct VocabularyWordStatusCommand {
+    pub id: VocabularyId,
+    pub status: VocabularyStatus,
+    pub occurred_at_unix_ms: i64,
 }

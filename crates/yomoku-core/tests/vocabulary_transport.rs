@@ -431,11 +431,20 @@ fn vocabulary_confirmation_cancel_and_exact_payload_gate_all_unrelated_work() {
         ready(&core);
         assert!(core
             .process_event(Event::RequestVocabularyBulkAction(
-                VocabularyBulkAction::Delete
+                VocabularyBulkAction::SetStatus {
+                    status: yomoku_core::vocabulary::VocabularyStatus::Known,
+                    occurred_at_unix_ms: 999
+                }
             ))
             .is_empty());
         select_all(&core);
-        let command = prompt(&core, VocabularyBulkAction::Delete);
+        let command = prompt(
+            &core,
+            VocabularyBulkAction::SetStatus {
+                status: yomoku_core::vocabulary::VocabularyStatus::Known,
+                occurred_at_unix_ms: 999,
+            },
+        );
         let before = core.view();
         for event in [
             Event::SelectDestination(Destination::Library),
@@ -469,7 +478,13 @@ fn vocabulary_confirmation_cancel_and_exact_payload_gate_all_unrelated_work() {
         assert!(core
             .process_event(Event::ConfirmVocabularyBulkAction(command.clone()))
             .is_empty());
-        let command = prompt(&core, VocabularyBulkAction::Delete);
+        let command = prompt(
+            &core,
+            VocabularyBulkAction::SetStatus {
+                status: yomoku_core::vocabulary::VocabularyStatus::Known,
+                occurred_at_unix_ms: 999,
+            },
+        );
         let mut effects = core.process_event(Event::ConfirmVocabularyBulkAction(command.clone()));
         assert_eq!(
             operation(&effects),
@@ -639,5 +654,274 @@ fn vocabulary_status_retries_freeze_ids_status_date_and_reject_wrong_success() {
             core.process_event(Event::CancelVocabularyBulkAction);
             assert_eq!(core.view().vocabulary.selection, Some(all_ids(1205)));
         }
+    }
+}
+
+fn word_details(core: &Core<Yomoku>) -> StorageResult {
+    let row = core.view().vocabulary.word.unwrap().row;
+    StorageResult::VocabularyWordLoaded(Box::new(yomoku_core::vocabulary::VocabularyWordDetails {
+        candidates: yomoku_core::dictionary::DictionaryCandidates {
+            surface: row.surface.clone(),
+            dictionary_form: None,
+            words: vec![],
+            names: vec![],
+        },
+        row,
+    }))
+}
+
+#[test]
+fn word_lookup_is_read_only_and_current_status_dismisses_without_storage() {
+    use yomoku_core::vocabulary::VocabularyWordStatusCommand;
+    for core in cores() {
+        ready(&core);
+        let before = core.view().vocabulary;
+        let row = before.rows[0].clone();
+        let mut effects = core.process_event(Event::OpenVocabularyWord(row.id));
+        assert_eq!(
+            operation(&effects),
+            Some(&StorageOperation::LoadVocabularyWord(row.id))
+        );
+        assert_eq!(core.view().vocabulary.word.as_ref().unwrap().row, row);
+        let details = word_details(&core);
+        resolve(&core, &mut effects, details);
+        let loaded = core.view().vocabulary;
+        assert_eq!(loaded.rows, before.rows);
+        assert_eq!(loaded.selection, None);
+        assert!(loaded.word.as_ref().unwrap().candidates.is_some());
+        let effects = core.process_event(Event::SetVocabularyWordStatus(
+            VocabularyWordStatusCommand {
+                id: row.id,
+                status: row.status,
+                occurred_at_unix_ms: 999,
+            },
+        ));
+        assert!(operation(&effects).is_none());
+        assert!(core.view().vocabulary.word.is_none());
+        assert_eq!(core.view().vocabulary.rows, before.rows);
+    }
+}
+
+#[test]
+fn dismissed_and_departed_word_reads_release_only_their_slot_without_reopening() {
+    for exit in [
+        Event::DismissVocabularyWord,
+        Event::SelectDestination(Destination::Library),
+        Event::OpenSettings,
+    ] {
+        for core in cores() {
+            ready(&core);
+            let id = core.view().vocabulary.rows[0].id;
+            let mut effects = core.process_event(Event::OpenVocabularyWord(id));
+            let details = word_details(&core);
+            core.process_event(exit.clone());
+            assert!(core.view().vocabulary.word.is_none());
+            assert!(core.view().storage_busy);
+            let before = core.view();
+            core.process_event(Event::VocabularyWordFinished(
+                0,
+                StorageResult::Failed(DocumentError::NotFound),
+            ));
+            core.process_event(Event::StorageFinished(StorageResult::Failed(
+                DocumentError::NotFound,
+            )));
+            assert_eq!(core.view(), before);
+            resolve(&core, &mut effects, details);
+            assert!(!core.view().storage_busy);
+            assert!(core.view().vocabulary.word.is_none());
+        }
+    }
+}
+
+#[test]
+fn word_lookup_failures_only_retry_explicitly_and_validate_identity() {
+    for core in cores() {
+        ready(&core);
+        let id = core.view().vocabulary.rows[0].id;
+        let mut effects = core.process_event(Event::OpenVocabularyWord(id));
+        let mut wrong = match word_details(&core) {
+            StorageResult::VocabularyWordLoaded(details) => details,
+            _ => unreachable!(),
+        };
+        wrong.row.id = 999.try_into().unwrap();
+        resolve(
+            &core,
+            &mut effects,
+            StorageResult::VocabularyWordLoaded(wrong),
+        );
+        assert_eq!(
+            core.view().vocabulary.word.as_ref().unwrap().error,
+            Some(DocumentError::InvalidDocument)
+        );
+        assert!(core.process_event(Event::LoadVocabulary).is_empty());
+        let mut retry = core.process_event(Event::RetryVocabularyWord);
+        resolve(
+            &core,
+            &mut retry,
+            StorageResult::Failed(DocumentError::Unavailable),
+        );
+        let mut retry = core.process_event(Event::RetryVocabularyWord);
+        let details = word_details(&core);
+        resolve(&core, &mut retry, details);
+        assert!(core.view().vocabulary.word.unwrap().candidates.is_some());
+        assert!(core.process_event(Event::RetryVocabularyWord).is_empty());
+    }
+}
+
+#[test]
+fn direct_status_retains_exact_retry_after_dismissal_and_invalidates_results_on_success() {
+    use yomoku_core::vocabulary::VocabularyWordStatusCommand;
+    for core in cores() {
+        ready(&core);
+        let row = core.view().vocabulary.rows[0].clone();
+        let mut lookup = core.process_event(Event::OpenVocabularyWord(row.id));
+        let details = word_details(&core);
+        resolve(&core, &mut lookup, details);
+        let command = VocabularyWordStatusCommand {
+            id: row.id,
+            status: VocabularyStatus::Learning,
+            occurred_at_unix_ms: 12345,
+        };
+        let mut change = core.process_event(Event::SetVocabularyWordStatus(command.clone()));
+        assert_eq!(
+            operation(&change),
+            Some(&StorageOperation::SetVocabularyWordStatus(command.clone()))
+        );
+        assert!(core.view().vocabulary.confirmation.is_none());
+        resolve(
+            &core,
+            &mut change,
+            StorageResult::Failed(DocumentError::Unavailable),
+        );
+        assert_eq!(core.view().vocabulary.word_status, Some(command.clone()));
+        assert_eq!(
+            core.view().vocabulary.word.as_ref().unwrap().row.status,
+            row.status
+        );
+        assert!(core
+            .process_event(Event::SetVocabularyWordStatus(
+                VocabularyWordStatusCommand {
+                    status: VocabularyStatus::Known,
+                    occurred_at_unix_ms: 99999,
+                    ..command.clone()
+                }
+            ))
+            .is_empty());
+        core.process_event(Event::DismissVocabularyWord);
+        let mut retry = core.process_event(Event::RetryVocabularyWordStatus);
+        assert_eq!(
+            operation(&retry),
+            Some(&StorageOperation::SetVocabularyWordStatus(command.clone()))
+        );
+        resolve(
+            &core,
+            &mut retry,
+            StorageResult::VocabularyWordStatusChanged(command),
+        );
+        let view = core.view();
+        assert!(!view.storage_busy);
+        assert!(view.vocabulary.word.is_none());
+        assert!(
+            view.vocabulary.word_status.is_none() && view.vocabulary.word_status_error.is_none()
+        );
+        assert!(view.vocabulary.rows.is_empty() && view.vocabulary.matching_count.is_none());
+    }
+}
+
+#[test]
+fn direct_status_keeps_word_open_after_filter_refresh_and_supports_cancel() {
+    use yomoku_core::vocabulary::VocabularyWordStatusCommand;
+    for core in cores() {
+        enter(&core);
+        let query = VocabularyQuery {
+            statuses: vec![VocabularyStatus::New],
+            ..Default::default()
+        };
+        let mut page = core.process_event(Event::SetVocabularyQuery(query));
+        resolve(&core, &mut page, loaded("", 0, 1));
+        let row = core.view().vocabulary.rows[0].clone();
+        let mut lookup = core.process_event(Event::OpenVocabularyWord(row.id));
+        let details = word_details(&core);
+        resolve(&core, &mut lookup, details);
+        for event in [
+            Event::ToggleVocabularySelection(row.id),
+            Event::SelectAllVocabulary,
+        ] {
+            assert!(core.process_event(event).is_empty());
+        }
+        let command = VocabularyWordStatusCommand {
+            id: row.id,
+            status: VocabularyStatus::Ignored,
+            occurred_at_unix_ms: 999,
+        };
+        let mut change = core.process_event(Event::SetVocabularyWordStatus(command.clone()));
+        resolve(
+            &core,
+            &mut change,
+            StorageResult::Failed(DocumentError::Unavailable),
+        );
+        core.process_event(Event::CancelVocabularyWordStatus);
+        assert!(core.view().vocabulary.word_status.is_none());
+        assert!(core
+            .process_event(Event::RetryVocabularyWordStatus)
+            .is_empty());
+        let mut change = core.process_event(Event::SetVocabularyWordStatus(command.clone()));
+        resolve(
+            &core,
+            &mut change,
+            StorageResult::VocabularyWordStatusChanged(command),
+        );
+        let mut refresh = core.process_event(Event::LoadVocabulary);
+        resolve(&core, &mut refresh, loaded("", 0, 0));
+        assert_eq!(core.view().vocabulary.matching_count, Some(0));
+        let word = core.view().vocabulary.word.unwrap();
+        assert_eq!(word.row.id, row.id);
+        assert_eq!(word.row.status, VocabularyStatus::Ignored);
+        assert!(word.candidates.is_some());
+        core.process_event(Event::DismissVocabularyWord);
+        assert!(core.view().vocabulary.word.is_none());
+    }
+}
+
+#[test]
+fn stale_word_callbacks_cannot_replace_a_new_lookup_or_acknowledge_another_status() {
+    use yomoku_core::vocabulary::VocabularyWordStatusCommand;
+    for core in cores() {
+        ready(&core); // Page request 1, first lookup 2.
+        let id = core.view().vocabulary.rows[0].id;
+        let mut first = core.process_event(Event::OpenVocabularyWord(id));
+        let old_details = word_details(&core);
+        core.process_event(Event::DismissVocabularyWord);
+        assert!(core.process_event(Event::OpenVocabularyWord(id)).is_empty());
+        resolve(&core, &mut first, old_details.clone());
+        let mut current = core.process_event(Event::OpenVocabularyWord(id));
+        let pending = core.view();
+        core.process_event(Event::VocabularyWordFinished(2, old_details));
+        assert_eq!(core.view(), pending);
+        let details = word_details(&core);
+        resolve(&core, &mut current, details);
+        let command = VocabularyWordStatusCommand {
+            id,
+            status: VocabularyStatus::Known,
+            occurred_at_unix_ms: 456,
+        };
+        let mut write = core.process_event(Event::SetVocabularyWordStatus(command.clone()));
+        let mut wrong = command.clone();
+        wrong.occurred_at_unix_ms += 1;
+        resolve(
+            &core,
+            &mut write,
+            StorageResult::VocabularyWordStatusChanged(wrong),
+        );
+        assert_eq!(core.view().vocabulary.word_status, Some(command.clone()));
+        assert_eq!(
+            core.view().vocabulary.word_status_error,
+            Some(DocumentError::InvalidDocument)
+        );
+        let retry = core.process_event(Event::RetryVocabularyWordStatus);
+        assert_eq!(
+            operation(&retry),
+            Some(&StorageOperation::SetVocabularyWordStatus(command))
+        );
     }
 }

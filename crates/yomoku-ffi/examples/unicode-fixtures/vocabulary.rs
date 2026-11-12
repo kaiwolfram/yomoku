@@ -141,8 +141,7 @@ pub fn exchange(dir: &Path, writing: bool) -> Result<(), Box<dyn Error>> {
         .map(|status| VocabularyBulkAction::SetStatus {
             status,
             occurred_at_unix_ms: 9_007_199_254_740_993,
-        })
-        .chain([VocabularyBulkAction::Delete]);
+        });
     for (index, action) in actions.enumerate() {
         let command = VocabularyBulkCommand {
             ids: ids.clone(),
@@ -212,6 +211,59 @@ pub fn exchange(dir: &Path, writing: bool) -> Result<(), Box<dyn Error>> {
                 dir.join(format!("vocabulary-selection-event-{index}-return.bin")),
             )?)?;
             assert_eq!(returned, event);
+        }
+    }
+    let command = yomoku_core::vocabulary::VocabularyWordStatusCommand {
+        id: i64::MAX.try_into()?,
+        status: yomoku_core::vocabulary::VocabularyStatus::Learning,
+        occurred_at_unix_ms: 9_007_199_254_740_993,
+    };
+    for (index, event) in [
+        Event::OpenVocabularyWord(command.id),
+        Event::DismissVocabularyWord,
+        Event::RetryVocabularyWord,
+        Event::SetVocabularyWordStatus(command.clone()),
+        Event::RetryVocabularyWordStatus,
+        Event::CancelVocabularyWordStatus,
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let mut view = Core::<Yomoku>::new().view();
+        view.vocabulary.word = Some(yomoku_core::vocabulary::VocabularyWordState {
+            row: yomoku_core::vocabulary::VocabularyRow {
+                id: command.id,
+                surface: "𠮷か\u{3099}\0".into(),
+                status: command.status,
+                registered_at_unix_ms: 123,
+                encountered_count: u64::MAX,
+                last_seen_unix_ms: Some(456),
+            },
+            candidates: (index % 2 == 0).then(|| yomoku_core::dictionary::DictionaryCandidates {
+                surface: "𠮷か\u{3099}\0".into(),
+                dictionary_form: None,
+                words: vec![],
+                names: vec![],
+            }),
+            error: (index % 2 != 0).then_some(DocumentError::Unavailable),
+        });
+        view.vocabulary.word_status = Some(command.clone());
+        view.vocabulary.word_status_error = Some(DocumentError::Unavailable);
+        for (kind, bytes) in [
+            ("view", super::encode(&view)),
+            ("event", super::encode(&event)),
+        ] {
+            let name = format!("vocabulary-word-{kind}-{index}");
+            if writing {
+                fs::write(dir.join(format!("{name}.bin")), bytes)?;
+            } else {
+                let returned = fs::read(dir.join(format!("{name}-return.bin")))?;
+                if kind == "view" {
+                    assert_eq!(BincodeFfiFormat::deserialize::<ViewModel>(&returned)?, view);
+                } else {
+                    assert_eq!(BincodeFfiFormat::deserialize::<Event>(&returned)?, event);
+                }
+            }
         }
     }
     Ok(())

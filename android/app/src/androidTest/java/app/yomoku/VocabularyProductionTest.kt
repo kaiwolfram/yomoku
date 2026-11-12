@@ -91,7 +91,7 @@ class VocabularyProductionTest {
     }
 
     @Test
-    fun unloadedAndHiddenSelectionsFrozenStatusAndDeleteRetrySurviveRecreation() {
+    fun unloadedAndHiddenSelectionsFrozenStatusRetrySurviveRecreation() {
         idle()
         val prefix = "選-${System.nanoTime()}-"
         val ids = mutableListOf<VocabularyId>()
@@ -194,47 +194,12 @@ class VocabularyProductionTest {
                         assertEquals(date, it.getLong(2))
                     }
             }
-            compose
-                .onNodeWithTag("vocabulary_row_${core().view.vocabulary.rows.first().id.value}")
-                .performTouchInput { longClick() }
-            compose.onNodeWithTag("vocabulary_select_all").performScrollTo().performClick()
-            idle()
-            assertEquals(206, core().view.vocabulary.selection?.size)
-            compose.onNodeWithTag("vocabulary_delete_selected").performScrollTo().performClick()
-            val deletion = checkNotNull(core().view.vocabulary.confirmation)
-            sql {
-                it.execSQL(
-                    "CREATE TRIGGER fail_ui_vocabulary_delete BEFORE DELETE ON vocabulary WHEN OLD.id = ${ids.last().value} BEGIN SELECT RAISE(ABORT, 'last word'); END"
-                )
-            }
-            compose.onNodeWithTag("vocabulary_confirm_bulk").performClick()
-            idle()
-            assertNotNull(core().view.vocabulary.bulkError)
-            sql { db ->
-                db.rawQuery(
-                        "SELECT COUNT(*) FROM vocabulary WHERE surface >= ? AND surface < ?",
-                        arrayOf(prefix, prefix + "\uffff"),
-                    )
-                    .use {
-                        it.moveToFirst()
-                        assertEquals(207, it.getInt(0))
-                    }
-                db.execSQL("DROP TRIGGER fail_ui_vocabulary_delete")
-                insert(db, prefix + "match-after-delete-prompt")
-            }
-            compose.activityRule.scenario.recreate()
-            idle()
-            assertEquals(deletion, core().view.vocabulary.confirmation)
-            compose.onNodeWithTag("vocabulary_confirm_bulk").performClick()
-            idle()
-            assertEquals(1UL, core().view.vocabulary.matchingCount)
-            assertEquals(
-                prefix + "match-after-delete-prompt",
-                core().view.vocabulary.rows.single().surface,
-            )
+            compose.onNodeWithTag("vocabulary_delete_selected").assertDoesNotExist()
             search(prefix + "hidden")
             assertEquals(VocabularyStatus.KNOWN, core().view.vocabulary.rows.single().status)
-            compose.onNodeWithTag("vocabulary_row_${hidden.value}").performClick()
+            compose.onNodeWithTag("vocabulary_row_${hidden.value}").performTouchInput {
+                longClick()
+            }
             compose.onNodeWithTag("vocabulary_selected_count").assertTextEquals("Selected words: 1")
             compose.runOnUiThread { compose.activity.onBackPressedDispatcher.onBackPressed() }
             idle()
@@ -242,7 +207,6 @@ class VocabularyProductionTest {
         } finally {
             sql { db ->
                 db.execSQL("DROP TRIGGER IF EXISTS fail_ui_vocabulary_status")
-                db.execSQL("DROP TRIGGER IF EXISTS fail_ui_vocabulary_delete")
                 db.execSQL(
                     "DELETE FROM vocabulary WHERE surface >= ? AND surface < ?",
                     arrayOf(prefix, prefix + "\uffff"),
@@ -457,7 +421,7 @@ class VocabularyProductionTest {
         visit()
         search("猫")
         val cat = core().view.vocabulary.rows.single { it.surface == "猫" }
-        compose.onNodeWithTag("vocabulary_row_${cat.id.value}").performClick()
+        compose.onNodeWithTag("vocabulary_row_${cat.id.value}").performTouchInput { longClick() }
         requestStatus(VocabularyStatus.LEARNING)
         compose.onNodeWithTag("vocabulary_confirm_bulk").performClick()
         idle()
@@ -482,39 +446,109 @@ class VocabularyProductionTest {
         visit()
         search("猫")
         compose.onNodeWithTag("vocabulary_row_${cat.id.value}").performClick()
-        compose.onNodeWithTag("vocabulary_delete_selected").performScrollTo().performClick()
-        compose.onNodeWithTag("vocabulary_confirm_bulk").performClick()
         idle()
-        assertFalse(core().view.vocabulary.rows.any { it.id == cat.id })
+        compose.onNodeWithTag("word_surface").assertTextEquals("猫")
+        compose.onNodeWithTag("word_definitions").assertExists()
+        compose
+            .onNodeWithTag("word_encountered")
+            .assertTextEquals("Encountered ${cat.encounteredCount} times")
+        compose.onNodeWithTag("vocabulary_delete_selected").assertDoesNotExist()
+        compose.onNodeWithTag("word_status_IGNORED").performClick()
+        idle()
+        assertEquals(VocabularyStatus.IGNORED, core().view.vocabulary.word?.row?.status)
+        compose.onNodeWithTag("reader_word_panel").assertExists()
+        compose.onNodeWithTag("word_status_IGNORED").performClick()
+        idle()
+        assertNull(core().view.vocabulary.word)
         val after = statistics()
-        assertEquals(
-            before.reading.japaneseOccurrences - cat.encounteredCount,
-            after.reading.japaneseOccurrences,
-        )
+        assertEquals(before.reading.japaneseOccurrences, after.reading.japaneseOccurrences)
         assertEquals(before.statuses.learning - 1UL, after.statuses.learning)
+        assertEquals(before.statuses.ignored + 1UL, after.statuses.ignored)
         library()
         assertEquals(
-            WordStatusCounts(0UL, 0UL, 0UL, 1UL, 0UL),
+            WordStatusCounts(0UL, 0UL, 0UL, 1UL, 1UL),
             core().view.libraryWordDistributions!!.single { it.documentId == id }.counts,
         )
         page = open(id)
         assertEquals(listOf("猫", "猫", "犬"), page.tokens.map { it.surface })
-        assertTrue(page.tokens.filter { it.surface == "猫" }.all { it.vocabulary == null })
+        assertTrue(
+            page.tokens
+                .filter { it.surface == "猫" }
+                .all { it.vocabulary?.status == VocabularyStatus.IGNORED }
+        )
         compose.runOnUiThread { core().dispatch(Event.CloseDocument) }
         idle()
         visit()
         search("猫")
-        assertFalse(core().view.vocabulary.rows.any { it.surface == "猫" })
-        library()
-        compose.runOnUiThread { core().dispatch(Event.CreatePaste("$title-fresh\n猫")) }
+        val retained = core().view.vocabulary.rows.single { it.surface == "猫" }
+        assertEquals(cat.id, retained.id)
+        assertEquals(cat.encounteredCount, retained.encounteredCount)
+    }
+
+    @Test
+    fun wordSheetRemainsOpenAfterStatusFilterRemovalAndBookDeletion() {
         idle()
+        library()
+        compose.runOnUiThread {
+            core().dispatch(Event.CreatePaste("Vocabulary-sheet-${System.nanoTime()}\n食べました 東京都"))
+        }
+        idle()
+        val book = checkNotNull(core().view.importSummary).documentId
         compose.runOnUiThread { core().dispatch(Event.DismissImportSummary) }
         visit()
-        search("猫")
-        val fresh = core().view.vocabulary.rows.single { it.surface == "猫" }
-        assertNotEquals(cat.id, fresh.id)
-        assertEquals(VocabularyStatus.NEW, fresh.status)
-        assertEquals(0UL, fresh.encounteredCount)
+        search("食べました")
+        val row = core().view.vocabulary.rows.single { it.surface == "食べました" }
+        val target =
+            if (row.status == VocabularyStatus.LEARNING) VocabularyStatus.KNOWN
+            else VocabularyStatus.LEARNING
+        compose.runOnUiThread {
+            core()
+                .dispatch(
+                    Event.SetVocabularyQuery(
+                        VocabularyQuery(row.surface, listOf(row.status), VocabularySort.NEWEST)
+                    )
+                )
+        }
+        idle()
+        compose.onNodeWithTag("vocabulary_row_${row.id.value}").performClick()
+        idle()
+        compose.onNodeWithTag("word_surface").assertTextEquals(row.surface)
+        compose.onNodeWithTag("word_definitions").assertExists()
+        compose.onNodeWithTag("word_status_${target.name}").performClick()
+        idle()
+        assertEquals(0UL, core().view.vocabulary.matchingCount)
+        assertEquals(target, core().view.vocabulary.word?.row?.status)
+        compose.onNodeWithTag("reader_word_panel").assertExists()
+        compose.onNodeWithTag("word_surface").assertTextEquals(row.surface)
+        androidx.test.platform.app.InstrumentationRegistry.getInstrumentation()
+            .sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_BACK)
+        idle()
+        assertNull(core().view.vocabulary.word)
+        library()
+        compose.runOnUiThread { core().dispatch(Event.RequestDocumentDeletion(book)) }
+        compose.runOnUiThread { core().dispatch(Event.ConfirmDocumentDeletion(book)) }
+        idle()
+        visit()
+        compose.runOnUiThread {
+            core()
+                .dispatch(
+                    Event.SetVocabularyQuery(
+                        VocabularyQuery(
+                            row.surface,
+                            VocabularyStatus.entries.toList(),
+                            VocabularySort.NEWEST,
+                        )
+                    )
+                )
+        }
+        idle()
+        compose.onNodeWithTag("vocabulary_row_${row.id.value}").performClick()
+        idle()
+        compose.onNodeWithTag("word_definitions").assertExists()
+        assertEquals(row.encounteredCount, core().view.vocabulary.word?.row?.encounteredCount)
+        compose.onNodeWithTag("word_status_${target.name}").performClick()
+        idle()
+        assertNull(core().view.vocabulary.word)
     }
 
     @Test

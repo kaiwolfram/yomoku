@@ -422,3 +422,5 @@ fn effective_worker_dictionary_failures_require_explicit_retry_and_reopen_the_in
     assert_eq!(word(&router, command), expected);
     assert_eq!(attempts.load(Ordering::Relaxed), 3);
 }
+
+mod vocabulary;

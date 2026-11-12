@@ -320,94 +320,83 @@ fn vocabulary_bulk_mutations_invalidate_and_refresh_statistics_library_and_reade
     let (mut observer, id) = seed(&database);
     let Factory { loader, trace, .. } = Factory::new(false, None);
     let (router, lifecycle) = import_router(database.path(), loader).unwrap();
-    for action in [
-        VocabularyBulkAction::SetStatus {
-            status: VocabularyStatus::Known,
-            occurred_at_unix_ms: NOW,
-        },
-        VocabularyBulkAction::Delete,
-    ] {
-        router.update(Event::SelectDestination(Destination::Statistics), |_| {});
-        read(&router, Timeframe::AllTime);
-        router.update(Event::SelectDestination(Destination::Library), |_| {});
-        dispatch(&router, Event::LoadLibraryWordDistributions);
-        router.update(Event::SelectDestination(Destination::Vocabulary), |_| {});
-        dispatch(&router, Event::LoadVocabulary);
-        dispatch(&router, Event::SelectAllVocabulary);
-        router.update(Event::RequestVocabularyBulkAction(action), |_| {});
-        let command = router.view().vocabulary.confirmation.unwrap();
-        let changed = dispatch(&router, Event::ConfirmVocabularyBulkAction(command));
-        assert!(changed.statistics.data.is_none() && changed.statistics.query.is_none());
-        assert!(changed.library_word_distributions.is_none());
-        assert!(
-            changed.effective_reader_tokens.is_none()
-                && changed.effective_reader_word.unwrap().details.is_none()
-        );
-        assert_eq!(changed.vocabulary.matching_count, None);
-        let expected_count = if action == VocabularyBulkAction::Delete {
-            0
-        } else {
-            5
-        };
-        assert_eq!(
-            dispatch(&router, Event::LoadVocabulary)
-                .vocabulary
-                .matching_count,
-            Some(expected_count)
-        );
-        router.update(Event::SelectDestination(Destination::Statistics), |_| {});
-        let statistics = read(&router, Timeframe::AllTime);
-        assert_eq!(
-            statistics,
-            observer
-                .statistics_buckets(Timeframe::AllTime, NOW)
-                .unwrap()
-        );
-        assert_eq!(
-            statistics.buckets.last().unwrap().values.statuses.known,
-            expected_count
-        );
+    let action = VocabularyBulkAction::SetStatus {
+        status: VocabularyStatus::Known,
+        occurred_at_unix_ms: NOW,
+    };
+    router.update(Event::SelectDestination(Destination::Statistics), |_| {});
+    read(&router, Timeframe::AllTime);
+    router.update(Event::SelectDestination(Destination::Library), |_| {});
+    dispatch(&router, Event::LoadLibraryWordDistributions);
+    router.update(Event::SelectDestination(Destination::Vocabulary), |_| {});
+    dispatch(&router, Event::LoadVocabulary);
+    dispatch(&router, Event::SelectAllVocabulary);
+    router.update(Event::RequestVocabularyBulkAction(action), |_| {});
+    let command = router.view().vocabulary.confirmation.unwrap();
+    let changed = dispatch(&router, Event::ConfirmVocabularyBulkAction(command));
+    assert!(changed.statistics.data.is_none() && changed.statistics.query.is_none());
+    assert!(changed.library_word_distributions.is_none());
+    assert!(
+        changed.effective_reader_tokens.is_none()
+            && changed.effective_reader_word.unwrap().details.is_none()
+    );
+    assert_eq!(changed.vocabulary.matching_count, None);
+    let expected_count = 5;
+    assert_eq!(
+        dispatch(&router, Event::LoadVocabulary)
+            .vocabulary
+            .matching_count,
+        Some(expected_count)
+    );
+    router.update(Event::SelectDestination(Destination::Statistics), |_| {});
+    let statistics = read(&router, Timeframe::AllTime);
+    assert_eq!(
+        statistics,
+        observer
+            .statistics_buckets(Timeframe::AllTime, NOW)
+            .unwrap()
+    );
+    assert_eq!(
+        statistics.buckets.last().unwrap().values.statuses.known,
+        expected_count
+    );
 
-        assert_eq!(
-            statistics
-                .buckets
-                .last()
-                .unwrap()
-                .values
-                .reading
-                .japanese_occurrences,
-            if expected_count == 0 { 0 } else { 6 }
-        );
-        router.update(Event::SelectDestination(Destination::Library), |_| {});
-        assert_eq!(
-            dispatch(&router, Event::LoadLibraryWordDistributions).library_word_distributions,
-            Some(observer.library_word_distributions().unwrap())
-        );
-        let opened = dispatch(&router, Event::OpenReader(id));
-        let tokens = dispatch(
-            &router,
-            Event::LoadReaderTokens(ReaderTokenKey {
-                document_id: id,
-                page: opened.reader.unwrap().anchor,
-                analysis: opened.reader_analysis.unwrap(),
-            }),
-        )
-        .effective_reader_tokens
-        .unwrap();
-        assert!(tokens.tokens.iter().all(|token| match action {
-            VocabularyBulkAction::Delete => token.vocabulary.is_none(),
-            _ => token
-                .vocabulary
-                .is_some_and(|entry| entry.status == VocabularyStatus::Known),
-        }));
-        assert_eq!(
-            observer
-                .vocabulary_matching_ids(&VocabularyQuery::default())
-                .unwrap()
-                .len() as u64,
-            expected_count
-        );
-    }
+    assert_eq!(
+        statistics
+            .buckets
+            .last()
+            .unwrap()
+            .values
+            .reading
+            .japanese_occurrences,
+        6
+    );
+    router.update(Event::SelectDestination(Destination::Library), |_| {});
+    assert_eq!(
+        dispatch(&router, Event::LoadLibraryWordDistributions).library_word_distributions,
+        Some(observer.library_word_distributions().unwrap())
+    );
+    let opened = dispatch(&router, Event::OpenReader(id));
+    let tokens = dispatch(
+        &router,
+        Event::LoadReaderTokens(ReaderTokenKey {
+            document_id: id,
+            page: opened.reader.unwrap().anchor,
+            analysis: opened.reader_analysis.unwrap(),
+        }),
+    )
+    .effective_reader_tokens
+    .unwrap();
+    assert!(tokens.tokens.iter().all(|token| token
+        .vocabulary
+        .is_some_and(|entry| entry.status == VocabularyStatus::Known)));
+    assert_eq!(
+        observer
+            .vocabulary_matching_ids(&VocabularyQuery::default())
+            .unwrap()
+            .len() as u64,
+        expected_count
+    );
     assert!(trace.try_recv().is_err());
     drop((router, lifecycle));
 }

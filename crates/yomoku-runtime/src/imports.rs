@@ -153,6 +153,69 @@ impl Imports {
         }
     }
 
+    /// Analyze a temporary chapter only; never publish its synthetic identity or persist analyses.
+    pub(crate) fn vocabulary_forms(
+        &mut self,
+        surface: &str,
+    ) -> Result<(Option<String>, Vec<String>), DocumentError> {
+        let chapter = ChapterText {
+            source_id: 1.try_into().expect("positive temporary ID"),
+            chapter_id: 1.try_into().expect("positive temporary ID"),
+            text: surface.to_owned(),
+        };
+        if self.analyzer.is_none() {
+            self.analyzer = Some((self.loader)()?);
+        }
+        let result = (|| {
+            let analyzer = self.analyzer.as_mut().expect("loaded analyzer");
+            let full = analyzer.analyze(&chapter)?;
+            full.validate(&chapter)
+                .map_err(|_| DocumentError::InvalidDocument)?;
+            if full.mode != SplitMode::C {
+                return Err(DocumentError::InvalidDocument);
+            }
+            let base = full
+                .tokens
+                .iter()
+                .find(|token| token.is_japanese && token.surface == surface)
+                .and_then(|token| token.dictionary_form.as_ref())
+                .map(|form| form.as_str().to_owned());
+            let mut components = full.tokens;
+            for mode in [SplitMode::A, SplitMode::B] {
+                let analysis = analyzer.analyze_mode(&chapter, mode, &full.profile)?;
+                analysis
+                    .validate(&chapter)
+                    .map_err(|_| DocumentError::InvalidDocument)?;
+                if analysis.mode != mode || analysis.profile != full.profile {
+                    return Err(DocumentError::InvalidDocument);
+                }
+                components.extend(analysis.tokens);
+            }
+            components.retain(|token| token.is_japanese);
+            components.sort_by_key(|token| {
+                (
+                    std::cmp::Reverse(token.surface.chars().count()),
+                    token.anchor.range.start,
+                )
+            });
+            let mut forms = Vec::new();
+            for token in components {
+                for form in std::iter::once(token.surface)
+                    .chain(token.dictionary_form.map(|form| form.as_str().to_owned()))
+                {
+                    if !forms.contains(&form) {
+                        forms.push(form);
+                    }
+                }
+            }
+            Ok((base, forms))
+        })();
+        if result.is_err() {
+            self.analyzer = None;
+        }
+        result
+    }
+
     pub(crate) fn analyze_mode(
         &mut self,
         chapter: &ChapterText,

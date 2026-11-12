@@ -181,10 +181,16 @@ class ReaderWordsTest {
                 details.token.dictionaryForm,
             )
             assertTrue(details.candidates.words.isNotEmpty())
-            compose.onNodeWithTag("word_status_LEARNING").performClick()
+            // Vocabulary is global across books and tests. Choose a transition;
+            // tapping the saved current status deliberately dismisses the sheet.
+            val target =
+                if (details.token.vocabulary?.status == VocabularyStatus.LEARNING)
+                    VocabularyStatus.FAMILIAR
+                else VocabularyStatus.LEARNING
+            compose.onNodeWithTag("word_status_$target").performClick()
             awaitWords()
             assertEquals(
-                VocabularyStatus.LEARNING,
+                target,
                 core()
                     .view
                     .effectiveReaderTokens!!

@@ -170,7 +170,10 @@ fn measured_reads_preserve_full_ids_and_include_wait_behind_an_existing_fifo_job
         Some(&expected_ids)
     );
     session.update(Event::RequestVocabularyBulkAction(
-        yomoku_core::vocabulary::VocabularyBulkAction::Delete,
+        yomoku_core::vocabulary::VocabularyBulkAction::SetStatus {
+            status: yomoku_core::vocabulary::VocabularyStatus::Known,
+            occurred_at_unix_ms: 999,
+        },
     ));
     assert_eq!(
         session.view().vocabulary.confirmation.unwrap().ids,

@@ -245,12 +245,32 @@ fn execute(
                     status,
                     occurred_at_unix_ms,
                 } => storage.set_vocabulary_statuses(&command.ids, status, occurred_at_unix_ms),
-                yomoku_core::vocabulary::VocabularyBulkAction::Delete => {
-                    storage.delete_vocabulary_entries(&command.ids)
-                }
             }
             .map_err(map_error)?;
             Ok(StorageResult::VocabularyBulkApplied(command))
+        }
+        StorageOperation::LoadVocabularyWord(id) => {
+            let row = storage
+                .vocabulary_row(id)
+                .map_err(map_error)?
+                .ok_or(DocumentError::NotFound)?;
+            let (base, components) = imports.vocabulary_forms(&row.surface)?;
+            let candidates = word_dictionary(dictionary, word_loader)?
+                .lookup_forms(&row.surface, base.as_deref(), &components)
+                .map_err(|_| {
+                    *dictionary = None;
+                    DocumentError::Unavailable
+                })?;
+            Ok(StorageResult::VocabularyWordLoaded(Box::new(
+                yomoku_core::vocabulary::VocabularyWordDetails { row, candidates },
+            )))
+        }
+        StorageOperation::SetVocabularyWordStatus(command) => {
+            storage
+                .set_vocabulary_status(command.id, command.status, command.occurred_at_unix_ms)
+                .map_err(map_error)?
+                .ok_or(DocumentError::NotFound)?;
+            Ok(StorageResult::VocabularyWordStatusChanged(command))
         }
         StorageOperation::LoadStatistics(query) => storage
             .statistics_buckets(query.timeframe, query.as_of_unix_ms)

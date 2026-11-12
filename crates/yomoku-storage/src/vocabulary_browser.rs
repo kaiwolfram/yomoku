@@ -1,6 +1,6 @@
 //! Indexed literal surface matching, without reading content or analyzer data.
 
-use rusqlite::{params_from_iter, types::Value};
+use rusqlite::{params_from_iter, types::Value, OptionalExtension};
 use yomoku_core::{
     document::VocabularyId,
     vocabulary::{Surface, VocabularyPage, VocabularyQuery, VocabularyRow},
@@ -15,6 +15,18 @@ mod page_sql;
 pub(super) use page_sql::page_sql;
 
 impl Storage {
+    /// Live status and lifetime counts for one saved identity, without source content.
+    pub fn vocabulary_row(&self, id: VocabularyId) -> Result<Option<VocabularyRow>, StorageError> {
+        self.connection
+            .query_row(
+                &page_sql(yomoku_core::vocabulary::VocabularySort::Newest, "v.id = ?"),
+                (i64::from(id), 0_i64),
+                |row| Ok(decode_row(row)),
+            )
+            .optional()?
+            .transpose()
+    }
+
     /// Capture every matching ID in one read snapshot, including unloaded rows.
     /// Sort affects presentation only; IDs are returned in ascending order.
     /// Freeze this selection before confirmation and reuse it for explicit Retry.
@@ -62,31 +74,7 @@ impl Storage {
             let mut statement = transaction.prepare(&page_sql(query.sort, &predicate))?;
             let mut rows = statement.query(params_from_iter(&parameters))?;
             while let Some(row) = rows.next()? {
-                let registered_at_unix_ms: i64 = row.get(3)?;
-                let count: i64 = row.get(4)?;
-                let last_seen_unix_ms: Option<i64> = row.get(5)?;
-                if registered_at_unix_ms < 0 {
-                    return Err(StorageError::InvalidVocabulary);
-                }
-                if !row.get::<_, bool>(6)?
-                    || last_seen_unix_ms.is_some_and(|date| date < 0)
-                    || (count == 0) != last_seen_unix_ms.is_none()
-                {
-                    return Err(StorageError::InvalidCompletion);
-                }
-                result.rows.push(VocabularyRow {
-                    id: VocabularyId::try_from(row.get::<_, i64>(0)?)
-                        .map_err(|_| StorageError::InvalidVocabulary)?,
-                    surface: Surface::new(row.get::<_, String>(1)?)
-                        .map_err(|_| StorageError::InvalidVocabulary)?
-                        .as_str()
-                        .to_owned(),
-                    status: decode_status(&row.get::<_, String>(2)?)?,
-                    registered_at_unix_ms,
-                    encountered_count: u64::try_from(count)
-                        .map_err(|_| StorageError::InvalidCompletion)?,
-                    last_seen_unix_ms,
-                });
+                result.rows.push(decode_row(row)?);
             }
             let next = offset + result.rows.len() as u64;
             result.next_offset = (next < matching_count).then_some(next);
@@ -139,4 +127,31 @@ fn prefix_end(prefix: &str) -> Option<String> {
         }
     }
     None
+}
+
+fn decode_row(row: &rusqlite::Row<'_>) -> Result<VocabularyRow, StorageError> {
+    let registered_at_unix_ms: i64 = row.get(3)?;
+    let count: i64 = row.get(4)?;
+    let last_seen_unix_ms: Option<i64> = row.get(5)?;
+    if registered_at_unix_ms < 0 {
+        return Err(StorageError::InvalidVocabulary);
+    }
+    if !row.get::<_, bool>(6)?
+        || last_seen_unix_ms.is_some_and(|date| date < 0)
+        || (count == 0) != last_seen_unix_ms.is_none()
+    {
+        return Err(StorageError::InvalidCompletion);
+    }
+    Ok(VocabularyRow {
+        id: VocabularyId::try_from(row.get::<_, i64>(0)?)
+            .map_err(|_| StorageError::InvalidVocabulary)?,
+        surface: Surface::new(row.get::<_, String>(1)?)
+            .map_err(|_| StorageError::InvalidVocabulary)?
+            .as_str()
+            .to_owned(),
+        status: decode_status(&row.get::<_, String>(2)?)?,
+        registered_at_unix_ms,
+        encountered_count: u64::try_from(count).map_err(|_| StorageError::InvalidCompletion)?,
+        last_seen_unix_ms,
+    })
 }

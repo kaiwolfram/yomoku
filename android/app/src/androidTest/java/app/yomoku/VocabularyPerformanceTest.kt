@@ -430,7 +430,11 @@ class VocabularyPerformanceTest {
                         .onNodeWithTag("vocabulary_selected_count")
                         .assertTextEquals("Selected words: $entries")
                     measure(frames, entries, iteration, "confirmation") {
-                        dispatch(Event.RequestVocabularyBulkAction(VocabularyBulkAction.Delete))
+                        dispatch(
+                            Event.RequestVocabularyBulkAction(
+                                VocabularyBulkAction.SetStatus(VocabularyStatus.KNOWN, 999L)
+                            )
+                        )
                     }
                     compose.onNodeWithTag("vocabulary_bulk_dialog").assertIsDisplayed()
                     assertEquals(

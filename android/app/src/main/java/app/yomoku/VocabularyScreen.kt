@@ -30,8 +30,8 @@ internal fun VocabularyScreen(
     val state = view.vocabulary
     val query = state.query
     val frozen = state.selectingAll || state.confirmation != null || state.bulkError != null
-    val enabled = (!view.storageBusy || state.loading) && !frozen
-    val canSelect = !view.storageBusy && !frozen
+    val enabled = (!view.storageBusy || state.loading) && !frozen && state.wordStatus == null
+    val canSelect = !view.storageBusy && !frozen && state.wordStatus == null
     val selection = state.selection
     BackHandler(enabled = selection != null || frozen) {
         if (!view.storageBusy)
@@ -41,6 +41,7 @@ internal fun VocabularyScreen(
             )
     }
     VocabularyBulkDialog(view, dispatch)
+    VocabularyWordSheet(view, dispatch)
     // The core owns attempted/error state. Resuming visibility or unrelated work
     // can start an unattempted read, but cannot retry a failed page.
     LaunchedEffect(sessionKey, view.storageBusy, state.matchingCount, frozen) {
@@ -73,6 +74,7 @@ internal fun VocabularyScreen(
         }
     }
     Column(Modifier.fillMaxSize()) {
+        if (state.word == null) VocabularyWordStatusRetry(view, dispatch)
         LazyColumn(
             modifier = Modifier.weight(1f).testTag("vocabulary_scroll"),
             state = scroll,
@@ -137,7 +139,12 @@ internal fun VocabularyScreen(
                             enabled = canSelect,
                             onLongClickLabel = selectLabel,
                             onLongClick = { dispatch(Event.ToggleVocabularySelection(row.id)) },
-                            onClick = { dispatch(Event.ToggleVocabularySelection(row.id)) },
+                            onClick = {
+                                dispatch(
+                                    if (selection != null) Event.ToggleVocabularySelection(row.id)
+                                    else Event.OpenVocabularyWord(row.id)
+                                )
+                            },
                         )
                         .semantics { if (selection != null) selected = isSelected }
                         .testTag("vocabulary_row_${row.id.value}"),

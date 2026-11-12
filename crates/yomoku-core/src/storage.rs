@@ -51,6 +51,12 @@ pub enum StorageOperation {
     #[serde(skip)]
     #[cfg_attr(feature = "facet_typegen", facet(skip))]
     ApplyVocabularyBulk(crate::vocabulary::VocabularyBulkCommand),
+    #[serde(skip)]
+    #[cfg_attr(feature = "facet_typegen", facet(skip))]
+    LoadVocabularyWord(crate::document::VocabularyId),
+    #[serde(skip)]
+    #[cfg_attr(feature = "facet_typegen", facet(skip))]
+    SetVocabularyWordStatus(crate::vocabulary::VocabularyWordStatusCommand),
     /// Native read of per-document vocabulary distributions for Library.
     #[serde(skip)]
     #[cfg_attr(feature = "facet_typegen", facet(skip))]
@@ -151,6 +157,12 @@ pub enum StorageResult {
     #[serde(skip)]
     #[cfg_attr(feature = "facet_typegen", facet(skip))]
     VocabularyBulkApplied(crate::vocabulary::VocabularyBulkCommand),
+    #[serde(skip)]
+    #[cfg_attr(feature = "facet_typegen", facet(skip))]
+    VocabularyWordLoaded(Box<crate::vocabulary::VocabularyWordDetails>),
+    #[serde(skip)]
+    #[cfg_attr(feature = "facet_typegen", facet(skip))]
+    VocabularyWordStatusChanged(crate::vocabulary::VocabularyWordStatusCommand),
     #[serde(skip)]
     #[cfg_attr(feature = "facet_typegen", facet(skip))]
     Effective(#[cfg_attr(feature = "facet_typegen", facet(opaque))] EffectiveStorageResult),

@@ -9,6 +9,7 @@ import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.TimeUnit
 
 internal fun verifyVocabularyBridge() {
+    verifyVocabularyWordBridge()
     val directory = Files.createTempDirectory("yomoku-vocabulary-").toFile()
     val effects = LinkedBlockingQueue<Thread>()
     val listener =
@@ -221,15 +222,27 @@ internal fun verifyVocabularyBridge() {
                 dispatch(bridge, Event.SelectAllVocabulary, 1).vocabulary.selection ==
                     listOf(cat.id)
             )
-            val deletion =
+            val ignored =
                 checkNotNull(
-                    dispatch(bridge, Event.RequestVocabularyBulkAction(VocabularyBulkAction.Delete))
+                    dispatch(
+                            bridge,
+                            Event.RequestVocabularyBulkAction(
+                                VocabularyBulkAction.SetStatus(VocabularyStatus.IGNORED, now)
+                            ),
+                        )
                         .vocabulary
                         .confirmation
                 )
-            dispatch(bridge, Event.ConfirmVocabularyBulkAction(deletion), 1)
-            check(dispatch(bridge, Event.LoadVocabulary, 1).vocabulary.matchingCount == 0UL)
-            check(loadTokens().filter { it.surface == "猫" }.all { it.vocabulary == null })
+            dispatch(bridge, Event.ConfirmVocabularyBulkAction(ignored), 1)
+            check(
+                dispatch(bridge, Event.LoadVocabulary, 1).vocabulary.rows.single().status ==
+                    VocabularyStatus.IGNORED
+            )
+            check(
+                loadTokens()
+                    .filter { it.surface == "猫" }
+                    .all { it.vocabulary?.status == VocabularyStatus.IGNORED }
+            )
             navigate(Destination.LIBRARY)
             val counts =
                 checkNotNull(
@@ -238,18 +251,121 @@ internal fun verifyVocabularyBridge() {
                     )
                     .single()
                     .counts
-            check(counts?.new == 1UL && counts.learning == 0UL)
+            check(counts?.new == 1UL && counts.ignored == 1UL)
             navigate(Destination.STATISTICS)
-            val erased =
+            val statuses =
                 checkNotNull(dispatch(bridge, Event.LoadStatistics(now), 1).statistics.data)
                     .buckets
                     .last()
                     .values
                     .statuses
-            check(erased.new == 1UL && erased.learning == 0UL)
+            check(statuses.new == 1UL && statuses.ignored == 1UL)
             check(dictionary.calls.get() == calls)
         }
         check(effects.isEmpty())
+    } finally {
+        directory.deleteRecursively()
+    }
+}
+
+private fun verifyVocabularyWordBridge() {
+    val directory = Files.createTempDirectory("yomoku-vocabulary-word-").toFile()
+    val callbacks = LinkedBlockingQueue<Thread>()
+    val listener =
+        object : EffectsListener {
+            override fun onEffects(requests: ByteArray) {
+                callbacks.add(Thread.currentThread())
+            }
+
+            override fun onError(error: FfiError) {
+                throw error
+            }
+        }
+    val provider = HostDictionary()
+    val database = directory.resolve("db.sqlite3")
+    fun dispatch(bridge: NativeBridge, event: Event, count: Int = 0): ViewModel {
+        bridge.update(event.bincodeSerialize())
+        repeat(count) {
+            check(checkNotNull(callbacks.poll(60, TimeUnit.SECONDS)) != Thread.currentThread())
+        }
+        return ViewModel.bincodeDeserialize(bridge.view()).also { check(!it.storageBusy) }
+    }
+    try {
+        var savedId: VocabularyId? = null
+        NativeBridge(database.path, listener, provider).use { bridge ->
+            val book =
+                checkNotNull(
+                        dispatch(bridge, Event.CreatePaste("東京 東京 食べました 東京都"), 1).importSummary
+                    )
+                    .documentId
+            dispatch(bridge, Event.RequestDocumentDeletion(book))
+            dispatch(bridge, Event.ConfirmDocumentDeletion(book), 1)
+            dispatch(bridge, Event.SelectDestination(Destination.VOCABULARY))
+            val rows = dispatch(bridge, Event.LoadVocabulary, 1).vocabulary.rows
+            val tokyo = rows.single { it.surface == "東京" }
+            val before = database.readBytes()
+            provider.failWords = true
+            val failed = dispatch(bridge, Event.OpenVocabularyWord(tokyo.id), 1).vocabulary.word
+            check(failed?.error != null && failed.candidates == null)
+            provider.failWords = false
+            val loaded =
+                checkNotNull(dispatch(bridge, Event.RetryVocabularyWord, 1).vocabulary.word)
+            val candidates = checkNotNull(loaded.candidates)
+            check(loaded.row == tokyo && loaded.row.encounteredCount == 0UL)
+            check(candidates.words.isNotEmpty() && candidates.names.isNotEmpty())
+            dispatch(bridge, Event.DismissVocabularyWord)
+            val eaten = rows.single { it.surface == "食べました" }
+            savedId = eaten.id
+            val inflected =
+                checkNotNull(
+                    dispatch(bridge, Event.OpenVocabularyWord(eaten.id), 1)
+                        .vocabulary
+                        .word
+                        ?.candidates
+                )
+            check(inflected.dictionaryForm == "食べる" && inflected.words.isNotEmpty())
+            check(database.readBytes().contentEquals(before))
+            dispatch(bridge, Event.DismissVocabularyWord)
+            dispatch(
+                bridge,
+                Event.SetVocabularyQuery(
+                    VocabularyQuery("食べました", listOf(VocabularyStatus.NEW), VocabularySort.NEWEST)
+                ),
+                1,
+            )
+            dispatch(bridge, Event.OpenVocabularyWord(eaten.id), 1)
+            val command =
+                VocabularyWordStatusCommand(
+                    eaten.id,
+                    VocabularyStatus.LEARNING,
+                    System.currentTimeMillis(),
+                )
+            val changed = dispatch(bridge, Event.SetVocabularyWordStatus(command), 1)
+            check(changed.vocabulary.confirmation == null && changed.vocabulary.wordStatus == null)
+            check(changed.vocabulary.word?.row?.status == VocabularyStatus.LEARNING)
+            val filtered = dispatch(bridge, Event.LoadVocabulary, 1)
+            check(
+                filtered.vocabulary.matchingCount == 0UL &&
+                    filtered.vocabulary.word?.row?.id == eaten.id
+            )
+            check(filtered.vocabulary.word.candidates == inflected)
+            dispatch(
+                bridge,
+                Event.SetVocabularyWordStatus(
+                    command.copy(occurredAtUnixMs = command.occurredAtUnixMs + 1)
+                ),
+            )
+            check(ViewModel.bincodeDeserialize(bridge.view()).vocabulary.word == null)
+        }
+        NativeBridge(database.path, listener, provider).use { bridge ->
+            dispatch(bridge, Event.SelectDestination(Destination.VOCABULARY))
+            val row =
+                dispatch(bridge, Event.LoadVocabulary, 1).vocabulary.rows.single {
+                    it.id == savedId
+                }
+            check(row.status == VocabularyStatus.LEARNING && row.encounteredCount == 0UL)
+        }
+        check(callbacks.isEmpty())
     } finally {
         directory.deleteRecursively()
     }

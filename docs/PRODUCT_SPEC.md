@@ -101,7 +101,7 @@ If a chosen library does not support a required capability or architecture in cu
 - Graph 2: **five distinct time-series lines** of absolute number of registered word surfaces in each status, with statuses' graph colors; import-time registration causes jumps in New.
 - There are **two charts only**: cumulative reading occurrences and the five vocabulary statuses. No separate **Known forms** chart or distinct dictionary-form count. Keep the Known status line in Graph 2 and dictionary-form metadata required by reader/dictionary/history workflows.
 - No calendar heatmaps, goals, streaks, or per-source charts in v1 (keep source identities internally).
-- **Vocabulary deletion semantics differ from document deletion:** permanently deleting a vocabulary entry wipes its encounter/status history and recalculates history-based stats. If the form appears again later, it starts as New; existing documents are not automatically rescanned to recreate it just because a word was deleted.
+- Vocabulary entries cannot be deleted through the app. Document deletion preserves vocabulary and its encounter/status history. Previously deleted vocabulary is not automatically recovered.
 
 ### 4.2 Vocabulary browser
 
@@ -110,7 +110,9 @@ If a chosen library does not support a required capability or architecture in cu
 - Default sort newest registration first; alternatives frequency, last seen, alphabetical. The arrow reverses the complete ordering; choosing a criterion restores its default direction (descending metrics, ascending alphabetical).
 - Filter by five statuses; show total matching count; query 100 at a time with infinite scroll.
 - Search scrolls with the list, above selection actions, filters, sorting and matching count.
-- Select All is available only after entering selection mode, not below Matching Words. It targets **every matching row, including results not loaded on screen**. Bulk change status or permanently delete with confirmation. Record status change events; enforce delete/history semantics above.
+- A normal word tap opens the shared Word sheet. Long press enters selection mode; taps then toggle selection. Select All is available only in selection mode and targets **every matching row, including results not loaded on screen**. Bulk status changes require confirmation and record status events. There are no vocabulary deletion controls.
+- Vocabulary uses the reader's surface header, encounter count, expanded definitions/readings/grammatical labels, separate names, priority markers, and five-status pill. Anki actions remain in the reader. Analyze the exact saved surface temporarily with the bundled analyzer/profile, independently of source passages or book availability; show applicable full-surface/base results, then A/B components with the reader's ordering and deduplication. Lookup never registers words, persists analysis, records encounters, or changes status.
+- Choosing another status persists immediately without confirmation and keeps the sheet open, including when the word leaves the current filter. Choosing the current status, outside tap, and Back dismiss. Successful writes refresh Vocabulary results and invalidate Statistics, Library distributions, and retained reader statuses. Lookup failures require explicit Retry; failed status commands retain their original ID, status, and timestamp for Retry or Cancel, even after sheet dismissal. Ignore stale lookup responses after dismissal or navigation.
 
 ## 5. Historical Feed/Nostr requirements (no longer planned)
 

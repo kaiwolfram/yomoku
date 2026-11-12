@@ -14,6 +14,7 @@ mod statistics;
 mod statistics_preference;
 mod vocabulary;
 mod vocabulary_bulk;
+mod vocabulary_word;
 
 use crate::{
     completion::{
@@ -88,6 +89,7 @@ pub struct Model {
     vocabulary_request: Option<vocabulary::VocabularyRequest>,
     vocabulary_request_sequence: u64,
     vocabulary_failed_offset: Option<u64>,
+    vocabulary_word_request: Option<vocabulary_word::VocabularyWordRequest>,
     vocabulary_bulk_request: Option<(u64, vocabulary_bulk::VocabularyBulkRequest)>,
     vocabulary_select_all_query: Option<crate::vocabulary::VocabularyQuery>,
     statistics: crate::statistics::StatisticsState,
@@ -148,6 +150,12 @@ pub enum Event {
     SetVocabularyQuery(crate::vocabulary::VocabularyQuery),
     LoadMoreVocabulary,
     RetryVocabulary,
+    OpenVocabularyWord(crate::document::VocabularyId),
+    DismissVocabularyWord,
+    RetryVocabularyWord,
+    SetVocabularyWordStatus(crate::vocabulary::VocabularyWordStatusCommand),
+    RetryVocabularyWordStatus,
+    CancelVocabularyWordStatus,
     ToggleVocabularySelection(crate::document::VocabularyId),
     SelectAllVocabulary,
     RetryVocabularySelection,
@@ -291,6 +299,9 @@ pub enum Event {
     #[serde(skip)]
     #[cfg_attr(feature = "facet_typegen", facet(skip))]
     VocabularyBulkFinished(u64, StorageResult),
+    #[serde(skip)]
+    #[cfg_attr(feature = "facet_typegen", facet(skip))]
+    VocabularyWordFinished(u64, StorageResult),
     /// Native preparation only. No provider dispatch or live callback token.
     #[serde(skip)]
     #[cfg_attr(feature = "facet_typegen", facet(skip))]
@@ -422,6 +433,12 @@ impl App for Yomoku {
             {
                 return command.and(render::render());
             }
+            return command;
+        }
+        if let Event::VocabularyWordFinished(request_id, result) = event {
+            return self.finish_vocabulary_word(request_id, result, model);
+        }
+        if let Some(command) = self.update_vocabulary_word(&event, model) {
             return command;
         }
         if let Event::VocabularyBulkFinished(request_id, result) = event {
@@ -817,6 +834,7 @@ impl App for Yomoku {
                     || model.statistics_request.is_some()
                     || model.vocabulary_request.is_some()
                     || model.vocabulary_bulk_request.is_some()
+                    || model.vocabulary_word_request.is_some()
                 {
                     return Command::done();
                 }
@@ -871,6 +889,8 @@ impl App for Yomoku {
                     | StorageResult::StatisticsLoaded(_)
                     | StorageResult::StatisticsTimeframeLoaded(_)
                     | StorageResult::StatisticsTimeframeSaved(_)
+                    | StorageResult::VocabularyWordLoaded(_)
+                    | StorageResult::VocabularyWordStatusChanged(_)
                     | StorageResult::VocabularyLoaded(_)
                     | StorageResult::VocabularyMatchingIds(_)
                     | StorageResult::VocabularyBulkApplied(_)
@@ -1010,6 +1030,13 @@ impl App for Yomoku {
             | Event::LoadMoreVocabulary
             | Event::RetryVocabulary
             | Event::VocabularyFinished(..)
+            | Event::VocabularyWordFinished(..)
+            | Event::OpenVocabularyWord(_)
+            | Event::DismissVocabularyWord
+            | Event::RetryVocabularyWord
+            | Event::SetVocabularyWordStatus(_)
+            | Event::RetryVocabularyWordStatus
+            | Event::CancelVocabularyWordStatus
             | Event::VocabularyBulkFinished(..)
             | Event::ToggleVocabularySelection(_)
             | Event::SelectAllVocabulary
