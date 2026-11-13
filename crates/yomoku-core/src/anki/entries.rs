@@ -59,6 +59,15 @@ pub enum AnkiEntryPhase {
     Busy,
 }
 
+/// Only an explicit Settings request may configure a missing model.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
+#[repr(C)]
+pub enum AnkiSetupRequest {
+    Refresh,
+    Configure,
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
 pub struct AnkiEntryView {

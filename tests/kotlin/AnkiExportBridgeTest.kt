@@ -23,8 +23,25 @@ internal fun verifyAnkiExportBridge() {
             }
         }
     fun view(bridge: NativeBridge) = ViewModel.bincodeDeserialize(bridge.view())
-    fun renders(bytes: ByteArray) {
-        check(Requests.bincodeDeserialize(bytes).value.all { it.effect is ShellEffect.Render })
+    fun renders(bridge: NativeBridge, bytes: ByteArray) {
+        for (request in Requests.bincodeDeserialize(bytes).value) {
+            when (val effect = request.effect) {
+                is ShellEffect.Render -> Unit
+                is ShellEffect.AnkiExportPreflight -> {
+                    // Deck saves now continue Settings setup. This host fixture has no provider.
+                    check(effect.value.surface.isEmpty())
+                    renders(
+                        bridge,
+                        bridge.resolve(
+                            request.id,
+                            AnkiPreflightResult.Failed(AnkiExportError.PROVIDERUNAVAILABLE)
+                                .bincodeSerialize(),
+                        ),
+                    )
+                }
+                else -> error("Unexpected provider write: ${request.effect}")
+            }
+        }
     }
     fun send(bridge: NativeBridge, event: Event): List<Request> {
         val bytes = event.bincodeSerialize()
@@ -38,7 +55,7 @@ internal fun verifyAnkiExportBridge() {
             if (predicate(snapshot)) return snapshot
             val remaining = deadline - System.nanoTime()
             check(remaining > 0) { "Native Anki state timed out: ${snapshot.ankiExport}" }
-            renders(checkNotNull(callbacks.poll(remaining, TimeUnit.NANOSECONDS)))
+            renders(bridge, checkNotNull(callbacks.poll(remaining, TimeUnit.NANOSECONDS)))
         }
     }
     try {
@@ -128,6 +145,7 @@ internal fun verifyAnkiExportBridge() {
                     val operation = (preflight.effect as ShellEffect.AnkiExportPreflight).value
                     check(operation.surface == "猫" && operation.deckId == Long.MAX_VALUE)
                     renders(
+                        bridge,
                         bridge.resolve(
                             preflight.id,
                             AnkiPreflightResult.Complete(
@@ -146,7 +164,7 @@ internal fun verifyAnkiExportBridge() {
                                     )
                                 )
                                 .bincodeSerialize(),
-                        )
+                        ),
                     )
                     val checked = checkNotNull(view(bridge).ankiExport)
                     check(
@@ -213,7 +231,7 @@ internal fun verifyAnkiExportBridge() {
                             )
                             AnkiLiveResult.NoteUncertain(Long.MAX_VALUE)
                         }
-                    renders(bridge.resolve(live.id, result.bincodeSerialize()))
+                    renders(bridge, bridge.resolve(live.id, result.bincodeSerialize()))
                     val expected =
                         if (create) AnkiExportPhase.ModelCreated(9007199254740993L)
                         else AnkiExportPhase.NoteUncertain(Long.MAX_VALUE)

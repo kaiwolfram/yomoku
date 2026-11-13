@@ -20,7 +20,7 @@ fn finish(model: &mut Model, id: u64, result: StorageResult) {
         .collect();
     assert!(effects
         .iter()
-        .all(|effect| matches!(effect, Effect::Render(_))));
+        .all(|effect| matches!(effect, Effect::Render(_) | Effect::AnkiExportPreflight(_))));
 }
 
 fn quiet(model: &mut Model, event: Event) {
@@ -266,4 +266,51 @@ fn anki_settings_callbacks_preserve_reader_and_frozen_export() {
             AnkiSettingsPhase::Unloaded
         );
     }
+}
+
+#[test]
+fn only_a_successful_explicit_deck_save_authorizes_model_configuration() {
+    let mut model = loaded(None);
+    request(&mut model, Event::SetAnkiDefaultDeck(Some(7)));
+    let mut completed = Yomoku.update(
+        Event::AnkiSettingsFinished(
+            2,
+            StorageResult::AnkiDefaultDeckSaved(Some(7.try_into().unwrap())),
+        ),
+        &mut model,
+    );
+    let mut query = completed
+        .effects()
+        .find_map(|effect| match effect {
+            Effect::AnkiExportPreflight(request) => Some(request),
+            _ => None,
+        })
+        .expect("a saved deck continues setup");
+    query
+        .resolve(crate::anki::AnkiPreflightResult::Complete(
+            crate::anki::AnkiPreflightObservation {
+                decks: vec![crate::anki::AnkiPreflightDeck {
+                    id: 7,
+                    filtered: false,
+                }],
+                duplicate_note_ids: vec![],
+                models: vec![],
+            },
+        ))
+        .unwrap();
+    let event = completed.events().next().unwrap();
+    drop(Yomoku.update(event, &mut model));
+    assert_eq!(
+        model.anki_live_progress(),
+        Some(crate::anki::AnkiLiveProgress::Ready)
+    );
+
+    // A readback after a lost save response observes the saved preference but has no write permit.
+    let mut restarted = loaded(Some(7));
+    assert!(restarted.anki_live.is_none());
+    assert!(Yomoku
+        .update(Event::LoadAnkiSettings, &mut restarted)
+        .effects()
+        .next()
+        .is_none());
 }

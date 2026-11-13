@@ -142,7 +142,8 @@ class AnkiInstalledProviderTest {
             check(setup.ankiSetup !is AnkiSetupPhase.Failed) {
                 "Real provider setup failed: ${setup.ankiSetup}"
             }
-            if (setup.ankiSetup == AnkiSetupPhase.Missing) send(Event.CreateAnkiModel)
+            if (setup.ankiSetup == AnkiSetupPhase.Missing)
+                send(Event.CheckAnkiSetup(app.yomoku.shared.AnkiSetupRequest.CONFIGURE))
             await { it.ankiSetup == AnkiSetupPhase.Ready }
             send(Event.CloseSettings)
             send(Event.CreatePaste("猫。"))

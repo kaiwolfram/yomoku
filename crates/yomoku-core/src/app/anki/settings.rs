@@ -76,7 +76,14 @@ impl Yomoku {
                         model.anki_settings.storage_error = Some(error);
                     }
                 }
-                return Some(render::render());
+                let setup = if matches!(request, SettingsRequest::Save(Some(_)))
+                    && model.anki_settings.phase == Ready
+                {
+                    self.check_anki_setup(model, true)
+                } else {
+                    Command::done()
+                };
+                return Some(render::render().and(setup));
             }
             _ => return None,
         };
@@ -95,6 +102,8 @@ impl Yomoku {
                 StorageOperation::LoadAnkiSettings
             }
             SettingsRequest::Save(deck) => {
+                model.anki_setup.phase = crate::anki::AnkiSetupPhase::Unchecked;
+                model.anki_entries.clear();
                 model.anki_settings.phase = Saving;
                 StorageOperation::SaveAnkiDefaultDeck(deck)
             }

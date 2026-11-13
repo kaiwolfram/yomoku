@@ -46,7 +46,6 @@ internal fun SettingsScreen(
     dispatch: (Event) -> Unit,
     ankiDecks: AnkiDeckDiscoveryState = AnkiDeckDiscoveryState.Unchecked,
     checkAnkiProvider: () -> Unit = {},
-    requestAnkiPermission: () -> Unit = {},
     ankiBrowser: AnkiNoteBrowser? = null,
 ) {
     var showNotices by rememberSaveable { mutableStateOf(false) }
@@ -183,9 +182,11 @@ internal fun SettingsScreen(
             ankiDecks,
             dispatch,
             checkAnkiProvider,
-            requestAnkiPermission,
+            setupBusy =
+                view.ankiSetup == app.yomoku.shared.AnkiSetupPhase.Checking ||
+                    view.ankiExport != null,
         )
-        AnkiModelSetupPanel(view.ankiSetup, dispatch, enabled = view.ankiExport == null)
+        AnkiModelSetupPanel(view.ankiSetup)
         view.ankiExport?.let { AnkiExportPanel(it, dispatch, ankiBrowser) }
         HorizontalDivider()
         SettingsSectionHeading(stringResource(R.string.settings_about))

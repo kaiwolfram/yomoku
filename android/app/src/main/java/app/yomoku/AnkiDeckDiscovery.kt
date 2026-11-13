@@ -57,6 +57,11 @@ internal class AnkiDeckDiscovery(
         }
     }
 
+    fun permissionDenied() {
+        check(Looper.myLooper() == Looper.getMainLooper())
+        if (!closed) state = AnkiDeckDiscoveryState.Failed(AnkiReadError.PermissionDenied)
+    }
+
     override fun close() {
         check(Looper.myLooper() == Looper.getMainLooper())
         closed = true

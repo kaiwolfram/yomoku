@@ -176,7 +176,10 @@ fn restart_has_no_recovery_or_automatic_write_and_setup_is_a_fresh_provider_quer
     assert!(restarted.prepared_anki_export().is_none());
     restarted.anki_settings.phase = AnkiSettingsPhase::Ready;
     restarted.anki_settings.default_deck_id = Some(7);
-    let mut query = Yomoku.update(Event::CheckAnkiSetup, &mut restarted);
+    let mut query = Yomoku.update(
+        Event::CheckAnkiSetup(crate::anki::AnkiSetupRequest::Refresh),
+        &mut restarted,
+    );
     assert!(query
         .effects()
         .any(|effect| matches!(effect, Effect::AnkiExportPreflight(_))));

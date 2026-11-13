@@ -64,7 +64,6 @@ internal fun YomokuApp(
     libraryActionsEnabled: Boolean = true,
     ankiDecks: AnkiDeckDiscoveryState = AnkiDeckDiscoveryState.Unchecked,
     checkAnkiProvider: () -> Unit = {},
-    requestAnkiPermission: () -> Unit = {},
     ankiBrowser: AnkiNoteBrowser? = null,
     onImportBook: (() -> Unit)? = null,
 ) {
@@ -191,7 +190,6 @@ internal fun YomokuApp(
                                 dispatch,
                                 ankiDecks,
                                 checkAnkiProvider,
-                                requestAnkiPermission,
                                 ankiBrowser,
                             )
                         view.contentRoute == ContentRoute.PASTE ->

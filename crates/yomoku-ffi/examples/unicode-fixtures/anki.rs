@@ -35,8 +35,8 @@ pub fn exchange(dir: &Path, writing: bool) -> Result<(), Box<dyn Error>> {
         segment_index: u64::MAX,
     });
     for (index, event) in [
-        Event::CheckAnkiSetup,
-        Event::CreateAnkiModel,
+        Event::CheckAnkiSetup(yomoku_core::anki::AnkiSetupRequest::Refresh),
+        Event::CheckAnkiSetup(yomoku_core::anki::AnkiSetupRequest::Configure),
         Event::LoadReaderAnkiEntries(entry_selection),
         Event::AddReaderAnkiEntry {
             selection: entry_selection,

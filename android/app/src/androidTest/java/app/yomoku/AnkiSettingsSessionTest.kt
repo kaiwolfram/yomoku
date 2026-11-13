@@ -40,13 +40,14 @@ class AnkiSettingsSessionTest {
         }
     }
 
-    private fun open() {
+    private fun open(needsPermission: () -> Boolean = { false }) {
         directory.mkdirs()
         main {
             core =
                 CoreSession(
                     database.path,
                     sudachiDictionaryProvider(instrumentation.targetContext),
+                    needsAnkiPermission = needsPermission,
                     readAnkiDecks = {
                         assertNotEquals(Looper.getMainLooper(), Looper.myLooper())
                         reads.incrementAndGet()
@@ -135,6 +136,70 @@ class AnkiSettingsSessionTest {
             open()
             await { it.ankiSettings.phase == AnkiSettingsPhase.READY }
             assertNull(core.view.ankiSettings.defaultDeckId)
+        } finally {
+            close()
+            directory.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun permissionApprovalContinuesOnceAndDenialWaitsForExplicitRetry() {
+        var permissionMissing = true
+        var prompts = 0
+        open { permissionMissing }
+        try {
+            main {
+                core.configureAnki { prompts++ }
+                core.configureAnki { prompts++ }
+            }
+            assertEquals(1, prompts)
+            assertEquals(0, reads.get())
+            main { core.ankiPermissionResult(false) }
+            assertEquals(
+                AnkiDeckDiscoveryState.Failed(AnkiReadError.PermissionDenied),
+                core.ankiDecks.state,
+            )
+            main { core.ankiPermissionResult(true) } // unsolicited/stale callback
+            assertEquals(0, reads.get())
+            assertEquals(1, prompts)
+            main { core.configureAnki { prompts++ } }
+            assertEquals(2, prompts)
+            // Replacing the composition does not restart the retained permission request.
+            main {
+                compose.activity.setContent { SettingsScreen(core.view, core::dispatch) }
+                core.configureAnki { prompts++ }
+                permissionMissing = false
+                core.ankiPermissionResult(true)
+                core.ankiPermissionResult(true)
+            }
+            compose.waitUntil(30_000) { core.ankiDecks.state is AnkiDeckDiscoveryState.Ready }
+            assertEquals(1, reads.get())
+            assertEquals(2, prompts)
+            main { core.configureAnki { prompts++ } }
+            compose.waitUntil(30_000) {
+                reads.get() == 2 && core.ankiDecks.state is AnkiDeckDiscoveryState.Ready
+            }
+            assertEquals(2, prompts)
+        } finally {
+            close()
+            directory.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun permissionApprovalAfterLeavingSettingsDoesNotRestartSetup() {
+        open { true }
+        try {
+            var prompts = 0
+            main {
+                core.configureAnki { prompts++ }
+                core.dispatch(Event.CloseSettings)
+                core.ankiPermissionResult(true)
+                core.dispatch(Event.OpenSettings)
+            }
+            assertEquals(1, prompts)
+            assertEquals(0, reads.get())
+            assertEquals(AnkiDeckDiscoveryState.Unchecked, core.ankiDecks.state)
         } finally {
             close()
             directory.deleteRecursively()

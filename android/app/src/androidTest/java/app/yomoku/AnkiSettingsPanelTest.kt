@@ -19,7 +19,6 @@ class AnkiSettingsPanelTest {
     private val discovery = mutableStateOf<AnkiDeckDiscoveryState>(AnkiDeckDiscoveryState.Unchecked)
     private val events = mutableListOf<Event>()
     private var checks = 0
-    private var permissions = 0
 
     private fun render() {
         compose.setContent {
@@ -29,7 +28,6 @@ class AnkiSettingsPanelTest {
                     discovery.value,
                     events::add,
                     { checks++ },
-                    { permissions++ },
                 )
             }
         }
@@ -40,12 +38,10 @@ class AnkiSettingsPanelTest {
         render()
         assertTrue(events.isEmpty())
         assertEquals(0, checks)
-        assertEquals(0, permissions)
         compose.onNodeWithText("No default deck configured.").assertDoesNotExist()
         compose.onNodeWithTag("anki_settings_load").performClick()
         assertEquals(Event.LoadAnkiSettings, events.last())
-        compose.onNodeWithTag("anki_decks_check").performClick()
-        assertEquals(1, checks)
+        compose.onNodeWithTag("anki_decks_check").assertIsNotEnabled()
         compose.runOnUiThread {
             settings.value = AnkiSettingsView(AnkiSettingsPhase.READY, null, null)
             discovery.value =
@@ -83,8 +79,11 @@ class AnkiSettingsPanelTest {
             compose.runOnUiThread { discovery.value = AnkiDeckDiscoveryState.Failed(error) }
             compose.waitForIdle()
             if (error == AnkiReadError.PermissionDenied) {
-                compose.onNodeWithTag("anki_permission_request").performClick()
-                assertEquals(1, permissions)
+                compose
+                    .onNodeWithText(
+                        "AnkiDroid database access lets Yomoku list decks, check existing notes and export words. You can keep reading without granting access."
+                    )
+                    .assertExists()
             } else compose.onNodeWithTag("anki_permission_request").assertDoesNotExist()
         }
         compose.runOnUiThread {
@@ -101,7 +100,6 @@ class AnkiSettingsPanelTest {
         compose.onNodeWithTag("anki_settings_load").performClick()
         assertEquals(listOf(Event.RetryAnkiSettings), events)
         assertEquals(0, checks)
-        assertEquals(1, permissions)
     }
 
     @Test

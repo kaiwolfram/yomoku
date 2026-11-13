@@ -31,8 +31,8 @@ internal fun verifyAnkiSettingsBridge(fixtures: String) {
         )
     val entryActions =
         listOf(
-            Event.CheckAnkiSetup,
-            Event.CreateAnkiModel,
+            Event.CheckAnkiSetup(AnkiSetupRequest.REFRESH),
+            Event.CheckAnkiSetup(AnkiSetupRequest.CONFIGURE),
             Event.LoadReaderAnkiEntries(entrySelection),
             Event.AddReaderAnkiEntry(
                 entrySelection,
@@ -119,11 +119,28 @@ internal fun verifyAnkiSettingsBridge(fixtures: String) {
             }
         }
     fun view(bridge: NativeBridge) = ViewModel.bincodeDeserialize(bridge.view())
-    fun renders(bytes: ByteArray) {
-        check(Requests.bincodeDeserialize(bytes).value.all { it.effect is ShellEffect.Render })
+    fun renders(bridge: NativeBridge, bytes: ByteArray) {
+        for (request in Requests.bincodeDeserialize(bytes).value) {
+            when (val effect = request.effect) {
+                is ShellEffect.Render -> Unit
+                is ShellEffect.AnkiExportPreflight -> {
+                    // Deck saves now continue Settings setup. This host fixture has no provider.
+                    check(effect.value.surface.isEmpty())
+                    renders(
+                        bridge,
+                        bridge.resolve(
+                            request.id,
+                            AnkiPreflightResult.Failed(AnkiExportError.PROVIDERUNAVAILABLE)
+                                .bincodeSerialize(),
+                        ),
+                    )
+                }
+                else -> error("Unexpected provider write: ${request.effect}")
+            }
+        }
     }
     fun send(bridge: NativeBridge, event: Event) {
-        renders(bridge.update(event.bincodeSerialize()))
+        renders(bridge, bridge.update(event.bincodeSerialize()))
     }
     fun awaitReady(bridge: NativeBridge, expected: Long?): ViewModel {
         val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(30)
@@ -136,7 +153,7 @@ internal fun verifyAnkiSettingsBridge(fixtures: String) {
             }
             val remaining = deadline - System.nanoTime()
             check(remaining > 0) { "Settings timed out: ${view.ankiSettings}" }
-            renders(checkNotNull(callbacks.poll(remaining, TimeUnit.NANOSECONDS)))
+            renders(bridge, checkNotNull(callbacks.poll(remaining, TimeUnit.NANOSECONDS)))
         }
     }
     try {
@@ -158,7 +175,10 @@ internal fun verifyAnkiSettingsBridge(fixtures: String) {
                 check(view(bridge).ankiSettings.defaultDeckId == null)
                 send(bridge, Event.SetAnkiDefaultDeck(Long.MAX_VALUE))
                 val saved = awaitReady(bridge, Long.MAX_VALUE)
-                check(saved.copy(ankiSettings = before.ankiSettings) == before)
+                check(
+                    saved.copy(ankiSettings = before.ankiSettings, ankiSetup = before.ankiSetup) ==
+                        before
+                )
                 send(bridge, Event.CloseSettings)
                 send(bridge, Event.OpenSettings)
                 send(bridge, Event.LoadAnkiSettings)

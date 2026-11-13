@@ -11,6 +11,10 @@ internal class CoreSessionOwner(application: Application) : AndroidViewModel(app
             sudachiDictionaryProvider(application),
             readAnkiPreflight = AnkiPreflightReader(AnkiProviderReader(application))::read,
             invokeAnkiLive = AnkiLiveDispatcher(application)::invoke,
+            needsAnkiPermission = {
+                val environment = AndroidAnkiProviderEnvironment(application)
+                environment.provider() != null && !environment.hasPermission()
+            },
             readAnkiDecks = AnkiProviderReader(application)::decks,
             resolveAnkiNotes = AnkiProviderReader(application)::existingNotesIntent,
             resolveAnkiNote = AnkiProviderReader(application)::existingNoteIntent,

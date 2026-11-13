@@ -27,7 +27,7 @@ internal fun AnkiSettingsPanel(
     discovery: AnkiDeckDiscoveryState,
     dispatch: (Event) -> Unit,
     checkProvider: () -> Unit,
-    requestPermission: () -> Unit,
+    setupBusy: Boolean = false,
 ) {
     Column(Modifier.testTag("anki_settings"), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         SettingsSectionHeading(stringResource(R.string.anki_settings_title))
@@ -86,7 +86,7 @@ internal fun AnkiSettingsPanel(
         }
         TextButton(
             onClick = checkProvider,
-            enabled = discovery != AnkiDeckDiscoveryState.Loading,
+            enabled = ready && !setupBusy && discovery != AnkiDeckDiscoveryState.Loading,
             modifier = Modifier.testTag("anki_decks_check"),
         ) {
             Text(stringResource(R.string.anki_settings_check))
@@ -101,12 +101,6 @@ internal fun AnkiSettingsPanel(
                 )
                 if (discovery.error == AnkiReadError.PermissionDenied) {
                     Text(stringResource(R.string.anki_settings_permission_reason))
-                    TextButton(
-                        onClick = requestPermission,
-                        modifier = Modifier.testTag("anki_permission_request"),
-                    ) {
-                        Text(stringResource(R.string.anki_settings_permission))
-                    }
                 }
             }
             is AnkiDeckDiscoveryState.Ready -> {
@@ -159,11 +153,7 @@ private fun AnkiReadError.messageResource(): Int =
     }
 
 @Composable
-internal fun AnkiModelSetupPanel(
-    phase: app.yomoku.shared.AnkiSetupPhase,
-    dispatch: (Event) -> Unit,
-    enabled: Boolean = true,
-) {
+internal fun AnkiModelSetupPanel(phase: app.yomoku.shared.AnkiSetupPhase) {
     Column(Modifier.testTag("anki_model_setup"), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(
             stringResource(
@@ -176,21 +166,5 @@ internal fun AnkiModelSetupPanel(
                 }
             )
         )
-        if (phase == app.yomoku.shared.AnkiSetupPhase.Missing) {
-            TextButton(
-                onClick = { dispatch(Event.CreateAnkiModel) },
-                enabled = enabled,
-                modifier = Modifier.testTag("anki_model_create"),
-            ) {
-                Text(stringResource(R.string.anki_export_create))
-            }
-        } else if (phase != app.yomoku.shared.AnkiSetupPhase.Checking) {
-            TextButton(
-                onClick = { dispatch(Event.CheckAnkiSetup) },
-                modifier = Modifier.testTag("anki_model_check"),
-            ) {
-                Text(stringResource(R.string.anki_export_check))
-            }
-        }
     }
 }

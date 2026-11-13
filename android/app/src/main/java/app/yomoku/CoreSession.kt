@@ -74,6 +74,7 @@ internal class CoreSession(
     private val invokeAnkiLive: (AnkiLiveOperation) -> AnkiLiveResult = {
         AnkiLiveResult.NoSubmission
     },
+    private val needsAnkiPermission: () -> Boolean = { false },
     readAnkiDecks: () -> AnkiReadResult<List<AnkiProviderDeck>> = {
         AnkiReadResult.Failed(AnkiReadError.ProviderUnavailable)
     },
@@ -171,11 +172,40 @@ internal class CoreSession(
             }
         }
 
+    private var ankiPermissionPending = false
+
+    fun configureAnki(requestPermission: () -> Unit) {
+        requireMainThread()
+        if (
+            closing ||
+                isClosed ||
+                !view.settingsOpen ||
+                ankiPermissionPending ||
+                ankiDecks.state == AnkiDeckDiscoveryState.Loading ||
+                view.ankiSettings.phase != app.yomoku.shared.AnkiSettingsPhase.READY ||
+                view.ankiExport != null
+        )
+            return
+        if (needsAnkiPermission()) {
+            ankiPermissionPending = true
+            requestPermission()
+        } else checkAnkiDecks()
+    }
+
+    fun ankiPermissionResult(granted: Boolean) {
+        requireMainThread()
+        if (!ankiPermissionPending || closing || isClosed) return
+        ankiPermissionPending = false
+        if (granted) checkAnkiDecks() else ankiDecks.permissionDenied()
+    }
+
     fun checkAnkiDecks() {
         requireMainThread()
         if (!closing && !isClosed && view.settingsOpen) {
+            if (ankiDecks.state == AnkiDeckDiscoveryState.Loading) return
             ankiDecks.check()
-            refreshAnkiSetup()
+            checkedAnkiDeck = view.ankiSettings.defaultDeckId
+            send(Event.CheckAnkiSetup(app.yomoku.shared.AnkiSetupRequest.CONFIGURE))
         }
     }
 
@@ -211,7 +241,7 @@ internal class CoreSession(
                     view.ankiExport == null
             ) {
                 checkedAnkiDeck = deck
-                send(Event.CheckAnkiSetup)
+                send(Event.CheckAnkiSetup(app.yomoku.shared.AnkiSetupRequest.REFRESH))
             }
         }
     }

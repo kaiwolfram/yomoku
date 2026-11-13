@@ -13,6 +13,7 @@ pub(in crate::app) struct SetupState {
     generation: u64,
     deck: Option<i64>,
     pub live_deck: Option<i64>,
+    configure: bool,
 }
 
 impl Model {
@@ -156,47 +157,77 @@ impl Model {
 }
 
 impl Yomoku {
+    pub(in crate::app) fn check_anki_setup(
+        &self,
+        model: &mut Model,
+        configure: bool,
+    ) -> Command<Effect, Event> {
+        if model.anki_settings.phase != AnkiSettingsPhase::Ready
+            || model.anki_operation_busy()
+            || (model.anki_setup.phase == AnkiSetupPhase::Checking
+                && (!configure || model.anki_setup.configure))
+        {
+            return Command::done();
+        }
+        let Some(deck) = model.anki_settings.default_deck_id else {
+            model.anki_setup.phase = AnkiSetupPhase::Unchecked;
+            model.anki_entries.clear();
+            return Command::done();
+        };
+        let Some(id) = model.anki_setup.generation.checked_add(1) else {
+            return Command::done();
+        };
+        model.anki_setup.generation = id;
+        model.anki_setup.configure = configure;
+        model.anki_setup.deck = Some(deck);
+        model.anki_setup.phase = AnkiSetupPhase::Checking;
+        // Retire observations and callbacks before querying the external collection.
+        model.anki_entries.clear();
+        // A model check has no selected word and never checks empty-word duplicates.
+        let operation = AnkiPreflightOperation {
+            surface: String::new(),
+            reading: String::new(),
+            deck_id: deck,
+            layout: Box::new((&AnkiModelLayout::yomoku()).into()),
+        };
+        Command::request_from_shell(operation)
+            .then_send(move |result| Event::AnkiSetupChecked(id, deck, result))
+    }
+
+    fn create_anki_model(&self, model: &mut Model) -> Command<Effect, Event> {
+        let Some(deck) = model.anki_setup.deck else {
+            return Command::done();
+        };
+        let Some(id) = model.anki_preparation_sequence.checked_add(1) else {
+            return Command::done();
+        };
+        model.anki_preparation_sequence = id;
+        model.prepared_anki_export = None;
+        model.anki_export_preflight = None;
+        model.anki_setup.live_deck = Some(deck);
+        let intent = AnkiLiveIntent::Model(Box::new(
+            AnkiModelCreation::new(AnkiModelLayout::yomoku()).expect("built-in layout"),
+        ));
+        self.begin_anki_intent(model, intent)
+    }
+
     pub(super) fn update_anki_entries(
         &self,
         event: &Event,
         model: &mut Model,
     ) -> Option<Command<Effect, Event>> {
         match event {
-            Event::CheckAnkiSetup => {
-                if model.anki_settings.phase != AnkiSettingsPhase::Ready
-                    || model.anki_operation_busy()
-                {
+            Event::CheckAnkiSetup(request) => {
+                if *request == AnkiSetupRequest::Configure && !model.settings_open {
                     return Some(Command::done());
                 }
-                let Some(deck) = model.anki_settings.default_deck_id else {
-                    model.anki_setup.phase = AnkiSetupPhase::Unchecked;
-                    model.anki_entries.clear();
-                    return Some(Command::done());
-                };
-                let Some(id) = model.anki_setup.generation.checked_add(1) else {
-                    return Some(Command::done());
-                };
-                model.anki_setup.generation = id;
-                model.anki_setup.deck = Some(deck);
-                model.anki_setup.phase = AnkiSetupPhase::Checking;
-                // Retire observations and callbacks before querying the external collection.
-                model.anki_entries.clear();
-                // A model check has no selected word and never checks empty-word duplicates.
-                let operation = AnkiPreflightOperation {
-                    surface: String::new(),
-                    reading: String::new(),
-                    deck_id: deck,
-                    layout: Box::new((&AnkiModelLayout::yomoku()).into()),
-                };
-                Some(
-                    Command::request_from_shell(operation)
-                        .then_send(move |result| Event::AnkiSetupChecked(id, deck, result)),
-                )
+                Some(self.check_anki_setup(model, *request == AnkiSetupRequest::Configure))
             }
             Event::AnkiSetupChecked(id, deck, result) => {
                 if *id != model.anki_setup.generation
                     || model.anki_settings.default_deck_id != Some(*deck)
                     || model.anki_setup.phase != AnkiSetupPhase::Checking
+                    || model.anki_settings.phase != AnkiSettingsPhase::Ready
                 {
                     return Some(Command::done());
                 }
@@ -213,6 +244,14 @@ impl Yomoku {
                     },
                     AnkiPreflightResult::Failed(error) => AnkiSetupPhase::Failed(*error),
                 };
+                let configure = std::mem::take(&mut model.anki_setup.configure);
+                if configure
+                    && model.anki_setup.phase == AnkiSetupPhase::Missing
+                    && model.anki_settings.phase == AnkiSettingsPhase::Ready
+                    && model.anki_export_gate_open()
+                {
+                    return Some(self.create_anki_model(model));
+                }
                 if model.anki_setup.phase == AnkiSetupPhase::Ready {
                     if let Some(selection) = model.effective_reader.word_state().selection {
                         // Refresh even when Compose coalesces Checking -> Ready into one frame.
@@ -223,30 +262,6 @@ impl Yomoku {
                     }
                 }
                 Some(Command::done())
-            }
-            Event::CreateAnkiModel => {
-                if !model.settings_open
-                    || model.anki_settings.phase != AnkiSettingsPhase::Ready
-                    || model.anki_setup.phase != AnkiSetupPhase::Missing
-                    || !model.anki_export_gate_open()
-                    || model.anki_setup.deck != model.anki_settings.default_deck_id
-                {
-                    return Some(Command::done());
-                }
-                let Some(deck) = model.anki_setup.deck else {
-                    return Some(Command::done());
-                };
-                let Some(id) = model.anki_preparation_sequence.checked_add(1) else {
-                    return Some(Command::done());
-                };
-                model.anki_preparation_sequence = id;
-                model.prepared_anki_export = None;
-                model.anki_export_preflight = None;
-                model.anki_setup.live_deck = Some(deck);
-                let intent = AnkiLiveIntent::Model(Box::new(
-                    AnkiModelCreation::new(AnkiModelLayout::yomoku()).ok()?,
-                ));
-                Some(self.begin_anki_intent(model, intent))
             }
             Event::LoadReaderAnkiEntries(selection) => {
                 if model.anki_settings.phase != AnkiSettingsPhase::Ready
@@ -453,7 +468,10 @@ mod tests {
     fn return_queries_can_refresh_during_reader_io_but_cannot_start_a_write() {
         let (mut model, selection) = configured();
         model.storage_busy = true;
-        update(&mut model, Event::CheckAnkiSetup);
+        update(
+            &mut model,
+            Event::CheckAnkiSetup(crate::anki::AnkiSetupRequest::Refresh),
+        );
         let generation = model.anki_setup.generation;
         update(
             &mut model,
@@ -514,7 +532,10 @@ mod tests {
             Event::AnkiEntryChecked(Box::new(old.clone()), observation(vec![88], true)),
         );
         for ids in [vec![], vec![99]] {
-            update(&mut model, Event::CheckAnkiSetup);
+            update(
+                &mut model,
+                Event::CheckAnkiSetup(crate::anki::AnkiSetupRequest::Refresh),
+            );
             assert!(model.anki_entries.is_empty());
             let generation = model.anki_setup.generation;
             update(
@@ -697,17 +718,31 @@ mod tests {
         let mut model = Model::default();
         model.anki_settings.phase = AnkiSettingsPhase::Ready;
         model.anki_settings.default_deck_id = Some(7);
-        update(&mut model, Event::CheckAnkiSetup);
+        update(
+            &mut model,
+            Event::CheckAnkiSetup(crate::anki::AnkiSetupRequest::Refresh),
+        );
         let generation = model.anki_setup.generation;
         update(
             &mut model,
             Event::AnkiSetupChecked(generation, 7, observation(vec![], false)),
         );
         assert_eq!(model.anki_setup.phase, AnkiSetupPhase::Missing);
-        update(&mut model, Event::CreateAnkiModel);
+        update(
+            &mut model,
+            Event::CheckAnkiSetup(crate::anki::AnkiSetupRequest::Configure),
+        );
         assert!(model.anki_live.is_none());
         model.settings_open = true;
-        update(&mut model, Event::CreateAnkiModel);
+        update(
+            &mut model,
+            Event::CheckAnkiSetup(crate::anki::AnkiSetupRequest::Configure),
+        );
+        let generation = model.anki_setup.generation;
+        update(
+            &mut model,
+            Event::AnkiSetupChecked(generation, 7, observation(vec![], false)),
+        );
         assert_eq!(model.anki_live_progress(), Some(AnkiLiveProgress::Ready));
         assert!(model.prepared_anki_export.is_none());
         assert_eq!(model.anki_export_view().unwrap().deck_id, 7);
@@ -719,6 +754,117 @@ mod tests {
         assert_eq!(model.anki_setup.phase, AnkiSetupPhase::Ready);
         assert!(model.anki_export_gate_open());
         assert!(model.anki_export_view().is_none());
+    }
+
+    #[test]
+    fn configuration_authorization_is_one_request_and_deck_even_after_navigation() {
+        let mut model = Model {
+            settings_open: true,
+            ..Model::default()
+        };
+        model.anki_settings.phase = AnkiSettingsPhase::Ready;
+        model.anki_settings.default_deck_id = Some(7);
+        update(&mut model, Event::CheckAnkiSetup(AnkiSetupRequest::Refresh));
+        let old = model.anki_setup.generation;
+        update(
+            &mut model,
+            Event::CheckAnkiSetup(AnkiSetupRequest::Configure),
+        );
+        let current = model.anki_setup.generation;
+        assert_ne!(old, current);
+        for request in [AnkiSetupRequest::Configure, AnkiSetupRequest::Refresh] {
+            update(&mut model, Event::CheckAnkiSetup(request));
+            assert_eq!(current, model.anki_setup.generation);
+        }
+        update(
+            &mut model,
+            Event::AnkiSetupChecked(old, 7, observation(vec![], false)),
+        );
+        assert!(model.anki_live.is_none());
+        update(&mut model, Event::CloseSettings);
+        update(
+            &mut model,
+            Event::AnkiSetupChecked(current, 7, observation(vec![], false)),
+        );
+        let request = model.anki_live.as_ref().unwrap().request.clone();
+        update(
+            &mut model,
+            Event::AnkiSetupChecked(current, 7, observation(vec![], false)),
+        );
+        assert_eq!(request, model.anki_live.as_ref().unwrap().request);
+        acknowledge_live(&mut model, AnkiLiveResult::ModelUncertain(Some(9)));
+        assert!(matches!(model.anki_setup.phase, AnkiSetupPhase::Failed(_)));
+        update(&mut model, Event::CheckAnkiSetup(AnkiSetupRequest::Refresh));
+        let refresh = model.anki_setup.generation;
+        update(
+            &mut model,
+            Event::AnkiSetupChecked(refresh, 7, observation(vec![], false)),
+        );
+        assert!(model.anki_live.is_none());
+        assert!(!model.anki_setup.configure);
+    }
+
+    #[test]
+    fn setup_reuses_compatible_models_and_rejects_partial_models_without_writing() {
+        for compatible in [true, false] {
+            let mut model = Model {
+                settings_open: true,
+                ..Model::default()
+            };
+            model.anki_settings.phase = AnkiSettingsPhase::Ready;
+            model.anki_settings.default_deck_id = Some(7);
+            update(
+                &mut model,
+                Event::CheckAnkiSetup(AnkiSetupRequest::Configure),
+            );
+            let generation = model.anki_setup.generation;
+            let mut result = observation(vec![], true);
+            if let AnkiPreflightResult::Complete(value) = &mut result {
+                value.models[0].matches_layout = compatible;
+            }
+            update(&mut model, Event::AnkiSetupChecked(generation, 7, result));
+            assert!(model.anki_live.is_none());
+            assert_eq!(
+                model.anki_setup.phase,
+                if compatible {
+                    AnkiSetupPhase::Ready
+                } else {
+                    AnkiSetupPhase::Failed(AnkiExportError::IncompatibleModel)
+                }
+            );
+            assert!(!model.anki_setup.configure);
+        }
+    }
+
+    #[test]
+    fn saving_another_deck_invalidates_pending_creation_authorization() {
+        let mut model = Model {
+            settings_open: true,
+            ..Model::default()
+        };
+        model.anki_settings.phase = AnkiSettingsPhase::Ready;
+        model.anki_settings.default_deck_id = Some(7);
+        update(
+            &mut model,
+            Event::CheckAnkiSetup(AnkiSetupRequest::Configure),
+        );
+        let generation = model.anki_setup.generation;
+        update(&mut model, Event::SetAnkiDefaultDeck(Some(8)));
+        update(
+            &mut model,
+            Event::AnkiSetupChecked(generation, 7, observation(vec![], false)),
+        );
+        assert!(model.anki_live.is_none());
+        let sequence = model.anki_settings_sequence;
+        update(
+            &mut model,
+            Event::AnkiSettingsFinished(
+                sequence,
+                StorageResult::Failed(DocumentError::Unavailable),
+            ),
+        );
+        assert!(model.anki_live.is_none());
+        assert_eq!(model.anki_settings.phase, AnkiSettingsPhase::Failed);
     }
 
     #[test]

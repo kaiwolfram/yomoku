@@ -266,8 +266,7 @@ pub enum Event {
         selection: crate::anki::AnkiSelection,
         entry: crate::anki::AnkiEntryKey,
     },
-    CheckAnkiSetup,
-    CreateAnkiModel,
+    CheckAnkiSetup(crate::anki::AnkiSetupRequest),
     #[serde(skip)]
     #[cfg_attr(feature = "facet_typegen", facet(skip))]
     AnkiEntryChecked(
@@ -1052,8 +1051,7 @@ impl App for Yomoku {
             | Event::SetStatisticsTimeframe { .. }
             | Event::RetryStatistics
             | Event::StatisticsFinished(..)
-            | Event::CheckAnkiSetup
-            | Event::CreateAnkiModel
+            | Event::CheckAnkiSetup(_)
             | Event::LoadReaderAnkiEntries(_)
             | Event::AddReaderAnkiEntry { .. }
             | Event::AnkiEntryChecked(..)

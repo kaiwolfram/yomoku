@@ -20,7 +20,7 @@ class MainActivity : ComponentActivity() {
         }
     private val ankiPermissionRequest =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-            if (granted) core.checkAnkiDecks()
+            core.ankiPermissionResult(granted)
         }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -47,13 +47,8 @@ class MainActivity : ComponentActivity() {
                     libraryActionsEnabled = !fileImports.active,
                     ankiDecks = core.ankiDecks.state,
                     ankiBrowser = core.ankiBrowser,
-                    checkAnkiProvider = core::checkAnkiDecks,
-                    requestAnkiPermission = {
-                        if (
-                            core.view.settingsOpen &&
-                                core.ankiDecks.state ==
-                                    AnkiDeckDiscoveryState.Failed(AnkiReadError.PermissionDenied)
-                        ) {
+                    checkAnkiProvider = {
+                        core.configureAnki {
                             ankiPermissionRequest.launch(AnkiProviderReader.PERMISSION)
                         }
                     },
