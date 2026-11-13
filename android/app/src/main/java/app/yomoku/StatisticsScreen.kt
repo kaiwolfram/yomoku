@@ -4,7 +4,6 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.*
@@ -15,8 +14,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import app.yomoku.shared.*
@@ -44,28 +45,41 @@ internal fun StatisticsScreen(
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         item {
-            val timeframeScroll =
-                rememberLazyListState(
-                    initialFirstVisibleItemIndex =
-                        StatisticsTimeframe.entries.indexOf(state.timeframe)
-                )
-            LazyRow(
-                state = timeframeScroll,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.fillMaxWidth().testTag("statistics_timeframes"),
-            ) {
-                items(StatisticsTimeframe.entries, key = { it.name }) { timeframe ->
-                    FilterChip(
-                        selected = state.timeframe == timeframe,
-                        onClick = {
-                            dispatch(
-                                Event.SetStatisticsTimeframe(timeframe, System.currentTimeMillis())
-                            )
-                        },
-                        enabled = !view.storageBusy || state.loading,
-                        label = { Text(stringResource(timeframe.label())) },
-                        modifier = Modifier.testTag("statistics_timeframe_${timeframe.name}"),
+            var expanded by remember { mutableStateOf(false) }
+            val enabled = !view.storageBusy || state.loading
+            Box {
+                TextButton(
+                    onClick = { expanded = true },
+                    enabled = enabled,
+                    modifier = Modifier.testTag("statistics_timeframe"),
+                ) {
+                    Text(stringResource(state.timeframe.label()))
+                    Spacer(Modifier.width(8.dp))
+                    Icon(
+                        painterResource(R.drawable.ic_arrow_down),
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp),
                     )
+                }
+                DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+                    StatisticsTimeframe.entries.forEach { timeframe ->
+                        DropdownMenuItem(
+                            text = { Text(stringResource(timeframe.label())) },
+                            onClick = {
+                                expanded = false
+                                dispatch(
+                                    Event.SetStatisticsTimeframe(
+                                        timeframe,
+                                        System.currentTimeMillis(),
+                                    )
+                                )
+                            },
+                            enabled = enabled,
+                            modifier =
+                                Modifier.testTag("statistics_timeframe_${timeframe.name}")
+                                    .semantics { selected = state.timeframe == timeframe },
+                        )
+                    }
                 }
             }
             Text(

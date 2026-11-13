@@ -110,9 +110,7 @@ class StatisticsProductionTest {
         )
 
         StatisticsTimeframe.entries.forEach { timeframe ->
-            compose
-                .onNodeWithTag("statistics_timeframes")
-                .performScrollToNode(hasTestTag("statistics_timeframe_${timeframe.name}"))
+            compose.onNodeWithTag("statistics_timeframe").performClick()
             compose.onNodeWithTag("statistics_timeframe_${timeframe.name}").performClick()
             idle()
             val data = checkNotNull(core().view.statistics.data)

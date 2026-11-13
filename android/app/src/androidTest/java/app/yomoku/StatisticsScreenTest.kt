@@ -27,37 +27,30 @@ class StatisticsScreenTest {
     }
 
     @Test
-    fun persistedIntervalIsVisibleOnEntryAndSelectionPreservesBothScrollPositions() {
+    fun persistedIntervalIsVisibleAndDropdownSelectionPreservesVerticalScroll() {
         frame.value =
             frame.value.copy(
                 statistics = frame.value.statistics.copy(timeframe = StatisticsTimeframe.ALLTIME)
             )
         render()
-        compose.onNodeWithTag("statistics_timeframe_ALLTIME").assertIsDisplayed().assertIsSelected()
-        compose
-            .onNodeWithTag("statistics_timeframes")
-            .performScrollToNode(hasTestTag("statistics_timeframe_LASTWEEK"))
+        compose.onNodeWithTag("statistics_timeframe").assertTextContains("All time")
         compose.onNodeWithTag("statistics_scroll").performSemanticsAction(
             SemanticsActions.ScrollBy
         ) {
             it(0f, 12f)
         }
         compose.waitForIdle()
-        fun horizontal() =
-            compose
-                .onNodeWithTag("statistics_timeframes")
-                .fetchSemanticsNode()
-                .config[SemanticsProperties.HorizontalScrollAxisRange]
-                .value()
         fun vertical() =
             compose
                 .onNodeWithTag("statistics_scroll")
                 .fetchSemanticsNode()
                 .config[SemanticsProperties.VerticalScrollAxisRange]
                 .value()
-        val x = horizontal()
         val y = vertical()
+        compose.onNodeWithTag("statistics_timeframe").performClick()
+        compose.onNodeWithTag("statistics_timeframe_ALLTIME").assertIsSelected()
         compose.onNodeWithTag("statistics_timeframe_LASTMONTH").performClick()
+        compose.onNodeWithTag("statistics_timeframe_LASTMONTH").assertDoesNotExist()
         assertEquals(
             StatisticsTimeframe.LASTMONTH,
             (events.last() as Event.SetStatisticsTimeframe).timeframe,
@@ -70,8 +63,7 @@ class StatisticsScreenTest {
                 )
         }
         compose.waitForIdle()
-        compose.onNodeWithTag("statistics_timeframe_LASTMONTH").assertIsSelected()
-        assertEquals(x, horizontal(), 0.5f)
+        compose.onNodeWithTag("statistics_timeframe").assertTextContains("Last month")
         assertEquals(y, vertical(), 0.5f)
     }
 
@@ -79,11 +71,10 @@ class StatisticsScreenTest {
     fun overviewChartsHaveNoDetailActionsAndAllTimeframeEvents() {
         render()
         compose.onNodeWithTag("statistics_card_KNOWN").assertDoesNotExist()
-        compose.onNodeWithTag("statistics_timeframe_LASTWEEK").assertIsSelected()
+        compose.onNodeWithTag("statistics_timeframe").assertTextContains("Last week")
+        captureUiTrial(compose, "statistics")
         StatisticsTimeframe.entries.forEach { timeframe ->
-            compose
-                .onNodeWithTag("statistics_timeframes")
-                .performScrollToNode(hasTestTag("statistics_timeframe_${timeframe.name}"))
+            compose.onNodeWithTag("statistics_timeframe").performClick()
             compose.onNodeWithTag("statistics_timeframe_${timeframe.name}").performClick()
             val event = events.last() as Event.SetStatisticsTimeframe
             assertEquals(timeframe, event.timeframe)
@@ -101,7 +92,14 @@ class StatisticsScreenTest {
                             )
                     )
             }
+            compose.onNodeWithTag("statistics_timeframe_${timeframe.name}").assertDoesNotExist()
+            compose.onNodeWithTag("statistics_timeframe").performClick()
             compose.onNodeWithTag("statistics_timeframe_${timeframe.name}").assertIsSelected()
+            if (timeframe == StatisticsTimeframe.LASTWEEK)
+                captureUiTrial(compose, "statistics-menu")
+            androidx.test.platform.app.InstrumentationRegistry.getInstrumentation()
+                .sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_BACK)
+            compose.onNodeWithTag("statistics_timeframe_${timeframe.name}").assertDoesNotExist()
         }
         StatisticsChart.entries.forEach { chart ->
             compose
