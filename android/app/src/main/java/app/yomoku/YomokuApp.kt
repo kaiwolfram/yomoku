@@ -62,6 +62,7 @@ internal fun YomokuApp(
     imageLoader: EpubImageLoader? = null,
     coverLoader: EpubCoverLoader? = null,
     libraryActionsEnabled: Boolean = true,
+    importActive: Boolean = false,
     ankiDecks: AnkiDeckDiscoveryState = AnkiDeckDiscoveryState.Unchecked,
     checkAnkiProvider: () -> Unit = {},
     ankiBrowser: AnkiNoteBrowser? = null,
@@ -115,6 +116,7 @@ internal fun YomokuApp(
                         ) {
                             LibraryAddMenu(view, dispatch, onImportBook, libraryActionsEnabled)
                         }
+                        AppLoadingIndicator(appIsLoading(view, ankiDecks, importActive))
                     },
                     navigationIcon = {
                         if (!view.settingsOpen && !mainContent) {

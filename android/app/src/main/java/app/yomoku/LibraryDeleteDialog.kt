@@ -2,7 +2,6 @@ package app.yomoku
 
 import androidx.compose.foundation.layout.Column
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -24,7 +23,6 @@ internal fun LibraryDeleteDialog(view: ViewModel, dispatch: (Event) -> Unit, ena
                 Text(stringResource(R.string.library_delete_confirmation, target.title))
                 if (view.libraryDeleteError != null)
                     Text(stringResource(R.string.library_delete_error))
-                if (view.storageBusy) LinearProgressIndicator()
             }
         },
         confirmButton = {

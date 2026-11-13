@@ -2,11 +2,9 @@ package app.yomoku
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -30,9 +28,6 @@ internal fun FileImportDialogs(imports: FileImports) {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text(imports.filename)
                     if (imports.cancelling) Text(stringResource(R.string.import_cancelling))
-                    LinearProgressIndicator(
-                        modifier = Modifier.fillMaxWidth().testTag("file_import_progress")
-                    )
                     if (imports.choosingEncoding) {
                         Text(stringResource(checkNotNull(imports.encodingError).messageResource()))
                         TextButton(onClick = { imports.selectEncoding(TextEncoding.UTF8) }) {

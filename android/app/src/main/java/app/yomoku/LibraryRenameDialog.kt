@@ -2,7 +2,6 @@ package app.yomoku
 
 import androidx.compose.foundation.layout.Column
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -32,7 +31,6 @@ internal fun LibraryRenameDialog(view: ViewModel, dispatch: (Event) -> Unit, ena
                 if (draft.error != null) {
                     Text(stringResource(R.string.library_rename_error))
                 }
-                if (view.storageBusy) LinearProgressIndicator()
             }
         },
         confirmButton = {

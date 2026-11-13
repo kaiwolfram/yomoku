@@ -75,7 +75,6 @@ internal fun StatisticsScreen(
         }
         if (state.loading || (data == null && state.error == null))
             item {
-                LinearProgressIndicator(Modifier.fillMaxWidth().testTag("statistics_loading"))
                 Text(stringResource(R.string.statistics_loading))
             }
         if (state.error != null)

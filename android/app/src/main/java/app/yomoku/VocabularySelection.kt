@@ -115,10 +115,6 @@ internal fun VocabularyBulkDialog(view: ViewModel, dispatch: (Event) -> Unit) {
                         ),
                         Modifier.testTag("vocabulary_bulk_error"),
                     )
-                if (view.storageBusy)
-                    LinearProgressIndicator(
-                        Modifier.fillMaxWidth().testTag("vocabulary_bulk_loading")
-                    )
             }
         },
         confirmButton = {

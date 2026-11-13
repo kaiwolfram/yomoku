@@ -176,7 +176,6 @@ internal fun VocabularyScreen(
                 item { Text(stringResource(R.string.vocabulary_no_matches)) }
             if (state.loading || (state.matchingCount == null && state.error == null))
                 item {
-                    LinearProgressIndicator(Modifier.fillMaxWidth().testTag("vocabulary_loading"))
                     Text(stringResource(R.string.vocabulary_loading))
                 }
             if (state.error != null)

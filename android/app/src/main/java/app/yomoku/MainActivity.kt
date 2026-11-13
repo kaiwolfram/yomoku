@@ -45,6 +45,7 @@ class MainActivity : ComponentActivity() {
                     core.images,
                     core.covers,
                     libraryActionsEnabled = !fileImports.active,
+                    importActive = fileImports.active,
                     ankiDecks = core.ankiDecks.state,
                     ankiBrowser = core.ankiBrowser,
                     checkAnkiProvider = {

@@ -19,7 +19,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -453,8 +452,6 @@ internal fun ReaderSaveRetry(view: ViewModel, dispatch: (Event) -> Unit) {
 
 @Composable
 internal fun StorageStatus(view: ViewModel) {
-    if (view.storageBusy)
-        LinearProgressIndicator(modifier = Modifier.fillMaxWidth().testTag("storage_busy"))
     view.documentError?.let { error ->
         Text(
             stringResource(error.messageResource()),

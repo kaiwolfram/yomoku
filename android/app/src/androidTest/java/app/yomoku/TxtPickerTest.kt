@@ -187,8 +187,9 @@ class TxtPickerTest {
             assertTrue(imports.active)
             assertFalse(imports.choosingEncoding)
             compose.onNodeWithText("$token.txt").assertIsDisplayed()
+            compose.mainClock.advanceTimeBy(320)
             compose
-                .onNodeWithTag("file_import_progress")
+                .onNodeWithTag("app_loading", useUnmergedTree = true)
                 .assertRangeInfoEquals(ProgressBarRangeInfo.Indeterminate)
             compose.activityRule.scenario.recreate()
             assertSame(imports, owner().fileImports)

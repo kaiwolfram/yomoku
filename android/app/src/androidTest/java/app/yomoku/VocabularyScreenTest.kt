@@ -369,7 +369,6 @@ class VocabularyScreenTest {
         compose.runOnUiThread { frame.value = frame.value.copy(storageBusy = true) }
         compose.onNodeWithTag("vocabulary_confirm_bulk").assertIsNotEnabled()
         compose.onNodeWithTag("vocabulary_cancel_bulk").assertIsNotEnabled()
-        compose.onNodeWithTag("vocabulary_bulk_loading").assertIsDisplayed()
         compose.mainClock.advanceTimeBy(1000)
         assertEquals(count, events.size)
         compose.runOnUiThread {
