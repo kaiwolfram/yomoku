@@ -32,6 +32,8 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -316,6 +318,7 @@ internal fun ReaderScreen(
     dispatch: (Event) -> Unit,
     imageLoader: EpubImageLoader? = null,
     ankiBrowser: AnkiNoteBrowser? = null,
+    onFinishRequested: (Offset) -> Unit = {},
 ) {
     val scroll =
         remember(sessionKey, view.reader?.documentId, view.reader?.anchor) { ScrollState(0) }
@@ -348,8 +351,10 @@ internal fun ReaderScreen(
     val currentKey by rememberUpdatedState(navigationKey)
     val currentCanAdvance by rememberUpdatedState(canAdvance)
     val currentCanGoBack by rememberUpdatedState(canGoBack)
+    var finishCenter by remember { mutableStateOf<Offset?>(null) }
     val next = {
         if (canAdvance && currentCanAdvance && currentKey == navigationKey) {
+            if (page.pageNumber == page.totalPages) finishCenter?.let(onFinishRequested)
             dispatch(
                 Event.CompleteEffectiveReaderPage(
                     snapshot!!.identity,
@@ -413,7 +418,13 @@ internal fun ReaderScreen(
                     TextButton(
                         onClick = next,
                         enabled = canAdvance,
-                        modifier = Modifier.testTag("next_page"),
+                        modifier =
+                            Modifier.testTag("next_page").onGloballyPositioned {
+                                finishCenter =
+                                    it.localToWindow(
+                                        Offset(it.size.width / 2f, it.size.height / 2f)
+                                    )
+                            },
                     ) {
                         Text(
                             stringResource(

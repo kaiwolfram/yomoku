@@ -24,10 +24,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
@@ -88,11 +92,19 @@ internal fun YomokuApp(
                 view.vocabulary.confirmation != null ||
                 view.vocabulary.bulkError != null)
     val showNavigation = mainContent
-    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+    var completionOrigin by remember(sessionKey) { mutableStateOf<Offset?>(null) }
+    var overlayPosition by remember { mutableStateOf(Offset.Zero) }
+    BoxWithConstraints(
+        modifier =
+            Modifier.fillMaxSize().onGloballyPositioned {
+                overlayPosition = it.positionInWindow()
+            }
+    ) {
         val useRail = maxWidth >= 600.dp
         Scaffold(
             topBar = {
                 TopAppBar(
+                    modifier = Modifier.testTag("app_toolbar"),
                     title = {
                         Text(
                             when {
@@ -203,6 +215,7 @@ internal fun YomokuApp(
                                 dispatch,
                                 imageLoader,
                                 ankiBrowser,
+                                onFinishRequested = { completionOrigin = it - overlayPosition },
                             )
                         view.destination == Destination.LIBRARY ->
                             LibraryScreen(
@@ -228,7 +241,7 @@ internal fun YomokuApp(
                 }
             }
         }
-        BookCompletionCelebration(view, dispatch)
+        BookCompletionCelebration(view, completionOrigin, { completionOrigin = null }, dispatch)
     }
 }
 

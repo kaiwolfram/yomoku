@@ -342,7 +342,7 @@ class ReaderNavigationTest {
         compose.mainClock.autoAdvance = false
         compose.runOnUiThread {
             compose.activity.setContent {
-                BookCompletionCelebration(snapshot) { event ->
+                BookCompletionCelebration(snapshot, Offset(180f, 400f), {}) { event ->
                     val id = (event as Event.DismissBookCompletionNotice).value
                     consumed.add(id.value)
                     snapshot = snapshot.copy(bookCompletionNotice = null)
