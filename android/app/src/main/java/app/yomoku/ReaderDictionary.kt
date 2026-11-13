@@ -82,11 +82,6 @@ internal fun ReaderDictionary(
         Text(stringResource(R.string.word_no_match), Modifier.testTag("word_no_match"))
     }
     if (candidates.words.isNotEmpty()) {
-        Text(
-            stringResource(R.string.word_definitions),
-            style = MaterialTheme.typography.titleMedium,
-            modifier = Modifier.testTag("word_definitions"),
-        )
         for (candidate in candidates.words) {
             HorizontalDivider()
             val pairs = candidate.forms.flatMap { it.matches }.map { it.reading }.distinct()

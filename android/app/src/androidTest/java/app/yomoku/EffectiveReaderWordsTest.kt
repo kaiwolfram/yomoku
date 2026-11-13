@@ -536,26 +536,13 @@ class EffectiveReaderWordsTest {
         assertEquals("か\u3099", text().text)
         tap()
         compose.onNodeWithTag("word_surface").assertTextEquals(full)
-        val word = frame.value.effectiveReaderWord!!
-        val candidate =
-            WordCandidate(1, WordEntry(emptyList(), emptyList(), emptyList()), emptyList())
-        compose.runOnUiThread {
-            frame.value =
-                frame.value.copy(
-                    effectiveReaderWord =
-                        word.copy(
-                            details =
-                                word.details!!.copy(
-                                    candidates =
-                                        word.details.candidates.copy(words = listOf(candidate))
-                                )
-                        )
-                )
-        }
-        compose.onNodeWithTag("word_definitions").assertExists()
+        exposeDictionaryAnki(
+            AnkiSelection.Effective(EffectiveReaderSelection(identity, token.segmentIndex))
+        )
+        assertDictionaryEntries(compose)
         assertEquals(
             EffectiveReaderSelection(identity, token.segmentIndex),
-            (events.single() as Event.LoadEffectiveReaderWord).value,
+            events.filterIsInstance<Event.LoadEffectiveReaderWord>().single().value,
         )
     }
 

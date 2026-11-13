@@ -11,6 +11,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.unit.dp
 import app.yomoku.shared.*
 import org.junit.Assert.*
 import org.junit.Rule
@@ -103,5 +104,36 @@ class LibraryPresentationTest {
             }
         }
         assertTrue(events.isEmpty())
+    }
+
+    @Test
+    fun sortingSitsImmediatelyBelowToolbarWithoutImportSummary() {
+        val books =
+            (1L..2L).map {
+                LibraryDocument(
+                    documentId = DocumentId(it),
+                    title = "Book $it",
+                    progressPercent = 0UL,
+                    finishedAtLeastOnce = false,
+                )
+            }
+        val view =
+            frozenScalarView(emptyList())
+                .copy(
+                    destination = Destination.LIBRARY,
+                    documents = books,
+                    libraryWordDistributions = emptyList(),
+                    importSummary = ImportSummary(DocumentId(1), "Book 1", ImportOutcome.CREATED),
+                )
+        compose.setContent { MaterialTheme { YomokuApp(view, "library-presentation", {}) } }
+        compose.onNodeWithTag("import_summary").assertDoesNotExist()
+        compose.onNodeWithText("Imported: Book 1").assertDoesNotExist()
+        compose.onNodeWithText("Close").assertDoesNotExist()
+        val toolbar = compose.onNodeWithTag("app_toolbar").fetchSemanticsNode().boundsInRoot
+        val sorting =
+            compose.onNodeWithTag("library_sort_controls").fetchSemanticsNode().boundsInRoot
+        assertEquals(toolbar.bottom, sorting.top, 1f)
+        compose.onNodeWithTag("library_sort_controls").assertHeightIsAtLeast(48.dp)
+        captureUiTrial(compose, "library")
     }
 }

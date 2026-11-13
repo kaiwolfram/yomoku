@@ -21,7 +21,7 @@ internal fun <T : Enum<T>> SortControls(
     onSort: (T) -> Unit,
 ) {
     var expanded by remember { mutableStateOf(false) }
-    Row(verticalAlignment = Alignment.CenterVertically) {
+    Row(Modifier.testTag("${tag}_sort_controls"), verticalAlignment = Alignment.CenterVertically) {
         Box {
             TextButton(
                 onClick = { expanded = true },

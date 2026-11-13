@@ -41,7 +41,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import app.yomoku.shared.DocumentError
 import app.yomoku.shared.Event
-import app.yomoku.shared.ImportOutcome
 import app.yomoku.shared.LibrarySort
 import app.yomoku.shared.ReaderAnalysis
 import app.yomoku.shared.ReaderTokenKey
@@ -80,7 +79,7 @@ internal fun LibraryScreen(
     val actionsLabel = stringResource(R.string.library_document_actions)
     LibraryDeleteDialog(view, dispatch, enabled = libraryActionsEnabled)
     LibraryRenameDialog(view, dispatch, enabled = libraryActionsEnabled)
-    Column(Modifier.fillMaxSize().padding(16.dp)) {
+    Column(Modifier.fillMaxSize().padding(start = 16.dp, end = 16.dp, bottom = 16.dp)) {
         StorageStatus(view)
         if (view.libraryWordError != null) {
             Text(stringResource(R.string.library_words_error))
@@ -90,23 +89,6 @@ internal fun LibraryScreen(
                 modifier = Modifier.testTag("retry_library_words"),
             ) {
                 Text(stringResource(R.string.retry))
-            }
-        }
-        view.importSummary?.let { summary ->
-            Column(modifier = Modifier.fillMaxWidth().testTag("import_summary")) {
-                Text(
-                    stringResource(
-                        when (summary.outcome) {
-                            ImportOutcome.CREATED -> R.string.import_created
-                            ImportOutcome.EXISTING -> R.string.import_existing
-                        },
-                        summary.title,
-                    ),
-                    modifier = Modifier.testTag("import_summary_message"),
-                )
-                TextButton(onClick = { dispatch(Event.DismissImportSummary) }) {
-                    Text(stringResource(R.string.close))
-                }
             }
         }
         if (view.documentError != null) {

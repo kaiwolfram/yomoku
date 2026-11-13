@@ -337,7 +337,7 @@ class ReaderWordsTest {
             compose
                 .onNodeWithTag("word_encountered")
                 .assertTextEquals("Encountered $encountered times")
-            compose.onNodeWithTag("word_definitions").assertExists()
+            assertDictionaryEntries(compose)
             compose.onNodeWithTag("word_names").performScrollTo().assertIsDisplayed()
             for (candidate in details.candidates.words) {
                 for (index in candidate.entry.senses.indices) {
@@ -357,7 +357,7 @@ class ReaderWordsTest {
             assertNull(core().view.effectiveReaderWord?.selection)
             tapSurface("食べた")
             assertEquals("食べる", core().view.effectiveReaderWord!!.details!!.token.dictionaryForm)
-            compose.onNodeWithTag("word_definitions").assertExists()
+            assertDictionaryEntries(compose)
             assertTrue(
                 compose
                     .onAllNodesWithText("Ichidan verb", substring = true)
@@ -446,7 +446,7 @@ class ReaderWordsTest {
             assertNull(session.view.effectiveReaderWord?.error)
             compose.onNodeWithTag("reader_word_panel").assertDoesNotExist()
             tapSurface("東京")
-            compose.onNodeWithTag("word_definitions").assertExists()
+            assertDictionaryEntries(compose)
             compose.onNodeWithTag("word_names").assertExists()
         } finally {
             release.countDown()
@@ -536,7 +536,7 @@ class ReaderWordsTest {
             compose.waitUntil(30_000) {
                 !session.view.storageBusy && session.view.effectiveReaderWord?.details != null
             }
-            compose.onNodeWithTag("word_definitions").assertExists()
+            assertDictionaryEntries(compose)
             assertEquals(2, calls.get())
             // Use a successful empty candidate payload to check the distinct no-match view.
             val base = session.view

@@ -112,6 +112,7 @@ class TxtPickerTest {
             assertEquals(ImportOutcome.EXISTING, finished().outcome)
             compose.onNodeWithText("Already in Library: $prefix-first.txt").assertIsDisplayed()
             compose.onNodeWithText("Close").performClick()
+            compose.onNodeWithTag("import_summary").assertDoesNotExist()
         } finally {
             resolver.call(blocked, "release", prefix, null)
         }

@@ -238,7 +238,8 @@ class PasteReaderTest {
         awaitStorage()
         compose.onNodeWithTag("screen_title").assertTextEquals("Library")
         compose.onNodeWithTag("reader_text").assertDoesNotExist()
-        compose.onNodeWithTag("import_summary_message").assertTextEquals("Imported: $title")
+        compose.onNodeWithTag("import_summary").assertDoesNotExist()
+        assertEquals(1, core().view.documents.count { it.title == title })
         awaitDictionaryMapping(true)
         compose.activityRule.scenario.recreate()
         awaitDictionaryMapping(true) // warm cache survives configuration changes
@@ -246,30 +247,22 @@ class PasteReaderTest {
         awaitDictionaryMapping(false)
         compose.activityRule.scenario.moveToState(Lifecycle.State.RESUMED)
         awaitDictionaryMapping(false) // returning to Library never eagerly loads Full
-        // Reimport through the actual form: same row, visible duplicate result, no reader.
+        // Reimport through the actual form: same row, no Library notice or reader.
         compose.onNodeWithTag("library_add").performClick()
         compose.onNodeWithText("Paste text").performClick()
         compose.onNodeWithTag("paste_text").performTextReplacement(text)
         compose.onNodeWithText("Save to Library").performClick()
         awaitStorage()
-        compose
-            .onNodeWithTag("import_summary_message")
-            .assertTextEquals("Already in Library: $title")
+        compose.onNodeWithTag("import_summary").assertDoesNotExist()
         awaitDictionaryMapping(true)
         assertEquals(1, core().view.documents.count { it.title == title })
         compose.onNodeWithTag("reader_text").assertDoesNotExist()
         compose.activityRule.scenario.recreate()
-        compose
-            .onNodeWithTag("import_summary_message")
-            .assertTextEquals("Already in Library: $title")
+        compose.onNodeWithTag("import_summary").assertDoesNotExist()
         compose.onNodeWithText("Settings").performClick()
         compose.onNodeWithTag("screen_title").assertTextEquals("Settings")
         compose.runOnUiThread { compose.activity.onBackPressedDispatcher.onBackPressed() }
         compose.onNodeWithTag("screen_title").assertTextEquals("Library")
-        compose
-            .onNodeWithTag("import_summary_message")
-            .assertTextEquals("Already in Library: $title")
-        compose.onNodeWithText("Close").performClick()
         compose.onNodeWithTag("import_summary").assertDoesNotExist()
         compose.activityRule.scenario.recreate()
         compose.onNodeWithTag("import_summary").assertDoesNotExist()

@@ -122,6 +122,7 @@ class MixedFilePickerTest {
                     compose.onNodeWithTag("file_import_summary").assertIsDisplayed()
                     compose.onNodeWithText("Close").performClick()
                 }
+                compose.onNodeWithTag("import_summary").assertDoesNotExist()
             } finally {
                 instrumentation.removeMonitor(monitor)
             }
