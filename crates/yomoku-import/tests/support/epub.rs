@@ -4,7 +4,19 @@ use std::io::{Cursor, Write};
 use zip::{write::SimpleFileOptions, ZipWriter};
 
 pub fn book(title: bool, second: &str) -> Vec<u8> {
+    book_with_spine(
+        title,
+        second,
+        "<itemref idref=\"first\"/><itemref idref=\"second\" linear=\"no\"/>",
+    )
+}
+
+pub fn book_with_spine(title: bool, second: &str, spine: &str) -> Vec<u8> {
     let mut package = include_str!("../fixtures/epub/book.opf").to_owned();
+    package = package.replace(
+        "<itemref idref=\"first\"/><itemref idref=\"second\" linear=\"no\"/>",
+        spine,
+    );
     if !title {
         package = package.replace("<dc:title> 日本語の本 &amp; EPUB </dc:title>", "");
     }

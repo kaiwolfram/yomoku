@@ -678,7 +678,7 @@ fn symlink_and_zip_encrypted_resources_fail_explicitly() {
 }
 
 #[test]
-fn invalid_container_and_duplicate_manifest_paths_or_spine_items_fail() {
+fn invalid_container_and_duplicate_manifest_paths_fail() {
     let mut files = fixture();
     edit(
         &mut files,
@@ -693,15 +693,44 @@ fn invalid_container_and_duplicate_manifest_paths_or_spine_items_fail() {
         "</invalid>",
     );
     assert_eq!(parse(&archive(files)), Err(EpubError::InvalidPackage));
-    for (from, to) in [
-        ("text/a-second.xhtml", "./text/z-first.xhtml"),
-        (
-            "<itemref idref=\"second\" linear=\"no\"/>",
-            "<itemref idref=\"first\"/>",
-        ),
-    ] {
+    let mut files = fixture();
+    edit(
+        &mut files,
+        "OPS/book.opf",
+        "text/a-second.xhtml",
+        "./text/z-first.xhtml",
+    );
+    assert_eq!(parse(&archive(files)), Err(EpubError::InvalidPackage));
+}
+
+#[test]
+fn repeated_cover_and_text_spine_items_keep_first_occurrence_and_annotations_once() {
+    for cover_only in [false, true] {
         let mut files = fixture();
-        edit(&mut files, "OPS/book.opf", from, to);
-        assert_eq!(parse(&archive(files)), Err(EpubError::InvalidPackage));
+        if cover_only {
+            files.insert(
+                "OPS/text/z-first.xhtml".to_owned(),
+                xhtml("<p><img src='../images/cover.png' alt='表紙'/></p>"),
+            );
+        }
+        let expected = parse(&archive(files.clone())).unwrap();
+        for spine in [
+            "<itemref idref='first'/><itemref idref='first'/><itemref idref='second'/>",
+            "<itemref idref='first'/><itemref idref='second'/><itemref idref='first'/><itemref idref='second'/>",
+            "<itemref idref='second'/><itemref idref='first'/><itemref idref='second'/>",
+        ] {
+            let mut repeated = files.clone();
+            edit(
+                &mut repeated,
+                "OPS/book.opf",
+                "<itemref idref=\"first\"/><itemref idref=\"second\" linear=\"no\"/>",
+                spine,
+            );
+            let mut expected = expected.clone();
+            if spine.starts_with("<itemref idref='second'") {
+                expected.chapters.reverse();
+            }
+            assert_eq!(parse(&archive(repeated)).unwrap(), expected);
+        }
     }
 }

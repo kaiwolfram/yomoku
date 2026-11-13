@@ -36,6 +36,10 @@ converts validated visible ranges to UTF-16 only at rendering boundaries.
 
 Imports preserve original bytes, encoding and hashes, canonical text, source ruby
 and EPUB image/format metadata. Exact duplicates retain their live document.
+EPUB imports tolerate repeated spine references by keeping each manifest item's
+first occurrence. This accepts books with duplicated cover entries without
+duplicating canonical chapters, analysis or reading content; original bytes and
+file hashes remain unchanged. Ambiguous manifest entries remain invalid.
 SRT cue boundaries are transient and preserve canonical blank-line separators.
 Internal and unsupported EPUB links retain text without annotation records;
 HTTP(S) links retain browser targets. Imported content is not editable.

@@ -17,7 +17,8 @@ const XHTML: &str = "http://www.w3.org/1999/xhtml";
 pub struct EpubDocument {
     /// The import adapter supplies the filename when metadata has no title.
     pub title: Option<String>,
-    /// Spine order, including auxiliary items; empty text-only items are omitted.
+    /// First-reference spine order, including auxiliary items; repeated items and
+    /// empty text-only items are omitted.
     pub chapters: Vec<EpubChapter>,
     /// Only referenced images and the cover, keyed by container-relative path.
     pub images: BTreeMap<String, EpubImage>,
@@ -218,7 +219,9 @@ pub fn parse_with_limits(bytes: &[u8], limits: EpubLimits) -> Result<EpubDocumen
     {
         let id = required(item, "idref")?;
         if !spine_ids.insert(id) {
-            return Err(EpubError::InvalidPackage);
+            // Some books repeat their cover or other spine items. Keep the
+            // first occurrence without duplicating chapters or analysis.
+            continue;
         }
         let (path, media_type) = items.get(id).ok_or(EpubError::InvalidPackage)?;
         let chapter = match *media_type {

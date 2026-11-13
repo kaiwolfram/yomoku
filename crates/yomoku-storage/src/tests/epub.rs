@@ -81,6 +81,63 @@ fn sequences(storage: &Storage) -> Vec<(String, i64)> {
 }
 
 #[test]
+fn repeated_spine_items_import_once_preserve_original_bytes_and_reopen_as_exact_duplicate() {
+    let database = TestDatabase::new();
+    let bytes = super::epub_fixture::book_with_spine(
+        true,
+        "<p>猫 犬</p>",
+        "<itemref idref='first'/><itemref idref='first'/><itemref idref='second'/><itemref idref='first'/>",
+    );
+    let expected = epub::parse(&book(true, "<p>猫 犬</p>")).unwrap();
+    let mut storage = Storage::open(database.path()).unwrap();
+    let mut analyzed = Vec::new();
+    let imported = created(
+        storage
+            .import_analyzed_epub(&bytes, "repeated.epub", 123, |chapter| {
+                analyzed.push(chapter.text.clone());
+                fixture(chapter)
+            })
+            .unwrap(),
+    );
+    assert_eq!(
+        analyzed,
+        expected
+            .chapters
+            .iter()
+            .map(|c| c.text.clone())
+            .collect::<Vec<_>>()
+    );
+    assert_eq!(imported.analysis_ids.len(), expected.chapters.len());
+    assert_eq!(imported.document.original_bytes, bytes);
+    assert_eq!(
+        imported
+            .document
+            .chapters
+            .iter()
+            .map(content)
+            .collect::<Vec<_>>(),
+        expected.chapters
+    );
+    drop(storage);
+
+    let mut storage = Storage::open(database.path()).unwrap();
+    let id = imported.document.document_id;
+    assert_eq!(
+        storage.load_epub_document(id).unwrap(),
+        Some(imported.document)
+    );
+    let before = totals(&storage);
+    let EpubImportOutcome::Existing(existing) = storage
+        .import_analyzed_epub(&bytes, "renamed.epub", 456, no_analysis)
+        .unwrap()
+    else {
+        panic!("expected exact duplicate")
+    };
+    assert_eq!(existing.document_id, id);
+    assert_eq!(totals(&storage), before);
+}
+
+#[test]
 fn epub_chapters_assets_metadata_and_original_analysis_reopen_read_only() {
     let database = TestDatabase::new();
     let mut storage = Storage::open(database.path()).unwrap();
