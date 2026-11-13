@@ -39,6 +39,21 @@ mod vocabulary;
 mod vocabulary_browser;
 mod vocabulary_bulk;
 
+// Thread-local observations of the real read paths, so status-cache tests can
+// detect accidental whole-document/chapter work and unrelated vocabulary reads.
+pub(crate) mod reader_work {
+    use std::cell::{Cell, RefCell};
+
+    thread_local! {
+        pub static DOCUMENTS: Cell<usize> = const { Cell::new(0) };
+        pub static CHAPTERS: Cell<usize> = const { Cell::new(0) };
+        pub static SURFACES: RefCell<Vec<String>> = const { RefCell::new(Vec::new()) };
+    }
+
+    pub fn take() -> (usize, usize, Vec<String>) {
+        (DOCUMENTS.replace(0), CHAPTERS.replace(0), SURFACES.take())
+    }
+}
 static NEXT_DATABASE: AtomicU64 = AtomicU64::new(0);
 
 // Historical fixtures cannot use current snapshot queries before migration 0011.

@@ -12,7 +12,10 @@ fn setup() -> (TestDatabase, Storage) {
     let database = TestDatabase::new();
     let mut connection = Connection::open(database.path()).unwrap();
     migrate(&mut connection, MIGRATIONS).unwrap();
-    let mut storage = Storage { connection };
+    let mut storage = Storage {
+        connection,
+        validated_reader_selection: None,
+    };
     for _ in 0..2 {
         storage
             .unanalyzed_fixture(&PasteText::new("\n か\u{3099}𠮷\0\r\n".into()).unwrap())

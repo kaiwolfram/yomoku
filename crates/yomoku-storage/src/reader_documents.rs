@@ -120,6 +120,8 @@ pub(crate) fn load_reader_document_in(
     connection: &Connection,
     document_id: DocumentId,
 ) -> Result<Option<ReaderDocument>, StorageError> {
+    #[cfg(test)]
+    crate::tests::reader_work::DOCUMENTS.update(|count| count + 1);
     // Query the live document first: absent provenance for a live row is an
     // error, not a deleted-document result or a fallback to chapter zero.
     let kind: Option<Option<String>> = connection

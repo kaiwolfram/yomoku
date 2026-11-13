@@ -125,9 +125,19 @@ class EffectiveReaderPerformanceTest {
         }
         val before = digest(database)
         measure(fixture, phase, "effective_page", iterations) { loadTokens(core) }
-        val fullBeforeWord = dictionaryCalls.get()
+        assertEquals(before, digest(database))
         val page = checkNotNull(core.view.effectiveReaderTokens)
         val selection = EffectiveReaderSelection(page.identity, page.tokens.first().segmentIndex)
+        // The first word lookup persists missing A/B component analyses. Prepare
+        // them before checking that steady-state reads leave the database intact.
+        report(
+            fixture,
+            "setup",
+            "first_word_prepare",
+            listOf(command(core, Event.LoadEffectiveReaderWord(selection))),
+        )
+        val wordBefore = digest(database)
+        val fullBeforeWord = dictionaryCalls.get()
         measure(fixture, phase, "word_lookup", iterations) {
             command(core, Event.LoadEffectiveReaderWord(selection)).also {
                 assertNotNull(it.view.effectiveReaderWord?.details)
@@ -138,7 +148,27 @@ class EffectiveReaderPerformanceTest {
         if (core.view.reader!!.images.isNotEmpty()) {
             measure(fixture, phase, "page_image_read_decode", iterations) { loadImages(core) }
         }
-        assertEquals(before, digest(database))
+        assertEquals(wordBefore, digest(database))
+        measure(fixture, phase, "word_status", iterations) {
+            val details = checkNotNull(core.view.effectiveReaderWord?.details)
+            val entry = checkNotNull(details.token.vocabulary)
+            val target =
+                if (entry.status == VocabularyStatus.LEARNING) VocabularyStatus.FAMILIAR
+                else VocabularyStatus.LEARNING
+            command(core, Event.SetEffectiveReaderStatus(selection, entry.id, target, 1_000)).also {
+                assertNull(it.view.effectiveReaderStatus?.error)
+                assertEquals(
+                    target,
+                    it.view.effectiveReaderWord?.details?.token?.vocabulary?.status,
+                )
+                assertTrue(
+                    it.view.effectiveReaderTokens!!
+                        .tokens
+                        .filter { token -> token.surface == details.token.surface }
+                        .all { token -> token.vocabulary?.status == target }
+                )
+            }
+        }
         command(core, Event.CloseDocument)
         val libraryBefore = digest(database)
         measure(fixture, phase, "effective_library", iterations) {
@@ -296,6 +326,17 @@ class EffectiveReaderPerformanceTest {
             val input = File(File(context.noBackupFilesDir, "effective-measure-inputs"), name)
             fixture(name, input.readBytes(), iterations)
         }
+        val longText = "国家公務員と猫。東京の図書館で日本語の本を読みました。\n".repeat(2_000)
+        fixture("synthetic-long.txt", longText.toByteArray(), iterations)
+        fixture(
+            "synthetic-chapters.epub",
+            FileImportFixtures.epub(
+                "status measurement",
+                "<p>$longText</p>",
+                secondBody = "<p>$longText</p>",
+            ),
+            iterations,
+        )
         val images =
             (0 until 12).associate { index ->
                 "images/$index.png" to

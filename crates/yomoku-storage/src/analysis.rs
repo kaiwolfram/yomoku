@@ -14,6 +14,8 @@ pub(crate) fn read_effective_reader_chapter_in<'a>(
     connection: &Connection,
     chapter: &'a ChapterText,
 ) -> Result<Option<EffectiveReaderChapter<'a>>, StorageError> {
+    #[cfg(test)]
+    crate::tests::reader_work::CHAPTERS.update(|count| count + 1);
     let ReaderAnalysis::Available(id) = read_reader_analysis(connection, chapter.chapter_id)?
     else {
         return Ok(None);

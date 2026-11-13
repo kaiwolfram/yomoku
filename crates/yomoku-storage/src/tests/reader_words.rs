@@ -525,3 +525,6 @@ fn corrupt_dictionary_fails_whole_lookup_and_can_retry_without_user_state_change
 
 #[path = "reader_words/effective.rs"]
 mod effective;
+
+#[path = "reader_words/status_cache.rs"]
+mod status_cache;

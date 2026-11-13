@@ -18,6 +18,9 @@ use crate::{
 
 const COUNT_SQL: &str = "SELECT COUNT(*) FROM reading_occurrences WHERE vocabulary_id = ?1";
 
+mod selection_cache;
+pub(crate) use selection_cache::{SelectionRevision, ValidatedSelection};
+
 #[derive(Debug)]
 pub enum ReaderWordError {
     Storage(StorageError),
@@ -70,7 +73,9 @@ impl Storage {
         key: &EffectiveReaderTokenKey,
         segment_index: u64,
     ) -> Result<Option<EffectiveReaderWordDetails>, ReaderWordError> {
+        self.validated_reader_selection = None;
         let transaction = self.connection.transaction().map_err(StorageError::from)?;
+        let revision = SelectionRevision::read(&transaction)?;
         let Some(token) = selected_effective_token_in(&transaction, key, segment_index)? else {
             return Ok(None);
         };
@@ -90,6 +95,8 @@ impl Storage {
                 .collect::<Vec<_>>(),
         )?;
         transaction.commit().map_err(StorageError::from)?;
+        self.validated_reader_selection =
+            Some(ValidatedSelection::new(key, token.clone(), revision));
         Ok(Some(EffectiveReaderWordDetails {
             key: key.clone(),
             dictionary_sources: components,

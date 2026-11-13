@@ -112,6 +112,7 @@ impl From<rusqlite::Error> for StorageError {
 /// No raw SQL/connection access is exposed through this API or the FFI.
 pub struct Storage {
     connection: Connection,
+    validated_reader_selection: Option<reader_words::ValidatedSelection>,
 }
 
 impl Storage {
@@ -123,7 +124,10 @@ impl Storage {
         // SQLite requires this outside a transaction, on every connection.
         connection.pragma_update(None, "foreign_keys", true)?;
         migrate(&mut connection, MIGRATIONS)?;
-        Ok(Self { connection })
+        Ok(Self {
+            connection,
+            validated_reader_selection: None,
+        })
     }
 
     pub fn schema_version(&self) -> Result<i64, StorageError> {

@@ -140,6 +140,9 @@ pub(crate) fn read_entry_by_surface(
     connection: &Connection,
     surface: &Surface,
 ) -> Result<Option<VocabularyEntry>, StorageError> {
+    #[cfg(test)]
+    crate::tests::reader_work::SURFACES
+        .with_borrow_mut(|forms| forms.push(surface.as_str().to_owned()));
     connection
         .query_row(
             "SELECT id, surface, status, registered_at_unix_ms FROM vocabulary WHERE surface = ?1",

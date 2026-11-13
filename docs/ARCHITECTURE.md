@@ -38,6 +38,11 @@ converts only displayed ranges to UTF-16, including crossing tokens and ruby.
 Dictionary lookup uses bundled JMdict/JMnedict only. Empty results show the
 existing no-match state. There is no custom-entry editor, fallback or export.
 Status changes commit through the worker and update repeated surfaces globally.
+Storage retains one fully validated word selection for status saves. Reuse requires
+the exact page/segmentation key and segment index, unchanged SQLite local change,
+external data and schema revisions, and a live exact-surface vocabulary ID check
+inside the immediate write transaction. Expected status/history writes retain the
+validation; other changes and failed writes discard it and require full validation.
 Shared text styling, links, images and ruby rendering remain independent of word
 selection. Whole-document payloads are not part of the live view.
 

@@ -6,7 +6,10 @@ fn setup() -> (TestDatabase, Storage) {
     let database = TestDatabase::new();
     let mut connection = Connection::open(database.path()).unwrap();
     migrate(&mut connection, MIGRATIONS).unwrap();
-    let mut storage = Storage { connection };
+    let mut storage = Storage {
+        connection,
+        validated_reader_selection: None,
+    };
     let document = storage
         .unanalyzed_fixture(
             &PasteText::new(" \n猫 𠮷 か\u{3099} English 。 📖 \0\r\n　".into()).unwrap(),
