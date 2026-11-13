@@ -390,16 +390,17 @@ internal fun ReaderScreen(
             )
 
             Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
+                modifier = Modifier.fillMaxWidth().testTag("reader_navigation"),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                TextButton(
-                    onClick = previous,
-                    enabled = canGoBack,
-                    modifier = Modifier.weight(1f).testTag("previous_page"),
-                ) {
-                    Text(stringResource(R.string.previous_page))
+                Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
+                    TextButton(
+                        onClick = previous,
+                        enabled = canGoBack,
+                        modifier = Modifier.testTag("previous_page"),
+                    ) {
+                        Text(stringResource(R.string.previous_page))
+                    }
                 }
                 Text(
                     stringResource(
@@ -409,17 +410,19 @@ internal fun ReaderScreen(
                     ),
                     modifier = Modifier.testTag("page_counter"),
                 )
-                TextButton(
-                    onClick = next,
-                    enabled = canAdvance,
-                    modifier = Modifier.weight(1f).testTag("next_page"),
-                ) {
-                    Text(
-                        stringResource(
-                            if (page.pageNumber == page.totalPages) R.string.finish_book
-                            else R.string.next_page
+                Box(Modifier.weight(1f), contentAlignment = Alignment.CenterEnd) {
+                    TextButton(
+                        onClick = next,
+                        enabled = canAdvance,
+                        modifier = Modifier.testTag("next_page"),
+                    ) {
+                        Text(
+                            stringResource(
+                                if (page.pageNumber == page.totalPages) R.string.finish_book
+                                else R.string.next_page
+                            )
                         )
-                    )
+                    }
                 }
             }
         }

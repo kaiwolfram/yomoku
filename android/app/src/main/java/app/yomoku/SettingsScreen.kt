@@ -1,17 +1,20 @@
 package app.yomoku
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Switch
@@ -28,6 +31,8 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import app.yomoku.shared.Event
 import app.yomoku.shared.PageLength
@@ -65,29 +70,23 @@ internal fun SettingsScreen(
             Modifier.widthIn(max = 720.dp)
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
+                .testTag("settings_scroll")
                 .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         StorageStatus(view)
         ReaderSaveRetry(view, dispatch)
-        AnkiSettingsPanel(
-            view.ankiSettings,
-            ankiDecks,
-            dispatch,
-            checkAnkiProvider,
-            requestAnkiPermission,
-        )
-        AnkiModelSetupPanel(view.ankiSetup, dispatch, enabled = view.ankiExport == null)
-        view.ankiExport?.let { AnkiExportPanel(it, dispatch, ankiBrowser) }
+        if (view.pageLength == null && !view.storageBusy) {
+            TextButton(onClick = { dispatch(Event.RefreshLibrary) }) {
+                Text(stringResource(R.string.retry))
+            }
+        }
         val typography = view.readerTypography
         val typographyEnabled =
             typography != null && !view.storageBusy && !view.completionSavePending
 
-        Text(
-            stringResource(R.string.reader_typography_title),
-            style = MaterialTheme.typography.titleMedium,
-        )
-        Text(stringResource(R.string.reader_typography_description))
+        SettingsSectionHeading(stringResource(R.string.settings_reader))
+        SettingsDescription(stringResource(R.string.reader_typography_description))
         TypographyControl(
             label = stringResource(R.string.reader_font_size, typography?.fontSize?.spValue ?: 16),
             tag = "reader_font_size",
@@ -147,7 +146,7 @@ internal fun SettingsScreen(
             stringResource(R.string.page_length_title),
             style = MaterialTheme.typography.titleMedium,
         )
-        Text(stringResource(R.string.page_length_description))
+        SettingsDescription(stringResource(R.string.page_length_description))
         Column(Modifier.selectableGroup()) {
             for ((length, characters) in
                 listOf(
@@ -178,23 +177,23 @@ internal fun SettingsScreen(
                 }
             }
         }
-        if (view.pageLength == null && !view.storageBusy) {
-            TextButton(onClick = { dispatch(Event.RefreshLibrary) }) {
-                Text(stringResource(R.string.retry))
-            }
-        }
-        TextButton(onClick = { showNotices = true }) {
-            Text(stringResource(R.string.sudachi_notices_title))
-        }
-        TextButton(onClick = { showWordNotices = true }) {
-            Text(stringResource(R.string.word_dictionary_notices_title))
-        }
-        TextButton(onClick = { showSvgNotices = true }) {
-            Text(stringResource(R.string.svg_notices_title))
-        }
-        TextButton(onClick = { showFontNotices = true }) {
-            Text(stringResource(R.string.reader_font_notices_title))
-        }
+        HorizontalDivider()
+        AnkiSettingsPanel(
+            view.ankiSettings,
+            ankiDecks,
+            dispatch,
+            checkAnkiProvider,
+            requestAnkiPermission,
+        )
+        AnkiModelSetupPanel(view.ankiSetup, dispatch, enabled = view.ankiExport == null)
+        view.ankiExport?.let { AnkiExportPanel(it, dispatch, ankiBrowser) }
+        HorizontalDivider()
+        SettingsSectionHeading(stringResource(R.string.settings_about))
+        SettingsDescription(stringResource(R.string.settings_about_description))
+        NoticeRow(stringResource(R.string.sudachi_notices_title)) { showNotices = true }
+        NoticeRow(stringResource(R.string.word_dictionary_notices_title)) { showWordNotices = true }
+        NoticeRow(stringResource(R.string.svg_notices_title)) { showSvgNotices = true }
+        NoticeRow(stringResource(R.string.reader_font_notices_title)) { showFontNotices = true }
     }
 }
 
@@ -207,9 +206,9 @@ private fun TypographyControl(
     enabled: Boolean,
     onChange: (Int) -> Unit,
 ) {
-    Column(Modifier.fillMaxWidth()) {
-        Text(label, modifier = Modifier.testTag(tag))
-        Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Text(label, modifier = Modifier.weight(1f).testTag(tag))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             TextButton(
                 onClick = { onChange(index - 1) },
                 enabled = enabled && index > 0,
@@ -226,4 +225,36 @@ private fun TypographyControl(
             }
         }
     }
+}
+
+@Composable
+internal fun SettingsSectionHeading(label: String) {
+    Text(
+        label,
+        modifier = Modifier.semantics { heading() }.padding(top = 8.dp),
+        style = MaterialTheme.typography.titleLarge,
+    )
+}
+
+@Composable
+internal fun SettingsDescription(description: String) {
+    Text(
+        description,
+        style = MaterialTheme.typography.bodyMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+}
+
+@Composable
+private fun NoticeRow(label: String, onClick: () -> Unit) {
+    Text(
+        label,
+        modifier =
+            Modifier.fillMaxWidth()
+                .sizeIn(minHeight = 48.dp)
+                .clickable(role = Role.Button, onClick = onClick)
+                .padding(vertical = 16.dp),
+        style = MaterialTheme.typography.bodyLarge,
+        color = MaterialTheme.colorScheme.primary,
+    )
 }

@@ -30,11 +30,8 @@ internal fun AnkiSettingsPanel(
     requestPermission: () -> Unit,
 ) {
     Column(Modifier.testTag("anki_settings"), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(
-            stringResource(R.string.anki_settings_title),
-            style = MaterialTheme.typography.titleMedium,
-        )
-        Text(stringResource(R.string.anki_settings_description))
+        SettingsSectionHeading(stringResource(R.string.anki_settings_title))
+        SettingsDescription(stringResource(R.string.anki_settings_description))
         Text(
             stringResource(
                 when (settings.phase) {

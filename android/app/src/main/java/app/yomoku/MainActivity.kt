@@ -1,17 +1,11 @@
 package app.yomoku
 
-import android.Manifest
-import android.content.pm.PackageManager
-import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModelProvider
 import app.yomoku.shared.ContentRoute
 import app.yomoku.shared.Event
@@ -20,12 +14,6 @@ import app.yomoku.theme.YomokuTheme
 class MainActivity : ComponentActivity() {
     private lateinit var core: CoreSession
     private lateinit var fileImports: FileImports
-    private var notificationPermission by mutableStateOf(true)
-    private val notificationRequest =
-        registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-            notificationPermission = granted
-            fileImports.refreshNotifications()
-        }
     private val filePicker =
         registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
             if (uri != null) fileImports.start(uri)
@@ -74,10 +62,7 @@ class MainActivity : ComponentActivity() {
                     // Validate the literal display-name extension in FileImports.
                     filePicker.launch(arrayOf("*/*"))
                 }
-                FileImportDialogs(fileImports, !notificationPermission) {
-                    if (Build.VERSION.SDK_INT >= 33)
-                        notificationRequest.launch(Manifest.permission.POST_NOTIFICATIONS)
-                }
+                FileImportDialogs(fileImports)
             }
         }
     }
@@ -85,10 +70,6 @@ class MainActivity : ComponentActivity() {
     override fun onStart() {
         super.onStart()
         core.setForeground(true)
-        notificationPermission =
-            Build.VERSION.SDK_INT < 33 ||
-                checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) ==
-                    PackageManager.PERMISSION_GRANTED
         fileImports.refreshNotifications()
     }
 

@@ -49,11 +49,6 @@ internal fun StatisticsScreen(
                     initialFirstVisibleItemIndex =
                         StatisticsTimeframe.entries.indexOf(state.timeframe)
                 )
-            LaunchedEffect(state.timeframe) {
-                timeframeScroll.animateScrollToItem(
-                    StatisticsTimeframe.entries.indexOf(state.timeframe)
-                )
-            }
             LazyRow(
                 state = timeframeScroll,
                 horizontalArrangement = Arrangement.spacedBy(8.dp),

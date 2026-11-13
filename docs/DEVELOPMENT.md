@@ -127,6 +127,17 @@ tools/start-android-emulator.sh medium_phone
 ./android/gradlew -p android :app:connectedDebugAndroidTest --offline --console=plain
 ```
 
+The denied-notification import case must run alone with notification permission
+revoked before instrumentation starts (revoking it during a test kills the app):
+
+```sh
+"$ANDROID_HOME/platform-tools/adb" -e shell pm revoke app.yomoku android.permission.POST_NOTIFICATIONS
+"$ANDROID_HOME/platform-tools/adb" -e shell am instrument -w -r -e class app.yomoku.ImportNotificationsTest#deniedNotificationsKeepImportDialogWithoutPermissionActionOrPrompt app.yomoku.test/androidx.test.runner.AndroidJUnitRunner
+```
+
+It skips when notifications are enabled; the other import-notification cases grant
+permission for their delivery checks.
+
 Use instrumentation class filters for focused reader/provider cases. Do not wipe
 an ordinary installation or accept unsupported development data by resetting it.
 An isolated fresh AVD is suitable for initial-schema tests. Reader trials should

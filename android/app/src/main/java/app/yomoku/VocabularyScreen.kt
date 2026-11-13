@@ -2,10 +2,12 @@ package app.yomoku
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -19,7 +21,6 @@ import app.yomoku.shared.*
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun VocabularyScreen(
     view: ViewModel,
@@ -103,7 +104,13 @@ internal fun VocabularyScreen(
                     },
                 )
                 if (selection != null) VocabularySelectionActions(view, dispatch, canSelect)
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(
+                    modifier =
+                        Modifier.fillMaxWidth()
+                            .horizontalScroll(rememberScrollState())
+                            .testTag("vocabulary_filters"),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
                     VocabularyStatus.entries.forEach { status ->
                         FilterChip(
                             selected = status in query.statuses,

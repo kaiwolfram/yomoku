@@ -38,6 +38,21 @@ class VocabularyScreenTest {
     }
 
     @Test
+    fun statusFiltersShareOneRowAndEveryChipIsReachable() {
+        render()
+        val top = compose.onNodeWithTag("vocabulary_status_NEW").getUnclippedBoundsInRoot().top
+        VocabularyStatus.entries.forEach { status ->
+            val chip = compose.onNodeWithTag("vocabulary_status_${status.name}")
+            assertEquals(top.value, chip.getUnclippedBoundsInRoot().top.value, 0.5f)
+            chip.performScrollTo().assertIsDisplayed().assertIsEnabled().performClick()
+            assertEquals(
+                VocabularyStatus.entries.filter { it.ordinal > status.ordinal },
+                frame.value.vocabulary.query.statuses,
+            )
+        }
+    }
+
+    @Test
     fun literalSearchAllStatusSubsetsSortsAndExactUnsignedLabels() {
         frame.value =
             frame.value.copy(
@@ -60,13 +75,17 @@ class VocabularyScreenTest {
         VocabularyStatus.entries.forEach { status ->
             compose
                 .onNodeWithTag("vocabulary_status_${status.name}")
+                .performScrollTo()
                 .assertIsSelected()
                 .performClick()
             compose.onNodeWithTag("vocabulary_status_${status.name}").assertIsNotSelected()
         }
         assertTrue(frame.value.vocabulary.query.statuses.isEmpty())
         VocabularyStatus.entries.forEach { status ->
-            compose.onNodeWithTag("vocabulary_status_${status.name}").performClick()
+            compose
+                .onNodeWithTag("vocabulary_status_${status.name}")
+                .performScrollTo()
+                .performClick()
         }
         assertEquals(VocabularyStatus.entries, frame.value.vocabulary.query.statuses)
         listOf(

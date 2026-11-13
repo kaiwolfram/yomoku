@@ -12,19 +12,23 @@ import android.net.Uri
 import android.os.Build
 import android.os.IBinder
 import android.util.Base64
+import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.ViewModelProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import org.junit.Assert.*
+import org.junit.Assume.assumeFalse
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
+import org.junit.rules.TestName
 import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
 class ImportNotificationsTest {
+    @get:Rule val testName = TestName()
     @get:Rule val compose = createAndroidComposeRule<MainActivity>()
     private val instrumentation = InstrumentationRegistry.getInstrumentation()
     private val context = instrumentation.targetContext
@@ -52,17 +56,46 @@ class ImportNotificationsTest {
 
     @Before
     fun prepare() {
-        if (Build.VERSION.SDK_INT >= 33)
+        if (
+            testName.methodName ==
+                "deniedNotificationsKeepImportDialogWithoutPermissionActionOrPrompt"
+        ) {
+            assumeFalse(
+                "Run this case with POST_NOTIFICATIONS revoked.",
+                manager.areNotificationsEnabled(),
+            )
+        } else if (Build.VERSION.SDK_INT >= 33) {
             instrumentation.uiAutomation.grantRuntimePermission(
                 context.packageName,
                 Manifest.permission.POST_NOTIFICATIONS,
             )
+        }
         manager.cancelAll()
         compose.waitUntil(30_000) {
             val view = owner().session.view
             !view.storageBusy &&
                 (view.libraryWordDistributions != null || view.libraryWordError != null)
         }
+    }
+
+    @Test
+    fun deniedNotificationsKeepImportDialogWithoutPermissionActionOrPrompt() {
+        val imports = owner().fileImports
+        assertFalse(manager.areNotificationsEnabled())
+        val uri =
+            fixture("denied-${System.nanoTime()}.srt", byteArrayOf(0xc2.toByte(), 0xa9.toByte()))
+        compose.runOnIdle { imports.start(uri) }
+        compose.waitUntil(30_000) { imports.choosingEncoding }
+        compose.onNodeWithText("Enable import notifications").assertDoesNotExist()
+        compose.onNodeWithText("Cancel").assertIsDisplayed()
+        assertNull(notice(ImportNotifications.WAIT_ID))
+        compose.activityRule.scenario.moveToState(Lifecycle.State.CREATED)
+        compose.activityRule.scenario.moveToState(Lifecycle.State.RESUMED)
+        compose.onNodeWithText("Cancel").assertIsDisplayed()
+        compose.onNodeWithText("Enable import notifications").assertDoesNotExist()
+        compose.runOnIdle { imports.cancel() }
+        compose.waitUntil(30_000) { !imports.active && !owner().session.view.storageBusy }
+        assertNull(notice(ImportNotifications.COMPLETE_ID))
     }
 
     @Test
@@ -82,6 +115,7 @@ class ImportNotificationsTest {
                         ?.getString(Notification.EXTRA_TEXT)
                         ?.contains("$prefix.epub") == true
             }
+            compose.onNodeWithText("Enable import notifications").assertDoesNotExist()
             assertTrue(foregroundService())
             val progress = checkNotNull(notice(ImportNotifications.PROGRESS_ID))
             assertEquals("Import book", progress.extras.getString(Notification.EXTRA_TITLE))

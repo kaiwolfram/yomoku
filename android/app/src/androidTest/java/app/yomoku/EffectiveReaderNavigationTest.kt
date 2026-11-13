@@ -103,6 +103,34 @@ class EffectiveReaderNavigationTest {
         events.filterIsInstance<Event.CompleteEffectiveReaderPage>().last()
 
     @Test
+    fun navigationButtonsAlignToEdgesAndCounterStaysCenteredForNextAndFinish() {
+        show()
+        for (number in listOf(2UL, 3UL)) {
+            compose.runOnUiThread {
+                frame.value =
+                    frame.value.copy(reader = frame.value.reader!!.copy(pageNumber = number))
+            }
+            compose.onNodeWithTag("page_counter").performScrollTo()
+            val row = compose.onNodeWithTag("reader_navigation").getUnclippedBoundsInRoot()
+            val previous = compose.onNodeWithTag("previous_page").getUnclippedBoundsInRoot()
+            val next = compose.onNodeWithTag("next_page").getUnclippedBoundsInRoot()
+            val counter = compose.onNodeWithTag("page_counter").getUnclippedBoundsInRoot()
+            assertEquals(row.left.value, previous.left.value, 0.5f)
+            assertEquals(row.right.value, next.right.value, 0.5f)
+            assertEquals(
+                (row.left.value + row.right.value) / 2,
+                (counter.left.value + counter.right.value) / 2,
+                0.5f,
+            )
+            assertTrue(previous.right <= counter.left)
+            assertTrue(counter.right <= next.left)
+            assertTrue(previous.right - previous.left < (row.right - row.left) / 2)
+            assertTrue(next.right - next.left < (row.right - row.left) / 2)
+            compose.onNodeWithText(if (number == 3UL) "Finish Book" else "Next").assertIsDisplayed()
+        }
+    }
+
+    @Test
     fun appUsesButtonsForCompactCompletionAndIgnoresHorizontalSwipes() {
         show()
         compose.onNodeWithTag("bottom_navigation").assertDoesNotExist()
@@ -287,13 +315,6 @@ class EffectiveReaderNavigationTest {
             val reader = compose.onNodeWithTag("reader_scroll").fetchSemanticsNode().boundsInRoot
             val counter = compose.onNodeWithTag("page_counter").fetchSemanticsNode().boundsInRoot
             assertEquals(reader.center.x, counter.center.x, 1f)
-            val previous = compose.onNodeWithTag("previous_page").getUnclippedBoundsInRoot()
-            val next = compose.onNodeWithTag("next_page").getUnclippedBoundsInRoot()
-            assertEquals(
-                (previous.right - previous.left).value,
-                (next.right - next.left).value,
-                0.5f,
-            )
         }
         checkCounter()
         compose.runOnUiThread {

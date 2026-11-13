@@ -2,6 +2,8 @@ package app.yomoku
 
 import androidx.activity.ComponentActivity
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -22,6 +24,55 @@ class StatisticsScreenTest {
         compose.setContent {
             YomokuTheme { YomokuApp(frame.value, "statistics-test", events::add) }
         }
+    }
+
+    @Test
+    fun persistedIntervalIsVisibleOnEntryAndSelectionPreservesBothScrollPositions() {
+        frame.value =
+            frame.value.copy(
+                statistics = frame.value.statistics.copy(timeframe = StatisticsTimeframe.ALLTIME)
+            )
+        render()
+        compose.onNodeWithTag("statistics_timeframe_ALLTIME").assertIsDisplayed().assertIsSelected()
+        compose
+            .onNodeWithTag("statistics_timeframes")
+            .performScrollToNode(hasTestTag("statistics_timeframe_LASTWEEK"))
+        compose.onNodeWithTag("statistics_scroll").performSemanticsAction(
+            SemanticsActions.ScrollBy
+        ) {
+            it(0f, 12f)
+        }
+        compose.waitForIdle()
+        fun horizontal() =
+            compose
+                .onNodeWithTag("statistics_timeframes")
+                .fetchSemanticsNode()
+                .config[SemanticsProperties.HorizontalScrollAxisRange]
+                .value()
+        fun vertical() =
+            compose
+                .onNodeWithTag("statistics_scroll")
+                .fetchSemanticsNode()
+                .config[SemanticsProperties.VerticalScrollAxisRange]
+                .value()
+        val x = horizontal()
+        val y = vertical()
+        compose.onNodeWithTag("statistics_timeframe_LASTMONTH").performClick()
+        assertEquals(
+            StatisticsTimeframe.LASTMONTH,
+            (events.last() as Event.SetStatisticsTimeframe).timeframe,
+        )
+        compose.runOnUiThread {
+            frame.value =
+                frame.value.copy(
+                    statistics =
+                        frame.value.statistics.copy(timeframe = StatisticsTimeframe.LASTMONTH)
+                )
+        }
+        compose.waitForIdle()
+        compose.onNodeWithTag("statistics_timeframe_LASTMONTH").assertIsSelected()
+        assertEquals(x, horizontal(), 0.5f)
+        assertEquals(y, vertical(), 0.5f)
     }
 
     @Test

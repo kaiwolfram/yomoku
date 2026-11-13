@@ -19,11 +19,7 @@ import app.yomoku.shared.ImportOutcome
 import app.yomoku.shared.TextEncoding
 
 @Composable
-internal fun FileImportDialogs(
-    imports: FileImports,
-    canRequestNotifications: Boolean = false,
-    requestNotifications: () -> Unit = {},
-) {
+internal fun FileImportDialogs(imports: FileImports) {
     if (imports.active) {
         AlertDialog(
             onDismissRequest = {},
@@ -47,11 +43,6 @@ internal fun FileImportDialogs(
                         }
                     }
                     Text(stringResource(R.string.import_background_limits))
-                    if (canRequestNotifications) {
-                        TextButton(onClick = requestNotifications) {
-                            Text(stringResource(R.string.import_enable_notifications))
-                        }
-                    }
                 }
             },
             confirmButton = {},
