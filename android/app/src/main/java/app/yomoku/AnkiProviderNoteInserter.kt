@@ -89,6 +89,7 @@ internal class AnkiProviderNoteInserter(
                 ContentValues().apply {
                     put("mid", request.modelId.value)
                     put("flds", request.joinedFields)
+                    put("tags", "yomoku")
                 }
             submitted = true
             val id = noteId(resolver.insert(notesUri(), values))

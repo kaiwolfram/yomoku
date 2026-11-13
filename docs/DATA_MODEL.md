@@ -88,6 +88,8 @@ INSERT INTO anki_settings VALUES (1, NULL);
 
 The saved deck is a preference, not proof of availability in the current collection.
 Prepared notes, duplicate results and active provider ownership are transient.
+New AnkiDroid note insertions include `yomoku` in the provider’s space-separated
+`tags` value; existing duplicate notes are never retagged.
 There are no submission/model-creation journals, export history or startup replay.
 
 ## Backup boundary
