@@ -234,7 +234,7 @@ CREATE INDEX vocabulary_status_events_by_entry ON vocabulary_status_events(vocab
 CREATE UNIQUE INDEX vocabulary_completion_status_once
     ON vocabulary_status_events(completion_command_id, vocabulary_id) WHERE cause = 'completion';
 
-INSERT INTO reader_settings VALUES (1, 500, 16, 150, 0);
+INSERT INTO reader_settings VALUES (1, 250, 16, 150, 0);
 INSERT INTO library_read_clock VALUES (1, 0);
 INSERT INTO anki_settings VALUES (1, NULL);
 

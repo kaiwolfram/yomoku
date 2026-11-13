@@ -183,7 +183,7 @@ fn replay_after_reopen_reflow_and_reread_never_moves_progress() {
     drop(storage);
     let mut storage = Storage::open(database.path()).unwrap();
     storage
-        .save_page_length(yomoku_core::pagination::PageLength::Characters250)
+        .save_page_length(yomoku_core::pagination::PageLength::Characters500)
         .unwrap();
     assert_eq!(
         storage.record_effective_page_completion(&first).unwrap(),
@@ -425,7 +425,7 @@ fn preparation_freezes_all_page_buckets_and_reserves_only_after_successful_valid
             ..intent
         },
         PageCompletionIntent {
-            page_length: yomoku_core::pagination::PageLength::Characters250,
+            page_length: yomoku_core::pagination::PageLength::Characters500,
             ..intent
         },
     ] {

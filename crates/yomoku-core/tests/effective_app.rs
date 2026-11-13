@@ -420,7 +420,7 @@ fn page_movement_reflow_and_exit_retire_compact_completion_callbacks_before_io()
             _ => {
                 f.core.process_event(Event::OpenSettings);
                 f.core
-                    .process_event(Event::SetPageLength(PageLength::Characters250));
+                    .process_event(Event::SetPageLength(PageLength::Characters500));
             }
         }
         assert!(f.core.view().effective_reader_tokens.is_none());

@@ -3,6 +3,22 @@ use yomoku_core::{document::PasteText, pagination::PageLength};
 use super::*;
 
 #[test]
+fn fresh_reader_page_length_defaults_to_250_and_reopens_unchanged() {
+    let database = TestDatabase::new();
+    let storage = Storage::open(database.path()).unwrap();
+    assert_eq!(PageLength::default(), PageLength::Characters250);
+    assert_eq!(storage.page_length().unwrap(), PageLength::Characters250);
+    drop(storage);
+    assert_eq!(
+        Storage::open(database.path())
+            .unwrap()
+            .page_length()
+            .unwrap(),
+        PageLength::Characters250
+    );
+}
+
+#[test]
 fn every_preset_is_global_durable_and_does_not_change_documents_or_positions() {
     let database = TestDatabase::new();
     let mut storage = Storage::open(database.path()).unwrap();

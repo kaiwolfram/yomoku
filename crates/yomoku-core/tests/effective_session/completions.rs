@@ -277,7 +277,7 @@ fn wrong_stage_or_changed_reservation_cannot_replace_the_accepted_command() {
         let mut intent = fixture.intent;
         match field {
             0 => intent.document_id = 99.try_into().unwrap(),
-            1 => intent.page_length = PageLength::Characters250,
+            1 => intent.page_length = PageLength::Characters500,
             2 => intent.completed_at_unix_ms += 1,
             3 => intent.departing_position.offset = 3.try_into().unwrap(),
             _ => intent.page.range.start = 3.try_into().unwrap(),

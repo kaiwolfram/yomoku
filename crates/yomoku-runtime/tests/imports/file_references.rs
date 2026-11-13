@@ -267,11 +267,11 @@ fn ordered_reader_worker_crosses_chapters_with_original_analysis_time_and_whole_
     let progress = saved.documents[0].progress_percent;
     router.update(Event::OpenSettings, |_| {});
     for length in [
-        yomoku_core::pagination::PageLength::Characters250,
+        yomoku_core::pagination::PageLength::Characters500,
         yomoku_core::pagination::PageLength::Characters750,
         yomoku_core::pagination::PageLength::Characters1000,
         yomoku_core::pagination::PageLength::Characters1500,
-        yomoku_core::pagination::PageLength::Characters500,
+        yomoku_core::pagination::PageLength::Characters250,
     ] {
         let reflowed = dispatch(&router, Event::SetPageLength(length));
         assert_eq!(reflowed.reader.as_ref().unwrap().position, position);

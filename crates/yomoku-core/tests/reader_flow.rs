@@ -322,7 +322,11 @@ fn settings_failures_keep_committed_page_and_late_saves_do_not_reopen_routes() {
     assert_eq!(core.view().page_length, None);
     let document = document(&"字。\n".repeat(1000));
     let mut effects = core.process_event(Event::OpenReader(document.document_id));
-    finish(&core, &mut effects, loaded(document, PageLength::default()));
+    finish(
+        &core,
+        &mut effects,
+        loaded(document, PageLength::Characters500),
+    );
     assert!(core
         .process_event(Event::SetPageLength(PageLength::Characters250))
         .is_empty());
@@ -334,7 +338,7 @@ fn settings_failures_keep_committed_page_and_late_saves_do_not_reopen_routes() {
         &mut effects,
         StorageResult::Failed(DocumentError::Unavailable),
     );
-    assert_eq!(core.view().page_length, Some(PageLength::default()));
+    assert_eq!(core.view().page_length, Some(PageLength::Characters500));
     assert_eq!(core.view().reader, previous);
     let mut effects = core.process_event(Event::SetPageLength(PageLength::Characters250));
     assert!(core.view().document_error.is_none());

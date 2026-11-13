@@ -40,7 +40,7 @@ fn reservation_authenticates_every_completion_field_before_and_after_recording_o
                 6 => changed.departing_position.source_id = i64::MAX.try_into().unwrap(),
                 7 => changed.departing_position.chapter_id = i64::MAX.try_into().unwrap(),
                 8 => changed.departing_position.offset = 3.try_into().unwrap(),
-                9 => changed.page_length = yomoku_core::pagination::PageLength::Characters250,
+                9 => changed.page_length = yomoku_core::pagination::PageLength::Characters500,
                 _ => changed.completed_at_unix_ms += 1,
             }
             // Invalid anchors fail at construction; all other payload changes

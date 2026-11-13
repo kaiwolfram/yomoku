@@ -29,7 +29,7 @@ fn slices<'a>(pages: &LogicalPages<'_>, chapter: &'a ChapterText) -> Vec<&'a str
 
 #[test]
 fn presets_and_default_match_the_reader_setting() {
-    assert_eq!(PageLength::default().characters(), 500);
+    assert_eq!(PageLength::default().characters(), 250);
     assert_eq!(
         PageLength::ALL.map(PageLength::characters),
         [250, 500, 750, 1000, 1500]
@@ -76,7 +76,7 @@ fn waits_for_a_paragraph_after_threshold_even_with_earlier_sentences() {
     let first = format!("{}。\n", "日".repeat(298));
     let second = format!("{}。{}。\n", "語".repeat(249), "文".repeat(49));
     let chapters = [chapter(1, format!("{first}{second}末尾"))];
-    let pages = LogicalPages::new(&chapters, PageLength::default()).unwrap();
+    let pages = LogicalPages::new(&chapters, PageLength::Characters500).unwrap();
     assert_eq!(
         slices(&pages, &chapters[0]),
         [format!("{first}{second}"), "末尾".into()]
@@ -90,7 +90,7 @@ fn long_paragraph_uses_the_first_following_sentence_and_keeps_closing_quotes() {
         1,
         format!("{}{sentence}終。\r\n\r\n", sentence.repeat(2)),
     )];
-    let pages = LogicalPages::new(&chapters, PageLength::default()).unwrap();
+    let pages = LogicalPages::new(&chapters, PageLength::Characters500).unwrap();
     assert_eq!(
         slices(&pages, &chapters[0]),
         [
@@ -108,7 +108,7 @@ fn long_paragraph_fallback_accounts_for_preceding_short_paragraphs() {
     let sentence = format!("{}。", "あ".repeat(299));
     let rest = format!("{}。", "後".repeat(600));
     let chapters = [chapter(1, format!("{prefix}{sentence}{rest}"))];
-    let pages = LogicalPages::new(&chapters, PageLength::default()).unwrap();
+    let pages = LogicalPages::new(&chapters, PageLength::Characters500).unwrap();
     assert_eq!(
         slices(&pages, &chapters[0]),
         [format!("{prefix}{sentence}"), rest]

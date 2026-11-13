@@ -13,8 +13,8 @@ use crate::document::{
 #[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
 #[repr(C)]
 pub enum PageLength {
-    Characters250,
     #[default]
+    Characters250,
     Characters500,
     Characters750,
     Characters1000,

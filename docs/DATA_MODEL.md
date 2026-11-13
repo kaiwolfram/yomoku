@@ -70,8 +70,10 @@ durations or pending-time state are persisted.
 
 ## Settings
 
-The singleton reader settings default to 500 characters, 16 sp font, 150% line
-spacing and furigana off. Page length is independent of typography. Library read
+The singleton reader settings default to 250 characters, 16 sp font, 150% line
+spacing and furigana off. The 250-character seed applies only to fresh databases; saved
+preferences, including 500 and legacy 1,500, survive reopening without migration
+or automatic reflow. Page length is independent of typography. Library read
 recency uses a persisted monotonic sequence.
 
 The entire Anki database state is:
