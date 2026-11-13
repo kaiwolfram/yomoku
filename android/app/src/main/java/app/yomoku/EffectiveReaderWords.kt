@@ -145,6 +145,18 @@ private fun EffectiveReaderWordContent(
         }
     }
     val display = tokens?.singleOrNull { it.selection == selected }
+    // Keep observation ownership outside the sheet and its transient details subtree.
+    // Status refreshes and switching sheet layouts must not restart duplicate queries.
+    val details =
+        word.details?.takeIf {
+            it.selection == selected && word.selection == selected && display != null
+        }
+    ObserveReaderAnkiEntries(
+        selected?.let { AnkiSelection.Effective(it) },
+        view.ankiSetup,
+        canRead && details != null,
+        dispatch,
+    )
     if (display != null) {
         val token = display.token
         ReaderWordPanel(
@@ -167,20 +179,8 @@ private fun EffectiveReaderWordContent(
                 }
             },
         ) {
-            val details =
-                word.details?.takeIf {
-                    it.selection == display.selection &&
-                        it.token == token &&
-                        word.selection == display.selection
-                }
             if (details != null) {
                 val ankiSelection = AnkiSelection.Effective(details.selection)
-                ObserveReaderAnkiEntries(
-                    ankiSelection,
-                    view.ankiSetup,
-                    canRead,
-                    dispatch,
-                )
                 ReaderDictionary(
                     details.encountered,
                     details.candidates,

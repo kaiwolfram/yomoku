@@ -36,14 +36,14 @@ import app.yomoku.shared.Event
 
 @Composable
 internal fun ObserveReaderAnkiEntries(
-    selection: AnkiSelection,
+    selection: AnkiSelection?,
     setup: AnkiSetupPhase,
     enabled: Boolean,
     dispatch: (Event) -> Unit,
 ) {
     var requested by remember(selection, setup) { mutableStateOf(false) }
     LaunchedEffect(selection, setup, enabled) {
-        if (setup == AnkiSetupPhase.Ready && enabled && !requested) {
+        if (selection != null && setup == AnkiSetupPhase.Ready && enabled && !requested) {
             requested = true
             dispatch(Event.LoadReaderAnkiEntries(selection))
         }

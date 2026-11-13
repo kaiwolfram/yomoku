@@ -2,13 +2,23 @@ package app.yomoku
 
 import android.database.sqlite.SQLiteDatabase
 import android.os.Looper
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
+import androidx.compose.ui.semantics.ProgressBarRangeInfo
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.*
+import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import app.yomoku.shared.*
+import app.yomoku.theme.YomokuTheme
 import java.io.File
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 import org.junit.Assert.*
+import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 
@@ -18,6 +28,10 @@ import org.junit.runner.RunWith
  */
 @RunWith(AndroidJUnit4::class)
 class AnkiEntrySessionTest {
+    @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
+    private val entryQueries = AtomicInteger()
+    private var providerEntered: CountDownLatch? = null
+    private var providerRelease: CountDownLatch? = null
     private val instrumentation = InstrumentationRegistry.getInstrumentation()
     private lateinit var core: CoreSession
     private val notes = ConcurrentHashMap<Pair<String, String>, List<Long>>()
@@ -52,6 +66,11 @@ class AnkiEntrySessionTest {
                     readAnkiPreflight = { operation ->
                         assertNotEquals(Looper.getMainLooper(), Looper.myLooper())
                         assertEquals("Yomoku", operation.layout.name)
+                        if (operation.surface.isNotEmpty()) {
+                            entryQueries.incrementAndGet()
+                            providerEntered?.countDown()
+                            check(providerRelease?.await(30, TimeUnit.SECONDS) != false)
+                        }
                         AnkiPreflightResult.Complete(
                             AnkiPreflightObservation(
                                 listOf(AnkiPreflightDeck(7, false)),
@@ -184,6 +203,151 @@ class AnkiEntrySessionTest {
             }
             assertEquals(1, writes.get())
         } finally {
+            close()
+            directory.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun statusWritesKeepSettledIconsAndDoNotRepeatDelayedProviderQueries() {
+        val directory =
+            File(instrumentation.targetContext.noBackupFilesDir, "anki-status-${System.nanoTime()}")
+                .apply { mkdirs() }
+        val database = File(directory, "db.sqlite3")
+        open(database)
+        try {
+            send(Event.OpenSettings)
+            send(Event.SetAnkiDefaultDeck(7))
+            await { it.ankiSetup == AnkiSetupPhase.Ready }
+            send(Event.CloseSettings)
+            send(Event.CreatePaste("猫。"))
+            val book = await {
+                it.documents.size == 1 && !it.storageBusy
+            }
+                .documents
+                .single()
+                .documentId
+            notes["猫" to "ねこ"] = listOf(88L)
+            providerEntered = CountDownLatch(1)
+            providerRelease = CountDownLatch(1)
+            send(Event.OpenReader(book))
+            compose.setContent {
+                YomokuTheme { YomokuApp(core.view, core.sessionKey, core::dispatch) }
+            }
+            val ready = await { it.effectiveReaderTokens != null && !it.storageBusy }
+            val span =
+                effectiveDisplayTokens(
+                        ready.reader!!,
+                        ready.effectiveReaderTokens!!.identity,
+                        ready.effectiveReaderTokens,
+                    )!!
+                    .first { it.token.surface == "猫" }
+            val text =
+                compose
+                    .onNodeWithTag("reader_text")
+                    .fetchSemanticsNode()
+                    .config[SemanticsProperties.Text]
+                    .single()
+            val link = text.getLinkAnnotations(span.start, span.end).single().item
+            compose.runOnUiThread { link.linkInteractionListener!!.onClick(link) }
+            compose.waitUntil(30_000) { providerEntered!!.count == 0L }
+            assertTrue(view().ankiEntries.any { it.phase == AnkiEntryPhase.Checking })
+            providerRelease!!.countDown()
+            await {
+                it.ankiEntries.isNotEmpty() &&
+                    it.ankiEntries.all { it.phase != AnkiEntryPhase.Checking }
+            }
+            compose.waitForIdle()
+            captureUiTrial(compose, "anki-word-sheet")
+            val settled = view().ankiEntries
+            val queries = entryQueries.get()
+            fun assertSettled() {
+                settled.forEach { entry ->
+                    compose.onNodeWithTag("anki_entry_${ankiEntryTag(entry.key)}").assertExists()
+                }
+                compose
+                    .onAllNodesWithContentDescription("Open 猫【ねこ】 in Anki")
+                    .assertCountEquals(
+                        settled.count {
+                            it.headword == "猫" &&
+                                it.reading == "ねこ" &&
+                                it.phase is AnkiEntryPhase.Existing
+                        }
+                    )
+                compose
+                    .onAllNodes(
+                        hasProgressBarRangeInfo(ProgressBarRangeInfo.Indeterminate) and
+                            hasAnyAncestor(hasTestTag("reader_word_panel")),
+                        useUnmergedTree = true,
+                    )
+                    .assertCountEquals(0)
+                assertEquals(settled, view().ankiEntries)
+                assertEquals(queries, entryQueries.get())
+            }
+            SQLiteDatabase.openDatabase(database.path, null, SQLiteDatabase.OPEN_READWRITE).use {
+                sql ->
+                // Framework SQLite and bundled Rust SQLite do not share in-process lock
+                // bookkeeping.
+                // A separate process holds the writer until the pending UI has been checked.
+                val lock =
+                    ProcessBuilder(
+                            "/system/bin/app_process",
+                            "/system/bin",
+                            "app.yomoku.SqliteWriteLock",
+                            database.path,
+                        )
+                        .apply {
+                            environment()["CLASSPATH"] =
+                                instrumentation.context.applicationInfo.sourceDir
+                            redirectErrorStream(true)
+                        }
+                        .start()
+                try {
+                    val output = lock.inputStream.bufferedReader()
+                    val ready =
+                        java.util.concurrent.CompletableFuture.supplyAsync {
+                            val lines = StringBuilder()
+                            while (true) {
+                                val line = output.readLine() ?: error("Writer exited: $lines")
+                                if (line == "locked") break
+                                lines.appendLine(line)
+                            }
+                        }
+                    ready.get(20, TimeUnit.SECONDS)
+                    compose.onNodeWithTag("word_status_LEARNING").performClick()
+                    assertTrue(view().effectiveReaderStatus!!.pending)
+                    compose.onNodeWithTag("word_status_KNOWN").assertIsNotEnabled()
+                    assertSettled()
+                } finally {
+                    lock.outputStream.close()
+                    if (!lock.waitFor(10, TimeUnit.SECONDS)) lock.destroyForcibly()
+                }
+                await { !it.storageBusy && it.effectiveReaderStatus?.pending == false }
+                compose.onNodeWithTag("word_status_LEARNING").assertIsSelected()
+                assertSettled()
+                sql.execSQL(
+                    "CREATE TRIGGER fail_anki_status BEFORE INSERT ON vocabulary_status_events BEGIN SELECT RAISE(ABORT, 'test status'); END"
+                )
+                try {
+                    compose.onNodeWithTag("word_status_KNOWN").performClick()
+                    await { !it.storageBusy && it.effectiveReaderStatus?.error != null }
+                    assertSettled()
+                    compose
+                        .onNodeWithTag("effective_status_retry")
+                        .performScrollTo()
+                        .assertIsEnabled()
+                    sql.execSQL("DROP TRIGGER fail_anki_status")
+                    compose.onNodeWithTag("effective_status_retry").performClick()
+                    await { !it.storageBusy && it.effectiveReaderStatus?.pending == false }
+                    compose.onNodeWithTag("word_status_KNOWN").performScrollTo().assertIsSelected()
+                    assertSettled()
+                } finally {
+                    sql.execSQL("DROP TRIGGER IF EXISTS fail_anki_status")
+                }
+            }
+        } finally {
+            providerRelease?.countDown()
+            compose.runOnUiThread { compose.activity.setContent {} }
             close()
             directory.deleteRecursively()
         }

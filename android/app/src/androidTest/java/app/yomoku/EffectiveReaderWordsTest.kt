@@ -266,6 +266,55 @@ class EffectiveReaderWordsTest {
     }
 
     @Test
+    fun statusRefreshAndTransientDetailsDoNotRestartAnkiObservation() {
+        show()
+        tap(1)
+        val selection = frame.value.effectiveReaderWord!!.selection!!
+        exposeDictionaryAnki(AnkiSelection.Effective(selection))
+        compose.onNodeWithTag("anki_entry_word_1_0_0").assertExists()
+        fun queries() = events.filterIsInstance<Event.LoadReaderAnkiEntries>().size
+        assertEquals(1, queries())
+        val original = frame.value
+        val snapshot = original.effectiveReaderTokens!!
+        compose.runOnUiThread {
+            frame.value =
+                original.copy(
+                    storageBusy = true,
+                    effectiveReaderStatus = EffectiveStatusState(true, true),
+                )
+        }
+        compose.onNodeWithTag("anki_entry_word_1_0_0").assertIsNotEnabled()
+        // Vocabulary refresh can be published before selected-word details catch up.
+        compose.runOnUiThread {
+            frame.value =
+                original.copy(
+                    effectiveReaderTokens =
+                        snapshot.copy(
+                            tokens =
+                                snapshot.tokens.map {
+                                    it.copy(
+                                        vocabulary =
+                                            it.vocabulary?.copy(status = VocabularyStatus.LEARNING)
+                                    )
+                                }
+                        )
+                )
+        }
+        compose.onNodeWithTag("anki_entry_word_1_0_0").assertIsEnabled()
+        assertEquals(1, queries())
+        compose.runOnUiThread {
+            frame.value =
+                original.copy(
+                    effectiveReaderWord = original.effectiveReaderWord!!.copy(details = null)
+                )
+        }
+        compose.onNodeWithTag("anki_entry_word_1_0_0").assertDoesNotExist()
+        compose.runOnUiThread { frame.value = original }
+        compose.onNodeWithTag("anki_entry_word_1_0_0").assertIsEnabled()
+        assertEquals(1, queries())
+    }
+
+    @Test
     fun manualUnicodeSelectionUsesCompactIdentityAndAllFiveStatusesWithoutGuessingMetadata() {
         show()
         compose.onNodeWithText("Edit word boundaries").assertDoesNotExist()
