@@ -1223,7 +1223,13 @@ fn joined_surfaces_register_once_retain_status_and_count_once_across_pages() {
         .set_vocabulary_status(entry.id, VocabularyStatus::Familiar, 20)
         .unwrap()
         .unwrap();
-    let text = PasteText::new(format!("{}. 食べました。\n食べました。", "x".repeat(497))).unwrap();
+    let page_length = PageLength::default();
+    // Place the first joined surface across the threshold for the current preset.
+    let text = PasteText::new(format!(
+        "{}. 食べました。\n食べました。",
+        "x".repeat(page_length.characters() - 3)
+    ))
+    .unwrap();
     let PasteImportOutcome::Created(imported) = storage
         .import_analyzed_paste(&text, 30, |chapter| analyzer().analyze(chapter))
         .unwrap()
@@ -1254,7 +1260,6 @@ fn joined_surfaces_register_once_retain_status_and_count_once_across_pages() {
             .collect::<Vec<_>>(),
         ["食べました", "食べました"]
     );
-    let page_length = PageLength::default();
     let layout = LogicalPages::new(
         std::slice::from_ref(&imported.document.chapter),
         page_length,
