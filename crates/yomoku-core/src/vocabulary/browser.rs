@@ -106,6 +106,7 @@ impl VocabularyQuery {
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
 pub struct VocabularyWordState {
+    pub selection: crate::anki::VocabularyAnkiSelection,
     pub row: VocabularyRow,
     pub candidates: Option<crate::dictionary::DictionaryCandidates>,
     pub error: Option<crate::storage::DocumentError>,

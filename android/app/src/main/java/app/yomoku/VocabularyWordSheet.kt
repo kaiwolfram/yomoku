@@ -11,10 +11,21 @@ import androidx.compose.ui.res.stringResource
 import app.yomoku.shared.*
 
 @Composable
-internal fun VocabularyWordSheet(view: ViewModel, dispatch: (Event) -> Unit) {
+internal fun VocabularyWordSheet(
+    view: ViewModel,
+    dispatch: (Event) -> Unit,
+    ankiBrowser: AnkiNoteBrowser? = null,
+) {
     val state = view.vocabulary
     val word = state.word
     val enabled = !view.storageBusy && state.wordStatus == null
+    val selection = word?.selection?.let { AnkiSelection.Vocabulary(it) }
+    ObserveReaderAnkiEntries(
+        selection,
+        view.ankiSetup,
+        enabled && word?.candidates != null,
+        dispatch,
+    )
     if (word == null) return
     ReaderWordPanel(
         ReaderWordHeader(
@@ -34,7 +45,25 @@ internal fun VocabularyWordSheet(view: ViewModel, dispatch: (Event) -> Unit) {
         },
     ) {
         val candidates = word.candidates
-        if (candidates != null) ReaderDictionary(word.row.encounteredCount, candidates)
+        if (candidates != null)
+            ReaderDictionary(
+                word.row.encounteredCount,
+                candidates,
+                action = { key ->
+                    AnkiEntryAction(
+                        view.ankiEntries.find { it.selection == selection && it.key == key },
+                        enabled,
+                        dispatch,
+                        ankiBrowser,
+                    )
+                },
+                notice = { key ->
+                    AnkiEntryNotice(
+                        view.ankiEntries.find { it.selection == selection && it.key == key },
+                        ankiBrowser,
+                    )
+                },
+            )
         else
             ReaderWordLookupState(word.error != null, enabled) {
                 dispatch(Event.RetryVocabularyWord)

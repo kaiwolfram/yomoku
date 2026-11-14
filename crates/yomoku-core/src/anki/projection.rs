@@ -11,6 +11,23 @@ use crate::{
 };
 
 impl AnkiNote {
+    pub(crate) fn from_vocabulary_entry(
+        candidates: &DictionaryCandidates,
+        entry: super::AnkiEntryKey,
+    ) -> Result<Self, InvalidTextValue> {
+        let content = entry_content(candidates, entry)?;
+        Ok(Self {
+            surface: Surface::new(&content.headword).map_err(|_| InvalidTextValue)?,
+            reading: content.reading.clone(),
+            fields: [
+                super::escape(&content.headword),
+                super::escape(&content.reading),
+                content.meanings,
+                String::new(),
+            ],
+        })
+    }
+
     /// Effective revisions distinguish changed segmentation and page revisits.
     /// Manual spans use only their own metadata, never old B data.
     pub fn from_effective_selection(

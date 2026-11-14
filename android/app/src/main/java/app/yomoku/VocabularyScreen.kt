@@ -24,6 +24,7 @@ internal fun VocabularyScreen(
     sessionKey: String,
     scroll: LazyListState,
     dispatch: (Event) -> Unit,
+    ankiBrowser: AnkiNoteBrowser? = null,
 ) {
     val state = view.vocabulary
     val query = state.query
@@ -39,7 +40,7 @@ internal fun VocabularyScreen(
     SideEffect { anchor.replace(displayed.rows, scroll) }
     val enabled = (!view.storageBusy || state.loading) && state.wordStatus == null
     val canOpenWord = !view.storageBusy && !state.loading && state.wordStatus == null
-    VocabularyWordSheet(view, dispatch)
+    VocabularyWordSheet(view, dispatch, ankiBrowser)
     // The core owns attempted/error state. Resuming visibility or unrelated work
     // can start an unattempted read, but cannot retry a failed page.
     LaunchedEffect(sessionKey, view.storageBusy, state.matchingCount) {

@@ -234,7 +234,13 @@ internal fun YomokuApp(
                                 libraryActionsEnabled,
                             )
                         view.destination == Destination.VOCABULARY ->
-                            VocabularyScreen(view, sessionKey, vocabularyScroll, dispatch)
+                            VocabularyScreen(
+                                view,
+                                sessionKey,
+                                vocabularyScroll,
+                                dispatch,
+                                ankiBrowser,
+                            )
                         view.destination == Destination.STATISTICS ->
                             StatisticsScreen(
                                 view,

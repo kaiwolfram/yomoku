@@ -145,6 +145,12 @@ pub fn exchange(dir: &Path, writing: bool) -> Result<(), Box<dyn Error>> {
         Event::ClearAnkiExport {
             preparation_id: u64::MAX,
         },
+        Event::PrepareReaderAnkiExport {
+            selection: AnkiSelection::Vocabulary(yomoku_core::anki::VocabularyAnkiSelection {
+                vocabulary_id: i64::MAX.try_into().unwrap(),
+                generation: u64::MAX,
+            }),
+        },
     ]
     .into_iter()
     .enumerate()

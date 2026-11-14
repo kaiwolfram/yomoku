@@ -46,6 +46,15 @@ provider_id!(
 #[repr(C)]
 pub enum AnkiSelection {
     Effective(EffectiveReaderSelection),
+    Vocabulary(VocabularyAnkiSelection),
+}
+
+/// Session-local identity for one Vocabulary lookup, retained through status writes.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
+pub struct VocabularyAnkiSelection {
+    pub vocabulary_id: crate::document::VocabularyId,
+    pub generation: u64,
 }
 
 /// Frozen before dispatch. The adapter must use this payload, not the current

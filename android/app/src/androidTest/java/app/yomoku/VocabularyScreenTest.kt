@@ -485,7 +485,12 @@ class VocabularyScreenTest {
                     frame.value.vocabulary.copy(
                         matchingCount = 1UL,
                         rows = listOf(row),
-                        word = VocabularyWordState(row, error = DocumentError.UNAVAILABLE),
+                        word =
+                            VocabularyWordState(
+                                VocabularyAnkiSelection(row.id, 1UL),
+                                row,
+                                error = DocumentError.UNAVAILABLE,
+                            ),
                     )
             )
         render()
@@ -502,6 +507,7 @@ class VocabularyScreenTest {
                         frame.value.vocabulary.copy(
                             word =
                                 VocabularyWordState(
+                                    VocabularyAnkiSelection(row.id, 1UL),
                                     row,
                                     DictionaryCandidates(
                                         row.surface,

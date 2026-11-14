@@ -69,13 +69,50 @@ impl Model {
         self.anki_export_preflight = None;
     }
 
+    pub(super) fn current_vocabulary_anki_word(
+        &self,
+        selection: VocabularyAnkiSelection,
+    ) -> Option<&crate::vocabulary::VocabularyWordState> {
+        if !self.vocabulary_visible() {
+            return None;
+        }
+        self.vocabulary.word.as_ref().filter(|word| {
+            word.selection == selection
+                && word.row.id == selection.vocabulary_id
+                && word.candidates.is_some()
+                && word.error.is_none()
+        })
+    }
+
+    fn current_anki_selection(&self) -> Option<AnkiSelection> {
+        if self.vocabulary_visible() {
+            self.vocabulary
+                .word
+                .as_ref()
+                .map(|word| AnkiSelection::Vocabulary(word.selection))
+        } else if !self.settings_open && self.content_route == ContentRoute::Reader {
+            self.effective_reader
+                .word_state()
+                .selection
+                .map(AnkiSelection::Effective)
+        } else {
+            None
+        }
+    }
+
     fn entry_keys(&self, selection: AnkiSelection) -> Option<Vec<AnkiEntryKey>> {
-        if self.settings_open || self.content_route != ContentRoute::Reader {
+        if self.settings_open {
             return None;
         }
         let effective_word = self.effective_reader.word_state();
         let candidates = match selection {
+            AnkiSelection::Vocabulary(s) => {
+                self.current_vocabulary_anki_word(s)?.candidates.as_ref()?
+            }
             AnkiSelection::Effective(s) => {
+                if self.content_route != ContentRoute::Reader {
+                    return None;
+                }
                 let word = &effective_word;
                 if word.selection != Some(s) || word.busy || word.error.is_some() {
                     return None;
@@ -253,12 +290,10 @@ impl Yomoku {
                     return Some(self.create_anki_model(model));
                 }
                 if model.anki_setup.phase == AnkiSetupPhase::Ready {
-                    if let Some(selection) = model.effective_reader.word_state().selection {
+                    if let Some(selection) = model.current_anki_selection() {
                         // Refresh even when Compose coalesces Checking -> Ready into one frame.
-                        return self.update_anki_entries(
-                            &Event::LoadReaderAnkiEntries(AnkiSelection::Effective(selection)),
-                            model,
-                        );
+                        return self
+                            .update_anki_entries(&Event::LoadReaderAnkiEntries(selection), model);
                     }
                 }
                 Some(Command::done())
@@ -300,6 +335,9 @@ impl Yomoku {
                 Some(command)
             }
             Event::AnkiEntryChecked(request, result) => {
+                if model.entry_keys(request.export().selection()).is_none() {
+                    return Some(Command::done());
+                }
                 let Some(state) = model
                     .anki_entries
                     .iter_mut()
@@ -464,6 +502,251 @@ mod tests {
         let event = command.events().next().unwrap();
         update(model, event);
     }
+    fn vocabulary_configured() -> (Model, AnkiSelection) {
+        let (mut model, _) = configured();
+        let candidates = model
+            .effective_reader
+            .word_state()
+            .details
+            .unwrap()
+            .candidates;
+        model.destination = Destination::Vocabulary;
+        model.content_route = ContentRoute::Main;
+        model.reader_document = None;
+        let row = crate::vocabulary::VocabularyRow {
+            id: 42.try_into().unwrap(),
+            surface: "猫".into(),
+            status: crate::vocabulary::VocabularyStatus::New,
+            registered_at_unix_ms: 0,
+            encountered_count: 0,
+            last_seen_unix_ms: None,
+        };
+        model.vocabulary.rows = vec![row.clone()];
+        update(&mut model, Event::OpenVocabularyWord(row.id));
+        let sequence = model.vocabulary_request_sequence;
+        update(
+            &mut model,
+            Event::VocabularyWordFinished(
+                sequence,
+                StorageResult::VocabularyWordLoaded(Box::new(
+                    crate::vocabulary::VocabularyWordDetails { row, candidates },
+                )),
+            ),
+        );
+        let selection =
+            AnkiSelection::Vocabulary(model.vocabulary.word.as_ref().unwrap().selection);
+        (model, selection)
+    }
+
+    fn settle_entries(model: &mut Model, result: AnkiPreflightResult) {
+        let requests: Vec<_> = model
+            .anki_entries
+            .iter()
+            .map(|state| state.request.clone())
+            .collect();
+        for request in requests {
+            update(
+                model,
+                Event::AnkiEntryChecked(Box::new(request), result.clone()),
+            );
+        }
+    }
+
+    #[test]
+    fn vocabulary_exports_without_book_recheck_once_and_report_success() {
+        let (mut model, selection) = vocabulary_configured();
+        let before = model.vocabulary.clone();
+        update(&mut model, Event::LoadReaderAnkiEntries(selection));
+        assert_eq!(model.anki_entries.len(), 2);
+        for state in &model.anki_entries {
+            let note = state.request.export().note();
+            assert_eq!(note.surface().as_str(), "猫");
+            assert_eq!(note.reading(), "ねこ");
+            assert!(note.fields()[2].contains("JMdict"));
+            assert!(note.fields()[3].is_empty());
+        }
+        settle_entries(&mut model, observation(vec![], true));
+        let entry = model.anki_entries_view()[0].key;
+        for _ in 0..2 {
+            update(&mut model, Event::AddReaderAnkiEntry { selection, entry });
+        }
+        let request = model.pending_anki_export_preflight().unwrap().clone();
+        update(
+            &mut model,
+            Event::AnkiExportPreflightProviderFinished(
+                Box::new(request),
+                observation(vec![], true),
+            ),
+        );
+        assert_eq!(model.anki_live_progress(), Some(AnkiLiveProgress::Ready));
+        acknowledge_live(&mut model, AnkiLiveResult::NoteAdded(88));
+        assert!(model
+            .anki_entries_view()
+            .iter()
+            .all(|entry| entry.phase == AnkiEntryPhase::Existing(vec![88])));
+        assert!(model.anki_added_notice.is_some());
+        update(&mut model, Event::AddReaderAnkiEntry { selection, entry });
+        assert!(model.anki_live.is_none());
+        assert_eq!(model.vocabulary, before);
+    }
+
+    #[test]
+    fn vocabulary_duplicate_failure_retry_and_return_refresh_share_reader_guards() {
+        let (mut model, selection) = vocabulary_configured();
+        for phase in [AnkiSetupPhase::Unchecked, AnkiSetupPhase::Missing] {
+            model.anki_setup.phase = phase;
+            update(&mut model, Event::LoadReaderAnkiEntries(selection));
+            assert!(model.anki_entries_view().is_empty());
+        }
+        model.anki_setup.phase = AnkiSetupPhase::Ready;
+        update(&mut model, Event::LoadReaderAnkiEntries(selection));
+        settle_entries(
+            &mut model,
+            AnkiPreflightResult::Failed(AnkiExportError::PermissionDenied),
+        );
+        let entry = model.anki_entries_view()[0].key;
+        update(&mut model, Event::AddReaderAnkiEntry { selection, entry });
+        assert!(model.prepared_anki_export.is_none());
+        update(&mut model, Event::LoadReaderAnkiEntries(selection));
+        settle_entries(&mut model, observation(vec![22, 23], true));
+        assert!(model
+            .anki_entries_view()
+            .iter()
+            .all(|entry| entry.phase == AnkiEntryPhase::Existing(vec![22, 23])));
+        update(&mut model, Event::AddReaderAnkiEntry { selection, entry });
+        assert!(model.prepared_anki_export.is_none());
+        let old = model.anki_entries[0].request.clone();
+        update(&mut model, Event::CheckAnkiSetup(AnkiSetupRequest::Refresh));
+        let generation = model.anki_setup.generation;
+        update(
+            &mut model,
+            Event::AnkiSetupChecked(generation, 7, observation(vec![], true)),
+        );
+        assert_eq!(model.anki_entries.len(), 2);
+        update(
+            &mut model,
+            Event::AnkiEntryChecked(Box::new(old), observation(vec![88], true)),
+        );
+        assert!(model
+            .anki_entries_view()
+            .iter()
+            .all(|entry| entry.phase == AnkiEntryPhase::Checking));
+        settle_entries(&mut model, observation(vec![], true));
+        assert!(model
+            .anki_entries_view()
+            .iter()
+            .all(|entry| entry.phase == AnkiEntryPhase::Add));
+    }
+
+    #[test]
+    fn vocabulary_dismissal_navigation_and_reopen_reject_old_actions_and_callbacks() {
+        let (mut model, old_selection) = vocabulary_configured();
+        update(&mut model, Event::LoadReaderAnkiEntries(old_selection));
+        let old = model.anki_entries[0].request.clone();
+        let entry = old.export().entry.unwrap();
+        update(&mut model, Event::DismissVocabularyWord);
+        assert!(model
+            .project_anki_export(old_selection, 7.try_into().unwrap(), Some(entry))
+            .is_none());
+        update(
+            &mut model,
+            Event::OpenVocabularyWord(42.try_into().unwrap()),
+        );
+        let current = model.vocabulary.word.as_ref().unwrap().selection;
+        assert_ne!(AnkiSelection::Vocabulary(current), old_selection);
+        let sequence = model.vocabulary_request_sequence;
+        let row = model.vocabulary.word.as_ref().unwrap().row.clone();
+        let candidates = old.export().note().surface().as_str();
+        assert_eq!(candidates, row.surface);
+        let dictionary = configured()
+            .0
+            .effective_reader
+            .word_state()
+            .details
+            .unwrap()
+            .candidates;
+        update(
+            &mut model,
+            Event::VocabularyWordFinished(
+                sequence,
+                StorageResult::VocabularyWordLoaded(Box::new(
+                    crate::vocabulary::VocabularyWordDetails {
+                        row,
+                        candidates: dictionary,
+                    },
+                )),
+            ),
+        );
+        update(
+            &mut model,
+            Event::LoadReaderAnkiEntries(AnkiSelection::Vocabulary(current)),
+        );
+        update(
+            &mut model,
+            Event::AnkiEntryChecked(Box::new(old), observation(vec![88], true)),
+        );
+        update(
+            &mut model,
+            Event::AddReaderAnkiEntry {
+                selection: old_selection,
+                entry,
+            },
+        );
+        assert!(model.prepared_anki_export.is_none());
+        assert!(model
+            .anki_entries_view()
+            .iter()
+            .all(|entry| entry.phase == AnkiEntryPhase::Checking));
+        update(&mut model, Event::SelectDestination(Destination::Library));
+        assert!(model.anki_entries_view().is_empty());
+        assert!(model
+            .project_anki_export(
+                AnkiSelection::Vocabulary(current),
+                7.try_into().unwrap(),
+                Some(entry)
+            )
+            .is_none());
+    }
+
+    #[test]
+    fn vocabulary_status_pending_failure_retry_and_success_preserve_observations() {
+        let (mut model, selection) = vocabulary_configured();
+        update(&mut model, Event::LoadReaderAnkiEntries(selection));
+        settle_entries(&mut model, observation(vec![88], true));
+        let entries = model.anki_entries_view();
+        let command = crate::vocabulary::VocabularyWordStatusCommand {
+            id: 42.try_into().unwrap(),
+            status: crate::vocabulary::VocabularyStatus::Learning,
+            occurred_at_unix_ms: 1,
+        };
+        update(&mut model, Event::SetVocabularyWordStatus(command.clone()));
+        assert_eq!(model.anki_entries_view(), entries);
+        let sequence = model.vocabulary_request_sequence;
+        update(
+            &mut model,
+            Event::VocabularyWordFinished(
+                sequence,
+                StorageResult::Failed(DocumentError::Unavailable),
+            ),
+        );
+        assert_eq!(model.anki_entries_view(), entries);
+        update(&mut model, Event::RetryVocabularyWordStatus);
+        assert_eq!(model.anki_entries_view(), entries);
+        let sequence = model.vocabulary_request_sequence;
+        update(
+            &mut model,
+            Event::VocabularyWordFinished(
+                sequence,
+                StorageResult::VocabularyWordStatusChanged(command),
+            ),
+        );
+        assert_eq!(model.anki_entries_view(), entries);
+        assert_eq!(
+            AnkiSelection::Vocabulary(model.vocabulary.word.as_ref().unwrap().selection),
+            selection
+        );
+    }
+
     #[test]
     fn return_queries_can_refresh_during_reader_io_but_cannot_start_a_write() {
         let (mut model, selection) = configured();

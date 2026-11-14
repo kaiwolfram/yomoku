@@ -24,9 +24,12 @@ impl Model {
         {
             return None;
         }
-        let AnkiSelection::Effective(current) = selection;
-        if !self.can_start_effective_selection(current) {
-            return None;
+        match selection {
+            AnkiSelection::Effective(current) if !self.can_start_effective_selection(current) => {
+                return None
+            }
+            AnkiSelection::Vocabulary(_) if self.vocabulary.word_status.is_some() => return None,
+            _ => {}
         }
         self.project_anki_export(selection, deck, entry)
     }
@@ -39,12 +42,23 @@ impl Model {
         deck: AnkiDeckId,
         entry: Option<crate::anki::AnkiEntryKey>,
     ) -> Option<AnkiExport> {
-        if self.settings_open || self.content_route != ContentRoute::Reader {
+        if self.settings_open {
             return None;
         }
-        let document = self.reader_document.as_ref()?;
         match selection {
+            AnkiSelection::Vocabulary(current) => {
+                let word = self.current_vocabulary_anki_word(current)?;
+                let entry = entry?;
+                let note =
+                    crate::anki::AnkiNote::from_vocabulary_entry(word.candidates.as_ref()?, entry)
+                        .ok()?;
+                Some(AnkiExport::for_entry(selection, entry, deck, note))
+            }
             AnkiSelection::Effective(selection) => {
+                if self.content_route != ContentRoute::Reader {
+                    return None;
+                }
+                let document = self.reader_document.as_ref()?;
                 if self.current_token_key() != Some(selection.page.base)
                     || self.effective_reader.page()?.identity != selection.page
                     || document.document_id != selection.page.base.document_id

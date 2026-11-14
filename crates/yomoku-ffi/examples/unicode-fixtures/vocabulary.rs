@@ -147,6 +147,10 @@ pub fn exchange(dir: &Path, writing: bool) -> Result<(), Box<dyn Error>> {
     {
         let mut view = Core::<Yomoku>::new().view();
         view.vocabulary.word = Some(yomoku_core::vocabulary::VocabularyWordState {
+            selection: yomoku_core::anki::VocabularyAnkiSelection {
+                vocabulary_id: i64::MAX.try_into().unwrap(),
+                generation: u64::MAX,
+            },
             row: yomoku_core::vocabulary::VocabularyRow {
                 id: command.id,
                 surface: "𠮷か\u{3099}\0".into(),

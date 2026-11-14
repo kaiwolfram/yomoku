@@ -6,12 +6,16 @@ import java.io.File
 internal fun verifyAnkiProtocol(fixtures: String) {
     verifyAnkiExportBridge()
     val root = File(fixtures)
-    for (index in 0..4) {
+    for (index in 0..5) {
         val bytes = root.resolve("anki-action-$index.bin").readBytes()
         val event = Event.bincodeDeserialize(bytes)
         when (event) {
             is Event.PrepareReaderAnkiExport -> {
                 when (val selected = event.selection) {
+                    is AnkiSelection.Vocabulary -> {
+                        check(index == 5 && selected.value.vocabularyId.value == Long.MAX_VALUE)
+                        check(selected.value.generation == ULong.MAX_VALUE)
+                    }
                     is AnkiSelection.Effective -> {
                         check(index in 0..1 && selected.value.segmentIndex == ULong.MAX_VALUE)
                         check(

@@ -67,7 +67,14 @@ impl Yomoku {
                 else {
                     return Some(Command::done());
                 };
+                let Some(generation) = model.vocabulary_request_sequence.checked_add(1) else {
+                    return Some(Command::done());
+                };
                 model.vocabulary.word = Some(VocabularyWordState {
+                    selection: crate::anki::VocabularyAnkiSelection {
+                        vocabulary_id: *id,
+                        generation,
+                    },
                     row,
                     candidates: None,
                     error: None,
@@ -154,6 +161,7 @@ impl Yomoku {
             StorageOperation::LoadVocabularyWord(_) => {
                 if let Some(word) = &mut model.vocabulary.word {
                     word.error = None;
+                    word.selection.generation = sequence;
                 }
             }
             _ => model.vocabulary.word_status_error = None,

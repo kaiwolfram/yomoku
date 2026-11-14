@@ -1,5 +1,6 @@
 package app.yomoku
 
+import android.content.Intent
 import android.database.sqlite.SQLiteDatabase
 import android.os.Looper
 import androidx.activity.ComponentActivity
@@ -15,6 +16,7 @@ import app.yomoku.theme.YomokuTheme
 import java.io.File
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 import org.junit.Assert.*
@@ -36,6 +38,8 @@ class AnkiEntrySessionTest {
     private lateinit var core: CoreSession
     private val notes = ConcurrentHashMap<Pair<String, String>, List<Long>>()
     private val writes = AtomicInteger()
+    private var expectedSentence = "<strong class=\"yomoku-target\">猫</strong>。"
+    @Volatile private var readFailure: AnkiExportError? = null
 
     private fun send(event: Event) = instrumentation.runOnMainSync { core.dispatch(event) }
 
@@ -51,7 +55,7 @@ class AnkiEntrySessionTest {
             val value = view()
             if (predicate(value)) return value
             check(System.nanoTime() < deadline) {
-                "Anki entry timed out: ${value.ankiSetup}, ${value.ankiEntries}, ${value.ankiExport}; word=${value.effectiveReaderWord}; reader=${value.documentError}"
+                "Anki entry timed out: ${value.ankiSetup}, ${value.ankiEntries}, ${value.ankiExport}; word=${value.effectiveReaderWord}; reader=${value.documentError}; vocabulary=${value.vocabulary.word?.selection}/${value.vocabulary.word?.error}; candidates=${value.vocabulary.word?.candidates != null}; settings=${value.settingsOpen}; busy=${value.storageBusy}"
             }
             Thread.sleep(10)
         }
@@ -71,13 +75,16 @@ class AnkiEntrySessionTest {
                             providerEntered?.countDown()
                             check(providerRelease?.await(30, TimeUnit.SECONDS) != false)
                         }
-                        AnkiPreflightResult.Complete(
-                            AnkiPreflightObservation(
-                                listOf(AnkiPreflightDeck(7, false)),
-                                notes[operation.surface to operation.reading].orEmpty(),
-                                listOf(AnkiPreflightModel(9, operation.layout.name, true)),
+                        if (operation.surface.isNotEmpty() && readFailure != null)
+                            AnkiPreflightResult.Failed(readFailure!!)
+                        else
+                            AnkiPreflightResult.Complete(
+                                AnkiPreflightObservation(
+                                    listOf(AnkiPreflightDeck(7, false)),
+                                    notes[operation.surface to operation.reading].orEmpty(),
+                                    listOf(AnkiPreflightModel(9, operation.layout.name, true)),
+                                )
                             )
-                        )
                     },
                     invokeAnkiLive = { operation ->
                         assertNotEquals(Looper.getMainLooper(), Looper.myLooper())
@@ -102,7 +109,7 @@ class AnkiEntrySessionTest {
                         assertEquals("猫", note.fields.first())
                         assertEquals(7L, note.deckId)
                         assertTrue(note.fields[2].contains("cat"))
-                        assertEquals("<strong class=\"yomoku-target\">猫</strong>。", note.fields[3])
+                        assertEquals(expectedSentence, note.fields[3])
                         writes.incrementAndGet()
                         notes[note.surface to note.reading] = listOf(88L)
                         AnkiLiveResult.NoteAdded(88)
@@ -203,6 +210,150 @@ class AnkiEntrySessionTest {
             }
             assertEquals(1, writes.get())
         } finally {
+            close()
+            directory.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun vocabularyActionsShareProviderFlowAndKeepStatusObservations() {
+        val directory =
+            File(
+                    instrumentation.targetContext.noBackupFilesDir,
+                    "anki-vocabulary-${System.nanoTime()}",
+                )
+                .apply { mkdirs() }
+        val database = File(directory, "db.sqlite3")
+        val executor = Executors.newSingleThreadExecutor()
+        val launches = AtomicInteger()
+        var browser: AnkiNoteBrowser? = null
+        expectedSentence = ""
+        open(database)
+        try {
+            send(Event.CreatePaste("猫。"))
+            await { it.documents.size == 1 && !it.storageBusy }
+            send(Event.SelectDestination(Destination.VOCABULARY))
+            send(Event.LoadVocabulary)
+            val row = await {
+                it.vocabulary.rows.isNotEmpty() && !it.storageBusy
+            }
+                .vocabulary
+                .rows
+                .first { it.surface == "猫" }
+            send(Event.OpenVocabularyWord(row.id))
+            await { it.vocabulary.word?.candidates != null && !it.storageBusy }
+            assertTrue(view().ankiEntries.isEmpty())
+            send(Event.OpenSettings)
+            send(Event.SetAnkiDefaultDeck(7))
+            await { it.ankiSetup == AnkiSetupPhase.Ready }
+            send(Event.CloseSettings)
+            readFailure = AnkiExportError.PERMISSIONDENIED
+            instrumentation.runOnMainSync {
+                browser =
+                    AnkiNoteBrowser(
+                        executor,
+                        { AnkiReadResult.Value(null) },
+                        currentEntries = { core.view.ankiEntries },
+                        resolveEntries = { ids ->
+                            assertEquals(listOf(88L), ids.map { it.value })
+                            AnkiReadResult.Value(Intent("test.vocabulary.anki"))
+                        },
+                    ) {
+                        core.view.ankiExport
+                    }
+                browser.attach { launches.incrementAndGet() }
+            }
+            compose.setContent {
+                YomokuTheme {
+                    YomokuApp(core.view, core.sessionKey, core::dispatch, ankiBrowser = browser)
+                }
+            }
+            compose.waitForIdle()
+            await { !it.storageBusy && it.vocabulary.word == null }
+            compose.onNodeWithTag("vocabulary_row_${row.id.value}").performClick()
+            await { it.vocabulary.word?.candidates != null && !it.storageBusy }
+            // Advance Compose frames so the sheet can observe the completed native lookup.
+            compose.waitUntil(60_000) {
+                val state = view()
+                state.ankiEntries.isNotEmpty() &&
+                    state.ankiEntries.all { it.phase is AnkiEntryPhase.Failed }
+            }
+            val failed = view().ankiEntries.first { it.headword == "猫" && it.reading == "ねこ" }
+            readFailure = null
+            compose
+                .onNodeWithTag("anki_entry_${ankiEntryTag(failed.key)}")
+                .performScrollTo()
+                .performClick()
+            val entry = await {
+                it.ankiEntries.any { it.key == failed.key && it.phase == AnkiEntryPhase.Add }
+            }
+                .ankiEntries
+                .first { it.key == failed.key }
+            compose
+                .onNodeWithTag("anki_entry_${ankiEntryTag(entry.key)}")
+                .performScrollTo()
+                .performClick()
+            send(Event.AddReaderAnkiEntry(entry.selection, entry.key))
+            await {
+                it.ankiEntries.any {
+                    it.key == entry.key && it.phase == AnkiEntryPhase.Existing(listOf(88L))
+                }
+            }
+            assertEquals(1, writes.get())
+            compose
+                .onNodeWithTag("anki_entry_${ankiEntryTag(entry.key)}")
+                .performScrollTo()
+                .performClick()
+            compose.waitUntil(30_000) { launches.get() == 1 }
+            val settled = view().ankiEntries
+            val queries = entryQueries.get()
+            val identity = view().vocabulary.word!!.selection
+            fun assertSettled() {
+                assertEquals(settled, view().ankiEntries)
+                assertEquals(queries, entryQueries.get())
+                assertEquals(identity, view().vocabulary.word!!.selection)
+            }
+            SQLiteDatabase.openDatabase(database.path, null, SQLiteDatabase.OPEN_READWRITE).use {
+                sql ->
+                sql.execSQL(
+                    "CREATE TRIGGER fail_vocabulary_anki BEFORE INSERT ON vocabulary_status_events BEGIN SELECT RAISE(ABORT, 'test status'); END"
+                )
+                try {
+                    compose.onNodeWithTag("word_status_LEARNING").performScrollTo().performClick()
+                    await { !it.storageBusy && it.vocabulary.wordStatusError != null }
+                    assertSettled()
+                    sql.execSQL("DROP TRIGGER fail_vocabulary_anki")
+                    compose
+                        .onNodeWithTag("vocabulary_word_status_retry")
+                        .performScrollTo()
+                        .performClick()
+                    await { !it.storageBusy && it.vocabulary.wordStatus == null }
+                    assertSettled()
+                } finally {
+                    sql.execSQL("DROP TRIGGER IF EXISTS fail_vocabulary_anki")
+                }
+            }
+            notes.remove("猫" to "ねこ")
+            send(Event.CheckAnkiSetup(AnkiSetupRequest.REFRESH))
+            await { it.ankiEntries.any { it.key == entry.key && it.phase == AnkiEntryPhase.Add } }
+            assertTrue(entryQueries.get() > queries)
+            val oldSelection = entry.selection
+            send(Event.DismissVocabularyWord)
+            send(Event.OpenVocabularyWord(row.id))
+            await { it.vocabulary.word?.candidates != null && !it.storageBusy }
+            assertNotEquals(
+                oldSelection,
+                AnkiSelection.Vocabulary(view().vocabulary.word!!.selection),
+            )
+            send(Event.AddReaderAnkiEntry(oldSelection, entry.key))
+            assertEquals(1, writes.get())
+        } finally {
+            compose.runOnUiThread {
+                compose.activity.setContent {}
+                browser?.close()
+            }
+            executor.shutdown()
+            assertTrue(executor.awaitTermination(30, TimeUnit.SECONDS))
             close()
             directory.deleteRecursively()
         }
