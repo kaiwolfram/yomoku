@@ -32,24 +32,15 @@ internal fun AnkiSettingsPanel(
     Column(Modifier.testTag("anki_settings"), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         SettingsSectionHeading(stringResource(R.string.anki_settings_title))
         SettingsDescription(stringResource(R.string.anki_settings_description))
-        Text(
-            stringResource(
-                when (settings.phase) {
-                    AnkiSettingsPhase.UNLOADED -> R.string.anki_settings_unloaded
-                    AnkiSettingsPhase.LOADING -> R.string.anki_settings_loading
-                    AnkiSettingsPhase.READY -> R.string.anki_settings_ready
-                    AnkiSettingsPhase.SAVING -> R.string.anki_settings_saving
-                    AnkiSettingsPhase.FAILED -> R.string.anki_settings_failed
-                }
-            ),
-            Modifier.testTag("anki_settings_status"),
-        )
-        settings.defaultDeckId?.let {
-            Text(
-                stringResource(R.string.anki_settings_deck_id, it),
-                Modifier.testTag("anki_settings_deck"),
-            )
-        }
+        val status =
+            when (settings.phase) {
+                AnkiSettingsPhase.UNLOADED -> R.string.anki_settings_unloaded
+                AnkiSettingsPhase.LOADING -> R.string.anki_settings_loading
+                AnkiSettingsPhase.READY -> null
+                AnkiSettingsPhase.SAVING -> R.string.anki_settings_saving
+                AnkiSettingsPhase.FAILED -> R.string.anki_settings_failed
+            }
+        status?.let { Text(stringResource(it), Modifier.testTag("anki_settings_status")) }
         settings.storageError?.let {
             Text(stringResource(it.messageResource()), color = MaterialTheme.colorScheme.error)
         }
@@ -75,15 +66,6 @@ internal fun AnkiSettingsPanel(
         val ready = settings.phase == AnkiSettingsPhase.READY
         if (ready && settings.defaultDeckId == null)
             Text(stringResource(R.string.anki_settings_no_deck))
-        if (settings.defaultDeckId != null) {
-            TextButton(
-                onClick = { dispatch(Event.SetAnkiDefaultDeck(null)) },
-                enabled = ready,
-                modifier = Modifier.testTag("anki_settings_clear"),
-            ) {
-                Text(stringResource(R.string.anki_settings_clear))
-            }
-        }
         TextButton(
             onClick = checkProvider,
             enabled = ready && !setupBusy && discovery != AnkiDeckDiscoveryState.Loading,
@@ -154,17 +136,15 @@ private fun AnkiReadError.messageResource(): Int =
 
 @Composable
 internal fun AnkiModelSetupPanel(phase: app.yomoku.shared.AnkiSetupPhase) {
+    val status =
+        when (phase) {
+            app.yomoku.shared.AnkiSetupPhase.Ready -> return
+            app.yomoku.shared.AnkiSetupPhase.Missing -> R.string.anki_model_missing
+            app.yomoku.shared.AnkiSetupPhase.Checking -> R.string.anki_export_checking
+            is app.yomoku.shared.AnkiSetupPhase.Failed -> phase.value.messageResource()
+            else -> R.string.anki_model_unchecked
+        }
     Column(Modifier.testTag("anki_model_setup"), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(
-            stringResource(
-                when (phase) {
-                    app.yomoku.shared.AnkiSetupPhase.Ready -> R.string.anki_model_ready
-                    app.yomoku.shared.AnkiSetupPhase.Missing -> R.string.anki_model_missing
-                    app.yomoku.shared.AnkiSetupPhase.Checking -> R.string.anki_export_checking
-                    is app.yomoku.shared.AnkiSetupPhase.Failed -> phase.value.messageResource()
-                    else -> R.string.anki_model_unchecked
-                }
-            )
-        )
+        Text(stringResource(status))
     }
 }

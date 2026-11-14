@@ -27,6 +27,7 @@ class SettingsScreenTest {
         val view =
             core.view.copy(
                 settingsOpen = true,
+                ankiSetup = AnkiSetupPhase.Ready,
                 pageLength = PageLength.CHARACTERS250,
                 readerTypography =
                     ReaderTypography(ReaderFontSize.SP16, ReaderLineSpacing.PERCENT150),
@@ -57,6 +58,16 @@ class SettingsScreenTest {
                 val increase = compose.onNodeWithTag("${tag}_increase").getUnclippedBoundsInRoot()
                 assertTrue(label.right <= decrease.left && decrease.right <= increase.left)
                 assertTrue(label.top < increase.bottom && increase.top < label.bottom)
+                assertTrue(
+                    (decrease.right - decrease.left).value >= 48f &&
+                        (decrease.bottom - decrease.top).value >= 48f
+                )
+                assertTrue(
+                    (increase.right - increase.left).value >= 48f &&
+                        (increase.bottom - increase.top).value >= 48f
+                )
+                compose.onNodeWithTag("${tag}_decrease").assertContentDescriptionEquals("Decrease")
+                compose.onNodeWithTag("${tag}_increase").assertContentDescriptionEquals("Increase")
                 compose.onNodeWithTag("${tag}_increase").performClick()
                 assertTrue(events.last() is Event.SetReaderTypography)
             }
@@ -69,7 +80,7 @@ class SettingsScreenTest {
                 .performScrollTo()
                 .assert(SemanticsMatcher.keyIsDefined(SemanticsProperties.Heading))
             compose.onNodeWithTag("anki_settings").assertExists()
-            compose.onNodeWithTag("anki_model_setup").assertExists()
+            compose.onNodeWithTag("anki_model_setup").assertDoesNotExist()
             compose
                 .onNodeWithText("About")
                 .performScrollTo()
@@ -88,12 +99,19 @@ class SettingsScreenTest {
                         .performScrollTo()
                         .assertHasClickAction()
                 val bounds = row.getUnclippedBoundsInRoot()
+                assertTrue((bounds.bottom - bounds.top).value >= 48f)
                 val width = bounds.right - bounds.left
                 val pageBounds = compose.onNodeWithTag("page_length_250").getUnclippedBoundsInRoot()
                 val pageWidth = pageBounds.right - pageBounds.left
                 assertEquals(pageWidth.value, width.value, 0.5f)
                 row.performClick()
                 compose.onNodeWithText("Close").performClick()
+            }
+            val noticeBounds = notices.map {
+                compose.onNodeWithText(compose.activity.getString(it)).getUnclippedBoundsInRoot()
+            }
+            noticeBounds.zipWithNext().forEach { (first, second) ->
+                assertEquals(first.bottom.value, second.top.value, 0.5f)
             }
             assertTrue(
                 compose.onAllNodesWithTag("bottom_navigation").fetchSemanticsNodes().isNotEmpty() ||

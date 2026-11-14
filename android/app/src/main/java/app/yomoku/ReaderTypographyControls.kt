@@ -61,19 +61,25 @@ private fun TypographyControl(
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Text(label, modifier = Modifier.weight(1f).testTag(tag))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            TextButton(
+            IconButton(
                 onClick = { onChange(index - 1) },
                 enabled = enabled && index > 0,
-                modifier = Modifier.testTag("${tag}_decrease"),
+                modifier = Modifier.size(48.dp).testTag("${tag}_decrease"),
             ) {
-                Text(stringResource(R.string.reader_typography_decrease))
+                Icon(
+                    painterResource(R.drawable.ic_remove),
+                    contentDescription = stringResource(R.string.reader_typography_decrease),
+                )
             }
-            TextButton(
+            IconButton(
                 onClick = { onChange(index + 1) },
                 enabled = enabled && index < count - 1,
-                modifier = Modifier.testTag("${tag}_increase"),
+                modifier = Modifier.size(48.dp).testTag("${tag}_increase"),
             ) {
-                Text(stringResource(R.string.reader_typography_increase))
+                Icon(
+                    painterResource(R.drawable.ic_add),
+                    contentDescription = stringResource(R.string.reader_typography_increase),
+                )
             }
         }
     }

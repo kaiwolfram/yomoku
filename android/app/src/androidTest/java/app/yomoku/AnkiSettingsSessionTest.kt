@@ -55,6 +55,7 @@ class AnkiSettingsSessionTest {
                             listOf(
                                 AnkiProviderDeck(Long.MAX_VALUE, "日本語", false),
                                 AnkiProviderDeck(42, "Filtered", true),
+                                AnkiProviderDeck(99, "Another deck", false),
                             )
                         )
                     },
@@ -83,7 +84,7 @@ class AnkiSettingsSessionTest {
     private fun click(tag: String) = compose.onNodeWithTag(tag).performScrollTo().performClick()
 
     @Test
-    fun explicitConfigurationPersistsClearsAndRetainsAcrossCompositionAndNavigation() {
+    fun explicitConfigurationPersistsSelectionAndRetainsAcrossCompositionAndNavigation() {
         open()
         try {
             assertEquals(0, reads.get())
@@ -127,15 +128,18 @@ class AnkiSettingsSessionTest {
             assertEquals(1, reads.get())
             await { it.ankiSettings.phase == AnkiSettingsPhase.READY }
             assertEquals(Long.MAX_VALUE, core.view.ankiSettings.defaultDeckId)
-            click("anki_settings_clear")
+            compose.onNodeWithTag("anki_settings_clear").assertDoesNotExist()
+            click("anki_decks_check")
+            compose.waitUntil(30_000) { core.ankiDecks.state is AnkiDeckDiscoveryState.Ready }
+            click("anki_deck_99")
             await {
                 it.ankiSettings.phase == AnkiSettingsPhase.READY &&
-                    it.ankiSettings.defaultDeckId == null
+                    it.ankiSettings.defaultDeckId == 99L
             }
             close()
             open()
             await { it.ankiSettings.phase == AnkiSettingsPhase.READY }
-            assertNull(core.view.ankiSettings.defaultDeckId)
+            assertEquals(99L, core.view.ankiSettings.defaultDeckId)
         } finally {
             close()
             directory.deleteRecursively()

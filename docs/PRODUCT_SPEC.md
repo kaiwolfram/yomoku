@@ -163,7 +163,7 @@ they must not drive implementation unless the user explicitly reopens this scope
 ## 8. UX and other confirmed decisions
 
 - App title **Yomoku**, tagline *Read Japanese, naturally.* Branding concept: dark navy `#1B2637`, off-white open-book motif, blue `#579FF5` highlighted word; apply after core app is functional.
-- Settings stays on one grouped screen, ordered **Reader**, **AnkiDroid**, **About**, with accessible section headings, dividers, secondary descriptions and consistent row spacing. Typography adjustment buttons sit beside their labels; retain the page-size radio choices. Group Anki deck/model controls together and use full-width clickable license-notice rows. Keep storage errors and retry actions above the sections.
+- Settings stays on one grouped screen, ordered **Reader**, **AnkiDroid**, **About**, with accessible section headings, dividers, secondary descriptions and consistent row spacing. Typography minus/plus icons sit beside their labels with accessible descriptions, existing limits and 48 dp touch targets; retain the page-size radio choices. Group Anki deck/model controls together and use contiguous full-width clickable license-notice rows with compact padding, bodyMedium text and a 48 dp minimum height. Omit the Clear default deck action, saved deck ID hint and successful settings/model status hints, including empty status containers; retain explicit deck selection, Check AnkiDroid, progress, errors and retries. Keep storage errors and retry actions above the sections.
 - Follow **Android system light/dark mode** automatically; no in-app override.
 - All user-facing interface and offline definitions **English**.
 - No Undo in v1; document deletion requires confirmation.

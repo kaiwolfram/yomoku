@@ -60,16 +60,16 @@ class AnkiSettingsPanelTest {
         compose.runOnUiThread {
             settings.value = AnkiSettingsView(AnkiSettingsPhase.SAVING, 9007199254740993L, null)
         }
-        compose.onNodeWithText("Saved default deck ID: 9007199254740993").assertExists()
+        compose.onNodeWithTag("anki_settings_deck").assertDoesNotExist()
         compose.onNodeWithTag("anki_deck_${Long.MAX_VALUE}").assertIsNotEnabled()
-        compose.onNodeWithTag("anki_settings_clear").assertIsNotEnabled()
+        compose.onNodeWithTag("anki_settings_clear").assertDoesNotExist()
         compose.onNodeWithTag("anki_settings_load").performClick()
         assertEquals(Event.RetryAnkiSettings, events.last())
         compose.runOnUiThread {
             settings.value = settings.value.copy(phase = AnkiSettingsPhase.READY)
         }
-        compose.onNodeWithTag("anki_settings_clear").performClick()
-        assertEquals(Event.SetAnkiDefaultDeck(null), events.last())
+        compose.onNodeWithTag("anki_settings_clear").assertDoesNotExist()
+        compose.onNodeWithTag("anki_settings_status").assertDoesNotExist()
     }
 
     @Test
@@ -96,7 +96,7 @@ class AnkiSettingsPanelTest {
                 )
         }
         compose.onNodeWithTag("anki_decks_check").assertIsNotEnabled()
-        compose.onNodeWithTag("anki_settings_clear").assertIsNotEnabled()
+        compose.onNodeWithTag("anki_settings_clear").assertDoesNotExist()
         compose.onNodeWithTag("anki_settings_load").performClick()
         assertEquals(listOf(Event.RetryAnkiSettings), events)
         assertEquals(0, checks)
@@ -114,14 +114,12 @@ class AnkiSettingsPanelTest {
         }
         compose.onNodeWithText("No regular decks are available in AnkiDroid.").assertExists()
         compose
-            .onNodeWithText(
-                "The saved deck is missing or filtered. Choose another deck or clear the default."
-            )
+            .onNodeWithText("The saved deck is missing or filtered. Choose another deck.")
             .assertExists()
-        compose.onNodeWithText("Saved default deck ID: ${Long.MAX_VALUE}").assertExists()
+        compose.onNodeWithTag("anki_settings_deck").assertDoesNotExist()
         compose.onNodeWithTag("anki_deck_${Long.MAX_VALUE}").assertDoesNotExist()
         assertTrue(events.isEmpty())
-        compose.onNodeWithTag("anki_settings_clear").performClick()
-        assertEquals(Event.SetAnkiDefaultDeck(null), events.single())
+        compose.onNodeWithTag("anki_settings_clear").assertDoesNotExist()
+        assertTrue(events.isEmpty())
     }
 }

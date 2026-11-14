@@ -129,10 +129,14 @@ internal fun SettingsScreen(
         HorizontalDivider()
         SettingsSectionHeading(stringResource(R.string.settings_about))
         SettingsDescription(stringResource(R.string.settings_about_description))
-        NoticeRow(stringResource(R.string.sudachi_notices_title)) { showNotices = true }
-        NoticeRow(stringResource(R.string.word_dictionary_notices_title)) { showWordNotices = true }
-        NoticeRow(stringResource(R.string.svg_notices_title)) { showSvgNotices = true }
-        NoticeRow(stringResource(R.string.reader_font_notices_title)) { showFontNotices = true }
+        Column {
+            NoticeRow(stringResource(R.string.sudachi_notices_title)) { showNotices = true }
+            NoticeRow(stringResource(R.string.word_dictionary_notices_title)) {
+                showWordNotices = true
+            }
+            NoticeRow(stringResource(R.string.svg_notices_title)) { showSvgNotices = true }
+            NoticeRow(stringResource(R.string.reader_font_notices_title)) { showFontNotices = true }
+        }
     }
 }
 
@@ -162,8 +166,8 @@ private fun NoticeRow(label: String, onClick: () -> Unit) {
             Modifier.fillMaxWidth()
                 .sizeIn(minHeight = 48.dp)
                 .clickable(role = Role.Button, onClick = onClick)
-                .padding(vertical = 16.dp),
-        style = MaterialTheme.typography.bodyLarge,
+                .padding(vertical = 8.dp),
+        style = MaterialTheme.typography.bodyMedium,
         color = MaterialTheme.colorScheme.primary,
     )
 }
