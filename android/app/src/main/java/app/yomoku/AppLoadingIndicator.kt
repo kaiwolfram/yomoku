@@ -33,7 +33,7 @@ internal fun appIsLoading(
         view.statistics.loading ||
         view.ankiSettings.phase == AnkiSettingsPhase.LOADING ||
         view.ankiSettings.phase == AnkiSettingsPhase.SAVING ||
-        discovery == AnkiDeckDiscoveryState.Loading ||
+        discovery is AnkiDeckDiscoveryState.Loading ||
         view.ankiSetup == AnkiSetupPhase.Checking ||
         when (view.ankiExport?.phase) {
             AnkiExportPhase.Checking,

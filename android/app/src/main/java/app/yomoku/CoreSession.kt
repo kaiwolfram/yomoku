@@ -179,7 +179,7 @@ internal class CoreSession(
                 isClosed ||
                 !view.settingsOpen ||
                 ankiPermissionPending ||
-                ankiDecks.state == AnkiDeckDiscoveryState.Loading ||
+                ankiDecks.state is AnkiDeckDiscoveryState.Loading ||
                 view.ankiSettings.phase != app.yomoku.shared.AnkiSettingsPhase.READY ||
                 view.ankiExport != null
         )
@@ -200,7 +200,7 @@ internal class CoreSession(
     fun checkAnkiDecks() {
         requireMainThread()
         if (!closing && !isClosed && view.settingsOpen) {
-            if (ankiDecks.state == AnkiDeckDiscoveryState.Loading) return
+            if (ankiDecks.state is AnkiDeckDiscoveryState.Loading) return
             ankiDecks.check()
             checkedAnkiDeck = view.ankiSettings.defaultDeckId
             send(Event.CheckAnkiSetup(app.yomoku.shared.AnkiSetupRequest.CONFIGURE))

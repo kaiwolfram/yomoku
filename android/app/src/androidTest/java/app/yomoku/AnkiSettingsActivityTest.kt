@@ -25,7 +25,7 @@ class AnkiSettingsActivityTest {
         }
         compose.waitUntil(30_000) { original.view.ankiSettings.phase == AnkiSettingsPhase.READY }
         compose.onNodeWithTag("anki_decks_check").performScrollTo().performClick()
-        compose.waitUntil(30_000) { original.ankiDecks.state != AnkiDeckDiscoveryState.Loading }
+        compose.waitUntil(30_000) { original.ankiDecks.state !is AnkiDeckDiscoveryState.Loading }
         val settings = original.view.ankiSettings
         val discovery = original.ankiDecks.state
         assertNotEquals(AnkiDeckDiscoveryState.Unchecked, discovery)

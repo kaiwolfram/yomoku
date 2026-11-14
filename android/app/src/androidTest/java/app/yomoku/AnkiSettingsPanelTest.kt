@@ -63,8 +63,9 @@ class AnkiSettingsPanelTest {
         compose.onNodeWithTag("anki_settings_deck").assertDoesNotExist()
         compose.onNodeWithTag("anki_deck_${Long.MAX_VALUE}").assertIsNotEnabled()
         compose.onNodeWithTag("anki_settings_clear").assertDoesNotExist()
-        compose.onNodeWithTag("anki_settings_load").performClick()
-        assertEquals(Event.RetryAnkiSettings, events.last())
+        compose.onNodeWithTag("anki_settings_load").assertDoesNotExist()
+        compose.onNodeWithTag("anki_settings_status").assertDoesNotExist()
+        compose.onNodeWithText("Saving default deck…").assertDoesNotExist()
         compose.runOnUiThread {
             settings.value = settings.value.copy(phase = AnkiSettingsPhase.READY)
         }
@@ -83,11 +84,11 @@ class AnkiSettingsPanelTest {
                     .onNodeWithText(
                         "AnkiDroid database access lets Yomoku list decks, check existing notes and export words. You can keep reading without granting access."
                     )
-                    .assertExists()
+                    .assertDoesNotExist()
             } else compose.onNodeWithTag("anki_permission_request").assertDoesNotExist()
         }
         compose.runOnUiThread {
-            discovery.value = AnkiDeckDiscoveryState.Loading
+            discovery.value = AnkiDeckDiscoveryState.Loading()
             settings.value =
                 AnkiSettingsView(
                     AnkiSettingsPhase.FAILED,
@@ -100,6 +101,63 @@ class AnkiSettingsPanelTest {
         compose.onNodeWithTag("anki_settings_load").performClick()
         assertEquals(listOf(Event.RetryAnkiSettings), events)
         assertEquals(0, checks)
+    }
+
+    @Test
+    fun checkingAndSavingKeepDeckGeometryWithoutTransientTextOrEnabledActions() {
+        val decks =
+            listOf(AnkiProviderDeck(1, "Deck one", false), AnkiProviderDeck(2, "Deck two", false))
+        settings.value = AnkiSettingsView(AnkiSettingsPhase.READY, 1, null)
+        discovery.value = AnkiDeckDiscoveryState.Ready(decks)
+        render()
+        compose
+            .onNodeWithText("Choose a default deck for future word exports.")
+            .assertDoesNotExist()
+        val first = compose.onNodeWithTag("anki_deck_1").getUnclippedBoundsInRoot()
+        val second = compose.onNodeWithTag("anki_deck_2").getUnclippedBoundsInRoot()
+        assertTrue(first.bottom.value - first.top.value >= 48f)
+        assertEquals(8f, second.top.value - first.bottom.value, 0.5f)
+        for (saving in listOf(true, false)) {
+            compose.runOnUiThread {
+                settings.value =
+                    settings.value.copy(
+                        phase = if (saving) AnkiSettingsPhase.SAVING else AnkiSettingsPhase.READY
+                    )
+                discovery.value =
+                    if (saving) AnkiDeckDiscoveryState.Ready(decks)
+                    else AnkiDeckDiscoveryState.Loading(decks)
+            }
+            compose.onNodeWithTag("anki_deck_1").assertIsNotEnabled()
+            compose.onNodeWithTag("anki_deck_2").assertIsNotEnabled()
+            assertEquals(first, compose.onNodeWithTag("anki_deck_1").getUnclippedBoundsInRoot())
+            assertEquals(second, compose.onNodeWithTag("anki_deck_2").getUnclippedBoundsInRoot())
+            compose.onNodeWithTag("anki_decks_check").assertIsNotEnabled()
+            compose.onNodeWithTag("anki_settings_status").assertDoesNotExist()
+            compose.onNodeWithTag("anki_settings_load").assertDoesNotExist()
+        }
+        compose.runOnUiThread {
+            discovery.value = AnkiDeckDiscoveryState.Failed(AnkiReadError.ProviderFailure, decks)
+        }
+        compose.onNodeWithTag("anki_deck_1").assertIsNotEnabled()
+        compose.onNodeWithTag("anki_decks_check").assertIsEnabled().performClick()
+        assertEquals(1, checks)
+    }
+
+    @Test
+    fun settingsLoadAndModelCheckHaveNoTemporaryText() {
+        compose.setContent {
+            YomokuTheme {
+                AnkiSettingsPanel(settings.value, discovery.value, events::add, {})
+                AnkiModelSetupPanel(AnkiSetupPhase.Checking)
+                AnkiModelSetupPanel(AnkiSetupPhase.Unchecked)
+            }
+        }
+        compose.runOnUiThread {
+            settings.value = settings.value.copy(phase = AnkiSettingsPhase.LOADING)
+        }
+        compose.onNodeWithTag("anki_settings_status").assertDoesNotExist()
+        compose.onNodeWithTag("anki_settings_load").assertDoesNotExist()
+        compose.onNodeWithTag("anki_model_setup").assertDoesNotExist()
     }
 
     @Test

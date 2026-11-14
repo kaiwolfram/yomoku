@@ -178,17 +178,12 @@
     <string name="anki_export_create">Create note model</string>
     <string name="anki_export_add">Add to Anki</string>
     <string name="anki_settings_title">AnkiDroid</string>
-    <string name="anki_settings_description">Choose a default deck for future word exports.</string>
     <string name="anki_settings_unloaded">Saved Anki settings have not been loaded.</string>
-    <string name="anki_settings_loading">Loading Anki settings…</string>
-    <string name="anki_settings_saving">Saving Anki settings…</string>
     <string name="anki_settings_failed">Anki settings could not be confirmed. Reload before changing them.</string>
     <string name="anki_settings_load">Load Anki settings</string>
     <string name="anki_settings_reload">Reload Anki settings</string>
     <string name="anki_settings_no_deck">No default deck configured.</string>
     <string name="anki_settings_check">Check AnkiDroid</string>
-    <string name="anki_settings_checking">Checking AnkiDroid…</string>
-    <string name="anki_settings_permission_reason">AnkiDroid database access lets Yomoku list decks, check existing notes and export words. You can keep reading without granting access.</string>
     <string name="anki_settings_no_available_decks">No regular decks are available in AnkiDroid.</string>
     <string name="anki_settings_missing_deck">The saved deck is missing or filtered. Choose another deck.</string>
     <string name="anki_settings_deck_option">%1$s (ID: %2$d)</string>
@@ -198,7 +193,6 @@
     <string name="anki_entry_retry">Retry checking %1$s in Anki</string>
     <string name="anki_entry_uncertain">Write interrupted. Check again before retrying.</string>
     <string name="anki_model_missing">Create the built-in Yomoku card format to finish setup. Existing cards will be preserved.</string>
-    <string name="anki_model_unchecked">Select a default deck and check the card format.</string>
     <string name="anki_added_toast">Added to AnkiDroid.</string>
     <string name="statistics_week">Last week</string>
 </resources>

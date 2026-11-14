@@ -49,7 +49,7 @@ class AnkiDeckDiscoveryTest {
         try {
             assertTrue(entered.await(30, TimeUnit.SECONDS))
             assertEquals(1, reads.get())
-            main { assertEquals(AnkiDeckDiscoveryState.Loading, discovery.state) }
+            main { assertEquals(AnkiDeckDiscoveryState.Loading(), discovery.state) }
             release.countDown()
             executor.submit {}.get(30, TimeUnit.SECONDS)
             instrumentation.waitForIdleSync()
@@ -74,6 +74,52 @@ class AnkiDeckDiscoveryTest {
             }
         } finally {
             release.countDown()
+            main { discovery.close() }
+            executor.shutdown()
+            assertTrue(executor.awaitTermination(30, TimeUnit.SECONDS))
+        }
+    }
+
+    @Test
+    fun recheckingRetainsDecksUntilFreshSuccessAndKeepsFailuresActionable() {
+        val executor = Executors.newSingleThreadExecutor()
+        val old = listOf(AnkiProviderDeck(1, "Old", false))
+        val fresh = listOf(AnkiProviderDeck(2, "Fresh", false))
+        var reads = 0
+        lateinit var discovery: AnkiDeckDiscovery
+        main {
+            discovery =
+                AnkiDeckDiscovery(executor) {
+                    when (++reads) {
+                        1 -> AnkiReadResult.Value(old)
+                        2 -> AnkiReadResult.Failed(AnkiReadError.CollectionUnavailable)
+                        else -> AnkiReadResult.Value(fresh)
+                    }
+                }
+        }
+        try {
+            main { discovery.check() }
+            executor.submit {}.get(30, TimeUnit.SECONDS)
+            instrumentation.waitForIdleSync()
+            main {
+                assertEquals(AnkiDeckDiscoveryState.Ready(old), discovery.state)
+                discovery.check()
+                assertEquals(AnkiDeckDiscoveryState.Loading(old), discovery.state)
+            }
+            executor.submit {}.get(30, TimeUnit.SECONDS)
+            instrumentation.waitForIdleSync()
+            main {
+                assertEquals(
+                    AnkiDeckDiscoveryState.Failed(AnkiReadError.CollectionUnavailable, old),
+                    discovery.state,
+                )
+                discovery.check()
+                assertEquals(AnkiDeckDiscoveryState.Loading(old), discovery.state)
+            }
+            executor.submit {}.get(30, TimeUnit.SECONDS)
+            instrumentation.waitForIdleSync()
+            main { assertEquals(AnkiDeckDiscoveryState.Ready(fresh), discovery.state) }
+        } finally {
             main { discovery.close() }
             executor.shutdown()
             assertTrue(executor.awaitTermination(30, TimeUnit.SECONDS))
@@ -110,7 +156,7 @@ class AnkiDeckDiscoveryTest {
                 executor.submit {}.get(30, TimeUnit.SECONDS)
                 instrumentation.waitForIdleSync()
                 main {
-                    assertEquals(AnkiDeckDiscoveryState.Loading, discovery.state)
+                    assertEquals(AnkiDeckDiscoveryState.Loading(), discovery.state)
                     discovery.check()
                 }
                 assertEquals(if (queued) 0 else 1, reads.get())

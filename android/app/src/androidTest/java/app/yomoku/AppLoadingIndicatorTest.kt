@@ -202,7 +202,7 @@ class AppLoadingIndicatorTest {
                         idle.copy(ankiExport = AnkiExportView(1UL, "", 7, it))
                     }
         for (view in states) assertTrue(appIsLoading(view, AnkiDeckDiscoveryState.Unchecked, false))
-        assertTrue(appIsLoading(idle, AnkiDeckDiscoveryState.Loading, false))
+        assertTrue(appIsLoading(idle, AnkiDeckDiscoveryState.Loading(), false))
         assertTrue(appIsLoading(idle, AnkiDeckDiscoveryState.Unchecked, true))
         assertFalse(
             appIsLoading(

@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.material3.MaterialTheme
@@ -31,20 +32,22 @@ internal fun AnkiSettingsPanel(
 ) {
     Column(Modifier.testTag("anki_settings"), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         SettingsSectionHeading(stringResource(R.string.anki_settings_title))
-        SettingsDescription(stringResource(R.string.anki_settings_description))
         val status =
             when (settings.phase) {
                 AnkiSettingsPhase.UNLOADED -> R.string.anki_settings_unloaded
-                AnkiSettingsPhase.LOADING -> R.string.anki_settings_loading
+                AnkiSettingsPhase.LOADING -> null
                 AnkiSettingsPhase.READY -> null
-                AnkiSettingsPhase.SAVING -> R.string.anki_settings_saving
+                AnkiSettingsPhase.SAVING -> null
                 AnkiSettingsPhase.FAILED -> R.string.anki_settings_failed
             }
         status?.let { Text(stringResource(it), Modifier.testTag("anki_settings_status")) }
         settings.storageError?.let {
             Text(stringResource(it.messageResource()), color = MaterialTheme.colorScheme.error)
         }
-        if (settings.phase != AnkiSettingsPhase.READY) {
+        if (
+            settings.phase == AnkiSettingsPhase.UNLOADED ||
+                settings.phase == AnkiSettingsPhase.FAILED
+        ) {
             TextButton(
                 onClick = {
                     dispatch(
@@ -64,59 +67,46 @@ internal fun AnkiSettingsPanel(
             }
         }
         val ready = settings.phase == AnkiSettingsPhase.READY
-        if (ready && settings.defaultDeckId == null)
+        if ((ready || settings.phase == AnkiSettingsPhase.SAVING) && settings.defaultDeckId == null)
             Text(stringResource(R.string.anki_settings_no_deck))
         TextButton(
             onClick = checkProvider,
-            enabled = ready && !setupBusy && discovery != AnkiDeckDiscoveryState.Loading,
+            enabled = ready && !setupBusy && discovery !is AnkiDeckDiscoveryState.Loading,
             modifier = Modifier.testTag("anki_decks_check"),
         ) {
             Text(stringResource(R.string.anki_settings_check))
         }
-        when (discovery) {
-            AnkiDeckDiscoveryState.Unchecked -> Unit
-            AnkiDeckDiscoveryState.Loading -> Text(stringResource(R.string.anki_settings_checking))
-            is AnkiDeckDiscoveryState.Failed -> {
-                Text(
-                    stringResource(discovery.error.messageResource()),
-                    color = MaterialTheme.colorScheme.error,
-                )
-                if (discovery.error == AnkiReadError.PermissionDenied) {
-                    Text(stringResource(R.string.anki_settings_permission_reason))
-                }
+        if (discovery is AnkiDeckDiscoveryState.Failed) {
+            Text(
+                stringResource(discovery.error.messageResource()),
+                color = MaterialTheme.colorScheme.error,
+            )
+        }
+        val decks = discovery.decks.filter { !it.filtered }
+        if (discovery is AnkiDeckDiscoveryState.Ready) {
+            if (decks.isEmpty()) Text(stringResource(R.string.anki_settings_no_available_decks))
+            if (settings.defaultDeckId != null && decks.none { it.id == settings.defaultDeckId }) {
+                Text(stringResource(R.string.anki_settings_missing_deck))
             }
-            is AnkiDeckDiscoveryState.Ready -> {
-                val decks = discovery.decks.filter { !it.filtered }
-                if (decks.isEmpty()) Text(stringResource(R.string.anki_settings_no_available_decks))
-                if (
-                    settings.defaultDeckId != null && decks.none { it.id == settings.defaultDeckId }
+        }
+        val selectionEnabled = ready && !setupBusy && discovery is AnkiDeckDiscoveryState.Ready
+        Column(Modifier.selectableGroup(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            for (deck in decks) {
+                val selected = settings.defaultDeckId == deck.id
+                Row(
+                    Modifier.fillMaxWidth()
+                        .heightIn(min = 48.dp)
+                        .selectable(
+                            selected = selected,
+                            enabled = selectionEnabled,
+                            role = Role.RadioButton,
+                            onClick = { dispatch(Event.SetAnkiDefaultDeck(deck.id)) },
+                        )
+                        .testTag("anki_deck_${deck.id}"),
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Text(stringResource(R.string.anki_settings_missing_deck))
-                }
-                Column(Modifier.selectableGroup()) {
-                    for (deck in decks) {
-                        val selected = settings.defaultDeckId == deck.id
-                        Row(
-                            Modifier.fillMaxWidth()
-                                .selectable(
-                                    selected = selected,
-                                    enabled = ready,
-                                    role = Role.RadioButton,
-                                    onClick = { dispatch(Event.SetAnkiDefaultDeck(deck.id)) },
-                                )
-                                .testTag("anki_deck_${deck.id}"),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            RadioButton(selected, onClick = null, enabled = ready)
-                            Text(
-                                stringResource(
-                                    R.string.anki_settings_deck_option,
-                                    deck.name,
-                                    deck.id,
-                                )
-                            )
-                        }
-                    }
+                    RadioButton(selected, onClick = null, enabled = selectionEnabled)
+                    Text(stringResource(R.string.anki_settings_deck_option, deck.name, deck.id))
                 }
             }
         }
@@ -140,9 +130,9 @@ internal fun AnkiModelSetupPanel(phase: app.yomoku.shared.AnkiSetupPhase) {
         when (phase) {
             app.yomoku.shared.AnkiSetupPhase.Ready -> return
             app.yomoku.shared.AnkiSetupPhase.Missing -> R.string.anki_model_missing
-            app.yomoku.shared.AnkiSetupPhase.Checking -> R.string.anki_export_checking
+            app.yomoku.shared.AnkiSetupPhase.Checking -> return
             is app.yomoku.shared.AnkiSetupPhase.Failed -> phase.value.messageResource()
-            else -> R.string.anki_model_unchecked
+            else -> return
         }
     Column(Modifier.testTag("anki_model_setup"), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(stringResource(status))

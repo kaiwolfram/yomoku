@@ -11,11 +11,12 @@ import java.util.concurrent.ExecutorService
 internal sealed interface AnkiDeckDiscoveryState {
     data object Unchecked : AnkiDeckDiscoveryState
 
-    data object Loading : AnkiDeckDiscoveryState
+    data class Loading(val decks: List<AnkiProviderDeck> = emptyList()) : AnkiDeckDiscoveryState
 
     data class Ready(val decks: List<AnkiProviderDeck>) : AnkiDeckDiscoveryState
 
-    data class Failed(val error: AnkiReadError) : AnkiDeckDiscoveryState
+    data class Failed(val error: AnkiReadError, val decks: List<AnkiProviderDeck> = emptyList()) :
+        AnkiDeckDiscoveryState
 }
 
 /**
@@ -32,8 +33,8 @@ internal class AnkiDeckDiscovery(
 
     fun check() {
         check(Looper.myLooper() == Looper.getMainLooper())
-        if (closed || state == AnkiDeckDiscoveryState.Loading) return
-        state = AnkiDeckDiscoveryState.Loading
+        if (closed || state is AnkiDeckDiscoveryState.Loading) return
+        state = AnkiDeckDiscoveryState.Loading(state.decks)
         executor.execute {
             if (closed) return@execute
             val result =
@@ -48,7 +49,8 @@ internal class AnkiDeckDiscovery(
                 if (!closed) {
                     state =
                         when (result) {
-                            is AnkiReadResult.Failed -> AnkiDeckDiscoveryState.Failed(result.error)
+                            is AnkiReadResult.Failed ->
+                                AnkiDeckDiscoveryState.Failed(result.error, state.decks)
                             is AnkiReadResult.Value ->
                                 AnkiDeckDiscoveryState.Ready(result.value.toList())
                         }
@@ -59,7 +61,8 @@ internal class AnkiDeckDiscovery(
 
     fun permissionDenied() {
         check(Looper.myLooper() == Looper.getMainLooper())
-        if (!closed) state = AnkiDeckDiscoveryState.Failed(AnkiReadError.PermissionDenied)
+        if (!closed)
+            state = AnkiDeckDiscoveryState.Failed(AnkiReadError.PermissionDenied, state.decks)
     }
 
     override fun close() {
@@ -67,3 +70,12 @@ internal class AnkiDeckDiscovery(
         closed = true
     }
 }
+
+internal val AnkiDeckDiscoveryState.decks: List<AnkiProviderDeck>
+    get() =
+        when (this) {
+            AnkiDeckDiscoveryState.Unchecked -> emptyList()
+            is AnkiDeckDiscoveryState.Loading -> decks
+            is AnkiDeckDiscoveryState.Ready -> decks
+            is AnkiDeckDiscoveryState.Failed -> decks
+        }
