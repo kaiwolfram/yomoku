@@ -86,8 +86,8 @@ retained retry commands. No Vocabulary selection or bulk commands cross the core
 Historical vocabulary deletion helpers erase events/occurrences without rescanning books. IDs retain
 AUTOINCREMENT high-water marks so reimported content has fresh identity.
 
-Supporting contracts: [rusqlite connection](https://docs.rs/rusqlite/0.40.2/rusqlite/struct.Connection.html),
-[transactions](https://docs.rs/rusqlite/0.40.2/rusqlite/struct.Transaction.html),
+Supporting contracts: [rusqlite connection](https://docs.rs/rusqlite/0.42.0/rusqlite/struct.Connection.html),
+[transactions](https://docs.rs/rusqlite/0.42.0/rusqlite/struct.Transaction.html),
 [SQLite immediate locking](https://www.sqlite.org/lang_transaction.html) and
 [AUTOINCREMENT](https://www.sqlite.org/autoinc.html).
 
