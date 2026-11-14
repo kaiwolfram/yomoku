@@ -36,6 +36,7 @@ impl Yomoku {
             | Event::CloseDocument => model.dismiss_vocabulary_word(),
             Event::CancelVocabularyWordStatus if !model.storage_busy => {
                 model.vocabulary.word_status = None;
+                model.vocabulary_status_changes_membership = false;
                 model.vocabulary.word_status_error = None;
                 return Some(render::render());
             }
@@ -106,6 +107,9 @@ impl Yomoku {
                     model.dismiss_vocabulary_word();
                     return Some(render::render());
                 }
+                model.vocabulary_status_changes_membership =
+                    model.vocabulary.query.statuses.contains(&word.row.status)
+                        != model.vocabulary.query.statuses.contains(&command.status);
                 model.vocabulary.word_status = Some(command.clone());
                 return Some(self.dispatch_vocabulary_word(
                     StorageOperation::SetVocabularyWordStatus(command.clone()),
@@ -231,11 +235,25 @@ impl Yomoku {
                             word.row.status = command.status;
                         }
                     }
-                    model.invalidate_vocabulary();
+                    // The retained presentation may predate a failed prefix refresh. Use
+                    // the accepted command's source status, even after dismissal/retry.
+                    let changes_membership =
+                        std::mem::take(&mut model.vocabulary_status_changes_membership);
+                    if !changes_membership
+                        && model.vocabulary.query.statuses.contains(&command.status)
+                    {
+                        model.patch_vocabulary_status(command.id, command.status);
+                    }
                     model.invalidate_statistics();
                     model.invalidate_library_words();
                     model.invalidate_effective_page();
                     model.clear_reader_word();
+                    if changes_membership && model.vocabulary.matching_count.is_some() {
+                        if model.vocabulary_visible() {
+                            return self.refresh_vocabulary_prefix(model);
+                        }
+                        model.invalidate_vocabulary();
+                    }
                 }
             }
             _ => unreachable!(),

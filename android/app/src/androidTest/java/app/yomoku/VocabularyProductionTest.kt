@@ -198,6 +198,113 @@ class VocabularyProductionTest {
         }
     }
 
+    @Test
+    fun statusRemovalRetryAndReentryKeepLoadedPrefixAndScrollPastFirstPage() {
+        idle()
+        val prefix = "状態-${System.nanoTime()}-"
+        sql { db ->
+            db.beginTransaction()
+            try {
+                (0..304).forEach { insert(db, prefix + it.toString().padStart(4, '0')) }
+                db.setTransactionSuccessful()
+            } finally {
+                db.endTransaction()
+            }
+        }
+        try {
+            visit()
+            search(prefix)
+            compose.runOnUiThread {
+                core()
+                    .dispatch(
+                        Event.SetVocabularyQuery(
+                            VocabularyQuery(
+                                prefix,
+                                listOf(VocabularyStatus.NEW),
+                                VocabularySort.ALPHABETICAL,
+                            )
+                        )
+                    )
+            }
+            idle()
+            repeat(2) {
+                compose.runOnUiThread { core().dispatch(Event.LoadMoreVocabulary) }
+                idle()
+            }
+            val original = core().view.vocabulary
+            assertEquals(300, original.rows.size)
+            val row = original.rows[150]
+            val next = original.rows[151]
+            compose.onNodeWithTag("vocabulary_scroll").performScrollToKey(row.id.value)
+            val top =
+                compose
+                    .onNodeWithTag("vocabulary_row_${row.id.value}")
+                    .getUnclippedBoundsInRoot()
+                    .top
+                    .value
+            compose.onNodeWithTag("vocabulary_row_${row.id.value}").performClick()
+            idle()
+            val candidates = core().view.vocabulary.word?.candidates
+            sql {
+                it.execSQL(
+                    "CREATE TRIGGER fail_polish_status BEFORE UPDATE OF status ON vocabulary BEGIN SELECT RAISE(ABORT, 'fixture'); END"
+                )
+            }
+            compose.onNodeWithTag("word_status_LEARNING").performClick()
+            idle()
+            assertNotNull(core().view.vocabulary.wordStatusError)
+            assertEquals(original.rows, core().view.vocabulary.rows)
+            sql { it.execSQL("DROP TRIGGER fail_polish_status") }
+            compose.onNodeWithTag("vocabulary_word_status_retry").performClick()
+            idle()
+            val removed = core().view.vocabulary
+            assertEquals(304UL, removed.matchingCount)
+            assertEquals(300, removed.rows.size)
+            assertEquals(300UL, removed.nextOffset)
+            assertFalse(removed.rows.any { it.id == row.id })
+            assertEquals(candidates, removed.word?.candidates)
+            compose.onNodeWithTag("word_status_NEW").performClick()
+            idle()
+            assertEquals(original.rows, core().view.vocabulary.rows)
+            assertEquals(305UL, core().view.vocabulary.matchingCount)
+            assertEquals(300UL, core().view.vocabulary.nextOffset)
+            assertEquals(candidates, core().view.vocabulary.word?.candidates)
+            compose.runOnUiThread { core().dispatch(Event.DismissVocabularyWord) }
+            idle()
+            val nextTop =
+                compose
+                    .onNodeWithTag("vocabulary_row_${next.id.value}")
+                    .getUnclippedBoundsInRoot()
+                    .top
+                    .value
+            assertEquals(top, nextTop, 0.5f)
+            compose.activityRule.scenario.recreate()
+            idle()
+            assertEquals(300, core().view.vocabulary.rows.size)
+            assertEquals(
+                nextTop,
+                compose
+                    .onNodeWithTag("vocabulary_row_${next.id.value}")
+                    .getUnclippedBoundsInRoot()
+                    .top
+                    .value,
+                0.5f,
+            )
+            compose.runOnUiThread { core().dispatch(Event.LoadMoreVocabulary) }
+            idle()
+            assertEquals(305, core().view.vocabulary.rows.size)
+            assertNull(core().view.vocabulary.nextOffset)
+        } finally {
+            sql { db ->
+                db.execSQL("DROP TRIGGER IF EXISTS fail_polish_status")
+                db.execSQL(
+                    "DELETE FROM vocabulary WHERE surface >= ? AND surface < ?",
+                    arrayOf(prefix, prefix + "\uffff"),
+                )
+            }
+        }
+    }
+
     private fun open(id: DocumentId): EffectiveReaderPage {
         compose.runOnUiThread { core().dispatch(Event.OpenReader(id)) }
         compose.waitUntil(90_000) {

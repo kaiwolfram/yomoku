@@ -35,6 +35,8 @@ internal fun VocabularyScreen(
     val nextPresentation = presentation.update(state)
     SideEffect { presentation = nextPresentation }
     val displayed = nextPresentation.display(state)
+    val anchor = remember(sessionKey, query) { VocabularyScrollAnchor() }
+    SideEffect { anchor.replace(displayed.rows, scroll) }
     val enabled = (!view.storageBusy || state.loading) && state.wordStatus == null
     val canOpenWord = !view.storageBusy && !state.loading && state.wordStatus == null
     VocabularyWordSheet(view, dispatch)
@@ -246,4 +248,33 @@ private data class VocabularyPresentation(
 
     fun display(state: VocabularyState): VocabularyState =
         if (sorting && state.matchingCount == null) successful ?: state else state
+}
+
+/** Keep the visible word, or its next/previous surviving neighbor, at the same pixel offset. */
+private class VocabularyScrollAnchor {
+    private var rows: List<VocabularyRow> = emptyList()
+
+    fun replace(next: List<VocabularyRow>, scroll: LazyListState) {
+        val previous = rows
+        rows = next
+        // Appending a page and patching a status already preserve the visible key.
+        if (
+            previous.isEmpty() || previous.indices.all { next.getOrNull(it)?.id == previous[it].id }
+        )
+            return
+        val index = scroll.firstVisibleItemIndex - 1 // Search/filter controls occupy one item.
+        if (index !in previous.indices) return
+        val positions = next.withIndex().associate { it.value.id to it.index }
+        val neighbor =
+            (index until previous.size).firstOrNull { previous[it].id in positions }
+                ?: (index - 1 downTo 0).firstOrNull { previous[it].id in positions }
+        if (neighbor == null) {
+            scroll.requestScrollToItem(0)
+        } else {
+            scroll.requestScrollToItem(
+                positions.getValue(previous[neighbor].id) + 1,
+                scroll.firstVisibleItemScrollOffset,
+            )
+        }
+    }
 }

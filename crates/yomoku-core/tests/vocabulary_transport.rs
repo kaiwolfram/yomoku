@@ -459,7 +459,7 @@ fn word_lookup_failures_only_retry_explicitly_and_validate_identity() {
 }
 
 #[test]
-fn direct_status_retains_exact_retry_after_dismissal_and_invalidates_results_on_success() {
+fn direct_status_retains_exact_retry_after_dismissal_and_patches_results_on_success() {
     use yomoku_core::vocabulary::VocabularyWordStatusCommand;
     for core in cores() {
         ready(&core);
@@ -513,7 +513,9 @@ fn direct_status_retains_exact_retry_after_dismissal_and_invalidates_results_on_
         assert!(
             view.vocabulary.word_status.is_none() && view.vocabulary.word_status_error.is_none()
         );
-        assert!(view.vocabulary.rows.is_empty() && view.vocabulary.matching_count.is_none());
+        assert_eq!(view.vocabulary.rows.len(), 100);
+        assert_eq!(view.vocabulary.matching_count, Some(1205));
+        assert_eq!(view.vocabulary.rows[0].status, VocabularyStatus::Learning);
     }
 }
 
@@ -549,12 +551,13 @@ fn direct_status_keeps_word_open_after_filter_refresh_and_supports_cancel() {
             .process_event(Event::RetryVocabularyWordStatus)
             .is_empty());
         let mut change = core.process_event(Event::SetVocabularyWordStatus(command.clone()));
-        resolve(
+        let mut refresh = resolve(
             &core,
             &mut change,
             StorageResult::VocabularyWordStatusChanged(command),
         );
-        let mut refresh = core.process_event(Event::LoadVocabulary);
+        assert_eq!(core.view().vocabulary.rows, vec![row.clone()]);
+        assert_eq!(core.view().vocabulary.matching_count, Some(1));
         resolve(&core, &mut refresh, loaded("", 0, 0));
         assert_eq!(core.view().vocabulary.matching_count, Some(0));
         let word = core.view().vocabulary.word.unwrap();
@@ -606,5 +609,275 @@ fn stale_word_callbacks_cannot_replace_a_new_lookup_or_acknowledge_another_statu
             operation(&retry),
             Some(&StorageOperation::SetVocabularyWordStatus(command))
         );
+    }
+}
+
+fn ready_prefix(core: &Core<Yomoku>, filtered: bool) {
+    enter(core);
+    let mut q = query("");
+    if filtered {
+        q.statuses = vec![VocabularyStatus::New];
+    }
+    let mut effects = core.process_event(Event::SetVocabularyQuery(q));
+    if operation(&effects).is_none() {
+        effects = core.process_event(Event::LoadVocabulary);
+    }
+    resolve(core, &mut effects, loaded("", 0, 305));
+    for offset in [100, 200] {
+        let mut more = core.process_event(Event::LoadMoreVocabulary);
+        resolve(core, &mut more, loaded("", offset, 305));
+    }
+}
+
+fn dataset_page(rows: &[VocabularyRow], offset: usize) -> StorageResult {
+    let end = (offset + 100).min(rows.len());
+    StorageResult::VocabularyLoaded(VocabularyPage {
+        matching_count: rows.len() as u64,
+        offset: offset as u64,
+        rows: rows[offset..end].to_vec(),
+        next_offset: (end < rows.len()).then_some(end as u64),
+    })
+}
+
+#[test]
+fn status_changes_beyond_page_one_patch_only_the_row_without_reads_or_pagination_changes() {
+    use yomoku_core::vocabulary::VocabularyWordStatusCommand;
+    for core in cores() {
+        ready_prefix(&core, false);
+        let original = core.view().vocabulary;
+        let row = original.rows[150].clone();
+        let mut lookup = core.process_event(Event::OpenVocabularyWord(row.id));
+        let details = word_details(&core);
+        resolve(&core, &mut lookup, details);
+        let candidates = core.view().vocabulary.word.unwrap().candidates;
+        for (index, status) in [
+            VocabularyStatus::Learning,
+            VocabularyStatus::Known,
+            VocabularyStatus::New,
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            let command = VocabularyWordStatusCommand {
+                id: row.id,
+                status,
+                occurred_at_unix_ms: 1000 + index as i64,
+            };
+            let mut write = core.process_event(Event::SetVocabularyWordStatus(command.clone()));
+            let effects = resolve(
+                &core,
+                &mut write,
+                StorageResult::VocabularyWordStatusChanged(command),
+            );
+            assert!(operation(&effects).is_none());
+            assert!(core.process_event(Event::LoadVocabulary).is_empty());
+            let state = core.view().vocabulary;
+            let mut expected = original.rows.clone();
+            expected[150].status = status;
+            assert_eq!(state.rows, expected);
+            assert_eq!(state.matching_count, original.matching_count);
+            assert_eq!(state.next_offset, Some(300));
+            assert_eq!(state.word.unwrap().candidates, candidates);
+        }
+    }
+}
+
+#[test]
+fn filter_removal_and_reentry_replace_entire_loaded_prefix_atomically_with_retry_and_dismissal() {
+    use yomoku_core::vocabulary::VocabularyWordStatusCommand;
+    for core in cores() {
+        ready_prefix(&core, true);
+        let original = core.view().vocabulary;
+        let row = original.rows[150].clone();
+        let mut lookup = core.process_event(Event::OpenVocabularyWord(row.id));
+        let details = word_details(&core);
+        resolve(&core, &mut lookup, details);
+        let candidates = core.view().vocabulary.word.unwrap().candidates;
+        let command = VocabularyWordStatusCommand {
+            id: row.id,
+            status: VocabularyStatus::Learning,
+            occurred_at_unix_ms: 999,
+        };
+        let mut write = core.process_event(Event::SetVocabularyWordStatus(command.clone()));
+        resolve(
+            &core,
+            &mut write,
+            StorageResult::Failed(DocumentError::Unavailable),
+        );
+        assert_eq!(core.view().vocabulary.rows, original.rows);
+        let mut write = core.process_event(Event::RetryVocabularyWordStatus);
+        let mut refresh = resolve(
+            &core,
+            &mut write,
+            StorageResult::VocabularyWordStatusChanged(command.clone()),
+        );
+        let StorageResult::VocabularyLoaded(all) = loaded("", 0, 305) else {
+            unreachable!()
+        };
+        let mut dataset = all.rows;
+        for offset in [100, 200, 300] {
+            let StorageResult::VocabularyLoaded(page) = loaded("", offset, 305) else {
+                unreachable!()
+            };
+            dataset.extend(page.rows);
+        }
+        let removed: Vec<_> = dataset
+            .iter()
+            .filter(|item| item.id != row.id)
+            .cloned()
+            .collect();
+        assert_eq!(
+            operation(&refresh),
+            Some(&request(original.query.clone(), 0))
+        );
+        refresh = resolve(&core, &mut refresh, dataset_page(&removed, 0));
+        assert_eq!(core.view().vocabulary.rows, original.rows);
+        assert_eq!(core.view().vocabulary.matching_count, Some(305));
+        assert_eq!(core.view().vocabulary.next_offset, Some(300));
+        resolve(
+            &core,
+            &mut refresh,
+            StorageResult::Failed(DocumentError::Unavailable),
+        );
+        assert_eq!(core.view().vocabulary.rows, original.rows);
+        assert!(core.process_event(Event::LoadMoreVocabulary).is_empty());
+        refresh = core.process_event(Event::RetryVocabulary);
+        assert_eq!(
+            operation(&refresh),
+            Some(&request(original.query.clone(), 100))
+        );
+        refresh = resolve(&core, &mut refresh, dataset_page(&removed, 100));
+        assert_eq!(core.view().vocabulary.rows, original.rows);
+        resolve(&core, &mut refresh, dataset_page(&removed, 200));
+        let state = core.view().vocabulary;
+        assert_eq!(state.rows, removed[..300]);
+        assert_eq!(state.matching_count, Some(304));
+        assert_eq!(state.next_offset, Some(300));
+        assert_eq!(
+            state.word.as_ref().unwrap().row.status,
+            VocabularyStatus::Learning
+        );
+        assert_eq!(state.word.unwrap().candidates, candidates);
+        // The still-open sheet can return the removed word to the same filter.
+        let reentry = VocabularyWordStatusCommand {
+            status: VocabularyStatus::New,
+            occurred_at_unix_ms: 1000,
+            ..command
+        };
+        let mut write = core.process_event(Event::SetVocabularyWordStatus(reentry.clone()));
+        let mut refresh = resolve(
+            &core,
+            &mut write,
+            StorageResult::VocabularyWordStatusChanged(reentry),
+        );
+        core.process_event(Event::DismissVocabularyWord);
+        for offset in [0, 100, 200] {
+            assert_eq!(
+                operation(&refresh),
+                Some(&request(original.query.clone(), offset))
+            );
+            refresh = resolve(&core, &mut refresh, dataset_page(&dataset, offset as usize));
+        }
+        assert!(operation(&refresh).is_none());
+        assert_eq!(core.view().vocabulary.rows, original.rows);
+        assert_eq!(core.view().vocabulary.matching_count, Some(305));
+        assert!(core.view().vocabulary.word.is_none());
+        let mut more = core.process_event(Event::LoadMoreVocabulary);
+        assert_eq!(operation(&more), Some(&request(original.query, 300)));
+        resolve(&core, &mut more, dataset_page(&dataset, 300));
+        assert_eq!(core.view().vocabulary.rows, dataset);
+        assert_eq!(core.view().vocabulary.next_offset, None);
+    }
+}
+
+#[test]
+fn an_obsolete_prefix_refresh_cannot_publish_after_query_change_or_reentry() {
+    use yomoku_core::vocabulary::VocabularyWordStatusCommand;
+    for core in cores() {
+        ready_prefix(&core, true);
+        let row = core.view().vocabulary.rows[150].clone();
+        let mut lookup = core.process_event(Event::OpenVocabularyWord(row.id));
+        let details = word_details(&core);
+        resolve(&core, &mut lookup, details);
+        let command = VocabularyWordStatusCommand {
+            id: row.id,
+            status: VocabularyStatus::Known,
+            occurred_at_unix_ms: 999,
+        };
+        let mut write = core.process_event(Event::SetVocabularyWordStatus(command.clone()));
+        let mut refresh = resolve(
+            &core,
+            &mut write,
+            StorageResult::VocabularyWordStatusChanged(command),
+        );
+        core.process_event(Event::DismissVocabularyWord);
+        core.process_event(Event::SetVocabularyQuery(query("犬")));
+        let mut fresh = resolve(&core, &mut refresh, loaded("", 0, 304));
+        assert_eq!(operation(&fresh), Some(&request(query("犬"), 0)));
+        assert!(core.view().vocabulary.rows.is_empty());
+        resolve(&core, &mut fresh, loaded("犬", 0, 1));
+        assert_eq!(core.view().vocabulary.rows[0].surface, "犬猫0");
+    }
+}
+
+#[test]
+fn reentry_after_failed_prefix_refresh_uses_written_status_instead_of_retained_row_membership() {
+    use yomoku_core::vocabulary::VocabularyWordStatusCommand;
+    for core in cores() {
+        ready_prefix(&core, true);
+        let original = core.view().vocabulary;
+        let row = original.rows[150].clone();
+        let mut lookup = core.process_event(Event::OpenVocabularyWord(row.id));
+        let details = word_details(&core);
+        resolve(&core, &mut lookup, details);
+        let command = VocabularyWordStatusCommand {
+            id: row.id,
+            status: VocabularyStatus::Learning,
+            occurred_at_unix_ms: 999,
+        };
+        let mut write = core.process_event(Event::SetVocabularyWordStatus(command.clone()));
+        let mut refresh = resolve(
+            &core,
+            &mut write,
+            StorageResult::VocabularyWordStatusChanged(command.clone()),
+        );
+        refresh = resolve(&core, &mut refresh, loaded("", 0, 304));
+        resolve(
+            &core,
+            &mut refresh,
+            StorageResult::Failed(DocumentError::Unavailable),
+        );
+        assert_eq!(core.view().vocabulary.rows, original.rows);
+        let reentry = VocabularyWordStatusCommand {
+            status: VocabularyStatus::New,
+            occurred_at_unix_ms: 1000,
+            ..command
+        };
+        let mut write = core.process_event(Event::SetVocabularyWordStatus(reentry.clone()));
+        // Retry after sheet dismissal must retain the source membership as well.
+        resolve(
+            &core,
+            &mut write,
+            StorageResult::Failed(DocumentError::Unavailable),
+        );
+        core.process_event(Event::DismissVocabularyWord);
+        let mut retry = core.process_event(Event::RetryVocabularyWordStatus);
+        refresh = resolve(
+            &core,
+            &mut retry,
+            StorageResult::VocabularyWordStatusChanged(reentry),
+        );
+        assert_eq!(
+            operation(&refresh),
+            Some(&request(original.query.clone(), 0))
+        );
+        for offset in [0, 100, 200] {
+            refresh = resolve(&core, &mut refresh, loaded("", offset, 305));
+        }
+        assert_eq!(core.view().vocabulary.rows, original.rows);
+        assert_eq!(core.view().vocabulary.matching_count, Some(305));
+        assert_eq!(core.view().vocabulary.next_offset, Some(300));
+        assert!(core.view().vocabulary.error.is_none());
+        assert!(core.view().vocabulary.word.is_none());
     }
 }

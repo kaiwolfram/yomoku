@@ -88,6 +88,8 @@ pub struct Model {
     vocabulary_request: Option<vocabulary::VocabularyRequest>,
     vocabulary_request_sequence: u64,
     vocabulary_failed_offset: Option<u64>,
+    vocabulary_refresh: Option<vocabulary::VocabularyRefresh>,
+    vocabulary_status_changes_membership: bool,
     vocabulary_word_request: Option<vocabulary_word::VocabularyWordRequest>,
     statistics: crate::statistics::StatisticsState,
     statistics_request: Option<(u64, crate::statistics::StatisticsQuery)>,

@@ -1,6 +1,7 @@
 package app.yomoku
 
 import androidx.activity.ComponentActivity
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
@@ -110,6 +111,78 @@ class VocabularyScreenTest {
         compose.onNodeWithTag("vocabulary_row_3").assertDoesNotExist()
         compose.onNodeWithTag("vocabulary_count").assertTextEquals("Matching words: 0")
         compose.onNodeWithTag("app_loading").assertDoesNotExist()
+    }
+
+    @Test
+    fun statusPatchRemovalAndReentryPreserveVisibleWordAndPixelOffsetBeyondFirstPage() {
+        val scroll = LazyListState()
+        val rows = (1..300).map { vocabularyRow(it.toLong()) }
+        frame.value =
+            frame.value.copy(
+                vocabulary =
+                    frame.value.vocabulary.copy(
+                        matchingCount = 305UL,
+                        rows = rows,
+                        nextOffset = 300UL,
+                    )
+            )
+        compose.setContent {
+            YomokuTheme { VocabularyScreen(frame.value, "anchor", scroll, events::add) }
+        }
+        compose.runOnUiThread { scroll.requestScrollToItem(151, 13) }
+        compose.waitForIdle()
+        fun assertAnchor(id: Long) {
+            compose.runOnIdle {
+                assertEquals(
+                    id,
+                    scroll.layoutInfo.visibleItemsInfo
+                        .first { it.index == scroll.firstVisibleItemIndex }
+                        .key,
+                )
+                assertEquals(13, scroll.firstVisibleItemScrollOffset)
+            }
+        }
+        assertAnchor(151)
+        fun update(
+            next: List<VocabularyRow>,
+            loading: Boolean = false,
+            error: DocumentError? = null,
+        ) {
+            compose.runOnUiThread {
+                frame.value =
+                    frame.value.copy(
+                        storageBusy = loading,
+                        vocabulary =
+                            frame.value.vocabulary.copy(
+                                rows = next,
+                                matchingCount = 305UL - (rows.size - next.size).toULong(),
+                                nextOffset = next.size.toULong(),
+                                loading = loading,
+                                error = error,
+                            ),
+                    )
+            }
+            compose.waitForIdle()
+        }
+        val patched = rows.map {
+            if (it.id.value == 151L) it.copy(status = VocabularyStatus.LEARNING) else it
+        }
+        update(patched)
+        assertAnchor(151)
+        // A refresh and a failed page retain the presentation and its position.
+        update(patched, loading = true)
+        assertAnchor(151)
+        update(patched, error = DocumentError.UNAVAILABLE)
+        assertAnchor(151)
+        val beforeAnchorRemoved = patched.filter { it.id.value != 100L }
+        update(beforeAnchorRemoved)
+        assertAnchor(151)
+        val anchorRemoved = beforeAnchorRemoved.filter { it.id.value != 151L }
+        update(anchorRemoved)
+        assertAnchor(152)
+        update(patched)
+        assertAnchor(152)
+        assertFalse(events.contains(Event.LoadMoreVocabulary))
     }
 
     @Test

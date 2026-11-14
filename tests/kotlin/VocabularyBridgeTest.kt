@@ -184,11 +184,11 @@ internal fun verifyVocabularyBridge() {
                 )
             dispatch(bridge, Event.DismissVocabularyWord)
             check(
-                changed.vocabulary.matchingCount == null &&
+                changed.vocabulary.matchingCount == 2UL &&
                     changed.statistics.data == null &&
                     changed.libraryWordDistributions == null
             )
-            val rows = dispatch(bridge, Event.LoadVocabulary, 1).vocabulary.rows
+            val rows = dispatch(bridge, Event.LoadVocabulary).vocabulary.rows
             check(rows.single { it.id == cat.id }.status == VocabularyStatus.LEARNING)
             navigate(Destination.STATISTICS)
             val stats = checkNotNull(dispatch(bridge, Event.LoadStatistics(now), 1).statistics.data)
@@ -297,10 +297,10 @@ private fun verifyVocabularyWordBridge() {
                     VocabularyStatus.LEARNING,
                     System.currentTimeMillis(),
                 )
-            val changed = dispatch(bridge, Event.SetVocabularyWordStatus(command), 1)
+            val changed = dispatch(bridge, Event.SetVocabularyWordStatus(command), 2)
             check(changed.vocabulary.wordStatus == null)
             check(changed.vocabulary.word?.row?.status == VocabularyStatus.LEARNING)
-            val filtered = dispatch(bridge, Event.LoadVocabulary, 1)
+            val filtered = dispatch(bridge, Event.LoadVocabulary)
             check(
                 filtered.vocabulary.matchingCount == 0UL &&
                     filtered.vocabulary.word?.row?.id == eaten.id
