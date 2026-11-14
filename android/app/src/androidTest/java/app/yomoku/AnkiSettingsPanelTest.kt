@@ -2,6 +2,7 @@ package app.yomoku
 
 import androidx.activity.ComponentActivity
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -19,6 +20,7 @@ class AnkiSettingsPanelTest {
     private val discovery = mutableStateOf<AnkiDeckDiscoveryState>(AnkiDeckDiscoveryState.Unchecked)
     private val events = mutableListOf<Event>()
     private var checks = 0
+    private val setupBusy = mutableStateOf(false)
 
     private fun render() {
         compose.setContent {
@@ -28,6 +30,7 @@ class AnkiSettingsPanelTest {
                     discovery.value,
                     events::add,
                     { checks++ },
+                    setupBusy.value,
                 )
             }
         }
@@ -116,31 +119,66 @@ class AnkiSettingsPanelTest {
         val first = compose.onNodeWithTag("anki_deck_1").getUnclippedBoundsInRoot()
         val second = compose.onNodeWithTag("anki_deck_2").getUnclippedBoundsInRoot()
         assertTrue(first.bottom.value - first.top.value >= 48f)
-        assertEquals(8f, second.top.value - first.bottom.value, 0.5f)
-        for (saving in listOf(true, false)) {
+        assertEquals(4f, second.top.value - first.bottom.value, 0.5f)
+        val checkBounds = compose.onNodeWithTag("anki_decks_check").getUnclippedBoundsInRoot()
+        val checkImage = compose.onNodeWithTag("anki_decks_check").captureToImage().toPixelMap()
+        val label =
+            compose
+                .onNodeWithTag("anki_deck_label_1", useUnmergedTree = true)
+                .getUnclippedBoundsInRoot()
+        assertEquals(32f, label.left.value - first.left.value, 0.5f)
+        for (phase in 0..2) {
             compose.runOnUiThread {
                 settings.value =
                     settings.value.copy(
-                        phase = if (saving) AnkiSettingsPhase.SAVING else AnkiSettingsPhase.READY
+                        phase =
+                            if (phase == 0) AnkiSettingsPhase.SAVING else AnkiSettingsPhase.READY
                     )
                 discovery.value =
-                    if (saving) AnkiDeckDiscoveryState.Ready(decks)
-                    else AnkiDeckDiscoveryState.Loading(decks)
+                    if (phase == 1) AnkiDeckDiscoveryState.Loading(decks)
+                    else AnkiDeckDiscoveryState.Ready(decks)
+                setupBusy.value = phase == 2
             }
             compose.onNodeWithTag("anki_deck_1").assertIsNotEnabled()
             compose.onNodeWithTag("anki_deck_2").assertIsNotEnabled()
             assertEquals(first, compose.onNodeWithTag("anki_deck_1").getUnclippedBoundsInRoot())
             assertEquals(second, compose.onNodeWithTag("anki_deck_2").getUnclippedBoundsInRoot())
             compose.onNodeWithTag("anki_decks_check").assertIsNotEnabled()
+            assertEquals(
+                checkBounds,
+                compose.onNodeWithTag("anki_decks_check").getUnclippedBoundsInRoot(),
+            )
+            val pendingImage =
+                compose.onNodeWithTag("anki_decks_check").captureToImage().toPixelMap()
+            for (y in 0 until checkImage.height) for (x in 0 until checkImage.width) {
+                assertEquals(checkImage[x, y], pendingImage[x, y])
+            }
             compose.onNodeWithTag("anki_settings_status").assertDoesNotExist()
             compose.onNodeWithTag("anki_settings_load").assertDoesNotExist()
         }
         compose.runOnUiThread {
+            setupBusy.value = false
             discovery.value = AnkiDeckDiscoveryState.Failed(AnkiReadError.ProviderFailure, decks)
         }
         compose.onNodeWithTag("anki_deck_1").assertIsNotEnabled()
         compose.onNodeWithTag("anki_decks_check").assertIsEnabled().performClick()
         assertEquals(1, checks)
+    }
+
+    @Test
+    fun choosingFirstDeckKeepsCheckPositionAsMissingDeckMessageDisappears() {
+        settings.value = AnkiSettingsView(AnkiSettingsPhase.READY, null, null)
+        discovery.value = AnkiDeckDiscoveryState.Ready(listOf(AnkiProviderDeck(1, "Deck", false)))
+        render()
+        val bounds = compose.onNodeWithTag("anki_decks_check").getUnclippedBoundsInRoot()
+        compose.onNodeWithTag("anki_deck_1").performClick()
+        assertEquals(Event.SetAnkiDefaultDeck(1), events.last())
+        compose.runOnUiThread {
+            settings.value = AnkiSettingsView(AnkiSettingsPhase.SAVING, 1, null)
+        }
+        assertEquals(bounds, compose.onNodeWithTag("anki_decks_check").getUnclippedBoundsInRoot())
+        compose.onNodeWithText("No default deck configured.").assertDoesNotExist()
+        compose.onNodeWithTag("anki_decks_check").assertIsNotEnabled()
     }
 
     @Test

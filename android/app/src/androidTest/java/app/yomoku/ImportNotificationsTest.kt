@@ -127,9 +127,11 @@ class ImportNotificationsTest {
                     "Progress and completion notifications are available while you use another app."
                 )
                 .assertDoesNotExist()
+            compose.onNodeWithText("Importing book...").assertIsDisplayed()
+            compose.onNodeWithText("Import book").assertDoesNotExist()
             assertTrue(foregroundService())
             val progress = checkNotNull(notice(ImportNotifications.PROGRESS_ID))
-            assertEquals("Import book", progress.extras.getString(Notification.EXTRA_TITLE))
+            assertEquals("Importing book...", progress.extras.getString(Notification.EXTRA_TITLE))
             assertTrue(
                 progress.extras.getString(Notification.EXTRA_TEXT)!!.contains("$prefix.epub")
             )

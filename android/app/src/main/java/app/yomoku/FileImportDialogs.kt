@@ -23,7 +23,7 @@ internal fun FileImportDialogs(imports: FileImports) {
             onDismissRequest = {},
             properties =
                 DialogProperties(dismissOnBackPress = false, dismissOnClickOutside = false),
-            title = { Text(stringResource(R.string.import_book)) },
+            title = { Text(stringResource(R.string.importing_book)) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text(imports.filename)

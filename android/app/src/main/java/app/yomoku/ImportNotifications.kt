@@ -189,7 +189,7 @@ class ImportService : Service() {
         startForeground(
             ImportNotifications.PROGRESS_ID,
             notification(this)
-                .setContentTitle(getString(R.string.import_book))
+                .setContentTitle(getString(R.string.importing_book))
                 .setProgress(0, 0, true)
                 .build(),
             ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC,
@@ -235,7 +235,7 @@ private fun progressNotification(context: Context, progress: FileImportProgress)
         when {
             progress.cancelling -> context.getString(R.string.import_cancelling)
             progress.choosingEncoding -> context.getString(R.string.import_choose_encoding)
-            else -> context.getString(R.string.import_book)
+            else -> context.getString(R.string.importing_book)
         }
     val detail = progress.filename
     return notification(context)

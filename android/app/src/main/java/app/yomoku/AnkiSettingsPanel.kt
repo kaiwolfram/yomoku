@@ -5,8 +5,10 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
@@ -67,15 +69,19 @@ internal fun AnkiSettingsPanel(
             }
         }
         val ready = settings.phase == AnkiSettingsPhase.READY
-        if ((ready || settings.phase == AnkiSettingsPhase.SAVING) && settings.defaultDeckId == null)
-            Text(stringResource(R.string.anki_settings_no_deck))
         TextButton(
             onClick = checkProvider,
             enabled = ready && !setupBusy && discovery !is AnkiDeckDiscoveryState.Loading,
             modifier = Modifier.testTag("anki_decks_check"),
+            colors =
+                ButtonDefaults.textButtonColors(
+                    disabledContentColor = MaterialTheme.colorScheme.primary
+                ),
         ) {
             Text(stringResource(R.string.anki_settings_check))
         }
+        if ((ready || settings.phase == AnkiSettingsPhase.SAVING) && settings.defaultDeckId == null)
+            Text(stringResource(R.string.anki_settings_no_deck))
         if (discovery is AnkiDeckDiscoveryState.Failed) {
             Text(
                 stringResource(discovery.error.messageResource()),
@@ -90,7 +96,7 @@ internal fun AnkiSettingsPanel(
             }
         }
         val selectionEnabled = ready && !setupBusy && discovery is AnkiDeckDiscoveryState.Ready
-        Column(Modifier.selectableGroup(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Column(Modifier.selectableGroup(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             for (deck in decks) {
                 val selected = settings.defaultDeckId == deck.id
                 Row(
@@ -106,7 +112,10 @@ internal fun AnkiSettingsPanel(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     RadioButton(selected, onClick = null, enabled = selectionEnabled)
-                    Text(stringResource(R.string.anki_settings_deck_option, deck.name, deck.id))
+                    Text(
+                        stringResource(R.string.anki_settings_deck_option, deck.name, deck.id),
+                        Modifier.padding(start = 8.dp).testTag("anki_deck_label_${deck.id}"),
+                    )
                 }
             }
         }
