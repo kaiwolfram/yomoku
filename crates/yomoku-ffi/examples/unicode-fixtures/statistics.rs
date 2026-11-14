@@ -21,7 +21,7 @@ pub fn exchange(dir: &Path, writing: bool) -> Result<(), Box<dyn Error>> {
     for (index, timeframe) in [
         StatisticsTimeframe::LastWeek,
         StatisticsTimeframe::LastMonth,
-        StatisticsTimeframe::LastSixMonths,
+        StatisticsTimeframe::LastQuarter,
         StatisticsTimeframe::LastYear,
         StatisticsTimeframe::AllTime,
     ]

@@ -16,7 +16,7 @@ pub enum StatisticsTimeframe {
     #[default]
     LastWeek,
     LastMonth,
-    LastSixMonths,
+    LastQuarter,
     LastYear,
     AllTime,
 }
@@ -69,7 +69,7 @@ impl std::fmt::Display for InvalidStatisticsHistory {
 impl std::error::Error for InvalidStatisticsHistory {}
 
 /// Daily / Monday-start weekly / monthly end-of-bucket values. Finite ranges
-/// start at UTC midnight one/six/twelve calendar months before the supplied date,
+/// start at UTC midnight one/three/twelve calendar months before the supplied date,
 /// clamping its day to the target month. Include the supplied instant, exclude
 /// later events, and fill gaps. All time starts at the earliest visible event's
 /// month (the current month when empty). Input dates must be nonnegative and at
@@ -93,7 +93,7 @@ pub fn statistics_buckets(
     let start = match timeframe {
         StatisticsTimeframe::LastWeek => (as_of_unix_ms / DAY_MS - 6) * DAY_MS,
         StatisticsTimeframe::LastMonth => today.months_before(1).day_number() * DAY_MS,
-        StatisticsTimeframe::LastSixMonths => today.months_before(6).day_number() * DAY_MS,
+        StatisticsTimeframe::LastQuarter => today.months_before(3).day_number() * DAY_MS,
         StatisticsTimeframe::LastYear => today.months_before(12).day_number() * DAY_MS,
         StatisticsTimeframe::AllTime => {
             let first = reading
@@ -145,7 +145,7 @@ pub fn statistics_buckets(
         let day = cursor / DAY_MS;
         let boundary = match timeframe {
             StatisticsTimeframe::LastWeek | StatisticsTimeframe::LastMonth => (day + 1) * DAY_MS,
-            StatisticsTimeframe::LastSixMonths | StatisticsTimeframe::LastYear => {
+            StatisticsTimeframe::LastQuarter | StatisticsTimeframe::LastYear => {
                 // 1970-01-01 was Thursday, index 3 when Monday is zero.
                 (day + 7 - (day + 3).rem_euclid(7)) * DAY_MS
             }

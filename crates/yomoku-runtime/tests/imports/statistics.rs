@@ -90,7 +90,7 @@ fn statistics_fifo_returns_exact_all_timeframes_and_persists_choice_without_load
         Timeframe::LastWeek,
         Timeframe::LastYear,
         Timeframe::LastMonth,
-        Timeframe::LastSixMonths,
+        Timeframe::LastQuarter,
         Timeframe::AllTime,
     ] {
         let result = read(&router, frame);

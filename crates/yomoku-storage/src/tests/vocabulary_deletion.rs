@@ -179,7 +179,7 @@ fn deletion_recalculates_original_effective_charts_without_rescan_and_new_appear
 
         for frame in [
             StatisticsTimeframe::LastMonth,
-            StatisticsTimeframe::LastSixMonths,
+            StatisticsTimeframe::LastQuarter,
             StatisticsTimeframe::LastYear,
             StatisticsTimeframe::AllTime,
         ] {

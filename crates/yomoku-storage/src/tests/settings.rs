@@ -189,7 +189,7 @@ fn statistics_timeframe_defaults_to_last_week_and_reopens_with_other_settings() 
     assert_eq!(storage.schema_version().unwrap(), 1);
     assert_eq!(storage.statistics_timeframe().unwrap(), LastWeek);
     assert_eq!(storage.page_length().unwrap().characters(), 750);
-    for value in [LastWeek, LastMonth, LastSixMonths, LastYear, AllTime] {
+    for value in [LastWeek, LastMonth, LastQuarter, LastYear, AllTime] {
         assert_eq!(storage.save_statistics_timeframe(value).unwrap(), value);
         drop(storage);
         storage = Storage::open(database.path()).unwrap();
@@ -247,5 +247,37 @@ fn statistics_timeframe_write_failure_keeps_previous_value_and_can_retry() {
             .statistics_timeframe()
             .unwrap(),
         LastYear
+    );
+}
+
+#[test]
+fn legacy_six_month_preference_slot_is_the_rolling_quarter_without_migration() {
+    use yomoku_core::statistics::StatisticsTimeframe::LastQuarter;
+    let database = TestDatabase::new();
+    let mut storage = Storage::open(database.path()).unwrap();
+    storage
+        .connection
+        .execute(
+            "UPDATE statistics_settings SET timeframe = 'last_six_months'",
+            [],
+        )
+        .unwrap();
+    assert_eq!(storage.statistics_timeframe().unwrap(), LastQuarter);
+    assert_eq!(storage.schema_version().unwrap(), 1);
+    storage.save_statistics_timeframe(LastQuarter).unwrap();
+    let slot: String = storage
+        .connection
+        .query_row("SELECT timeframe FROM statistics_settings", [], |row| {
+            row.get(0)
+        })
+        .unwrap();
+    assert_eq!(slot, "last_six_months");
+    drop(storage);
+    assert_eq!(
+        Storage::open(database.path())
+            .unwrap()
+            .statistics_timeframe()
+            .unwrap(),
+        LastQuarter
     );
 }

@@ -144,7 +144,7 @@ fn rapid_changes_coalesce_and_discard_old_successes_and_failures() {
         let mut effects = core.process_event(Event::LoadStatistics { as_of_unix_ms: NOW });
         for timeframe in [
             Timeframe::LastMonth,
-            Timeframe::LastSixMonths,
+            Timeframe::LastQuarter,
             Timeframe::AllTime,
         ] {
             let changed = core.process_event(Event::SetStatisticsTimeframe {

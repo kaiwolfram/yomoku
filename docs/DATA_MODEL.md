@@ -110,3 +110,7 @@ read/save effects share the SQLite FIFO; one preference request runs at a time,
 coalescing later selections even after navigation. Statistics Retry retries failed
 preference operations. Missing or invalid settings are errors and are never repaired.
 Backup validation requires the exact initial schema and all settings singletons.
+
+Statistics maps the initial schema’s `last_six_months` preference slot to the rolling
+three-month `LastQuarter` interval. The slot and schema stay unchanged so saved
+selections survive without a database migration.

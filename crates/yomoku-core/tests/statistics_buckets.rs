@@ -14,14 +14,16 @@ const DAY: i64 = 86_400_000;
 fn date(iso: &str) -> i64 {
     match iso {
         "2023-03-31" => 1_680_220_800_000,
-        "2023-09-30" => 1_696_032_000_000,
+        "2023-12-31" => 1_703_980_800_000,
+        "2024-05-31" => 1_717_113_600_000,
+        "2023-05-31" => 1_685_491_200_000,
         "2024-02-29" => 1_709_164_800_000,
         "2024-03-01" => 1_709_251_200_000,
         "2024-03-04" => 1_709_510_400_000,
         "2024-03-30" => 1_711_756_800_000,
         "2024-03-31" => 1_711_843_200_000,
-        "2024-07-03" => 1_719_964_800_000,
-        "2024-07-08" => 1_720_396_800_000,
+        "2024-10-03" => 1_727_913_600_000,
+        "2024-10-07" => 1_728_259_200_000,
         "2024-12-30" => 1_735_516_800_000,
         "2024-12-31" => 1_735_603_200_000,
         "2025-01-01" => 1_735_689_600_000,
@@ -67,7 +69,7 @@ fn defaults_rolling_calendar_months_and_partial_today() {
     let now = date("2024-03-31") + DAY / 2;
     for (frame, start) in [
         (LastMonth, "2024-02-29"),
-        (LastSixMonths, "2023-09-30"),
+        (LastQuarter, "2023-12-31"),
         (LastYear, "2023-03-31"),
         (AllTime, "2024-03-01"),
     ] {
@@ -98,9 +100,9 @@ fn defaults_rolling_calendar_months_and_partial_today() {
 
 #[test]
 fn weekly_buckets_use_mondays_across_iso_year_boundary_and_clip_edges() {
-    let result = statistics_buckets(LastSixMonths, date("2025-01-03"), &[], &[]).unwrap();
-    assert_eq!(result.buckets[0].start_unix_ms, date("2024-07-03"));
-    assert_eq!(result.buckets[0].end_exclusive_unix_ms, date("2024-07-08"));
+    let result = statistics_buckets(LastQuarter, date("2025-01-03"), &[], &[]).unwrap();
+    assert_eq!(result.buckets[0].start_unix_ms, date("2024-10-03"));
+    assert_eq!(result.buckets[0].end_exclusive_unix_ms, date("2024-10-07"));
     assert_eq!(
         result.buckets.last().unwrap().start_unix_ms,
         date("2024-12-30")
@@ -124,7 +126,7 @@ fn weekly_buckets_use_mondays_across_iso_year_boundary_and_clip_edges() {
 fn sunday_and_monday_events_belong_to_different_weekly_end_values() {
     let monday = date("2024-12-30");
     let result = statistics_buckets(
-        LastSixMonths,
+        LastQuarter,
         date("2025-01-03"),
         &[reading(monday - 1, 5), reading(monday, 11)],
         &[
@@ -157,6 +159,9 @@ fn sunday_and_monday_events_belong_to_different_weekly_end_values() {
 fn leap_days_centuries_and_calendar_year_clamping() {
     for (frame, now, expected) in [
         (LastYear, "2024-02-29", "2023-02-28"),
+        (LastQuarter, "2024-05-31", "2024-02-29"),
+        (LastQuarter, "2023-05-31", "2023-02-28"),
+        (LastQuarter, "2025-01-03", "2024-10-03"),
         (LastMonth, "2000-03-31", "2000-02-29"),
         (LastMonth, "2100-03-31", "2100-02-28"),
     ] {
@@ -219,7 +224,7 @@ fn filters_preserve_lifetime_origin_and_absolute_lines_with_exact_endpoint_owner
     );
     assert_eq!(last.statuses, statuses[2].counts);
 
-    for frame in [LastSixMonths, LastYear, AllTime] {
+    for frame in [LastQuarter, LastYear, AllTime] {
         assert_eq!(
             statistics_buckets(frame, now, &readings, &statuses)
                 .unwrap()
@@ -255,7 +260,7 @@ fn monthly_gaps_carry_values_and_earliest_status_can_precede_reading() {
 
 #[test]
 fn epoch_empty_future_only_and_upper_calendar_limit_are_bounded() {
-    for frame in [LastMonth, LastSixMonths, LastYear, AllTime] {
+    for frame in [LastMonth, LastQuarter, LastYear, AllTime] {
         let result = statistics_buckets(frame, 0, &[reading(1, 99)], &[]).unwrap();
         assert_eq!(result.start_unix_ms, 0);
         assert_eq!(result.buckets.len(), 1);

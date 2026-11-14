@@ -49,6 +49,7 @@ internal fun StatisticsScreen(
                     selection = state.timeframe,
                     label = stringResource(state.timeframe.label()),
                     tag = "statistics_timeframe",
+                    outlined = true,
                     enabled = !view.storageBusy || state.loading,
                     onSelect = { timeframe ->
                         dispatch(
@@ -191,7 +192,7 @@ private fun StatisticsTimeframe.label(): Int =
     when (this) {
         StatisticsTimeframe.LASTWEEK -> R.string.statistics_week
         StatisticsTimeframe.LASTMONTH -> R.string.statistics_month
-        StatisticsTimeframe.LASTSIXMONTHS -> R.string.statistics_six_months
+        StatisticsTimeframe.LASTQUARTER -> R.string.statistics_quarter
         StatisticsTimeframe.LASTYEAR -> R.string.statistics_year
         StatisticsTimeframe.ALLTIME -> R.string.statistics_all_time
     }
@@ -200,7 +201,7 @@ private fun StatisticsTimeframe.grouping(): Int =
     when (this) {
         StatisticsTimeframe.LASTWEEK,
         StatisticsTimeframe.LASTMONTH -> R.string.statistics_daily
-        StatisticsTimeframe.LASTSIXMONTHS,
+        StatisticsTimeframe.LASTQUARTER,
         StatisticsTimeframe.LASTYEAR -> R.string.statistics_weekly
         StatisticsTimeframe.ALLTIME -> R.string.statistics_monthly
     }

@@ -4,6 +4,7 @@ import app.yomoku.shared.*
 import java.io.File
 
 internal fun verifyStatisticsCodecs(dir: String) {
+    check(StatisticsTimeframe.entries[2] == StatisticsTimeframe.LASTQUARTER)
     StatisticsTimeframe.entries.forEachIndexed { index, timeframe ->
         val bytes = File(dir, "statistics-view-$index.bin").readBytes()
         val view = ViewModel.bincodeDeserialize(bytes)

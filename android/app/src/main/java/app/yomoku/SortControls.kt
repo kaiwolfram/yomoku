@@ -1,6 +1,7 @@
 package app.yomoku
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -60,17 +61,36 @@ internal fun <T : Enum<T>> SelectionDropdown(
     label: String,
     tag: String,
     enabled: Boolean = true,
+    outlined: Boolean = false,
     onSelect: (T) -> Unit,
 ) {
     var expanded by remember(enabled) { mutableStateOf(false) }
     Box {
-        TextButton(
-            onClick = { expanded = true },
-            enabled = enabled,
-            contentPadding = PaddingValues(start = 12.dp, end = 0.dp),
-            modifier = Modifier.testTag(tag),
-        ) {
-            Text(label)
+        if (outlined) {
+            OutlinedButton(
+                onClick = { expanded = true },
+                enabled = enabled,
+                shape = RoundedCornerShape(12.dp),
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+                modifier = Modifier.testTag(tag),
+            ) {
+                Text(label)
+                Spacer(Modifier.width(8.dp))
+                Icon(
+                    painterResource(R.drawable.ic_chevron_down),
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp),
+                )
+            }
+        } else {
+            TextButton(
+                onClick = { expanded = true },
+                enabled = enabled,
+                contentPadding = PaddingValues(start = 12.dp, end = 0.dp),
+                modifier = Modifier.testTag(tag),
+            ) {
+                Text(label)
+            }
         }
         DropdownMenu(expanded = expanded && enabled, onDismissRequest = { expanded = false }) {
             labels.forEach { (option, resource) ->

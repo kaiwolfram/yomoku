@@ -83,7 +83,7 @@ fn buckets_keep_original_effective_rereads_lifetime_origin_and_all_lines_read_on
         }
     );
     let status = storage.vocabulary_status_timeline().unwrap();
-    for frame in [LastMonth, LastSixMonths, LastYear, AllTime] {
+    for frame in [LastMonth, LastQuarter, LastYear, AllTime] {
         let result = buckets(&mut storage, frame);
         let last = result.buckets.last().unwrap().values;
         assert_eq!(last.reading, lifetime);
