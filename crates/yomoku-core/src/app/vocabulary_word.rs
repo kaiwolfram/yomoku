@@ -55,8 +55,6 @@ impl Yomoku {
                 if model.vocabulary_visible()
                     && !model.storage_busy
                     && model.vocabulary.word.is_none()
-                    && model.vocabulary.selection.is_none()
-                    && model.vocabulary.confirmation.is_none()
                     && model.vocabulary.word_status.is_none() =>
             {
                 let Some(row) = model
@@ -119,10 +117,7 @@ impl Yomoku {
             | Event::SetVocabularyWordStatus(_)
             | Event::CancelVocabularyWordStatus => return Some(Command::done()),
             // A failed direct write owns its frozen command until Retry/Cancel.
-            Event::ToggleVocabularySelection(_)
-            | Event::SelectAllVocabulary
-            | Event::SetVocabularyQuery(_)
-            | Event::RequestVocabularyBulkAction(_)
+            Event::SetVocabularyQuery(_)
                 if model.vocabulary.word_status.is_some() || model.vocabulary.word.is_some() =>
             {
                 return Some(Command::done());

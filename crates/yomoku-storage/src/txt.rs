@@ -1,4 +1,4 @@
-//! Atomic original-file identity, canonical TXT content and source ruby.
+//! Atomic original-file identity, canonical TXT content.
 
 use std::{error::Error, fmt};
 
@@ -8,10 +8,10 @@ use yomoku_core::{
     analysis::ChapterAnalysis,
     document::{ChapterText, DocumentId, LibraryDocument},
 };
-use yomoku_import::txt::{self, SourceRuby, TextEncoding, TxtError};
+use yomoku_import::txt::{self, TextEncoding, TxtError};
 
 use crate::{
-    documents::{create_single_text_in, load_paste_in},
+    documents::create_single_text_in,
     files::{encoding_name, find_imported_in},
     imports::store_analyzed_document_in,
     AnalyzedPaste, ImportCancellation, Storage, StorageError,
@@ -56,12 +56,11 @@ impl<E> From<StorageError> for TxtImportError<E> {
     }
 }
 
-/// Ruby anchors refer only to the saved canonical chapter's UTF-8 bytes.
+/// Original bytes and the selected decoder for a saved TXT source.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct StoredTxtSource {
     pub original_bytes: Vec<u8>,
     pub encoding: TextEncoding,
-    pub ruby: Vec<SourceRuby>,
 }
 
 impl Storage {
@@ -138,7 +137,6 @@ impl Storage {
                 return Err(StorageError::InvalidDocument.into());
             }
             let parsed = txt::parse(original_bytes, selection).map_err(TxtImportError::Parse)?;
-            validate_ruby(&parsed.text, &parsed.ruby)?;
             if cancellation.is_cancelled() {
                 return Ok(None);
             }
@@ -148,17 +146,6 @@ impl Storage {
                  VALUES (?1, ?2, ?3, ?4)",
                 (i64::from(document.document_id), digest.as_slice(), original_bytes, encoding_name(parsed.encoding)),
             ).map_err(StorageError::from)?;
-            for (index, ruby) in parsed.ruby.iter().enumerate() {
-                if cancellation.is_cancelled() {
-                    return Ok(None);
-                }
-                transaction.execute(
-                    "INSERT INTO source_ruby (chapter_id, ruby_index, start_byte, end_byte, reading)
-                     VALUES (?1, ?2, ?3, ?4, ?5)",
-                    (i64::from(document.chapter.chapter_id), to_i64(index)?,
-                     to_i64(ruby.range.start)?, to_i64(ruby.range.end)?, &ruby.reading),
-                ).map_err(StorageError::from)?;
-            }
             if cancellation.is_cancelled() {
                 return Ok(None);
             }
@@ -183,7 +170,7 @@ impl Storage {
         })
     }
 
-    /// Read original bytes, selected encoding and canonical ruby without parsing
+    /// Read original bytes, selected encoding without parsing
     /// or loading the analyzer. None means no live TXT document with this ID.
     pub fn load_txt_source(
         &mut self,
@@ -221,72 +208,10 @@ impl Storage {
             "shift_jis" => TextEncoding::ShiftJis,
             _ => return Err(StorageError::InvalidDocument),
         };
-        let document =
-            load_paste_in(&transaction, document_id)?.ok_or(StorageError::InvalidDocument)?;
-        let ruby = load_source_ruby_in(
-            &transaction,
-            document.chapter.chapter_id,
-            &document.chapter.text,
-        )?;
         transaction.commit()?;
         Ok(Some(StoredTxtSource {
             original_bytes,
             encoding,
-            ruby,
         }))
     }
-}
-
-pub(crate) fn load_source_ruby_in(
-    connection: &rusqlite::Connection,
-    chapter_id: yomoku_core::document::ChapterId,
-    text: &str,
-) -> Result<Vec<SourceRuby>, StorageError> {
-    let mut statement = connection.prepare(
-        "SELECT ruby_index, start_byte, end_byte, reading FROM source_ruby
-         WHERE chapter_id = ?1 ORDER BY ruby_index",
-    )?;
-    let rows = statement.query_map([i64::from(chapter_id)], |row| {
-        Ok((
-            row.get::<_, i64>(0)?,
-            row.get::<_, i64>(1)?,
-            row.get::<_, i64>(2)?,
-            row.get::<_, String>(3)?,
-        ))
-    })?;
-    let ruby = rows
-        .enumerate()
-        .map(|(index, row)| {
-            let (stored_index, start, end, reading) = row?;
-            if stored_index != to_i64(index)? {
-                return Err(StorageError::InvalidDocument);
-            }
-            Ok(SourceRuby {
-                range: usize::try_from(start).map_err(|_| StorageError::InvalidDocument)?
-                    ..usize::try_from(end).map_err(|_| StorageError::InvalidDocument)?,
-                reading,
-            })
-        })
-        .collect::<Result<Vec<_>, StorageError>>()?;
-    validate_ruby(text, &ruby)?;
-    Ok(ruby)
-}
-
-pub(crate) fn validate_ruby(text: &str, ruby: &[SourceRuby]) -> Result<(), StorageError> {
-    let mut previous_end = 0;
-    for item in ruby {
-        if item.range.start < previous_end
-            || item.range.is_empty()
-            || text.get(item.range.clone()).is_none()
-            || item.reading.is_empty()
-        {
-            return Err(StorageError::InvalidDocument);
-        }
-        previous_end = item.range.end;
-    }
-    Ok(())
-}
-
-fn to_i64(value: usize) -> Result<i64, StorageError> {
-    i64::try_from(value).map_err(|_| StorageError::InvalidDocument)
 }

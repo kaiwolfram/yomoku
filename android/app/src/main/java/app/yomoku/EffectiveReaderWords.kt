@@ -125,7 +125,6 @@ private fun EffectiveReaderWordContent(
         text,
         imageLoader,
         view.readerTypography,
-        view.readerFurigana,
     )
     if (
         base != null &&

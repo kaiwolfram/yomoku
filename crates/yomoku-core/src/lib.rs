@@ -16,7 +16,6 @@ pub mod pagination;
 pub mod reader;
 pub mod reader_formatting;
 pub mod reader_images;
-pub mod reader_ruby;
 pub mod segmentation;
 pub mod statistics;
 pub mod storage;

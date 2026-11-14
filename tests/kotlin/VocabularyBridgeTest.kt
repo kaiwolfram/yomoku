@@ -173,34 +173,16 @@ internal fun verifyVocabularyBridge() {
             navigate(Destination.VOCABULARY)
             val initial = dispatch(bridge, Event.LoadVocabulary, 1)
             val cat = initial.vocabulary.rows.single { it.surface == "猫" }
-            dispatch(bridge, Event.ToggleVocabularySelection(cat.id))
-            val selection = ViewModel.bincodeDeserialize(bridge.view()).vocabulary.selection
-            dispatch(bridge, Event.OpenSettings)
-            check(dispatch(bridge, Event.CloseSettings).vocabulary.selection == selection)
-            val action = VocabularyBulkAction.SetStatus(VocabularyStatus.LEARNING, now)
-            var command =
-                checkNotNull(
-                    dispatch(bridge, Event.RequestVocabularyBulkAction(action))
-                        .vocabulary
-                        .confirmation
+            dispatch(bridge, Event.OpenVocabularyWord(cat.id), 1)
+            val changed =
+                dispatch(
+                    bridge,
+                    Event.SetVocabularyWordStatus(
+                        VocabularyWordStatusCommand(cat.id, VocabularyStatus.LEARNING, now)
+                    ),
+                    1,
                 )
-            check(command.ids == selection)
-            val frozen = dispatch(bridge, Event.OpenSettings)
-            check(!frozen.settingsOpen && frozen.vocabulary.confirmation == command)
-            dispatch(bridge, Event.CancelVocabularyBulkAction)
-            check(
-                dispatch(bridge, Event.ConfirmVocabularyBulkAction(command))
-                    .vocabulary
-                    .confirmation == null
-            )
-            command =
-                checkNotNull(
-                    dispatch(bridge, Event.RequestVocabularyBulkAction(action))
-                        .vocabulary
-                        .confirmation
-                )
-            val changed = dispatch(bridge, Event.ConfirmVocabularyBulkAction(command), 1)
-            check(changed.vocabulary.selection == null && changed.vocabulary.confirmation == null)
+            dispatch(bridge, Event.DismissVocabularyWord)
             check(
                 changed.vocabulary.matchingCount == null &&
                     changed.statistics.data == null &&
@@ -218,40 +200,15 @@ internal fun verifyVocabularyBridge() {
             )
             navigate(Destination.VOCABULARY)
             dispatch(bridge, Event.SetVocabularyQuery(query("猫")), 1)
-            check(
-                dispatch(bridge, Event.SelectAllVocabulary, 1).vocabulary.selection ==
-                    listOf(cat.id)
+            dispatch(bridge, Event.OpenVocabularyWord(cat.id), 1)
+            dispatch(
+                bridge,
+                Event.SetVocabularyWordStatus(
+                    VocabularyWordStatusCommand(cat.id, VocabularyStatus.IGNORED, now)
+                ),
+                1,
             )
-            val ignored =
-                checkNotNull(
-                    dispatch(
-                            bridge,
-                            Event.RequestVocabularyBulkAction(
-                                VocabularyBulkAction.SetStatus(VocabularyStatus.IGNORED, now)
-                            ),
-                        )
-                        .vocabulary
-                        .confirmation
-                )
-            dispatch(bridge, Event.ConfirmVocabularyBulkAction(ignored), 1)
-            check(
-                dispatch(bridge, Event.LoadVocabulary, 1).vocabulary.rows.single().status ==
-                    VocabularyStatus.IGNORED
-            )
-            check(
-                loadTokens()
-                    .filter { it.surface == "猫" }
-                    .all { it.vocabulary?.status == VocabularyStatus.IGNORED }
-            )
-            navigate(Destination.LIBRARY)
-            val counts =
-                checkNotNull(
-                        dispatch(bridge, Event.LoadLibraryWordDistributions, 1)
-                            .libraryWordDistributions
-                    )
-                    .single()
-                    .counts
-            check(counts?.new == 1UL && counts.ignored == 1UL)
+            dispatch(bridge, Event.DismissVocabularyWord)
             navigate(Destination.STATISTICS)
             val statuses =
                 checkNotNull(dispatch(bridge, Event.LoadStatistics(now), 1).statistics.data)
@@ -341,7 +298,7 @@ private fun verifyVocabularyWordBridge() {
                     System.currentTimeMillis(),
                 )
             val changed = dispatch(bridge, Event.SetVocabularyWordStatus(command), 1)
-            check(changed.vocabulary.confirmation == null && changed.vocabulary.wordStatus == null)
+            check(changed.vocabulary.wordStatus == null)
             check(changed.vocabulary.word?.row?.status == VocabularyStatus.LEARNING)
             val filtered = dispatch(bridge, Event.LoadVocabulary, 1)
             check(

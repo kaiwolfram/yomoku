@@ -31,7 +31,6 @@ fn content(chapter: &StoredEpubChapter) -> EpubChapter {
     EpubChapter {
         path: chapter.path.clone(),
         text: chapter.chapter.text.clone(),
-        ruby: chapter.ruby.clone(),
         spans: chapter.spans.clone(),
         images: chapter.images.clone(),
     }
@@ -49,7 +48,6 @@ fn totals(storage: &Storage) -> Vec<i64> {
         "epub_assets",
         "epub_spans",
         "epub_inline_images",
-        "source_ruby",
         "chapter_analyses",
         "analyzed_tokens",
         "vocabulary",
@@ -148,7 +146,7 @@ fn epub_chapters_assets_metadata_and_original_analysis_reopen_read_only() {
     let imported = created(
         storage
             .import_analyzed_epub(&bytes, "原本.epub", 123, |chapter| {
-                assert_eq!(totals(&observer), vec![0; 18]);
+                assert_eq!(totals(&observer), vec![0; 17]);
                 assert_eq!(chapter.text, parsed.chapters[calls].text);
                 calls += 1;
                 fixture(chapter)
@@ -194,7 +192,7 @@ fn epub_chapters_assets_metadata_and_original_analysis_reopen_read_only() {
         );
     }
     assert_eq!(imported.registered_surfaces, surfaces.len());
-    assert_eq!(totals(&storage)[15..], [0, 0, 0]);
+    assert_eq!(totals(&storage)[14..], [0, 0, 0]);
     drop(storage);
     let mut storage = Storage::open(database.path()).unwrap();
     let before = fs::read(database.path()).unwrap();
@@ -385,7 +383,7 @@ fn epub_unique_registration_across_chapters_preserves_all_five_statuses() {
             Some(entry)
         );
     }
-    assert_eq!(totals(&storage)[15..], [0, 0, 0]);
+    assert_eq!(totals(&storage)[14..], [0, 0, 0]);
 }
 
 #[test]
@@ -461,7 +459,6 @@ fn epub_every_write_and_deferred_commit_failure_roll_back_all_chapters_assets_an
         "chapters",
         "chapter_texts",
         "epub_chapters",
-        "source_ruby",
         "epub_spans",
         "epub_inline_images",
         "chapter_analyses",
@@ -633,8 +630,6 @@ fn epub_corrupt_saved_content_assets_identity_or_ranges_fail_without_repair() {
         "DELETE FROM epub_spans WHERE span_index = 0",
         "UPDATE epub_spans SET start_byte = 1 WHERE span_index = 0",
         "UPDATE epub_spans SET span_index = span_index + 10",
-        "DELETE FROM source_ruby",
-        "UPDATE source_ruby SET start_byte = start_byte + 1",
         "DELETE FROM epub_inline_images",
         "UPDATE epub_inline_images SET start_byte = 0, end_byte = 3",
         "UPDATE epub_assets SET bytes = X'00'",
@@ -866,7 +861,7 @@ fn epub_asset_reads_exact_shared_and_cover_bytes_after_read_only_reopen() {
         }
     }
     assert_eq!(fs::read(database.path()).unwrap(), before);
-    assert_eq!(totals(&storage)[15..], [0, 0, 0]);
+    assert_eq!(totals(&storage)[14..], [0, 0, 0]);
 }
 
 #[test]
@@ -907,7 +902,7 @@ fn epub_cover_reference_is_metadata_only_read_only_and_content_addressed() {
         Err(StorageError::InvalidDocument)
     ));
     assert_eq!(fs::read(database.path()).unwrap(), before);
-    assert_eq!(totals(&storage)[15..], [0, 0, 0]);
+    assert_eq!(totals(&storage)[14..], [0, 0, 0]);
 }
 
 #[test]

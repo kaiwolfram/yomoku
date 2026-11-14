@@ -49,7 +49,6 @@ class VocabularyPerformanceTest {
         compose.waitForIdle()
         assertNull(core.view.documentError)
         assertNull(core.view.vocabulary.error)
-        assertNull(core.view.vocabulary.bulkError)
     }
 
     private fun dispatch(event: Event): Double {
@@ -260,15 +259,11 @@ class VocabularyPerformanceTest {
         }
         if (measureRender) {
             if (metric != "scroll_loaded_rows") assertTrue(renders.isNotEmpty())
-            if (metric == "select_all") assertTrue(renders.any { it.selectedIds == entries })
-            if (metric == "confirmation") assertTrue(renders.any { it.confirmationIds == entries })
-            if (metric == "equal_confirmation") {
+            if (metric == "equal_view") {
                 assertTrue(requests.isEmpty())
                 assertEquals(1, renders.size)
                 assertEquals(CoreRenderSource.REPLAY, renders.single().source)
                 assertFalse(renders.single().published)
-                assertEquals(entries, renders.single().selectedIds)
-                assertEquals(entries, renders.single().confirmationIds)
             }
             renders.forEachIndexed { index, render ->
                 assertTrue(render.nativeViewNanos >= 0)
@@ -276,7 +271,7 @@ class VocabularyPerformanceTest {
                 assertTrue(render.publishNanos >= 0)
                 assertTrue(render.payloadBytes > 0)
                 emit(
-                    "RENDER,$entries,$iteration,$metric,$index,${render.source.name.lowercase()},${render.nativeViewNanos / 1e6},${render.decodeNanos / 1e6},${render.publishNanos / 1e6},${render.payloadBytes},${render.loadedRows},${render.selectedIds},${render.confirmationIds},${render.published}"
+                    "RENDER,$entries,$iteration,$metric,$index,${render.source.name.lowercase()},${render.nativeViewNanos / 1e6},${render.decodeNanos / 1e6},${render.publishNanos / 1e6},${render.payloadBytes},${render.loadedRows},${render.published}"
                 )
             }
             requests.forEachIndexed { index, request ->
@@ -365,7 +360,7 @@ class VocabularyPerformanceTest {
             )
             if (measureRender) {
                 emit(
-                    "RENDER_COLUMNS,entries,iteration,metric,index,source,native_view_ms,decode_ms,publish_ms,payload_bytes,loaded_rows,selected_ids,confirmation_ids,published"
+                    "RENDER_COLUMNS,entries,iteration,metric,index,source,native_view_ms,decode_ms,publish_ms,payload_bytes,loaded_rows,published"
                 )
                 emit(
                     "REQUEST_COLUMNS,entries,iteration,metric,index,source,event_encode_ms,native_update_ms,request_decode_ms,payload_bytes,request_count"
@@ -419,35 +414,13 @@ class VocabularyPerformanceTest {
                     assertEquals(loaded, core.view.vocabulary.rows.size)
                     compose.onNodeWithTag("vocabulary_scroll").performScrollToIndex(0)
                     idle()
-                    measure(frames, entries, iteration, "select_all") {
-                        dispatch(Event.SelectAllVocabulary)
-                    }
-                    assertEquals(
-                        (1L..entries.toLong()).map(::VocabularyId),
-                        core.view.vocabulary.selection,
-                    )
-                    compose
-                        .onNodeWithTag("vocabulary_selected_count")
-                        .assertTextEquals("Selected words: $entries")
-                    measure(frames, entries, iteration, "confirmation") {
-                        dispatch(
-                            Event.RequestVocabularyBulkAction(
-                                VocabularyBulkAction.SetStatus(VocabularyStatus.KNOWN, 999L)
-                            )
-                        )
-                    }
-                    compose.onNodeWithTag("vocabulary_bulk_dialog").assertIsDisplayed()
-                    assertEquals(
-                        core.view.vocabulary.selection,
-                        core.view.vocabulary.confirmation!!.ids,
-                    )
                     if (iteration >= 0)
                         emit(
                             "PAYLOAD,$entries,$iteration,${core.view.vocabulary.rows.size},${core.view.bincodeSerialize().size}"
                         )
                     if (measureRender) {
                         val frozenView = core.view
-                        measure(frames, entries, iteration, "equal_confirmation") {
+                        measure(frames, entries, iteration, "equal_view") {
                             var duration = 0L
                             compose.runOnUiThread {
                                 val start = SystemClock.elapsedRealtimeNanos()
@@ -457,10 +430,7 @@ class VocabularyPerformanceTest {
                             duration / 1e6
                         }
                         assertSame(frozenView, core.view)
-                        compose.onNodeWithTag("vocabulary_bulk_dialog").assertIsDisplayed()
                     }
-                    dispatch(Event.CancelVocabularyBulkAction)
-                    dispatch(Event.CancelVocabularySelection)
                 }
             }
             assertEquals(0, calls.get())

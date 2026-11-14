@@ -137,9 +137,6 @@ fn measured_reads_preserve_full_ids_and_include_wait_behind_an_existing_fifo_job
     let expected = storage
         .vocabulary_page(&VocabularyQuery::default(), 0)
         .unwrap();
-    let expected_ids = storage
-        .vocabulary_matching_ids(&VocabularyQuery::default())
-        .unwrap();
     let before = std::fs::read(database.path()).unwrap();
     let session = Session::new(&database);
 
@@ -163,25 +160,6 @@ fn measured_reads_preserve_full_ids_and_include_wait_behind_an_existing_fifo_job
     assert!(sample.queue >= resumed.duration_since(submitted));
     assert_eq!(session.view().vocabulary.rows, expected.rows);
 
-    session.update(Event::SelectAllVocabulary);
-    session.completed(StorageRead::VocabularyMatchingIds, false);
-    assert_eq!(
-        session.view().vocabulary.selection.as_ref(),
-        Some(&expected_ids)
-    );
-    session.update(Event::RequestVocabularyBulkAction(
-        yomoku_core::vocabulary::VocabularyBulkAction::SetStatus {
-            status: yomoku_core::vocabulary::VocabularyStatus::Known,
-            occurred_at_unix_ms: 999,
-        },
-    ));
-    assert_eq!(
-        session.view().vocabulary.confirmation.unwrap().ids,
-        expected_ids
-    );
-    session.update(Event::SelectAllVocabulary);
-    // Rejected/replayed/synchronous events must not manufacture worker samples.
-    assert!(session.deliveries.try_recv().is_err());
     assert_eq!(std::fs::read(database.path()).unwrap(), before);
 }
 

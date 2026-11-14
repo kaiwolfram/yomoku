@@ -37,7 +37,7 @@ mod statistics;
 mod txt;
 mod vocabulary;
 mod vocabulary_browser;
-mod vocabulary_bulk;
+mod vocabulary_deletion;
 
 // Thread-local observations of the real read paths, so status-cache tests can
 // detect accidental whole-document/chapter work and unrelated vocabulary reads.
@@ -55,8 +55,6 @@ pub(crate) mod reader_work {
     }
 }
 static NEXT_DATABASE: AtomicU64 = AtomicU64::new(0);
-
-// Historical fixtures cannot use current snapshot queries before migration 0011.
 
 pub(crate) struct TestDatabase(PathBuf);
 
@@ -112,7 +110,6 @@ fn initial_schema_has_only_release_tables_and_reopens_without_writes() {
         "chapter_texts",
         "paste_content_hashes",
         "imported_files",
-        "source_ruby",
         "epub_documents",
         "epub_chapters",
         "epub_spans",
@@ -156,7 +153,7 @@ fn initial_schema_has_only_release_tables_and_reopens_without_writes() {
     );
     assert_eq!(
         history(&database.path()),
-        [(1, "0001_simplified_initial_schema".into())]
+        [(1, "0001_base_text_initial_schema".into())]
     );
     assert_eq!(
         storage
@@ -203,7 +200,7 @@ fn concurrent_initialization_records_initial_schema_once() {
     });
     assert_eq!(
         history(&database.path()),
-        [(1, "0001_simplified_initial_schema".into())]
+        [(1, "0001_base_text_initial_schema".into())]
     );
 }
 
@@ -212,6 +209,7 @@ fn incompatible_development_unknown_and_future_databases_are_never_cleared() {
     for journal in [
         None,
         Some((1, "0001_initial_schema")),
+        Some((1, "0001_simplified_initial_schema")),
         Some((1, "0001_migration_history")),
         Some((24, "0024_anki_settings")),
         Some((2, "0002_future")),

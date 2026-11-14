@@ -7,8 +7,7 @@ use yomoku_core::{
     app::{Event, ViewModel, Yomoku},
     storage::DocumentError,
     vocabulary::{
-        VocabularyBulkAction, VocabularyBulkCommand, VocabularyQuery, VocabularyRow,
-        VocabularySort, VocabularyState, VocabularyStatus,
+        VocabularyQuery, VocabularyRow, VocabularySort, VocabularyState, VocabularyStatus,
     },
 };
 
@@ -126,89 +125,6 @@ pub fn exchange(dir: &Path, writing: bool) -> Result<(), Box<dyn Error>> {
         } else {
             let returned: Event = BincodeFfiFormat::deserialize(&fs::read(
                 dir.join(format!("vocabulary-action-{index}-return.bin")),
-            )?)?;
-            assert_eq!(returned, event);
-        }
-    }
-    let ids = vec![
-        1.try_into()?,
-        9_007_199_254_740_993_i64.try_into()?,
-        i64::MAX.try_into()?,
-    ];
-    let actions = VocabularyQuery::default()
-        .statuses
-        .into_iter()
-        .map(|status| VocabularyBulkAction::SetStatus {
-            status,
-            occurred_at_unix_ms: 9_007_199_254_740_993,
-        });
-    for (index, action) in actions.enumerate() {
-        let command = VocabularyBulkCommand {
-            ids: ids.clone(),
-            action,
-        };
-        let mut view = Core::<Yomoku>::new().view();
-        view.vocabulary.selection = Some(ids.clone());
-        view.vocabulary.confirmation = Some(command.clone());
-        view.vocabulary.bulk_error = Some(DocumentError::Unavailable);
-        let events = [
-            Event::RequestVocabularyBulkAction(action),
-            Event::ConfirmVocabularyBulkAction(command),
-        ];
-        if writing {
-            fs::write(
-                dir.join(format!("vocabulary-bulk-view-{index}.bin")),
-                super::encode(&view),
-            )?;
-        } else {
-            let returned: ViewModel = BincodeFfiFormat::deserialize(&fs::read(
-                dir.join(format!("vocabulary-bulk-view-{index}-return.bin")),
-            )?)?;
-            assert_eq!(returned, view);
-        }
-        for (kind, event) in events.into_iter().enumerate() {
-            let name = format!("vocabulary-bulk-event-{index}-{kind}");
-            if writing {
-                fs::write(dir.join(format!("{name}.bin")), super::encode(&event))?;
-            } else {
-                let returned: Event = BincodeFfiFormat::deserialize(&fs::read(
-                    dir.join(format!("{name}-return.bin")),
-                )?)?;
-                assert_eq!(returned, event);
-            }
-        }
-    }
-    for (index, event) in [
-        Event::ToggleVocabularySelection(i64::MAX.try_into()?),
-        Event::SelectAllVocabulary,
-        Event::RetryVocabularySelection,
-        Event::CancelVocabularySelection,
-        Event::RetryVocabularyBulkAction,
-        Event::CancelVocabularyBulkAction,
-    ]
-    .into_iter()
-    .enumerate()
-    {
-        let mut view = Core::<Yomoku>::new().view();
-        view.vocabulary.selection = Some(vec![]);
-        view.vocabulary.selecting_all = index % 2 == 0;
-        view.vocabulary.bulk_error = (index % 2 != 0).then_some(DocumentError::Unavailable);
-        if writing {
-            fs::write(
-                dir.join(format!("vocabulary-selection-view-{index}.bin")),
-                super::encode(&view),
-            )?;
-            fs::write(
-                dir.join(format!("vocabulary-selection-event-{index}.bin")),
-                super::encode(&event),
-            )?;
-        } else {
-            let returned: ViewModel = BincodeFfiFormat::deserialize(&fs::read(
-                dir.join(format!("vocabulary-selection-view-{index}-return.bin")),
-            )?)?;
-            assert_eq!(returned, view);
-            let returned: Event = BincodeFfiFormat::deserialize(&fs::read(
-                dir.join(format!("vocabulary-selection-event-{index}-return.bin")),
             )?)?;
             assert_eq!(returned, event);
         }

@@ -51,30 +51,6 @@ impl Storage {
         Ok(entry)
     }
 
-    /// Apply one confirmed, frozen selection atomically. Append an immutable
-    /// manual event only for an actual transition, using the supplied date.
-    /// Absent/repeated IDs and unchanged statuses are harmless. A deleted ID
-    /// never targets a later registration of the same spelling.
-    pub fn set_vocabulary_statuses(
-        &mut self,
-        ids: &[VocabularyId],
-        status: VocabularyStatus,
-        occurred_at_unix_ms: i64,
-    ) -> Result<(), StorageError> {
-        validate_timestamp(occurred_at_unix_ms)?;
-        if ids.is_empty() {
-            return Ok(());
-        }
-        let transaction = self
-            .connection
-            .transaction_with_behavior(TransactionBehavior::Immediate)?;
-        for &id in ids {
-            set_vocabulary_status_in(&transaction, id, status, occurred_at_unix_ms)?;
-        }
-        transaction.commit()?;
-        Ok(())
-    }
-
     /// Historical-data helper, intentionally absent from app events and FFI.
     /// Permanently erase a frozen selection and its status events,
     /// occurrences and dictionary-form links in a single transaction. Retain

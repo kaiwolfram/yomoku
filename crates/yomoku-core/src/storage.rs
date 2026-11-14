@@ -47,12 +47,6 @@ pub enum StorageOperation {
     },
     #[serde(skip)]
     #[cfg_attr(feature = "facet_typegen", facet(skip))]
-    VocabularyMatchingIds(crate::vocabulary::VocabularyQuery),
-    #[serde(skip)]
-    #[cfg_attr(feature = "facet_typegen", facet(skip))]
-    ApplyVocabularyBulk(crate::vocabulary::VocabularyBulkCommand),
-    #[serde(skip)]
-    #[cfg_attr(feature = "facet_typegen", facet(skip))]
     LoadVocabularyWord(crate::document::VocabularyId),
     #[serde(skip)]
     #[cfg_attr(feature = "facet_typegen", facet(skip))]
@@ -151,12 +145,6 @@ pub enum StorageResult {
     #[serde(skip)]
     #[cfg_attr(feature = "facet_typegen", facet(skip))]
     VocabularyLoaded(crate::vocabulary::VocabularyPage),
-    #[serde(skip)]
-    #[cfg_attr(feature = "facet_typegen", facet(skip))]
-    VocabularyMatchingIds(Vec<crate::document::VocabularyId>),
-    #[serde(skip)]
-    #[cfg_attr(feature = "facet_typegen", facet(skip))]
-    VocabularyBulkApplied(crate::vocabulary::VocabularyBulkCommand),
     #[serde(skip)]
     #[cfg_attr(feature = "facet_typegen", facet(skip))]
     VocabularyWordLoaded(Box<crate::vocabulary::VocabularyWordDetails>),

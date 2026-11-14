@@ -75,7 +75,6 @@ impl Fixture {
                 chapters: vec![chapter],
                 formatting: vec![],
                 images: vec![],
-                source_ruby: vec![],
                 reading_position: Some(intent.departing_position),
             },
             original,

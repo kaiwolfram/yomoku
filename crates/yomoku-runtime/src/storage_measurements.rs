@@ -11,7 +11,6 @@ use yomoku_core::storage::StorageOperation;
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum StorageRead {
     VocabularyPage,
-    VocabularyMatchingIds,
 }
 
 #[derive(Clone, Debug)]
@@ -48,7 +47,6 @@ impl QueuedMeasurement {
         let observer = observer?;
         let operation = match operation {
             StorageOperation::LoadVocabulary { .. } => StorageRead::VocabularyPage,
-            StorageOperation::VocabularyMatchingIds(_) => StorageRead::VocabularyMatchingIds,
             _ => return None,
         };
         Some(Box::new(Self {

@@ -7,7 +7,6 @@ use yomoku_core::{
     reader::{DocumentReaderSnapshot, ReaderChapterAnalysis},
     reader_formatting::{ReaderChapterFormatting, ReaderTextSpan, ReaderTextStyle},
     reader_images::{ReaderChapterImages, ReaderImageAsset, ReaderInlineImage},
-    reader_ruby::{ReaderChapterRuby, ReaderRuby},
 };
 use yomoku_import::epub::SpanKind;
 
@@ -214,12 +213,6 @@ pub(crate) fn load_reader_document_in(
                 reading_position: stored.reading_position,
                 formatting,
                 images,
-                source_ruby: stored
-                    .chapters
-                    .iter()
-                    .filter(|item| !item.ruby.is_empty())
-                    .map(|item| project_ruby(&item.chapter, &item.ruby))
-                    .collect::<Result<_, _>>()?,
                 chapters: stored
                     .chapters
                     .into_iter()
@@ -238,17 +231,9 @@ pub(crate) fn load_reader_document_in(
             if count != 1 {
                 return Err(StorageError::InvalidDocument);
             }
-            let mut document: ReaderDocument = load_paste_in(connection, document_id)?
+            let document: ReaderDocument = load_paste_in(connection, document_id)?
                 .ok_or(StorageError::InvalidDocument)?
                 .into();
-            if kind.as_deref() == Some("txt") {
-                let chapter = &document.chapters[0];
-                let ruby =
-                    crate::txt::load_source_ruby_in(connection, chapter.chapter_id, &chapter.text)?;
-                if !ruby.is_empty() {
-                    document.source_ruby.push(project_ruby(chapter, &ruby)?);
-                }
-            }
             document
         }
         _ => return Err(StorageError::InvalidDocument),
@@ -257,27 +242,4 @@ pub(crate) fn load_reader_document_in(
         .validate()
         .map_err(|_| StorageError::InvalidDocument)?;
     Ok(Some(document))
-}
-
-fn project_ruby(
-    chapter: &yomoku_core::document::ChapterText,
-    ruby: &[yomoku_import::txt::SourceRuby],
-) -> Result<ReaderChapterRuby, StorageError> {
-    let ruby = ruby
-        .iter()
-        .map(|item| {
-            Ok(ReaderRuby {
-                range: TextRange {
-                    start: TextOffset::at(&chapter.text, item.range.start)?,
-                    end: TextOffset::at(&chapter.text, item.range.end)?,
-                },
-                reading: item.reading.clone(),
-            })
-        })
-        .collect::<Result<_, yomoku_core::document::InvalidTextValue>>()
-        .map_err(|_| StorageError::InvalidDocument)?;
-    Ok(ReaderChapterRuby {
-        chapter_id: chapter.chapter_id,
-        ruby,
-    })
 }

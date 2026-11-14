@@ -123,20 +123,6 @@ internal fun verifyEpubImportBridge() {
                 val opened = listener.dispatch(bridge, Event.OpenReader(id))
                 check(checkNotNull(opened.reader).totalPages == 2uL)
                 val formatted = checkNotNull(opened.reader)
-                val ruby = loaded.sourceRuby.single()
-                check(ruby.reading == "とうきょう")
-                val rubyBaseStart = loaded.text.indexOf("東京")
-                val rubyByteStart =
-                    loaded.text
-                        .substring(0, rubyBaseStart)
-                        .toByteArray(Charsets.UTF_8)
-                        .size
-                        .toLong()
-                check(
-                    ruby.range ==
-                        TextRange(TextOffset(rubyByteStart), TextOffset(rubyByteStart + 6L))
-                )
-                check(formatted.sourceRuby == listOf(ruby))
                 check(formatted.formatting.size == 4)
                 val image = formatted.images.single()
                 check(

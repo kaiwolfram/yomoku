@@ -45,64 +45,6 @@ internal fun verifyVocabularyCodecs(directory: String) {
         check(event.bincodeSerialize().contentEquals(actionBytes))
         File(dir, "vocabulary-action-$index-return.bin").writeBytes(event.bincodeSerialize())
     }
-    repeat(5) { index ->
-        val bytes = File(dir, "vocabulary-bulk-view-$index.bin").readBytes()
-        val view = ViewModel.bincodeDeserialize(bytes)
-        val command = checkNotNull(view.vocabulary.confirmation)
-        check(command.ids == view.vocabulary.selection)
-        check(command.ids.map { it.value } == listOf(1L, 9_007_199_254_740_993L, Long.MAX_VALUE))
-        check(view.vocabulary.bulkError == DocumentError.UNAVAILABLE)
-        check(
-            command.action ==
-                VocabularyBulkAction.SetStatus(
-                    VocabularyStatus.entries[index],
-                    9_007_199_254_740_993L,
-                )
-        )
-        check(view.bincodeSerialize().contentEquals(bytes))
-        File(dir, "vocabulary-bulk-view-$index-return.bin").writeBytes(view.bincodeSerialize())
-        repeat(2) { kind ->
-            val name = "vocabulary-bulk-event-$index-$kind"
-            val eventBytes = File(dir, "$name.bin").readBytes()
-            val event = Event.bincodeDeserialize(eventBytes)
-            check(
-                event ==
-                    if (kind == 0) Event.RequestVocabularyBulkAction(command.action)
-                    else Event.ConfirmVocabularyBulkAction(command)
-            )
-            check(event.bincodeSerialize().contentEquals(eventBytes))
-            File(dir, "$name-return.bin").writeBytes(event.bincodeSerialize())
-        }
-    }
-    repeat(6) { index ->
-        val stateBytes = File(dir, "vocabulary-selection-view-$index.bin").readBytes()
-        val stateView = ViewModel.bincodeDeserialize(stateBytes)
-        check(stateView.vocabulary.selection == emptyList<VocabularyId>())
-        check(stateView.vocabulary.selectingAll == (index % 2 == 0))
-        check(
-            stateView.vocabulary.bulkError ==
-                if (index % 2 != 0) DocumentError.UNAVAILABLE else null
-        )
-        check(stateView.bincodeSerialize().contentEquals(stateBytes))
-        File(dir, "vocabulary-selection-view-$index-return.bin")
-            .writeBytes(stateView.bincodeSerialize())
-        val eventBytes = File(dir, "vocabulary-selection-event-$index.bin").readBytes()
-        val event = Event.bincodeDeserialize(eventBytes)
-        check(
-            event ==
-                listOf(
-                    Event.ToggleVocabularySelection(VocabularyId(Long.MAX_VALUE)),
-                    Event.SelectAllVocabulary,
-                    Event.RetryVocabularySelection,
-                    Event.CancelVocabularySelection,
-                    Event.RetryVocabularyBulkAction,
-                    Event.CancelVocabularyBulkAction,
-                )[index]
-        )
-        check(event.bincodeSerialize().contentEquals(eventBytes))
-        File(dir, "vocabulary-selection-event-$index-return.bin")
-            .writeBytes(event.bincodeSerialize())
-    }
     repeat(6) { index ->
         val name = "vocabulary-word"
         val bytes = File(dir, "$name-view-$index.bin").readBytes()

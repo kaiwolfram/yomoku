@@ -44,7 +44,6 @@ fn totals(storage: &Storage) -> Vec<i64> {
         "reading_positions",
         "reading_completions",
         "reading_occurrences",
-        "source_ruby",
         "paste_content_hashes",
     ]
     .map(|table| count(storage, table))
@@ -61,7 +60,7 @@ fn srt_original_bytes_cues_analysis_and_title_survive_read_only_reopen() {
     let imported = created(
         storage
             .import_analyzed_srt(bytes, "字幕.srt", None, 123, |chapter| {
-                assert_eq!(totals(&observer), vec![0; 14]);
+                assert_eq!(totals(&observer), vec![0; 13]);
                 assert_eq!(chapter.text, canonical);
                 fixture(chapter)
             })
@@ -73,7 +72,6 @@ fn srt_original_bytes_cues_analysis_and_title_survive_read_only_reopen() {
         "reading_positions",
         "reading_completions",
         "reading_occurrences",
-        "source_ruby",
         "paste_content_hashes",
     ] {
         assert_eq!(count(&storage, table), 0, "{table}");

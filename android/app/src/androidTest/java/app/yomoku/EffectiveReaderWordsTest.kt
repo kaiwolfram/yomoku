@@ -48,7 +48,6 @@ class EffectiveReaderWordsTest {
                 2UL,
                 emptyList(),
                 emptyList(),
-                emptyList(),
             )
         val analysis = ReaderAnalysis.Available(AnalysisId(Long.MAX_VALUE))
         val identity =
@@ -84,7 +83,6 @@ class EffectiveReaderWordsTest {
                 VocabularyState(
                     VocabularyQuery("", VocabularyStatus.entries.toList(), VocabularySort.NEWEST),
                     rows = emptyList(),
-                    selectingAll = false,
                     loading = false,
                 ),
             statistics = StatisticsState(StatisticsTimeframe.LASTWEEK, loading = false),
@@ -100,7 +98,6 @@ class EffectiveReaderWordsTest {
             effectiveReaderTokens = EffectiveReaderPage(identity, tokens),
             effectiveReaderWord = EffectiveReaderWordState(busy = false),
             effectiveReaderStatus = EffectiveStatusState(false, false),
-            readerFurigana = emptyList(),
         )
     }
 

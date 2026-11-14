@@ -121,7 +121,6 @@ class AppLoadingIndicatorTest {
                 VocabularyState(
                     VocabularyQuery("", VocabularyStatus.entries.toList(), VocabularySort.NEWEST),
                     rows = emptyList(),
-                    selectingAll = false,
                     loading = false,
                 ),
             statistics = StatisticsState(StatisticsTimeframe.LASTWEEK, loading = false),
@@ -132,6 +131,5 @@ class AppLoadingIndicatorTest {
             storageBusy = false,
             contentRoute = ContentRoute.MAIN,
             completionSavePending = false,
-            readerFurigana = emptyList(),
         )
 }

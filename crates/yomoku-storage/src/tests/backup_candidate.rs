@@ -130,6 +130,7 @@ fn backup_candidate_rejects_unsupported_or_disagreeing_manifest_and_journal() {
     for sql in [
         "DELETE FROM schema_migrations WHERE version = 1",
         "UPDATE schema_migrations SET name = 'untrusted secret' WHERE version = 1",
+        "UPDATE schema_migrations SET name = '0001_simplified_initial_schema' WHERE version = 1",
         "INSERT INTO schema_migrations VALUES (25, 'future')",
         "DELETE FROM schema_migrations",
     ] {

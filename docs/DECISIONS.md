@@ -29,13 +29,14 @@ Supporting contracts: [Crux middleware](https://docs.rs/crux_core/0.20.0/crux_co
 
 One production session reads immutable canonical text with stored Sudachi Mode C
 segmentation. A/B analyses supply dictionary components. Reader entry, snapshots,
-position saves, effective page/word lookup and session furigana share this path.
-Source ruby takes precedence over analyzer ruby. Page fragments retain complete
+position saves and effective page/word lookup share this path. The reader renders
+base text only. Page fragments retain complete
 word identities. UTF-8 byte anchors and scalar boundaries are canonical; Kotlin
 converts validated visible ranges to UTF-16 only at rendering boundaries.
 
-Imports preserve original bytes, encoding and hashes, canonical text, source ruby
-and EPUB image/format metadata. Exact duplicates retain their live document.
+Imports preserve original bytes, encoding and hashes, canonical base text
+and EPUB image/format metadata. Recognized source readings are discarded; dictionary
+readings remain available in word sheets. Exact duplicates retain their live document.
 EPUB imports tolerate repeated spine references by keeping each manifest item's
 first occurrence. This accepts books with duplicated cover entries without
 duplicating canonical chapters, analysis or reading content; original bytes and
@@ -64,7 +65,7 @@ Pinned inputs, patches, licenses and notices are in
 
 ## Persistence and history
 
-Use one initial SQL schema, version 1, journal `0001_simplified_initial_schema`,
+Use one initial SQL schema, version 1, journal `0001_base_text_initial_schema`,
 with 26 application tables. Retain the immediate-transaction runner/journal for
 future published upgrades. Previous development databases and backups, including
 the prior schema-1 journal, fail validation without migration, clearing or repair.
@@ -80,8 +81,9 @@ without completion. Reading durations are not collected or persisted.
 
 Document deletion is individual and confirmed. It removes live content/progress
 while retaining source/chapter provenance, global vocabulary and history.
-Vocabulary bulk actions retain their own frozen selections; vocabulary deletion
-erases that entry's events/occurrences without rescanning books. IDs retain
+Vocabulary rows open individual word sheets with direct status persistence and
+retained retry commands. No Vocabulary selection or bulk commands cross the core/runtime boundary.
+Historical vocabulary deletion helpers erase events/occurrences without rescanning books. IDs retain
 AUTOINCREMENT high-water marks so reimported content has fresh identity.
 
 Supporting contracts: [rusqlite connection](https://docs.rs/rusqlite/0.40.2/rusqlite/struct.Connection.html),

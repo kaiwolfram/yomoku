@@ -2,28 +2,10 @@ use yomoku_core::{
     document::{ChapterId, ChapterText, SourceId, TextOffset},
     pagination::{LogicalPages, PageLength, ReadingPosition},
 };
-use yomoku_import::txt::{parse, SourceRuby, TextEncoding, TxtDocument, TxtError};
+use yomoku_import::txt::{parse, TextEncoding, TxtDocument, TxtError};
 
 fn utf8(text: &str) -> TxtDocument {
     parse(text.as_bytes(), Some(TextEncoding::Utf8)).unwrap()
-}
-
-fn readings(document: &TxtDocument) -> Vec<(&str, &str)> {
-    let mut last_end = 0;
-    document
-        .ruby
-        .iter()
-        .map(|ruby| {
-            assert!(ruby.range.start >= last_end);
-            assert!(ruby.range.start < ruby.range.end);
-            last_end = ruby.range.end;
-            // All ranges must be exact UTF-8 boundaries in the canonical text.
-            (
-                document.text.get(ruby.range.clone()).unwrap(),
-                ruby.reading.as_str(),
-            )
-        })
-        .collect()
 }
 
 #[test]
@@ -42,7 +24,6 @@ fn detects_unambiguous_utf8_shift_jis_and_equivalent_ascii() {
         let document = parse(bytes, None).unwrap();
         assert_eq!(document.encoding, encoding);
         assert_eq!(document.text, text);
-        assert!(document.ruby.is_empty());
     }
 }
 
@@ -128,27 +109,15 @@ fn hard_breaks_whitespace_unicode_and_literal_markup_remain_exact() {
     let source = "  第一章\r\n続く行\r単独CR\n\n　𠮷😀e\u{301}\0\t <b>本文</b> | literal\n";
     let document = utf8(source);
     assert_eq!(document.text, source);
-    assert!(document.ruby.is_empty());
     let shift_jis = [0x82, 0xA0, b'\r', b'\n', b'\r', 0x82, 0xA2, b'\n'];
     assert_eq!(parse(&shift_jis, None).unwrap().text, "あ\r\n\rい\n");
 }
 
 #[test]
-fn aozora_fixture_keeps_base_text_and_all_source_ruby_in_order() {
+fn aozora_fixture_keeps_base_text_and_discards_readings() {
     let source = include_str!("fixtures/aozora.txt");
     let document = utf8(source);
     assert_eq!(document.text, include_str!("fixtures/aozora-expected.txt"));
-    assert_eq!(
-        readings(&document),
-        [
-            ("漢字", "かんじ"),
-            ("東京", "とうきょう"),
-            ("食べた", "たべた"),
-            ("𠮷野家", "よしのや"),
-            ("市ヶ谷", "いちがや"),
-            ("転々", "てんてん"),
-        ]
-    );
     let encoded = encoding_rs::SHIFT_JIS.encode(source);
     // This fixture contains supplementary kanji: it must not be encoded lossily.
     assert!(encoded.2);
@@ -158,25 +127,13 @@ fn aozora_fixture_keeps_base_text_and_all_source_ruby_in_order() {
     let legacy = parse(&encoded, None).unwrap();
     let unicode = utf8(&source);
     assert_eq!(legacy.text, unicode.text);
-    assert_eq!(legacy.ruby, unicode.ruby);
 }
 
 #[test]
-fn ruby_ranges_handle_mixed_scripts_combining_marks_and_adjacent_bases() {
+fn annotated_bases_handle_mixed_scripts_combining_marks_and_adjacent_bases() {
     let document = utf8("😀｜e\u{301}と漢字《reading》東京《とうきょう》京都《きょうと》。お湯《ゆ》と〆切《しめきり》。");
     assert_eq!(document.text, "😀e\u{301}と漢字東京京都。お湯と〆切。");
-    assert_eq!(
-        readings(&document),
-        [
-            ("e\u{301}と漢字", "reading"),
-            ("東京", "とうきょう"),
-            ("京都", "きょうと"),
-            ("湯", "ゆ"),
-            ("〆切", "しめきり"),
-        ]
-    );
     assert_eq!(utf8("東京《とうきょう》《二つ目》").text, "東京《二つ目》");
-    assert_eq!(utf8("東京《とうきょう》京都《きょうと》").ruby.len(), 2);
 }
 
 #[test]
@@ -229,13 +186,8 @@ fn canonicalization_precedes_pagination_and_never_infers_chapters() {
             .map(|page| page.slice(&chapters[0]).unwrap())
             .collect();
         assert_eq!(slices.concat(), document.text);
-        assert!(pages
-            .pages()
-            .iter()
-            .all(|page| page.chapter_id == chapters[0].chapter_id));
-        for SourceRuby { range, .. } in &document.ruby {
-            assert_eq!(&document.text[range.clone()], "漢字");
-            let offset = TextOffset::at(&chapters[0].text, range.start).unwrap();
+        for page in pages.pages() {
+            let offset = page.range.start;
             let position = ReadingPosition {
                 source_id: chapters[0].source_id,
                 chapter_id: chapters[0].chapter_id,
@@ -248,6 +200,10 @@ fn canonicalization_precedes_pagination_and_never_infers_chapters() {
                 offset
             );
         }
+        assert!(pages
+            .pages()
+            .iter()
+            .all(|page| page.chapter_id == chapters[0].chapter_id));
     }
 }
 
@@ -263,6 +219,4 @@ fn large_and_repeated_malformed_markup_keeps_text_and_does_not_recurse() {
     let source = "東京《とうきょう》。\r\n".repeat(10_000);
     let document = utf8(&source);
     assert_eq!(document.text, "東京。\r\n".repeat(10_000));
-    assert_eq!(document.ruby.len(), 10_000);
-    assert_eq!(readings(&document).len(), 10_000);
 }

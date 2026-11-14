@@ -37,8 +37,7 @@ CREATE TABLE reader_settings (
     page_length INTEGER NOT NULL CHECK (page_length IN (250, 500, 750, 1000, 1500))
 , font_size INTEGER NOT NULL DEFAULT 16
     CHECK (font_size IN (14, 16, 18, 20, 24)), line_spacing INTEGER NOT NULL DEFAULT 150
-    CHECK (line_spacing IN (125, 150, 175, 200)), furigana INTEGER NOT NULL DEFAULT 0
-    CHECK (furigana IN (0, 1))) STRICT;
+    CHECK (line_spacing IN (125, 150, 175, 200))) STRICT;
 
 CREATE TABLE completion_commands (
     id INTEGER PRIMARY KEY AUTOINCREMENT CHECK (id > 0)
@@ -126,14 +125,6 @@ CREATE TABLE "vocabulary_status_events" (
         OR (cause = 'completion' AND old_status IS NOT NULL AND old_status = 'new' AND new_status = 'known' AND completion_command_id IS NOT NULL))
 ) STRICT;
 
-CREATE TABLE source_ruby (
-    chapter_id INTEGER NOT NULL REFERENCES chapter_texts(chapter_id) ON DELETE CASCADE,
-    ruby_index INTEGER NOT NULL CHECK (ruby_index >= 0),
-    start_byte INTEGER NOT NULL CHECK (start_byte >= 0),
-    end_byte INTEGER NOT NULL CHECK (end_byte > start_byte),
-    reading TEXT NOT NULL CHECK (length(CAST(reading AS BLOB)) > 0),
-    PRIMARY KEY (chapter_id, ruby_index)
-) STRICT;
 
 CREATE TABLE "sources" (
     id INTEGER PRIMARY KEY AUTOINCREMENT CHECK (id > 0),
@@ -171,7 +162,6 @@ CREATE TABLE epub_chapters (
     document_id INTEGER NOT NULL REFERENCES epub_documents(document_id) ON DELETE CASCADE,
     path TEXT NOT NULL,
     text_sha256 BLOB NOT NULL CHECK (length(text_sha256) = 32),
-    ruby_count INTEGER NOT NULL CHECK (ruby_count >= 0),
     span_count INTEGER NOT NULL CHECK (span_count >= 0),
     image_count INTEGER NOT NULL CHECK (image_count >= 0),
     UNIQUE (document_id, path),
@@ -234,7 +224,7 @@ CREATE INDEX vocabulary_status_events_by_entry ON vocabulary_status_events(vocab
 CREATE UNIQUE INDEX vocabulary_completion_status_once
     ON vocabulary_status_events(completion_command_id, vocabulary_id) WHERE cause = 'completion';
 
-INSERT INTO reader_settings VALUES (1, 250, 16, 150, 0);
+INSERT INTO reader_settings VALUES (1, 250, 16, 150);
 INSERT INTO library_read_clock VALUES (1, 0);
 INSERT INTO anki_settings VALUES (1, NULL);
 

@@ -20,12 +20,8 @@ impl Storage {
         read_page_length(&transaction)?;
         read_reader_typography(&transaction)?;
         transaction.execute(
-            "UPDATE reader_settings SET font_size = ?1, line_spacing = ?2, furigana = ?3 WHERE id = 1",
-            [
-                typography.font_size.sp(),
-                typography.line_spacing.percent(),
-                i64::from(typography.furigana),
-            ],
+            "UPDATE reader_settings SET font_size = ?1, line_spacing = ?2 WHERE id = 1",
+            [typography.font_size.sp(), typography.line_spacing.percent()],
         )?;
         transaction.commit()?;
         Ok(typography)
@@ -53,14 +49,14 @@ impl Storage {
 pub(crate) fn read_reader_typography(
     connection: &rusqlite::Connection,
 ) -> Result<ReaderTypography, StorageError> {
-    let values: Option<(i64, i64, i64)> = connection
+    let values: Option<(i64, i64)> = connection
         .query_row(
-            "SELECT font_size, line_spacing, furigana FROM reader_settings WHERE id = 1",
+            "SELECT font_size, line_spacing FROM reader_settings WHERE id = 1",
             [],
-            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+            |row| Ok((row.get(0)?, row.get(1)?)),
         )
         .optional()?;
-    let (size, spacing, furigana) = values.ok_or(StorageError::InvalidSettings)?;
+    let (size, spacing) = values.ok_or(StorageError::InvalidSettings)?;
     Ok(ReaderTypography {
         font_size: ReaderFontSize::ALL
             .into_iter()
@@ -70,11 +66,6 @@ pub(crate) fn read_reader_typography(
             .into_iter()
             .find(|value| value.percent() == spacing)
             .ok_or(StorageError::InvalidSettings)?,
-        furigana: match furigana {
-            0 => false,
-            1 => true,
-            _ => return Err(StorageError::InvalidSettings),
-        },
     })
 }
 

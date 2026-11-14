@@ -33,7 +33,7 @@ they do not select another reader. The native session retains chapter data and
 validates each page. The shell receives a compact page and revision identity;
 selections contain that identity and a segment index. Stale callbacks cannot attach
 to a later page or session. UTF-8 anchors remain canonical; Compose validates and
-converts only displayed ranges to UTF-16, including crossing tokens and ruby.
+converts only displayed ranges to UTF-16, including crossing tokens.
 
 Dictionary lookup uses bundled JMdict/JMnedict only. Empty results show the
 existing no-match state. There is no custom-entry editor, fallback or export.
@@ -43,7 +43,7 @@ the exact page/segmentation key and segment index, unchanged SQLite local change
 external data and schema revisions, and a live exact-surface vocabulary ID check
 inside the immediate write transaction. Expected status/history writes retain the
 validation; other changes and failed writes discard it and require full validation.
-Shared text styling, links, images and ruby rendering remain independent of word
+Shared text styling, links and images remain independent of word
 selection. Whole-document payloads are not part of the live view.
 
 Completion freezes identity and reserves a command ID. The
@@ -55,8 +55,7 @@ rereads use new commands and count again. Previous moves position without counti
 Reading durations are not collected or persisted.
 
 The worker uses whole-document snapshot/open/position operations and effective
-page/word lookups. Session furigana combines source-preferred ruby with validated
-visible tokens.
+page/word lookups. The reader renders canonical base text only.
 
 | Operation | Production API |
 | --- | --- |
@@ -64,7 +63,6 @@ visible tokens.
 | Position | `save_document_reading_position` |
 | Page / selected word | `load_effective_reader_tokens` / `load_effective_reader_word` |
 | Completion | `prepare_effective_page_completion` / `record_effective_page_completion` |
-| Furigana | `EffectiveReaderSession::furigana` |
 
 ## AnkiDroid
 
@@ -85,7 +83,7 @@ See [ANKIDROID_API.md](ANKIDROID_API.md) for provider details.
 
 ## Persistence and builds
 
-The [data model](DATA_MODEL.md) contains 27 application tables. The initial schema
+The [data model](DATA_MODEL.md) contains 26 application tables. The initial schema
 includes the Statistics preference. A transactional migration runner/journal remains
 for future releases; historical development files are rejected without clearing them. Bundled dictionaries are separate read-only assets.
 

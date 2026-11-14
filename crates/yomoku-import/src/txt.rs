@@ -1,6 +1,6 @@
 //! Strict UTF-8/Shift-JIS TXT decoding and common Aozora markup.
 
-use std::{borrow::Cow, ops::Range};
+use std::borrow::Cow;
 
 use encoding_rs::SHIFT_JIS;
 
@@ -12,20 +12,12 @@ pub enum TextEncoding {
     ShiftJis,
 }
 
-/// Ruby refers to the base text in `TxtDocument::text`, never source-file bytes.
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct SourceRuby {
-    pub range: Range<usize>,
-    pub reading: String,
-}
-
 /// One canonical text unit: headings and page directives never create chapters.
 /// The filename supplies the title at the storage boundary.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct TxtDocument {
     pub encoding: TextEncoding,
     pub text: String,
-    pub ruby: Vec<SourceRuby>,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -58,15 +50,11 @@ impl std::error::Error for TxtError {}
 /// Unicode scalars outside recognized markup remain unchanged.
 pub fn parse(bytes: &[u8], selection: Option<TextEncoding>) -> Result<TxtDocument, TxtError> {
     let (encoding, decoded) = decode(bytes, selection)?;
-    let (text, ruby) = aozora::parse(&decoded);
+    let text = aozora::parse(&decoded);
     if text.trim().is_empty() {
         return Err(TxtError::EmptyText);
     }
-    Ok(TxtDocument {
-        encoding,
-        text,
-        ruby,
-    })
+    Ok(TxtDocument { encoding, text })
 }
 
 /// Decode a supported text file without applying TXT/Aozora markup rules.

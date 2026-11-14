@@ -13,7 +13,6 @@ mod effective;
 mod statistics;
 mod statistics_preference;
 mod vocabulary;
-mod vocabulary_bulk;
 mod vocabulary_word;
 
 use crate::{
@@ -90,8 +89,6 @@ pub struct Model {
     vocabulary_request_sequence: u64,
     vocabulary_failed_offset: Option<u64>,
     vocabulary_word_request: Option<vocabulary_word::VocabularyWordRequest>,
-    vocabulary_bulk_request: Option<(u64, vocabulary_bulk::VocabularyBulkRequest)>,
-    vocabulary_select_all_query: Option<crate::vocabulary::VocabularyQuery>,
     statistics: crate::statistics::StatisticsState,
     statistics_request: Option<(u64, crate::statistics::StatisticsQuery)>,
     statistics_request_sequence: u64,
@@ -156,14 +153,6 @@ pub enum Event {
     SetVocabularyWordStatus(crate::vocabulary::VocabularyWordStatusCommand),
     RetryVocabularyWordStatus,
     CancelVocabularyWordStatus,
-    ToggleVocabularySelection(crate::document::VocabularyId),
-    SelectAllVocabulary,
-    RetryVocabularySelection,
-    CancelVocabularySelection,
-    RequestVocabularyBulkAction(crate::vocabulary::VocabularyBulkAction),
-    ConfirmVocabularyBulkAction(crate::vocabulary::VocabularyBulkCommand),
-    RetryVocabularyBulkAction,
-    CancelVocabularyBulkAction,
     OpenSettings,
     CloseSettings,
     RefreshLibrary,
@@ -297,9 +286,6 @@ pub enum Event {
     VocabularyFinished(u64, StorageResult),
     #[serde(skip)]
     #[cfg_attr(feature = "facet_typegen", facet(skip))]
-    VocabularyBulkFinished(u64, StorageResult),
-    #[serde(skip)]
-    #[cfg_attr(feature = "facet_typegen", facet(skip))]
     VocabularyWordFinished(u64, StorageResult),
     /// Native preparation only. No provider dispatch or live callback token.
     #[serde(skip)]
@@ -389,8 +375,6 @@ pub struct ViewModel {
     pub effective_reader_tokens: Option<EffectiveReaderPage>,
     pub effective_reader_word: Option<EffectiveReaderWordState>,
     pub effective_reader_status: Option<EffectiveStatusState>,
-    /// Enabled source-preferred readings, in page-local UTF-8 ranges. No I/O.
-    pub reader_furigana: Vec<crate::reader_ruby::ReaderRuby>,
 }
 
 #[effect]
@@ -438,12 +422,6 @@ impl App for Yomoku {
             return self.finish_vocabulary_word(request_id, result, model);
         }
         if let Some(command) = self.update_vocabulary_word(&event, model) {
-            return command;
-        }
-        if let Event::VocabularyBulkFinished(request_id, result) = event {
-            return self.finish_vocabulary_bulk(request_id, result, model);
-        }
-        if let Some(command) = self.update_vocabulary_bulk(&event, model) {
             return command;
         }
         if let Event::VocabularyFinished(request_id, result) = event {
@@ -832,7 +810,6 @@ impl App for Yomoku {
                 if model.effective_request.is_some()
                     || model.statistics_request.is_some()
                     || model.vocabulary_request.is_some()
-                    || model.vocabulary_bulk_request.is_some()
                     || model.vocabulary_word_request.is_some()
                 {
                     return Command::done();
@@ -891,8 +868,6 @@ impl App for Yomoku {
                     | StorageResult::VocabularyWordLoaded(_)
                     | StorageResult::VocabularyWordStatusChanged(_)
                     | StorageResult::VocabularyLoaded(_)
-                    | StorageResult::VocabularyMatchingIds(_)
-                    | StorageResult::VocabularyBulkApplied(_)
                     | StorageResult::AnkiSettingsLoaded(_)
                     | StorageResult::AnkiDefaultDeckSaved(_) => {
                         model.document_error = Some(DocumentError::InvalidDocument);
@@ -1036,15 +1011,6 @@ impl App for Yomoku {
             | Event::SetVocabularyWordStatus(_)
             | Event::RetryVocabularyWordStatus
             | Event::CancelVocabularyWordStatus
-            | Event::VocabularyBulkFinished(..)
-            | Event::ToggleVocabularySelection(_)
-            | Event::SelectAllVocabulary
-            | Event::RetryVocabularySelection
-            | Event::CancelVocabularySelection
-            | Event::RequestVocabularyBulkAction(_)
-            | Event::ConfirmVocabularyBulkAction(_)
-            | Event::RetryVocabularyBulkAction
-            | Event::CancelVocabularyBulkAction
             | Event::LoadStatistics { .. }
             | Event::LoadStatisticsTimeframe
             | Event::StatisticsTimeframeFinished(..)
@@ -1113,15 +1079,6 @@ impl App for Yomoku {
             effective_reader_tokens: model.effective_reader.page().cloned(),
             effective_reader_word: Some(model.effective_reader.word_state()),
             effective_reader_status: Some(model.effective_reader.status_state()),
-            reader_furigana: model
-                .reader_typography
-                .filter(|typography| typography.furigana)
-                .and(model.reader.as_ref())
-                .and_then(|page| {
-                    let analysis = model.reader_analysis.unwrap_or(ReaderAnalysis::Missing);
-                    model.effective_reader.furigana(page, analysis).ok()
-                })
-                .unwrap_or_default(),
         }
     }
 }

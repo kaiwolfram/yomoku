@@ -4,8 +4,6 @@ use std::{collections::BTreeMap, ops::Range};
 
 use roxmltree::{Document, Node, ParsingOptions};
 
-use crate::txt::SourceRuby;
-
 mod archive;
 mod content;
 
@@ -29,7 +27,6 @@ pub struct EpubDocument {
 pub struct EpubChapter {
     pub path: String,
     pub text: String,
-    pub ruby: Vec<SourceRuby>,
     pub spans: Vec<EpubSpan>,
     /// Each image occupies one U+FFFC scalar in canonical text, never its alt text.
     pub images: Vec<InlineImage>,

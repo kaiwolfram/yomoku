@@ -128,10 +128,9 @@ private fun readerFixture(): ViewModel {
             1UL,
             emptyList(),
             emptyList(),
-            emptyList(),
         )
     val analysis = ReaderAnalysis.Available(AnalysisId(1))
-    return frozenScalarView(emptyList())
+    return scalarVocabularyView(emptyList())
         .copy(
             destination = Destination.LIBRARY,
             contentRoute = ContentRoute.READER,

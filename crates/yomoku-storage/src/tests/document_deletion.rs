@@ -89,7 +89,6 @@ fn document_deletion_cleans_all_file_formats_chapters_assets_and_live_dedup_only
         assert_eq!(rows(&storage, "vocabulary"), vocabulary);
         for table in [
             "imported_files",
-            "source_ruby",
             "epub_documents",
             "epub_chapters",
             "epub_spans",

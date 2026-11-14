@@ -26,7 +26,6 @@ pub(super) fn fixture() -> (Model, AnkiSelection) {
         chapters: vec![chapter.clone()],
         formatting: vec![],
         images: vec![],
-        source_ruby: vec![],
     };
     let page = ReaderPage::open_document(&document, PageLength::default()).unwrap();
     let analysis_id = 4.try_into().unwrap();

@@ -65,6 +65,9 @@ internal fun verifyConjugationBridge() {
             val text = "x".repeat(497) + ". 食べました。\n食べました。"
             id = checkNotNull(dispatch(bridge, Event.CreatePaste(text)).importSummary).documentId
             dispatch(bridge, Event.OpenReader(id))
+            bridge.update(Event.OpenSettings.bincodeSerialize())
+            dispatch(bridge, Event.SetPageLength(PageLength.CHARACTERS500))
+            bridge.update(Event.CloseSettings.bincodeSerialize())
             val first = tokens(bridge)
             check(first.tokens.map { it.surface } == listOf("食べました"))
             val token = first.tokens.single()

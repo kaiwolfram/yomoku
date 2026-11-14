@@ -18,9 +18,7 @@ use yomoku_core::{
     document::{ChapterText, PasteText, TextAnchor, TextOffset, TextRange},
     reader::ReaderPage,
     statistics::StatisticsTimeframe,
-    vocabulary::{
-        Surface, VocabularyBulkAction, VocabularyQuery, VocabularySort, VocabularyStatus,
-    },
+    vocabulary::{Surface, VocabularyQuery, VocabularySort, VocabularyStatus},
 };
 use yomoku_ffi::YomokuBridge;
 use yomoku_runtime::ShellEffectFfi;
@@ -208,22 +206,33 @@ fn seed(storage: &mut Storage, config: &Config) {
             .save_document_reading_position(imported.document.document_id, page.position)
             .unwrap();
     }
-    let ids = storage
-        .vocabulary_matching_ids(&VocabularyQuery::default())
-        .unwrap();
+    let mut ids = Vec::new();
+    let mut offset = 0;
+    loop {
+        let page = storage
+            .vocabulary_page(&VocabularyQuery::default(), offset)
+            .unwrap();
+        ids.extend(page.rows.into_iter().map(|row| row.id));
+        match page.next_offset {
+            Some(next) => offset = next,
+            None => break,
+        }
+    }
     let statuses = VocabularyQuery::default().statuses;
     // Rotate all five groups so final statuses are mixed and every later round
     // creates one real manual transition per surface through production APIs.
     for round in 0..config.rounds {
         for group in 0..5 {
             let group_ids: Vec<_> = ids.iter().skip(group).step_by(5).copied().collect();
-            storage
-                .set_vocabulary_statuses(
-                    &group_ids,
-                    statuses[(group + round + 1) % 5],
-                    DATE + config.rereads as i64 + round as i64 + 1,
-                )
-                .unwrap();
+            for id in group_ids {
+                storage
+                    .set_vocabulary_status(
+                        id,
+                        statuses[(group + round + 1) % 5],
+                        DATE + config.rereads as i64 + round as i64 + 1,
+                    )
+                    .unwrap();
+            }
         }
     }
     let totals = storage.lifetime_reading_totals().unwrap();
@@ -347,9 +356,6 @@ impl Session {
         );
         #[cfg(feature = "storage-measurements")]
         let expected_operation = match &event {
-            Event::SelectAllVocabulary => {
-                yomoku_runtime::storage_measurements::StorageRead::VocabularyMatchingIds
-            }
             Event::LoadVocabulary | Event::LoadMoreVocabulary => {
                 yomoku_runtime::storage_measurements::StorageRead::VocabularyPage
             }
@@ -385,81 +391,49 @@ impl Session {
 }
 
 fn bridge_measurements(path: &Path, config: &Config) {
-    let expected_ids = Storage::open(path)
-        .unwrap()
-        .vocabulary_matching_ids(&VocabularyQuery::default())
-        .unwrap();
     let session = Session::new(path);
     let mut first = Vec::new();
-    let mut select_all = Vec::new();
     #[cfg(feature = "storage-measurements")]
-    let (mut load_phases, mut capture_phases) = (Vec::new(), Vec::new());
+    let mut load_phases = Vec::new();
     for index in 0..=config.iterations {
-        // Navigation invalidates the loaded page and clears session selection.
+        // Navigation invalidates the loaded page.
         session.dispatch(Event::SelectDestination(Destination::Library));
         session.dispatch(Event::SelectDestination(Destination::Vocabulary));
         let load = session.request(Event::LoadVocabulary);
         assert_eq!(session.view().vocabulary.rows.len(), 100);
-        let capture = session.request(Event::SelectAllVocabulary);
-        let state = session.view().vocabulary;
-        assert!(state.error.is_none() && state.bulk_error.is_none());
-        assert_eq!(state.selection.as_ref().unwrap(), &expected_ids);
         if index > 0 {
             first.push(load.elapsed);
-            select_all.push(capture.elapsed);
             #[cfg(feature = "storage-measurements")]
             {
                 load_phases.push(load.storage);
-                capture_phases.push(capture.storage);
             }
         }
     }
     report("fifo_first_page_callback", first);
-    report("fifo_select_all_callback", select_all);
     #[cfg(feature = "storage-measurements")]
-    for (operation, samples) in [("first_page", load_phases), ("select_all", capture_phases)] {
+    {
         report(
-            &format!("worker_{operation}_queue"),
-            samples.iter().map(|s| s.queue).collect(),
+            "worker_first_page_queue",
+            load_phases.iter().map(|s| s.queue).collect(),
         );
         report(
-            &format!("worker_{operation}_execute"),
-            samples.iter().map(|s| s.execute).collect(),
+            "worker_first_page_execute",
+            load_phases.iter().map(|s| s.execute).collect(),
         );
         report(
-            &format!("worker_{operation}_resolve"),
-            samples.iter().map(|s| s.resolve).collect(),
+            "worker_first_page_resolve",
+            load_phases.iter().map(|s| s.resolve).collect(),
         );
     }
 
     // Measure the complete production ViewModel projection/encoding, including
-    // retained rows and global selection, independently of repository/FIFO work.
+    // retained rows, independently of repository/FIFO work.
     let mut targets = vec![100, config.entries.min(1_000)];
     targets.dedup();
     for target in targets {
         while session.view().vocabulary.rows.len() < target {
             session.request(Event::LoadMoreVocabulary);
         }
-        session.dispatch(Event::RequestVocabularyBulkAction(
-            VocabularyBulkAction::SetStatus {
-                status: VocabularyStatus::Known,
-                occurred_at_unix_ms: DATE + 100_000,
-            },
-        ));
-        let state = session.view();
-        let command = state.vocabulary.confirmation.as_ref().unwrap();
-        assert_eq!(command.ids, *state.vocabulary.selection.as_ref().unwrap());
-        let event = Event::ConfirmVocabularyBulkAction(command.clone());
-        // Encode/decode confirmation without executing a mutation.
-        let bytes = encode(&event);
-        let decoded: Event = BincodeFfiFormat::deserialize(&bytes).unwrap();
-        assert_eq!(decoded, event);
-        eprintln!(
-            "rows={target} selected={} view_bytes={} confirmation_event_bytes={}",
-            config.entries,
-            session.bridge.view().unwrap().len(),
-            bytes.len()
-        );
         measure(
             &format!("rows_{target}_view_project_encode"),
             config.iterations,
@@ -471,15 +445,7 @@ fn bridge_measurements(path: &Path, config: &Config) {
             config.iterations,
             || BincodeFfiFormat::deserialize::<ViewModel>(&view_bytes).unwrap(),
         );
-        measure(
-            &format!("rows_{target}_confirm_encode"),
-            config.iterations,
-            || encode(&event),
-        );
-        session.dispatch(Event::CancelVocabularyBulkAction);
     }
-    session.dispatch(Event::CancelVocabularySelection);
-    assert!(session.view().vocabulary.selection.is_none());
 }
 
 fn main() {
@@ -562,11 +528,6 @@ fn main() {
             }
         }
     }
-    measure("repository_select_all", config.iterations, || {
-        storage
-            .vocabulary_matching_ids(&VocabularyQuery::default())
-            .unwrap()
-    });
     measure("repository_statistics_year", config.iterations, || {
         storage
             .statistics_buckets(StatisticsTimeframe::LastYear, DATE + 100_000)

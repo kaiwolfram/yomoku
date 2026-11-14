@@ -235,20 +235,6 @@ fn execute(
             .vocabulary_page(&query, offset)
             .map(StorageResult::VocabularyLoaded)
             .map_err(map_error),
-        StorageOperation::VocabularyMatchingIds(query) => storage
-            .vocabulary_matching_ids(&query)
-            .map(StorageResult::VocabularyMatchingIds)
-            .map_err(map_error),
-        StorageOperation::ApplyVocabularyBulk(command) => {
-            match command.action {
-                yomoku_core::vocabulary::VocabularyBulkAction::SetStatus {
-                    status,
-                    occurred_at_unix_ms,
-                } => storage.set_vocabulary_statuses(&command.ids, status, occurred_at_unix_ms),
-            }
-            .map_err(map_error)?;
-            Ok(StorageResult::VocabularyBulkApplied(command))
-        }
         StorageOperation::LoadVocabularyWord(id) => {
             let row = storage
                 .vocabulary_row(id)

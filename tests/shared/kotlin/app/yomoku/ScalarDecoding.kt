@@ -146,7 +146,7 @@ internal fun scalarIds(size: Int): List<VocabularyId> =
         )
     }
 
-internal fun frozenScalarView(ids: List<VocabularyId>): ViewModel =
+internal fun scalarVocabularyView(ids: List<VocabularyId>): ViewModel =
     ViewModel(
         ankiAddedNotice = null,
         ankiSettings = AnkiSettingsView(AnkiSettingsPhase.UNLOADED, null, null),
@@ -173,17 +173,6 @@ internal fun frozenScalarView(ids: List<VocabularyId>): ViewModel =
                     },
                 nextOffset = if (ids.size > 100) 100UL else null,
                 loading = false,
-                selection = ids,
-                selectingAll = false,
-                confirmation =
-                    VocabularyBulkCommand(
-                        ids,
-                        VocabularyBulkAction.SetStatus(
-                            VocabularyStatus.LEARNING,
-                            9_007_199_254_740_993L,
-                        ),
-                    ),
-                bulkError = DocumentError.UNAVAILABLE,
             ),
         statistics = StatisticsState(StatisticsTimeframe.LASTWEEK, loading = false),
         destination = Destination.VOCABULARY,
@@ -193,7 +182,6 @@ internal fun frozenScalarView(ids: List<VocabularyId>): ViewModel =
         storageBusy = false,
         contentRoute = ContentRoute.MAIN,
         completionSavePending = false,
-        readerFurigana = emptyList(),
     )
 
 internal fun scalarListBytes(ids: List<VocabularyId>): ByteArray =
@@ -216,7 +204,7 @@ internal fun decodeScalarView(bytes: ByteArray, legacy: Boolean): ViewModel {
 internal fun verifyScalarSnapshots() {
     for (size in listOf(0, 1, 2, 100, 10_000, 100_000)) {
         val ids = scalarIds(size)
-        val view = frozenScalarView(ids)
+        val view = scalarVocabularyView(ids)
         val bytes = view.bincodeSerialize()
         for (legacy in listOf(false, true)) {
             check(decodeScalarList(scalarListBytes(ids), legacy) == ids)
@@ -226,7 +214,7 @@ internal fun verifyScalarSnapshots() {
         }
     }
     // Nested malformed data: compare exact generated failures and partial-read offsets.
-    val valid = frozenScalarView(scalarIds(2)).bincodeSerialize()
+    val valid = scalarVocabularyView(scalarIds(2)).bincodeSerialize()
     for (bytes in List(valid.size) { valid.copyOf(it) } + listOf(valid + byteArrayOf(0))) {
         data class Failure(val message: String?, val offset: Int)
         fun failure(legacy: Boolean): Failure {

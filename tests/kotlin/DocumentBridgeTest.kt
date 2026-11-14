@@ -61,7 +61,6 @@ internal fun verifyDocumentBridge() {
                 check(!database.exists())
                 val initial = listener.dispatch(bridge, Event.RefreshLibrary)
                 check(initial.documents.isEmpty())
-                check(initial.readerTypography?.furigana == false)
                 check(dictionary.calls.get() == 0)
                 dictionary.fail = true
                 val failed = listener.dispatch(bridge, Event.CreatePaste(text))
@@ -189,19 +188,17 @@ internal fun verifyDocumentBridge() {
                     check(changed.reader == saved)
                 }
                 val typographyPage = ViewModel.bincodeDeserialize(bridge.view()).reader
-                for (furigana in listOf(false, true)) {
-                    for (size in ReaderFontSize.entries) {
-                        for (spacing in ReaderLineSpacing.entries) {
-                            val typography = ReaderTypography(size, spacing, furigana)
-                            val before = ViewModel.bincodeDeserialize(bridge.view())
-                            if (before.readerTypography == typography) continue
-                            val event = Event.SetReaderTypography(typography)
-                            check(Event.bincodeDeserialize(event.bincodeSerialize()) == event)
-                            val changed = listener.dispatch(bridge, event)
-                            check(changed.readerTypography == typography)
-                            check(changed.reader == typographyPage)
-                            check(changed.reader == saved && changed.readerAnalysis == analysis)
-                        }
+                for (size in ReaderFontSize.entries) {
+                    for (spacing in ReaderLineSpacing.entries) {
+                        val typography = ReaderTypography(size, spacing)
+                        val before = ViewModel.bincodeDeserialize(bridge.view())
+                        if (before.readerTypography == typography) continue
+                        val event = Event.SetReaderTypography(typography)
+                        check(Event.bincodeDeserialize(event.bincodeSerialize()) == event)
+                        val changed = listener.dispatch(bridge, event)
+                        check(changed.readerTypography == typography)
+                        check(changed.reader == typographyPage)
+                        check(changed.reader == saved && changed.readerAnalysis == analysis)
                     }
                 }
                 bridge.update(Event.CloseSettings.bincodeSerialize())
@@ -209,7 +206,6 @@ internal fun verifyDocumentBridge() {
                 check(ViewModel.bincodeDeserialize(bridge.view()).contentRoute == ContentRoute.MAIN)
                 check(ViewModel.bincodeDeserialize(bridge.view()).readerAnalysis == null)
 
-                check(ViewModel.bincodeDeserialize(bridge.view()).readerFurigana.isEmpty())
                 val duplicate = listener.dispatch(bridge, Event.CreatePaste(text))
                 check(duplicate.documents.single().documentId == id)
                 check(duplicate.documents.single().progressPercent > 0UL)
@@ -246,7 +242,7 @@ internal fun verifyDocumentBridge() {
             check(initial.pageLength == PageLength.CHARACTERS1500)
             check(
                 initial.readerTypography ==
-                    ReaderTypography(ReaderFontSize.SP24, ReaderLineSpacing.PERCENT200, true)
+                    ReaderTypography(ReaderFontSize.SP24, ReaderLineSpacing.PERCENT200)
             )
             check(
                 reopened.dispatch(bridge, Event.OpenReader(document.documentId)).reader == document

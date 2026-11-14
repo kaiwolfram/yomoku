@@ -1,8 +1,5 @@
-use super::SourceRuby;
-
-pub(super) fn parse(source: &str) -> (String, Vec<SourceRuby>) {
+pub(super) fn parse(source: &str) -> String {
     let mut text = String::with_capacity(source.len());
-    let mut ruby = Vec::new();
     let mut remaining = source;
     // A second reading must never overlap an already annotated base.
     let mut ruby_floor = 0;
@@ -13,13 +10,8 @@ pub(super) fn parse(source: &str) -> (String, Vec<SourceRuby>) {
                 let base = &after_marker[..open];
                 let suffix = &after_marker[open..];
                 if !base.trim().is_empty() && suffix.starts_with('《') {
-                    if let Some((reading, consumed)) = reading(suffix) {
-                        let start = text.len();
+                    if let Some((_, consumed)) = reading(suffix) {
                         text.push_str(base);
-                        ruby.push(SourceRuby {
-                            range: start..text.len(),
-                            reading: reading.to_owned(),
-                        });
                         ruby_floor = text.len();
                         remaining = &suffix[consumed..];
                         continue;
@@ -27,18 +19,8 @@ pub(super) fn parse(source: &str) -> (String, Vec<SourceRuby>) {
                 }
             }
         } else if ch == '《' {
-            if let Some((reading, consumed)) = reading(remaining) {
-                let start = text[ruby_floor..]
-                    .char_indices()
-                    .rev()
-                    .take_while(|(_, ch)| is_kanji(*ch))
-                    .last()
-                    .map(|(index, _)| ruby_floor + index);
-                if let Some(start) = start {
-                    ruby.push(SourceRuby {
-                        range: start..text.len(),
-                        reading: reading.to_owned(),
-                    });
+            if let Some((_, consumed)) = reading(remaining) {
+                if text[ruby_floor..].chars().next_back().is_some_and(is_kanji) {
                     ruby_floor = text.len();
                     remaining = &remaining[consumed..];
                     continue;
@@ -89,7 +71,7 @@ pub(super) fn parse(source: &str) -> (String, Vec<SourceRuby>) {
         text.push(ch);
         remaining = &remaining[ch.len_utf8()..];
     }
-    (text, ruby)
+    text
 }
 
 /// Returns the reading and total source bytes through the closing delimiter.

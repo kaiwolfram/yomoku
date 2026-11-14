@@ -8,7 +8,7 @@ keeps exact reading positions, tracks vocabulary and reading history, and looks 
 words and names in bundled English JMdict/JMnedict dictionaries.
 
 The production reader uses stored Mode C analysis, with A/B dictionary components,
-source/analyzer furigana, word highlights, five vocabulary statuses, EPUB images
+base-text rendering, word highlights, five vocabulary statuses, EPUB images
 and links. Completion saves occurrences, status changes and position
 atomically; deliberate rereads count again. Imports retain original bytes and
 canonical content, deduplicate atomically and return to Library.

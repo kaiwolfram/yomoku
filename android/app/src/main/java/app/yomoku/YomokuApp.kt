@@ -86,11 +86,6 @@ internal fun YomokuApp(
         if (view.contentRoute != ContentRoute.PASTE) pasteText = ""
     }
     val mainContent = view.contentRoute == ContentRoute.MAIN
-    val vocabularyLocked =
-        view.destination == app.yomoku.shared.Destination.VOCABULARY &&
-            (view.vocabulary.selectingAll ||
-                view.vocabulary.confirmation != null ||
-                view.vocabulary.bulkError != null)
     val showNavigation = mainContent
     var completionOrigin by remember(sessionKey) { mutableStateOf<Offset?>(null) }
     var overlayPosition by remember { mutableStateOf(Offset.Zero) }
@@ -147,7 +142,6 @@ internal fun YomokuApp(
                     NavigationBar(modifier = Modifier.testTag("bottom_navigation")) {
                         for (destination in navigationDestinations) {
                             NavigationBarItem(
-                                enabled = !vocabularyLocked,
                                 selected = !view.settingsOpen && view.destination == destination,
                                 onClick = { dispatch(Event.SelectDestination(destination)) },
                                 icon = { DestinationIcon(destination) },
@@ -155,7 +149,6 @@ internal fun YomokuApp(
                             )
                         }
                         NavigationBarItem(
-                            enabled = !vocabularyLocked,
                             selected = view.settingsOpen,
                             onClick = { dispatch(Event.OpenSettings) },
                             icon = { SettingsIcon() },
@@ -176,7 +169,6 @@ internal fun YomokuApp(
                     ) {
                         for (destination in navigationDestinations) {
                             NavigationRailItem(
-                                enabled = !vocabularyLocked,
                                 selected = !view.settingsOpen && view.destination == destination,
                                 onClick = { dispatch(Event.SelectDestination(destination)) },
                                 icon = { DestinationIcon(destination) },
@@ -184,7 +176,6 @@ internal fun YomokuApp(
                             )
                         }
                         NavigationRailItem(
-                            enabled = !vocabularyLocked,
                             selected = view.settingsOpen,
                             onClick = { dispatch(Event.OpenSettings) },
                             icon = { SettingsIcon() },
@@ -311,7 +302,6 @@ private fun YomokuPreview() {
                             VocabularySort.NEWEST,
                         ),
                         rows = emptyList(),
-                        selectingAll = false,
                         loading = false,
                     ),
                 statistics = StatisticsState(StatisticsTimeframe.LASTWEEK, loading = false),
@@ -335,7 +325,6 @@ private fun YomokuPreview() {
                 completionNotice = null,
                 bookCompletionNotice = null,
                 effectiveReaderTokens = null,
-                readerFurigana = emptyList(),
             ),
             sessionKey = "preview",
             dispatch = {},

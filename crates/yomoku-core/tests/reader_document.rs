@@ -24,7 +24,6 @@ fn document() -> ReaderDocument {
         reading_position: None,
         formatting: Vec::new(),
         images: Vec::new(),
-        source_ruby: Vec::new(),
     }
 }
 

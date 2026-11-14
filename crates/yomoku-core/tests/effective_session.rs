@@ -11,8 +11,6 @@ use yomoku_core::{
 mod completions;
 #[path = "effective_session/requests.rs"]
 mod requests;
-#[path = "effective_session/ruby.rs"]
-mod ruby;
 #[path = "effective_session/statuses.rs"]
 mod statuses;
 #[path = "effective_session/words.rs"]

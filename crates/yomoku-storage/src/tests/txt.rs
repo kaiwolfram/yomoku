@@ -7,7 +7,7 @@ use yomoku_core::{
     reader::ReaderAnalysis,
     vocabulary::{Surface, VocabularyStatus},
 };
-use yomoku_import::txt::{SourceRuby, TextEncoding, TxtError};
+use yomoku_import::txt::{TextEncoding, TxtError};
 
 use super::{imports::fixture, positions::position, *};
 
@@ -38,7 +38,6 @@ fn totals(storage: &Storage) -> Vec<i64> {
         "documents",
         "chapter_texts",
         "imported_files",
-        "source_ruby",
         "chapter_analyses",
         "analyzed_tokens",
         "vocabulary",
@@ -68,7 +67,7 @@ fn txt_cancelled_before_start_skips_validation_database_and_analyzer() {
         .import_analyzed_txt_cancellable(&[0xff], "", None, -1, &cancellation, no_analysis)
         .unwrap()
         .is_none());
-    assert_eq!(totals(&storage), vec![0; 14]);
+    assert_eq!(totals(&storage), vec![0; 13]);
     assert_eq!(fs::read(database.path()).unwrap(), before);
 }
 
@@ -122,7 +121,7 @@ fn txt_cancel_during_analysis_rolls_back_current_file_and_ids_but_keeps_complete
             3,
             &worker,
             |chapter| {
-                // Provisional document/file/ruby rows already exist in the writer.
+                // Provisional document/file rows already exist in the writer.
                 entered.send(()).unwrap();
                 finish.recv_timeout(Duration::from_secs(10)).unwrap();
                 fixture(chapter)
@@ -266,7 +265,7 @@ fn txt_cancellable_commit_failure_rolls_back_and_releases_cancel_gate() {
         ),
         Err(TxtImportError::Storage(StorageError::Sqlite(_)))
     ));
-    assert_eq!(totals(&storage), vec![0; 14]);
+    assert_eq!(totals(&storage), vec![0; 13]);
     cancellation.cancel();
     assert!(cancellation.is_cancelled());
     storage
@@ -289,7 +288,7 @@ fn txt_cancellable_commit_failure_rolls_back_and_releases_cancel_gate() {
 }
 
 #[test]
-fn txt_atomic_canonical_ruby_original_bytes_analysis_and_filename_survive_reopen() {
+fn txt_atomic_canonical_original_bytes_analysis_and_filename_survive_reopen() {
     let database = TestDatabase::new();
     let mut storage = Storage::open(database.path()).unwrap();
     let observer = Storage::open(database.path()).unwrap();
@@ -299,7 +298,7 @@ fn txt_atomic_canonical_ruby_original_bytes_analysis_and_filename_survive_reopen
     let imported = created(
         storage
             .import_analyzed_txt(bytes, "本.txt", None, 123, |chapter| {
-                assert_eq!(totals(&observer), vec![0; 14]);
+                assert_eq!(totals(&observer), vec![0; 13]);
                 assert_eq!(
                     chapter.text,
                     "𠮷 猫 猫\r\nか\u{3099} English 。 📖 \0\r第一章\n\n終"
@@ -325,10 +324,6 @@ fn txt_atomic_canonical_ruby_original_bytes_analysis_and_filename_survive_reopen
     let source = StoredTxtSource {
         original_bytes: bytes.to_vec(),
         encoding: TextEncoding::Utf8,
-        ruby: vec![SourceRuby {
-            range: 0..4,
-            reading: "よし".into(),
-        }],
     };
     assert_eq!(
         storage
@@ -598,7 +593,6 @@ fn txt_every_write_and_commit_failure_rolls_back_and_can_retry_independently() {
         "documents",
         "chapter_texts",
         "imported_files",
-        "source_ruby",
         "chapter_analyses",
         "analyzed_tokens",
         "vocabulary",
@@ -728,7 +722,6 @@ fn txt_delete_reimport_resets_live_identity_but_preserves_global_vocabulary_and_
         )
         .unwrap();
     assert_eq!(count(&storage, "imported_files"), 0);
-    assert_eq!(count(&storage, "source_ruby"), 0);
     assert!(storage
         .load_txt_source(document.document_id)
         .unwrap()
@@ -756,13 +749,10 @@ fn txt_delete_reimport_resets_live_identity_but_preserves_global_vocabulary_and_
 }
 
 #[test]
-fn txt_corrupt_digest_or_ruby_fails_closed_without_repair_or_reanalysis() {
+fn txt_corrupt_digest_fails_closed_without_repair_or_reanalysis() {
     for corruption in [
         "UPDATE imported_files SET original_bytes = X'00'",
         "DELETE FROM imported_files",
-        "UPDATE source_ruby SET start_byte = 1",
-        "UPDATE source_ruby SET end_byte = 999",
-        "UPDATE source_ruby SET ruby_index = 1",
     ] {
         let database = TestDatabase::new();
         let mut storage = Storage::open(database.path()).unwrap();

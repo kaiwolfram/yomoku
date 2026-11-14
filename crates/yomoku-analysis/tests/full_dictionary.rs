@@ -586,9 +586,6 @@ fn real_txt_import_analyzes_only_canonical_text_and_completes_with_original_anch
         .unwrap()
         .unwrap();
     assert_eq!(source.original_bytes, bytes);
-    assert_eq!(source.ruby.len(), 1);
-    assert_eq!(&canonical[source.ruby[0].range.clone()], "猫");
-    assert_eq!(source.ruby[0].reading, "ねこ");
     for surface in &unique {
         assert_eq!(
             storage.vocabulary_entry(surface).unwrap().unwrap().status,

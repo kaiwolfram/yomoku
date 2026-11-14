@@ -3,7 +3,7 @@
 This inventories current **schema 1** validation. It does not authorize activation.
 See [BACKUP_FORMAT.md](BACKUP_FORMAT.md) and [PRODUCT_SPEC.md §7](PRODUCT_SPEC.md#7-secure-manual-backup-and-restore).
 Development databases/backups are unsupported; the exact initial schema/journal
-must match `0001_simplified_initial_schema`, including the Statistics preference
+must match `0001_base_text_initial_schema`, including the Statistics preference
 singleton. Previous schema-1 journals,
 unknown/extra schema objects and incompatible versions fail unchanged.
 
@@ -20,7 +20,7 @@ unknown/extra schema objects and incompatible versions fail unchanged.
 | Positions | Ownership and scalar boundaries/range including EOF |
 | Analysis | Profile/mode, contiguous indices, range/coverage/scalar/surface/classification/reading/form domains; no analyzer rerun |
 | Import identity | Exact canonical-paste/original-file SHA-256, encoding/format ownership, required file/EPUB headers |
-| TXT/SRT/ruby | Pure saved-encoding derivation matches canonical text and TXT ruby; SRT cue parsing remains transient; ruby indices/ranges/readings obey existing contracts |
+| TXT/SRT | Pure saved-encoding derivation matches canonical base text; recognized Aozora readings are discarded and SRT cue parsing remains transient |
 
 Compact reservations contain no whole-chapter segmentation. They retain C provenance
 and counted occurrences; surviving text/analysis validate the frozen page without

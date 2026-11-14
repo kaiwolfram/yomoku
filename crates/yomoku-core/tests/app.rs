@@ -131,7 +131,6 @@ fn starts_in_library() {
                 busy: false,
                 error: None
             }),
-            reader_furigana: Vec::new(),
             reader_typography: None,
             page_length: None,
             import_summary: None,

@@ -9,11 +9,9 @@ import app.yomoku.shared.EffectiveReaderSelection
 import app.yomoku.shared.Event
 import app.yomoku.shared.ImportOutcome
 import app.yomoku.shared.PageLength
-import app.yomoku.shared.ReaderRuby
 import app.yomoku.shared.ReaderTokenKey
 import app.yomoku.shared.TextEncoding
 import app.yomoku.shared.TextOffset
-import app.yomoku.shared.TextRange
 import app.yomoku.shared.TxtImport
 import app.yomoku.shared.ViewModel
 import app.yomoku.shared.VocabularyStatus
@@ -91,35 +89,13 @@ class DocumentSessionTest {
             val id = created.documents.single().documentId
             val loaded = dispatch(core, Event.OpenReader(id)).reader!!
             assertEquals("猫と猫。\r\n𠮷😀\u0000終", loaded.text)
-            val ruby = loaded.sourceRuby
-            assertEquals(
-                ReaderRuby(TextRange(TextOffset(0), TextOffset(3)), "ねこ"),
-                ruby.single(),
-            )
             val opened = dispatch(core, Event.OpenReader(id))
             val page = opened.reader!!
-            assertEquals(ruby, page.sourceRuby)
-            assertTrue(opened.readerFurigana.isEmpty())
-            dispatch(core, Event.OpenSettings)
-            val enabled =
-                dispatch(
-                    core,
-                    Event.SetReaderTypography(opened.readerTypography!!.copy(furigana = true)),
-                )
-            assertEquals(page.sourceRuby, enabled.readerFurigana)
-            assertEquals(page, enabled.reader)
-            dispatch(core, Event.CloseSettings)
             val key = ReaderTokenKey(id, page.anchor, opened.readerAnalysis!!)
             val tokenView = dispatch(core, Event.LoadReaderTokens(key))
             val tokens = tokenView.effectiveReaderTokens!!
             val cats = tokens.tokens.filter { it.surface == "猫" }
             assertEquals(2, cats.size)
-            assertEquals(page.sourceRuby.single(), tokenView.readerFurigana.first())
-            assertFalse(page.sourceRuby.single().reading == cats[0].reading)
-            assertEquals(
-                cats[1].reading,
-                tokenView.readerFurigana.single { it.range == cats[1].displayRange }.reading,
-            )
             val familiar =
                 dispatch(
                     core,
@@ -130,7 +106,7 @@ class DocumentSessionTest {
                         1234,
                     ),
                 )
-            assertEquals(tokenView.readerFurigana, familiar.readerFurigana)
+            assertFalse(familiar.effectiveReaderStatus!!.pending)
             val position = page.position.copy(offset = TextOffset(3))
             dispatch(core, Event.SaveReadingPosition(position))
             dispatch(core, Event.CloseDocument)
@@ -153,12 +129,6 @@ class DocumentSessionTest {
                             assertEquals("utf8", it.getString(1))
                             assertFalse(it.moveToNext())
                         }
-                    db.rawQuery("SELECT start_byte, end_byte, reading FROM source_ruby", null).use {
-                        assertTrue(it.moveToFirst())
-                        assertEquals(0, it.getInt(0))
-                        assertEquals(3, it.getInt(1))
-                        assertEquals("ねこ", it.getString(2))
-                    }
                     db.rawQuery("SELECT count(*) FROM reading_completions", null).use {
                         assertTrue(it.moveToFirst())
                         assertEquals(0, it.getInt(0))
@@ -174,9 +144,6 @@ class DocumentSessionTest {
             val reopenedView = dispatch(core, Event.OpenReader(id))
             val reopened = reopenedView.reader!!
             assertEquals(position, reopened.position)
-            assertEquals(ruby, reopened.sourceRuby)
-            assertTrue(reopenedView.readerTypography!!.furigana)
-            assertEquals(reopened.sourceRuby, reopenedView.readerFurigana)
             val restored = dispatch(core, Event.LoadReaderTokens(key)).effectiveReaderTokens!!
             assertTrue(
                 restored.tokens

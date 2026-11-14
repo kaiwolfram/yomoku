@@ -1,7 +1,6 @@
 package app.yomoku
 
-import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -14,8 +13,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.selected
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import app.yomoku.shared.*
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -30,23 +27,13 @@ internal fun VocabularyScreen(
 ) {
     val state = view.vocabulary
     val query = state.query
-    val frozen = state.selectingAll || state.confirmation != null || state.bulkError != null
-    val enabled = (!view.storageBusy || state.loading) && !frozen && state.wordStatus == null
-    val canSelect = !view.storageBusy && !frozen && state.wordStatus == null
-    val selection = state.selection
-    BackHandler(enabled = selection != null || frozen) {
-        if (!view.storageBusy)
-            dispatch(
-                if (state.confirmation != null) Event.CancelVocabularyBulkAction
-                else Event.CancelVocabularySelection
-            )
-    }
-    VocabularyBulkDialog(view, dispatch)
+    val enabled = (!view.storageBusy || state.loading) && state.wordStatus == null
+    val canOpenWord = !view.storageBusy && state.wordStatus == null
     VocabularyWordSheet(view, dispatch)
     // The core owns attempted/error state. Resuming visibility or unrelated work
     // can start an unattempted read, but cannot retry a failed page.
-    LaunchedEffect(sessionKey, view.storageBusy, state.matchingCount, frozen) {
-        if (!view.storageBusy && !frozen && state.matchingCount == null && state.error == null)
+    LaunchedEffect(sessionKey, view.storageBusy, state.matchingCount) {
+        if (!view.storageBusy && state.matchingCount == null && state.error == null)
             dispatch(Event.LoadVocabulary)
     }
     val lastId = state.rows.lastOrNull()?.id?.value
@@ -58,15 +45,13 @@ internal fun VocabularyScreen(
         state.loading,
         state.error,
         view.storageBusy,
-        frozen,
     ) {
         if (
             lastId != null &&
                 state.nextOffset != null &&
                 !state.loading &&
                 state.error == null &&
-                !view.storageBusy &&
-                !frozen
+                !view.storageBusy
         ) {
             snapshotFlow { scroll.layoutInfo.visibleItemsInfo.any { it.key == lastId } }
                 .distinctUntilChanged()
@@ -103,7 +88,6 @@ internal fun VocabularyScreen(
                             }
                     },
                 )
-                if (selection != null) VocabularySelectionActions(view, dispatch, canSelect)
                 Row(
                     modifier =
                         Modifier.fillMaxWidth()
@@ -138,26 +122,15 @@ internal fun VocabularyScreen(
                     )
             }
             items(state.rows, key = { it.id.value }) { row ->
-                val isSelected = selection?.containsSortedVocabularyId(row.id) == true
-                val selectLabel = stringResource(R.string.vocabulary_select_word)
                 Row(
                     Modifier.fillMaxWidth()
-                        .combinedClickable(
-                            enabled = canSelect,
-                            onLongClickLabel = selectLabel,
-                            onLongClick = { dispatch(Event.ToggleVocabularySelection(row.id)) },
-                            onClick = {
-                                dispatch(
-                                    if (selection != null) Event.ToggleVocabularySelection(row.id)
-                                    else Event.OpenVocabularyWord(row.id)
-                                )
-                            },
+                        .clickable(
+                            enabled = canOpenWord,
+                            onClick = { dispatch(Event.OpenVocabularyWord(row.id)) },
                         )
-                        .semantics { if (selection != null) selected = isSelected }
                         .testTag("vocabulary_row_${row.id.value}"),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    if (selection != null) Checkbox(checked = isSelected, onCheckedChange = null)
                     Column(Modifier.weight(1f)) {
                         Text(row.surface, style = MaterialTheme.typography.titleMedium)
                         Text(stringResource(row.status.labelResource()))
@@ -186,7 +159,7 @@ internal fun VocabularyScreen(
                     )
                     Button(
                         onClick = { dispatch(Event.RetryVocabulary) },
-                        enabled = !view.storageBusy && !frozen,
+                        enabled = !view.storageBusy,
                         modifier = Modifier.testTag("vocabulary_retry"),
                     ) {
                         Text(stringResource(R.string.retry))

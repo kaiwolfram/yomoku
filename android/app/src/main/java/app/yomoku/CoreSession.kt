@@ -39,8 +39,6 @@ internal data class CoreRenderMeasurement(
     val publishNanos: Long,
     val payloadBytes: Int,
     val loadedRows: Int,
-    val selectedIds: Int,
-    val confirmationIds: Int,
     val published: Boolean,
 )
 
@@ -485,8 +483,6 @@ internal class CoreSession(
                 published - deserialized,
                 bytes.size,
                 decoded.vocabulary.rows.size,
-                decoded.vocabulary.selection?.size ?: 0,
-                decoded.vocabulary.confirmation?.ids?.size ?: 0,
                 view === decoded,
             )
         )

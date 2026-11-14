@@ -32,9 +32,8 @@ class ReaderHighlightsTest {
     @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
 
     @Test
-    fun insetPaintPreservesUnicodeWrappedRubyTextAndAdjacentTapTargetsInBothThemes() {
+    fun insetPaintPreservesUnicodeWrappedTextAndAdjacentTapTargetsInBothThemes() {
         val night = mutableStateOf(false)
-        val ruby = mutableStateOf(false)
         val taps = mutableListOf<ULong>()
         val text = "猫犬𠮷か\u3099東京日本語東京日本語猫"
         val tokens =
@@ -69,11 +68,9 @@ class ReaderHighlightsTest {
                             {},
                             taps::add,
                         )
-                    ReaderRubyText(
+                    ReaderHighlightedText(
                         annotated,
                         readerTextStyle(null),
-                        if (ruby.value) listOf(ReaderDisplayRuby(2, text.length - 1, "よしにほんご"))
-                        else emptyList(),
                         Modifier.width(140.dp)
                             .background(if (night.value) Color.Black else Color.White)
                             .testTag("highlight_text"),
@@ -82,64 +79,58 @@ class ReaderHighlightsTest {
             }
         }
         for (dark in listOf(false, true)) {
-            for (showRuby in listOf(false, true)) {
-                compose.runOnUiThread {
-                    night.value = dark
-                    ruby.value = showRuby
-                }
-                val node = compose.onNodeWithTag("highlight_text")
-                val layouts = mutableListOf<TextLayoutResult>()
-                node.performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
-                val layout = layouts.single()
-                assertEquals(text, layout.layoutInput.text.text)
-                val first = readerHighlightRects(layout, 0, 1, inset).single()
-                val second = readerHighlightRects(layout, 1, 2, inset).single()
-                assertEquals(inset * 2, second.left - first.right, 0.6f)
-                val wrapped = readerHighlightRects(layout, 2, text.length - 1, inset)
-                assertTrue(wrapped.size > 1)
-                val pixels = node.captureToImage().toPixelMap()
-                for ((index, status) in
-                    listOf(
-                            VocabularyStatus.NEW,
-                            VocabularyStatus.LEARNING,
-                            VocabularyStatus.FAMILIAR,
-                        )
-                        .withIndex()) {
-                    val token = tokens[index]
-                    val color = vocabularyBackground(status, dark)
-                    assertTrue(
-                        (0 until pixels.height).any { y ->
-                            (0 until pixels.width).any { x -> pixels[x, y] == color }
-                        }
-                    )
-                    for (rect in readerHighlightRects(layout, token.start, token.end, inset)) {
-                        val x = (rect.left - inset / 2).toInt().coerceIn(0, pixels.width - 1)
-                        assertTrue(
-                            (rect.top.toInt().coerceAtLeast(0) until
-                                    rect.bottom.toInt().coerceAtMost(pixels.height))
-                                .none { y -> pixels[x, y] == color }
-                        )
-                    }
-                }
-                node.performTouchInput { click(layout.getBoundingBox(0).center) }
-                assertEquals(0UL, taps.last())
-                node.performTouchInput { click(layout.getBoundingBox(1).center) }
-                assertEquals(1UL, taps.last())
-                assertTrue(
-                    layout.layoutInput.text
-                        .getStringAnnotations(READER_HIGHLIGHT, text.length - 1, text.length)
-                        .isEmpty()
-                )
-                // The same annotations are retained and clipped by both image and block splitting.
-                val fragment = layout.layoutInput.text.subSequence(4, text.length - 2)
-                assertEquals(
-                    0,
-                    fragment
-                        .getStringAnnotations(READER_HIGHLIGHT, 0, fragment.length)
-                        .single()
-                        .start,
-                )
+            compose.runOnUiThread {
+                night.value = dark
             }
+            val node = compose.onNodeWithTag("highlight_text")
+            val layouts = mutableListOf<TextLayoutResult>()
+            node.performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
+            val layout = layouts.single()
+            assertEquals(text, layout.layoutInput.text.text)
+            val first = readerHighlightRects(layout, 0, 1, inset).single()
+            val second = readerHighlightRects(layout, 1, 2, inset).single()
+            assertEquals(inset * 2, second.left - first.right, 0.6f)
+            val wrapped = readerHighlightRects(layout, 2, text.length - 1, inset)
+            assertTrue(wrapped.size > 1)
+            val pixels = node.captureToImage().toPixelMap()
+            for ((index, status) in
+                listOf(
+                        VocabularyStatus.NEW,
+                        VocabularyStatus.LEARNING,
+                        VocabularyStatus.FAMILIAR,
+                    )
+                    .withIndex()) {
+                val token = tokens[index]
+                val color = vocabularyBackground(status, dark)
+                assertTrue(
+                    (0 until pixels.height).any { y ->
+                        (0 until pixels.width).any { x -> pixels[x, y] == color }
+                    }
+                )
+                for (rect in readerHighlightRects(layout, token.start, token.end, inset)) {
+                    val x = (rect.left - inset / 2).toInt().coerceIn(0, pixels.width - 1)
+                    assertTrue(
+                        (rect.top.toInt().coerceAtLeast(0) until
+                                rect.bottom.toInt().coerceAtMost(pixels.height))
+                            .none { y -> pixels[x, y] == color }
+                    )
+                }
+            }
+            node.performTouchInput { click(layout.getBoundingBox(0).center) }
+            assertEquals(0UL, taps.last())
+            node.performTouchInput { click(layout.getBoundingBox(1).center) }
+            assertEquals(1UL, taps.last())
+            assertTrue(
+                layout.layoutInput.text
+                    .getStringAnnotations(READER_HIGHLIGHT, text.length - 1, text.length)
+                    .isEmpty()
+            )
+            // The same annotations are retained and clipped by both image and block splitting.
+            val fragment = layout.layoutInput.text.subSequence(4, text.length - 2)
+            assertEquals(
+                0,
+                fragment.getStringAnnotations(READER_HIGHLIGHT, 0, fragment.length).single().start,
+            )
         }
     }
 }

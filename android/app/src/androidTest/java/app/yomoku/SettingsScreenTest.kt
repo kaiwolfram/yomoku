@@ -29,7 +29,7 @@ class SettingsScreenTest {
                 settingsOpen = true,
                 pageLength = PageLength.CHARACTERS250,
                 readerTypography =
-                    ReaderTypography(ReaderFontSize.SP16, ReaderLineSpacing.PERCENT150, false),
+                    ReaderTypography(ReaderFontSize.SP16, ReaderLineSpacing.PERCENT150),
             )
         val dark = mutableStateOf(false)
         val events = mutableListOf<Event>()
@@ -42,6 +42,7 @@ class SettingsScreenTest {
                 }
             }
         }
+        compose.onNodeWithTag("reader_furigana").assertDoesNotExist()
         for (night in listOf(false, true)) {
             compose.runOnUiThread { dark.value = night }
             val reader = compose.onNodeWithText("Reader").performScrollTo()
@@ -59,8 +60,6 @@ class SettingsScreenTest {
                 compose.onNodeWithTag("${tag}_increase").performClick()
                 assertTrue(events.last() is Event.SetReaderTypography)
             }
-            compose.onNodeWithTag("reader_furigana").performScrollTo().performClick()
-            assertTrue((events.last() as Event.SetReaderTypography).value.furigana)
             listOf(250, 500, 750, 1000).forEach { size ->
                 compose.onNodeWithTag("page_length_$size").performScrollTo().assertIsEnabled()
             }

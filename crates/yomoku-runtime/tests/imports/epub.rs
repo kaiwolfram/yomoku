@@ -77,7 +77,6 @@ fn whole_book_import_registers_all_chapters_without_encounters_and_reopens_witho
         .zip(snapshot.analyses)
     {
         assert_eq!(stored.chapter.text, parsed.text);
-        assert_eq!(stored.ruby, parsed.ruby);
         assert_eq!(stored.spans, parsed.spans);
         assert_eq!(stored.images, parsed.images);
         let ReaderAnalysis::Available(id) = original.analysis else {
@@ -291,7 +290,6 @@ fn every_epub_write_later_chapter_and_deferred_commit_failure_rolls_back_whole_b
         "epub_documents",
         "epub_assets",
         "epub_chapters",
-        "source_ruby",
         "epub_spans",
         "epub_inline_images",
         "chapter_analyses",

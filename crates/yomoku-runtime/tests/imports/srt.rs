@@ -146,7 +146,7 @@ fn srt_loader_analysis_and_invalid_output_failures_preserve_completed_files_and_
                 DocumentError::Unavailable
             })
         );
-        assert_eq!(srt_totals(&database.path()), vec![0; 14]);
+        assert_eq!(srt_totals(&database.path()), vec![0; 13]);
     }
     failure.store(0, Ordering::Relaxed);
     let created = dispatch(

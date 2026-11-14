@@ -19,7 +19,6 @@ private fun page(text: String = "😀 𠮷か\u3099\u0000猫", start: Long = 4) 
         2uL,
         emptyList(),
         emptyList(),
-        emptyList(),
     )
 
 private fun identity(page: ReaderPage) =

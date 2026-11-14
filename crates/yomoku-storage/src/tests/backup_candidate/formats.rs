@@ -164,59 +164,6 @@ fn backup_candidate_formats_reject_undecodable_or_different_text_even_with_updat
 }
 
 #[test]
-fn backup_candidate_formats_reject_missing_extra_changed_or_invalid_txt_ruby() {
-    {
-        let version = 1;
-        for sql in [
-            "DELETE FROM source_ruby WHERE chapter_id = 3",
-            "DELETE FROM source_ruby WHERE chapter_id = 3 AND ruby_index = 1",
-            "UPDATE source_ruby SET ruby_index = ruby_index + 10 WHERE chapter_id = 3",
-            "UPDATE source_ruby SET start_byte = 1 WHERE chapter_id = 3 AND ruby_index = 0",
-            "UPDATE source_ruby SET end_byte = 9999 WHERE chapter_id = 3 AND ruby_index = 0",
-            "UPDATE source_ruby SET start_byte = 0 WHERE chapter_id = 3 AND ruby_index = 1",
-            "UPDATE source_ruby SET reading = 'changed' WHERE chapter_id = 3",
-            "UPDATE source_ruby SET reading = CAST(X'ff' AS TEXT) WHERE chapter_id = 3",
-            "INSERT INTO source_ruby VALUES (3, 2, 0, 4, 'extra')",
-            "INSERT INTO source_ruby VALUES (1, 0, 2, 5, 'foreign')",
-        ] {
-            let (database, storage) = setup();
-            storage.connection.execute_batch(sql).unwrap();
-            check_rejected(&database, version as u32, CandidateError::InvalidData);
-        }
-    }
-    let (database, storage) = setup();
-    storage
-        .connection
-        .execute_batch("INSERT INTO source_ruby VALUES (4, 0, 0, 4, 'foreign')")
-        .unwrap();
-    check_rejected(&database, 1, CandidateError::InvalidData);
-}
-
-#[test]
-fn backup_candidate_formats_validate_epub_ruby_ranges_without_reinterpreting_readings() {
-    for sql in [
-        "UPDATE source_ruby SET ruby_index = 10 WHERE chapter_id = 5",
-        "UPDATE source_ruby SET start_byte = 1 WHERE chapter_id = 5",
-        "UPDATE source_ruby SET end_byte = 9999 WHERE chapter_id = 5",
-        "UPDATE source_ruby SET reading = CAST(X'ff' AS TEXT) WHERE chapter_id = 5",
-        "INSERT INTO source_ruby VALUES (5, 1, 0, 3, 'overlap')",
-    ] {
-        let (database, storage) = setup();
-        storage.connection.execute_batch(sql).unwrap();
-        check_rejected(&database, 1, CandidateError::InvalidData);
-    }
-    let (database, storage) = setup();
-    storage
-        .connection
-        .execute(
-            "UPDATE source_ruby SET reading = ?1 WHERE chapter_id = 5",
-            ["　\0\n"],
-        )
-        .unwrap();
-    accept_unchanged(&database, 1);
-}
-
-#[test]
 fn backup_candidate_formats_preserve_explicit_shift_jis_renames_and_deleted_file_provenance() {
     let (database, mut storage) = setup();
     for (bytes, srt) in [

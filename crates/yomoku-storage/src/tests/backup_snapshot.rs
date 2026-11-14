@@ -190,7 +190,6 @@ pub(super) fn populate(storage: &mut Storage) {
         .save_reader_typography(ReaderTypography {
             font_size: ReaderFontSize::Sp24,
             line_spacing: ReaderLineSpacing::Percent200,
-            furigana: true,
         })
         .unwrap();
     storage

@@ -42,7 +42,6 @@ class EffectiveReaderNavigationTest {
                 3UL,
                 emptyList(),
                 emptyList(),
-                emptyList(),
             )
         val analysis = ReaderAnalysis.Available(AnalysisId(1))
         val identity =
@@ -70,7 +69,6 @@ class EffectiveReaderNavigationTest {
                 VocabularyState(
                     VocabularyQuery("", VocabularyStatus.entries.toList(), VocabularySort.NEWEST),
                     rows = emptyList(),
-                    selectingAll = false,
                     loading = false,
                 ),
             statistics = StatisticsState(StatisticsTimeframe.LASTWEEK, loading = false),
@@ -86,7 +84,6 @@ class EffectiveReaderNavigationTest {
             effectiveReaderTokens = EffectiveReaderPage(identity, listOf(token)),
             effectiveReaderWord = EffectiveReaderWordState(busy = false),
             effectiveReaderStatus = EffectiveStatusState(pending = false, busy = false),
-            readerFurigana = emptyList(),
         )
     }
 

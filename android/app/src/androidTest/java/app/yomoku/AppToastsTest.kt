@@ -46,7 +46,7 @@ class AppToastsTest {
 
     @Test
     fun ankiSuccessIsConsumedBeforeDisplayAndCannotReplayOnRecompositionOrRecreation() {
-        val snapshot = mutableStateOf(frozenScalarView(emptyList()).copy(ankiAddedNotice = 7UL))
+        val snapshot = mutableStateOf(scalarVocabularyView(emptyList()).copy(ankiAddedNotice = 7UL))
         val messages = mutableListOf<String>()
         val events = mutableListOf<Event>()
         fun render() {

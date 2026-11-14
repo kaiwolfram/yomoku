@@ -75,7 +75,6 @@ class ReaderLongPageTest {
                 1UL,
                 emptyList(),
                 emptyList(),
-                emptyList(),
             )
         lateinit var measurer: TextMeasurer
         compose.runOnUiThread {

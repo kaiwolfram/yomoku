@@ -84,187 +84,6 @@ class VocabularyProductionTest {
         return VocabularyId(id)
     }
 
-    private fun requestStatus(status: VocabularyStatus) {
-        compose.onNodeWithTag("vocabulary_change_status").performScrollTo().performClick()
-        compose.onNodeWithTag("vocabulary_bulk_status_${status.name}").performClick()
-        compose.onNodeWithTag("vocabulary_bulk_dialog").assertIsDisplayed()
-    }
-
-    @Test
-    fun unloadedAndHiddenSelectionsFrozenStatusRetrySurviveRecreation() {
-        idle()
-        val prefix = "選-${System.nanoTime()}-"
-        val ids = mutableListOf<VocabularyId>()
-        lateinit var hidden: VocabularyId
-        sql { db ->
-            hidden = insert(db, prefix + "hidden")
-            repeat(205) { ids.add(insert(db, prefix + "match-" + it.toString().padStart(4, '0'))) }
-        }
-        try {
-            visit()
-            search(prefix + "hidden")
-            compose.onNodeWithTag("vocabulary_row_${hidden.value}").performTouchInput {
-                longClick()
-            }
-            compose.onNodeWithTag("vocabulary_selected_count").assertTextEquals("Selected words: 1")
-            compose.onNodeWithText("Settings").performClick()
-            compose.onNodeWithTag("screen_title").assertTextEquals("Settings")
-            compose.runOnUiThread { compose.activity.onBackPressedDispatcher.onBackPressed() }
-            compose.onNodeWithTag("screen_title").assertTextEquals("Vocabulary")
-            idle()
-            assertEquals(listOf(hidden), core().view.vocabulary.selection)
-            search(prefix + "match-")
-            assertEquals(100, core().view.vocabulary.rows.size)
-            compose.onNodeWithTag("vocabulary_select_all").performScrollTo().performClick()
-            idle()
-            val selected = (ids + hidden).sortedBy { it.value }
-            assertEquals(selected, core().view.vocabulary.selection)
-            assertEquals(100, core().view.vocabulary.rows.size)
-            compose
-                .onNodeWithTag("vocabulary_selected_count")
-                .assertTextEquals("Selected words: 206")
-            val session = core()
-            compose.activityRule.scenario.recreate()
-            idle()
-            assertSame(session, core())
-            assertEquals(selected, core().view.vocabulary.selection)
-            requestStatus(VocabularyStatus.FAMILIAR)
-            val cancelled = checkNotNull(core().view.vocabulary.confirmation)
-            compose.activityRule.scenario.recreate()
-            idle()
-            assertEquals(cancelled, core().view.vocabulary.confirmation)
-            compose.onNodeWithTag("vocabulary_cancel_bulk").performClick()
-            assertEquals(selected, core().view.vocabulary.selection)
-            requestStatus(VocabularyStatus.KNOWN)
-            val frozen = checkNotNull(core().view.vocabulary.confirmation)
-            sql {
-                it.execSQL(
-                    "CREATE TRIGGER fail_ui_vocabulary_status BEFORE UPDATE ON vocabulary WHEN OLD.id = ${ids.last().value} BEGIN SELECT RAISE(ABORT, 'last word'); END"
-                )
-            }
-            compose.onNodeWithTag("vocabulary_confirm_bulk").performClick()
-            idle()
-            assertNotNull(core().view.vocabulary.bulkError)
-            sql { db ->
-                db.rawQuery(
-                        "SELECT COUNT(*) FROM vocabulary WHERE surface >= ? AND surface < ? AND status != 'new'",
-                        arrayOf(prefix, prefix + "\uffff"),
-                    )
-                    .use {
-                        it.moveToFirst()
-                        assertEquals(0, it.getInt(0))
-                    }
-                insert(db, prefix + "match-later")
-                db.execSQL("DROP TRIGGER fail_ui_vocabulary_status")
-            }
-            compose.runOnUiThread {
-                core()
-                    .dispatch(
-                        Event.SetVocabularyQuery(
-                            core().view.vocabulary.query.copy(prefix = "ignored")
-                        )
-                    )
-                core().dispatch(Event.SelectDestination(Destination.LIBRARY))
-                core().dispatch(Event.OpenSettings)
-            }
-            compose.activityRule.scenario.recreate()
-            idle()
-            assertEquals(Destination.VOCABULARY, core().view.destination)
-            assertFalse(core().view.settingsOpen)
-            assertEquals(prefix + "match-", core().view.vocabulary.query.prefix)
-            assertEquals(frozen, core().view.vocabulary.confirmation)
-            compose.onNodeWithTag("vocabulary_bulk_error").assertIsDisplayed()
-            compose.onNodeWithTag("vocabulary_confirm_bulk").performClick()
-            idle()
-            assertNull(core().view.vocabulary.selection)
-            assertNull(core().view.vocabulary.confirmation)
-            assertNull(core().view.vocabulary.bulkError)
-            assertEquals(206UL, core().view.vocabulary.matchingCount)
-            sql { db ->
-                db.rawQuery(
-                        "SELECT COUNT(*), MIN(occurred_at_unix_ms), MAX(occurred_at_unix_ms) FROM vocabulary_status_events WHERE cause = 'manual' AND vocabulary_id IN (${selected.joinToString { it.value.toString() }})",
-                        null,
-                    )
-                    .use {
-                        it.moveToFirst()
-                        assertEquals(206, it.getInt(0))
-                        val date =
-                            (frozen.action as VocabularyBulkAction.SetStatus).occurredAtUnixMs
-                        assertEquals(date, it.getLong(1))
-                        assertEquals(date, it.getLong(2))
-                    }
-            }
-            compose.onNodeWithTag("vocabulary_delete_selected").assertDoesNotExist()
-            search(prefix + "hidden")
-            assertEquals(VocabularyStatus.KNOWN, core().view.vocabulary.rows.single().status)
-            compose.onNodeWithTag("vocabulary_row_${hidden.value}").performTouchInput {
-                longClick()
-            }
-            compose.onNodeWithTag("vocabulary_selected_count").assertTextEquals("Selected words: 1")
-            compose.runOnUiThread { compose.activity.onBackPressedDispatcher.onBackPressed() }
-            idle()
-            assertNull(core().view.vocabulary.selection)
-        } finally {
-            sql { db ->
-                db.execSQL("DROP TRIGGER IF EXISTS fail_ui_vocabulary_status")
-                db.execSQL(
-                    "DELETE FROM vocabulary WHERE surface >= ? AND surface < ?",
-                    arrayOf(prefix, prefix + "\uffff"),
-                )
-            }
-        }
-    }
-
-    @Test
-    fun failedCaptureRetriesItsQueryAndBackAbandonsItWithoutAutomaticRetry() {
-        idle()
-        val prefix = "捕-${System.nanoTime()}-"
-        sql { db -> repeat(3) { insert(db, prefix + it) } }
-        var renamed = false
-        try {
-            visit()
-            search(prefix)
-            compose.onNodeWithTag("vocabulary_select_all").assertDoesNotExist()
-            compose
-                .onNodeWithTag("vocabulary_row_${core().view.vocabulary.rows.first().id.value}")
-                .performTouchInput { longClick() }
-            sql { it.execSQL("ALTER TABLE vocabulary RENAME TO vocabulary_capture_unavailable") }
-            renamed = true
-            compose.onNodeWithTag("vocabulary_select_all").performScrollTo().performClick()
-            idle()
-            assertNotNull(core().view.vocabulary.bulkError)
-            assertNull(core().view.vocabulary.confirmation)
-            sql { it.execSQL("ALTER TABLE vocabulary_capture_unavailable RENAME TO vocabulary") }
-            renamed = false
-            compose.activityRule.scenario.recreate()
-            idle()
-            assertNotNull(core().view.vocabulary.bulkError)
-            compose.onNodeWithTag("vocabulary_confirm_bulk").performClick()
-            idle()
-            assertNull(core().view.vocabulary.bulkError)
-            assertEquals(3, core().view.vocabulary.selection?.size)
-            sql { it.execSQL("ALTER TABLE vocabulary RENAME TO vocabulary_capture_unavailable") }
-            renamed = true
-            compose.onNodeWithTag("vocabulary_select_all").performScrollTo().performClick()
-            idle()
-            assertNotNull(core().view.vocabulary.bulkError)
-            compose.runOnUiThread { compose.activity.onBackPressedDispatcher.onBackPressed() }
-            idle()
-            assertNull(core().view.vocabulary.bulkError)
-            assertNull(core().view.vocabulary.selection)
-            compose.onNodeWithTag("vocabulary_bulk_dialog").assertDoesNotExist()
-        } finally {
-            sql { db ->
-                if (renamed)
-                    db.execSQL("ALTER TABLE vocabulary_capture_unavailable RENAME TO vocabulary")
-                db.execSQL(
-                    "DELETE FROM vocabulary WHERE surface >= ? AND surface < ?",
-                    arrayOf(prefix, prefix + "\uffff"),
-                )
-            }
-        }
-    }
-
     @Test
     fun nativePagesUnloadedPrefixExplicitRetrySettingsAndRecreation() {
         idle()
@@ -406,9 +225,9 @@ class VocabularyProductionTest {
     }
 
     @Test
-    fun composeBulkChangesRefreshStatisticsLibraryAndEffectiveReaderWithoutRescanning() {
+    fun composeStatusChangesRefreshStatisticsLibraryAndEffectiveReaderWithoutRescanning() {
         idle()
-        val title = "Bulk-refresh-${System.nanoTime()}"
+        val title = "Status-refresh-${System.nanoTime()}"
         compose.runOnUiThread { core().dispatch(Event.CreatePaste("$title\n猫 猫 犬")) }
         idle()
         val id = checkNotNull(core().view.importSummary).documentId
@@ -421,9 +240,11 @@ class VocabularyProductionTest {
         visit()
         search("猫")
         val cat = core().view.vocabulary.rows.single { it.surface == "猫" }
-        compose.onNodeWithTag("vocabulary_row_${cat.id.value}").performTouchInput { longClick() }
-        requestStatus(VocabularyStatus.LEARNING)
-        compose.onNodeWithTag("vocabulary_confirm_bulk").performClick()
+        compose.onNodeWithTag("vocabulary_row_${cat.id.value}").performClick()
+        idle()
+        compose.onNodeWithTag("word_status_LEARNING").performClick()
+        idle()
+        compose.onNodeWithTag("word_status_LEARNING").performClick()
         idle()
         assertEquals(
             VocabularyStatus.LEARNING,

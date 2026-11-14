@@ -50,8 +50,8 @@ struct Migration {
 
 const MIGRATIONS: &[Migration] = &[Migration {
     version: 1,
-    name: "0001_simplified_initial_schema",
-    sql: include_str!("../migrations/0001_simplified_initial_schema.sql"),
+    name: "0001_base_text_initial_schema",
+    sql: include_str!("../migrations/0001_base_text_initial_schema.sql"),
 }];
 
 /// Failures are returned to the runtime; opening never resets a database.

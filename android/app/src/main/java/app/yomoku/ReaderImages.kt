@@ -36,7 +36,6 @@ import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.DpSize
 import app.yomoku.shared.ReaderInlineImage
 import app.yomoku.shared.ReaderPage
-import app.yomoku.shared.ReaderRuby
 import app.yomoku.shared.ReaderTypography
 
 internal sealed interface ReaderImagePart {
@@ -51,7 +50,6 @@ private fun ReaderTextBlock(
     text: AnnotatedString,
     typography: ReaderTypography?,
     modifier: Modifier,
-    ruby: List<ReaderDisplayRuby> = emptyList(),
 ) {
     val original = LocalViewConfiguration.current
     val configuration =
@@ -85,7 +83,7 @@ private fun ReaderTextBlock(
                     }
             }
         if (text.length <= 1024 || !canSplit) {
-            ReaderRubyText(text, style, ruby, modifier)
+            ReaderHighlightedText(text, style, modifier)
         } else {
             // Measure once without creating link nodes, then bound each interactive layout.
             // Split at visual line ends so this does not add logical pages or hard breaks.
@@ -103,10 +101,9 @@ private fun ReaderTextBlock(
                             remember(text, range) {
                                 text.subSequence(range.first, range.last + 1)
                             }
-                        ReaderRubyText(
+                        ReaderHighlightedText(
                             block,
                             style,
-                            ruby.mapNotNull { it.clip(range.first, range.last + 1) },
                             if (index == 0) modifier
                             else Modifier.testTag("reader_text_block_${range.first}"),
                         )
@@ -161,16 +158,13 @@ internal fun ReaderImageContent(
     text: AnnotatedString,
     loader: EpubImageLoader?,
     typography: ReaderTypography? = null,
-    furigana: List<ReaderRuby> = emptyList(),
 ) {
     val parts = remember(page.text, page.images) { readerImageParts(page.text, page.images) }
-    val ruby = remember(page.text, furigana) { readerDisplayRuby(page.text, furigana).orEmpty() }
     if (parts == null || page.images.isEmpty()) {
         ReaderTextBlock(
             text,
             typography,
             modifier = Modifier.testTag("reader_text"),
-            ruby = ruby,
         )
         return
     }
@@ -205,7 +199,6 @@ internal fun ReaderImageContent(
                         text.subSequence(part.start, part.end),
                         typography,
                         modifier = Modifier.testTag("reader_text_${part.start}"),
-                        ruby = ruby.mapNotNull { it.clip(part.start, part.end) },
                     )
                 is ReaderImagePart.Image -> {
                     val reference = page.images[part.index]

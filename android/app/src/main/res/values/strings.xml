@@ -63,16 +63,6 @@
     <string name="vocabulary_sort_frequency">Frequency</string>
     <string name="vocabulary_sort_last_seen">Last seen</string>
     <string name="vocabulary_sort_alphabetical">Alphabetical</string>
-    <string name="vocabulary_select_word">Select word</string>
-    <string name="vocabulary_select_all">Select All</string>
-    <string name="vocabulary_selected">Selected words: %1$s</string>
-    <string name="vocabulary_change_status">Change status</string>
-    <string name="vocabulary_confirm_title">Confirm vocabulary change</string>
-    <string name="vocabulary_confirm">Confirm</string>
-    <string name="vocabulary_status_confirmation">Change selected words (%1$s) to %2$s?</string>
-    <string name="vocabulary_capture_error">Matching words could not be selected. Retry or cancel.</string>
-    <string name="vocabulary_bulk_error">The vocabulary change could not be saved. Retry the same selection or cancel.</string>
-    <string name="reader_furigana">Furigana</string>
     <string name="reader_typography_description">Font size and line spacing apply to all documents. Your reading position stays the same.</string>
     <string name="reader_font_size">Font size: %1$d</string>
     <string name="reader_line_spacing">Line spacing: %1$d%%</string>

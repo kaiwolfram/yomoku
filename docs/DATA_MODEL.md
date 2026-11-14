@@ -1,14 +1,14 @@
 # Data model
 
-The authoritative SQL is [0001_simplified_initial_schema.sql](../crates/yomoku-storage/migrations/0001_simplified_initial_schema.sql).
-The release schema version is **1**, journal name `0001_simplified_initial_schema`.
-It has **27 application tables** plus SQLite's internal `sqlite_sequence` table.
+The authoritative SQL is [0001_base_text_initial_schema.sql](../crates/yomoku-storage/migrations/0001_base_text_initial_schema.sql).
+The release schema version is **1**, journal name `0001_base_text_initial_schema`.
+It has **26 application tables** plus SQLite's internal `sqlite_sequence` table.
 Earlier development schemas and journals are unsupported, including the previous
 schema-1 journal. They are rejected without migration or modification.
 
 | Area | Tables |
 | --- | --- |
-| Content | `sources`, `chapters`, `documents`, `chapter_texts`, `paste_content_hashes`, `imported_files`, `source_ruby`, `epub_documents`, `epub_chapters`, `epub_spans`, `epub_assets`, `epub_inline_images` |
+| Content | `sources`, `chapters`, `documents`, `chapter_texts`, `paste_content_hashes`, `imported_files`, `epub_documents`, `epub_chapters`, `epub_spans`, `epub_assets`, `epub_inline_images` |
 | Analysis and vocabulary | `chapter_analyses`, `analyzed_tokens`, `vocabulary`, `vocabulary_status_events` |
 | Progress and history | `reading_positions`, `library_read_clock`, `completion_commands`, `effective_completion_commands`, `reading_completions`, `completion_analyses`, `reading_occurrences` |
 | Settings and schema | `reader_settings`, `anki_settings`, `statistics_settings`, `schema_migrations` |
@@ -30,13 +30,14 @@ encoding; EPUB retains asset metadata/bytes and ordered spine chapters. Paste
 SHA-256 is saved in the same transaction as the paste; imported-file identities use
 original bytes. Duplicate imports preserve existing title, status and progress.
 Deletion removes live content while preserving supported historical provenance.
-Only individually confirmed document deletion is supported; vocabulary bulk
-actions retain their separate history-erasure semantics.
+Only individually confirmed document deletion is exposed in the app. Vocabulary
+rows open word sheets with individual status controls; there is no bulk action.
 
 SRT cue parsing is transient: canonical text preserves blank-line separators.
 EPUB stores heading/emphasis/strong and HTTP(S) link spans. Internal and unsupported
 links contribute visible text without annotation rows. Original bytes, saved
-encoding/hashes, source ruby, images and history remain durable.
+encoding/hashes, images and history remain durable. Recognized EPUB/Aozora reading
+annotations are discarded while preserving their base text; no ruby metadata is stored.
 
 Offsets are UTF-8 byte positions at scalar boundaries, never UTF-16 indices.
 Analysis headers retain engine/dictionary profile and A/B/C mode; indexed tokens
@@ -71,7 +72,7 @@ durations or pending-time state are persisted.
 ## Settings
 
 The singleton reader settings default to 250 characters, 16 sp font, 150% line
-spacing and furigana off. The 250-character seed applies only to fresh databases; saved
+spacing. The 250-character seed applies only to fresh databases; saved
 preferences, including 500 and legacy 1,500, survive reopening without migration
 or automatic reflow. Page length is independent of typography. Library read
 recency uses a persisted monotonic sequence.

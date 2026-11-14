@@ -12,12 +12,10 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
-import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -117,29 +115,6 @@ internal fun SettingsScreen(
                     )
                 )
             }
-        }
-        Row(
-            Modifier.fillMaxWidth()
-                .toggleable(
-                    value = typography?.furigana == true,
-                    enabled = typographyEnabled,
-                    role = Role.Switch,
-                ) { enabled ->
-                    typography?.let {
-                        dispatch(Event.SetReaderTypography(it.copy(furigana = enabled)))
-                    }
-                }
-                .testTag("reader_furigana")
-                .padding(vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween,
-        ) {
-            Text(stringResource(R.string.reader_furigana))
-            Switch(
-                checked = typography?.furigana == true,
-                onCheckedChange = null,
-                enabled = typographyEnabled,
-            )
         }
         Text(
             stringResource(R.string.page_length_title),

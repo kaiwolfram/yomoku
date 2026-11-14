@@ -73,7 +73,6 @@ impl Fixture {
             chapters: vec![chapter],
             formatting: vec![],
             images: vec![],
-            source_ruby: vec![],
         };
         let core = Core::new_with(Yomoku, Model::default());
         let mut effects = core.process_event(Event::OpenReader(document.document_id));
@@ -83,10 +82,7 @@ impl Fixture {
             StorageResult::Loaded(DocumentReaderSnapshot {
                 document: document.clone(),
                 page_length: PageLength::default(),
-                typography: yomoku_core::typography::ReaderTypography {
-                    furigana: true,
-                    ..Default::default()
-                },
+                typography: yomoku_core::typography::ReaderTypography::default(),
                 analyses: vec![ReaderChapterAnalysis {
                     chapter_id: document.chapters[0].chapter_id,
                     analysis: ReaderAnalysis::Available(4.try_into().unwrap()),
@@ -237,9 +233,8 @@ fn resolve(core: &Core<Yomoku>, effects: &mut [Effect], result: StorageResult) -
 }
 
 #[test]
-fn effective_application_loads_compact_page_and_uses_exact_furigana_without_legacy_writes() {
+fn effective_application_loads_compact_page_without_legacy_writes() {
     let f = Fixture::new(false);
-    assert!(f.core.view().reader_furigana.is_empty());
     let identity = f.load();
     let view = f.core.view();
     let tokens = view.effective_reader_tokens.unwrap().tokens;
@@ -251,7 +246,6 @@ fn effective_application_loads_compact_page_and_uses_exact_furigana_without_lega
         ["猫", "犬", "𠮷か\u{3099}\0"]
     );
     assert!(tokens[0].reading.is_some() && tokens[1].reading.is_some());
-    assert_eq!(view.reader_furigana.len(), 3); // exact analyzed word, never borrowed B for 猫/犬
     let _page = view.reader.unwrap();
     let mut effects = f.core.process_event(f.complete(identity));
     let (mut effects, prepared) = f.prepare(&mut effects);
@@ -554,7 +548,7 @@ fn accepted_failed_completion_blocks_typography_and_imports_until_explicit_retry
     }
     f.core.process_event(Event::OpenSettings);
     let typography = yomoku_core::typography::ReaderTypography {
-        furigana: true,
+        font_size: yomoku_core::typography::ReaderFontSize::Sp24,
         ..Default::default()
     };
     assert!(f

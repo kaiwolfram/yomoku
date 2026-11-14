@@ -1,8 +1,8 @@
 use roxmltree::{Document, Node};
 
 use super::{
-    archive::resolve, plain_text, EpubChapter, EpubError, EpubLimits, EpubSpan, InlineImage,
-    Result, SourceRuby, SpanKind, XHTML,
+    archive::resolve, EpubChapter, EpubError, EpubLimits, EpubSpan, InlineImage, Result, SpanKind,
+    XHTML,
 };
 
 pub(super) fn extract(
@@ -22,7 +22,6 @@ pub(super) fn extract(
         chapter: EpubChapter {
             path: path.to_owned(),
             text: String::new(),
-            ruby: Vec::new(),
             spans: Vec::new(),
             images: Vec::new(),
         },
@@ -35,10 +34,6 @@ pub(super) fn extract(
         .chapter
         .spans
         .sort_by_key(|span| (span.range.start, span.range.end));
-    output
-        .chapter
-        .ruby
-        .sort_by_key(|ruby| (ruby.range.start, ruby.range.end));
     Ok(output.chapter)
 }
 
@@ -46,7 +41,6 @@ pub(super) fn image_chapter(path: &str) -> EpubChapter {
     EpubChapter {
         path: path.to_owned(),
         text: "\u{fffc}".to_owned(),
-        ruby: Vec::new(),
         spans: Vec::new(),
         images: vec![InlineImage {
             range: 0..3,
@@ -217,21 +211,6 @@ impl Output {
                     range: range.clone(),
                     kind,
                 });
-            }
-            if name == "ruby" {
-                let reading: String = node
-                    .descendants()
-                    .filter(|n| n.has_tag_name((XHTML, "rt")))
-                    .filter(|n| {
-                        !n.ancestors()
-                            .take_while(|ancestor| *ancestor != node)
-                            .any(|a| a.has_tag_name((XHTML, "rtc")))
-                    })
-                    .map(plain_text)
-                    .collect();
-                if !reading.is_empty() {
-                    self.chapter.ruby.push(SourceRuby { range, reading });
-                }
             }
         }
         if block {

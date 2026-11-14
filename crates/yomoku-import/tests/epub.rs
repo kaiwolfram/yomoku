@@ -89,8 +89,6 @@ fn extracts_fixture_in_spine_order_with_metadata_and_canonical_ranges() {
             include_str!("fixtures/epub/first-expected.txt").trim_end_matches('\n')
         );
         assert_eq!(document.chapters[1].text, "第二章\n\n別の章。");
-        assert_eq!(&first.text[first.ruby[0].range.clone()], "東京");
-        assert_eq!(first.ruby[0].reading, "とうきょう");
         assert_eq!(document.cover.as_deref(), Some("OPS/images/cover.png"));
         assert_eq!(document.images.len(), 2);
         assert_eq!(
@@ -152,12 +150,6 @@ fn source_ruby_readings_and_parentheses_never_enter_base_text() {
     let document = parse(&with_body("<p>𠮷😀<ruby><rb>東</rb><rt>とう</rt><rb>京</rb><rt>きょう</rt><rtc><rt>Tokyo</rt></rtc></ruby>と<ruby>漢字<rp>(</rp><rt>かんじ</rt><rp>)</rp></ruby>。</p>")).unwrap();
     let chapter = &document.chapters[0];
     assert_eq!(chapter.text, "𠮷😀東京と漢字。");
-    let ruby: Vec<_> = chapter
-        .ruby
-        .iter()
-        .map(|ruby| (&chapter.text[ruby.range.clone()], ruby.reading.as_str()))
-        .collect();
-    assert_eq!(ruby, [("東京", "とうきょう"), ("漢字", "かんじ")]);
 }
 
 #[test]
@@ -550,11 +542,7 @@ fn many_paragraphs_and_nested_annotations_keep_valid_byte_ranges() {
     ))
     .unwrap();
     let chapter = &document.chapters[0];
-    assert_eq!(chapter.ruby.len(), 10_000);
     assert_eq!(chapter.spans.len(), 10_000);
-    for ruby in &chapter.ruby {
-        assert_eq!(&chapter.text[ruby.range.clone()], "漢字");
-    }
     for span in &chapter.spans {
         assert_eq!(&chapter.text[span.range.clone()], "漢字");
     }

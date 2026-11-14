@@ -11,21 +11,19 @@ use yomoku_core::{
     },
     pagination::ReadingPosition,
 };
-use yomoku_import::{
-    epub::{self, EpubChapter, EpubError, EpubImage, EpubSpan, InlineImage, SpanKind},
-    txt::SourceRuby,
+use yomoku_import::epub::{
+    self, EpubChapter, EpubError, EpubImage, EpubSpan, InlineImage, SpanKind,
 };
 
 use crate::{
-    files::find_imported_in, imports::store_analyzed_chapter_in, txt::validate_ruby,
-    ImportCancellation, Storage, StorageError,
+    files::find_imported_in, imports::store_analyzed_chapter_in, ImportCancellation, Storage,
+    StorageError,
 };
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct StoredEpubChapter {
     pub chapter: ChapterText,
     pub path: String,
-    pub ruby: Vec<SourceRuby>,
     pub spans: Vec<EpubSpan>,
     pub images: Vec<InlineImage>,
 }
@@ -226,7 +224,6 @@ impl Storage {
                 chapters.push(StoredEpubChapter {
                     chapter,
                     path: content.path,
-                    ruby: content.ruby,
                     spans: content.spans,
                     images: content.images,
                 });
@@ -275,12 +272,8 @@ fn store_content(
     content: &EpubChapter,
 ) -> Result<(), StorageError> {
     let id = i64::from(chapter_id);
-    connection.execute("INSERT INTO epub_chapters (chapter_id, document_id, path, text_sha256, ruby_count, span_count, image_count) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
-        (id, i64::from(document_id), &content.path, Sha256::digest(content.text.as_bytes()).as_slice(), number(content.ruby.len())?, number(content.spans.len())?, number(content.images.len())?))?;
-    for (index, ruby) in content.ruby.iter().enumerate() {
-        connection.execute("INSERT INTO source_ruby (chapter_id, ruby_index, start_byte, end_byte, reading) VALUES (?1, ?2, ?3, ?4, ?5)",
-            (id, number(index)?, number(ruby.range.start)?, number(ruby.range.end)?, &ruby.reading))?;
-    }
+    connection.execute("INSERT INTO epub_chapters (chapter_id, document_id, path, text_sha256, span_count, image_count) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+        (id, i64::from(document_id), &content.path, Sha256::digest(content.text.as_bytes()).as_slice(), number(content.spans.len())?, number(content.images.len())?))?;
     for (index, span) in content.spans.iter().enumerate() {
         let (kind, level, target) = match &span.kind {
             SpanKind::Heading(level) => ("heading", Some(i64::from(*level)), None),
@@ -361,7 +354,7 @@ pub(crate) fn load_epub_in(
     }
     // Start from provenance so a missing live chapter/metadata row cannot silently
     // omit a spine item or reinterpret another source's chapter as this book.
-    let mut statement = connection.prepare("SELECT c.id, c.chapter_index, t.text, e.path, e.text_sha256, e.ruby_count, e.span_count, e.image_count, e.document_id FROM chapters c LEFT JOIN chapter_texts t ON t.chapter_id = c.id LEFT JOIN epub_chapters e ON e.chapter_id = c.id WHERE c.source_id = ?1 ORDER BY c.chapter_index")?;
+    let mut statement = connection.prepare("SELECT c.id, c.chapter_index, t.text, e.path, e.text_sha256, e.span_count, e.image_count, e.document_id FROM chapters c LEFT JOIN chapter_texts t ON t.chapter_id = c.id LEFT JOIN epub_chapters e ON e.chapter_id = c.id WHERE c.source_id = ?1 ORDER BY c.chapter_index")?;
     let rows = statement.query_map([i64::from(source_id)], |row| {
         Ok((
             row.get::<_, i64>(0)?,
@@ -372,22 +365,11 @@ pub(crate) fn load_epub_in(
             row.get::<_, Option<i64>>(5)?,
             row.get::<_, Option<i64>>(6)?,
             row.get::<_, Option<i64>>(7)?,
-            row.get::<_, Option<i64>>(8)?,
         ))
     })?;
     let mut chapters = Vec::new();
     for (index, row) in rows.enumerate() {
-        let (
-            chapter_id,
-            stored_index,
-            text,
-            path,
-            digest,
-            ruby_count,
-            span_count,
-            image_count,
-            owner,
-        ) = row?;
+        let (chapter_id, stored_index, text, path, digest, span_count, image_count, owner) = row?;
         let text = text.ok_or(StorageError::InvalidDocument)?;
         if stored_index != number(index)?
             || owner != Some(i64::from(document_id))
@@ -403,8 +385,7 @@ pub(crate) fn load_epub_in(
             path.ok_or(StorageError::InvalidDocument)?,
             text,
         )?;
-        if ruby_count != Some(number(content.ruby.len())?)
-            || span_count != Some(number(content.spans.len())?)
+        if span_count != Some(number(content.spans.len())?)
             || image_count != Some(number(content.images.len())?)
             || content
                 .images
@@ -421,7 +402,6 @@ pub(crate) fn load_epub_in(
                 text: content.text,
             },
             path: content.path,
-            ruby: content.ruby,
             spans: content.spans,
             images: content.images,
         });
@@ -479,11 +459,9 @@ fn read_content(
     let mut content = EpubChapter {
         path,
         text,
-        ruby: Vec::new(),
         spans: Vec::new(),
         images: Vec::new(),
     };
-    content.ruby = crate::txt::load_source_ruby_in(connection, chapter_id, &content.text)?;
     let mut statement = connection.prepare("SELECT span_index, start_byte, end_byte, kind, heading_level, target FROM epub_spans WHERE chapter_id = ?1 ORDER BY span_index")?;
     let rows = statement.query_map([id], |row| {
         Ok((
@@ -536,7 +514,6 @@ fn validate_content(content: &EpubChapter) -> Result<(), StorageError> {
     if content.path.is_empty() || content.text.trim().is_empty() {
         return Err(StorageError::InvalidDocument);
     }
-    validate_ruby(&content.text, &content.ruby)?;
     for span in &content.spans {
         if span.range.is_empty() || content.text.get(span.range.clone()).is_none() {
             return Err(StorageError::InvalidDocument);

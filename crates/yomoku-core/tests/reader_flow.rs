@@ -530,7 +530,6 @@ fn typography_list_load_and_late_save_do_not_restore_closed_reader() {
     let core = Core::<Yomoku>::new();
     let typography = ReaderTypography {
         font_size: ReaderFontSize::Sp20,
-        furigana: true,
         ..Default::default()
     };
     let mut effects = core.process_event(Event::RefreshLibrary);
@@ -647,7 +646,6 @@ fn typography_requires_loaded_settings_commits_before_publish_and_preserves_read
     let typography = ReaderTypography {
         font_size: ReaderFontSize::Sp24,
         line_spacing: ReaderLineSpacing::Percent200,
-        furigana: true,
     };
     core.process_event(Event::OpenSettings);
     assert!(core

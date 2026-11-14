@@ -653,15 +653,11 @@ fn srt_event(bytes: &[u8], encoding: Option<TextEncoding>) -> Event {
 fn file_totals(path: &PathBuf) -> Vec<i64> {
     let connection = Connection::open(path).unwrap();
     let mut counts = totals(path);
-    for table in ["imported_files", "source_ruby"] {
-        counts.push(
-            connection
-                .query_row(&format!("SELECT COUNT(*) FROM {table}"), [], |row| {
-                    row.get(0)
-                })
-                .unwrap(),
-        );
-    }
+    counts.push(
+        connection
+            .query_row("SELECT COUNT(*) FROM imported_files", [], |row| row.get(0))
+            .unwrap(),
+    );
     counts
 }
 
@@ -1082,7 +1078,6 @@ fn txt_duplicates_after_reopen_preserve_source_status_progress_and_skip_unavaila
         .unwrap()
         .unwrap();
     let source = storage.load_txt_source(id).unwrap().unwrap();
-    assert_eq!(source.ruby[0].reading, "よし");
     assert_eq!(source.original_bytes, bytes);
     let before = file_totals(&database.path());
     lifecycle.set_foreground(false).unwrap();
@@ -1139,7 +1134,7 @@ fn txt_loader_analysis_and_invalid_output_failures_preserve_completed_files_and_
                 DocumentError::Unavailable
             })
         );
-        assert_eq!(file_totals(&database.path()), vec![0; 14]);
+        assert_eq!(file_totals(&database.path()), vec![0; 13]);
     }
     failure.store(0, Ordering::Relaxed);
     let created = dispatch(
@@ -1177,7 +1172,6 @@ fn txt_each_write_and_commit_failure_is_atomic_through_worker() {
         "documents",
         "chapter_texts",
         "imported_files",
-        "source_ruby",
         "chapter_analyses",
         "analyzed_tokens",
         "vocabulary",
@@ -1248,7 +1242,7 @@ fn background_and_close_drain_atomic_import_and_reject_duplicate_callbacks(
             other => panic!("{other:?}"),
         };
         assert_eq!(trace.recv_timeout(TIMEOUT).unwrap(), Trace::Analyze(worker));
-        assert_eq!(file_totals(&database.path()), vec![0; 14]);
+        assert_eq!(file_totals(&database.path()), vec![0; 13]);
         assert!(router.update(event, |_| unreachable!()).is_empty());
         lifecycle.set_foreground(false).unwrap();
         let router = if close {

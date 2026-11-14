@@ -24,7 +24,7 @@ class LibraryPresentationTest {
     fun emptyStateIsCenteredBelowMessagesAndUsesThemeColors() {
         val dark = mutableStateOf(false)
         val view =
-            frozenScalarView(emptyList())
+            scalarVocabularyView(emptyList())
                 .copy(
                     destination = Destination.LIBRARY,
                     libraryWordError = DocumentError.UNAVAILABLE,
@@ -78,7 +78,9 @@ class LibraryPresentationTest {
                 )
             }
         val frame =
-            mutableStateOf(frozenScalarView(emptyList()).copy(destination = Destination.LIBRARY))
+            mutableStateOf(
+                scalarVocabularyView(emptyList()).copy(destination = Destination.LIBRARY)
+            )
         val events = mutableListOf<Event>()
         compose.setContent {
             MaterialTheme {
@@ -118,7 +120,7 @@ class LibraryPresentationTest {
                 )
             }
         val view =
-            frozenScalarView(emptyList())
+            scalarVocabularyView(emptyList())
                 .copy(
                     destination = Destination.LIBRARY,
                     documents = books,

@@ -231,160 +231,30 @@ class VocabularyScreenTest {
     }
 
     @Test
-    fun selectionMembershipFollowsIdsAcrossRowSortAndEqualSizeReplacement() {
+    fun rowTapOpensWordAndLongPressHasNoSelectionAction() {
         frame.value =
             frame.value.copy(
                 vocabulary =
                     frame.value.vocabulary.copy(
-                        matchingCount = 3UL,
-                        rows = listOf(Long.MAX_VALUE, 7L, 1L).map(::vocabularyRow),
-                        selection = listOf(VocabularyId(1), VocabularyId(Long.MAX_VALUE)),
-                    )
-            )
-        render()
-        val search = compose.onNodeWithTag("vocabulary_search").getUnclippedBoundsInRoot()
-        val actions = compose.onNodeWithTag("vocabulary_selected_count").getUnclippedBoundsInRoot()
-        val filters = compose.onNodeWithTag("vocabulary_status_NEW").getUnclippedBoundsInRoot()
-        assertTrue(search.bottom <= actions.top)
-        assertTrue(actions.bottom <= filters.top)
-        compose.onNodeWithTag("vocabulary_scroll").performScrollToKey(Long.MAX_VALUE)
-        compose.onNodeWithTag("vocabulary_row_${Long.MAX_VALUE}").assertIsSelected()
-        compose.onNodeWithTag("vocabulary_row_7").assertIsNotSelected()
-        compose.onNodeWithTag("vocabulary_row_1").assertIsSelected()
-        compose.runOnUiThread {
-            frame.value =
-                frame.value.copy(
-                    vocabulary =
-                        frame.value.vocabulary.copy(
-                            selection = listOf(VocabularyId(7), VocabularyId(Long.MAX_VALUE))
-                        )
-                )
-        }
-        compose.onNodeWithTag("vocabulary_selected_count").assertTextEquals("Selected words: 2")
-        compose.onNodeWithTag("vocabulary_row_${Long.MAX_VALUE}").assertIsSelected()
-        compose.onNodeWithTag("vocabulary_row_7").assertIsSelected()
-        compose.onNodeWithTag("vocabulary_row_1").assertIsNotSelected().performClick()
-        assertEquals(Event.ToggleVocabularySelection(VocabularyId(1)), events.last())
-    }
-
-    @Test
-    fun rowSelectionAllStatusesAndConfirmationEchoTheRetainedCommand() {
-        frame.value =
-            frame.value.copy(
-                vocabulary =
-                    frame.value.vocabulary.copy(
-                        matchingCount = 205UL,
+                        matchingCount = 1UL,
                         rows = listOf(vocabularyRow(1)),
                     )
             )
         render()
-        compose.onNodeWithTag("vocabulary_select_all").assertDoesNotExist()
         compose.onNodeWithTag("vocabulary_row_1").performClick()
         assertEquals(Event.OpenVocabularyWord(VocabularyId(1)), events.last())
-        compose.onNodeWithTag("vocabulary_row_1").performTouchInput { longClick() }
-        assertEquals(Event.ToggleVocabularySelection(VocabularyId(1)), events.last())
-        compose.runOnUiThread {
-            frame.value =
-                frame.value.copy(
-                    vocabulary =
-                        frame.value.vocabulary.copy(
-                            selection = listOf(VocabularyId(1), VocabularyId(999))
-                        )
-                )
-        }
-        compose.onNodeWithTag("vocabulary_selected_count").assertTextEquals("Selected words: 2")
-        compose.onNodeWithTag("vocabulary_scroll").performScrollToKey(1L)
-        compose.onNodeWithTag("vocabulary_row_1").assertIsSelected().performClick()
-        assertEquals(Event.ToggleVocabularySelection(VocabularyId(1)), events.last())
-        compose.onNodeWithTag("vocabulary_select_all").performScrollTo().performClick()
-        assertEquals(Event.SelectAllVocabulary, events.last())
-        VocabularyStatus.entries.forEach { status ->
-            compose.onNodeWithTag("vocabulary_change_status").performScrollTo().performClick()
-            val before = System.currentTimeMillis()
-            compose.onNodeWithTag("vocabulary_bulk_status_${status.name}").performClick()
-            val requested =
-                (events.last() as Event.RequestVocabularyBulkAction).value
-                    as VocabularyBulkAction.SetStatus
-            assertEquals(status, requested.status)
-            assertTrue(requested.occurredAtUnixMs in before..System.currentTimeMillis())
-            val frozen =
-                VocabularyBulkCommand(
-                    listOf(VocabularyId(1), VocabularyId(999)),
-                    VocabularyBulkAction.SetStatus(status, 9_007_199_254_740_993L),
-                )
-            compose.runOnUiThread {
-                frame.value =
-                    frame.value.copy(
-                        vocabulary = frame.value.vocabulary.copy(confirmation = frozen)
-                    )
-            }
-            compose.onNodeWithTag("vocabulary_confirm_bulk").performClick()
-            assertEquals(Event.ConfirmVocabularyBulkAction(frozen), events.last())
-            compose.onNodeWithTag("vocabulary_cancel_bulk").performClick()
-            assertEquals(Event.CancelVocabularyBulkAction, events.last())
-            compose.runOnUiThread {
-                frame.value =
-                    frame.value.copy(vocabulary = frame.value.vocabulary.copy(confirmation = null))
-            }
-        }
-        compose.onNodeWithTag("vocabulary_delete_selected").assertDoesNotExist()
-        compose.runOnUiThread { compose.activity.onBackPressedDispatcher.onBackPressed() }
-        compose.waitForIdle()
-        assertEquals(Event.CancelVocabularySelection, events.last())
-    }
-
-    @Test
-    fun captureAndWriteFailuresRequireExplicitRetainedRetryAndGatePendingWork() {
-        frame.value =
-            frame.value.copy(
-                vocabulary =
-                    frame.value.vocabulary.copy(
-                        matchingCount = 205UL,
-                        rows = listOf(vocabularyRow(1)),
-                        selection = listOf(VocabularyId(1)),
-                        bulkError = DocumentError.UNAVAILABLE,
-                    )
-            )
-        render()
+        events.clear()
         compose
-            .onNodeWithTag("vocabulary_bulk_error")
-            .assertTextEquals("Matching words could not be selected. Retry or cancel.")
-        compose.onNodeWithTag("vocabulary_confirm_bulk").performClick()
-        assertEquals(Event.RetryVocabularySelection, events.last())
-        compose.onNodeWithTag("vocabulary_cancel_bulk").performClick()
-        assertEquals(Event.CancelVocabularySelection, events.last())
-        val command =
-            VocabularyBulkCommand(
-                listOf(VocabularyId(1)),
-                VocabularyBulkAction.SetStatus(VocabularyStatus.KNOWN, 999L),
-            )
-        compose.runOnUiThread {
-            frame.value =
-                frame.value.copy(vocabulary = frame.value.vocabulary.copy(confirmation = command))
-        }
-        compose.onNodeWithText("Change selected words (1) to Known?").assertExists()
-        compose.onNodeWithTag("vocabulary_confirm_bulk").performClick()
-        assertEquals(Event.RetryVocabularyBulkAction, events.last())
-        val count = events.size
-        compose.runOnUiThread { frame.value = frame.value.copy(storageBusy = true) }
-        compose.onNodeWithTag("vocabulary_confirm_bulk").assertIsNotEnabled()
-        compose.onNodeWithTag("vocabulary_cancel_bulk").assertIsNotEnabled()
-        compose.mainClock.advanceTimeBy(1000)
-        assertEquals(count, events.size)
-        compose.runOnUiThread {
-            frame.value =
-                frame.value.copy(
-                    vocabulary =
-                        frame.value.vocabulary.copy(
-                            confirmation = null,
-                            bulkError = null,
-                            selectingAll = true,
-                        )
+            .onNodeWithTag("vocabulary_row_1")
+            .assert(
+                SemanticsMatcher.keyNotDefined(
+                    androidx.compose.ui.semantics.SemanticsActions.OnLongClick
                 )
-        }
-        compose.onNodeWithTag("vocabulary_confirm_bulk").assertDoesNotExist()
-        compose.onNodeWithTag("vocabulary_cancel_bulk").assertIsNotEnabled()
-        assertEquals(count, events.size)
+            )
+        compose.onNodeWithTag("vocabulary_row_1").performTouchInput { longClick() }
+        assertTrue(events.all { it == Event.OpenVocabularyWord(VocabularyId(1)) })
+        compose.onNodeWithTag("vocabulary_select_all").assertDoesNotExist()
+        compose.onNodeWithTag("vocabulary_selected_count").assertDoesNotExist()
     }
 
     @Test
@@ -475,7 +345,6 @@ private fun vocabularyView() =
             VocabularyState(
                 VocabularyQuery("", VocabularyStatus.entries.toList(), VocabularySort.NEWEST),
                 rows = emptyList(),
-                selectingAll = false,
                 loading = false,
             ),
         statistics = StatisticsState(StatisticsTimeframe.LASTWEEK, loading = false),
@@ -486,5 +355,4 @@ private fun vocabularyView() =
         storageBusy = false,
         contentRoute = ContentRoute.MAIN,
         completionSavePending = false,
-        readerFurigana = emptyList(),
     )

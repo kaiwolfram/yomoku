@@ -13,7 +13,7 @@ import org.junit.runner.RunWith
 class ScalarDecodingTest {
     @Test fun scalarValuesErrorsAndOffsetsMatchLegacy() = verifyScalarDecoding()
 
-    @Test fun generatedFrozenSnapshotsMatchLegacy() = verifyScalarSnapshots()
+    @Test fun generatedSnapshotsMatchLegacy() = verifyScalarSnapshots()
 
     @Test
     fun measureLegacyAndGenerated() {
@@ -26,7 +26,7 @@ class ScalarDecodingTest {
         val size = (args.getString("yomokuVocabularyEntries") ?: "100000").toInt()
         require(size in 1..100_000)
         val ids = scalarIds(size)
-        val view = frozenScalarView(ids)
+        val view = scalarVocabularyView(ids)
         fun emit(line: String) =
             instrumentation.sendStatus(0, Bundle().apply { putString("stream", "$line\n") })
         fun allocated() = checkNotNull(Debug.getRuntimeStat("art.gc.bytes-allocated")).toLong()
@@ -40,7 +40,7 @@ class ScalarDecodingTest {
                 MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") {
                     "%02x".format(it)
                 }
-            emit("SCALAR_PAYLOAD,${if (snapshot) "frozen" else "list"},${bytes.size},$digest")
+            emit("SCALAR_PAYLOAD,${if (snapshot) "view" else "list"},${bytes.size},$digest")
             for (iteration in -4 until 8) {
                 val results = mutableListOf<Any>()
                 val samples = mutableListOf<String>()
@@ -57,7 +57,7 @@ class ScalarDecodingTest {
                         val allocation = allocated() - before
                         check(nanos >= 0 && allocation >= 0)
                         samples.add(
-                            "SCALAR,$size,${if (snapshot) "frozen" else "list"},$iteration,$order,${if (legacy) "legacy" else "generated"},${bytes.size},${nanos / 1e6},$allocation"
+                            "SCALAR,$size,${if (snapshot) "view" else "list"},$iteration,$order,${if (legacy) "legacy" else "generated"},${bytes.size},${nanos / 1e6},$allocation"
                         )
                     }
                     results.add(actual)

@@ -4,10 +4,10 @@ use rusqlite::{types::ValueRef, Connection, Row};
 use sha2::{Digest, Sha256};
 use yomoku_import::{
     srt,
-    txt::{self, SourceRuby, TextEncoding},
+    txt::{self, TextEncoding},
 };
 
-use super::{analyses::slice, check_cancelled, CandidateError};
+use super::{check_cancelled, CandidateError};
 
 pub(super) fn check(
     connection: &Connection,
@@ -16,7 +16,6 @@ pub(super) fn check(
     check_pastes(connection, cancelled)?;
 
     check_files(connection, cancelled)?;
-    check_ruby(connection, cancelled)?;
 
     let mut statement = connection.prepare(
         "SELECT s.kind, e.document_id FROM main.documents d
@@ -66,7 +65,7 @@ fn check_files(
 ) -> Result<(), CandidateError> {
     let mut statement = connection.prepare(
         "SELECT s.kind, f.document_id, f.sha256, f.original_bytes, f.text_encoding,
-                c.id, t.text
+                t.text
          FROM main.documents d JOIN main.sources s ON s.id = d.source_id
          LEFT JOIN main.imported_files f ON f.document_id = d.id
          JOIN main.chapters c ON c.source_id = s.id AND c.chapter_index = 0
@@ -94,8 +93,7 @@ fn check_files(
             "shift_jis" => TextEncoding::ShiftJis,
             _ => return Err(CandidateError::InvalidData),
         };
-        let chapter = row.get::<_, i64>(5)?;
-        let canonical = text(row, 6)?;
+        let canonical = text(row, 5)?;
         check_cancelled(cancelled)?;
         // Pure adapters derive expected content using the saved explicit choice.
         // No dedup, analyzer, identity allocation, writes or external resolution.
@@ -105,7 +103,6 @@ fn check_files(
                     txt::parse(bytes, Some(encoding)).map_err(|_| CandidateError::InvalidData)?;
                 check_cancelled(cancelled)?;
                 require(parsed.text == canonical)?;
-                match_ruby(connection, chapter, &parsed.ruby, cancelled)?;
             }
             "srt" => {
                 let (_, decoded) =
@@ -121,69 +118,6 @@ fn check_files(
     Ok(())
 }
 
-fn match_ruby(
-    connection: &Connection,
-    chapter: i64,
-    expected: &[SourceRuby],
-    cancelled: &mut impl FnMut() -> bool,
-) -> Result<(), CandidateError> {
-    let mut statement = connection.prepare(
-        "SELECT ruby_index, start_byte, end_byte, reading FROM main.source_ruby
-         WHERE chapter_id = ?1 ORDER BY ruby_index",
-    )?;
-    let mut rows = statement.query([chapter])?;
-    for (index, expected) in expected.iter().enumerate() {
-        check_cancelled(cancelled)?;
-        let row = rows.next()?.ok_or(CandidateError::InvalidData)?;
-        require(
-            row.get::<_, i64>(0)? == to_i64(index)?
-                && row.get::<_, i64>(1)? == to_i64(expected.range.start)?
-                && row.get::<_, i64>(2)? == to_i64(expected.range.end)?
-                && text(row, 3)? == expected.reading,
-        )?;
-    }
-    require(rows.next()?.is_none())
-}
-
-fn check_ruby(
-    connection: &Connection,
-    cancelled: &mut impl FnMut() -> bool,
-) -> Result<(), CandidateError> {
-    let mut statement = connection.prepare(
-        "SELECT r.chapter_id, s.kind, t.text, r.ruby_index, r.start_byte, r.end_byte, r.reading
-         FROM main.source_ruby r JOIN main.chapters c ON c.id = r.chapter_id
-         JOIN main.sources s ON s.id = c.source_id
-         JOIN main.chapter_texts t ON t.chapter_id = c.id ORDER BY r.chapter_id, r.ruby_index",
-    )?;
-    let mut rows = statement.query([])?;
-    let mut chapter = None;
-    let mut index = 0_i64;
-    let mut previous_end = 0;
-    while let Some(row) = rows.next()? {
-        check_cancelled(cancelled)?;
-        let id = row.get::<_, i64>(0)?;
-        if chapter != Some(id) {
-            chapter = Some(id);
-            index = 0;
-            previous_end = 0;
-        }
-        let start = row.get::<_, i64>(4)?;
-        let end = row.get::<_, i64>(5)?;
-        // Existing validate_ruby permits literal whitespace/NUL readings.
-        require(
-            matches!(text(row, 1)?, "txt" | "epub")
-                && row.get::<_, i64>(3)? == index
-                && start >= previous_end
-                && end > start
-                && !slice(text(row, 2)?, start, end)?.is_empty()
-                && !text(row, 6)?.is_empty(),
-        )?;
-        index = index.checked_add(1).ok_or(CandidateError::InvalidData)?;
-        previous_end = end;
-    }
-    Ok(())
-}
-
 fn check_hash(
     bytes: &[u8],
     expected: &[u8],
@@ -195,10 +129,6 @@ fn check_hash(
         digest.update(chunk);
     }
     require(digest.finalize().as_slice() == expected)
-}
-
-fn to_i64(value: usize) -> Result<i64, CandidateError> {
-    i64::try_from(value).map_err(|_| CandidateError::InvalidData)
 }
 
 fn text<'row>(row: &'row Row<'_>, column: usize) -> Result<&'row str, CandidateError> {
