@@ -14,10 +14,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import app.yomoku.shared.*
@@ -41,51 +39,28 @@ internal fun StatisticsScreen(
     LazyColumn(
         Modifier.fillMaxSize().testTag("statistics_scroll"),
         state = scroll,
-        contentPadding = PaddingValues(16.dp),
+        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        item {
-            var expanded by remember { mutableStateOf(false) }
-            val enabled = !view.storageBusy || state.loading
-            Box {
-                TextButton(
-                    onClick = { expanded = true },
-                    enabled = enabled,
-                    modifier = Modifier.testTag("statistics_timeframe"),
-                ) {
-                    Text(stringResource(state.timeframe.label()))
-                    Spacer(Modifier.width(8.dp))
-                    Icon(
-                        painterResource(R.drawable.ic_arrow_down),
-                        contentDescription = null,
-                        modifier = Modifier.size(16.dp),
-                    )
-                }
-                DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-                    StatisticsTimeframe.entries.forEach { timeframe ->
-                        DropdownMenuItem(
-                            text = { Text(stringResource(timeframe.label())) },
-                            onClick = {
-                                expanded = false
-                                dispatch(
-                                    Event.SetStatisticsTimeframe(
-                                        timeframe,
-                                        System.currentTimeMillis(),
-                                    )
-                                )
-                            },
-                            enabled = enabled,
-                            modifier =
-                                Modifier.testTag("statistics_timeframe_${timeframe.name}")
-                                    .semantics { selected = state.timeframe == timeframe },
+        item(key = "header") {
+            Column(Modifier.testTag("statistics_header")) {
+                SelectionDropdown(
+                    labels = StatisticsTimeframe.entries.associateWith { it.label() },
+                    selection = state.timeframe,
+                    label = stringResource(state.timeframe.label()),
+                    tag = "statistics_timeframe",
+                    enabled = !view.storageBusy || state.loading,
+                    onSelect = { timeframe ->
+                        dispatch(
+                            Event.SetStatisticsTimeframe(timeframe, System.currentTimeMillis())
                         )
-                    }
-                }
+                    },
+                )
+                Text(
+                    stringResource(state.timeframe.grouping()),
+                    style = MaterialTheme.typography.bodySmall,
+                )
             }
-            Text(
-                stringResource(state.timeframe.grouping()),
-                style = MaterialTheme.typography.bodySmall,
-            )
         }
         if (state.loading || (data == null && state.error == null))
             item {

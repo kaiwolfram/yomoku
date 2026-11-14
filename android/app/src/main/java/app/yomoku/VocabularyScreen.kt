@@ -27,8 +27,16 @@ internal fun VocabularyScreen(
 ) {
     val state = view.vocabulary
     val query = state.query
+    // Presentation may retain a successful sort, but pagination always uses core state below.
+    var presentation by
+        remember(sessionKey, query.prefix, query.statuses) {
+            mutableStateOf(VocabularyPresentation(query.sort))
+        }
+    val nextPresentation = presentation.update(state)
+    SideEffect { presentation = nextPresentation }
+    val displayed = nextPresentation.display(state)
     val enabled = (!view.storageBusy || state.loading) && state.wordStatus == null
-    val canOpenWord = !view.storageBusy && state.wordStatus == null
+    val canOpenWord = !view.storageBusy && !state.loading && state.wordStatus == null
     VocabularyWordSheet(view, dispatch)
     // The core owns attempted/error state. Resuming visibility or unrelated work
     // can start an unattempted read, but cannot retry a failed page.
@@ -64,7 +72,7 @@ internal fun VocabularyScreen(
         LazyColumn(
             modifier = Modifier.weight(1f).testTag("vocabulary_scroll"),
             state = scroll,
-            contentPadding = PaddingValues(16.dp),
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             item(key = "controls") {
@@ -115,13 +123,16 @@ internal fun VocabularyScreen(
                 VocabularySortMenu(query.sort, enabled) {
                     dispatch(Event.SetVocabularyQuery(query.copy(sort = it)))
                 }
-                if (state.matchingCount != null)
+                if (displayed.matchingCount != null)
                     Text(
-                        stringResource(R.string.vocabulary_matches, state.matchingCount.toString()),
+                        stringResource(
+                            R.string.vocabulary_matches,
+                            displayed.matchingCount.toString(),
+                        ),
                         modifier = Modifier.testTag("vocabulary_count"),
                     )
             }
-            items(state.rows, key = { it.id.value }) { row ->
+            items(displayed.rows, key = { it.id.value }) { row ->
                 Row(
                     Modifier.fillMaxWidth()
                         .clickable(
@@ -145,12 +156,8 @@ internal fun VocabularyScreen(
                     }
                 }
             }
-            if (state.matchingCount == 0UL)
+            if (displayed.matchingCount == 0UL)
                 item { Text(stringResource(R.string.vocabulary_no_matches)) }
-            if (state.loading || (state.matchingCount == null && state.error == null))
-                item {
-                    Text(stringResource(R.string.vocabulary_loading))
-                }
             if (state.error != null)
                 item(key = "error") {
                     Text(
@@ -217,4 +224,26 @@ private fun VocabularySortMenu(
         onReverse = { onSort(reverse) },
         onSort = onSort,
     )
+}
+
+/** Retain only a successful presentation during sort changes within the same filter/session. */
+private data class VocabularyPresentation(
+    val sort: VocabularySort,
+    val successful: VocabularyState? = null,
+    val sorting: Boolean = false,
+) {
+    fun update(state: VocabularyState): VocabularyPresentation =
+        VocabularyPresentation(
+            sort = state.query.sort,
+            successful =
+                when {
+                    state.error != null -> null
+                    !state.loading -> state.takeIf { it.matchingCount != null }
+                    else -> successful
+                },
+            sorting = (sorting || sort != state.query.sort) && state.loading && state.error == null,
+        )
+
+    fun display(state: VocabularyState): VocabularyState =
+        if (sorting && state.matchingCount == null) successful ?: state else state
 }

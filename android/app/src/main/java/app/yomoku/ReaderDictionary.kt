@@ -12,7 +12,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -209,7 +208,7 @@ private fun DictionaryHeadword(
             Icon(
                 painterResource(R.drawable.ic_dictionary_priority),
                 contentDescription = stringResource(R.string.dictionary_high_priority),
-                tint = Color(0xFFD49A14),
+                tint = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.size(16.dp),
             )
         action()

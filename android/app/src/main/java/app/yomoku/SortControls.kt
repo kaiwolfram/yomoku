@@ -8,6 +8,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 
 @Composable
@@ -20,32 +22,16 @@ internal fun <T : Enum<T>> SortControls(
     onReverse: () -> Unit,
     onSort: (T) -> Unit,
 ) {
-    var expanded by remember { mutableStateOf(false) }
     Row(Modifier.testTag("${tag}_sort_controls"), verticalAlignment = Alignment.CenterVertically) {
-        Box {
-            TextButton(
-                onClick = { expanded = true },
-                enabled = enabled,
-                contentPadding = PaddingValues(start = 12.dp, end = 0.dp),
-                modifier = Modifier.testTag("${tag}_sort"),
-            ) {
-                Text(
-                    stringResource(R.string.library_sort, stringResource(labels.getValue(baseSort)))
-                )
-            }
-            DropdownMenu(expanded = expanded && enabled, onDismissRequest = { expanded = false }) {
-                labels.forEach { (option, label) ->
-                    DropdownMenuItem(
-                        text = { Text(stringResource(label)) },
-                        onClick = {
-                            expanded = false
-                            onSort(option)
-                        },
-                        modifier = Modifier.testTag("${tag}_sort_${option.name}"),
-                    )
-                }
-            }
-        }
+        SelectionDropdown(
+            labels = labels,
+            selection = baseSort,
+            label =
+                stringResource(R.string.library_sort, stringResource(labels.getValue(baseSort))),
+            tag = "${tag}_sort",
+            enabled = enabled,
+            onSelect = onSort,
+        )
         IconButton(
             onClick = onReverse,
             enabled = enabled,
@@ -62,6 +48,45 @@ internal fun <T : Enum<T>> SortControls(
                     ),
                 modifier = Modifier.size(16.dp),
             )
+        }
+    }
+}
+
+/** Shared anchored selector; reverse ordering remains a separate sort action. */
+@Composable
+internal fun <T : Enum<T>> SelectionDropdown(
+    labels: Map<T, Int>,
+    selection: T,
+    label: String,
+    tag: String,
+    enabled: Boolean = true,
+    onSelect: (T) -> Unit,
+) {
+    var expanded by remember(enabled) { mutableStateOf(false) }
+    Box {
+        TextButton(
+            onClick = { expanded = true },
+            enabled = enabled,
+            contentPadding = PaddingValues(start = 12.dp, end = 0.dp),
+            modifier = Modifier.testTag(tag),
+        ) {
+            Text(label)
+        }
+        DropdownMenu(expanded = expanded && enabled, onDismissRequest = { expanded = false }) {
+            labels.forEach { (option, resource) ->
+                DropdownMenuItem(
+                    text = { Text(stringResource(resource)) },
+                    onClick = {
+                        expanded = false
+                        onSelect(option)
+                    },
+                    enabled = enabled,
+                    modifier =
+                        Modifier.testTag("${tag}_${option.name}").semantics {
+                            selected = option == selection
+                        },
+                )
+            }
         }
     }
 }

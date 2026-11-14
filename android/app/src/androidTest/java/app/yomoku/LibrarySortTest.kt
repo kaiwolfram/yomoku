@@ -22,8 +22,10 @@ class LibrarySortTest {
         }
 
     private fun sort(sort: LibrarySort) {
-        compose.onNodeWithTag("library_sort").performClick()
-        compose.onNodeWithTag("library_sort_${sort.name}").performClick()
+        compose.onNodeWithTag("library_sort").performTouchInput { click() }
+        compose.onNodeWithTag("library_sort_${sort.name}").assertIsEnabled().performTouchInput {
+            click()
+        }
         compose.waitUntil { core().view.librarySort == sort }
     }
 

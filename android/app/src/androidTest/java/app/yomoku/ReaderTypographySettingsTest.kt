@@ -100,8 +100,11 @@ class ReaderTypographySettingsTest {
             val page = core().view.reader!!
             val oldLines = readerLayouts().sumOf { it.lineCount }
             val tokens = core().view.effectiveReaderTokens
-            compose.runOnUiThread { core().dispatch(Event.OpenSettings) }
-            awaitSaved()
+            compose
+                .onNodeWithTag("reader_settings")
+                .assertContentDescriptionEquals("Reader settings")
+                .performTouchInput { click() }
+            compose.onNodeWithTag("reader_typography_popup").assertIsDisplayed()
             val database = File(compose.activity.filesDir, "yomoku.sqlite3")
             SQLiteDatabase.openDatabase(database.path, null, SQLiteDatabase.OPEN_READWRITE).use { db
                 ->
@@ -118,6 +121,13 @@ class ReaderTypographySettingsTest {
                     }
                     assertEquals(ReaderFontSize.SP16, core().view.readerTypography!!.fontSize)
                     compose.onNodeWithTag("reader_font_size").assertTextEquals("Font size: 16")
+                    compose.onNodeWithTag("reader_typography_popup").assertIsDisplayed()
+                    compose
+                        .onNode(
+                            hasTestTag("document_error") and
+                                hasAnyAncestor(hasTestTag("reader_typography_popup"))
+                        )
+                        .assertIsDisplayed()
                 } finally {
                     db.execSQL("DROP TRIGGER IF EXISTS fail_typography_ui")
                 }
@@ -131,7 +141,18 @@ class ReaderTypographySettingsTest {
             val expected = ReaderTypography(ReaderFontSize.SP20, ReaderLineSpacing.PERCENT175)
             assertEquals(expected, core().view.readerTypography)
             assertNull(core().view.documentError)
+            compose.onNodeWithTag("reader_typography_popup").assertIsDisplayed()
             compose.activityRule.scenario.recreate()
+            awaitReader()
+            compose.onNodeWithTag("reader_typography_popup").assertDoesNotExist()
+            compose.onNodeWithTag("reader_settings").performClick()
+            compose.onNodeWithTag("reader_font_size").assertTextEquals("Font size: 20")
+            compose.onNodeWithTag("reader_line_spacing").assertTextEquals("Line spacing: 175%")
+            androidx.test.platform.app.InstrumentationRegistry.getInstrumentation()
+                .sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_BACK)
+            compose.onNodeWithTag("reader_typography_popup").assertDoesNotExist()
+            compose.runOnUiThread { core().dispatch(Event.OpenSettings) }
+            awaitSaved()
             compose.onNodeWithTag("reader_font_size").assertTextEquals("Font size: 20")
             compose.onNodeWithTag("reader_line_spacing").assertTextEquals("Line spacing: 175%")
             closeSettings()

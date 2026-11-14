@@ -27,6 +27,39 @@ class StatisticsScreenTest {
     }
 
     @Test
+    fun mainScreenContentStartsAtToolbarBottom() {
+        frame.value =
+            frame.value.copy(
+                documents =
+                    (1L..2L).map {
+                        LibraryDocument(
+                            documentId = DocumentId(it),
+                            title = "Book $it",
+                            progressPercent = 0UL,
+                            finishedAtLeastOnce = false,
+                        )
+                    },
+                readerTypography =
+                    ReaderTypography(ReaderFontSize.SP16, ReaderLineSpacing.PERCENT150),
+                pageLength = PageLength.CHARACTERS250,
+            )
+        render()
+        fun assertTop(node: SemanticsNodeInteraction) {
+            val toolbar = compose.onNodeWithTag("app_toolbar").getUnclippedBoundsInRoot()
+            assertEquals(toolbar.bottom.value, node.getUnclippedBoundsInRoot().top.value, 0.5f)
+        }
+        assertTop(compose.onNodeWithTag("statistics_header"))
+        compose.runOnUiThread { frame.value = frame.value.copy(destination = Destination.LIBRARY) }
+        assertTop(compose.onNodeWithTag("library_sort_controls"))
+        compose.runOnUiThread {
+            frame.value = frame.value.copy(destination = Destination.VOCABULARY)
+        }
+        assertTop(compose.onNodeWithTag("vocabulary_search"))
+        compose.runOnUiThread { frame.value = frame.value.copy(settingsOpen = true) }
+        assertTop(compose.onNodeWithText("Reader"))
+    }
+
+    @Test
     fun persistedIntervalIsVisibleAndDropdownSelectionPreservesVerticalScroll() {
         frame.value =
             frame.value.copy(
@@ -47,7 +80,7 @@ class StatisticsScreenTest {
                 .config[SemanticsProperties.VerticalScrollAxisRange]
                 .value()
         val y = vertical()
-        compose.onNodeWithTag("statistics_timeframe").performClick()
+        compose.onNodeWithTag("statistics_timeframe").performTouchInput { click() }
         compose.onNodeWithTag("statistics_timeframe_ALLTIME").assertIsSelected()
         compose.onNodeWithTag("statistics_timeframe_LASTMONTH").performClick()
         compose.onNodeWithTag("statistics_timeframe_LASTMONTH").assertDoesNotExist()
@@ -74,8 +107,10 @@ class StatisticsScreenTest {
         compose.onNodeWithTag("statistics_timeframe").assertTextContains("Last week")
         captureUiTrial(compose, "statistics")
         StatisticsTimeframe.entries.forEach { timeframe ->
-            compose.onNodeWithTag("statistics_timeframe").performClick()
-            compose.onNodeWithTag("statistics_timeframe_${timeframe.name}").performClick()
+            compose.onNodeWithTag("statistics_timeframe").performTouchInput { click() }
+            compose.onNodeWithTag("statistics_timeframe_${timeframe.name}").performTouchInput {
+                click()
+            }
             val event = events.last() as Event.SetStatisticsTimeframe
             assertEquals(timeframe, event.timeframe)
             assertTrue(event.asOfUnixMs > 0)
@@ -170,6 +205,30 @@ class StatisticsScreenTest {
         compose.onNodeWithTag("statistics_error").assertIsDisplayed()
         assertEquals(requested, events.last())
         assertEquals(1, events.count { it == Event.RetryStatistics })
+    }
+
+    @Test
+    fun dropdownDismissesOnOutsideTapAndWhenLoadingGuardDisablesIt() {
+        render()
+        compose.onNodeWithTag("statistics_timeframe").performTouchInput { click() }
+        compose.onNodeWithTag("statistics_timeframe_LASTWEEK").assertIsSelected()
+        tapBelowPopup(compose.activity)
+        compose.onNodeWithTag("statistics_timeframe_LASTWEEK").assertDoesNotExist()
+        compose.onNodeWithTag("statistics_timeframe").performClick()
+        compose.runOnUiThread { frame.value = frame.value.copy(storageBusy = true) }
+        compose.onNodeWithTag("statistics_timeframe_LASTWEEK").assertDoesNotExist()
+        compose.onNodeWithTag("statistics_timeframe").assertIsNotEnabled()
+        compose.runOnUiThread {
+            frame.value = frame.value.copy(statistics = frame.value.statistics.copy(loading = true))
+        }
+        compose.onNodeWithTag("statistics_timeframe").assertIsEnabled().performTouchInput {
+            click()
+        }
+        compose.onNodeWithTag("statistics_timeframe_LASTMONTH").performTouchInput { click() }
+        assertEquals(
+            StatisticsTimeframe.LASTMONTH,
+            (events.last() as Event.SetStatisticsTimeframe).timeframe,
+        )
     }
 
     @Test

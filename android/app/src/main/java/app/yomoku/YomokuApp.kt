@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -23,6 +24,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -85,6 +87,7 @@ internal fun YomokuApp(
     LaunchedEffect(view.contentRoute) {
         if (view.contentRoute != ContentRoute.PASTE) pasteText = ""
     }
+    val loadingVisible = rememberAppLoadingVisible(appIsLoading(view, ankiDecks, importActive))
     val mainContent = view.contentRoute == ContentRoute.MAIN
     val showNavigation = mainContent
     var completionOrigin by remember(sessionKey) { mutableStateOf<Offset?>(null) }
@@ -121,9 +124,24 @@ internal fun YomokuApp(
                                 !view.settingsOpen &&
                                 view.destination == Destination.LIBRARY
                         ) {
-                            LibraryAddMenu(view, dispatch, onImportBook, libraryActionsEnabled)
+                            Box(Modifier.size(48.dp)) {
+                                if (loadingVisible) AppLoadingIndicator()
+                                else
+                                    LibraryAddMenu(
+                                        view,
+                                        dispatch,
+                                        onImportBook,
+                                        libraryActionsEnabled,
+                                    )
+                            }
+                        } else if (loadingVisible) {
+                            AppLoadingIndicator()
                         }
-                        AppLoadingIndicator(appIsLoading(view, ankiDecks, importActive))
+                        if (!view.settingsOpen && view.contentRoute == ContentRoute.READER) {
+                            key(sessionKey, view.reader?.documentId) {
+                                ReaderTypographyMenu(view, dispatch)
+                            }
+                        }
                     },
                     navigationIcon = {
                         if (!view.settingsOpen && !mainContent) {

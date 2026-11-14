@@ -21,7 +21,9 @@ class AppLoadingIndicatorTest {
     fun delaysFor300MillisecondsAndDisappearsOnCompletionWithoutMinimumDisplayTime() {
         val loading = mutableStateOf(true)
         compose.mainClock.autoAdvance = false
-        compose.setContent { YomokuTheme { AppLoadingIndicator(loading.value) } }
+        compose.setContent {
+            YomokuTheme { if (rememberAppLoadingVisible(loading.value)) AppLoadingIndicator() }
+        }
         compose.mainClock.advanceTimeBy(299, ignoreFrameDuration = true)
         compose.onNodeWithTag("app_loading").assertDoesNotExist()
         compose.mainClock.advanceTimeBy(1, ignoreFrameDuration = true)
@@ -40,7 +42,7 @@ class AppLoadingIndicatorTest {
     fun shortOperationsCancelPendingDisplayAndNextOperationGetsItsOwnDelay() {
         val loading = mutableStateOf(true)
         compose.mainClock.autoAdvance = false
-        compose.setContent { AppLoadingIndicator(loading.value) }
+        compose.setContent { if (rememberAppLoadingVisible(loading.value)) AppLoadingIndicator() }
         compose.mainClock.advanceTimeBy(200)
         compose.runOnUiThread { loading.value = false }
         compose.mainClock.advanceTimeByFrame()
@@ -55,7 +57,7 @@ class AppLoadingIndicatorTest {
     }
 
     @Test
-    fun continuousWorkAcrossSourcesKeepsDelayAndSpinnerIsAfterLibraryAdd() {
+    fun continuousWorkAcrossSourcesKeepsDelayAndSpinnerReplacesLibraryAddWithoutMovement() {
         val view = mutableStateOf(idleView().copy(storageBusy = true))
         val importing = mutableStateOf(false)
         compose.mainClock.autoAdvance = false
@@ -64,6 +66,7 @@ class AppLoadingIndicatorTest {
                 YomokuApp(view.value, "loading-test", {}, importActive = importing.value)
             }
         }
+        val add = compose.onNodeWithTag("library_add").getUnclippedBoundsInRoot()
         compose.mainClock.advanceTimeBy(240)
         compose.runOnUiThread {
             view.value = view.value.copy(storageBusy = false)
@@ -73,11 +76,112 @@ class AppLoadingIndicatorTest {
         val spinner = compose.onNodeWithTag("app_loading")
         spinner.assertExists()
         compose.onAllNodesWithTag("app_loading").assertCountEquals(1)
-        val add = compose.onNodeWithTag("library_add").fetchSemanticsNode().boundsInRoot
-        assertTrue(spinner.fetchSemanticsNode().boundsInRoot.left >= add.right)
+        compose.onNodeWithTag("library_add").assertDoesNotExist()
+        val spinnerBounds = spinner.getUnclippedBoundsInRoot()
+        assertEquals(
+            (add.left.value + add.right.value) / 2f,
+            (spinnerBounds.left.value + spinnerBounds.right.value) / 2f,
+            0.5f,
+        )
+        assertEquals(
+            (add.top.value + add.bottom.value) / 2f,
+            (spinnerBounds.top.value + spinnerBounds.bottom.value) / 2f,
+            0.5f,
+        )
         compose.runOnUiThread { importing.value = false }
         compose.mainClock.advanceTimeByFrame()
         spinner.assertDoesNotExist()
+        compose.onNodeWithTag("library_add").assertIsDisplayed().assertIsEnabled()
+        assertEquals(add, compose.onNodeWithTag("library_add").getUnclippedBoundsInRoot())
+    }
+
+    @Test
+    fun readerSpinnerIsImmediatelyLeftOfSettingsAndPopupSharesLimitsBusyAndErrorStates() {
+        val frame =
+            mutableStateOf(
+                idleView()
+                    .copy(
+                        contentRoute = ContentRoute.READER,
+                        readerTypography =
+                            ReaderTypography(ReaderFontSize.SP16, ReaderLineSpacing.PERCENT150),
+                    )
+            )
+        val events = mutableListOf<Event>()
+        compose.setContent { YomokuTheme { YomokuApp(frame.value, "reader-menu", events::add) } }
+        compose.onNodeWithTag("reader_settings").performTouchInput { click() }
+        compose.onNodeWithTag("reader_font_size_increase").performTouchInput { click() }
+        assertEquals(
+            Event.SetReaderTypography(
+                ReaderTypography(ReaderFontSize.SP18, ReaderLineSpacing.PERCENT150)
+            ),
+            events.last(),
+        )
+        compose.onNodeWithTag("reader_typography_popup").assertIsDisplayed()
+        for (busy in listOf("storage", "completion")) {
+            compose.runOnUiThread {
+                frame.value =
+                    frame.value.copy(
+                        storageBusy = busy == "storage",
+                        completionSavePending = busy == "completion",
+                    )
+            }
+            compose.onNodeWithTag("reader_font_size_increase").assertIsNotEnabled()
+            compose.onNodeWithTag("reader_line_spacing_decrease").assertIsNotEnabled()
+        }
+        compose.runOnUiThread {
+            frame.value =
+                frame.value.copy(
+                    storageBusy = false,
+                    completionSavePending = false,
+                    documentError = DocumentError.UNAVAILABLE,
+                    readerTypography =
+                        ReaderTypography(ReaderFontSize.SP24, ReaderLineSpacing.PERCENT200),
+                )
+        }
+        // The page also reports the error; inspect the popup's copy.
+        compose
+            .onNode(
+                hasTestTag("document_error") and
+                    hasAnyAncestor(hasTestTag("reader_typography_popup"))
+            )
+            .assertIsDisplayed()
+        compose.onNodeWithTag("reader_font_size_increase").assertIsNotEnabled()
+        compose.onNodeWithTag("reader_line_spacing_increase").assertIsNotEnabled()
+        compose.onNodeWithTag("reader_font_size_decrease").assertIsEnabled().performClick()
+        assertTrue(events.last() is Event.SetReaderTypography)
+        compose.runOnUiThread {
+            frame.value =
+                frame.value.copy(
+                    readerTypography =
+                        ReaderTypography(ReaderFontSize.SP14, ReaderLineSpacing.PERCENT125)
+                )
+        }
+        compose.onNodeWithTag("reader_font_size_decrease").assertIsNotEnabled()
+        compose.onNodeWithTag("reader_line_spacing_decrease").assertIsNotEnabled()
+        androidx.test.platform.app.InstrumentationRegistry.getInstrumentation()
+            .sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_BACK)
+        compose.onNodeWithTag("reader_typography_popup").assertDoesNotExist()
+        compose.onNodeWithTag("reader_settings").performClick()
+        compose.onNodeWithTag("reader_typography_popup").assertIsDisplayed()
+        tapBelowPopup(compose.activity)
+        compose.onNodeWithTag("reader_typography_popup").assertDoesNotExist()
+        compose.runOnUiThread { frame.value = frame.value.copy(storageBusy = true) }
+        compose.mainClock.advanceTimeBy(320)
+        val spinner = compose.onNodeWithTag("app_loading").getUnclippedBoundsInRoot()
+        val settings = compose.onNodeWithTag("reader_settings").getUnclippedBoundsInRoot()
+        assertEquals(
+            48f,
+            (settings.left.value + settings.right.value) / 2f -
+                (spinner.left.value + spinner.right.value) / 2f,
+            0.5f,
+        )
+        compose.onNodeWithTag("reader_settings").performClick()
+        compose.runOnUiThread {
+            frame.value = frame.value.copy(contentRoute = ContentRoute.MAIN, storageBusy = false)
+        }
+        compose.onNodeWithTag("reader_typography_popup").assertDoesNotExist()
+        compose.runOnUiThread { frame.value = frame.value.copy(contentRoute = ContentRoute.READER) }
+        compose.onNodeWithTag("reader_typography_popup").assertDoesNotExist()
     }
 
     @Test

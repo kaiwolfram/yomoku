@@ -17,13 +17,14 @@ class VocabularyScreenTest {
     @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
     private val events = mutableListOf<Event>()
     private val frame = mutableStateOf(vocabularyView())
+    private val sessionKey = mutableStateOf("vocabulary-test")
 
     private fun render() {
         compose.setContent {
             YomokuTheme {
                 YomokuApp(
                     frame.value,
-                    "vocabulary-test",
+                    sessionKey.value,
                     dispatch = { event ->
                         events.add(event)
                         if (event is Event.SetVocabularyQuery)
@@ -33,6 +34,151 @@ class VocabularyScreenTest {
                                 )
                     },
                 )
+            }
+        }
+    }
+
+    @Test
+    fun sortRetainsRowsAndCountUntilAtomicReplacementIncludingRapidReturnToOriginalSort() {
+        frame.value =
+            frame.value.copy(
+                vocabulary =
+                    frame.value.vocabulary.copy(
+                        matchingCount = 2UL,
+                        rows = listOf(vocabularyRow(1), vocabularyRow(2)),
+                    )
+            )
+        render()
+        fun loading(sort: VocabularySort) {
+            compose.runOnUiThread {
+                frame.value =
+                    frame.value.copy(
+                        storageBusy = true,
+                        vocabulary =
+                            frame.value.vocabulary.copy(
+                                query = frame.value.vocabulary.query.copy(sort = sort),
+                                loading = true,
+                                matchingCount = null,
+                                rows = emptyList(),
+                                nextOffset = null,
+                            ),
+                    )
+            }
+        }
+        loading(VocabularySort.FREQUENCY)
+        compose.onNodeWithTag("vocabulary_row_1").assertIsDisplayed().assertIsNotEnabled()
+        compose.onNodeWithTag("vocabulary_count").assertTextEquals("Matching words: 2")
+        compose.onNodeWithText("Loading vocabulary…").assertDoesNotExist()
+        compose.mainClock.advanceTimeBy(200)
+        compose.onNodeWithTag("app_loading").assertDoesNotExist()
+        loading(VocabularySort.NEWEST)
+        compose.onNodeWithTag("vocabulary_row_2").assertExists().assertIsNotEnabled()
+        compose.mainClock.advanceTimeBy(150)
+        compose.onNodeWithTag("app_loading").assertExists()
+        assertFalse(events.contains(Event.LoadMoreVocabulary))
+        compose.runOnUiThread {
+            frame.value =
+                frame.value.copy(
+                    storageBusy = false,
+                    vocabulary =
+                        frame.value.vocabulary.copy(
+                            loading = false,
+                            matchingCount = 1UL,
+                            rows = listOf(vocabularyRow(3)),
+                        ),
+                )
+        }
+        compose.onNodeWithTag("vocabulary_row_1").assertDoesNotExist()
+        compose.onNodeWithTag("vocabulary_row_3").assertIsDisplayed().assertIsEnabled()
+        compose.onNodeWithTag("vocabulary_count").assertTextEquals("Matching words: 1")
+        compose.onNodeWithTag("app_loading").assertDoesNotExist()
+        // A quick subsequent sort also retains the latest successful result.
+        loading(VocabularySort.ALPHABETICAL)
+        compose.onNodeWithTag("vocabulary_row_3").assertExists().assertIsNotEnabled()
+        compose.runOnUiThread {
+            frame.value =
+                frame.value.copy(
+                    storageBusy = false,
+                    vocabulary =
+                        frame.value.vocabulary.copy(
+                            loading = false,
+                            matchingCount = 0UL,
+                            rows = emptyList(),
+                        ),
+                )
+        }
+        compose.onNodeWithTag("vocabulary_row_3").assertDoesNotExist()
+        compose.onNodeWithTag("vocabulary_count").assertTextEquals("Matching words: 0")
+        compose.onNodeWithTag("app_loading").assertDoesNotExist()
+    }
+
+    @Test
+    fun errorsSearchFiltersAndSessionChangesClearRetainedSortPresentation() {
+        render()
+        for (reset in listOf("error", "search", "filter", "session")) {
+            compose.runOnUiThread {
+                frame.value =
+                    vocabularyView()
+                        .copy(
+                            vocabulary =
+                                vocabularyView()
+                                    .vocabulary
+                                    .copy(
+                                        matchingCount = 1UL,
+                                        rows = listOf(vocabularyRow(1)),
+                                    )
+                        )
+            }
+            compose.onNodeWithTag("vocabulary_row_1").assertExists()
+            compose.runOnUiThread {
+                frame.value =
+                    frame.value.copy(
+                        storageBusy = true,
+                        vocabulary =
+                            frame.value.vocabulary.copy(
+                                query =
+                                    frame.value.vocabulary.query.copy(
+                                        sort = VocabularySort.FREQUENCY
+                                    ),
+                                loading = true,
+                                matchingCount = null,
+                                rows = emptyList(),
+                            ),
+                    )
+            }
+            compose.onNodeWithTag("vocabulary_row_1").assertExists()
+            compose.runOnUiThread {
+                val state = frame.value.vocabulary
+                frame.value =
+                    frame.value.copy(
+                        vocabulary =
+                            when (reset) {
+                                "error" ->
+                                    state.copy(loading = false, error = DocumentError.UNAVAILABLE)
+                                "search" -> state.copy(query = state.query.copy(prefix = "猫"))
+                                "filter" ->
+                                    state.copy(
+                                        query =
+                                            state.query.copy(
+                                                statuses = listOf(VocabularyStatus.KNOWN)
+                                            )
+                                    )
+                                else -> state
+                            }
+                    )
+                if (reset == "session") sessionKey.value = "new-session"
+            }
+            compose.onNodeWithTag("vocabulary_row_1").assertDoesNotExist()
+            compose.onNodeWithTag("vocabulary_count").assertDoesNotExist()
+            if (reset == "error") {
+                compose.onNodeWithTag("vocabulary_error").assertExists()
+                compose.runOnUiThread {
+                    frame.value =
+                        frame.value.copy(
+                            vocabulary = frame.value.vocabulary.copy(loading = true, error = null)
+                        )
+                }
+                compose.onNodeWithTag("vocabulary_row_1").assertDoesNotExist()
             }
         }
     }
@@ -95,8 +241,8 @@ class VocabularyScreenTest {
                 VocabularySort.ALPHABETICAL,
             )
             .forEach { sort ->
-                compose.onNodeWithTag("vocabulary_sort").performClick()
-                compose.onNodeWithTag("vocabulary_sort_${sort.name}").performClick()
+                compose.onNodeWithTag("vocabulary_sort").performTouchInput { click() }
+                compose.onNodeWithTag("vocabulary_sort_${sort.name}").performTouchInput { click() }
                 assertEquals(sort, (events.last() as Event.SetVocabularyQuery).value.sort)
                 compose.onNodeWithTag("vocabulary_reverse_sort").performClick()
                 assertNotEquals(sort, frame.value.vocabulary.query.sort)

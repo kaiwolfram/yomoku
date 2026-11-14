@@ -44,7 +44,7 @@ internal fun appIsLoading(
 
 /** One delay per continuous interval of aggregate work; completion removes it in this frame. */
 @Composable
-internal fun AppLoadingIndicator(loading: Boolean) {
+internal fun rememberAppLoadingVisible(loading: Boolean): Boolean {
     var visible by remember(loading) { mutableStateOf(false) }
     LaunchedEffect(loading) {
         if (loading) {
@@ -52,16 +52,19 @@ internal fun AppLoadingIndicator(loading: Boolean) {
             visible = true
         }
     }
-    if (loading && visible) {
-        val description = stringResource(R.string.app_loading)
-        Box(Modifier.size(48.dp), contentAlignment = Alignment.Center) {
-            CircularProgressIndicator(
-                modifier =
-                    Modifier.size(24.dp).testTag("app_loading").semantics {
-                        contentDescription = description
-                    },
-                strokeWidth = 2.dp,
-            )
-        }
+    return loading && visible
+}
+
+@Composable
+internal fun AppLoadingIndicator() {
+    val description = stringResource(R.string.app_loading)
+    Box(Modifier.size(48.dp), contentAlignment = Alignment.Center) {
+        CircularProgressIndicator(
+            modifier =
+                Modifier.size(24.dp).testTag("app_loading").semantics {
+                    contentDescription = description
+                },
+            strokeWidth = 2.dp,
+        )
     }
 }

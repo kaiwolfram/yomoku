@@ -57,12 +57,12 @@
     <string name="vocabulary_search">Search written prefix</string>
     <string name="vocabulary_matches">Matching words: %1$s</string>
     <string name="vocabulary_no_matches">No matching words.</string>
-    <string name="vocabulary_loading">Loading vocabulary…</string>
     <string name="vocabulary_error">Vocabulary could not be loaded.</string>
     <string name="vocabulary_sort_newest">Newest</string>
     <string name="vocabulary_sort_frequency">Frequency</string>
     <string name="vocabulary_sort_last_seen">Last seen</string>
     <string name="vocabulary_sort_alphabetical">Alphabetical</string>
+    <string name="reader_typography_settings">Reader settings</string>
     <string name="reader_typography_description">Font size and line spacing apply to all documents. Your reading position stays the same.</string>
     <string name="reader_font_size">Font size: %1$d</string>
     <string name="reader_line_spacing">Line spacing: %1$d%%</string>

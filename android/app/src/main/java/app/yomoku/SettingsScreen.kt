@@ -34,8 +34,6 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import app.yomoku.shared.Event
 import app.yomoku.shared.PageLength
-import app.yomoku.shared.ReaderFontSize
-import app.yomoku.shared.ReaderLineSpacing
 import app.yomoku.shared.ViewModel
 
 @Composable
@@ -68,7 +66,7 @@ internal fun SettingsScreen(
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
                 .testTag("settings_scroll")
-                .padding(16.dp),
+                .padding(start = 16.dp, end = 16.dp, bottom = 16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         StorageStatus(view)
@@ -78,44 +76,9 @@ internal fun SettingsScreen(
                 Text(stringResource(R.string.retry))
             }
         }
-        val typography = view.readerTypography
-        val typographyEnabled =
-            typography != null && !view.storageBusy && !view.completionSavePending
-
-        SettingsSectionHeading(stringResource(R.string.settings_reader))
+        SettingsSectionHeading(stringResource(R.string.settings_reader), topSpacing = false)
         SettingsDescription(stringResource(R.string.reader_typography_description))
-        TypographyControl(
-            label = stringResource(R.string.reader_font_size, typography?.fontSize?.spValue ?: 16),
-            tag = "reader_font_size",
-            index = typography?.fontSize?.ordinal ?: 1,
-            count = ReaderFontSize.entries.size,
-            enabled = typographyEnabled,
-        ) { index ->
-            typography?.let {
-                dispatch(
-                    Event.SetReaderTypography(it.copy(fontSize = ReaderFontSize.entries[index]))
-                )
-            }
-        }
-        TypographyControl(
-            label =
-                stringResource(
-                    R.string.reader_line_spacing,
-                    typography?.lineSpacing?.percent ?: 150,
-                ),
-            tag = "reader_line_spacing",
-            index = typography?.lineSpacing?.ordinal ?: 1,
-            count = ReaderLineSpacing.entries.size,
-            enabled = typographyEnabled,
-        ) { index ->
-            typography?.let {
-                dispatch(
-                    Event.SetReaderTypography(
-                        it.copy(lineSpacing = ReaderLineSpacing.entries[index])
-                    )
-                )
-            }
-        }
+        ReaderTypographyControls(view, dispatch)
         Text(
             stringResource(R.string.page_length_title),
             style = MaterialTheme.typography.titleMedium,
@@ -174,40 +137,10 @@ internal fun SettingsScreen(
 }
 
 @Composable
-private fun TypographyControl(
-    label: String,
-    tag: String,
-    index: Int,
-    count: Int,
-    enabled: Boolean,
-    onChange: (Int) -> Unit,
-) {
-    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Text(label, modifier = Modifier.weight(1f).testTag(tag))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            TextButton(
-                onClick = { onChange(index - 1) },
-                enabled = enabled && index > 0,
-                modifier = Modifier.testTag("${tag}_decrease"),
-            ) {
-                Text(stringResource(R.string.reader_typography_decrease))
-            }
-            TextButton(
-                onClick = { onChange(index + 1) },
-                enabled = enabled && index < count - 1,
-                modifier = Modifier.testTag("${tag}_increase"),
-            ) {
-                Text(stringResource(R.string.reader_typography_increase))
-            }
-        }
-    }
-}
-
-@Composable
-internal fun SettingsSectionHeading(label: String) {
+internal fun SettingsSectionHeading(label: String, topSpacing: Boolean = true) {
     Text(
         label,
-        modifier = Modifier.semantics { heading() }.padding(top = 8.dp),
+        modifier = Modifier.semantics { heading() }.padding(top = if (topSpacing) 8.dp else 0.dp),
         style = MaterialTheme.typography.titleLarge,
     )
 }
