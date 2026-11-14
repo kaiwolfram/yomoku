@@ -89,7 +89,9 @@ class ImportNotificationsTest {
         compose.waitUntil(30_000) { imports.choosingEncoding }
         compose.onNodeWithText("Enable import notifications").assertDoesNotExist()
         compose
-            .onNodeWithText(context.getString(R.string.import_notifications_unavailable))
+            .onNodeWithText(
+                "Progress and completion notifications are unavailable. You can follow the import here."
+            )
             .assertDoesNotExist()
         compose.onNodeWithText("Cancel").assertIsDisplayed()
         assertNull(notice(ImportNotifications.WAIT_ID))
@@ -121,7 +123,9 @@ class ImportNotificationsTest {
             }
             compose.onNodeWithText("Enable import notifications").assertDoesNotExist()
             compose
-                .onNodeWithText(context.getString(R.string.import_notifications_available))
+                .onNodeWithText(
+                    "Progress and completion notifications are available while you use another app."
+                )
                 .assertDoesNotExist()
             assertTrue(foregroundService())
             val progress = checkNotNull(notice(ImportNotifications.PROGRESS_ID))
@@ -209,7 +213,9 @@ class ImportNotificationsTest {
             compose.waitUntil(30_000) { notice(ImportNotifications.PROGRESS_ID) != null }
             compose.onNodeWithText("$prefix.epub").assertIsDisplayed()
             compose
-                .onNodeWithText(context.getString(R.string.import_background_limits))
+                .onNodeWithText(
+                    "Android may stop an import in the background. If Android ends the app process, committed books are kept but an unfinished import will not resume."
+                )
                 .assertDoesNotExist()
             compose.onNodeWithText("Cancel").assertIsDisplayed()
             compose.activityRule.scenario.moveToState(Lifecycle.State.CREATED)
