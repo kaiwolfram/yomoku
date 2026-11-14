@@ -233,6 +233,45 @@ fn resolve(core: &Core<Yomoku>, effects: &mut [Effect], result: StorageResult) -
 }
 
 #[test]
+fn active_reader_typography_saves_preserve_effective_page_identity_and_allow_retry() {
+    use yomoku_core::typography::{ReaderFontSize, ReaderTypography};
+    let f = Fixture::new(true);
+    let identity = f.load();
+    let before = f.core.view();
+    let typography = ReaderTypography {
+        font_size: ReaderFontSize::Sp24,
+        ..Default::default()
+    };
+    for result in [
+        StorageResult::Failed(DocumentError::Unavailable),
+        StorageResult::ReaderTypographySaved(typography),
+    ] {
+        let mut effects = f.core.process_event(Event::SetReaderTypography(typography));
+        assert!(effects
+            .iter()
+            .any(|effect| matches!(effect, Effect::Storage(request)
+            if request.operation == StorageOperation::SaveReaderTypography(typography))));
+        assert_eq!(f.core.view().reader_typography, before.reader_typography);
+        assert!(f
+            .core
+            .process_event(Event::SetReaderTypography(typography))
+            .is_empty());
+        resolve(&f.core, &mut effects, result);
+        assert_eq!(f.core.view().reader, before.reader);
+        assert_eq!(
+            f.core.view().effective_reader_tokens,
+            before.effective_reader_tokens
+        );
+        assert_eq!(
+            f.core.view().effective_reader_tokens.unwrap().identity,
+            identity
+        );
+    }
+    assert_eq!(f.core.view().reader_typography, Some(typography));
+    assert!(f.core.view().document_error.is_none());
+}
+
+#[test]
 fn effective_application_loads_compact_page_without_legacy_writes() {
     let f = Fixture::new(false);
     let identity = f.load();

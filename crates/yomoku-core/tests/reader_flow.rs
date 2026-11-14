@@ -640,7 +640,7 @@ fn duplicate_summary_preserves_progress_survives_settings_and_refresh_and_can_be
 }
 
 #[test]
-fn typography_requires_loaded_settings_commits_before_publish_and_preserves_reader() {
+fn typography_requires_loaded_preferences_commits_before_publish_and_preserves_reader() {
     use yomoku_core::typography::{ReaderFontSize, ReaderLineSpacing, ReaderTypography};
     let core = Core::<Yomoku>::new();
     let typography = ReaderTypography {
@@ -653,6 +653,16 @@ fn typography_requires_loaded_settings_commits_before_publish_and_preserves_read
         .is_empty());
     assert_eq!(core.view().reader_typography, None);
     core.process_event(Event::CloseSettings);
+    let mut effects = core.process_event(Event::RefreshLibrary);
+    finish(
+        &core,
+        &mut effects,
+        StorageResult::Listed(vec![], PageLength::default(), ReaderTypography::default()),
+    );
+    // Loaded preferences alone do not authorize a write outside Settings/Reader.
+    assert!(core
+        .process_event(Event::SetReaderTypography(typography))
+        .is_empty());
     let document = document(&"𠮷猫。\n".repeat(300));
     let mut effects = core.process_event(Event::OpenReader(document.document_id));
     finish(&core, &mut effects, loaded(document, PageLength::default()));
@@ -661,10 +671,6 @@ fn typography_requires_loaded_settings_commits_before_publish_and_preserves_read
         previous.reader_typography,
         Some(ReaderTypography::default())
     );
-    assert!(core
-        .process_event(Event::SetReaderTypography(typography))
-        .is_empty());
-    core.process_event(Event::OpenSettings);
     let mut effects = core.process_event(Event::SetReaderTypography(typography));
     assert!(effects.iter().any(|request| matches!(request, Effect::Storage(request) if request.operation == StorageOperation::SaveReaderTypography(typography))));
     assert!(core
@@ -687,6 +693,13 @@ fn typography_requires_loaded_settings_commits_before_publish_and_preserves_read
     assert_eq!(core.view().reader, previous.reader);
     assert_eq!(core.view().documents, previous.documents);
     assert_eq!(core.view().reader_analysis, previous.reader_analysis);
+    assert_eq!(
+        core.view().effective_reader_tokens,
+        previous.effective_reader_tokens
+    );
+    assert_eq!(core.view().document_error, None);
+    // The same persisted value is visible in Settings; no redundant write is issued.
+    core.process_event(Event::OpenSettings);
     assert!(core
         .process_event(Event::SetReaderTypography(typography))
         .is_empty());

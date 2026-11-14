@@ -187,12 +187,14 @@ internal fun verifyDocumentBridge() {
                     check(changed.readerAnalysis == analysis)
                     check(changed.reader == saved)
                 }
+                bridge.update(Event.CloseSettings.bincodeSerialize())
                 val typographyPage = ViewModel.bincodeDeserialize(bridge.view()).reader
                 for (size in ReaderFontSize.entries) {
                     for (spacing in ReaderLineSpacing.entries) {
                         val typography = ReaderTypography(size, spacing)
                         val before = ViewModel.bincodeDeserialize(bridge.view())
                         if (before.readerTypography == typography) continue
+                        check(!before.settingsOpen && before.contentRoute == ContentRoute.READER)
                         val event = Event.SetReaderTypography(typography)
                         check(Event.bincodeDeserialize(event.bincodeSerialize()) == event)
                         val changed = listener.dispatch(bridge, event)
@@ -201,6 +203,11 @@ internal fun verifyDocumentBridge() {
                         check(changed.reader == saved && changed.readerAnalysis == analysis)
                     }
                 }
+                val readerTypography = ViewModel.bincodeDeserialize(bridge.view()).readerTypography
+                bridge.update(Event.OpenSettings.bincodeSerialize())
+                check(
+                    ViewModel.bincodeDeserialize(bridge.view()).readerTypography == readerTypography
+                )
                 bridge.update(Event.CloseSettings.bincodeSerialize())
                 bridge.update(Event.CloseDocument.bincodeSerialize())
                 check(ViewModel.bincodeDeserialize(bridge.view()).contentRoute == ContentRoute.MAIN)

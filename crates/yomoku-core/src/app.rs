@@ -548,7 +548,9 @@ impl App for Yomoku {
             Event::OpenReader(id) => Some(StorageOperation::OpenReader(*id)),
 
             Event::SetReaderTypography(typography) => {
-                if !model.settings_open
+                let active_reader =
+                    model.content_route == ContentRoute::Reader && model.reader.is_some();
+                if (!model.settings_open && !active_reader)
                     || model.reader_typography.is_none()
                     || model.reader_typography == Some(*typography)
                 {
