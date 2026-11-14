@@ -29,8 +29,11 @@ internal interface FileImportObserver : AutoCloseable {
 }
 
 /** The lease and callbacks exist only in this process; there is no restartable work. */
-internal class ImportNotifications(context: Context, private val interrupt: () -> Unit) :
-    FileImportObserver {
+internal class ImportNotifications(
+    context: Context,
+    private val isActivityVisible: () -> Boolean,
+    private val interrupt: () -> Unit,
+) : FileImportObserver {
     private val context = context.applicationContext
     private val manager = this.context.getSystemService(NotificationManager::class.java)
     private var progress: FileImportProgress? = null
@@ -109,7 +112,7 @@ internal class ImportNotifications(context: Context, private val interrupt: () -
         releaseService()
         manager.cancel(PROGRESS_ID)
         manager.cancel(WAIT_ID)
-        if (manager.areNotificationsEnabled()) {
+        if (!isActivityVisible() && manager.areNotificationsEnabled()) {
             manager.notify(
                 COMPLETE_ID,
                 notification(context)

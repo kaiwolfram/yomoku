@@ -6,6 +6,14 @@ import androidx.lifecycle.AndroidViewModel
 
 /** Retains the Rust session across Activity recreation without copying domain state. */
 internal class CoreSessionOwner(application: Application) : AndroidViewModel(application) {
+    var activityVisible = false
+        private set
+
+    fun setForeground(visible: Boolean) {
+        activityVisible = visible
+        session.setForeground(visible)
+    }
+
     val importBookRequest = ImportBookRequest()
     val session =
         CoreSession(
@@ -25,7 +33,9 @@ internal class CoreSessionOwner(application: Application) : AndroidViewModel(app
         FileImports(
             application.contentResolver,
             session,
-            ImportNotifications(application) { fileImports.cancel() },
+            ImportNotifications(application, isActivityVisible = { activityVisible }) {
+                fileImports.cancel()
+            },
             notificationsAvailable = {
                 val manager = application.getSystemService(NotificationManager::class.java)
                 manager.areNotificationsEnabled() &&

@@ -37,14 +37,6 @@ internal fun FileImportDialogs(imports: FileImports) {
                             Text("Shift-JIS")
                         }
                     }
-                    Text(
-                        stringResource(
-                            if (imports.notificationsEnabled)
-                                R.string.import_notifications_available
-                            else R.string.import_notifications_unavailable
-                        )
-                    )
-                    Text(stringResource(R.string.import_background_limits))
                 }
             },
             confirmButton = {},

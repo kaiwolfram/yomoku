@@ -34,7 +34,19 @@ class TxtImportRecoveryProbeActivity : ComponentActivity() {
         directory = File(noBackupFilesDir, "txt-recovery-$run")
         check(directory.isDirectory || directory.mkdir())
         core = CoreSession(File(directory, "reader.sqlite3").path, sudachiDictionaryProvider(this))
-        imports = FileImports(contentResolver, core, ImportNotifications(this) { imports.cancel() })
+        imports =
+            FileImports(
+                contentResolver,
+                core,
+                ImportNotifications(
+                    this,
+                    isActivityVisible = {
+                        lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.STARTED)
+                    },
+                ) {
+                    imports.cancel()
+                },
+            )
         setContent { Text("TXT process-death acceptance: $phase") }
         val deadline = SystemClock.elapsedRealtime() + 90_000
         var started = false

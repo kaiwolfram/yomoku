@@ -15,6 +15,7 @@ import app.yomoku.shared.Event
 import app.yomoku.theme.YomokuTheme
 
 class MainActivity : ComponentActivity() {
+    private lateinit var owner: CoreSessionOwner
     private lateinit var core: CoreSession
     private lateinit var fileImports: FileImports
     private lateinit var importBookRequest: ImportBookRequest
@@ -35,7 +36,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        val owner = ViewModelProvider(this)[CoreSessionOwner::class.java]
+        owner = ViewModelProvider(this)[CoreSessionOwner::class.java]
         core = owner.session
         fileImports = owner.fileImports
         importBookRequest = owner.importBookRequest
@@ -95,7 +96,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onStart() {
         super.onStart()
-        core.setForeground(true)
+        owner.setForeground(true)
         fileImports.refreshNotifications()
     }
 
@@ -112,7 +113,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onStop() {
         // Configuration changes retain the worker and its warm analyzer.
-        if (!isChangingConfigurations) core.setForeground(false)
+        if (!isChangingConfigurations) owner.setForeground(false)
         super.onStop()
     }
 }

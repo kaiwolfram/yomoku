@@ -15,6 +15,7 @@ import android.util.Base64
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.ViewModelProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -89,7 +90,7 @@ class ImportNotificationsTest {
         compose.onNodeWithText("Enable import notifications").assertDoesNotExist()
         compose
             .onNodeWithText(context.getString(R.string.import_notifications_unavailable))
-            .assertIsDisplayed()
+            .assertDoesNotExist()
         compose.onNodeWithText("Cancel").assertIsDisplayed()
         assertNull(notice(ImportNotifications.WAIT_ID))
         compose.activityRule.scenario.moveToState(Lifecycle.State.CREATED)
@@ -121,7 +122,7 @@ class ImportNotificationsTest {
             compose.onNodeWithText("Enable import notifications").assertDoesNotExist()
             compose
                 .onNodeWithText(context.getString(R.string.import_notifications_available))
-                .assertIsDisplayed()
+                .assertDoesNotExist()
             assertTrue(foregroundService())
             val progress = checkNotNull(notice(ImportNotifications.PROGRESS_ID))
             assertEquals("Import book", progress.extras.getString(Notification.EXTRA_TITLE))
@@ -156,8 +157,77 @@ class ImportNotificationsTest {
     }
 
     @Test
+    fun visibleCompletionAndBackgroundReturnSuppressResultsIncludingRecreationGap() {
+        val retained = owner()
+        val observer =
+            ImportNotifications(context, isActivityVisible = { retained.activityVisible }) {}
+        val result = FileImportResult("book.txt", app.yomoku.shared.ImportOutcome.CREATED, "Book")
+        try {
+            compose.runOnIdle { observer.finished(result) }
+            assertNull(notice(ImportNotifications.COMPLETE_ID))
+            // Finish in the old Activity's stopped callback, before the replacement starts.
+            var stoppedDuringRecreation = false
+            compose.runOnIdle {
+                val activity = compose.activity
+                activity.lifecycle.addObserver(
+                    LifecycleEventObserver { _, event ->
+                        if (event == Lifecycle.Event.ON_STOP && activity.isChangingConfigurations) {
+                            stoppedDuringRecreation = true
+                            assertTrue(retained.activityVisible)
+                            observer.finished(result)
+                        }
+                    }
+                )
+            }
+            compose.activityRule.scenario.recreate()
+            assertTrue(stoppedDuringRecreation)
+            assertSame(retained, owner())
+            assertNull(notice(ImportNotifications.COMPLETE_ID))
+            compose.activityRule.scenario.moveToState(Lifecycle.State.CREATED)
+            instrumentation.runOnMainSync {
+                assertFalse(retained.activityVisible)
+                observer.finished(result)
+            }
+            compose.waitUntil(30_000) { notice(ImportNotifications.COMPLETE_ID) != null }
+            manager.cancel(ImportNotifications.COMPLETE_ID)
+            compose.waitUntil(30_000) { notice(ImportNotifications.COMPLETE_ID) == null }
+            compose.activityRule.scenario.moveToState(Lifecycle.State.RESUMED)
+            compose.runOnIdle { observer.finished(result) }
+            assertNull(notice(ImportNotifications.COMPLETE_ID))
+        } finally {
+            instrumentation.runOnMainSync { observer.close() }
+        }
+    }
+
+    @Test
+    fun foregroundReturnKeepsConciseDialogAndDoesNotPostCompletion() {
+        val prefix = "visible-${System.nanoTime()}"
+        val uri = FileImportFixtures.uri("$prefix.epub", FileImportFixtures.epub(prefix), prefix)
+        val imports = owner().fileImports
+        try {
+            compose.runOnIdle { imports.start(uri) }
+            compose.waitUntil(30_000) { notice(ImportNotifications.PROGRESS_ID) != null }
+            compose.onNodeWithText("$prefix.epub").assertIsDisplayed()
+            compose
+                .onNodeWithText(context.getString(R.string.import_background_limits))
+                .assertDoesNotExist()
+            compose.onNodeWithText("Cancel").assertIsDisplayed()
+            compose.activityRule.scenario.moveToState(Lifecycle.State.CREATED)
+            assertTrue(foregroundService())
+            compose.activityRule.scenario.moveToState(Lifecycle.State.RESUMED)
+            context.contentResolver.call(uri, "release", prefix, null)
+            compose.waitUntil(90_000) { !imports.active }
+            assertEquals(app.yomoku.shared.ImportOutcome.CREATED, imports.result?.outcome)
+            compose.onNodeWithTag("file_import_summary").assertIsDisplayed()
+            assertNull(notice(ImportNotifications.COMPLETE_ID))
+        } finally {
+            context.contentResolver.call(uri, "release", prefix, null)
+        }
+    }
+
+    @Test
     fun terminalNotificationsDescribeTheSingleOutcome() {
-        val observer = ImportNotifications(context) {}
+        val observer = ImportNotifications(context, isActivityVisible = { false }) {}
         try {
             val outcomes =
                 listOf(
@@ -227,16 +297,10 @@ class ImportNotificationsTest {
             compose.waitUntil(30_000) {
                 !imports.active &&
                     !owner().session.view.storageBusy &&
-                    notice(ImportNotifications.COMPLETE_ID) != null &&
                     notice(ImportNotifications.WAIT_ID) == null
             }
             assertNull(notice(ImportNotifications.WAIT_ID))
-            assertEquals(
-                "Import cancelled",
-                notice(ImportNotifications.COMPLETE_ID)!!
-                    .extras
-                    .getString(Notification.EXTRA_TITLE),
-            )
+            assertNull(notice(ImportNotifications.COMPLETE_ID))
             compose.runOnIdle { imports.start(blocked) }
             compose.waitUntil(30_000) { foregroundService() }
             compose.runOnIdle {
