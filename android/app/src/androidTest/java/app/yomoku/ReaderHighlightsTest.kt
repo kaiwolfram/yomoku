@@ -87,10 +87,10 @@ class ReaderHighlightsTest {
             node.performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
             val layout = layouts.single()
             assertEquals(text, layout.layoutInput.text.text)
-            val first = readerHighlightRects(layout, 0, 1, inset).single()
-            val second = readerHighlightRects(layout, 1, 2, inset).single()
+            val first = readerTextFragmentRects(layout, 0, 1, inset).single()
+            val second = readerTextFragmentRects(layout, 1, 2, inset).single()
             assertEquals(inset * 2, second.left - first.right, 0.6f)
-            val wrapped = readerHighlightRects(layout, 2, text.length - 1, inset)
+            val wrapped = readerTextFragmentRects(layout, 2, text.length - 1, inset)
             assertTrue(wrapped.size > 1)
             val pixels = node.captureToImage().toPixelMap()
             for ((index, status) in
@@ -107,7 +107,7 @@ class ReaderHighlightsTest {
                         (0 until pixels.width).any { x -> pixels[x, y] == color }
                     }
                 )
-                for (rect in readerHighlightRects(layout, token.start, token.end, inset)) {
+                for (rect in readerTextFragmentRects(layout, token.start, token.end, inset)) {
                     val x = (rect.left - inset / 2).toInt().coerceIn(0, pixels.width - 1)
                     assertTrue(
                         (rect.top.toInt().coerceAtLeast(0) until

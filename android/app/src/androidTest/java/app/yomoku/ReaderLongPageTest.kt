@@ -9,7 +9,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
-import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextLinkStyles
@@ -162,5 +162,19 @@ class ReaderLongPageTest {
             assertEquals(original.lineCount, line)
         }
         assertEquals(List(blocks.size) { 7UL }, tapped)
+        if (split) {
+            // Physical coordinates in each clipped block must retain the original selection.
+            for ((index, block) in blocks.withIndex()) {
+                val tag =
+                    if (index == 0) "reader_text"
+                    else
+                        "reader_text_block_${blocks.take(index).sumOf { it.layoutInput.text.length }}"
+                val node = compose.onNodeWithTag(tag).performScrollTo()
+                val offset = block.layoutInput.text.text.indexOf("猫")
+                assertTrue(offset >= 0)
+                node.performTouchInput { click(block.getBoundingBox(offset).center) }
+            }
+            assertEquals(List(blocks.size * 2) { 7UL }, tapped)
+        }
     }
 }

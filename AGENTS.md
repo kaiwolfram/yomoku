@@ -8,6 +8,8 @@ do not resume deferred features unless requested.
 - Consult the relevant sections of `docs/PRODUCT_SPEC.md` when checking product
   behavior. It is the product source of truth. Read technical docs only as needed
   for the affected feature; historical reports are reference material.
+- Use `/home/kai/Documents/books/japanese` as the default directory for local
+  Japanese book examples. Keep book files outside Git.
 - Use Kotlin/Compose for Android, a pure Rust Crux core, separate Rust SQLite I/O
   and EffectRouter, and a narrow typed FFI. Do not put SQL/platform I/O in core.
 - Do not invent product behavior, add excluded features, or change major
