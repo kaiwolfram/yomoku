@@ -34,6 +34,12 @@ class TxtPickerTest {
     private fun owner() = ViewModelProvider(compose.activity)[CoreSessionOwner::class.java]
 
     private fun awaitIdle() {
+        if (android.os.Build.VERSION.SDK_INT >= 33) {
+            instrumentation.uiAutomation.grantRuntimePermission(
+                instrumentation.targetContext.packageName,
+                android.Manifest.permission.POST_NOTIFICATIONS,
+            )
+        }
         compose.waitUntil(30_000) {
             val view = owner().session.view
             !view.storageBusy &&

@@ -87,6 +87,9 @@ class ImportNotificationsTest {
         compose.runOnIdle { imports.start(uri) }
         compose.waitUntil(30_000) { imports.choosingEncoding }
         compose.onNodeWithText("Enable import notifications").assertDoesNotExist()
+        compose
+            .onNodeWithText(context.getString(R.string.import_notifications_unavailable))
+            .assertIsDisplayed()
         compose.onNodeWithText("Cancel").assertIsDisplayed()
         assertNull(notice(ImportNotifications.WAIT_ID))
         compose.activityRule.scenario.moveToState(Lifecycle.State.CREATED)
@@ -116,6 +119,9 @@ class ImportNotificationsTest {
                         ?.contains("$prefix.epub") == true
             }
             compose.onNodeWithText("Enable import notifications").assertDoesNotExist()
+            compose
+                .onNodeWithText(context.getString(R.string.import_notifications_available))
+                .assertIsDisplayed()
             assertTrue(foregroundService())
             val progress = checkNotNull(notice(ImportNotifications.PROGRESS_ID))
             assertEquals("Import book", progress.extras.getString(Notification.EXTRA_TITLE))

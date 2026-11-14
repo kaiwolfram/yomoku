@@ -81,6 +81,7 @@ internal class FileImports(
     private val resolver: ContentResolver,
     private val core: CoreSession,
     private val observer: FileImportObserver? = null,
+    private val notificationsAvailable: () -> Boolean = { false },
 ) : AutoCloseable {
     private val handler = Handler(Looper.getMainLooper())
     private var reader = Executors.newSingleThreadExecutor()
@@ -105,6 +106,9 @@ internal class FileImports(
         private set
 
     var result: FileImportResult? by mutableStateOf(null)
+        private set
+
+    var notificationsEnabled by mutableStateOf(false)
         private set
 
     init {
@@ -286,6 +290,7 @@ internal class FileImports(
 
     fun refreshNotifications() {
         checkMainThread()
+        notificationsEnabled = notificationsAvailable()
         if (!closed && active)
             observer?.update(
                 FileImportProgress(

@@ -136,7 +136,27 @@ revoked before instrumentation starts (revoking it during a test kills the app):
 ```
 
 It skips when notifications are enabled; the other import-notification cases grant
-permission for their delivery checks.
+permission for their delivery checks. The denied case starts an import directly and
+checks the active dialog without requesting permission inside it.
+
+Run the permission-before-picker regression separately for each Android 13+ choice
+on the disposable emulator. Reset permission before starting instrumentation, since
+revoking it during instrumentation kills the app:
+
+```sh
+# Repeat this reset and instrumentation command with grant, deny, and blocked.
+"$ANDROID_HOME/platform-tools/adb" -e shell pm revoke app.yomoku android.permission.POST_NOTIFICATIONS
+"$ANDROID_HOME/platform-tools/adb" -e shell pm clear-permission-flags app.yomoku android.permission.POST_NOTIFICATIONS user-set user-fixed
+# For blocked only, prevent the runtime prompt:
+# "$ANDROID_HOME/platform-tools/adb" -e shell pm set-permission-flags app.yomoku android.permission.POST_NOTIFICATIONS user-set user-fixed
+"$ANDROID_HOME/platform-tools/adb" -e shell am instrument -w -r -e class app.yomoku.ImportBookPermissionTest -e notificationChoice grant app.yomoku.test/androidx.test.runner.AndroidJUnitRunner
+```
+
+The default `notificationChoice` is `granted`; it grants permission before tapping
+Import book and checks the direct-picker path. Grant/deny recreate the activity
+while the system prompt is pending. Each path checks one picker launch, cancellation,
+and unchanged Library state. `ImportBookRequestTest` covers duplicate/stale callbacks
+and discarded process state. On pre-33 Android the picker opens directly.
 
 Use instrumentation class filters for focused reader/provider cases. Do not wipe
 an ordinary installation or accept unsupported development data by resetting it.

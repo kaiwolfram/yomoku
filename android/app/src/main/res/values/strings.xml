@@ -23,7 +23,9 @@
     <string name="import_complete">Import complete</string>
     <string name="import_choose_encoding">Choose an encoding in Yomoku</string>
     <string name="import_notifications">Book imports</string>
-    <string name="import_background_limits">Android may stop an import in the background. An unfinished import will not resume after the app closes.</string>
+    <string name="import_notifications_available">Progress and completion notifications are available while you use another app.</string>
+    <string name="import_notifications_unavailable">Progress and completion notifications are unavailable. You can follow the import here.</string>
+    <string name="import_background_limits">Android may stop an import in the background. If Android ends the app process, committed books are kept but an unfinished import will not resume.</string>
     <string name="import_summary_title">Import result</string>
     <string name="import_file_created">Imported</string>
     <string name="import_file_unreadable">Could not read this file. Select it again to retry.</string>

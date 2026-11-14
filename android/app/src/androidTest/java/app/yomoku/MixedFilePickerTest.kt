@@ -6,6 +6,7 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.database.sqlite.SQLiteDatabase
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -31,6 +32,12 @@ class MixedFilePickerTest {
 
     @Test
     fun mixedPickerPreservesFormatsEncodingAndFailuresWithoutOpeningReader() {
+        if (android.os.Build.VERSION.SDK_INT >= 33) {
+            instrumentation.uiAutomation.grantRuntimePermission(
+                instrumentation.targetContext.packageName,
+                android.Manifest.permission.POST_NOTIFICATIONS,
+            )
+        }
         compose.waitUntil(30_000) {
             val view = owner().session.view
             !view.storageBusy &&
@@ -68,7 +75,16 @@ class MixedFilePickerTest {
                     true,
                 )
             try {
-                compose.onNodeWithTag("library_add").performClick()
+                // Each import invalidates Library distributions; wait for that
+                // asynchronous refresh before tapping the enabled menu again.
+                compose.waitUntil(30_000) {
+                    val view = owner().session.view
+                    !imports.active &&
+                        !view.storageBusy &&
+                        owner().importBookRequest.step == null &&
+                        (view.libraryWordDistributions != null || view.libraryWordError != null)
+                }
+                compose.onNodeWithTag("library_add").assertIsEnabled().performClick()
                 compose.onNodeWithText("Import book").performClick()
                 compose.waitUntil(90_000) { imports.result != null || imports.choosingEncoding }
                 assertEquals(1, monitor.hits)

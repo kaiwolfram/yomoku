@@ -1,10 +1,12 @@
 package app.yomoku
 
 import android.app.Application
+import android.app.NotificationManager
 import androidx.lifecycle.AndroidViewModel
 
 /** Retains the Rust session across Activity recreation without copying domain state. */
 internal class CoreSessionOwner(application: Application) : AndroidViewModel(application) {
+    val importBookRequest = ImportBookRequest()
     val session =
         CoreSession(
             java.io.File(application.filesDir, "yomoku.sqlite3").absolutePath,
@@ -24,6 +26,12 @@ internal class CoreSessionOwner(application: Application) : AndroidViewModel(app
             application.contentResolver,
             session,
             ImportNotifications(application) { fileImports.cancel() },
+            notificationsAvailable = {
+                val manager = application.getSystemService(NotificationManager::class.java)
+                manager.areNotificationsEnabled() &&
+                    manager.getNotificationChannel(ImportNotifications.CHANNEL)?.importance !=
+                        NotificationManager.IMPORTANCE_NONE
+            },
         )
 
     override fun onCleared() {
