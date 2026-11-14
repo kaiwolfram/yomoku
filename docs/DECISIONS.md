@@ -56,9 +56,9 @@ Supporting evidence: [pinned Sudachi source](https://github.com/WorksApplication
 [mapped-file lifetime](https://docs.rs/memmap2/0.9.12/memmap2/struct.Mmap.html),
 [str boundaries](https://doc.rust-lang.org/std/primitive.str.html#method.is_char_boundary),
 [UTF-16](https://doc.rust-lang.org/std/primitive.str.html#method.encode_utf16),
-[strict decoding](https://docs.rs/encoding_rs/0.8.35/encoding_rs/struct.Encoding.html),
-[ZIP metadata](https://docs.rs/zip/8.6.0/zip/read/struct.ZipFile.html) and
-[XML parsing](https://docs.rs/roxmltree/0.21.1/roxmltree/struct.ParsingOptions.html).
+[strict decoding](https://docs.rs/encoding_rs/0.8.44/encoding_rs/struct.Encoding.html),
+[ZIP metadata](https://docs.rs/zip/9.5.1/zip/read/struct.ZipFile.html) and
+[XML parsing](https://docs.rs/roxmltree/0.21.2/roxmltree/struct.ParsingOptions.html).
 Pinned inputs, patches, licenses and notices are in
 [Sudachi notes](../third_party/sudachi/README.md) and
 [dictionary notes](../third_party/dictionaries/README.md).
