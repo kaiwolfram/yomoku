@@ -241,7 +241,8 @@ fn selected_word_bridge_loads_lazily_retries_both_failure_kinds_reuses_fifo_and_
         .clone()
         .unwrap();
     assert_eq!(details.selection, selected);
-    assert_eq!(details.encountered, 0);
+    // Reader details include each exact-surface occurrence on the visible page.
+    assert_eq!(details.encountered, 2);
     let words = details.candidates.words;
     let names = details.candidates.names;
     assert_eq!((words.len(), names.len()), (1, 1));
@@ -264,7 +265,7 @@ fn selected_word_bridge_loads_lazily_retries_both_failure_kinds_reuses_fifo_and_
     );
     let absent = absent.effective_reader_word.unwrap().details.unwrap();
     assert!(absent.candidates.words.is_empty() && absent.candidates.names.is_empty());
-    assert_eq!(absent.encountered, 0);
+    assert_eq!(absent.encountered, 1);
     assert!(loads.try_recv().is_err());
     assert_eq!(std::fs::read(fixture.user()).unwrap(), user_before);
     assert_eq!(std::fs::read(fixture.index()).unwrap(), index_before);
