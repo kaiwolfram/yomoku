@@ -21,8 +21,8 @@ boltffi_bin="${BOLTFFI_BIN:-$repo_dir/.local/bin/boltffi}"
 for tool in "$boltffi_bin" cargo rustc; do
     command -v "$tool" >/dev/null || { echo "Missing tool: $tool" >&2; exit 1; }
 done
-if [[ "$("$boltffi_bin" --version)" != "boltffi 0.30.1" ]]; then
-    echo 'BoltFFI CLI 0.30.1 is required to match the Rust library.' >&2
+if [[ "$("$boltffi_bin" --version)" != "boltffi 0.32.1" ]]; then
+    echo 'BoltFFI CLI 0.32.1 is required to match the Rust library.' >&2
     exit 1
 fi
 

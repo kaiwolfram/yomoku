@@ -13,7 +13,7 @@ worker. Kotlin owns lifecycle, descriptors, permissions, browser intents and the
 AnkiDroid ContentResolver adapter. Core contains no SQL or platform I/O.
 
 Crux 0.20.0 supplies typed events, commands, rendering and the Bincode middleware
-bridge. Facet generates the Kotlin payload codecs; BoltFFI 0.30.1 owns JNI/platform
+bridge. Facet generates the Kotlin payload codecs; BoltFFI 0.32.1 owns JNI/platform
 entry points. Generated artifacts live under ignored `target/`. The shell receives
 compact pages and revision identities; full chapter/provenance values stay native.
 Retained Android sessions reject stale callbacks and close native handles explicitly.
@@ -21,7 +21,7 @@ Retained Android sessions reject stale callbacks and close native handles explic
 Supporting contracts: [Crux middleware](https://docs.rs/crux_core/0.20.0/crux_core/middleware/struct.Bridge.html),
 [Bincode bridge](https://docs.rs/crux_core/0.20.0/crux_core/bridge/struct.BincodeFfiFormat.html),
 [Facet generation](https://docs.rs/crux_core/0.20.0/crux_core/type_generation/facet/index.html),
-[BoltFFI](https://docs.rs/crate/boltffi/0.30.1),
+[BoltFFI](https://docs.rs/crate/boltffi/0.32.1),
 [JNI](https://docs.oracle.com/en/java/javase/17/docs/specs/jni/design.html) and
 [Android ViewModel](https://developer.android.com/topic/libraries/architecture/viewmodel).
 

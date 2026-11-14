@@ -16,7 +16,7 @@ supported-version declaration. Install dependencies once before offline checks.
 ```sh
 cargo fetch --locked
 rustup target add aarch64-linux-android x86_64-linux-android
-cargo install boltffi_cli --version 0.30.1 --locked --root .local
+cargo install boltffi_cli --version 0.32.1 --locked --root .local
 python3 tools/prepare-sudachi.py
 # Offline alternative: tools/prepare-sudachi.py --archive /path/to/pinned-full.zip
 python3 tools/prepare-dictionaries.py --sources .local/dictionaries/upstream
@@ -64,7 +64,7 @@ diff -r target/generated/kotlin target/generated/kotlin-repeat
 ```
 
 Generated Kotlin stays under ignored `target/`. Crux codecs use Facet; BoltFFI
-0.30.1 supplies JNI ownership/platform entry points. Regenerate payloads and
+0.32.1 supplies JNI ownership/platform entry points. Regenerate payloads and
 Unicode fixtures whenever Rust interfaces change. ReaderDocument codecs remain
 explicitly registered for standalone Unicode fixtures, not the live render view.
 

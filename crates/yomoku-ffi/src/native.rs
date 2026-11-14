@@ -89,6 +89,7 @@ pub trait EpubCoverListener: Send + Sync {
 }
 
 /// Each native handle owns an independent application instance.
+#[boltffi::export]
 pub struct NativeBridge {
     bridge: YomokuBridge,
     lifecycle: AnalyzerLifecycle,

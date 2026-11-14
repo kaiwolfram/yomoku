@@ -26,8 +26,8 @@ jni_include_dir="${JNI_INCLUDE_DIR:-${JAVA_HOME:-$repo_dir/.local/jni-25}/includ
 for tool in "$boltffi_bin" "$kotlinc_bin" "$java_bin" "${CC:-cc}" cargo; do
     command -v "$tool" >/dev/null || { echo "Missing tool: $tool" >&2; exit 1; }
 done
-if [[ "$("$boltffi_bin" --version)" != "boltffi 0.30.1" ]]; then
-    echo 'BoltFFI CLI 0.30.1 is required to match the Rust library.' >&2
+if [[ "$("$boltffi_bin" --version)" != "boltffi 0.32.1" ]]; then
+    echo 'BoltFFI CLI 0.32.1 is required to match the Rust library.' >&2
     exit 1
 fi
 if [[ ! -f "$jni_include_dir/jni.h" || ! -f "$jni_include_dir/linux/jni_md.h" ]]; then
@@ -44,7 +44,9 @@ cargo run -p yomoku-ffi --bin generate-kotlin --features facet_typegen --locked 
 # native exports after generation before linking JNI against it.
 cargo build --workspace --locked --offline
 cargo run -p yomoku-ffi --example unicode-fixtures --locked --offline -- write target/unicode-fixtures
-"${CC:-cc}" -std=c11 -shared -fPIC -O2 -Wall -Wextra -Werror \
+# BoltFFI 0.32 emits an unused callback-error helper for our void callbacks.
+# Keep other diagnostics fatal when compiling this generated translation unit.
+"${CC:-cc}" -std=c11 -shared -fPIC -O2 -Wall -Wextra -Werror -Wno-error=unused-function \
     -I"$jni_include_dir" -I"$jni_include_dir/linux" \
     -Itarget/generated/native/jni target/generated/native/jni/jni_glue.c \
     -Ltarget/debug -lyomoku_ffi '-Wl,-rpath,$ORIGIN/debug' -Wl,-z,defs \

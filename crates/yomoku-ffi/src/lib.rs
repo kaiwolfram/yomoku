@@ -11,6 +11,8 @@ use yomoku_runtime::{
     effect_router, AnalyzerLifecycle, AnalyzerLoader, EffectRouter, WordDictionaryLoader,
 };
 
+boltffi::scaffolding!();
+
 pub mod native;
 
 /// Error categories for the native binding; payloads and internal
