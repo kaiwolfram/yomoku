@@ -75,9 +75,25 @@ impl EffectiveReaderSession {
         }
     }
     pub fn word_state(&self) -> EffectiveReaderWordState {
+        // Keep the accepted storage result untouched. Each render projects the
+        // current page again so taps/status changes cannot accumulate history.
+        let details = self.words.details.as_ref().map(|saved| {
+            let mut projected = saved.clone();
+            let visible_occurrences = self
+                .page()
+                .filter(|page| page.identity == saved.selection.page)
+                .map_or(0, |page| {
+                    page.tokens
+                        .iter()
+                        .filter(|token| token.surface == saved.token.surface)
+                        .count() as u64
+                });
+            projected.encountered = saved.encountered.saturating_add(visible_occurrences);
+            projected
+        });
         EffectiveReaderWordState {
             selection: self.words.selection,
-            details: self.words.details.clone(),
+            details,
             error: self.words.error,
             busy: self.words.pending.is_some(),
         }

@@ -81,7 +81,7 @@ fn word_projection_is_compact_and_preserves_resolved_unresolved_and_live_fields(
             let word = pages.word_state().details.unwrap();
             assert_eq!(word.selection, selection);
             assert_eq!(word.token, expected.token.into());
-            assert_eq!(word.encountered, 7);
+            assert_eq!(word.encountered, 8);
             assert_eq!(word.candidates, expected.candidates);
             assert_eq!(word.token.reading.is_none(), manual);
             assert_eq!(word.token.dictionary_form.is_none(), manual);
@@ -170,5 +170,91 @@ fn foreign_word_results_fail_closed_without_consuming_another_request() {
         let next = pages.begin_word_load(selection).unwrap();
         assert!(!pages.finish_word_request(&request, Err(DocumentError::Unavailable)));
         assert!(pages.finish_word_request(&next, Err(DocumentError::Unavailable)));
+    }
+}
+
+#[test]
+fn encounter_projection_recounts_exact_visible_surfaces_on_navigation_and_rereads() {
+    let chapter = ChapterText {
+        source_id: 2.try_into().unwrap(),
+        chapter_id: 3.try_into().unwrap(),
+        text: "食べた食べた食べる".into(),
+    };
+    let mut start = 0;
+    let analysis = ChapterAnalysis {
+        profile: AnalysisProfile {
+            engine_revision: "fixture@1".into(),
+            dictionary_revision: "full@1".into(),
+        },
+        mode: SplitMode::C,
+        tokens: ["食べた", "食べた", "食べる"]
+            .into_iter()
+            .map(|surface| {
+                let end = start + surface.len();
+                let token = AnalyzedToken {
+                    anchor: TextAnchor {
+                        source_id: chapter.source_id,
+                        chapter_id: chapter.chapter_id,
+                        range: range(start, end),
+                    },
+                    surface: surface.into(),
+                    is_japanese: true,
+                    reading: None,
+                    dictionary_form: Some(Surface::new("食べる").unwrap()),
+                };
+                start = end;
+                token
+            })
+            .collect(),
+    };
+    let mut session = EffectiveReaderSession::default();
+    // Forward, backward, and a reread each get a fresh page projection.
+    for (start, end, visible) in [(0, 9, 1), (9, 27, 1), (0, 27, 2), (0, 9, 1)] {
+        for saved in [0, 7, u64::MAX] {
+            let resolved =
+                EffectiveReaderChapter::resolve(&chapter, 4.try_into().unwrap(), &analysis)
+                    .unwrap();
+            let page = TextAnchor {
+                source_id: chapter.source_id,
+                chapter_id: chapter.chapter_id,
+                range: range(start, end),
+            };
+            let snapshot = EffectiveReaderTokenSnapshot {
+                document_id: 1.try_into().unwrap(),
+                page,
+                tokens: resolved.tokens_on_page(page).unwrap(),
+                segmentation: Some(resolved.into_segmentation()),
+            };
+            let token = snapshot.tokens.first().unwrap().clone();
+            let details = EffectiveReaderWordDetails {
+                key: snapshot.key().unwrap(),
+                token,
+                encountered: saved,
+                candidates: DictionaryCandidates {
+                    surface: "食べた".into(),
+                    dictionary_form: Some("食べる".into()),
+                    words: vec![],
+                    names: vec![],
+                },
+                dictionary_sources: vec![],
+            };
+            let request = session.begin_load(base(&snapshot)).unwrap();
+            assert!(session.word_state().details.is_none());
+            assert!(session.accept(request, snapshot));
+            let selection = EffectiveReaderSelection {
+                page: session.page().unwrap().identity,
+                segment_index: details.token.segment_index,
+            };
+            for _ in 0..3 {
+                finish_load(&mut session, selection, details.clone());
+                for _ in 0..3 {
+                    assert_eq!(
+                        session.word_state().details.unwrap().encountered,
+                        saved.saturating_add(visible)
+                    );
+                }
+                session.dismiss_word();
+            }
+        }
     }
 }

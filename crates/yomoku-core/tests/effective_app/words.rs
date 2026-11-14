@@ -129,7 +129,7 @@ fn compact_lookup_requires_current_visible_selection_and_explicit_retry_after_ba
         .unwrap();
     assert_eq!(word.token.surface, "猫");
     assert!(word.token.reading.is_some() && word.token.dictionary_form.is_some());
-    assert_eq!(word.encountered, 7);
+    assert_eq!(word.encountered, 8);
     f.load();
     assert!(f
         .core
@@ -145,6 +145,12 @@ fn all_five_status_choices_update_repeated_spellings_and_word_details_including_
     let f = Fixture::new(true);
     f.load();
     let selected = selection(&f);
+    let visible_occurrences = f
+        .snapshot()
+        .tokens
+        .iter()
+        .filter(|token| token.surface == "猫")
+        .count() as u64;
     let id = 55.try_into().unwrap();
     load_word(
         &f,
@@ -180,7 +186,7 @@ fn all_five_status_choices_update_repeated_spellings_and_word_details_including_
             .all(|token| token.vocabulary == Some(ReaderVocabulary { id, status })));
         let word = view.effective_reader_word.unwrap().details.unwrap();
         assert_eq!(word.token.vocabulary.unwrap().status, status);
-        assert_eq!(word.encountered, 7);
+        assert_eq!(word.encountered, 7 + visible_occurrences);
         assert!(!view.effective_reader_status.unwrap().pending);
     }
     let mut effects = f
@@ -199,7 +205,7 @@ fn all_five_status_choices_update_repeated_spellings_and_word_details_including_
         .details
         .unwrap();
     assert!(word.token.vocabulary.is_none());
-    assert_eq!(word.encountered, 0);
+    assert_eq!(word.encountered, visible_occurrences);
     assert!(f
         .core
         .process_event(status_event(selected, VocabularyStatus::New))

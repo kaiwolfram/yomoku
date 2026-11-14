@@ -65,7 +65,7 @@ internal fun verifyEffectiveReaderBridge() {
             check(word.token.surface == "国家公務員")
             val forms = word.candidates.words.flatMap { it.forms }.map { it.form }.toSet()
             check(forms.containsAll(listOf("国家公務員", "国家", "公務員", "公務", "員")))
-            check(word.encountered == 0UL)
+            check(word.encountered == 2UL)
         }
         println("PASS: Mode C JNI selection and A/B component dictionary lookup")
     } finally {

@@ -65,7 +65,7 @@ internal fun verifyReaderWordBridge() {
                     loaded.effectiveReaderWord.selection == selection &&
                         loaded.effectiveReaderWord.error == null
                 )
-                check(word.token == token && word.encountered == 0UL)
+                check(word.token == token && word.encountered == 2UL)
                 check(word.candidates.words.isNotEmpty() && word.candidates.names.isNotEmpty())
                 check(
                     word.candidates.words.all {
@@ -87,8 +87,11 @@ internal fun verifyReaderWordBridge() {
                     !before.contentEquals(database.readBytes())
                 ) // First lookup caches A/B analysis.
                 val cached = database.readBytes()
-                dispatch(bridge, Event.LoadEffectiveReaderWord(selection))
-                check(cached.contentEquals(database.readBytes()))
+                repeat(3) {
+                    val repeated = dispatch(bridge, Event.LoadEffectiveReaderWord(selection))
+                    check(repeated.effectiveReaderWord?.details?.encountered == 2UL)
+                    check(cached.contentEquals(database.readBytes()))
+                }
                 check(loaded.reader == page && loaded.completionNotice == null)
                 check(provider.wordCalls.get() == 2)
                 check(provider.wordThreads.all { it != Thread.currentThread() })
@@ -143,7 +146,7 @@ internal fun verifyReaderWordBridge() {
                         .effectiveReaderWord
                         ?.details
                 )
-            check(details.encountered == 2UL)
+            check(details.encountered == 4UL)
             check(fresh.calls.get() == 0 && fresh.wordCalls.get() == 1)
             check(before.contentEquals(database.readBytes()))
         }

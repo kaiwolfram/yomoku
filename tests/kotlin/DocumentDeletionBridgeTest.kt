@@ -77,7 +77,7 @@ internal fun verifyDocumentDeletionBridge() {
                 )
             dispatch(Event.CompleteEffectiveReaderPage(snapshot.identity, page.position, 500), 2)
             val beforeWord = word(second)
-            check(beforeWord.encountered == 2UL)
+            check(beforeWord.encountered == 3UL)
             check(beforeWord.token.vocabulary?.status == VocabularyStatus.KNOWN)
             dispatch(Event.CloseDocument)
             val beforeBytes = database.readBytes()

@@ -84,7 +84,7 @@ internal fun verifyConjugationBridge() {
             )
             val updated = tokens(bridge)
             val details = word(bridge, updated)
-            check(details.encountered == 0UL)
+            check(details.encountered == 1UL)
             check(details.candidates.surface == "食べました")
             check(details.candidates.dictionaryForm == "食べる")
             check(details.candidates.words.flatMap { it.forms }.any { it.form == "食べる" })
@@ -99,7 +99,7 @@ internal fun verifyConjugationBridge() {
                         it.vocabulary.status == VocabularyStatus.LEARNING
                 }
             )
-            check(word(bridge, second).encountered == 1UL)
+            check(word(bridge, second).encountered == 2UL)
             dispatch(
                 bridge,
                 Event.CompleteEffectiveReaderPage(
@@ -122,7 +122,7 @@ internal fun verifyConjugationBridge() {
             dispatch(bridge, Event.OpenReader(id))
             val page = tokens(bridge)
             check(page.tokens.single().vocabulary?.status == VocabularyStatus.LEARNING)
-            check(word(bridge, page).encountered == 2UL)
+            check(word(bridge, page).encountered == 3UL)
         }
         println(
             "PASS: joined conjugation JNI identity, base/components, cross-page counts, status, Library and reopen"

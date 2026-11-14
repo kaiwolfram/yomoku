@@ -126,7 +126,7 @@ fn status_changes_update_live_word_and_page_without_guessing_manual_metadata() {
 }
 
 #[test]
-fn status_observing_deleted_vocabulary_clears_the_selected_words_encounter_count() {
+fn status_observing_deleted_vocabulary_clears_saved_history_but_keeps_visible_occurrences() {
     let (mut session, selection, details) = loaded();
     let candidates = details.candidates.clone();
     let request = session.begin_word_load(selection).unwrap();
@@ -134,12 +134,12 @@ fn status_observing_deleted_vocabulary_clears_the_selected_words_encounter_count
         &request,
         Ok(Output::WordLoaded(selection, Box::new(details)))
     ));
-    assert_eq!(session.word_state().details.unwrap().encountered, 7);
+    assert_eq!(session.word_state().details.unwrap().encountered, 8);
     let request = begin(&mut session, selection);
     assert!(session.finish_status_request(&request, Ok(Output::StatusChanged(selection, None))));
     let details = session.word_state().details.unwrap();
     assert!(details.token.vocabulary.is_none());
-    assert_eq!(details.encountered, 0);
+    assert_eq!(details.encountered, 1);
     assert_eq!(details.candidates, candidates);
     assert!(session
         .page()

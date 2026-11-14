@@ -223,8 +223,18 @@ class ReaderWordsTest {
                 "SELECT count(*) FROM vocabulary_status_events WHERE vocabulary_id = $catId"
             val readingSql = "SELECT count(*) FROM reading_completions WHERE document_id = $id"
             val baseline = count(db, eventsSql)
+            val encountersSql =
+                "SELECT count(*) FROM reading_occurrences WHERE vocabulary_id = $catId"
+            val savedEncounters = count(db, encountersSql)
+            fun assertEncounterProjection() {
+                assertEquals(savedEncounters, count(db, encountersSql))
+                compose
+                    .onNodeWithTag("word_encountered")
+                    .assertTextEquals("Encountered ${savedEncounters + 2} times")
+            }
             tapSurface("猫")
             assertCats(VocabularyStatus.NEW)
+            assertEncounterProjection()
             assertEquals(baseline, count(db, eventsSql))
             assertEquals(0, count(db, readingSql))
             compose.onNodeWithText("Close").assertDoesNotExist()
@@ -243,6 +253,7 @@ class ReaderWordsTest {
                 compose.onNodeWithTag("word_status_$status").performClick()
                 awaitWords()
                 assertCats(status)
+                assertEncounterProjection()
                 assertEquals(original, core().view.reader)
                 assertEquals(0, count(db, readingSql))
             }
@@ -256,6 +267,7 @@ class ReaderWordsTest {
                     !core().view.storageBusy && core().view.effectiveReaderStatus?.error != null
                 }
                 assertCats(VocabularyStatus.NEW)
+                assertEncounterProjection()
                 assertEquals(baseline + 5, count(db, eventsSql))
             } finally {
                 db.execSQL("DROP TRIGGER IF EXISTS fail_word_ui")
@@ -266,6 +278,7 @@ class ReaderWordsTest {
             compose.onNodeWithTag("effective_status_retry").performScrollTo().performClick()
             awaitWords()
             assertCats(VocabularyStatus.LEARNING)
+            assertEncounterProjection()
             assertNull(core().view.effectiveReaderStatus?.error)
             assertEquals(baseline + 6, count(db, eventsSql))
             androidx.test.platform.app.InstrumentationRegistry.getInstrumentation()
@@ -275,6 +288,7 @@ class ReaderWordsTest {
             awaitWords()
             tapSurface("猫")
             assertCats(VocabularyStatus.LEARNING)
+            assertEncounterProjection()
             assertEquals(baseline + 6, count(db, eventsSql))
             androidx.test.platform.app.InstrumentationRegistry.getInstrumentation()
                 .sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_BACK)
@@ -286,6 +300,7 @@ class ReaderWordsTest {
             compose.onNodeWithTag("reader_word_panel").assertDoesNotExist()
             tapSurface("猫")
             assertCats(VocabularyStatus.LEARNING)
+            assertEncounterProjection()
             assertEquals(0, count(db, readingSql))
         }
     }
@@ -336,7 +351,7 @@ class ReaderWordsTest {
             assertTrue(details.candidates.names.isNotEmpty())
             compose
                 .onNodeWithTag("word_encountered")
-                .assertTextEquals("Encountered $encountered times")
+                .assertTextEquals("Encountered ${encountered + 1} times")
             assertDictionaryEntries(compose)
             compose.onNodeWithTag("word_names").performScrollTo().assertIsDisplayed()
             for (candidate in details.candidates.words) {
@@ -383,7 +398,7 @@ class ReaderWordsTest {
             tapSurface("東京")
             compose
                 .onNodeWithTag("word_encountered")
-                .assertTextEquals("Encountered ${encountered + 1} times")
+                .assertTextEquals("Encountered ${encountered + 2} times")
             compose.runOnUiThread { core().dispatch(Event.OpenSettings) }
             compose.onNodeWithTag("reader_word_panel").assertDoesNotExist()
             compose.waitUntil(30_000) { !core().view.storageBusy }
@@ -585,7 +600,7 @@ class ReaderWordsTest {
                     )
             }
             compose.onNodeWithTag("word_no_match").performScrollTo().assertIsDisplayed()
-            compose.onNodeWithTag("word_encountered").assertTextEquals("Encountered 0 times")
+            compose.onNodeWithTag("word_encountered").assertTextEquals("Encountered 2 times")
             compose.onNodeWithTag("word_lookup_error").assertDoesNotExist()
             compose.onNodeWithTag("retry_word_details").assertDoesNotExist()
             assertEquals(1, events.filterIsInstance<Event.LoadEffectiveReaderWord>().size)
