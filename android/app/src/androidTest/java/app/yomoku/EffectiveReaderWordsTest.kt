@@ -132,6 +132,12 @@ class EffectiveReaderWordsTest {
                                 if (failLookup) null
                                 else
                                     EffectiveWordDetails(
+                                        DictionaryLookup(
+                                            DictionaryQuery(token.surface, token.dictionaryForm),
+                                            emptyList(),
+                                            revision = 1UL,
+                                            loading = false,
+                                        ),
                                         event.value,
                                         token,
                                         ULong.MAX_VALUE,
@@ -141,7 +147,6 @@ class EffectiveReaderWordsTest {
                                             emptyList(),
                                             emptyList(),
                                         ),
-                                        emptyList(),
                                     ),
                             error = if (failLookup) DocumentError.UNAVAILABLE else null,
                             busy = false,
@@ -243,11 +248,11 @@ class EffectiveReaderWordsTest {
         show()
         tap(2)
         val selected = frame.value.effectiveReaderWord!!.selection!!
-        exposeDictionaryAnki(AnkiSelection.Effective(selected))
+        exposeDictionaryAnki(AnkiSelection.Effective(selected, 1UL))
         click("anki_entry_word_1_0_0")
         assertEquals(
             Event.AddReaderAnkiEntry(
-                AnkiSelection.Effective(selected),
+                AnkiSelection.Effective(selected, 1UL),
                 AnkiEntryKey.Word(1, ReadingMatch(0UL, 0UL)),
             ),
             events.last(),
@@ -267,7 +272,7 @@ class EffectiveReaderWordsTest {
         show()
         tap(1)
         val selection = frame.value.effectiveReaderWord!!.selection!!
-        exposeDictionaryAnki(AnkiSelection.Effective(selection))
+        exposeDictionaryAnki(AnkiSelection.Effective(selection, 1UL))
         compose.onNodeWithTag("anki_entry_word_1_0_0").assertExists()
         fun queries() = events.filterIsInstance<Event.LoadReaderAnkiEntries>().size
         assertEquals(1, queries())
@@ -534,7 +539,7 @@ class EffectiveReaderWordsTest {
         tap()
         compose.onNodeWithTag("word_surface").assertTextEquals(full)
         exposeDictionaryAnki(
-            AnkiSelection.Effective(EffectiveReaderSelection(identity, token.segmentIndex))
+            AnkiSelection.Effective(EffectiveReaderSelection(identity, token.segmentIndex), 1UL)
         )
         assertDictionaryEntries(compose)
         assertEquals(

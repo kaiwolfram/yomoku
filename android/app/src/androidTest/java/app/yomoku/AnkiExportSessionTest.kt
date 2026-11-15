@@ -149,7 +149,13 @@ class AnkiExportSessionTest {
             )
         send(Event.LoadEffectiveReaderWord(selected))
         await { it.effectiveReaderWord?.details != null && !it.storageBusy }
-        val prepare = Event.PrepareReaderAnkiExport(AnkiSelection.Effective(selected))
+        val prepare =
+            Event.PrepareReaderAnkiExport(
+                AnkiSelection.Effective(
+                    selected,
+                    core.view.effectiveReaderWord!!.details!!.lookup.revision,
+                )
+            )
         send(prepare)
         assertEquals(null, core.view.ankiExport)
         send(Event.OpenSettings)
@@ -170,6 +176,15 @@ class AnkiExportSessionTest {
         send(Event.LoadEffectiveReaderWord(selected))
         await { it.effectiveReaderWord?.details != null && !it.storageBusy }
         send(prepare)
+        assertNull(core.view.ankiExport)
+        send(
+            Event.PrepareReaderAnkiExport(
+                AnkiSelection.Effective(
+                    selected,
+                    core.view.effectiveReaderWord!!.details!!.lookup.revision,
+                )
+            )
+        )
         return checkNotNull(core.view.ankiExport)
     }
 
@@ -266,7 +281,16 @@ class AnkiExportSessionTest {
             assertEquals(Long.MAX_VALUE, operation.deckId)
             assertEquals("猫", operation.fields[0])
             assertEquals("猫と<strong class=\"yomoku-target\">猫</strong>。", operation.fields[3])
+            duplicates = listOf(Long.MAX_VALUE)
             results.add(AnkiLiveResult.NoteAdded(Long.MAX_VALUE))
+            await { it.ankiExport == null }
+            // A different lookup owns fresh observations; the old write cannot relabel it.
+            val current = core.view.effectiveReaderWord!!.details!!
+            send(
+                Event.LoadReaderAnkiEntries(
+                    AnkiSelection.Effective(current.selection, current.lookup.revision)
+                )
+            )
             await {
                 it.ankiExport == null &&
                     it.ankiEntries.any { entry ->
@@ -279,9 +303,15 @@ class AnkiExportSessionTest {
             assertEquals(original.statistics, core.view.statistics)
             assertEquals(original.completionNotice, core.view.completionNotice)
             tapCatAfterDismissal()
+            val reopened = core.view.effectiveReaderWord!!.details!!
             assertEquals(
                 original.effectiveReaderWord?.details,
-                core.view.effectiveReaderWord?.details,
+                reopened.copy(
+                    lookup =
+                        reopened.lookup.copy(
+                            revision = original.effectiveReaderWord!!.details!!.lookup.revision
+                        )
+                ),
             )
             assertTrue(operations.isEmpty())
         } finally {
@@ -301,7 +331,11 @@ class AnkiExportSessionTest {
         try {
             showDictionary()
             preflightFailure = AnkiExportError.PROVIDERUNAVAILABLE
-            val selection = AnkiSelection.Effective(core.view.effectiveReaderWord!!.selection!!)
+            val selection =
+                AnkiSelection.Effective(
+                    core.view.effectiveReaderWord!!.selection!!,
+                    core.view.effectiveReaderWord!!.details!!.lookup.revision,
+                )
             send(Event.LoadReaderAnkiEntries(selection))
             await { it.ankiEntries.any { entry -> entry.phase is AnkiEntryPhase.Failed } }
             val entry = core.view.ankiEntries.first { it.phase is AnkiEntryPhase.Failed }

@@ -157,7 +157,7 @@ impl Imports {
     pub(crate) fn vocabulary_forms(
         &mut self,
         surface: &str,
-    ) -> Result<(Option<String>, Vec<String>), DocumentError> {
+    ) -> Result<(Option<String>, Vec<yomoku_core::dictionary::DictionaryPart>), DocumentError> {
         let chapter = ChapterText {
             source_id: 1.try_into().expect("positive temporary ID"),
             chapter_id: 1.try_into().expect("positive temporary ID"),
@@ -191,10 +191,10 @@ impl Imports {
                 }
                 components.extend(analysis.tokens);
             }
-            let forms = yomoku_core::dictionary::component_sources(components)
-                .into_iter()
-                .map(|source| source.form)
-                .collect();
+            let forms = yomoku_core::dictionary::component_parts(
+                components,
+                yomoku_core::document::TextOffset::START,
+            );
             Ok((base, forms))
         })();
         if result.is_err() {

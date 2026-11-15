@@ -65,7 +65,7 @@ impl Fixture {
             tokens: vec![token.clone()],
         };
         let details = EffectiveWordDetails {
-            dictionary_sources: vec![],
+            lookup: Default::default(),
             selection: EffectiveReaderSelection {
                 page: page.identity,
                 segment_index: token.segment_index,
@@ -303,6 +303,33 @@ fn sentence_uses_full_chapter_when_page_only_displays_part_of_word() {
         AnkiNote::from_effective_selection(&f.chapter, &page, details.selection, &details).unwrap(),
         f.note().unwrap()
     );
+}
+
+#[test]
+fn selected_part_highlights_its_exact_occurrence_even_outside_the_clipped_page() {
+    let mut f = Fixture::new("前。猫と猫。猫と猫。次。", "猫と猫");
+    let start = f.chapter.text.rfind('と').unwrap();
+    f.page.identity.base.page.range = range(&f.chapter.text, start, start + "と".len());
+    f.page.tokens[0].display_range = range("と", 0, "と".len());
+    f.details.lookup.parts = vec![DictionaryPart {
+        surface: "猫".into(),
+        dictionary_form: None,
+        range: range("猫と猫", 0, "猫".len()),
+        primary: true,
+    }];
+    f.details.lookup.active = Some(0);
+    f.details.candidates.surface = "猫".into();
+    assert_eq!(
+        f.note().unwrap().fields()[3],
+        "<strong class=\"yomoku-target\">猫</strong>と猫。"
+    );
+    f.details.lookup.parts[0].range = range("猫と猫", "猫と".len(), "猫と猫".len());
+    assert_eq!(
+        f.note().unwrap().fields()[3],
+        "猫と<strong class=\"yomoku-target\">猫</strong>。"
+    );
+    f.details.lookup.loading = true;
+    assert!(f.note().is_err());
 }
 
 #[test]

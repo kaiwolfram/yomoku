@@ -17,11 +17,12 @@ internal fun verifyAnkiProtocol(fixtures: String) {
                         check(selected.value.generation == ULong.MAX_VALUE)
                     }
                     is AnkiSelection.Effective -> {
-                        check(index in 0..1 && selected.value.segmentIndex == ULong.MAX_VALUE)
+                        check(index in 0..1 && selected.selection.segmentIndex == ULong.MAX_VALUE)
                         check(
-                            selected.value.page.revision == if (index == 0) 1UL else ULong.MAX_VALUE
+                            selected.selection.page.revision ==
+                                if (index == 0) 1UL else ULong.MAX_VALUE
                         )
-                        check(selected.value.page.base.documentId.value == Long.MAX_VALUE)
+                        check(selected.selection.page.base.documentId.value == Long.MAX_VALUE)
                     }
                 }
             }

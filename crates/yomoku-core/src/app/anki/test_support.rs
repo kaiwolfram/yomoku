@@ -114,12 +114,11 @@ pub(super) fn fixture() -> (Model, AnkiSelection) {
             tokens,
         };
         let details = EffectiveReaderWordDetails {
+            parts: Vec::new(),
             key: snapshot.key().unwrap(),
             token: snapshot.tokens[1].clone(),
             encountered: 47,
             candidates,
-
-            dictionary_sources: Vec::new(),
         };
         assert!(session.accept(request, snapshot));
         let selected = EffectiveReaderSelection {
@@ -134,7 +133,10 @@ pub(super) fn fixture() -> (Model, AnkiSelection) {
                 Box::new(details)
             ))
         ));
-        AnkiSelection::Effective(selected)
+        AnkiSelection::Effective {
+            selection: selected,
+            lookup_revision: 1,
+        }
     };
     (model, selection)
 }
@@ -142,34 +144,9 @@ pub(super) fn fixture() -> (Model, AnkiSelection) {
 pub(super) fn set_candidates(model: &mut Model, words: Vec<crate::dictionary::WordCandidate>) {
     let session = &mut model.effective_reader;
     let current = session.word_state().details.unwrap();
-    let command = session.freeze_selection(current.selection).unwrap();
-    let metadata = command.key().segmentation.segments[current.selection.segment_index as usize]
-        .metadata
-        .clone();
-    let details = EffectiveReaderWordDetails {
-        key: command.key().clone(),
-        token: crate::effective_reader::EffectiveReaderToken {
-            segment_index: current.token.segment_index,
-            anchor: current.token.anchor,
-            display_range: current.token.display_range,
-            surface: current.token.surface,
-            eligibility: current.token.eligibility,
-            metadata,
-            vocabulary: current.token.vocabulary,
-        },
-        encountered: current.encountered,
-        candidates: DictionaryCandidates {
-            words,
-            ..current.candidates
-        },
-        dictionary_sources: current.dictionary_sources,
-    };
-    let request = session.begin_word_load(current.selection).unwrap();
-    assert!(session.finish_word_request(
-        &request,
-        Ok(EffectiveStorageResult::WordLoaded(
-            current.selection,
-            Box::new(details)
-        ))
-    ));
+    session
+        .dictionary_word_mut(current.selection)
+        .unwrap()
+        .candidates
+        .words = words;
 }

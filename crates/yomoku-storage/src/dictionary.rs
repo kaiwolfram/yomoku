@@ -70,6 +70,99 @@ pub struct Dictionary {
 }
 
 impl Dictionary {
+    /// One ordered index seek answers exact membership and prefix viability.
+    /// Payloads are intentionally left unread until a choice is active.
+    fn first_form(
+        statement: &mut rusqlite::Statement<'_>,
+        prefix: &str,
+    ) -> Result<Option<String>, DictionaryError> {
+        use rusqlite::OptionalExtension;
+        Ok(statement.query_row([prefix], |row| row.get(0)).optional()?)
+    }
+
+    pub fn parts(
+        &self,
+        surface: &str,
+        components: Vec<yomoku_core::dictionary::DictionaryPart>,
+    ) -> Result<Vec<yomoku_core::dictionary::DictionaryPart>, DictionaryError> {
+        use yomoku_core::{
+            dictionary::DictionaryPart,
+            document::{TextOffset, TextRange},
+        };
+        let mut statement = self.connection.prepare(
+            "SELECT surface FROM forms WHERE surface >= ?1 COLLATE BINARY ORDER BY surface LIMIT 1",
+        )?;
+        let mut parts: Vec<DictionaryPart> = Vec::new();
+        let mut retain = |part: DictionaryPart| {
+            if let Some(existing) = parts.iter_mut().find(|old| old.surface == part.surface) {
+                if part.range.start < existing.range.start {
+                    *existing = part;
+                }
+            } else {
+                parts.push(part);
+            }
+        };
+        for component in components {
+            if component.surface == surface
+                || component.surface.trim().is_empty()
+                || component.range.slice(surface) != Ok(component.surface.as_str())
+            {
+                continue;
+            }
+            let exact = Self::first_form(&mut statement, &component.surface)?.as_deref()
+                == Some(&component.surface);
+            let base = match component
+                .dictionary_form
+                .as_deref()
+                .filter(|base| !base.trim().is_empty())
+            {
+                Some(base) => Self::first_form(&mut statement, base)?.as_deref() == Some(base),
+                None => false,
+            };
+            if exact || base {
+                retain(component);
+            }
+        }
+        for (start, _) in surface.char_indices() {
+            for (offset, scalar) in surface[start..].char_indices() {
+                let end = start + offset + scalar.len_utf8();
+                let part = &surface[start..end];
+                let Some(first) = Self::first_form(&mut statement, part)? else {
+                    break;
+                };
+                if !first.starts_with(part) {
+                    break;
+                }
+                if first == part && part != surface && !part.trim().is_empty() {
+                    retain(DictionaryPart {
+                        surface: part.to_owned(),
+                        dictionary_form: None,
+                        range: TextRange {
+                            start: TextOffset::at(surface, start)
+                                .map_err(|_| DictionaryError::InvalidQuery)?,
+                            end: TextOffset::at(surface, end)
+                                .map_err(|_| DictionaryError::InvalidQuery)?,
+                        },
+                        primary: false,
+                    });
+                }
+            }
+        }
+        parts.sort_by_key(|part| {
+            (
+                std::cmp::Reverse(part.surface.chars().count()),
+                part.range.start,
+            )
+        });
+        for index in 0..parts.len() {
+            let range = parts[index].range;
+            parts[index].primary = !parts[..index]
+                .iter()
+                .any(|larger| larger.range.start <= range.start && larger.range.end >= range.end);
+        }
+        Ok(parts)
+    }
+
     /// Never creates a missing file, follows SQLite URI options, or migrates.
     pub fn open(path: impl AsRef<Path>) -> Result<Self, DictionaryError> {
         let connection = Connection::open_with_flags(

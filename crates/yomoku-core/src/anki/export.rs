@@ -45,7 +45,10 @@ provider_id!(
 #[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
 #[repr(C)]
 pub enum AnkiSelection {
-    Effective(EffectiveReaderSelection),
+    Effective {
+        selection: EffectiveReaderSelection,
+        lookup_revision: u64,
+    },
     Vocabulary(VocabularyAnkiSelection),
 }
 
@@ -108,7 +111,10 @@ impl AnkiExport {
         details: &EffectiveWordDetails,
     ) -> Result<Self, InvalidTextValue> {
         Ok(Self {
-            selection: AnkiSelection::Effective(selection),
+            selection: AnkiSelection::Effective {
+                selection,
+                lookup_revision: details.lookup.revision,
+            },
             entry: None,
             deck,
             note: AnkiNote::from_effective_selection(chapter, current, selection, details)?,

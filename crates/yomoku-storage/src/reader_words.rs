@@ -83,6 +83,7 @@ impl Storage {
             return Ok(None);
         };
         let components = component_forms_in(&transaction, key, token.anchor)?;
+        let parts = dictionary.parts(&token.surface, components)?;
         let (encountered, candidates) = word_details_in(
             &transaction,
             dictionary,
@@ -93,17 +94,13 @@ impl Storage {
                 .as_ref()
                 .map(|form| form.as_str()),
             token.vocabulary,
-            &components
-                .iter()
-                .map(|source| source.form.clone())
-                .collect::<Vec<_>>(),
         )?;
         transaction.commit().map_err(StorageError::from)?;
         self.validated_reader_selection =
             Some(ValidatedSelection::new(key, token.clone(), revision));
         Ok(Some(EffectiveReaderWordDetails {
             key: key.clone(),
-            dictionary_sources: components,
+            parts,
             token,
             encountered,
             candidates,
@@ -143,7 +140,6 @@ fn word_details_in(
     surface: &str,
     dictionary_form: Option<&str>,
     vocabulary: Option<ReaderVocabulary>,
-    components: &[String],
 ) -> Result<(u64, DictionaryCandidates), ReaderWordError> {
     let encountered = match vocabulary {
         Some(entry) => {
@@ -154,7 +150,7 @@ fn word_details_in(
         }
         None => 0,
     };
-    let candidates = dictionary.lookup_forms(surface, dictionary_form, components)?;
+    let candidates = dictionary.lookup(surface, dictionary_form)?;
     Ok((encountered, candidates))
 }
 
@@ -162,7 +158,7 @@ fn component_forms_in(
     connection: &Connection,
     key: &EffectiveReaderTokenKey,
     anchor: yomoku_core::document::TextAnchor,
-) -> Result<Vec<yomoku_core::dictionary::DictionarySource>, ReaderWordError> {
+) -> Result<Vec<yomoku_core::dictionary::DictionaryPart>, ReaderWordError> {
     let chapter = crate::analysis::read_chapter(connection, anchor.chapter_id)?;
     let mut statement = connection.prepare("SELECT id FROM chapter_analyses WHERE chapter_id = ?1 AND engine_revision = ?2 AND dictionary_revision = ?3 AND split_mode IN ('a','b') ORDER BY split_mode").map_err(StorageError::from)?;
     let ids = statement
@@ -189,7 +185,10 @@ fn component_forms_in(
             t.anchor.range.start >= anchor.range.start && t.anchor.range.end <= anchor.range.end
         }));
     }
-    Ok(yomoku_core::dictionary::component_sources(components))
+    Ok(yomoku_core::dictionary::component_parts(
+        components,
+        anchor.range.start,
+    ))
 }
 
 #[cfg(test)]

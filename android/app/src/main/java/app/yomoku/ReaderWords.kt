@@ -184,6 +184,7 @@ internal fun ReaderWordPanel(
     enabled: Boolean,
     onClose: () -> Unit,
     onStatus: (VocabularyStatus) -> Unit,
+    choices: @Composable () -> Unit = {},
     details: @Composable () -> Unit,
 ) {
     val windowSize = LocalWindowInfo.current.containerSize
@@ -203,6 +204,7 @@ internal fun ReaderWordPanel(
                 style = MaterialTheme.typography.headlineSmall,
                 modifier = Modifier.testTag("word_surface"),
             )
+            choices()
             Row(
                 Modifier.fillMaxWidth()
                     .clip(RoundedCornerShape(50))

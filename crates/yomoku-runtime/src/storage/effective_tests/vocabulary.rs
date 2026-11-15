@@ -163,7 +163,7 @@ fn independent_lookup_keeps_lifetime_counts_after_book_deletion_and_never_writes
     let before = std::fs::read(fixture.path()).unwrap();
     for (surface, count, ids) in [
         ("食べた", 2, vec![2]),
-        ("東京都", 0, vec![3, 4, 5]),
+        ("東京都", 0, vec![3]),
         ("𠮷か\u{3099}\0", 1, vec![]),
     ] {
         let row = rows.iter().find(|row| row.surface == surface).unwrap();
@@ -188,6 +188,14 @@ fn independent_lookup_keeps_lifetime_counts_after_book_deletion_and_never_writes
         }
         if surface == "東京都" {
             assert_eq!(candidates.names[0].entry.names[0].name_type, ["place name"]);
+            assert_eq!(
+                word.lookup
+                    .parts
+                    .iter()
+                    .map(|part| part.surface.as_str())
+                    .collect::<Vec<_>>(),
+                ["東京", "東"]
+            );
             assert_eq!(
                 candidates.words[0].entry.senses[0].glosses[0].text,
                 "test definition"

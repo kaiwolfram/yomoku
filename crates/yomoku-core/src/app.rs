@@ -12,6 +12,7 @@ mod anki;
 mod effective;
 mod pending_storage;
 use pending_storage::{DocumentRequest, PendingStorage};
+mod dictionary_lookup;
 mod statistics;
 mod statistics_preference;
 mod vocabulary;
@@ -253,6 +254,11 @@ pub enum Event {
         entry: crate::anki::AnkiEntryKey,
     },
     CheckAnkiSetup(crate::anki::AnkiSetupRequest),
+    ChooseDictionaryPart {
+        selection: crate::anki::AnkiSelection,
+        part: Option<u64>,
+    },
+    RetryDictionaryPart(crate::anki::AnkiSelection),
     #[serde(skip)]
     #[cfg_attr(feature = "facet_typegen", facet(skip))]
     AnkiEntryChecked(
@@ -329,6 +335,9 @@ pub enum Event {
     #[serde(skip)]
     #[cfg_attr(feature = "facet_typegen", facet(skip))]
     StatisticsTimeframeFinished(u64, StorageResult),
+    #[serde(skip)]
+    #[cfg_attr(feature = "facet_typegen", facet(skip))]
+    DictionaryLookupFinished(crate::anki::AnkiSelection, StorageResult),
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -417,6 +426,12 @@ impl App for Yomoku {
         }
         if let Event::VocabularyWordFinished(request_id, result) = event {
             return self.finish_vocabulary_word(request_id, result, model);
+        }
+        if let Event::DictionaryLookupFinished(selection, result) = event {
+            return self.finish_dictionary_lookup(selection, result, model);
+        }
+        if let Some(command) = self.update_dictionary_lookup(&event, model) {
+            return command;
         }
         if let Some(command) = self.update_vocabulary_word(&event, model) {
             return command;
@@ -877,6 +892,7 @@ impl App for Yomoku {
                     | StorageResult::StatisticsTimeframeLoaded(_)
                     | StorageResult::StatisticsTimeframeSaved(_)
                     | StorageResult::VocabularyWordLoaded(_)
+                    | StorageResult::DictionaryLoaded(_)
                     | StorageResult::VocabularyWordStatusChanged(_)
                     | StorageResult::VocabularyLoaded(_)
                     | StorageResult::AnkiSettingsLoaded(_)
@@ -1011,6 +1027,9 @@ impl App for Yomoku {
             | Event::RetryVocabulary
             | Event::VocabularyFinished(..)
             | Event::VocabularyWordFinished(..)
+            | Event::ChooseDictionaryPart { .. }
+            | Event::RetryDictionaryPart(_)
+            | Event::DictionaryLookupFinished(..)
             | Event::OpenVocabularyWord(_)
             | Event::DismissVocabularyWord
             | Event::RetryVocabularyWord

@@ -8,6 +8,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
@@ -150,10 +151,15 @@ private fun EffectiveReaderWordContent(
         word.details?.takeIf {
             it.selection == selected && word.selection == selected && display != null
         }
+    // A transient details gap must not retire an already observed lookup.
+    // A new choice supplies its new revision immediately; dismissal clears it.
+    var retainedAnkiRevision by remember(selected) { mutableStateOf<ULong?>(null) }
+    val ankiRevision = details?.lookup?.revision ?: retainedAnkiRevision
+    SideEffect { retainedAnkiRevision = ankiRevision }
     ObserveReaderAnkiEntries(
-        selected?.let { AnkiSelection.Effective(it) },
+        selected?.let { selection -> ankiRevision?.let { AnkiSelection.Effective(selection, it) } },
         view.ankiSetup,
-        canRead && details != null,
+        canRead && details != null && !details.lookup.loading && details.lookup.error == null,
         dispatch,
     )
     if (display != null) {
@@ -177,9 +183,22 @@ private fun EffectiveReaderWordContent(
                     )
                 }
             },
+            choices = {
+                if (details != null) {
+                    DictionaryPartChoices(details.lookup, canRead) {
+                        dispatch(
+                            Event.ChooseDictionaryPart(
+                                AnkiSelection.Effective(details.selection, details.lookup.revision),
+                                it,
+                            )
+                        )
+                    }
+                }
+            },
         ) {
-            if (details != null) {
-                val ankiSelection = AnkiSelection.Effective(details.selection)
+            if (details != null && !details.lookup.loading && details.lookup.error == null) {
+                val ankiSelection =
+                    AnkiSelection.Effective(details.selection, details.lookup.revision)
                 ReaderDictionary(
                     details.encountered,
                     details.candidates,
@@ -203,8 +222,17 @@ private fun EffectiveReaderWordContent(
                     },
                 )
             } else {
-                ReaderWordLookupState(word.error != null, canRead) {
-                    dispatch(Event.LoadEffectiveReaderWord(display.selection))
+                ReaderWordLookupState(
+                    word.error != null || details?.lookup?.error != null,
+                    canRead,
+                ) {
+                    if (details != null)
+                        dispatch(
+                            Event.RetryDictionaryPart(
+                                AnkiSelection.Effective(details.selection, details.lookup.revision)
+                            )
+                        )
+                    else dispatch(Event.LoadEffectiveReaderWord(display.selection))
                 }
             }
             EffectiveReaderPendingActions(view, idle, dispatch)

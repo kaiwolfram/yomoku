@@ -83,7 +83,7 @@ fn effective_reader_words_validate_pages_indices_missing_deleted_and_corrupt_ana
 }
 
 #[test]
-fn longest_token_lookup_includes_anchored_components_without_registering_or_counting_them() {
+fn longest_token_lookup_suggests_parts_without_registering_or_counting_them() {
     use yomoku_core::analysis::{AnalyzedToken, SplitMode};
     let database = TestDatabase::new();
     let index = dictionary();
@@ -141,16 +141,23 @@ fn longest_token_lookup_includes_anchored_components_without_registering_or_coun
         .unwrap()
         .unwrap();
     assert_eq!(word.token.surface, "試験語別語");
-    assert_eq!(word.candidates.words.len(), 1);
-    assert_eq!(word.candidates.names.len(), 1);
+    assert!(word.candidates.words.is_empty() && word.candidates.names.is_empty());
     assert_eq!(
-        word.candidates.words[0]
-            .forms
+        word.parts
             .iter()
-            .map(|f| f.form.as_str())
+            .map(|part| part.surface.as_str())
             .collect::<Vec<_>>(),
-        ["試験語"]
+        ["試験語", "別語"]
     );
+    assert_eq!(word.parts[1].dictionary_form.as_deref(), Some("試験語"));
+    let chosen = dictionary
+        .lookup(
+            &word.parts[1].surface,
+            word.parts[1].dictionary_form.as_deref(),
+        )
+        .unwrap();
+    assert_eq!(chosen.words.len(), 1);
+    assert_eq!(chosen.names.len(), 1);
     assert_eq!(word.encountered, 0);
     assert_eq!(
         before,

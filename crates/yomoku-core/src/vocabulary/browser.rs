@@ -106,6 +106,7 @@ impl VocabularyQuery {
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
 pub struct VocabularyWordState {
+    pub lookup: crate::dictionary::DictionaryLookup,
     pub selection: crate::anki::VocabularyAnkiSelection,
     pub row: VocabularyRow,
     pub candidates: Option<crate::dictionary::DictionaryCandidates>,
@@ -115,6 +116,7 @@ pub struct VocabularyWordState {
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
 pub struct VocabularyWordDetails {
+    pub parts: Vec<crate::dictionary::DictionaryPart>,
     pub row: VocabularyRow,
     pub candidates: crate::dictionary::DictionaryCandidates,
 }

@@ -50,6 +50,9 @@ pub enum StorageOperation {
     LoadVocabularyWord(crate::document::VocabularyId),
     #[serde(skip)]
     #[cfg_attr(feature = "facet_typegen", facet(skip))]
+    LookupDictionary(crate::dictionary::DictionaryQuery),
+    #[serde(skip)]
+    #[cfg_attr(feature = "facet_typegen", facet(skip))]
     SetVocabularyWordStatus(crate::vocabulary::VocabularyWordStatusCommand),
     /// Native read of per-document vocabulary distributions for Library.
     #[serde(skip)]
@@ -148,6 +151,9 @@ pub enum StorageResult {
     #[serde(skip)]
     #[cfg_attr(feature = "facet_typegen", facet(skip))]
     VocabularyWordLoaded(Box<crate::vocabulary::VocabularyWordDetails>),
+    #[serde(skip)]
+    #[cfg_attr(feature = "facet_typegen", facet(skip))]
+    DictionaryLoaded(crate::dictionary::DictionaryCandidates),
     #[serde(skip)]
     #[cfg_attr(feature = "facet_typegen", facet(skip))]
     VocabularyWordStatusChanged(crate::vocabulary::VocabularyWordStatusCommand),

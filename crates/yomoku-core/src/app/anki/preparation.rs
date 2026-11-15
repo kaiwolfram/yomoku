@@ -25,9 +25,9 @@ impl Model {
             return None;
         }
         match selection {
-            AnkiSelection::Effective(current) if !self.can_start_effective_selection(current) => {
-                return None
-            }
+            AnkiSelection::Effective {
+                selection: current, ..
+            } if !self.can_start_effective_selection(current) => return None,
             AnkiSelection::Vocabulary(_) if self.vocabulary.word_status.is_some() => return None,
             _ => {}
         }
@@ -54,7 +54,10 @@ impl Model {
                         .ok()?;
                 Some(AnkiExport::for_entry(selection, entry, deck, note))
             }
-            AnkiSelection::Effective(selection) => {
+            AnkiSelection::Effective {
+                selection,
+                lookup_revision,
+            } => {
                 if self.content_route != ContentRoute::Reader {
                     return None;
                 }
@@ -70,6 +73,13 @@ impl Model {
                 if word.selection != Some(selection) || word.busy || word.error.is_some() {
                     return None;
                 }
+                let details = word.details.as_ref()?;
+                if details.lookup.revision != lookup_revision
+                    || details.lookup.loading
+                    || details.lookup.error.is_some()
+                {
+                    return None;
+                }
                 let chapter = document.chapter(selection.page.base.page.chapter_id).ok()?;
                 if let Some(entry) = entry {
                     let note = crate::anki::AnkiNote::from_effective_entry(
@@ -81,7 +91,10 @@ impl Model {
                     )
                     .ok()?;
                     return Some(AnkiExport::for_entry(
-                        AnkiSelection::Effective(selection),
+                        AnkiSelection::Effective {
+                            selection,
+                            lookup_revision,
+                        },
                         entry,
                         deck,
                         note,

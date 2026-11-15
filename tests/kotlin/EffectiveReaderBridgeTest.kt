@@ -64,10 +64,43 @@ internal fun verifyEffectiveReaderBridge() {
                 )
             check(word.token.surface == "国家公務員")
             val forms = word.candidates.words.flatMap { it.forms }.map { it.form }.toSet()
-            check(forms.containsAll(listOf("国家公務員", "国家", "公務員", "公務", "員")))
+            check(forms == setOf("国家公務員"))
+            check(word.lookup.parts.map { it.surface }.containsAll(listOf("国家", "公務員", "公務", "員")))
             check(word.encountered == 2UL)
+            val index = word.lookup.parts.indexOfFirst { it.surface == "公務員" }.toULong()
+            val chosen =
+                checkNotNull(
+                    dispatch(
+                            bridge,
+                            Event.ChooseDictionaryPart(
+                                AnkiSelection.Effective(selection, word.lookup.revision),
+                                index,
+                            ),
+                        )
+                        .effectiveReaderWord
+                        ?.details
+                )
+            check(chosen.lookup.active == index && chosen.lookup.revision > word.lookup.revision)
+            check(chosen.token == word.token && chosen.encountered == word.encountered)
+            check(chosen.candidates.words.flatMap { it.forms }.all { it.form == "公務員" })
+            check(chosen.candidates.words.isNotEmpty())
+            val restored =
+                checkNotNull(
+                    dispatch(
+                            bridge,
+                            Event.ChooseDictionaryPart(
+                                AnkiSelection.Effective(selection, chosen.lookup.revision),
+                                null,
+                            ),
+                        )
+                        .effectiveReaderWord
+                        ?.details
+                )
+            check(restored.lookup.active == null && restored.candidates == word.candidates)
         }
-        println("PASS: Mode C JNI selection and A/B component dictionary lookup")
+        println(
+            "PASS: Mode C JNI whole-word lookup, selectable parts, exact identity and whole-word restoration"
+        )
     } finally {
         directory.deleteRecursively()
     }

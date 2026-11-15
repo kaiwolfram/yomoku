@@ -60,7 +60,9 @@ impl Model {
             _ => return,
         };
         for state in &mut self.anki_entries {
-            if state.request.export().note().same_identity(export.note()) {
+            if state.request.export().selection() == export.selection()
+                && state.request.export().note().same_identity(export.note())
+            {
                 state.result = Some(result.clone());
             }
         }
@@ -81,6 +83,8 @@ impl Model {
                 && word.row.id == selection.vocabulary_id
                 && word.candidates.is_some()
                 && word.error.is_none()
+                && !word.lookup.loading
+                && word.lookup.error.is_none()
         })
     }
 
@@ -93,8 +97,11 @@ impl Model {
         } else if !self.settings_open && self.content_route == ContentRoute::Reader {
             self.effective_reader
                 .word_state()
-                .selection
-                .map(AnkiSelection::Effective)
+                .details
+                .map(|details| AnkiSelection::Effective {
+                    selection: details.selection,
+                    lookup_revision: details.lookup.revision,
+                })
         } else {
             None
         }
@@ -109,7 +116,10 @@ impl Model {
             AnkiSelection::Vocabulary(s) => {
                 self.current_vocabulary_anki_word(s)?.candidates.as_ref()?
             }
-            AnkiSelection::Effective(s) => {
+            AnkiSelection::Effective {
+                selection: s,
+                lookup_revision,
+            } => {
                 if self.content_route != ContentRoute::Reader {
                     return None;
                 }
@@ -118,7 +128,11 @@ impl Model {
                     return None;
                 }
                 let details = word.details.as_ref()?;
-                if details.selection != s {
+                if details.selection != s
+                    || details.lookup.revision != lookup_revision
+                    || details.lookup.loading
+                    || details.lookup.error.is_some()
+                {
                     return None;
                 }
                 &details.candidates
@@ -152,7 +166,9 @@ impl Model {
                     return None;
                 }
                 let phase = if let Some(active) = &self.prepared_anki_export {
-                    if active.note().same_identity(export.note()) {
+                    if active.selection() == export.selection()
+                        && active.note().same_identity(export.note())
+                    {
                         self.anki_export_view().map(|view| match view.phase {
                             AnkiExportPhase::Existing(ids) => AnkiEntryPhase::Existing(ids),
                             AnkiExportPhase::NoteAdded(id) => AnkiEntryPhase::Existing(vec![id]),
@@ -529,7 +545,11 @@ mod tests {
             Event::VocabularyWordFinished(
                 sequence,
                 StorageResult::VocabularyWordLoaded(Box::new(
-                    crate::vocabulary::VocabularyWordDetails { row, candidates },
+                    crate::vocabulary::VocabularyWordDetails {
+                        parts: Vec::new(),
+                        row,
+                        candidates,
+                    },
                 )),
             ),
         );
@@ -549,6 +569,67 @@ mod tests {
                 model,
                 Event::AnkiEntryChecked(Box::new(request), result.clone()),
             );
+        }
+    }
+
+    #[test]
+    fn lookup_revisions_reject_old_anki_observations_and_actions_for_both_sheets() {
+        for vocabulary in [false, true] {
+            let (mut model, old) = if vocabulary {
+                vocabulary_configured()
+            } else {
+                configured()
+            };
+            update(&mut model, Event::LoadReaderAnkiEntries(old));
+            let request = model.anki_entries[0].request.clone();
+            let current = match old {
+                AnkiSelection::Effective { selection, .. } => {
+                    let revision = model.effective_reader.next_dictionary_revision().unwrap();
+                    model
+                        .effective_reader
+                        .dictionary_word_mut(selection)
+                        .unwrap()
+                        .lookup
+                        .revision = revision;
+                    AnkiSelection::Effective {
+                        selection,
+                        lookup_revision: revision,
+                    }
+                }
+                AnkiSelection::Vocabulary(mut selection) => {
+                    selection.generation += 1;
+                    let word = model.vocabulary.word.as_mut().unwrap();
+                    word.selection = selection;
+                    word.lookup.revision = selection.generation;
+                    AnkiSelection::Vocabulary(selection)
+                }
+            };
+            assert!(model.anki_entries_view().is_empty());
+            update(
+                &mut model,
+                Event::AnkiEntryChecked(Box::new(request.clone()), observation(vec![88], true)),
+            );
+            assert!(model.anki_entries[0].result.is_none());
+            update(&mut model, Event::LoadReaderAnkiEntries(current));
+            settle_entries(&mut model, observation(vec![], true));
+            let settled = model.anki_entries_view();
+            assert!(!settled.is_empty());
+            assert!(settled
+                .iter()
+                .all(|entry| entry.selection == current && entry.phase == AnkiEntryPhase::Add));
+            update(
+                &mut model,
+                Event::AnkiEntryChecked(Box::new(request), observation(vec![88], true)),
+            );
+            update(
+                &mut model,
+                Event::AddReaderAnkiEntry {
+                    selection: old,
+                    entry: settled[0].key,
+                },
+            );
+            assert!(model.prepared_anki_export.is_none());
+            assert_eq!(model.anki_entries_view(), settled);
         }
     }
 
@@ -671,6 +752,7 @@ mod tests {
                 sequence,
                 StorageResult::VocabularyWordLoaded(Box::new(
                     crate::vocabulary::VocabularyWordDetails {
+                        parts: Vec::new(),
                         row,
                         candidates: dictionary,
                     },
@@ -1252,32 +1334,37 @@ mod tests {
         let token = page.tokens[0].clone();
         let chapter = &model.reader_document.as_ref().unwrap().chapters[0];
         let start = chapter.text.find('𠮷').unwrap();
-        let source = crate::dictionary::DictionarySource {
-            form: "𠮷".into(),
-            anchor: TextAnchor {
-                chapter_id: chapter.chapter_id,
-                source_id: chapter.source_id,
-                range: crate::document::TextRange {
-                    start: (start as i64).try_into().unwrap(),
-                    end: ((start + "𠮷".len()) as i64).try_into().unwrap(),
-                },
+        let part = crate::dictionary::DictionaryPart {
+            surface: "𠮷".into(),
+            dictionary_form: None,
+            range: crate::document::TextRange {
+                start: (start as i64 - i64::from(token.anchor.range.start))
+                    .try_into()
+                    .unwrap(),
+                end: ((start + "𠮷".len()) as i64 - i64::from(token.anchor.range.start))
+                    .try_into()
+                    .unwrap(),
             },
+            primary: true,
         };
         let details = crate::effective_session::EffectiveWordDetails {
+            lookup: crate::dictionary::DictionaryLookup {
+                parts: vec![part],
+                active: Some(0),
+                ..Default::default()
+            },
             selection: crate::effective_session::EffectiveReaderSelection {
                 page: page.identity,
                 segment_index: token.segment_index,
             },
             candidates: crate::dictionary::DictionaryCandidates {
-                surface: token.surface.clone(),
-                dictionary_form: token.dictionary_form.clone(),
+                surface: "𠮷".into(),
+                dictionary_form: None,
                 words: vec![candidate(1, "𠮷", "よし", "good fortune")],
                 names: vec![],
             },
             token,
             encountered: 0,
-
-            dictionary_sources: vec![source],
         };
         let note = AnkiNote::from_effective_entry(
             chapter,
@@ -1299,7 +1386,7 @@ mod tests {
             "猫と<strong class=\"yomoku-target\">𠮷</strong>と猫。"
         );
         let mut bad = details;
-        bad.dictionary_sources.clear();
+        bad.lookup.parts.clear();
         assert!(AnkiNote::from_effective_entry(
             chapter,
             page,

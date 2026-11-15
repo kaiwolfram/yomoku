@@ -88,7 +88,12 @@ internal fun verifyConjugationBridge() {
             check(details.candidates.surface == "食べました")
             check(details.candidates.dictionaryForm == "食べる")
             check(details.candidates.words.flatMap { it.forms }.any { it.form == "食べる" })
-            check(details.dictionarySources.map { it.form }.containsAll(listOf("食べ", "まし", "た")))
+            check(details.lookup.parts.any { it.surface == "食べ" && it.dictionaryForm == "食べる" })
+            check(
+                details.candidates.words
+                    .flatMap { it.forms }
+                    .all { it.form in listOf("食べました", "食べる") }
+            )
             val position = checkNotNull(current(bridge).reader).position
             dispatch(bridge, Event.CompleteEffectiveReaderPage(updated.identity, position, 200L), 2)
             val second = tokens(bridge)

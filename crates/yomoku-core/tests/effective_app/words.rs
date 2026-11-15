@@ -13,6 +13,167 @@ fn selection(f: &Fixture) -> EffectiveReaderSelection {
     }
 }
 
+#[test]
+fn dictionary_choices_keep_word_identity_validate_revisions_and_retry_the_same_part() {
+    use yomoku_core::{anki::AnkiSelection, dictionary::DictionaryPart};
+    let f = Fixture::new(false);
+    f.load();
+    let page = f.core.view().effective_reader_tokens.unwrap();
+    let selected = EffectiveReaderSelection {
+        page: page.identity,
+        segment_index: page.tokens[2].segment_index,
+    };
+    let mut original = details(&f, selected);
+    original.parts = vec![DictionaryPart {
+        surface: "𠮷".into(),
+        dictionary_form: None,
+        range: range(0, 4),
+        primary: true,
+    }];
+    let mut effects = f
+        .core
+        .process_event(Event::LoadEffectiveReaderWord(selected));
+    resolve(
+        &f.core,
+        &mut effects,
+        StorageResult::Effective(Output::WordLoaded(selected, Box::new(original))),
+    );
+    let before = f
+        .core
+        .view()
+        .effective_reader_word
+        .unwrap()
+        .details
+        .unwrap();
+    let owner = AnkiSelection::Effective {
+        selection: selected,
+        lookup_revision: before.lookup.revision,
+    };
+    assert!(f
+        .core
+        .process_event(Event::ChooseDictionaryPart {
+            selection: owner,
+            part: None
+        })
+        .is_empty());
+    assert!(f
+        .core
+        .process_event(Event::ChooseDictionaryPart {
+            selection: owner,
+            part: Some(99)
+        })
+        .is_empty());
+    let mut effects = f.core.process_event(Event::ChooseDictionaryPart {
+        selection: owner,
+        part: Some(0),
+    });
+    let query = operation(&effects);
+    let StorageOperation::LookupDictionary(query) = query else {
+        panic!("dictionary read only")
+    };
+    assert_eq!(query.surface, "𠮷");
+    let current = f
+        .core
+        .view()
+        .effective_reader_word
+        .unwrap()
+        .details
+        .unwrap();
+    let current_owner = AnkiSelection::Effective {
+        selection: selected,
+        lookup_revision: current.lookup.revision,
+    };
+    assert!(current.lookup.loading && current.lookup.revision > before.lookup.revision);
+    assert!(f
+        .core
+        .process_event(Event::ChooseDictionaryPart {
+            selection: current_owner,
+            part: None
+        })
+        .is_empty());
+    f.core.process_event(Event::DictionaryLookupFinished(
+        owner,
+        StorageResult::Failed(DocumentError::NotFound),
+    ));
+    assert!(f.core.view().storage_busy);
+    resolve(
+        &f.core,
+        &mut effects,
+        StorageResult::Failed(DocumentError::Unavailable),
+    );
+    let mut retry = f
+        .core
+        .process_event(Event::RetryDictionaryPart(current_owner));
+    assert_eq!(
+        operation(&retry),
+        StorageOperation::LookupDictionary(query.clone())
+    );
+    let candidates = DictionaryCandidates {
+        surface: query.surface,
+        dictionary_form: query.dictionary_form,
+        words: vec![],
+        names: vec![],
+    };
+    resolve(
+        &f.core,
+        &mut retry,
+        StorageResult::DictionaryLoaded(candidates.clone()),
+    );
+    let current = f
+        .core
+        .view()
+        .effective_reader_word
+        .unwrap()
+        .details
+        .unwrap();
+    assert_eq!(current.candidates, candidates);
+    assert_eq!(current.token, before.token);
+    assert_eq!(current.encountered, before.encountered);
+    assert_eq!(current.lookup.active, Some(0));
+    assert!(f
+        .core
+        .process_event(Event::ChooseDictionaryPart {
+            selection: owner,
+            part: None
+        })
+        .is_empty());
+    let owner = AnkiSelection::Effective {
+        selection: selected,
+        lookup_revision: current.lookup.revision,
+    };
+    let mut whole = f.core.process_event(Event::ChooseDictionaryPart {
+        selection: owner,
+        part: None,
+    });
+    assert_eq!(
+        operation(&whole),
+        StorageOperation::LookupDictionary(before.lookup.whole)
+    );
+    f.core.process_event(Event::DismissReaderWord);
+    resolve(
+        &f.core,
+        &mut whole,
+        StorageResult::DictionaryLoaded(before.candidates),
+    );
+    assert!(f
+        .core
+        .view()
+        .effective_reader_word
+        .unwrap()
+        .details
+        .is_none());
+    load_word(&f, selected, None);
+    let reopened = f
+        .core
+        .view()
+        .effective_reader_word
+        .unwrap()
+        .details
+        .unwrap();
+    assert_eq!(reopened.lookup.active, None);
+    assert!(reopened.lookup.revision > current.lookup.revision);
+}
+
 fn details(f: &Fixture, selection: EffectiveReaderSelection) -> EffectiveReaderWordDetails {
     let snapshot = f.snapshot();
     let token = snapshot
@@ -21,6 +182,7 @@ fn details(f: &Fixture, selection: EffectiveReaderSelection) -> EffectiveReaderW
         .find(|token| token.segment_index == selection.segment_index)
         .unwrap();
     EffectiveReaderWordDetails {
+        parts: Vec::new(),
         key: f.snapshot().key().unwrap(),
         candidates: DictionaryCandidates {
             surface: token.surface.clone(),
@@ -34,8 +196,6 @@ fn details(f: &Fixture, selection: EffectiveReaderSelection) -> EffectiveReaderW
         },
         token,
         encountered: 7,
-
-        dictionary_sources: Vec::new(),
     }
 }
 

@@ -19,6 +19,7 @@ pub(super) fn loaded(
     let mut pages = EffectiveReaderSession::default();
     let request = pages.begin_load(base(&snapshot)).unwrap();
     let details = EffectiveReaderWordDetails {
+        parts: Vec::new(),
         key: snapshot.key().unwrap(),
         candidates: DictionaryCandidates {
             surface: token.surface.clone(),
@@ -33,8 +34,6 @@ pub(super) fn loaded(
         },
         token,
         encountered: 7,
-
-        dictionary_sources: Vec::new(),
     };
     assert!(pages.accept(request, snapshot));
     let selection = EffectiveReaderSelection {
@@ -223,6 +222,7 @@ fn encounter_projection_recounts_exact_visible_surfaces_on_navigation_and_reread
             };
             let token = snapshot.tokens.first().unwrap().clone();
             let details = EffectiveReaderWordDetails {
+                parts: Vec::new(),
                 key: snapshot.key().unwrap(),
                 token,
                 encountered: saved,
@@ -232,7 +232,6 @@ fn encounter_projection_recounts_exact_visible_surfaces_on_navigation_and_reread
                     words: vec![],
                     names: vec![],
                 },
-                dictionary_sources: vec![],
             };
             let request = session.begin_load(base(&snapshot)).unwrap();
             assert!(session.word_state().details.is_none());

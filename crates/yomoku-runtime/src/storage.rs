@@ -231,6 +231,14 @@ fn execute(
     }
     let storage = storage.as_mut().expect("opened storage");
     match operation {
+        StorageOperation::LookupDictionary(query) => {
+            let result = word_dictionary(dictionary, word_loader)?
+                .lookup(&query.surface, query.dictionary_form.as_deref());
+            result.map(StorageResult::DictionaryLoaded).map_err(|_| {
+                *dictionary = None;
+                DocumentError::Unavailable
+            })
+        }
         StorageOperation::LoadVocabulary { query, offset } => storage
             .vocabulary_page(&query, offset)
             .map(StorageResult::VocabularyLoaded)
@@ -241,14 +249,24 @@ fn execute(
                 .map_err(map_error)?
                 .ok_or(DocumentError::NotFound)?;
             let (base, components) = imports.vocabulary_forms(&row.surface)?;
-            let candidates = word_dictionary(dictionary, word_loader)?
-                .lookup_forms(&row.surface, base.as_deref(), &components)
+            let dictionary_ref = word_dictionary(dictionary, word_loader)?;
+            let (parts, candidates) = dictionary_ref
+                .parts(&row.surface, components)
+                .and_then(|parts| {
+                    dictionary_ref
+                        .lookup(&row.surface, base.as_deref())
+                        .map(|candidates| (parts, candidates))
+                })
                 .map_err(|_| {
                     *dictionary = None;
                     DocumentError::Unavailable
                 })?;
             Ok(StorageResult::VocabularyWordLoaded(Box::new(
-                yomoku_core::vocabulary::VocabularyWordDetails { row, candidates },
+                yomoku_core::vocabulary::VocabularyWordDetails {
+                    row,
+                    candidates,
+                    parts,
+                },
             )))
         }
         StorageOperation::SetVocabularyWordStatus(command) => {

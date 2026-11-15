@@ -487,6 +487,12 @@ class VocabularyScreenTest {
                         rows = listOf(row),
                         word =
                             VocabularyWordState(
+                                DictionaryLookup(
+                                    DictionaryQuery(row.surface),
+                                    emptyList(),
+                                    revision = 1UL,
+                                    loading = false,
+                                ),
                                 VocabularyAnkiSelection(row.id, 1UL),
                                 row,
                                 error = DocumentError.UNAVAILABLE,
@@ -507,6 +513,12 @@ class VocabularyScreenTest {
                         frame.value.vocabulary.copy(
                             word =
                                 VocabularyWordState(
+                                    DictionaryLookup(
+                                        DictionaryQuery(row.surface),
+                                        emptyList(),
+                                        revision = 1UL,
+                                        loading = false,
+                                    ),
                                     VocabularyAnkiSelection(row.id, 1UL),
                                     row,
                                     DictionaryCandidates(

@@ -157,7 +157,10 @@ class AnkiEntrySessionTest {
             }
             it.effectiveReaderWord?.details != null && !it.storageBusy
         }
-        return AnkiSelection.Effective(selected)
+        return AnkiSelection.Effective(
+            selected,
+            core.view.effectiveReaderWord!!.details!!.lookup.revision,
+        )
     }
 
     @Test

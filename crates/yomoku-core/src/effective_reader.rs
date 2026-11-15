@@ -70,12 +70,11 @@ impl EffectiveReaderTokenSnapshot {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct EffectiveReaderWordDetails {
+    pub parts: Vec<crate::dictionary::DictionaryPart>,
     pub key: EffectiveReaderTokenKey,
     pub token: EffectiveReaderToken,
     pub encountered: u64,
     pub candidates: DictionaryCandidates,
-
-    pub dictionary_sources: Vec<crate::dictionary::DictionarySource>,
 }
 
 /// Construction validates the entire snapshot before any page is projected.

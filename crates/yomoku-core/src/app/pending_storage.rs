@@ -14,6 +14,10 @@ pub(super) enum PendingStorage {
     Statistics(u64, crate::statistics::StatisticsQuery),
     Vocabulary(vocabulary::VocabularyRequest),
     VocabularyWord(vocabulary_word::VocabularyWordRequest),
+    DictionaryLookup(
+        crate::anki::AnkiSelection,
+        crate::dictionary::DictionaryQuery,
+    ),
 }
 
 pub(super) enum DocumentRequest {

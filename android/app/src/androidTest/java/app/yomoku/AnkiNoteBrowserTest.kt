@@ -91,7 +91,8 @@ class AnkiNoteBrowserTest {
         val entry =
             AnkiEntryView(
                 AnkiSelection.Effective(
-                    EffectiveReaderSelection(EffectivePageIdentity(1UL, key), 0UL)
+                    EffectiveReaderSelection(EffectivePageIdentity(1UL, key), 0UL),
+                    1UL,
                 ),
                 AnkiEntryKey.Word(5, ReadingMatch(0UL, 0UL)),
                 "猫",

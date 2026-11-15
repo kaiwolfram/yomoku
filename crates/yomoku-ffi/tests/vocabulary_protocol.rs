@@ -47,6 +47,7 @@ fn vocabulary_word_operations_and_callbacks_are_native_only_and_deletion_is_unre
         assert!(BincodeFfiFormat::serialize(&mut vec![], &operation).is_err());
     }
     let result = StorageResult::VocabularyWordLoaded(Box::new(VocabularyWordDetails {
+        parts: Vec::new(),
         row: yomoku_core::vocabulary::VocabularyRow {
             id: command.id,
             surface: "猫".into(),

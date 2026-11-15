@@ -351,6 +351,7 @@ fn ready(core: &Core<Yomoku>) {
 fn word_details(core: &Core<Yomoku>) -> StorageResult {
     let row = core.view().vocabulary.word.unwrap().row;
     StorageResult::VocabularyWordLoaded(Box::new(yomoku_core::vocabulary::VocabularyWordDetails {
+        parts: Vec::new(),
         candidates: yomoku_core::dictionary::DictionaryCandidates {
             surface: row.surface.clone(),
             dictionary_form: None,
@@ -359,6 +360,98 @@ fn word_details(core: &Core<Yomoku>) -> StorageResult {
         },
         row,
     }))
+}
+
+#[test]
+fn part_lookup_preserves_vocabulary_status_counts_and_results_through_status_changes() {
+    use yomoku_core::{
+        anki::AnkiSelection,
+        dictionary::{DictionaryPart, DictionaryQuery},
+        document::TextRange,
+        vocabulary::VocabularyWordStatusCommand,
+    };
+    for core in cores() {
+        ready(&core);
+        let row = core.view().vocabulary.rows[0].clone();
+        let mut effects = core.process_event(Event::OpenVocabularyWord(row.id));
+        let StorageResult::VocabularyWordLoaded(mut details) = word_details(&core) else {
+            unreachable!()
+        };
+        details.parts = vec![DictionaryPart {
+            surface: "猫".into(),
+            dictionary_form: None,
+            range: TextRange {
+                start: 0.try_into().unwrap(),
+                end: 3.try_into().unwrap(),
+            },
+            primary: true,
+        }];
+        resolve(
+            &core,
+            &mut effects,
+            StorageResult::VocabularyWordLoaded(details),
+        );
+        let owner = AnkiSelection::Vocabulary(core.view().vocabulary.word.unwrap().selection);
+        let mut effects = core.process_event(Event::ChooseDictionaryPart {
+            selection: owner,
+            part: Some(0),
+        });
+        let query = DictionaryQuery {
+            surface: "猫".into(),
+            dictionary_form: None,
+        };
+        assert_eq!(
+            operation(&effects),
+            Some(&StorageOperation::LookupDictionary(query))
+        );
+        let found = yomoku_core::dictionary::DictionaryCandidates {
+            surface: "猫".into(),
+            dictionary_form: None,
+            words: vec![],
+            names: vec![],
+        };
+        resolve(
+            &core,
+            &mut effects,
+            StorageResult::DictionaryLoaded(found.clone()),
+        );
+        let selected = core.view().vocabulary.word.unwrap();
+        assert_eq!(selected.row, row);
+        assert_eq!(selected.lookup.active, Some(0));
+        assert_ne!(AnkiSelection::Vocabulary(selected.selection), owner);
+        let command = VocabularyWordStatusCommand {
+            id: row.id,
+            status: VocabularyStatus::Known,
+            occurred_at_unix_ms: 999,
+        };
+        let mut status = core.process_event(Event::SetVocabularyWordStatus(command.clone()));
+        resolve(
+            &core,
+            &mut status,
+            StorageResult::VocabularyWordStatusChanged(command),
+        );
+        let after = core.view().vocabulary.word.unwrap();
+        assert_eq!(after.lookup, selected.lookup);
+        assert_eq!(after.selection, selected.selection);
+        assert_eq!(after.candidates, Some(found));
+        assert_eq!(after.row.encountered_count, row.encountered_count);
+        assert_eq!(after.row.status, VocabularyStatus::Known);
+        let mut whole = core.process_event(Event::ChooseDictionaryPart {
+            selection: AnkiSelection::Vocabulary(after.selection),
+            part: None,
+        });
+        core.process_event(Event::DismissVocabularyWord);
+        resolve(
+            &core,
+            &mut whole,
+            StorageResult::Failed(DocumentError::Unavailable),
+        );
+        assert!(core.view().vocabulary.word.is_none());
+        let mut reopen = core.process_event(Event::OpenVocabularyWord(row.id));
+        let details = word_details(&core);
+        resolve(&core, &mut reopen, details);
+        assert_eq!(core.view().vocabulary.word.unwrap().lookup.active, None);
+    }
 }
 
 #[test]

@@ -1,5 +1,6 @@
 package app.yomoku.tests
 
+import app.yomoku.shared.AnkiSelection
 import app.yomoku.shared.ChapterText
 import app.yomoku.shared.DocumentError
 import app.yomoku.shared.DocumentId
@@ -15,6 +16,8 @@ import app.yomoku.shared.TextAnchor
 import app.yomoku.shared.TextOffset
 import app.yomoku.shared.TextRange
 import app.yomoku.shared.ViewModel
+import app.yomoku.shared.VocabularyAnkiSelection
+import app.yomoku.shared.VocabularyId
 import app.yomoku.shared.VocabularyStatus
 import java.io.File
 
@@ -116,7 +119,11 @@ fun verifyTextBoundaries(directory: String) {
     check(details.selection == effectiveSelection)
     check(details.token == effective.tokens[1])
     check(details.encountered == ULong.MAX_VALUE)
-    check(details.candidates.dictionaryForm == null)
+    check(details.lookup.revision == ULong.MAX_VALUE && details.lookup.active == 0UL)
+    check(details.lookup.parts.single().surface == "𠮷")
+    check(details.lookup.parts.single().dictionaryForm == "原形𠮷\u0000")
+    check(details.lookup.parts.single().range == TextRange(TextOffset(4), TextOffset(8)))
+    check(details.candidates.dictionaryForm == details.lookup.parts.single().dictionaryForm)
     check(details.candidates.words.isEmpty() && details.candidates.names.isEmpty())
     check(!effectiveWord.busy && effectiveWord.error == null)
     check(effectiveWord.bincodeSerialize().contentEquals(effectiveWordBytes))
@@ -125,7 +132,7 @@ fun verifyTextBoundaries(directory: String) {
     val effectiveStatus = checkNotNull(view.effectiveReaderStatus)
     check(effectiveStatus.pending && !effectiveStatus.busy)
     check(effectiveStatus.error == DocumentError.UNAVAILABLE)
-    for (index in 0..3) {
+    for (index in 0..6) {
         val bytes = File(dir, "effective-word-event-$index.bin").readBytes()
         val event = Event.bincodeDeserialize(bytes)
         when (index) {
@@ -139,6 +146,21 @@ fun verifyTextBoundaries(directory: String) {
             }
             2 -> check(event is Event.RetryEffectiveReaderStatus)
             3 -> check(event is Event.CancelEffectiveReaderStatus)
+            4,
+            5 -> {
+                event as Event.ChooseDictionaryPart
+                check(
+                    event.selection == AnkiSelection.Effective(effectiveSelection, ULong.MAX_VALUE)
+                )
+                check(event.part == if (index == 4) ULong.MAX_VALUE else null)
+            }
+            6 ->
+                check(
+                    (event as Event.RetryDictionaryPart).value ==
+                        AnkiSelection.Vocabulary(
+                            VocabularyAnkiSelection(VocabularyId(Long.MAX_VALUE), ULong.MAX_VALUE)
+                        )
+                )
         }
         check(event.bincodeSerialize().contentEquals(bytes))
         File(dir, "effective-word-event-$index-return.bin").writeBytes(event.bincodeSerialize())

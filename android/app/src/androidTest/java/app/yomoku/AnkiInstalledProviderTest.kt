@@ -114,7 +114,10 @@ class AnkiInstalledProviderTest {
                 )
             send(Event.LoadEffectiveReaderWord(selection))
             await { !it.storageBusy && it.effectiveReaderWord?.details != null }
-            return AnkiSelection.Effective(selection)
+            return AnkiSelection.Effective(
+                selection,
+                core.view.effectiveReaderWord!!.details!!.lookup.revision,
+            )
         }
         fun refresh() {
             main {

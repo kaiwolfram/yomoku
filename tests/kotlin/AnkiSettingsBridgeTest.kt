@@ -27,7 +27,8 @@ internal fun verifyAnkiSettingsBridge(fixtures: String) {
                     ),
                 ),
                 ULong.MAX_VALUE,
-            )
+            ),
+            1UL,
         )
     val entryActions =
         listOf(

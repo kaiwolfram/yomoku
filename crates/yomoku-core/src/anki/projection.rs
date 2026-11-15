@@ -62,6 +62,20 @@ impl AnkiNote {
         if &observed != token {
             return Err(InvalidTextValue);
         }
+        let part = details
+            .lookup
+            .active
+            .map(|index| {
+                details
+                    .lookup
+                    .parts
+                    .get(usize::try_from(index).map_err(|_| InvalidTextValue)?)
+                    .ok_or(InvalidTextValue)
+            })
+            .transpose()?;
+        if details.lookup.loading || details.lookup.error.is_some() {
+            return Err(InvalidTextValue);
+        }
         prepare(
             chapter,
             current.identity.base.page,
@@ -72,7 +86,7 @@ impl AnkiNote {
             token.dictionary_form.as_deref(),
             &details.candidates,
             entry,
-            &details.dictionary_sources,
+            part,
         )
     }
 }
@@ -88,12 +102,13 @@ fn prepare(
     dictionary_form: Option<&str>,
     candidates: &DictionaryCandidates,
     entry: Option<super::AnkiEntryKey>,
-    sources: &[crate::dictionary::DictionarySource],
+    part: Option<&crate::dictionary::DictionaryPart>,
 ) -> Result<AnkiNote, InvalidTextValue> {
     page.slice(chapter)?;
     if target.slice(chapter)? != surface
-        || candidates.surface != surface
-        || candidates.dictionary_form.as_deref() != dictionary_form
+        || candidates.surface != part.map_or(surface, |part| part.surface.as_str())
+        || candidates.dictionary_form.as_deref()
+            != part.map_or(dictionary_form, |part| part.dictionary_form.as_deref())
         || target.range.start >= page.range.end
         || target.range.end <= page.range.start
     {
@@ -120,23 +135,31 @@ fn prepare(
         )
     } else {
         let (reading, meanings) = definitions(candidates, analyzer_reading)?;
-        (surface.to_owned(), reading, meanings, surface.to_owned())
+        (
+            candidates.surface.clone(),
+            reading,
+            meanings,
+            candidates.surface.clone(),
+        )
     };
-    let occurrence = if form == surface || Some(form.as_str()) == dictionary_form {
-        target
-    } else {
-        let source = sources
-            .iter()
-            .find(|source| source.form == form)
-            .ok_or(InvalidTextValue)?;
-        if source.anchor.chapter_id != target.chapter_id
-            || source.anchor.range.start < target.range.start
-            || source.anchor.range.end > target.range.end
+    let occurrence = if let Some(part) = part {
+        if part.range.slice(surface)? != part.surface
+            || (form != part.surface && Some(form.as_str()) != part.dictionary_form.as_deref())
         {
             return Err(InvalidTextValue);
         }
-        source.anchor.slice(chapter)?;
-        source.anchor
+        let origin = i64::from(target.range.start);
+        TextAnchor {
+            range: TextRange {
+                start: (origin + i64::from(part.range.start)).try_into()?,
+                end: (origin + i64::from(part.range.end)).try_into()?,
+            },
+            ..target
+        }
+    } else if form == surface || Some(form.as_str()) == dictionary_form {
+        target
+    } else {
+        return Err(InvalidTextValue);
     };
     let target = occurrence;
     let sentence = sentence_range(&chapter.text, target.range)?;

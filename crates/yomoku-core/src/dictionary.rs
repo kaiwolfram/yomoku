@@ -4,6 +4,110 @@
 
 use serde::{Deserialize, Serialize};
 
+/// A proper contiguous part of the original surface. Offsets are relative UTF-8
+/// byte positions, just like the reader's other text ranges. Base forms come
+/// only from analyzer metadata, never from a guessed substring conjugation.
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
+pub struct DictionaryPart {
+    pub surface: String,
+    pub dictionary_form: Option<String>,
+    pub range: crate::document::TextRange,
+    pub primary: bool,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, Eq)]
+#[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
+pub struct DictionaryQuery {
+    pub surface: String,
+    pub dictionary_form: Option<String>,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, Eq)]
+#[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
+pub struct DictionaryLookup {
+    pub whole: DictionaryQuery,
+    pub parts: Vec<DictionaryPart>,
+    pub active: Option<u64>,
+    pub revision: u64,
+    pub loading: bool,
+    pub error: Option<crate::storage::DocumentError>,
+}
+
+impl DictionaryLookup {
+    pub fn query(&self, choice: Option<u64>) -> Option<DictionaryQuery> {
+        match choice {
+            None => Some(self.whole.clone()),
+            Some(index) => {
+                self.parts
+                    .get(usize::try_from(index).ok()?)
+                    .map(|part| DictionaryQuery {
+                        surface: part.surface.clone(),
+                        dictionary_form: part.dictionary_form.clone(),
+                    })
+            }
+        }
+    }
+
+    pub fn new(
+        candidates: &DictionaryCandidates,
+        parts: Vec<DictionaryPart>,
+        revision: u64,
+    ) -> Self {
+        Self {
+            whole: DictionaryQuery {
+                surface: candidates.surface.clone(),
+                dictionary_form: candidates.dictionary_form.clone(),
+            },
+            parts,
+            revision,
+            ..Self::default()
+        }
+    }
+}
+
+/// Check worker-supplied offsets before exposing choices or exporting an occurrence.
+pub fn valid_parts(surface: &str, parts: &[DictionaryPart]) -> bool {
+    parts.iter().enumerate().all(|(index, part)| {
+        !part.surface.is_empty()
+            && part.surface != surface
+            && part.range.slice(surface) == Ok(part.surface.as_str())
+            && !part
+                .dictionary_form
+                .as_ref()
+                .is_some_and(|base| base.trim().is_empty())
+            && !parts[..index]
+                .iter()
+                .any(|earlier| earlier.surface == part.surface)
+    })
+}
+
+/// Preserve each component's written surface, exact occurrence and supplied base.
+pub fn component_parts(
+    tokens: Vec<crate::analysis::AnalyzedToken>,
+    origin: crate::document::TextOffset,
+) -> Vec<DictionaryPart> {
+    tokens
+        .into_iter()
+        .filter(|token| token.is_japanese)
+        .filter_map(|token| {
+            Some(DictionaryPart {
+                surface: token.surface,
+                dictionary_form: token.dictionary_form.map(|form| form.as_str().to_owned()),
+                range: crate::document::TextRange {
+                    start: (i64::from(token.anchor.range.start) - i64::from(origin))
+                        .try_into()
+                        .ok()?,
+                    end: (i64::from(token.anchor.range.end) - i64::from(origin))
+                        .try_into()
+                        .ok()?,
+                },
+                primary: false,
+            })
+        })
+        .collect()
+}
+
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
 #[serde(deny_unknown_fields)]
@@ -228,39 +332,4 @@ pub struct DictionaryCandidates {
     pub dictionary_form: Option<String>,
     pub words: Vec<WordCandidate>,
     pub names: Vec<NameCandidate>,
-}
-
-/// Validated analyzer provenance for an entry form, including inflected components.
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
-#[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
-pub struct DictionarySource {
-    pub form: String,
-    pub anchor: crate::document::TextAnchor,
-}
-
-/// Order Japanese components by length then source position, keeping the first
-/// occurrence of each exact surface/base form and its original highlight anchor.
-/// Callers supply the supported analyses and any selection-range filtering.
-pub fn component_sources(mut tokens: Vec<crate::analysis::AnalyzedToken>) -> Vec<DictionarySource> {
-    tokens.retain(|token| token.is_japanese);
-    tokens.sort_by_key(|token| {
-        (
-            std::cmp::Reverse(token.surface.chars().count()),
-            token.anchor.range.start,
-        )
-    });
-    let mut sources: Vec<DictionarySource> = Vec::new();
-    for token in tokens {
-        for form in std::iter::once(token.surface)
-            .chain(token.dictionary_form.map(|form| form.as_str().to_owned()))
-        {
-            if !sources.iter().any(|source| source.form == form) {
-                sources.push(DictionarySource {
-                    form,
-                    anchor: token.anchor,
-                });
-            }
-        }
-    }
-    sources
 }

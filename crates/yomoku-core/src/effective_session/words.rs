@@ -15,11 +15,11 @@ use serde::{Deserialize, Serialize};
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
 pub struct EffectiveWordDetails {
+    pub lookup: crate::dictionary::DictionaryLookup,
     pub selection: EffectiveReaderSelection,
     pub token: EffectivePageToken,
     pub encountered: u64,
     pub candidates: DictionaryCandidates,
-    pub dictionary_sources: Vec<crate::dictionary::DictionarySource>,
 }
 #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
 #[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
@@ -53,6 +53,25 @@ impl WordState {
     }
 }
 impl EffectiveReaderSession {
+    pub fn next_dictionary_revision(&mut self) -> Option<u64> {
+        self.words.attempt = self.words.attempt.checked_add(1)?;
+        Some(self.words.attempt)
+    }
+    pub fn dictionary_word_mut(
+        &mut self,
+        selection: EffectiveReaderSelection,
+    ) -> Option<&mut EffectiveWordDetails> {
+        if self.words.selection != Some(selection)
+            || self.words.pending.is_some()
+            || self.words.error.is_some()
+        {
+            return None;
+        }
+        self.words
+            .details
+            .as_mut()
+            .filter(|details| details.selection == selection)
+    }
     pub fn mutation_pending(&self) -> bool {
         self.status_state().pending
     }
@@ -166,6 +185,7 @@ impl EffectiveReaderSession {
     ) -> Result<EffectiveWordDetails, DocumentError> {
         let selection = request.command.selection();
         if &details.key != request.command.key()
+            || !crate::dictionary::valid_parts(&details.token.surface, &details.parts)
             || details.token.segment_index != selection.segment_index
             || details.candidates.surface != details.token.surface
             || details.candidates.dictionary_form.as_deref()
@@ -199,12 +219,15 @@ impl EffectiveReaderSession {
             }
         }
         Ok(EffectiveWordDetails {
+            lookup: crate::dictionary::DictionaryLookup::new(
+                &details.candidates,
+                details.parts,
+                request.attempt,
+            ),
             selection,
             token,
             encountered: details.encountered,
             candidates: details.candidates,
-
-            dictionary_sources: details.dictionary_sources,
         })
     }
 }

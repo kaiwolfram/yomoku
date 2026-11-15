@@ -71,6 +71,7 @@ impl Yomoku {
                     return Some(Command::done());
                 };
                 model.vocabulary.word = Some(VocabularyWordState {
+                    lookup: crate::dictionary::DictionaryLookup::default(),
                     selection: crate::anki::VocabularyAnkiSelection {
                         vocabulary_id: *id,
                         generation,
@@ -207,8 +208,17 @@ impl Yomoku {
                             StorageResult::VocabularyWordLoaded(details)
                                 if details.row.id == id
                                     && details.row.surface == word.row.surface
+                                    && crate::dictionary::valid_parts(
+                                        &word.row.surface,
+                                        &details.parts,
+                                    )
                                     && details.candidates.surface == word.row.surface =>
                             {
+                                word.lookup = crate::dictionary::DictionaryLookup::new(
+                                    &details.candidates,
+                                    details.parts,
+                                    word.selection.generation,
+                                );
                                 word.row = details.row;
                                 word.candidates = Some(details.candidates);
                             }

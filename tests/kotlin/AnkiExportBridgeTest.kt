@@ -101,7 +101,8 @@ internal fun verifyAnkiExportBridge() {
                             it.effectiveReaderWord?.details != null && !it.storageBusy
                         }
                     val before = checkNotNull(loaded.effectiveReaderWord?.details)
-                    val prepare = Event.PrepareReaderAnkiExport(AnkiSelection.Effective(selected))
+                    var prepare =
+                        Event.PrepareReaderAnkiExport(AnkiSelection.Effective(selected, 1UL))
                     check(send(bridge, prepare).isEmpty())
                     check(view(bridge).ankiExport == null)
                     send(bridge, Event.OpenSettings)
@@ -121,6 +122,17 @@ internal fun verifyAnkiExportBridge() {
                     send(bridge, Event.CloseSettings)
                     send(bridge, Event.LoadEffectiveReaderWord(selected))
                     awaitView(bridge) { it.effectiveReaderWord?.details != null && !it.storageBusy }
+                    check(
+                        send(bridge, prepare).isEmpty()
+                    ) // A reopened lookup rejects the old revision.
+                    check(view(bridge).ankiExport == null)
+                    prepare =
+                        Event.PrepareReaderAnkiExport(
+                            AnkiSelection.Effective(
+                                selected,
+                                view(bridge).effectiveReaderWord!!.details!!.lookup.revision,
+                            )
+                        )
                     send(bridge, prepare)
                     val old = checkNotNull(view(bridge).ankiExport)
                     check(old.phase == AnkiExportPhase.Prepared && old.surface == "猫")
@@ -236,7 +248,12 @@ internal fun verifyAnkiExportBridge() {
                         if (create) AnkiExportPhase.ModelCreated(9007199254740993L)
                         else AnkiExportPhase.NoteUncertain(Long.MAX_VALUE)
                     val finished = awaitView(bridge) { it.ankiExport?.phase == expected }
-                    check(finished.effectiveReaderWord?.details == before)
+                    val finalWord = checkNotNull(finished.effectiveReaderWord?.details)
+                    check(
+                        finalWord.copy(
+                            lookup = finalWord.lookup.copy(revision = before.lookup.revision)
+                        ) == before
+                    )
                     check(
                         finished.reader == loaded.reader &&
                             finished.completionNotice == loaded.completionNotice

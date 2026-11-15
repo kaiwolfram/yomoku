@@ -3,6 +3,143 @@ use crate::tests::TestDatabase;
 use serde_json::{json, Value};
 use std::fs;
 
+#[test]
+fn part_discovery_uses_forms_only_orders_maximal_matches_and_keeps_exact_occurrences() {
+    let file = fixture();
+    let connection = Connection::open(file.path()).unwrap();
+    for (id, text) in [
+        (10, "ふくろう"),
+        (11, "便"),
+        (12, "ふく"),
+        (13, "くろう"),
+        (14, "う"),
+        (15, "食べる"),
+        (16, "𠮷"),
+    ] {
+        insert(
+            &connection,
+            "JMdict",
+            id,
+            &json!({"kanji": [], "readings": [{"text": text}], "senses": [{"glosses": [{"text": text, "lang": "eng"}]}]}),
+        );
+    }
+    // Discovery must not decode an unselected entry's payload.
+    connection
+        .execute(
+            "UPDATE entries SET payload = 'invalid' WHERE entry_id = 12",
+            [],
+        )
+        .unwrap();
+    let dictionary = Dictionary::open(file.path()).unwrap();
+    assert!(dictionary
+        .lookup("ふくろう便", None)
+        .unwrap()
+        .words
+        .is_empty());
+    let parts = dictionary.parts("ふくろう便", vec![]).unwrap();
+    assert_eq!(
+        parts
+            .iter()
+            .filter(|part| part.primary)
+            .map(|part| part.surface.as_str())
+            .collect::<Vec<_>>(),
+        ["ふくろう", "便"]
+    );
+    assert!(parts
+        .iter()
+        .any(|part| part.surface == "くろう" && !part.primary));
+    for part in parts.iter().filter(|part| part.primary) {
+        let found = dictionary
+            .lookup(&part.surface, part.dictionary_form.as_deref())
+            .unwrap();
+        assert_eq!(found.words.len(), 1);
+        assert_eq!(part.range.slice("ふくろう便").unwrap(), part.surface);
+    }
+    let repeated = dictionary.parts("😀𠮷𠮷", vec![]).unwrap();
+    assert_eq!(repeated.len(), 1);
+    assert_eq!(i64::from(repeated[0].range.start), 4);
+    assert_eq!(i64::from(repeated[0].range.end), 8);
+    let names = dictionary.parts("未試験語末", vec![]).unwrap();
+    assert!(names.iter().any(|part| part.surface == "試験語"));
+    assert!(!dictionary.lookup("試験語", None).unwrap().names.is_empty());
+    assert!(dictionary
+        .parts(&"龘".repeat(10_000), vec![])
+        .unwrap()
+        .is_empty());
+    assert!(dictionary.parts("xyz", vec![]).unwrap().is_empty());
+}
+
+#[test]
+fn component_suggestions_retain_supplied_inflections_and_earliest_base_provenance() {
+    use yomoku_core::{dictionary::DictionaryPart, document::TextRange};
+    let file = fixture();
+    let dictionary = Dictionary::open(file.path()).unwrap();
+    let part = DictionaryPart {
+        surface: "試験語だった".into(),
+        dictionary_form: Some("試験語".into()),
+        range: TextRange {
+            start: 0.try_into().unwrap(),
+            end: 18.try_into().unwrap(),
+        },
+        primary: false,
+    };
+    let parts = dictionary
+        .parts(
+            "試験語だった試験語だった",
+            vec![
+                DictionaryPart {
+                    range: TextRange {
+                        start: 18.try_into().unwrap(),
+                        end: 36.try_into().unwrap(),
+                    },
+                    ..part.clone()
+                },
+                part.clone(),
+            ],
+        )
+        .unwrap();
+    let first = parts
+        .iter()
+        .find(|value| value.surface == part.surface)
+        .unwrap();
+    assert_eq!(first.range, part.range);
+    assert_eq!(first.dictionary_form, part.dictionary_form);
+    assert!(first.primary);
+    let found = dictionary
+        .lookup(&first.surface, first.dictionary_form.as_deref())
+        .unwrap();
+    assert!(!found.words.is_empty() && !found.names.is_empty());
+    assert!(dictionary
+        .lookup("試験語だった試験語だった", None)
+        .unwrap()
+        .words
+        .is_empty());
+}
+
+#[test]
+#[ignore = "requires prepared full dictionary index"]
+fn bundled_fukurou_bin_suggests_separate_parts_without_whole_word_definitions() {
+    let dictionary = Dictionary::open(std::env::var("YOMOKU_DICTIONARY_INDEX").unwrap()).unwrap();
+    let whole = dictionary.lookup("ふくろう便", None).unwrap();
+    assert!(whole.words.is_empty() && whole.names.is_empty());
+    let parts = dictionary.parts("ふくろう便", vec![]).unwrap();
+    assert_eq!(
+        parts
+            .iter()
+            .filter(|part| part.primary)
+            .map(|part| part.surface.as_str())
+            .collect::<Vec<_>>(),
+        ["ふくろう", "便"]
+    );
+    for part in parts.iter().filter(|part| part.primary) {
+        assert!(!dictionary
+            .lookup(&part.surface, None)
+            .unwrap()
+            .words
+            .is_empty());
+    }
+}
+
 fn word() -> Value {
     json!({
         "kanji": [{"text": "試験語", "ke_inf": ["test spelling"], "ke_pri": ["spec1"]}, {"text": "試験語𠮷"}],

@@ -39,7 +39,8 @@ class AnkiEntryActionTest {
                     ),
                 ),
                 0UL,
-            )
+            ),
+            1UL,
         )
 
     @Test

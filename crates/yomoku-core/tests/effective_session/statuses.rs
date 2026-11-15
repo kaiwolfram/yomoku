@@ -21,6 +21,7 @@ fn loaded() -> (
     });
     snapshot.tokens.last_mut().unwrap().vocabulary = token.vocabulary;
     let details = EffectiveReaderWordDetails {
+        parts: Vec::new(),
         key: snapshot.key().unwrap(),
         token,
         encountered: 7,
@@ -30,8 +31,6 @@ fn loaded() -> (
             words: vec![],
             names: vec![],
         },
-
-        dictionary_sources: Vec::new(),
     };
     let mut session = EffectiveReaderSession::default();
     let request = session.begin_load(base(&snapshot)).unwrap();

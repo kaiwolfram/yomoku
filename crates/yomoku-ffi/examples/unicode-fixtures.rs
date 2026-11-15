@@ -212,13 +212,31 @@ fn main() -> Result<(), Box<dyn Error>> {
     let effective_word = EffectiveReaderWordState {
         selection: Some(effective_selection),
         details: Some(EffectiveWordDetails {
-            dictionary_sources: Vec::new(),
+            lookup: yomoku_core::dictionary::DictionaryLookup {
+                whole: yomoku_core::dictionary::DictionaryQuery {
+                    surface: image_text.into(),
+                    dictionary_form: None,
+                },
+                parts: vec![yomoku_core::dictionary::DictionaryPart {
+                    surface: "𠮷".into(),
+                    dictionary_form: Some("原形𠮷\0".into()),
+                    range: TextRange {
+                        start: 4.try_into()?,
+                        end: 8.try_into()?,
+                    },
+                    primary: true,
+                }],
+                active: Some(0),
+                revision: u64::MAX,
+                loading: false,
+                error: None,
+            },
             selection: effective_selection,
             token: effective_page.tokens[1].clone(),
             encountered: u64::MAX,
             candidates: yomoku_core::dictionary::DictionaryCandidates {
-                surface: image_text.into(),
-                dictionary_form: None,
+                surface: "𠮷".into(),
+                dictionary_form: Some("原形𠮷\0".into()),
                 words: vec![],
                 names: vec![],
             },
@@ -256,6 +274,26 @@ fn main() -> Result<(), Box<dyn Error>> {
         },
         AppEvent::RetryEffectiveReaderStatus,
         AppEvent::CancelEffectiveReaderStatus,
+        AppEvent::ChooseDictionaryPart {
+            selection: yomoku_core::anki::AnkiSelection::Effective {
+                selection: effective_selection,
+                lookup_revision: u64::MAX,
+            },
+            part: Some(u64::MAX),
+        },
+        AppEvent::ChooseDictionaryPart {
+            selection: yomoku_core::anki::AnkiSelection::Effective {
+                selection: effective_selection,
+                lookup_revision: u64::MAX,
+            },
+            part: None,
+        },
+        AppEvent::RetryDictionaryPart(yomoku_core::anki::AnkiSelection::Vocabulary(
+            yomoku_core::anki::VocabularyAnkiSelection {
+                vocabulary_id: i64::MAX.try_into()?,
+                generation: u64::MAX,
+            },
+        )),
     ]
     .into_iter()
     .enumerate()

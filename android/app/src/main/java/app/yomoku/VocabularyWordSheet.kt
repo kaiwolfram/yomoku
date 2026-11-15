@@ -23,7 +23,7 @@ internal fun VocabularyWordSheet(
     ObserveReaderAnkiEntries(
         selection,
         view.ankiSetup,
-        enabled && word?.candidates != null,
+        enabled && word?.candidates != null && !word.lookup.loading && word.lookup.error == null,
         dispatch,
     )
     if (word == null) return
@@ -43,9 +43,14 @@ internal fun VocabularyWordSheet(
                 )
             )
         },
+        choices = {
+            DictionaryPartChoices(word.lookup, enabled) {
+                dispatch(Event.ChooseDictionaryPart(checkNotNull(selection), it))
+            }
+        },
     ) {
         val candidates = word.candidates
-        if (candidates != null)
+        if (candidates != null && !word.lookup.loading && word.lookup.error == null)
             ReaderDictionary(
                 word.row.encounteredCount,
                 candidates,
@@ -65,8 +70,9 @@ internal fun VocabularyWordSheet(
                 },
             )
         else
-            ReaderWordLookupState(word.error != null, enabled) {
-                dispatch(Event.RetryVocabularyWord)
+            ReaderWordLookupState(word.error != null || word.lookup.error != null, enabled) {
+                if (candidates != null) dispatch(Event.RetryDictionaryPart(checkNotNull(selection)))
+                else dispatch(Event.RetryVocabularyWord)
             }
         VocabularyWordStatusRetry(view, dispatch)
     }
