@@ -66,17 +66,30 @@ pub enum EffectiveCompletionProgress {
 #[derive(Default)]
 pub(super) struct CompletionState {
     attempt: u64,
-    pending: Option<Action>,
-    in_flight: Option<EffectiveCompletionRequest>,
-    error: Option<DocumentError>,
+    phase: CompletionPhase,
+}
+
+#[derive(Default)]
+enum CompletionPhase {
+    #[default]
+    Idle,
+    Dispatchable(Action),
+    InFlight(EffectiveCompletionRequest),
+    Failed {
+        action: Action,
+        error: DocumentError,
+    },
 }
 
 impl EffectiveReaderSession {
     pub fn completion_state(&self) -> EffectiveCompletionState {
         EffectiveCompletionState {
-            pending: self.completion.pending.is_some(),
-            busy: self.completion.in_flight.is_some(),
-            error: self.completion.error,
+            pending: !matches!(self.completion.phase, CompletionPhase::Idle),
+            busy: matches!(self.completion.phase, CompletionPhase::InFlight(_)),
+            error: match self.completion.phase {
+                CompletionPhase::Failed { error, .. } => Some(error),
+                _ => None,
+            },
         }
     }
 
@@ -88,7 +101,7 @@ impl EffectiveReaderSession {
         identity: EffectivePageIdentity,
         intent: PageCompletionIntent,
     ) -> bool {
-        if self.completion.pending.is_some()
+        if self.completion_state().pending
             || self.words.blocks_completion()
             || self.status_state().pending
             || intent.document_id != identity.base.document_id
@@ -105,8 +118,7 @@ impl EffectiveReaderSession {
         let Some(command) = self.freeze_page(identity) else {
             return false;
         };
-        self.completion.pending = Some(Action::Prepare { intent, command });
-        self.completion.error = None;
+        self.completion.phase = CompletionPhase::Dispatchable(Action::Prepare { intent, command });
         self.invalidate();
         true
     }
@@ -115,17 +127,18 @@ impl EffectiveReaderSession {
     /// durable reservation, never prepares
     /// another one. The app must not auto-retry a Failed progress result.
     pub fn dispatch_completion(&mut self) -> Option<EffectiveCompletionRequest> {
-        if self.completion.in_flight.is_some() {
-            return None;
-        }
-        let action = self.completion.pending.as_ref()?;
+        let action = match &self.completion.phase {
+            CompletionPhase::Dispatchable(action) | CompletionPhase::Failed { action, .. } => {
+                action
+            }
+            CompletionPhase::Idle | CompletionPhase::InFlight(_) => return None,
+        };
         self.completion.attempt = self.completion.attempt.checked_add(1)?;
         let request = EffectiveCompletionRequest {
             attempt: self.completion.attempt,
             action: action.clone(),
         };
-        self.completion.in_flight = Some(request.clone());
-        self.completion.error = None;
+        self.completion.phase = CompletionPhase::InFlight(request.clone());
         Some(request)
     }
 
@@ -137,15 +150,15 @@ impl EffectiveReaderSession {
         request: &EffectiveCompletionRequest,
         result: Result<Output, DocumentError>,
     ) -> Option<EffectiveCompletionProgress> {
-        if self.completion.in_flight.as_ref() != Some(request) {
+        if !matches!(&self.completion.phase, CompletionPhase::InFlight(current) if current == request)
+        {
             return None;
         }
-        self.completion.in_flight = None;
         let progress = match (&request.action, result) {
             (Action::Prepare { intent, command }, Ok(Output::CompletionPrepared(prepared)))
                 if matches_preparation(*intent, command, &prepared) =>
             {
-                self.completion.pending = Some(Action::Commit(prepared));
+                self.completion.phase = CompletionPhase::Dispatchable(Action::Commit(prepared));
                 EffectiveCompletionProgress::Prepared
             }
             (Action::Commit(prepared), Ok(Output::PageCompleted(document, outcome)))
@@ -156,7 +169,7 @@ impl EffectiveReaderSession {
                         .and_then(|chapter| prepared.completion().page.slice(chapter))
                         .is_ok() =>
             {
-                self.completion.pending = None;
+                self.completion.phase = CompletionPhase::Idle;
                 EffectiveCompletionProgress::Completed {
                     completion: prepared.completion(),
                     document: Box::new(document),
@@ -166,10 +179,12 @@ impl EffectiveReaderSession {
             (_, Err(error)) => EffectiveCompletionProgress::Failed(error),
             _ => EffectiveCompletionProgress::Failed(DocumentError::InvalidDocument),
         };
-        self.completion.error = match progress {
-            EffectiveCompletionProgress::Failed(error) => Some(error),
-            _ => None,
-        };
+        if let EffectiveCompletionProgress::Failed(error) = progress {
+            self.completion.phase = CompletionPhase::Failed {
+                action: request.action.clone(),
+                error,
+            };
+        }
         Some(progress)
     }
 }

@@ -76,6 +76,26 @@ private data class FileInput(
         }
 }
 
+private sealed interface FileImportPhase {
+    data object Idle : FileImportPhase
+
+    data class Reading(val filename: String) : FileImportPhase
+
+    data class ChoosingEncoding(val input: FileInput, val error: DocumentError) : FileImportPhase
+
+    data class Importing(val input: FileInput) : FileImportPhase
+
+    // Native cancellation and its storage result can return in either order.
+    data class Cancelling(
+        val filename: String,
+        val waitingForCore: Boolean,
+        val cancellationReturned: Boolean,
+        val result: FileImportResult? = null,
+    ) : FileImportPhase
+
+    data class Finished(val result: FileImportResult?) : FileImportPhase
+}
+
 /** Only platform URI reads and coordination live here. Rust owns the import transaction. */
 internal class FileImports(
     private val resolver: ContentResolver,
@@ -87,26 +107,42 @@ internal class FileImports(
     private var reader = Executors.newSingleThreadExecutor()
     @Volatile private var readGeneration = 0L
     private var closed = false
-    private var waitingForCore = false
-    private var cancellationReturned = false
-    private var input: FileInput? = null
-    var active by mutableStateOf(false)
-        private set
+    private var phase: FileImportPhase by mutableStateOf(FileImportPhase.Idle)
 
-    var choosingEncoding by mutableStateOf(false)
-        private set
+    val active: Boolean
+        get() =
+            when (phase) {
+                FileImportPhase.Idle,
+                is FileImportPhase.Finished -> false
+                else -> true
+            }
 
-    var cancelling by mutableStateOf(false)
-        private set
+    val choosingEncoding: Boolean
+        get() = phase is FileImportPhase.ChoosingEncoding
 
-    var filename by mutableStateOf("")
-        private set
+    val cancelling: Boolean
+        get() = phase is FileImportPhase.Cancelling
 
-    var encodingError: DocumentError? by mutableStateOf(null)
-        private set
+    val filename: String
+        get() =
+            when (val current = phase) {
+                is FileImportPhase.Reading -> current.filename
+                is FileImportPhase.ChoosingEncoding -> current.input.filename
+                is FileImportPhase.Importing -> current.input.filename
+                is FileImportPhase.Cancelling -> current.filename
+                else -> ""
+            }
 
-    var result: FileImportResult? by mutableStateOf(null)
-        private set
+    val encodingError: DocumentError?
+        get() = (phase as? FileImportPhase.ChoosingEncoding)?.error
+
+    val result: FileImportResult?
+        get() =
+            when (val current = phase) {
+                is FileImportPhase.Finished -> current.result
+                is FileImportPhase.Cancelling -> current.result
+                else -> null
+            }
 
     var notificationsEnabled by mutableStateOf(false)
         private set
@@ -128,14 +164,9 @@ internal class FileImports(
                 view.settingsOpen
         )
             return
-        result = null
         core.dispatch(Event.DismissImportSummary)
-        active = true
-        input = null
-        choosingEncoding = false
-        encodingError = null
+        phase = FileImportPhase.Reading(uri.lastPathSegment.orEmpty())
         val generation = ++readGeneration
-        filename = uri.lastPathSegment.orEmpty()
         refreshNotifications()
         reader.execute {
             var name = uri.lastPathSegment.orEmpty()
@@ -153,7 +184,7 @@ internal class FileImports(
                     val displayName = name
                     handler.post {
                         if (generation == readGeneration) {
-                            filename = displayName
+                            phase = FileImportPhase.Reading(displayName)
                             refreshNotifications()
                         }
                     }
@@ -181,36 +212,44 @@ internal class FileImports(
                     if (loaded == null) {
                         finish(FileImportResult(name, message = R.string.import_supported_files))
                     } else {
-                        input = loaded
-                        filename = loaded.filename
-                        submit()
+                        submit(loaded)
                     }
                 }
             }
         }
     }
 
-    private fun submit() {
-        waitingForCore = true
-        core.dispatch(checkNotNull(input).event())
+    private fun submit(input: FileInput) {
+        phase = FileImportPhase.Importing(input)
+        core.dispatch(input.event())
     }
 
     private fun receive() {
-        if (closed || !waitingForCore || core.view.storageBusy) return
-        waitingForCore = false
+        if (closed || core.view.storageBusy) return
+        val current = phase
+        if (
+            current !is FileImportPhase.Importing &&
+                !(current is FileImportPhase.Cancelling && current.waitingForCore)
+        )
+            return
         val error = core.view.documentError
         val summary = core.view.importSummary
-        if (cancelling) {
+        if (current is FileImportPhase.Cancelling) {
             // A completed COMMIT wins cancellation. A rolled-back/encoding attempt adds no row.
-            if (summary != null) result = FileImportResult(filename, summary.outcome, summary.title)
+            phase =
+                current.copy(
+                    waitingForCore = false,
+                    result =
+                        summary?.let { FileImportResult(current.filename, it.outcome, it.title) },
+                )
             core.dispatch(Event.DismissImportSummary)
             refreshNotifications()
             settleCancellation()
             return
         }
-        if (input?.needsEncoding(error) == true) {
-            encodingError = error
-            choosingEncoding = true
+        val input = (current as FileImportPhase.Importing).input
+        if (input.needsEncoding(error)) {
+            phase = FileImportPhase.ChoosingEncoding(input, checkNotNull(error))
             refreshNotifications()
             return
         }
@@ -230,53 +269,47 @@ internal class FileImports(
 
     fun selectEncoding(encoding: TextEncoding) {
         checkMainThread()
-        if (closed || cancelling || !choosingEncoding) return
-        input = checkNotNull(input).copy(encoding = encoding)
-        choosingEncoding = false
+        if (closed) return
+        val current = phase as? FileImportPhase.ChoosingEncoding ?: return
+        submit(current.input.copy(encoding = encoding))
         refreshNotifications()
-        submit()
     }
 
     private fun finish(result: FileImportResult) {
-        this.result = result
-        complete()
+        complete(result)
     }
 
     fun cancel() {
         checkMainThread()
         if (closed || !active || cancelling) return
-        cancelling = true
-        choosingEncoding = false
-        encodingError = null
-        input = null
+        val waitingForCore = phase is FileImportPhase.Importing
+        phase = FileImportPhase.Cancelling(filename, waitingForCore, !waitingForCore)
         refreshNotifications()
         ++readGeneration
         // A provider can ignore interruption. Retire its executor and ignore all late callbacks;
         // a fresh import must not wait behind that provider's blocked read/query.
         reader.shutdownNow()
         reader = Executors.newSingleThreadExecutor()
-        cancellationReturned = !waitingForCore
         if (waitingForCore) {
             core.cancelFileImport {
-                cancellationReturned = true
-                if (!closed) settleCancellation()
+                val current = phase as? FileImportPhase.Cancelling
+                if (!closed && current != null) {
+                    phase = current.copy(cancellationReturned = true)
+                    settleCancellation()
+                }
             }
         }
         settleCancellation()
     }
 
     private fun settleCancellation() {
-        if (cancellationReturned && !waitingForCore) complete()
+        val current = phase as? FileImportPhase.Cancelling ?: return
+        if (current.cancellationReturned && !current.waitingForCore) complete(current.result)
     }
 
-    private fun complete() {
+    private fun complete(result: FileImportResult?) {
+        phase = FileImportPhase.Finished(result)
         observer?.finished(result)
-        active = false
-        cancelling = false
-        choosingEncoding = false
-        encodingError = null
-        filename = ""
-        input = null
         // Clear transient errors; retain the terminal outcome for the result dialog.
         core.dispatch(Event.RefreshLibrary)
     }
@@ -284,7 +317,7 @@ internal class FileImports(
     fun dismissSummary() {
         checkMainThread()
         if (!active) {
-            result = null
+            phase = FileImportPhase.Idle
         }
     }
 
@@ -306,7 +339,7 @@ internal class FileImports(
         closed = true
         ++readGeneration
         core.onViewChanged = null
-        input = null
+        phase = FileImportPhase.Idle
         reader.shutdownNow()
         observer?.close()
         // Already accepted Rust work still drains through CoreSession.close(). No import resumes.
