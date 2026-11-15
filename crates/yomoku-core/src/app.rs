@@ -10,6 +10,8 @@ use serde::{Deserialize, Serialize};
 
 mod anki;
 mod effective;
+mod pending_storage;
+use pending_storage::{DocumentRequest, PendingStorage};
 mod statistics;
 mod statistics_preference;
 mod vocabulary;
@@ -85,14 +87,11 @@ pub struct Model {
     anki_notice_sequence: u64,
     anki_export_preflight: Option<crate::anki::AnkiPreflight>,
     vocabulary: crate::vocabulary::VocabularyState,
-    vocabulary_request: Option<vocabulary::VocabularyRequest>,
     vocabulary_request_sequence: u64,
     vocabulary_failed_offset: Option<u64>,
     vocabulary_refresh: Option<vocabulary::VocabularyRefresh>,
     vocabulary_status_changes_membership: bool,
-    vocabulary_word_request: Option<vocabulary_word::VocabularyWordRequest>,
     statistics: crate::statistics::StatisticsState,
-    statistics_request: Option<(u64, crate::statistics::StatisticsQuery)>,
     statistics_request_sequence: u64,
     statistics_preference_request: Option<(u64, Option<crate::statistics::StatisticsTimeframe>)>,
     statistics_preference_sequence: u64,
@@ -105,18 +104,15 @@ pub struct Model {
     library_sort: LibrarySort,
     library_word_distributions: Option<Vec<LibraryWordDistribution>>,
     library_word_error: Option<DocumentError>,
-    loading_library_words: bool,
     library_delete_target: Option<LibraryDocument>,
     library_delete_error: Option<DocumentError>,
-    pending_document_delete: Option<DocumentId>,
     library_rename: Option<LibraryRenameState>,
-    pending_document_rename: Option<(DocumentId, String)>,
-    storage_busy: bool,
+    pending_storage: PendingStorage,
+    storage_sequence: u64,
     document_error: Option<DocumentError>,
     content_route: ContentRoute,
     reader: Option<ReaderPage>,
     reader_analysis: Option<ReaderAnalysis>,
-    pending_reader: Option<DocumentId>,
     reader_document: Option<ReaderDocument>,
     reader_analyses: Vec<ReaderChapterAnalysis>,
     page_length: Option<PageLength>,
@@ -126,7 +122,6 @@ pub struct Model {
     completion_notice: Option<CompletionNotice>,
     book_completion_notice: Option<CompletionCommandId>,
     effective_reader: EffectiveReaderSession,
-    effective_request: Option<EffectiveReaderRequest>,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -279,7 +274,7 @@ pub enum Event {
     ),
     #[serde(skip)]
     #[cfg_attr(feature = "facet_typegen", facet(skip))]
-    StorageFinished(StorageResult),
+    StorageFinished(u64, StorageResult),
     #[serde(skip)]
     #[cfg_attr(feature = "facet_typegen", facet(skip))]
     StatisticsFinished(u64, StorageResult),
@@ -587,15 +582,22 @@ impl App for Yomoku {
         if let Some(operation) = operation {
             // One in-flight command per session prevents duplicate submissions and
             // stale load/list callbacks from replacing a newer snapshot.
-            if model.storage_busy
+            if model.storage_busy()
                 || model.effective_mutation_pending()
                 || model.completion_pending()
             {
                 return Command::done();
             }
-            model.storage_busy = true;
-            if let StorageOperation::RenameDocument { document_id, title } = &operation {
-                model.pending_document_rename = Some((*document_id, title.clone()));
+            let Some(attempt) = model.storage_sequence.checked_add(1) else {
+                model.document_error = Some(DocumentError::Unavailable);
+                return render::render();
+            };
+            model.storage_sequence = attempt;
+            model.pending_storage = PendingStorage::Document {
+                attempt,
+                request: DocumentRequest::capture(&operation),
+            };
+            if let StorageOperation::RenameDocument { .. } = &operation {
                 if let Some(draft) = model.library_rename.as_mut() {
                     draft.error = None;
                 }
@@ -603,8 +605,7 @@ impl App for Yomoku {
                 model.library_rename = None;
             }
             match &operation {
-                StorageOperation::DeleteDocument(id) => {
-                    model.pending_document_delete = Some(*id);
+                StorageOperation::DeleteDocument(_) => {
                     model.library_delete_error = None;
                 }
                 StorageOperation::LoadEffectiveLibraryWordDistributions => {}
@@ -613,7 +614,6 @@ impl App for Yomoku {
                 }
             }
             if operation.loads_library_words() {
-                model.loading_library_words = true;
                 model.library_word_distributions = None;
                 model.library_word_error = None;
             }
@@ -655,11 +655,10 @@ impl App for Yomoku {
                 model.book_completion_notice = None;
             }
 
-            if let Event::OpenReader(id) = event {
+            if let Event::OpenReader(_) = event {
                 model.destination = Destination::Library;
                 model.settings_open = false;
                 model.content_route = ContentRoute::Reader;
-                model.pending_reader = Some(id);
                 model.reader = None;
                 model.reader_analysis = None;
                 model.invalidate_effective_page();
@@ -667,12 +666,14 @@ impl App for Yomoku {
                 model.reader_document = None;
                 model.reader_analyses.clear();
             }
-            return render::render()
-                .and(Command::request_from_shell(operation).then_send(Event::StorageFinished));
+            return render::render().and(
+                Command::request_from_shell(operation)
+                    .then_send(move |result| Event::StorageFinished(attempt, result)),
+            );
         }
         match event {
             Event::RequestDocumentRename(id) => {
-                if !model.library_visible() || model.storage_busy || model.completion_pending() {
+                if !model.library_visible() || model.storage_busy() || model.completion_pending() {
                     return Command::done();
                 }
                 let Some(target) = model
@@ -691,7 +692,7 @@ impl App for Yomoku {
                 });
             }
             Event::EditDocumentTitle { document_id, title } => {
-                if model.storage_busy || !model.library_visible() {
+                if model.storage_busy() || !model.library_visible() {
                     return Command::done();
                 }
                 let Some(draft) = model.library_rename.as_mut() else {
@@ -704,13 +705,19 @@ impl App for Yomoku {
                 draft.error = None;
             }
             Event::CancelDocumentRename => {
-                if model.pending_document_rename.is_some() {
+                if matches!(
+                    model.pending_storage,
+                    PendingStorage::Document {
+                        request: DocumentRequest::Rename(..),
+                        ..
+                    }
+                ) {
                     return Command::done();
                 }
                 model.library_rename = None;
             }
             Event::RequestDocumentDeletion(id) => {
-                if !model.library_visible() || model.storage_busy || model.completion_pending() {
+                if !model.library_visible() || model.storage_busy() || model.completion_pending() {
                     return Command::done();
                 }
                 let Some(target) = model
@@ -726,7 +733,13 @@ impl App for Yomoku {
                 model.library_rename = None;
             }
             Event::CancelDocumentDeletion => {
-                if model.pending_document_delete.is_some() {
+                if matches!(
+                    model.pending_storage,
+                    PendingStorage::Document {
+                        request: DocumentRequest::Delete(_),
+                        ..
+                    }
+                ) {
                     return Command::done();
                 }
                 model.clear_library_delete();
@@ -768,7 +781,6 @@ impl App for Yomoku {
                 model.clear_reader_word();
                 model.reader_document = None;
                 model.reader_analyses.clear();
-                model.pending_reader = None;
             }
             Event::OpenPaste => {
                 model.library_rename = None;
@@ -785,7 +797,6 @@ impl App for Yomoku {
                 model.clear_reader_word();
                 model.reader_document = None;
                 model.reader_analyses.clear();
-                model.pending_reader = None;
 
                 model.document_error = None;
             }
@@ -810,20 +821,29 @@ impl App for Yomoku {
                     model.book_completion_notice = None;
                 }
             }
-            Event::StorageFinished(result) => {
-                if model.effective_request.is_some()
-                    || model.statistics_request.is_some()
-                    || model.vocabulary_request.is_some()
-                    || model.vocabulary_word_request.is_some()
+            Event::StorageFinished(attempt, result) => {
+                if !matches!(model.pending_storage, PendingStorage::Document { attempt: current, .. } if current == attempt)
                 {
                     return Command::done();
                 }
-                model.storage_busy = false;
-
-                let loading_library_words = std::mem::take(&mut model.loading_library_words);
-                let pending_reader = model.pending_reader.take();
-                let document_delete = model.pending_document_delete.take();
-                let document_rename = model.pending_document_rename.take();
+                let PendingStorage::Document { request, .. } =
+                    std::mem::take(&mut model.pending_storage)
+                else {
+                    unreachable!()
+                };
+                let loading_library_words = matches!(request, DocumentRequest::LibraryWords);
+                let pending_reader = match request {
+                    DocumentRequest::Reader(id) => Some(id),
+                    _ => None,
+                };
+                let document_delete = match request {
+                    DocumentRequest::Delete(id) => Some(id),
+                    _ => None,
+                };
+                let document_rename = match request {
+                    DocumentRequest::Rename(id, title) => Some((id, title)),
+                    _ => None,
+                };
                 let import_outcome = match &result {
                     StorageResult::Created(_) => Some(ImportOutcome::Created),
                     StorageResult::Existing(_) => Some(ImportOutcome::Existing),
@@ -1069,7 +1089,7 @@ impl App for Yomoku {
             library_delete_target: model.library_delete_target.clone(),
             library_delete_error: model.library_delete_error,
             library_rename: model.library_rename.clone(),
-            storage_busy: model.storage_busy,
+            storage_busy: model.storage_busy(),
             document_error: model.document_error,
             content_route: model.content_route,
             reader: model.reader.clone(),
@@ -1146,7 +1166,6 @@ impl Model {
         self.clear_reader_word();
         self.reader_document = None;
         self.reader_analyses.clear();
-        self.pending_reader = None;
 
         self.document_error = None;
     }

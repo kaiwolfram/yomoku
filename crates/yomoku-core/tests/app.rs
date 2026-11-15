@@ -137,3 +137,39 @@ fn starts_in_library() {
         }
     );
 }
+
+#[test]
+fn old_document_callback_cannot_release_a_newer_shared_storage_owner() {
+    use yomoku_core::storage::{DocumentError, StorageResult};
+    let core = Core::<Yomoku>::new();
+    let mut first = core.process_event(Event::RefreshLibrary);
+    let request = first
+        .iter_mut()
+        .find_map(|effect| match effect {
+            Effect::Storage(request) => Some(request),
+            _ => None,
+        })
+        .unwrap();
+    core.resolve(request, StorageResult::Failed(DocumentError::Unavailable))
+        .unwrap();
+    let mut second = core.process_event(Event::RefreshLibrary);
+    assert!(core.view().storage_busy);
+    assert!(core
+        .process_event(Event::StorageFinished(
+            1,
+            StorageResult::Failed(DocumentError::InvalidDocument)
+        ))
+        .is_empty());
+    assert!(core.view().storage_busy);
+    assert!(core.view().document_error.is_none());
+    let request = second
+        .iter_mut()
+        .find_map(|effect| match effect {
+            Effect::Storage(request) => Some(request),
+            _ => None,
+        })
+        .unwrap();
+    core.resolve(request, StorageResult::Failed(DocumentError::Unavailable))
+        .unwrap();
+    assert!(!core.view().storage_busy);
+}

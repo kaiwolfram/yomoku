@@ -750,7 +750,10 @@ mod tests {
     #[test]
     fn return_queries_can_refresh_during_reader_io_but_cannot_start_a_write() {
         let (mut model, selection) = configured();
-        model.storage_busy = true;
+        model.pending_storage = PendingStorage::Document {
+            attempt: 0,
+            request: DocumentRequest::Library,
+        };
         update(
             &mut model,
             Event::CheckAnkiSetup(crate::anki::AnkiSetupRequest::Refresh),
@@ -786,7 +789,7 @@ mod tests {
             },
         );
         assert!(model.prepared_anki_export.is_none() && model.anki_live.is_none());
-        model.storage_busy = false;
+        model.pending_storage = PendingStorage::Idle;
         assert!(model.prepared_anki_export.is_none());
         update(
             &mut model,

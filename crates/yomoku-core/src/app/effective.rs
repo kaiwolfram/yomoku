@@ -20,7 +20,7 @@ impl Model {
     }
 
     fn can_start_effective_page(&self, page: EffectivePageIdentity) -> bool {
-        !self.storage_busy
+        !self.storage_busy()
             && !self.settings_open
             && !self.completion_pending()
             && self.deferred_reader_event.is_none()
@@ -116,7 +116,7 @@ impl Yomoku {
                 }))
             }
             Event::RetryEffectiveReaderStatus => {
-                if model.storage_busy {
+                if model.storage_busy() {
                     return Some(Command::done());
                 }
                 let session = &mut model.effective_reader;
@@ -128,7 +128,7 @@ impl Yomoku {
                 }))
             }
             Event::CancelEffectiveReaderStatus => {
-                if model.storage_busy {
+                if model.storage_busy() {
                     return Some(Command::done());
                 }
                 let session = &mut model.effective_reader;
@@ -140,7 +140,7 @@ impl Yomoku {
                 })
             }
             Event::LoadReaderTokens(base) => {
-                if model.storage_busy
+                if model.storage_busy()
                     || model.settings_open
                     || model.completion_pending()
                     || model.effective_mutation_pending()
@@ -163,7 +163,7 @@ impl Yomoku {
             } => {
                 if model.completion_pending()
                     || model.deferred_reader_event.is_some()
-                    || model.storage_busy
+                    || model.storage_busy()
                     || model.content_route != ContentRoute::Reader
                     || model.settings_open
                     || !model.reader.as_ref().is_some_and(|reader| {
@@ -197,7 +197,7 @@ impl Yomoku {
                 Some(self.update(Event::RetryReaderCompletion, model))
             }
             Event::RetryReaderCompletion => {
-                if model.storage_busy {
+                if model.storage_busy() {
                     return Some(Command::done());
                 }
                 let request = model.effective_reader.dispatch_completion();
@@ -214,8 +214,7 @@ impl Yomoku {
         request: EffectiveReaderRequest,
         model: &mut Model,
     ) -> Command<Effect, Event> {
-        model.storage_busy = true;
-        model.effective_request = Some(request.clone());
+        model.pending_storage = PendingStorage::Effective(request.clone());
         model.document_error = None;
         render::render().and(
             request.command(|request, result| {
@@ -230,14 +229,14 @@ impl Yomoku {
         result: StorageResult,
         model: &mut Model,
     ) -> Command<Effect, Event> {
-        if model.effective_request.as_ref() != Some(request) {
+        if !matches!(&model.pending_storage, PendingStorage::Effective(current) if current == request)
+        {
             return Command::done();
         }
         let progress = model.effective_reader.finish_request(request, result);
         // A dismissed read has lost its presentation lifecycle but still owns the
         // app's FIFO slot. Release only its captured request, never newer work.
-        model.effective_request = None;
-        model.storage_busy = false;
+        model.pending_storage = PendingStorage::Idle;
 
         match progress {
             Some(EffectiveReaderProgress::TokensFailed(error)) => {

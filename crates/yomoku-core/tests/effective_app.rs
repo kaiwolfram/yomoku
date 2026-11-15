@@ -381,10 +381,10 @@ fn read_failure_and_dismissal_ignore_old_callbacks_without_releasing_new_work() 
             f.core.process_event(Event::CloseDocument);
         }
         // Uncaptured results cannot clear the effective read's FIFO obligation.
-        f.core
-            .process_event(Event::StorageFinished(StorageResult::Failed(
-                DocumentError::Unavailable,
-            )));
+        f.core.process_event(Event::StorageFinished(
+            0,
+            StorageResult::Failed(DocumentError::Unavailable),
+        ));
         assert!(f.core.view().storage_busy);
         let result = if dismiss {
             StorageResult::Effective(Output::TokensLoaded(request, snapshot))

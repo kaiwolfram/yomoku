@@ -234,7 +234,10 @@ fn anki_settings_callbacks_preserve_reader_and_frozen_export() {
         ));
         assert!(model.prepared_anki_export.is_some());
         model.settings_open = true;
-        model.storage_busy = true;
+        model.pending_storage = PendingStorage::Document {
+            attempt: 0,
+            request: DocumentRequest::Library,
+        };
         model.document_error = Some(DocumentError::MissingAnalysis);
         let before = Yomoku.view(&model);
         let export = model.prepared_anki_export.clone();

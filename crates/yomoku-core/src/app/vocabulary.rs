@@ -52,7 +52,7 @@ impl Model {
         self.vocabulary.next_offset = None;
         self.vocabulary.error = None;
         self.vocabulary_failed_offset = None;
-        if let Some(request) = &mut self.vocabulary_request {
+        if let Some(request) = self.vocabulary_request_mut() {
             // Query equality alone cannot distinguish A -> B -> A or reentry.
             request.obsolete = true;
         }
@@ -86,7 +86,8 @@ impl Yomoku {
         ) {
             return None;
         }
-        if !model.vocabulary_visible() || (model.storage_busy && model.vocabulary_request.is_none())
+        if !model.vocabulary_visible()
+            || (model.storage_busy() && model.vocabulary_request().is_none())
         {
             return Some(Command::done());
         }
@@ -95,14 +96,14 @@ impl Yomoku {
             if model.vocabulary.query != query {
                 model.vocabulary.query = query;
                 model.invalidate_vocabulary();
-                return Some(if model.vocabulary_request.is_some() {
+                return Some(if model.vocabulary_request().is_some() {
                     render::render()
                 } else {
                     self.dispatch_vocabulary(0, model)
                 });
             }
         }
-        if model.vocabulary_request.is_some() {
+        if model.vocabulary_request().is_some() {
             return Some(Command::done());
         }
         let offset = match event {
@@ -132,7 +133,7 @@ impl Yomoku {
         };
         model.vocabulary_request_sequence = id;
         let query = model.vocabulary.query.clone();
-        model.vocabulary_request = Some(VocabularyRequest {
+        model.pending_storage = PendingStorage::Vocabulary(VocabularyRequest {
             id,
             query: query.clone(),
             offset,
@@ -141,7 +142,6 @@ impl Yomoku {
         model.vocabulary.loading = true;
         model.vocabulary.error = None;
         model.vocabulary_failed_offset = None;
-        model.storage_busy = true;
 
         render::render().and(
             Command::request_from_shell(StorageOperation::LoadVocabulary { query, offset })
@@ -156,14 +156,15 @@ impl Yomoku {
         model: &mut Model,
     ) -> Command<Effect, Event> {
         if !model
-            .vocabulary_request
+            .vocabulary_request()
             .as_ref()
             .is_some_and(|request| request.id == id)
         {
             return Command::done();
         }
-        let request = model.vocabulary_request.take().expect("matched request");
-        model.storage_busy = false;
+        let PendingStorage::Vocabulary(request) = std::mem::take(&mut model.pending_storage) else {
+            unreachable!("matched request")
+        };
         model.vocabulary.loading = false;
         if request.obsolete {
             return if model.vocabulary_visible() {

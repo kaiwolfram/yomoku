@@ -12,7 +12,7 @@ pub(super) struct VocabularyWordRequest {
 impl Model {
     fn dismiss_vocabulary_word(&mut self) {
         self.vocabulary.word = None;
-        if let Some(request) = &mut self.vocabulary_word_request {
+        if let Some(request) = self.vocabulary_word_request_mut() {
             request.obsolete = true;
         }
     }
@@ -34,14 +34,14 @@ impl Yomoku {
             | Event::OpenPaste
             | Event::OpenReader(_)
             | Event::CloseDocument => model.dismiss_vocabulary_word(),
-            Event::CancelVocabularyWordStatus if !model.storage_busy => {
+            Event::CancelVocabularyWordStatus if !model.storage_busy() => {
                 model.vocabulary.word_status = None;
                 model.vocabulary_status_changes_membership = false;
                 model.vocabulary.word_status_error = None;
                 return Some(render::render());
             }
             Event::RetryVocabularyWordStatus => {
-                if model.storage_busy || model.vocabulary.word_status_error.is_none() {
+                if model.storage_busy() || model.vocabulary.word_status_error.is_none() {
                     return Some(Command::done());
                 }
                 let Some(command) = model.vocabulary.word_status.clone() else {
@@ -54,7 +54,7 @@ impl Yomoku {
             }
             Event::OpenVocabularyWord(id)
                 if model.vocabulary_visible()
-                    && !model.storage_busy
+                    && !model.storage_busy()
                     && model.vocabulary.word.is_none()
                     && model.vocabulary.word_status.is_none() =>
             {
@@ -85,7 +85,7 @@ impl Yomoku {
             }
             Event::RetryVocabularyWord
                 if model.vocabulary_visible()
-                    && !model.storage_busy
+                    && !model.storage_busy()
                     && model.vocabulary.word_status.is_none() =>
             {
                 let Some(word) = model.vocabulary.word.as_ref() else {
@@ -101,7 +101,7 @@ impl Yomoku {
             }
             Event::SetVocabularyWordStatus(command)
                 if model.vocabulary_visible()
-                    && !model.storage_busy
+                    && !model.storage_busy()
                     && model.vocabulary.word_status.is_none() =>
             {
                 let Some(word) = model.vocabulary.word.as_ref() else {
@@ -166,12 +166,11 @@ impl Yomoku {
             }
             _ => model.vocabulary.word_status_error = None,
         }
-        model.vocabulary_word_request = Some(VocabularyWordRequest {
+        model.pending_storage = PendingStorage::VocabularyWord(VocabularyWordRequest {
             sequence,
             operation: operation.clone(),
             obsolete: false,
         });
-        model.storage_busy = true;
         render::render().and(
             Command::request_from_shell(operation)
                 .then_send(move |result| Event::VocabularyWordFinished(sequence, result)),
@@ -185,17 +184,16 @@ impl Yomoku {
         model: &mut Model,
     ) -> Command<Effect, Event> {
         if !model
-            .vocabulary_word_request
+            .vocabulary_word_request()
             .as_ref()
             .is_some_and(|request| request.sequence == sequence)
         {
             return Command::done();
         }
-        let request = model
-            .vocabulary_word_request
-            .take()
-            .expect("matched request");
-        model.storage_busy = false;
+        let PendingStorage::VocabularyWord(request) = std::mem::take(&mut model.pending_storage)
+        else {
+            unreachable!("matched request")
+        };
         match request.operation {
             StorageOperation::LoadVocabularyWord(id) => {
                 if !request.obsolete && model.vocabulary_visible() {

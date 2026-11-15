@@ -31,7 +31,7 @@ impl Yomoku {
             } => (*timeframe, *as_of_unix_ms),
             Event::RetryStatistics => {
                 if !model.statistics_visible()
-                    || model.storage_busy
+                    || model.storage_busy()
                     || model.statistics.error.is_none()
                 {
                     return Some(Command::done());
@@ -40,7 +40,8 @@ impl Yomoku {
             }
             _ => return None,
         };
-        if !model.statistics_visible() || (model.storage_busy && model.statistics_request.is_none())
+        if !model.statistics_visible()
+            || (model.storage_busy() && model.statistics_request().is_none())
         {
             return Some(Command::done());
         }
@@ -65,7 +66,7 @@ impl Yomoku {
         // unattempted reads that were coalesced while hidden in Settings.
         if model.statistics.query == Some(query) {
             return Some(save.and(
-                if model.statistics_request.is_none()
+                if model.statistics_request().is_none()
                     && model.statistics.data.is_none()
                     && model.statistics.error.is_none()
                 {
@@ -78,7 +79,7 @@ impl Yomoku {
         model.statistics.query = Some(query);
         model.statistics.data = None;
         model.statistics.error = None;
-        Some(save.and(if model.statistics_request.is_some() {
+        Some(save.and(if model.statistics_request().is_some() {
             // Coalesce rapid selections; the old callback still owns the FIFO.
             render::render()
         } else {
@@ -93,10 +94,9 @@ impl Yomoku {
             return render::render();
         };
         model.statistics_request_sequence = request_id;
-        model.statistics_request = Some((request_id, query));
+        model.pending_storage = PendingStorage::Statistics(request_id, query);
         model.statistics.loading = true;
         model.statistics.error = None;
-        model.storage_busy = true;
 
         render::render().and(
             Command::request_from_shell(StorageOperation::LoadStatistics(query))
@@ -110,14 +110,13 @@ impl Yomoku {
         result: StorageResult,
         model: &mut Model,
     ) -> Command<Effect, Event> {
-        let Some((pending_id, query)) = model.statistics_request else {
+        let Some((pending_id, query)) = model.statistics_request() else {
             return Command::done();
         };
         if request_id != pending_id {
             return Command::done();
         }
-        model.statistics_request = None;
-        model.storage_busy = false;
+        model.pending_storage = PendingStorage::Idle;
         model.statistics.loading = false;
         if model.statistics.query != Some(query) {
             // Navigation/mutation can invalidate a read; a changed timeframe can

@@ -16,7 +16,7 @@ impl Model {
         deck: AnkiDeckId,
         entry: Option<crate::anki::AnkiEntryKey>,
     ) -> Option<AnkiExport> {
-        if self.storage_busy
+        if self.storage_busy()
             || self.settings_open
             || self.completion_pending()
             || self.deferred_reader_event.is_some()

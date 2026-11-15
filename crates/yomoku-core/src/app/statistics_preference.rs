@@ -238,7 +238,7 @@ mod tests {
         );
         assert!(model.statistics_preference_dirty);
         // Finish the independent chart read so Retry may also retry chart failures.
-        model.storage_busy = false;
+        model.pending_storage = PendingStorage::Idle;
         assert_eq!(
             update(&mut model, Event::RetryStatistics),
             [StorageOperation::SaveStatisticsTimeframe(LastWeek)]

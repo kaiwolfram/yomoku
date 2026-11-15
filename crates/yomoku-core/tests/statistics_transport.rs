@@ -200,9 +200,10 @@ fn stale_callback_cannot_release_new_request_even_with_identical_query() {
             .process_event(Event::StatisticsFinished(1, loaded(q)))
             .is_empty());
         assert!(core
-            .process_event(Event::StorageFinished(StorageResult::Failed(
-                DocumentError::Unavailable
-            )))
+            .process_event(Event::StorageFinished(
+                0,
+                StorageResult::Failed(DocumentError::Unavailable)
+            ))
             .is_empty());
         assert!(core.view().storage_busy && core.view().statistics.loading);
         resolve(&core, &mut second, loaded(q));

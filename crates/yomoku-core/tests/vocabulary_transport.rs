@@ -235,7 +235,7 @@ fn stale_callbacks_cannot_release_new_requests_or_accept_generic_storage_results
         let mut next = core.process_event(Event::LoadMoreVocabulary);
         for event in [
             Event::VocabularyFinished(1, loaded("", 0, 205)),
-            Event::StorageFinished(StorageResult::Failed(DocumentError::Unavailable)),
+            Event::StorageFinished(0, StorageResult::Failed(DocumentError::Unavailable)),
         ] {
             assert!(core.process_event(event).is_empty());
             assert!(core.view().storage_busy && core.view().vocabulary.loading);
@@ -412,9 +412,10 @@ fn dismissed_and_departed_word_reads_release_only_their_slot_without_reopening()
                 0,
                 StorageResult::Failed(DocumentError::NotFound),
             ));
-            core.process_event(Event::StorageFinished(StorageResult::Failed(
-                DocumentError::NotFound,
-            )));
+            core.process_event(Event::StorageFinished(
+                0,
+                StorageResult::Failed(DocumentError::NotFound),
+            ));
             assert_eq!(core.view(), before);
             resolve(&core, &mut effects, details);
             assert!(!core.view().storage_busy);
