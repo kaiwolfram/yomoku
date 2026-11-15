@@ -659,12 +659,7 @@ impl App for Yomoku {
                 model.destination = Destination::Library;
                 model.settings_open = false;
                 model.content_route = ContentRoute::Reader;
-                model.reader = None;
-                model.reader_analysis = None;
-                model.invalidate_effective_page();
-                model.clear_reader_word();
-                model.reader_document = None;
-                model.reader_analyses.clear();
+                model.clear_reader_presentation();
             }
             return render::render().and(
                 Command::request_from_shell(operation)
@@ -775,12 +770,7 @@ impl App for Yomoku {
                 model.destination = destination;
                 model.settings_open = false;
                 model.content_route = ContentRoute::Main;
-                model.reader = None;
-                model.reader_analysis = None;
-                model.invalidate_effective_page();
-                model.clear_reader_word();
-                model.reader_document = None;
-                model.reader_analyses.clear();
+                model.clear_reader_presentation();
             }
             Event::OpenPaste => {
                 model.library_rename = None;
@@ -791,16 +781,13 @@ impl App for Yomoku {
                 model.destination = Destination::Library;
                 model.settings_open = false;
                 model.content_route = ContentRoute::Paste;
-                model.reader = None;
-                model.reader_analysis = None;
-                model.invalidate_effective_page();
-                model.clear_reader_word();
-                model.reader_document = None;
-                model.reader_analyses.clear();
+                model.clear_reader_presentation();
 
                 model.document_error = None;
             }
             Event::CloseDocument => model.close_document(),
+            // Settings intentionally overlays the retained route: closing it
+            // returns to the same reader/paste/main presentation.
             Event::OpenSettings => {
                 model.library_rename = None;
                 model.clear_library_delete();
@@ -933,12 +920,7 @@ impl App for Yomoku {
                         model.destination = Destination::Library;
                         model.settings_open = false;
                         model.content_route = ContentRoute::Main;
-                        model.reader = None;
-                        model.reader_analysis = None;
-                        model.invalidate_effective_page();
-                        model.clear_reader_word();
-                        model.reader_document = None;
-                        model.reader_analyses.clear();
+                        model.clear_reader_presentation();
                     }
                     StorageResult::Loaded(snapshot) => {
                         if snapshot.validate().is_err() {
@@ -1153,6 +1135,17 @@ impl Model {
         })
     }
 
+    /// Retire visible reader data and stale shell selections. Accepted mutations
+    /// and completion retries remain owned by the session and shared storage slot.
+    fn clear_reader_presentation(&mut self) {
+        self.reader = None;
+        self.reader_analysis = None;
+        self.invalidate_effective_page();
+        self.clear_reader_word();
+        self.reader_document = None;
+        self.reader_analyses.clear();
+    }
+
     fn close_document(&mut self) {
         self.library_rename = None;
         self.clear_library_delete();
@@ -1160,12 +1153,7 @@ impl Model {
         self.completion_notice = None;
         self.book_completion_notice = None;
         self.content_route = ContentRoute::Main;
-        self.reader = None;
-        self.reader_analysis = None;
-        self.invalidate_effective_page();
-        self.clear_reader_word();
-        self.reader_document = None;
-        self.reader_analyses.clear();
+        self.clear_reader_presentation();
 
         self.document_error = None;
     }
