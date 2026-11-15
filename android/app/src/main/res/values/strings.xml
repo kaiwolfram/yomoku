@@ -28,6 +28,7 @@
     <string name="import_summary_title">Import result</string>
     <string name="import_file_created">Imported</string>
     <string name="import_file_unreadable">Could not read this file. Select it again to retry.</string>
+    <string name="import_file_too_large">This file is too large for the available import memory.</string>
     <string name="import_supported_files">Select an EPUB (.epub), TXT (.txt), or SRT (.srt) file.</string>
     <string name="app_name">Yomoku</string>
     <string name="library_title">Library</string>

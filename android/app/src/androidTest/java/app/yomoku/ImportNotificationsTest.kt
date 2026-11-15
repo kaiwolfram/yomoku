@@ -251,6 +251,8 @@ class ImportNotificationsTest {
                     ) to "Already in Library: Book",
                     FileImportResult("unreadable.txt", message = R.string.import_file_unreadable) to
                         context.getString(R.string.import_file_unreadable),
+                    FileImportResult("large.epub", message = R.string.import_file_too_large) to
+                        context.getString(R.string.import_file_too_large),
                 )
             for ((result, text) in outcomes) {
                 compose.runOnIdle { observer.finished(result) }

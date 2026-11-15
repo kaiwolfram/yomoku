@@ -34,9 +34,11 @@ public final class TxtFixtureProvider extends ContentProvider {
     @Override
     public Cursor query(Uri uri, String[] projection, String selection, String[] args, String sort) {
         requireWorker();
-        MatrixCursor cursor = new MatrixCursor(new String[] {OpenableColumns.DISPLAY_NAME});
+        MatrixCursor cursor = new MatrixCursor(new String[] {OpenableColumns.DISPLAY_NAME, OpenableColumns.SIZE});
         String name = uri.getQueryParameter("name");
-        cursor.addRow(new Object[] {name == null ? uri.getLastPathSegment() : name});
+        String size = uri.getQueryParameter("reportedSize");
+        cursor.addRow(new Object[] {name == null ? uri.getLastPathSegment() : name,
+                size == null ? null : Long.valueOf(size)});
         return cursor;
     }
 

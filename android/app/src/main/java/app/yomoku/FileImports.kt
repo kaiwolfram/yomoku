@@ -102,6 +102,7 @@ internal class FileImports(
     private val core: CoreSession,
     private val observer: FileImportObserver? = null,
     private val notificationsAvailable: () -> Boolean = { false },
+    private val availableImportMemory: () -> Long = FileImportMemory::availableBytes,
 ) : AutoCloseable {
     private val handler = Handler(Looper.getMainLooper())
     private var reader = Executors.newSingleThreadExecutor()
@@ -192,17 +193,25 @@ internal class FileImports(
                     if (format == null) {
                         null
                     } else {
+                        val limit = FileImportMemory.sourceLimit(availableImportMemory())
                         val bytes =
-                            resolver.openInputStream(uri)?.use { it.readBytes() }
-                                ?: error("Cannot open document")
+                            resolver.openInputStream(uri)?.use {
+                                FileImportMemory.read(it, limit) { generation == readGeneration }
+                            } ?: error("Cannot open document")
                         if (generation != readGeneration) return@execute
                         FileInput(FileImportBytes(bytes), name, format)
                     }
-                } catch (_: Exception) {
+                } catch (error: Exception) {
                     handler.post {
                         if (generation == readGeneration)
                             finish(
-                                FileImportResult(name, message = R.string.import_file_unreadable)
+                                FileImportResult(
+                                    name,
+                                    message =
+                                        if (error is ImportMemoryExceeded)
+                                            R.string.import_file_too_large
+                                        else R.string.import_file_unreadable,
+                                )
                             )
                     }
                     return@execute
@@ -220,6 +229,16 @@ internal class FileImports(
     }
 
     private fun submit(input: FileInput) {
+        try {
+            FileImportMemory.requireSubmissionRoom(
+                input.bytes.size,
+                input.filename,
+                availableImportMemory(),
+            )
+        } catch (_: ImportMemoryExceeded) {
+            finish(FileImportResult(input.filename, message = R.string.import_file_too_large))
+            return
+        }
         phase = FileImportPhase.Importing(input)
         core.dispatch(input.event())
     }
