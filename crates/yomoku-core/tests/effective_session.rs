@@ -17,10 +17,10 @@ mod statuses;
 mod words;
 
 fn snapshot() -> EffectiveReaderTokenSnapshot {
-    snapshot_with_manual_split(false)
+    snapshot_with_separate_tokens(false)
 }
 
-fn snapshot_with_manual_split(manual: bool) -> EffectiveReaderTokenSnapshot {
+fn snapshot_with_separate_tokens(separate: bool) -> EffectiveReaderTokenSnapshot {
     let chapter = ChapterText {
         source_id: 2.try_into().unwrap(),
         chapter_id: 3.try_into().unwrap(),
@@ -33,7 +33,7 @@ fn snapshot_with_manual_split(manual: bool) -> EffectiveReaderTokenSnapshot {
             dictionary_revision: "full@1".into(),
         },
         mode: SplitMode::C,
-        tokens: if manual {
+        tokens: if separate {
             vec!["𠮷か\u{3099}\0", "。", "猫", "犬"]
         } else {
             vec!["𠮷か\u{3099}\0", "。", "猫犬"]
@@ -49,12 +49,12 @@ fn snapshot_with_manual_split(manual: bool) -> EffectiveReaderTokenSnapshot {
                 },
                 surface: surface.into(),
                 is_japanese: surface != "。",
-                reading: if manual && ["猫", "犬"].contains(&surface) {
+                reading: if separate && ["猫", "犬"].contains(&surface) {
                     None
                 } else {
                     Some(format!("読み{surface}"))
                 },
-                dictionary_form: if manual && ["猫", "犬"].contains(&surface) {
+                dictionary_form: if separate && ["猫", "犬"].contains(&surface) {
                     None
                 } else {
                     Some(Surface::new(surface).unwrap())

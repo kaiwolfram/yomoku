@@ -35,7 +35,7 @@ pub struct EffectivePageIdentity {
     pub base: ReaderTokenKey,
 }
 
-/// An effective whole-chapter segment index, never an original C token index.
+/// An immutable Mode C whole-chapter segment index.
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
 pub struct EffectiveReaderSelection {
@@ -60,17 +60,11 @@ pub struct EffectivePageToken {
 
 impl From<EffectiveReaderToken> for EffectivePageToken {
     fn from(token: EffectiveReaderToken) -> Self {
-        let (reading, dictionary_form) = token
-            .metadata
-            .map(|metadata| {
-                (
-                    metadata.reading,
-                    metadata
-                        .dictionary_form
-                        .map(|form| form.as_str().to_owned()),
-                )
-            })
-            .unwrap_or_default();
+        let metadata = token.metadata;
+        let reading = metadata.reading;
+        let dictionary_form = metadata
+            .dictionary_form
+            .map(|form| form.as_str().to_owned());
         Self {
             segment_index: token.segment_index,
             anchor: token.anchor,

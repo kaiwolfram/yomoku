@@ -345,7 +345,10 @@ fn commit_retry_keeps_the_same_reservation_and_emits_success_once() {
                 .collect::<Vec<_>>(),
             ["猫", "犬", "𠮷か\u{3099}\0"]
         );
-        assert!(b.occurrences()[0].metadata.is_some());
+        assert_eq!(
+            b.occurrences()[0].metadata.analysis_id,
+            fixture.intent.analysis_id
+        );
         let output = Output::PageCompleted(fixture.completed_document(), outcome);
         assert!(session
             .finish_completion_request(&first, Ok(output.clone()))

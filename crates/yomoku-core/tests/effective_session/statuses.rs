@@ -13,7 +13,7 @@ fn loaded() -> (
     EffectiveReaderSelection,
     EffectiveReaderWordDetails,
 ) {
-    let mut snapshot = snapshot_with_manual_split(true);
+    let mut snapshot = snapshot_with_separate_tokens(true);
     let mut token = snapshot.tokens.last().unwrap().clone();
     token.vocabulary = Some(ReaderVocabulary {
         id: 55.try_into().unwrap(),
@@ -83,7 +83,7 @@ pub(super) fn intent(selection: EffectiveReaderSelection) -> PageCompletionInten
 }
 
 #[test]
-fn status_changes_update_live_word_and_page_without_guessing_manual_metadata() {
+fn status_changes_update_live_word_and_page_without_guessing_missing_readings_or_base_forms() {
     let (mut session, selection, details) = loaded();
     let request = session.begin_word_load(selection).unwrap();
     assert!(session.finish_word_request(
@@ -243,7 +243,7 @@ fn invalidated_status_callbacks_drain_without_touching_fresh_page_or_restoring_w
     assert!(session.status_state().busy);
     assert!(session.finish_status_request(&first, Err(DocumentError::Unavailable)));
     let retry = session.retry_status_change().unwrap();
-    let mut fresh = snapshot_with_manual_split(true);
+    let mut fresh = snapshot_with_separate_tokens(true);
     fresh.tokens.last_mut().unwrap().vocabulary = Some(ReaderVocabulary {
         status: VocabularyStatus::Learning,
         ..entry()

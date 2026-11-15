@@ -25,13 +25,13 @@ pub enum EffectiveTokenEligibility {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 pub struct EffectiveReaderToken {
     /// Whole effective-chapter index, including gaps for non-Japanese segments.
-    /// This is never an original analyzer token index.
+    /// With immutable Mode C segmentation this is also the stored token index.
     pub segment_index: u64,
     pub anchor: TextAnchor,
     pub display_range: TextRange,
     pub surface: String,
     pub eligibility: EffectiveTokenEligibility,
-    pub metadata: Option<SegmentMetadata>,
+    pub metadata: SegmentMetadata,
     pub vocabulary: Option<ReaderVocabulary>,
 }
 
@@ -110,9 +110,10 @@ impl<'a> EffectiveReaderChapter<'a> {
     /// cloning metadata. Library membership uses the same eligibility as reading
     /// and completion; callers deduplicate exact spellings across chapters.
     pub fn eligible_surfaces(&self) -> impl Iterator<Item = &str> {
-        self.segmentation.segments.iter().filter_map(|segment| {
-            segment_eligibility(segment).map(|_| segment.boundary.surface.as_str())
-        })
+        self.segmentation
+            .segments
+            .iter()
+            .filter_map(|segment| segment_eligibility(segment).map(|_| segment.surface.as_str()))
     }
 
     /// Crossing tokens remain selectable on both pages with a complete surface,
@@ -147,32 +148,31 @@ impl<'a> EffectiveReaderChapter<'a> {
         }
         let mut tokens = Vec::new();
         for (index, segment) in self.segmentation.segments.iter().enumerate() {
-            let boundary = &segment.boundary;
             let Some(eligibility) = segment_eligibility(segment) else {
                 continue;
             };
-            if boundary.anchor.range.start >= page.range.end
-                || boundary.anchor.range.end <= page.range.start
-                || (starts_only && boundary.anchor.range.start < page.range.start)
+            if segment.anchor.range.start >= page.range.end
+                || segment.anchor.range.end <= page.range.start
+                || (starts_only && segment.anchor.range.start < page.range.start)
             {
                 continue;
             }
             tokens.push(EffectiveReaderToken {
                 segment_index: u64::try_from(index).map_err(|_| InvalidAnalysis)?,
-                anchor: boundary.anchor,
+                anchor: segment.anchor,
                 display_range: TextRange {
                     start: TextOffset::try_from(
-                        i64::from(boundary.anchor.range.start.max(page.range.start))
+                        i64::from(segment.anchor.range.start.max(page.range.start))
                             - i64::from(page.range.start),
                     )
                     .map_err(|_| InvalidAnalysis)?,
                     end: TextOffset::try_from(
-                        i64::from(boundary.anchor.range.end.min(page.range.end))
+                        i64::from(segment.anchor.range.end.min(page.range.end))
                             - i64::from(page.range.start),
                     )
                     .map_err(|_| InvalidAnalysis)?,
                 },
-                surface: boundary.surface.clone(),
+                surface: segment.surface.clone(),
                 eligibility,
                 metadata: segment.metadata.clone(),
                 vocabulary: None,
@@ -183,11 +183,10 @@ impl<'a> EffectiveReaderChapter<'a> {
 }
 
 fn segment_eligibility(segment: &EffectiveSegment) -> Option<EffectiveTokenEligibility> {
-    match &segment.metadata {
-        Some(metadata) if metadata.is_japanese => Some(EffectiveTokenEligibility::AnalyzerJapanese),
-        Some(_) => None,
-        None => None,
-    }
+    segment
+        .metadata
+        .is_japanese
+        .then_some(EffectiveTokenEligibility::AnalyzerJapanese)
 }
 
 /// Frozen effective completion. Only validated chapter projection can construct

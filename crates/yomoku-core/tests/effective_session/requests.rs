@@ -54,7 +54,7 @@ fn token_callbacks_use_captured_attempts_and_require_explicit_retry_after_bad_re
 
 #[test]
 fn status_errors_preserve_frozen_choice_until_retry_or_cancel() {
-    let mut snapshot = snapshot_with_manual_split(true);
+    let mut snapshot = snapshot_with_separate_tokens(true);
     let id = 55.try_into().unwrap();
     snapshot.tokens.last_mut().unwrap().vocabulary = Some(ReaderVocabulary {
         id,

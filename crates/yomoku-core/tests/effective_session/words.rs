@@ -8,13 +8,13 @@ use yomoku_core::{
 };
 
 pub(super) fn loaded(
-    manual: bool,
+    separate: bool,
 ) -> (
     EffectiveReaderSession,
     EffectiveReaderSelection,
     EffectiveReaderWordDetails,
 ) {
-    let snapshot = snapshot_with_manual_split(manual);
+    let snapshot = snapshot_with_separate_tokens(separate);
     let token = snapshot.tokens.last().unwrap().clone();
     let mut pages = EffectiveReaderSession::default();
     let request = pages.begin_load(base(&snapshot)).unwrap();
@@ -22,13 +22,12 @@ pub(super) fn loaded(
         key: snapshot.key().unwrap(),
         candidates: DictionaryCandidates {
             surface: token.surface.clone(),
-            dictionary_form: token.metadata.as_ref().and_then(|metadata| {
-                metadata
-                    .dictionary_form
-                    .as_ref()
-                    .map(Surface::as_str)
-                    .map(str::to_owned)
-            }),
+            dictionary_form: token
+                .metadata
+                .dictionary_form
+                .as_ref()
+                .map(Surface::as_str)
+                .map(str::to_owned),
             words: vec![],
             names: vec![],
         },
@@ -61,8 +60,8 @@ fn finish_load(
 }
 
 #[test]
-fn word_projection_is_compact_and_preserves_resolved_unresolved_and_live_fields() {
-    for manual in [false, true] {
+fn word_projection_is_compact_and_preserves_optional_analyzer_metadata_and_live_fields() {
+    for separate in [false, true] {
         for status in [
             None,
             Some(VocabularyStatus::New),
@@ -71,7 +70,7 @@ fn word_projection_is_compact_and_preserves_resolved_unresolved_and_live_fields(
             Some(VocabularyStatus::Known),
             Some(VocabularyStatus::Ignored),
         ] {
-            let (mut pages, selection, mut details) = loaded(manual);
+            let (mut pages, selection, mut details) = loaded(separate);
             details.token.vocabulary = status.map(|status| ReaderVocabulary {
                 id: 55.try_into().unwrap(),
                 status,
@@ -83,8 +82,8 @@ fn word_projection_is_compact_and_preserves_resolved_unresolved_and_live_fields(
             assert_eq!(word.token, expected.token.into());
             assert_eq!(word.encountered, 8);
             assert_eq!(word.candidates, expected.candidates);
-            assert_eq!(word.token.reading.is_none(), manual);
-            assert_eq!(word.token.dictionary_form.is_none(), manual);
+            assert_eq!(word.token.reading.is_none(), separate);
+            assert_eq!(word.token.dictionary_form.is_none(), separate);
             assert_eq!(
                 pages.page().unwrap().tokens.last().unwrap().vocabulary,
                 word.token.vocabulary
@@ -119,7 +118,7 @@ fn dismissed_refreshed_and_duplicate_word_callbacks_cannot_resurrect_selection()
     assert!(pages.word_state().selection.is_none());
     assert!(pages.word_state().details.is_none());
     assert!(!pages.word_state().busy);
-    let snapshot = snapshot_with_manual_split(true);
+    let snapshot = snapshot_with_separate_tokens(true);
     let load = pages.begin_load(base(&snapshot)).unwrap();
     assert!(pages.accept(load, snapshot));
     assert!(pages.begin_word_load(selection).is_none());
@@ -144,10 +143,7 @@ fn foreign_word_results_fail_closed_without_consuming_another_request() {
         match case {
             0 => returned.page.revision += 1,
             1 => details.key.document_id = 99.try_into().unwrap(),
-            2 => details.key.segmentation.segments[0]
-                .boundary
-                .surface
-                .push('別'),
+            2 => details.key.segmentation.segments[0].surface.push('別'),
             3 => details.token.segment_index += 1,
             4 => details.token.surface.push('別'),
             5 => details.token.display_range = range(0, 1),

@@ -86,8 +86,9 @@ impl Storage {
             &token.surface,
             token
                 .metadata
+                .dictionary_form
                 .as_ref()
-                .and_then(|metadata| metadata.dictionary_form.as_ref().map(|form| form.as_str())),
+                .map(|form| form.as_str()),
             token.vocabulary,
             &components
                 .iter()

@@ -264,11 +264,7 @@ fn read_only_details_keep_all_applicable_word_name_views_and_exact_inflected_ide
     assert_eq!(details.token.segment_index, 0);
     assert_eq!(details.token.surface, "試験語だった");
     assert_eq!(
-        details
-            .token
-            .metadata
-            .as_ref()
-            .and_then(|m| m.reading.as_deref()),
+        details.token.metadata.reading.as_deref(),
         Some("シケンゴダッタ")
     );
     assert_eq!(details.encountered, 0);

@@ -172,8 +172,9 @@ impl EffectiveReaderSession {
                 != details
                     .token
                     .metadata
+                    .dictionary_form
                     .as_ref()
-                    .and_then(|metadata| metadata.dictionary_form.as_ref().map(Surface::as_str))
+                    .map(Surface::as_str)
         {
             return Err(DocumentError::InvalidDocument);
         }

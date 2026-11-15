@@ -26,8 +26,9 @@ fn details(f: &Fixture, selection: EffectiveReaderSelection) -> EffectiveReaderW
             surface: token.surface.clone(),
             dictionary_form: token
                 .metadata
+                .dictionary_form
                 .as_ref()
-                .and_then(|m| m.dictionary_form.as_ref().map(|f| f.as_str().to_owned())),
+                .map(|f| f.as_str().to_owned()),
             words: vec![],
             names: vec![],
         },

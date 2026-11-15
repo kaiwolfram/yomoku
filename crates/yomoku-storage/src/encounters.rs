@@ -50,8 +50,7 @@ pub(crate) fn record_effective_occurrences_in(
     let completion = frozen.completion();
     let segmentation = &frozen.key().segmentation;
     // This header identifies the immutable Mode C basis. The versioned effective
-    // reservation distinguishes effective segment indices from analyzer indices
-    // and preserves each exact metadata/rule source, including unresolved spans.
+    // reservation preserves exact token metadata for retries and backup validation.
     connection.execute(
         "INSERT INTO completion_analyses
          (command_id, semantics_version, analysis_id, engine_revision, dictionary_revision, split_mode)
@@ -72,17 +71,15 @@ pub(crate) fn record_effective_occurrences_in(
          SELECT ?1, ?2, id, ?3, ?4, ?5, ?6, ?7 FROM vocabulary WHERE surface = ?5",
     )?;
     for token in frozen.occurrences() {
-        let metadata = token.metadata.as_ref();
+        let metadata = &token.metadata;
         insert.execute((
             i64::from(completion.command_id),
             i64::try_from(token.segment_index).map_err(|_| StorageError::InvalidAnalysis)?,
             i64::from(token.anchor.range.start),
             i64::from(token.anchor.range.end),
             &token.surface,
-            metadata.and_then(|metadata| metadata.reading.as_deref()),
-            metadata
-                .and_then(|metadata| metadata.dictionary_form.as_ref())
-                .map(Surface::as_str),
+            metadata.reading.as_deref(),
+            metadata.dictionary_form.as_ref().map(Surface::as_str),
         ))?;
     }
     Ok(newly_known)

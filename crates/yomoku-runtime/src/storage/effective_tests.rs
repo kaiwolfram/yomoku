@@ -348,7 +348,10 @@ fn effective_worker_reads_exact_analyzer_metadata_live_status_and_literal_custom
     load(&router, &mut session, fixture.base);
     let manual = select(&session, "食べた");
     let details = word(&router, manual.clone());
-    assert!(details.token.metadata.is_some());
+    assert_eq!(
+        details.token.metadata.analysis_id,
+        details.key.segmentation.original_analysis_id
+    );
     assert!(details.token.vocabulary.is_some()); // reads never register override parts
     assert!(details.candidates.dictionary_form.is_some());
     assert_eq!(details.encountered, 0);

@@ -256,6 +256,16 @@ fn compact_mode_c_reservation_excludes_other_pages_and_keeps_atomic_deletion_saf
     assert!(record.get("key").is_none());
     assert!(record.get("segmentation").is_none());
     assert_eq!(record["occurrences"].as_array().unwrap().len(), 1);
+    // Native segmentation refactors must keep version-2 reservation JSON stable.
+    let occurrence = &record["occurrences"][0];
+    let metadata = &occurrence["metadata"];
+    assert_eq!(metadata["analysis_id"], i64::from(imported.analysis_id));
+    assert_eq!(metadata["mode"], "C");
+    assert_eq!(metadata["token_index"], occurrence["segment_index"]);
+    assert_eq!(metadata["is_japanese"], true);
+    assert!(metadata.get("reading").is_some());
+    assert!(metadata.get("dictionary_form").is_some());
+    assert_eq!(metadata.as_object().unwrap().len(), 6);
     assert!(payload.len() < imported.document.chapter.text.len());
     storage.connection.execute_batch("CREATE TRIGGER fail_receipt BEFORE INSERT ON reading_occurrences BEGIN SELECT RAISE(ABORT, 'fixture'); END;").unwrap();
     assert!(storage.record_effective_page_completion(&frozen).is_err());

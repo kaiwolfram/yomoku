@@ -431,15 +431,13 @@ fn real_mode_c_import_and_completion_preserve_surfaces_and_duplicate_identity() 
         assert_eq!(actual.segment_index, index as u64);
         assert_eq!(actual.anchor, token.anchor);
         assert_eq!(actual.surface, token.surface);
-        assert_eq!(
-            actual.metadata.as_ref().and_then(|m| m.reading.clone()),
-            token.reading
-        );
+        assert_eq!(actual.metadata.reading.clone(), token.reading);
         assert_eq!(
             actual
                 .metadata
+                .dictionary_form
                 .as_ref()
-                .and_then(|m| m.dictionary_form.as_ref().map(|s| s.as_str().to_owned()))
+                .map(|s| s.as_str().to_owned())
                 .as_deref(),
             token.dictionary_form.as_ref().map(Surface::as_str)
         );

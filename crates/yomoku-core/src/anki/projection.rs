@@ -29,7 +29,7 @@ impl AnkiNote {
     }
 
     /// Effective revisions distinguish changed segmentation and page revisits.
-    /// Manual spans use only their own metadata, never old B data.
+    /// Tokens retain exact Mode C metadata and component highlight anchors.
     pub fn from_effective_selection(
         chapter: &ChapterText,
         current: &EffectiveReaderPage,
