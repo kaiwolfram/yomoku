@@ -20,6 +20,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import app.yomoku.shared.ContentRoute
+import app.yomoku.shared.Destination
 import app.yomoku.shared.Event
 import app.yomoku.shared.PageLength
 import app.yomoku.shared.TextOffset
@@ -39,7 +40,18 @@ class PasteReaderTest {
         ViewModelProvider(compose.activity)[CoreSessionOwner::class.java].session
 
     private fun awaitStorage() {
-        compose.waitUntil(30_000) { !core().view.storageBusy }
+        compose.waitForIdle()
+        compose.waitUntil(30_000) {
+            val view = core().view
+            // Library schedules a distribution read after the preceding operation renders.
+            // Wait for that follow-up too before submitting another native command.
+            !view.storageBusy &&
+                (view.contentRoute != ContentRoute.MAIN ||
+                    view.settingsOpen ||
+                    view.destination != Destination.LIBRARY ||
+                    view.libraryWordDistributions != null ||
+                    view.libraryWordError != null)
+        }
         compose.waitForIdle()
     }
 
