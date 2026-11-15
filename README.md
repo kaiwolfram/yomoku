@@ -7,6 +7,8 @@ a pure Rust Crux core, SQLite and Sudachi Full. It imports EPUB, TXT and SRT,
 keeps exact reading positions, tracks vocabulary and reading history, and looks up
 words and names in bundled English JMdict/JMnedict dictionaries.
 
+Inspired by [Lute](https://github.com/LuteOrg/lute-v3).
+
 The production reader uses stored Mode C analysis, with A/B dictionary components,
 base-text rendering, word highlights, five vocabulary statuses, EPUB images
 and links. Completion saves occurrences, status changes and position
