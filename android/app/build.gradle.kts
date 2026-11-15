@@ -95,7 +95,7 @@ android {
     defaultConfig {
         applicationId = "app.yomoku"
         minSdk = 29
-        targetSdk = 36
+        targetSdk = 37
         versionCode = 1
         versionName = "0.1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
@@ -139,8 +139,6 @@ android {
         disable += "NewerVersionAvailable"
         disable += "AndroidGradlePluginVersion"
         disable += "GradleDependency"
-        // Compose requires compileSdk 37; target SDK behavior is reviewed separately.
-        disable += "OldTargetApi"
     }
 }
 
@@ -169,6 +167,7 @@ dependencies {
     implementation(libs.androidx.compose.ui.tooling.preview)
     debugImplementation(libs.androidx.compose.ui.tooling)
     androidTestImplementation(libs.androidx.test.runner)
+    androidTestImplementation(libs.androidx.test.espresso.core)
     androidTestImplementation(libs.androidx.test.ext.junit)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)

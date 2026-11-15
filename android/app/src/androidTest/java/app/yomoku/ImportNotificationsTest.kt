@@ -302,14 +302,20 @@ class ImportNotificationsTest {
             compose.activityRule.scenario.moveToState(Lifecycle.State.CREATED)
             compose.activityRule.scenario.moveToState(Lifecycle.State.RESUMED)
             compose.runOnIdle { imports.cancel() }
+            // Cancellation refreshes Library; wait for its queued distribution read too.
             compose.waitUntil(30_000) {
+                val view = owner().session.view
                 !imports.active &&
-                    !owner().session.view.storageBusy &&
+                    !view.storageBusy &&
+                    view.libraryWordDistributions != null &&
                     notice(ImportNotifications.WAIT_ID) == null
             }
             assertNull(notice(ImportNotifications.WAIT_ID))
             assertNull(notice(ImportNotifications.COMPLETE_ID))
-            compose.runOnIdle { imports.start(blocked) }
+            compose.runOnIdle {
+                imports.start(blocked)
+                assertTrue(imports.active)
+            }
             compose.waitUntil(30_000) { foregroundService() }
             compose.runOnIdle {
                 bound =

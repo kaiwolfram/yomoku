@@ -13,8 +13,8 @@ Android/Kotlin dependency versions are in `android/gradle/libs.versions.toml`.
 The locked Rust graph has been tested with Rust 1.100.0; this is not a minimum
 supported-version declaration. Install dependencies once before offline checks.
 The Android build uses Gradle 9.9.1, AGP 9.5.1, Compose BOM 2026.09.00
-(UI 1.12.1) and Lifecycle 2.11.0. Compose requires compileSdk 37; targetSdk
-remains 36 and Java/Kotlin bytecode targets 17. Kotlin/Compose compiler remains
+(UI 1.12.1) and Lifecycle 2.11.0. compileSdk and targetSdk are 37;
+Java/Kotlin bytecode targets 17. Kotlin/Compose compiler remains
 2.4.21. This Gradle/AGP pair exceeds JetBrains' fully tested range; verify the
 local build and instrumentation when changing any of these pins. See
 [AGP compatibility](https://developer.android.com/build/releases/agp-9-5-0-release-notes),
@@ -128,7 +128,9 @@ Verify no `libandroid_app_probe.so` or debug probe classes enter release.
 ## Android trials
 
 Use an authorized device or a dedicated disposable AVD with an installed x86_64
-image and host KVM. The helper starts an existing `medium_phone` AVD by default:
+image and host KVM. Use an API 37 image for Android 17 target behavior checks,
+and an older image for backward compatibility. The helper starts an existing
+`medium_phone` AVD by default:
 
 ```sh
 tools/start-android-emulator.sh medium_phone
@@ -167,6 +169,8 @@ while the system prompt is pending. Each path checks one picker launch, cancella
 and unchanged Library state. `ImportBookRequestTest` covers duplicate/stale callbacks
 and discarded process state. On pre-33 Android the picker opens directly.
 
+Instrumentation pins Espresso 3.7.0 for Android 17's lock-free MessageQueue
+compatibility; see the [platform guidance](https://developer.android.com/about/versions/17/changes/messagequeue).
 Compose instrumentation uses the v2 test rules and their standard coroutine
 dispatcher. Synchronize queued composition work with `waitForIdle` or `runOnIdle`
 before asserting; see the [v2 migration guide](https://developer.android.com/develop/ui/compose/testing/migrate-v2).
