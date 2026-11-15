@@ -18,6 +18,7 @@ import app.yomoku.shared.TextEncoding
 
 @Composable
 internal fun FileImportDialogs(imports: FileImports) {
+    val result = imports.result
     if (imports.active) {
         AlertDialog(
             onDismissRequest = {},
@@ -46,8 +47,12 @@ internal fun FileImportDialogs(imports: FileImports) {
                 }
             },
         )
-    } else if (imports.result != null) {
-        val result = checkNotNull(imports.result)
+    } else if (
+        result != null &&
+            (result.outcome != ImportOutcome.CREATED ||
+                result.error != null ||
+                result.message != null)
+    ) {
         AlertDialog(
             onDismissRequest = imports::dismissSummary,
             title = { Text(stringResource(R.string.import_summary_title)) },

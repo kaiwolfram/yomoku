@@ -83,7 +83,7 @@ class TxtPickerTest {
         try {
             start(first)
             assertEquals(ImportOutcome.CREATED, finished().outcome)
-            compose.onNodeWithText("Close").performClick()
+            compose.onNodeWithTag("file_import_summary").assertDoesNotExist()
             start(blocked)
             compose.waitUntil(30_000) { imports.filename == "$prefix-blocked.txt" }
             compose.onNodeWithText("Cancel").performClick()
@@ -156,9 +156,7 @@ class TxtPickerTest {
             val result = imports.result
             compose.activityRule.scenario.recreate()
             assertEquals(result, owner().fileImports.result)
-            compose.onNodeWithTag("file_import_summary").assertIsDisplayed()
-            compose.onNodeWithText("Close").performClick()
-            assertNull(imports.result)
+            compose.onNodeWithTag("file_import_summary").assertDoesNotExist()
             SQLiteDatabase.openDatabase(
                     File(compose.activity.filesDir, "yomoku.sqlite3").path,
                     null,

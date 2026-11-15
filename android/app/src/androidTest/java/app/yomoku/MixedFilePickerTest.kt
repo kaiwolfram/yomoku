@@ -134,9 +134,11 @@ class MixedFilePickerTest {
                 }
                 assertEquals(ContentRoute.MAIN, owner().session.view.contentRoute)
                 assertNull(owner().session.view.reader)
-                if (imports.result != null) {
+                if (imports.result != null && imports.result?.outcome != ImportOutcome.CREATED) {
                     compose.onNodeWithTag("file_import_summary").assertIsDisplayed()
                     compose.onNodeWithText("Close").performClick()
+                } else {
+                    compose.onNodeWithTag("file_import_summary").assertDoesNotExist()
                 }
                 compose.onNodeWithTag("import_summary").assertDoesNotExist()
             } finally {
@@ -216,7 +218,8 @@ class MixedFilePickerTest {
                         assertEquals("$prefix 猫。\n\n犬。", it.getString(0))
                     }
             }
-        assertNull(imports.result)
+        assertEquals(ImportOutcome.CREATED, imports.result?.outcome)
+        compose.onNodeWithTag("file_import_summary").assertDoesNotExist()
         compose.onNodeWithTag("reader_text").assertDoesNotExist()
     }
 }

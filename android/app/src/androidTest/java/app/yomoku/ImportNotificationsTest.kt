@@ -112,11 +112,11 @@ class ImportNotificationsTest {
         val imports = owner().fileImports
         try {
             compose.runOnIdle { imports.start(blocked) }
+            var progress: Notification? = null
             compose.waitUntil(90_000) {
-                notice(ImportNotifications.PROGRESS_ID)
-                    ?.extras
-                    ?.getBoolean(Notification.EXTRA_PROGRESS_INDETERMINATE) == true &&
-                    notice(ImportNotifications.PROGRESS_ID)
+                progress = notice(ImportNotifications.PROGRESS_ID)
+                progress?.extras?.getBoolean(Notification.EXTRA_PROGRESS_INDETERMINATE) == true &&
+                    progress
                         ?.extras
                         ?.getString(Notification.EXTRA_TEXT)
                         ?.contains("$prefix.epub") == true
@@ -130,10 +130,13 @@ class ImportNotificationsTest {
             compose.onNodeWithText("Importing book...").assertIsDisplayed()
             compose.onNodeWithText("Import book").assertDoesNotExist()
             assertTrue(foregroundService())
-            val progress = checkNotNull(notice(ImportNotifications.PROGRESS_ID))
-            assertEquals("Importing book...", progress.extras.getString(Notification.EXTRA_TITLE))
+            val shownProgress = checkNotNull(progress)
+            assertEquals(
+                "Importing book...",
+                shownProgress.extras.getString(Notification.EXTRA_TITLE),
+            )
             assertTrue(
-                progress.extras.getString(Notification.EXTRA_TEXT)!!.contains("$prefix.epub")
+                shownProgress.extras.getString(Notification.EXTRA_TEXT)!!.contains("$prefix.epub")
             )
             compose.activityRule.scenario.recreate()
             assertSame(imports, owner().fileImports)
@@ -206,7 +209,7 @@ class ImportNotificationsTest {
     }
 
     @Test
-    fun foregroundReturnKeepsConciseDialogAndDoesNotPostCompletion() {
+    fun foregroundReturnClosesSuccessfulImportWithoutPostingCompletion() {
         val prefix = "visible-${System.nanoTime()}"
         val uri = FileImportFixtures.uri("$prefix.epub", FileImportFixtures.epub(prefix), prefix)
         val imports = owner().fileImports
@@ -226,7 +229,7 @@ class ImportNotificationsTest {
             context.contentResolver.call(uri, "release", prefix, null)
             compose.waitUntil(90_000) { !imports.active }
             assertEquals(app.yomoku.shared.ImportOutcome.CREATED, imports.result?.outcome)
-            compose.onNodeWithTag("file_import_summary").assertIsDisplayed()
+            compose.onNodeWithTag("file_import_summary").assertDoesNotExist()
             assertNull(notice(ImportNotifications.COMPLETE_ID))
         } finally {
             context.contentResolver.call(uri, "release", prefix, null)
