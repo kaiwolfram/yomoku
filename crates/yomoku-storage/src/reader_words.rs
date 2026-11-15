@@ -180,34 +180,10 @@ fn component_forms_in(
             .validate(&chapter)
             .map_err(|_| StorageError::InvalidAnalysis)?;
         components.extend(analysis.tokens.into_iter().filter(|t| {
-            t.is_japanese
-                && t.anchor.range.start >= anchor.range.start
-                && t.anchor.range.end <= anchor.range.end
+            t.anchor.range.start >= anchor.range.start && t.anchor.range.end <= anchor.range.end
         }));
     }
-    components.sort_by_key(|t| {
-        (
-            std::cmp::Reverse(t.surface.chars().count()),
-            t.anchor.range.start,
-        )
-    });
-    let mut forms = Vec::new();
-    for token in components {
-        for form in std::iter::once(token.surface)
-            .chain(token.dictionary_form.map(|f| f.as_str().to_owned()))
-        {
-            if !forms
-                .iter()
-                .any(|source: &yomoku_core::dictionary::DictionarySource| source.form == form)
-            {
-                forms.push(yomoku_core::dictionary::DictionarySource {
-                    form,
-                    anchor: token.anchor,
-                });
-            }
-        }
-    }
-    Ok(forms)
+    Ok(yomoku_core::dictionary::component_sources(components))
 }
 
 #[cfg(test)]

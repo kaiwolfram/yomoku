@@ -237,3 +237,30 @@ pub struct DictionarySource {
     pub form: String,
     pub anchor: crate::document::TextAnchor,
 }
+
+/// Order Japanese components by length then source position, keeping the first
+/// occurrence of each exact surface/base form and its original highlight anchor.
+/// Callers supply the supported analyses and any selection-range filtering.
+pub fn component_sources(mut tokens: Vec<crate::analysis::AnalyzedToken>) -> Vec<DictionarySource> {
+    tokens.retain(|token| token.is_japanese);
+    tokens.sort_by_key(|token| {
+        (
+            std::cmp::Reverse(token.surface.chars().count()),
+            token.anchor.range.start,
+        )
+    });
+    let mut sources: Vec<DictionarySource> = Vec::new();
+    for token in tokens {
+        for form in std::iter::once(token.surface)
+            .chain(token.dictionary_form.map(|form| form.as_str().to_owned()))
+        {
+            if !sources.iter().any(|source| source.form == form) {
+                sources.push(DictionarySource {
+                    form,
+                    anchor: token.anchor,
+                });
+            }
+        }
+    }
+    sources
+}

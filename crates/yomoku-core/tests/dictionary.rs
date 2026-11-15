@@ -120,3 +120,47 @@ fn impossible_sense_pair_is_not_displayable_and_ambiguous_form_is_not_duplicated
     assert_eq!(found.len(), 3); // Two spelling pairs for reading 0, one for reading 1.
     assert_ne!(found[0].reading, found[1].reading);
 }
+
+#[test]
+fn components_keep_length_position_and_exact_form_highlight_ownership() {
+    use yomoku_core::{
+        analysis::AnalyzedToken,
+        dictionary::component_sources,
+        document::{TextAnchor, TextRange},
+        vocabulary::Surface,
+    };
+    let token = |surface: &str, base: Option<&str>, start: i64, japanese| AnalyzedToken {
+        anchor: TextAnchor {
+            source_id: 1.try_into().unwrap(),
+            chapter_id: 1.try_into().unwrap(),
+            range: TextRange {
+                start: start.try_into().unwrap(),
+                end: (start + surface.len() as i64).try_into().unwrap(),
+            },
+        },
+        surface: surface.into(),
+        dictionary_form: base.map(|form| Surface::new(form).unwrap()),
+        reading: None,
+        is_japanese: japanese,
+    };
+    let early = token("食べた", Some("食べる"), 0, true);
+    let late = token("食べた", Some("食べる"), 20, true);
+    let sources = component_sources(vec![
+        token("ignored-long-text", None, 0, false),
+        token("猫", None, 30, true),
+        late,
+        token("東京都", None, 10, true),
+        early.clone(),
+        token("猫", None, 40, true),
+    ]);
+    assert_eq!(
+        sources
+            .iter()
+            .map(|source| source.form.as_str())
+            .collect::<Vec<_>>(),
+        ["食べた", "食べる", "東京都", "猫"]
+    );
+    assert_eq!(sources[0].anchor, early.anchor);
+    assert_eq!(sources[1].anchor, early.anchor);
+    assert_eq!(i64::from(sources[3].anchor.range.start), 30);
+}

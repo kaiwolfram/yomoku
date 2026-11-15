@@ -191,23 +191,10 @@ impl Imports {
                 }
                 components.extend(analysis.tokens);
             }
-            components.retain(|token| token.is_japanese);
-            components.sort_by_key(|token| {
-                (
-                    std::cmp::Reverse(token.surface.chars().count()),
-                    token.anchor.range.start,
-                )
-            });
-            let mut forms = Vec::new();
-            for token in components {
-                for form in std::iter::once(token.surface)
-                    .chain(token.dictionary_form.map(|form| form.as_str().to_owned()))
-                {
-                    if !forms.contains(&form) {
-                        forms.push(form);
-                    }
-                }
-            }
+            let forms = yomoku_core::dictionary::component_sources(components)
+                .into_iter()
+                .map(|source| source.form)
+                .collect();
             Ok((base, forms))
         })();
         if result.is_err() {
