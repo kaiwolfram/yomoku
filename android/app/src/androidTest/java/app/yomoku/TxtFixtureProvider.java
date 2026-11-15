@@ -17,7 +17,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
 /** Test APK providers run without the target APK's Kotlin runtime. Keep this fixture standalone. */
-public final class TxtFixtureProvider extends ContentProvider {
+public class TxtFixtureProvider extends ContentProvider {
     private final ConcurrentHashMap<String, CountDownLatch> gates = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, Boolean> finished = new ConcurrentHashMap<>();
 

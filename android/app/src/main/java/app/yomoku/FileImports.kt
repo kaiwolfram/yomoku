@@ -17,6 +17,7 @@ import app.yomoku.shared.ImportOutcome
 import app.yomoku.shared.SrtImport
 import app.yomoku.shared.TextEncoding
 import app.yomoku.shared.TxtImport
+import java.util.concurrent.CancellationException
 import java.util.concurrent.Executors
 
 /** Takes ownership of a private file buffer without retaining one boxed UByte per byte. */
@@ -170,17 +171,24 @@ internal class FileImports(
         val generation = ++readGeneration
         refreshNotifications()
         reader.execute {
+            fun checkCurrent() {
+                if (generation != readGeneration) throw CancellationException()
+            }
             var name = uri.lastPathSegment.orEmpty()
             val loaded =
                 try {
+                    checkCurrent()
                     name =
                         resolver
                             .query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)
                             ?.use { cursor ->
-                                if (cursor.moveToFirst()) cursor.getString(0) else null
+                                checkCurrent()
+                                val hasName = cursor.moveToFirst()
+                                checkCurrent()
+                                if (hasName) cursor.getString(0) else null
                             }
                             ?.takeIf { it.isNotBlank() } ?: error("Missing display name")
-                    if (generation != readGeneration) return@execute
+                    checkCurrent()
                     // Publish the display name before a potentially slow provider read.
                     val displayName = name
                     handler.post {
@@ -194,14 +202,17 @@ internal class FileImports(
                         null
                     } else {
                         val limit = FileImportMemory.sourceLimit(availableImportMemory())
+                        checkCurrent()
                         val bytes =
                             resolver.openInputStream(uri)?.use {
                                 FileImportMemory.read(it, limit) { generation == readGeneration }
                             } ?: error("Cannot open document")
-                        if (generation != readGeneration) return@execute
+                        checkCurrent()
                         FileInput(FileImportBytes(bytes), name, format)
                     }
                 } catch (error: Exception) {
+                    // Resources unwind on this worker, even if their close blocks.
+                    if (generation != readGeneration) return@execute
                     handler.post {
                         if (generation == readGeneration)
                             finish(
