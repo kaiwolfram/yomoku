@@ -291,10 +291,77 @@ fn store_content(
     Ok(())
 }
 
+/// Canonical reader content and asset metadata; never owns binary payloads.
+pub(crate) struct EpubMetadata {
+    pub document_id: DocumentId,
+    pub source_id: SourceId,
+    pub title: String,
+    pub filename: String,
+    pub finished_at_least_once: bool,
+    pub reading_position: Option<ReadingPosition>,
+    pub metadata_title: Option<String>,
+    pub cover: Option<String>,
+    pub images: BTreeMap<String, String>,
+    pub chapters: Vec<StoredEpubChapter>,
+}
+
 pub(crate) fn load_epub_in(
     connection: &Connection,
     document_id: DocumentId,
 ) -> Result<Option<StoredEpubDocument>, StorageError> {
+    let Some(metadata) = load_epub_metadata_in(connection, document_id)? else {
+        return Ok(None);
+    };
+    let original_bytes = connection.query_row(
+        "SELECT original_bytes, sha256 FROM imported_files WHERE document_id = ?1",
+        [i64::from(document_id)],
+        |row| {
+            let bytes: Vec<u8> = row.get(0)?;
+            let digest: Vec<u8> = row.get(1)?;
+            Ok((bytes, digest))
+        },
+    )?;
+    if Sha256::digest(&original_bytes.0).as_slice() != original_bytes.1 {
+        return Err(StorageError::InvalidDocument);
+    }
+    let mut images = BTreeMap::new();
+    let mut statement = connection.prepare(
+        "SELECT path, media_type, bytes, sha256 FROM epub_assets WHERE document_id = ?1",
+    )?;
+    let mut rows = statement.query([i64::from(document_id)])?;
+    while let Some(row) = rows.next()? {
+        let bytes: Vec<u8> = row.get(2)?;
+        let digest: Vec<u8> = row.get(3)?;
+        if Sha256::digest(&bytes).as_slice() != digest {
+            return Err(StorageError::InvalidDocument);
+        }
+        images.insert(
+            row.get(0)?,
+            EpubImage {
+                media_type: row.get(1)?,
+                bytes,
+            },
+        );
+    }
+    Ok(Some(StoredEpubDocument {
+        document_id: metadata.document_id,
+        source_id: metadata.source_id,
+        title: metadata.title,
+        filename: metadata.filename,
+        finished_at_least_once: metadata.finished_at_least_once,
+        reading_position: metadata.reading_position,
+        original_bytes: original_bytes.0,
+        metadata_title: metadata.metadata_title,
+        cover: metadata.cover,
+        images,
+        chapters: metadata.chapters,
+    }))
+}
+
+pub(crate) fn load_epub_metadata_in(
+    connection: &Connection,
+    document_id: DocumentId,
+) -> Result<Option<EpubMetadata>, StorageError> {
     let header = connection.query_row("SELECT d.source_id, d.title, d.finished_at_least_once, s.kind FROM documents d JOIN sources s ON s.id = d.source_id WHERE d.id = ?1",
         [i64::from(document_id)], |row| Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?, row.get::<_, bool>(2)?, row.get::<_, String>(3)?))).optional()?;
     let Some((source_id, title, finished_at_least_once, kind)) = header else {
@@ -304,20 +371,10 @@ pub(crate) fn load_epub_in(
         return Ok(None);
     }
     let source_id = SourceId::try_from(source_id).map_err(|_| StorageError::InvalidDocument)?;
-    let header = connection.query_row("SELECT f.original_bytes, f.sha256, f.text_encoding, e.filename, e.metadata_title, e.cover_path, e.chapter_count, e.asset_count FROM imported_files f JOIN epub_documents e ON e.document_id = f.document_id WHERE f.document_id = ?1",
-        [i64::from(document_id)], |row| Ok((row.get::<_, Vec<u8>>(0)?, row.get::<_, Vec<u8>>(1)?, row.get::<_, String>(2)?, row.get::<_, String>(3)?, row.get::<_, Option<String>>(4)?, row.get::<_, Option<String>>(5)?, row.get::<_, i64>(6)?, row.get::<_, i64>(7)?))).optional()?.ok_or(StorageError::InvalidDocument)?;
-    let (
-        original_bytes,
-        digest,
-        encoding,
-        filename,
-        metadata_title,
-        cover,
-        chapter_count,
-        asset_count,
-    ) = header;
+    let header = connection.query_row("SELECT f.text_encoding, e.filename, e.metadata_title, e.cover_path, e.chapter_count, e.asset_count FROM imported_files f JOIN epub_documents e ON e.document_id = f.document_id WHERE f.document_id = ?1",
+        [i64::from(document_id)], |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?, row.get::<_, Option<String>>(2)?, row.get::<_, Option<String>>(3)?, row.get::<_, i64>(4)?, row.get::<_, i64>(5)?))).optional()?.ok_or(StorageError::InvalidDocument)?;
+    let (encoding, filename, metadata_title, cover, chapter_count, asset_count) = header;
     if encoding != "epub"
-        || Sha256::digest(&original_bytes).as_slice() != digest
         || filename.trim().is_empty()
         || metadata_title
             .as_ref()
@@ -326,24 +383,17 @@ pub(crate) fn load_epub_in(
         return Err(StorageError::InvalidDocument);
     }
     let mut images = BTreeMap::new();
-    let mut statement = connection.prepare("SELECT path, media_type, bytes, sha256 FROM epub_assets WHERE document_id = ?1 ORDER BY path")?;
+    let mut statement = connection
+        .prepare("SELECT path, media_type FROM epub_assets WHERE document_id = ?1 ORDER BY path")?;
     let rows = statement.query_map([i64::from(document_id)], |row| {
-        Ok((
-            row.get::<_, String>(0)?,
-            row.get::<_, String>(1)?,
-            row.get::<_, Vec<u8>>(2)?,
-            row.get::<_, Vec<u8>>(3)?,
-        ))
+        Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
     })?;
     for row in rows {
-        let (path, media_type, bytes, digest) = row?;
-        if path.is_empty()
-            || !media_type.starts_with("image/")
-            || Sha256::digest(&bytes).as_slice() != digest
-        {
+        let (path, media_type) = row?;
+        if path.is_empty() || !media_type.starts_with("image/") {
             return Err(StorageError::InvalidDocument);
         }
-        images.insert(path, EpubImage { media_type, bytes });
+        images.insert(path, media_type);
     }
     if number(images.len())? != asset_count
         || cover
@@ -434,14 +484,13 @@ pub(crate) fn load_epub_in(
             Ok::<_, StorageError>(position)
         })
         .transpose()?;
-    Ok(Some(StoredEpubDocument {
+    Ok(Some(EpubMetadata {
         document_id,
         source_id,
         title,
         filename,
         finished_at_least_once,
         reading_position,
-        original_bytes,
         metadata_title,
         cover,
         images,

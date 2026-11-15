@@ -56,7 +56,7 @@ pub(super) fn execute(
         EffectiveStorageOperation::LoadWord(command) => {
             let selection = command.selection();
             let key = command.key();
-            let mut component_document = None;
+            let mut component_chapter = None;
             for mode in [
                 yomoku_core::analysis::SplitMode::A,
                 yomoku_core::analysis::SplitMode::B,
@@ -65,20 +65,15 @@ pub(super) fn execute(
                     .has_component_analysis(key.page.chapter_id, &key.segmentation.profile, mode)
                     .map_err(map_error)?
                 {
-                    if component_document.is_none() {
-                        component_document = Some(
+                    if component_chapter.is_none() {
+                        component_chapter = Some(
                             storage
-                                .load_document_reader_snapshot(key.document_id)
+                                .load_reader_chapter(key.document_id, key.page.chapter_id)
                                 .map_err(map_error)?
-                                .ok_or(DocumentError::NotFound)?
-                                .document,
+                                .ok_or(DocumentError::NotFound)?,
                         );
                     }
-                    let chapter = component_document
-                        .as_ref()
-                        .expect("loaded document")
-                        .chapter(key.page.chapter_id)
-                        .map_err(|_| DocumentError::InvalidDocument)?;
+                    let chapter = component_chapter.as_ref().expect("loaded chapter");
                     let analysis =
                         imports.analyze_mode(chapter, mode, &key.segmentation.profile)?;
                     analysis

@@ -2,7 +2,7 @@
 
 use rusqlite::{Connection, OptionalExtension, TransactionBehavior};
 use yomoku_core::{
-    document::{DocumentId, ReaderDocument, TextOffset, TextRange},
+    document::{ChapterId, ChapterText, DocumentId, ReaderDocument, TextOffset, TextRange},
     pagination::ReadingPosition,
     reader::{DocumentReaderSnapshot, ReaderChapterAnalysis},
     reader_formatting::{ReaderChapterFormatting, ReaderTextSpan, ReaderTextStyle},
@@ -15,12 +15,30 @@ use crate::{
     documents::{
         load_paste_in, read_last_read_sequence_in, record_reader_entry_in, write_position_in,
     },
-    epub::load_epub_in,
+    epub::load_epub_metadata_in,
+    reader_integrity::ReaderIntegrity,
     settings::read_page_length,
     Storage, StorageError,
 };
 
 impl Storage {
+    /// Validated canonical chapter for lazy dictionary component analysis.
+    pub fn load_reader_chapter(
+        &mut self,
+        document_id: DocumentId,
+        chapter_id: ChapterId,
+    ) -> Result<Option<ChapterText>, StorageError> {
+        let transaction = self.connection.transaction()?;
+        let chapter = load_reader_chapter_in(
+            &transaction,
+            document_id,
+            chapter_id,
+            &self.reader_integrity,
+        )?;
+        transaction.commit()?;
+        Ok(chapter)
+    }
+
     /// Read all canonical chapters, exact position, preset and original per-chapter
     /// Mode C identities atomically. Never parses source bytes or loads Full.
     pub fn load_document_reader_snapshot(
@@ -28,7 +46,9 @@ impl Storage {
         document_id: DocumentId,
     ) -> Result<Option<DocumentReaderSnapshot>, StorageError> {
         let transaction = self.connection.transaction()?;
-        let Some(document) = load_reader_document_in(&transaction, document_id)? else {
+        let Some(document) =
+            load_reader_document_in(&transaction, document_id, &self.reader_integrity)?
+        else {
             return Ok(None);
         };
         let snapshot = snapshot_in(&transaction, document)?;
@@ -45,7 +65,9 @@ impl Storage {
         let transaction = self
             .connection
             .transaction_with_behavior(TransactionBehavior::Immediate)?;
-        let Some(mut document) = load_reader_document_in(&transaction, document_id)? else {
+        let Some(mut document) =
+            load_reader_document_in(&transaction, document_id, &self.reader_integrity)?
+        else {
             return Ok(None);
         };
         if document.finished_at_least_once {
@@ -75,7 +97,9 @@ impl Storage {
         let transaction = self
             .connection
             .transaction_with_behavior(TransactionBehavior::Immediate)?;
-        let Some(mut document) = load_reader_document_in(&transaction, document_id)? else {
+        let Some(mut document) =
+            load_reader_document_in(&transaction, document_id, &self.reader_integrity)?
+        else {
             return Ok(None);
         };
         position
@@ -118,9 +142,11 @@ fn snapshot_in(
 pub(crate) fn load_reader_document_in(
     connection: &Connection,
     document_id: DocumentId,
+    integrity: &ReaderIntegrity,
 ) -> Result<Option<ReaderDocument>, StorageError> {
     #[cfg(test)]
     crate::tests::reader_work::DOCUMENTS.update(|count| count + 1);
+    let revision = integrity.revision(connection)?;
     // Query the live document first: absent provenance for a live row is an
     // error, not a deleted-document result or a fallback to chapter zero.
     let kind: Option<Option<String>> = connection
@@ -135,11 +161,9 @@ pub(crate) fn load_reader_document_in(
     };
     let document = match kind.as_deref() {
         Some("epub") => {
-            // Reuse the authoritative read-only integrity checks for the saved
-            // container, chapter counts/order, annotations and assets. Source
-            // bytes and image payloads are not part of the reader projection.
-            let stored =
-                load_epub_in(connection, document_id)?.ok_or(StorageError::InvalidDocument)?;
+            integrity.validate_binaries(connection, document_id, revision)?;
+            let stored = load_epub_metadata_in(connection, document_id)?
+                .ok_or(StorageError::InvalidDocument)?;
             let formatting = stored
                 .chapters
                 .iter()
@@ -194,7 +218,7 @@ pub(crate) fn load_reader_document_in(
                                 },
                                 asset: ReaderImageAsset {
                                     path: image.path.clone(),
-                                    media_type: asset.media_type.clone(),
+                                    media_type: asset.clone(),
                                 },
                                 alt: image.alt.clone(),
                             })
@@ -241,5 +265,35 @@ pub(crate) fn load_reader_document_in(
     document
         .validate()
         .map_err(|_| StorageError::InvalidDocument)?;
+    if kind.as_deref() == Some("epub") {
+        integrity.remember_document(document_id, document.chapters[0].source_id, revision);
+    }
     Ok(Some(document))
+}
+
+/// Reuse whole-document integrity only at the exact database revision. On a hit,
+/// retrieve just the requested canonical chapter; no other text or annotations.
+pub(crate) fn load_reader_chapter_in(
+    connection: &Connection,
+    document_id: DocumentId,
+    chapter_id: ChapterId,
+    integrity: &ReaderIntegrity,
+) -> Result<Option<ChapterText>, StorageError> {
+    let revision = integrity.revision(connection)?;
+    if let Some(source_id) = integrity.validated_source(document_id, revision) {
+        let chapter = crate::analysis::read_chapter(connection, chapter_id)?;
+        if chapter.source_id != source_id {
+            return Err(StorageError::InvalidAnalysis);
+        }
+        return Ok(Some(chapter));
+    }
+    let Some(document) = load_reader_document_in(connection, document_id, integrity)? else {
+        return Ok(None);
+    };
+    document
+        .chapters
+        .into_iter()
+        .find(|chapter| chapter.chapter_id == chapter_id)
+        .map(Some)
+        .ok_or(StorageError::InvalidAnalysis)
 }

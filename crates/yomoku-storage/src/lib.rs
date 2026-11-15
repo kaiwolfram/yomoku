@@ -18,6 +18,7 @@ mod import_cancellation;
 mod imports;
 mod library_words;
 mod reader_documents;
+mod reader_integrity;
 mod reader_tokens;
 pub mod reader_words;
 mod settings;
@@ -113,6 +114,7 @@ impl From<rusqlite::Error> for StorageError {
 pub struct Storage {
     connection: Connection,
     validated_reader_selection: Option<reader_words::ValidatedSelection>,
+    reader_integrity: reader_integrity::ReaderIntegrity,
 }
 
 impl Storage {
@@ -124,7 +126,9 @@ impl Storage {
         // SQLite requires this outside a transaction, on every connection.
         connection.pragma_update(None, "foreign_keys", true)?;
         migrate(&mut connection, MIGRATIONS)?;
+        let reader_integrity = reader_integrity::ReaderIntegrity::install(&mut connection)?;
         Ok(Self {
+            reader_integrity,
             connection,
             validated_reader_selection: None,
         })

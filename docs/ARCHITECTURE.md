@@ -55,7 +55,27 @@ rereads use new commands and count again. Previous moves position without counti
 Reading durations are not collected or persisted.
 
 The worker uses whole-document snapshot/open/position operations and effective
-page/word lookups. The reader renders canonical base text only.
+page/word lookups. The reader renders canonical base text only. EPUB reader
+projections contain canonical text, annotations and image metadata, separately
+from original archive and image payloads. Lazy A/B analysis requests canonical
+chapter text directly rather than a whole-document snapshot.
+
+Storage retains bounded integrity markers for one EPUB's binaries and one
+validated document; it retains no payloads in these caches. Whole-document
+validation is reused for chapter/page/word reads only at the exact SQLite local
+change, external data and schema revision. A revision change requires full
+text/annotation/ownership checks again, including chapters outside the page.
+Binary digests are checked on first access and after local writes to either
+binary table, transaction rollback, schema changes or external commits.
+Connection-local update/rollback hooks invalidate binary validation, including
+trigger writes; normal local status, analysis and position writes reuse it.
+The binary tables must remain rowid tables for the
+[SQLite update hook](https://sqlite.org/c3ref/update_hook.html). Missing rows are
+also rejected by the live metadata/count checks. Revisions are sampled inside
+the operation's transaction before content reads and are never advanced after
+COMMIT. Cold opens still verify all binary bytes, borrowing each SQLite row
+without retaining the archive or all assets. Explicit image/cover asset reads
+always hash the requested bytes independently of these markers.
 
 | Operation | Production API |
 | --- | --- |

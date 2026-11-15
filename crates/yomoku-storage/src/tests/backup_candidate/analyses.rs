@@ -6,9 +6,12 @@ fn setup() -> (TestDatabase, Storage) {
     let database = TestDatabase::new();
     let mut connection = Connection::open(database.path()).unwrap();
     migrate(&mut connection, MIGRATIONS).unwrap();
+    let reader_integrity =
+        crate::reader_integrity::ReaderIntegrity::install(&mut connection).unwrap();
     let mut storage = Storage {
         connection,
         validated_reader_selection: None,
+        reader_integrity,
     };
     let document = storage
         .unanalyzed_fixture(

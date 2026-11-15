@@ -9,8 +9,8 @@ use crate::StorageError;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) struct SelectionRevision {
     total_changes: u64,
-    data_version: i64,
-    schema_version: i64,
+    pub(crate) data_version: i64,
+    pub(crate) schema_version: i64,
 }
 
 impl SelectionRevision {

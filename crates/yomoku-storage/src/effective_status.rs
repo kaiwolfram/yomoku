@@ -41,8 +41,13 @@ impl Storage {
             match cached.filter(|cached| cached.matches(key, segment_index, revision)) {
                 Some(cached) => cached,
                 None => {
-                    let token = selected_effective_token_in(&transaction, key, segment_index)?
-                        .ok_or(ReaderWordError::InvalidSelection)?;
+                    let token = selected_effective_token_in(
+                        &transaction,
+                        key,
+                        segment_index,
+                        &self.reader_integrity,
+                    )?
+                    .ok_or(ReaderWordError::InvalidSelection)?;
                     ValidatedSelection::new(key, token, revision)
                 }
             };

@@ -12,6 +12,7 @@ use yomoku_core::{
 
 use crate::{
     dictionary::{Dictionary, DictionaryError},
+    reader_integrity::ReaderIntegrity,
     reader_tokens::load_effective_reader_tokens_in,
     Storage, StorageError,
 };
@@ -76,7 +77,9 @@ impl Storage {
         self.validated_reader_selection = None;
         let transaction = self.connection.transaction().map_err(StorageError::from)?;
         let revision = SelectionRevision::read(&transaction)?;
-        let Some(token) = selected_effective_token_in(&transaction, key, segment_index)? else {
+        let Some(token) =
+            selected_effective_token_in(&transaction, key, segment_index, &self.reader_integrity)?
+        else {
             return Ok(None);
         };
         let components = component_forms_in(&transaction, key, token.anchor)?;
@@ -115,8 +118,10 @@ pub(crate) fn selected_effective_token_in(
     connection: &Connection,
     key: &EffectiveReaderTokenKey,
     segment_index: u64,
+    integrity: &ReaderIntegrity,
 ) -> Result<Option<EffectiveReaderToken>, ReaderWordError> {
-    let Some(snapshot) = load_effective_reader_tokens_in(connection, key.document_id, key.page)?
+    let Some(snapshot) =
+        load_effective_reader_tokens_in(connection, key.document_id, key.page, integrity)?
     else {
         return Ok(None);
     };

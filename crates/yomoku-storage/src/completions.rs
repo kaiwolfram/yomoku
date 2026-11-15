@@ -30,8 +30,9 @@ impl Storage {
         {
             return Err(StorageError::InvalidCompletion);
         }
-        let document = load_reader_document_in(&transaction, intent.document_id)?
-            .ok_or(StorageError::InvalidCompletion)?;
+        let document =
+            load_reader_document_in(&transaction, intent.document_id, &self.reader_integrity)?
+                .ok_or(StorageError::InvalidCompletion)?;
         let chapter = document
             .chapter(intent.page.chapter_id)
             .map_err(|_| StorageError::InvalidCompletion)?;
@@ -131,8 +132,9 @@ impl Storage {
         if !issued || read_page_length(&transaction)? != completion.page_length {
             return Err(StorageError::InvalidCompletion);
         }
-        let document = load_reader_document_in(&transaction, completion.document_id)?
-            .ok_or(StorageError::InvalidCompletion)?;
+        let document =
+            load_reader_document_in(&transaction, completion.document_id, &self.reader_integrity)?
+                .ok_or(StorageError::InvalidCompletion)?;
         let next = completion
             .next_document_position(&document)
             .map_err(|_| StorageError::InvalidCompletion)?;

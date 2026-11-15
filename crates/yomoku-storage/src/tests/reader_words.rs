@@ -524,3 +524,5 @@ mod effective;
 
 #[path = "reader_words/status_cache.rs"]
 mod status_cache;
+
+mod epub_io;

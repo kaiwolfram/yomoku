@@ -44,7 +44,13 @@ pub(crate) fn find_imported_in(
     let Some(id) = find_imported_id_in(connection, original_bytes, digest)? else {
         return Ok(None);
     };
-    let document = load_reader_document_in(connection, id)?.ok_or(StorageError::InvalidDocument)?;
+    // Import duplicate checks always perform a fresh one-shot validation.
+    let document = load_reader_document_in(
+        connection,
+        id,
+        &crate::reader_integrity::ReaderIntegrity::default(),
+    )?
+    .ok_or(StorageError::InvalidDocument)?;
     let mut summary = document
         .library_summary()
         .map_err(|_| StorageError::InvalidDocument)?;

@@ -8,8 +8,8 @@ use yomoku_core::{
 };
 
 use crate::{
-    analysis::read_effective_reader_chapter_in, reader_documents::load_reader_document_in,
-    vocabulary::read_entry_by_surface, Storage, StorageError,
+    analysis::read_effective_reader_chapter_in, reader_documents::load_reader_chapter_in,
+    reader_integrity::ReaderIntegrity, vocabulary::read_entry_by_surface, Storage, StorageError,
 };
 
 impl Storage {
@@ -22,7 +22,12 @@ impl Storage {
         page: TextAnchor,
     ) -> Result<Option<EffectiveReaderTokenSnapshot>, StorageError> {
         let transaction = self.connection.transaction()?;
-        let snapshot = load_effective_reader_tokens_in(&transaction, document_id, page)?;
+        let snapshot = load_effective_reader_tokens_in(
+            &transaction,
+            document_id,
+            page,
+            &self.reader_integrity,
+        )?;
         transaction.commit()?;
         Ok(snapshot)
     }
@@ -32,21 +37,21 @@ pub(crate) fn load_effective_reader_tokens_in(
     connection: &Connection,
     document_id: DocumentId,
     page: TextAnchor,
+    integrity: &ReaderIntegrity,
 ) -> Result<Option<EffectiveReaderTokenSnapshot>, StorageError> {
-    let Some(document) = load_reader_document_in(connection, document_id)? else {
+    let Some(chapter) =
+        load_reader_chapter_in(connection, document_id, page.chapter_id, integrity)?
+    else {
         return Ok(None);
     };
-    let chapter = document
-        .chapter(page.chapter_id)
-        .map_err(|_| StorageError::InvalidAnalysis)?;
     if page
-        .slice(chapter)
+        .slice(&chapter)
         .map_err(|_| StorageError::InvalidAnalysis)?
         .is_empty()
     {
         return Err(StorageError::InvalidAnalysis);
     }
-    let effective = read_effective_reader_chapter_in(connection, chapter)?;
+    let effective = read_effective_reader_chapter_in(connection, &chapter)?;
     let mut tokens = effective
         .as_ref()
         .map(|effective| effective.tokens_on_page(page))
