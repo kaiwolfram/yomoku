@@ -1,6 +1,6 @@
 # Yomoku
 
-*Read Japanese, naturally.*
+*Learn Japanese by reading*
 
 Yomoku is a native offline-first Android reader built with Kotlin/Compose,
 a pure Rust Crux core, SQLite and Sudachi Full. It imports EPUB, TXT and SRT,

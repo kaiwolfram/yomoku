@@ -1,6 +1,6 @@
 # Yomoku product specification
 
-**Yomoku** — *“Read Japanese, naturally.”* A native, offline-first Android app
+**Yomoku** — *“Learn Japanese by reading”* A native, offline-first Android app
 for reading Japanese books, text, and subtitles while
 tracking vocabulary and reading progress. Inspired by Lute, but this is its own
 product.
@@ -164,7 +164,7 @@ they must not drive implementation unless the user explicitly reopens this scope
 
 ## 8. UX and other confirmed decisions
 
-- App title **Yomoku**, tagline *Read Japanese, naturally.* Branding concept: dark navy `#1B2637`, off-white open-book motif, blue `#579FF5` highlighted word; apply after core app is functional.
+- App title **Yomoku**, tagline *Learn Japanese by reading*. Branding concept: dark navy `#1B2637`, off-white open-book motif, blue `#579FF5` highlighted word; apply after core app is functional.
 - Settings stays on one grouped screen, ordered **Reader**, **AnkiDroid**, **About**, with accessible section headings, dividers, secondary descriptions and consistent row spacing. Typography minus/plus icons sit beside their labels with accessible descriptions, existing limits and 48 dp touch targets; retain the page-size radio choices. Group Anki deck/model controls together and use contiguous full-width clickable license-notice rows with compact padding, bodyMedium text and a 48 dp minimum height. Omit the Clear default deck action, saved deck ID hint and successful settings/model status hints, including empty status containers; retain explicit deck selection, Check AnkiDroid, progress, errors and retries. Deck rows have 8 dp spacing and at least 48 dp touch targets. Omit the default-deck and unchecked-model instructions and the permission explanation paragraph. Saving, checking and loading use only the shared toolbar spinner after its 300 ms delay; show local load/retry controls only when unloaded or failed. Retain discovered decks during provider rechecks with selection disabled; fresh successes replace them and failures retain actionable errors. Keep storage errors and retry actions above the sections.
 - Follow **Android system light/dark mode** automatically; no in-app override.
 - All user-facing interface and offline definitions **English**.
