@@ -8,7 +8,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.*
-import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.text.LinkAnnotation
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -325,11 +325,12 @@ class AnkiExportSessionTest {
         createModel = true
         open()
         try {
-            prepare()
-            checkAndBegin()
+            // Saving a deck creates a missing model in Settings before reader exports.
+            send(Event.OpenSettings)
+            send(Event.SetAnkiDefaultDeck(Long.MAX_VALUE))
             assertTrue(operations.poll(60, TimeUnit.SECONDS) is AnkiLiveOperation.CreateModel)
             results.add(AnkiLiveResult.ModelCreated(Long.MAX_VALUE))
-            await { it.ankiExport?.phase == AnkiExportPhase.ModelCreated(Long.MAX_VALUE) }
+            await { it.ankiSetup == AnkiSetupPhase.Ready && it.ankiExport == null }
             send(Event.RefreshLibrary)
             await { !it.storageBusy }
             assertTrue(operations.isEmpty())

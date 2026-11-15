@@ -7,8 +7,8 @@ val repoDirectory = rootProject.layout.projectDirectory.dir("..")
 val nativeOutput = repoDirectory.dir("target/generated")
 val sudachiAssets = nativeOutput.dir("sudachi-assets")
 val dictionaryAssets = nativeOutput.dir("dictionary-assets")
-val bundleDictionaries by
-    tasks.registering(Exec::class) {
+val bundleDictionaries =
+    tasks.register<Exec>("bundleDictionaries") {
         group = "build"
         description = "Verify and bundle prepared JMdict/JMnedict index, sources and notices"
         workingDir(repoDirectory)
@@ -21,8 +21,8 @@ val bundleDictionaries by
         inputs.dir(repoDirectory.dir(".local/dictionaries/index-v1-20261025"))
         outputs.dir(dictionaryAssets)
     }
-val bundleSudachi by
-    tasks.registering(Exec::class) {
+val bundleSudachi =
+    tasks.register<Exec>("bundleSudachi") {
         group = "build"
         description =
             "Verify and bundle the explicitly prepared Sudachi Full dictionary and notices"
@@ -67,8 +67,8 @@ val buildRustBridgeRelease = rustBridgeTask("release")
 
 buildRustBridgeRelease.configure { mustRunAfter(buildRustBridgeDebug) }
 
-val buildSudachiAppProbe by
-    tasks.registering(Exec::class) {
+val buildSudachiAppProbe =
+    tasks.register<Exec>("buildSudachiAppProbe") {
         group = "verification"
         description = "Build the measurement-only Sudachi JNI library for debug APKs"
         dependsOn(buildRustBridgeDebug) // Native builds share Cargo output; keep them sequential.
@@ -87,7 +87,7 @@ val buildSudachiAppProbe by
 
 android {
     namespace = "app.yomoku"
-    compileSdk = 36
+    compileSdk = 37
     buildToolsVersion = "36.0.0"
     // Must match crates/yomoku-ffi/boltffi.toml; also used by AGP's native tooling.
     ndkVersion = "30.0.16248370"
@@ -139,6 +139,8 @@ android {
         disable += "NewerVersionAvailable"
         disable += "AndroidGradlePluginVersion"
         disable += "GradleDependency"
+        // Compose requires compileSdk 37; target SDK behavior is reviewed separately.
+        disable += "OldTargetApi"
     }
 }
 

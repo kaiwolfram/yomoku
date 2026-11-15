@@ -2,7 +2,7 @@ package app.yomoku
 
 import android.database.sqlite.SQLiteDatabase
 import androidx.compose.ui.test.*
-import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.lifecycle.ViewModelProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.yomoku.shared.*
@@ -124,6 +124,8 @@ class VocabularyProductionTest {
             assertNull(core().view.vocabulary.nextOffset)
             val last = core().view.vocabulary.rows.last().id.value
             compose.onNodeWithTag("vocabulary_scroll").performScrollToKey(last)
+            // Settle the v2 dispatcher's queued scroll before saving recreation state.
+            idle()
             val session = core()
             compose.activityRule.scenario.recreate()
             idle()
@@ -349,6 +351,11 @@ class VocabularyProductionTest {
         val cat = core().view.vocabulary.rows.single { it.surface == "猫" }
         compose.onNodeWithTag("vocabulary_row_${cat.id.value}").performClick()
         idle()
+        // Vocabulary is global; ensure Learning is a transition, not a dismissal.
+        if (cat.status == VocabularyStatus.LEARNING) {
+            compose.onNodeWithTag("word_status_KNOWN").performClick()
+            idle()
+        }
         compose.onNodeWithTag("word_status_LEARNING").performClick()
         idle()
         compose.onNodeWithTag("word_status_LEARNING").performClick()

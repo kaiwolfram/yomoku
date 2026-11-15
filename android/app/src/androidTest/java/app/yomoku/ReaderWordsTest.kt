@@ -14,7 +14,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.*
-import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.lifecycle.ViewModelProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.yomoku.nativebridge.DictionaryProvider
@@ -389,9 +389,15 @@ class ReaderWordsTest {
                         )
                     )
             }
+            // The v2 dispatcher queues the Library's distribution-loading effect.
+            // Wait for that work before sending a reader command that is gated by storage.
             compose.waitUntil(30_000) {
-                !core().view.storageBusy && core().view.contentRoute == ContentRoute.MAIN
+                val view = core().view
+                !view.storageBusy &&
+                    view.contentRoute == ContentRoute.MAIN &&
+                    view.libraryWordDistributions != null
             }
+            compose.waitForIdle()
             compose.onNodeWithTag("reader_word_panel").assertDoesNotExist()
             compose.runOnUiThread { core().dispatch(Event.OpenReader(DocumentId(id))) }
             awaitWords()

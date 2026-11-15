@@ -7,11 +7,20 @@ CSV measurements in this directory retain their original measurement context.
 ## Tools and assets
 
 Use Fedora-compatible tooling: Rust/Cargo with rustfmt/Clippy, a C compiler and
-Python 3.11+; Android additionally needs JDK 17, SDK platform 36, build tools
+Python 3.11+; Android additionally needs JDK 17, SDK platform 37.0, build tools
 36.0.0, platform-tools and NDK **30.0.16248370**. Gradle is pinned by the wrapper;
 Android/Kotlin dependency versions are in `android/gradle/libs.versions.toml`.
-The locked Rust graph has been tested with Rust 1.99.1; this is not a minimum
+The locked Rust graph has been tested with Rust 1.100.0; this is not a minimum
 supported-version declaration. Install dependencies once before offline checks.
+The Android build uses Gradle 9.9.1, AGP 9.5.1, Compose BOM 2026.09.00
+(UI 1.12.1) and Lifecycle 2.11.0. Compose requires compileSdk 37; targetSdk
+remains 36 and Java/Kotlin bytecode targets 17. Kotlin/Compose compiler remains
+2.4.21. This Gradle/AGP pair exceeds JetBrains' fully tested range; verify the
+local build and instrumentation when changing any of these pins. See
+[AGP compatibility](https://developer.android.com/build/releases/agp-9-5-0-release-notes),
+[Kotlin compatibility](https://kotlinlang.org/docs/gradle-configure-project.html),
+[Compose BOM mapping](https://developer.android.com/develop/ui/compose/bom/bom-mapping)
+and the [Gradle 9.9.1 security fix](https://github.com/gradle/gradle/security/advisories/GHSA-3cfg-jpcr-gfp3).
 
 ```sh
 cargo fetch --locked
@@ -157,6 +166,10 @@ Import book and checks the direct-picker path. Grant/deny recreate the activity
 while the system prompt is pending. Each path checks one picker launch, cancellation,
 and unchanged Library state. `ImportBookRequestTest` covers duplicate/stale callbacks
 and discarded process state. On pre-33 Android the picker opens directly.
+
+Compose instrumentation uses the v2 test rules and their standard coroutine
+dispatcher. Synchronize queued composition work with `waitForIdle` or `runOnIdle`
+before asserting; see the [v2 migration guide](https://developer.android.com/develop/ui/compose/testing/migrate-v2).
 
 Use instrumentation class filters for focused reader/provider cases. Do not wipe
 an ordinary installation or accept unsupported development data by resetting it.

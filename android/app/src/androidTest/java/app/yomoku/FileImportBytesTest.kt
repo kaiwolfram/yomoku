@@ -20,7 +20,7 @@ class FileImportBytesTest {
             val encoded = event.bincodeSerialize()
             // Event tag + sequence length precede the original file. Check every byte,
             // including NUL and unsigned values above 127, without a second boxed list.
-            assertEquals(45, encoded[0].toInt())
+            assertEquals(43, encoded[0].toInt())
             assertEquals(
                 bytes.size + 4 + 8 + 8 + "literal-😀𠮷.epub".toByteArray().size,
                 encoded.size,
