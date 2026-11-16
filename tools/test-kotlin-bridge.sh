@@ -54,6 +54,7 @@ cargo run -p yomoku-ffi --example unicode-fixtures --locked --offline -- write t
 "$kotlinc_bin" target/generated/kotlin/app target/generated/kotlin/com \
     target/generated/native/app tests/kotlin tests/shared/kotlin \
     android/app/src/main/java/app/yomoku/ReaderTokenRanges.kt \
+    android/app/src/main/java/app/yomoku/SeenHistory.kt \
     -jvm-target 17 -Werror -include-runtime -d target/bridge-tests.jar
 "$java_bin" --enable-native-access=ALL-UNNAMED -Xcheck:jni \
     --add-opens=java.base/java.io=ALL-UNNAMED \

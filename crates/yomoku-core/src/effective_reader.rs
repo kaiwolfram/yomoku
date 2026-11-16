@@ -74,6 +74,7 @@ pub struct EffectiveReaderWordDetails {
     pub key: EffectiveReaderTokenKey,
     pub token: EffectiveReaderToken,
     pub encountered: u64,
+    pub last_seen_unix_ms: Option<i64>,
     pub candidates: DictionaryCandidates,
 }
 

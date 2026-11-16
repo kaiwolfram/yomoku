@@ -77,6 +77,7 @@ class ReaderWordDetailsSessionTest {
             assertNull(loaded.effectiveReaderWord.error)
             assertEquals(tokyo, details.token)
             assertEquals(2UL, details.encountered)
+            assertNull(details.lastSeenUnixMs)
             assertTrue(details.candidates.words.isNotEmpty())
             assertTrue(details.candidates.names.isNotEmpty())
             assertTrue(details.candidates.words.all { it.entry.readings.isNotEmpty() })
@@ -122,6 +123,7 @@ class ReaderWordDetailsSessionTest {
                     ),
                 )
             assertEquals(4UL, counted.effectiveReaderWord!!.details!!.encountered)
+            assertEquals(5678L, counted.effectiveReaderWord.details.lastSeenUnixMs)
             dispatch(core, Event.OpenSettings)
             instrumentation.runOnMainSync {
                 assertNull(core.view.effectiveReaderWord?.selection)

@@ -386,7 +386,7 @@ class VocabularyProductionTest {
         assertDictionaryEntries(compose)
         compose
             .onNodeWithTag("word_encountered")
-            .assertTextEquals("Encountered ${cat.encounteredCount} times")
+            .assertTextEquals(seenHistory(cat.encounteredCount, cat.lastSeenUnixMs))
         compose.onNodeWithTag("vocabulary_delete_selected").assertDoesNotExist()
         compose.onNodeWithTag("word_status_IGNORED").performClick()
         idle()

@@ -34,6 +34,7 @@ pub(super) fn loaded(
         },
         token,
         encountered: 7,
+        last_seen_unix_ms: None,
     };
     assert!(pages.accept(request, snapshot));
     let selection = EffectiveReaderSelection {
@@ -226,6 +227,7 @@ fn encounter_projection_recounts_exact_visible_surfaces_on_navigation_and_reread
                 key: snapshot.key().unwrap(),
                 token,
                 encountered: saved,
+                last_seen_unix_ms: None,
                 candidates: DictionaryCandidates {
                     surface: "食べた".into(),
                     dictionary_form: Some("食べる".into()),

@@ -207,6 +207,14 @@ fn complete(
     storage: &mut Storage,
     imported: &AnalyzedPaste,
 ) -> yomoku_core::effective_reader::EffectivePageCompletion {
+    complete_at(storage, imported, 500)
+}
+
+fn complete_at(
+    storage: &mut Storage,
+    imported: &AnalyzedPaste,
+    timestamp: i64,
+) -> yomoku_core::effective_reader::EffectivePageCompletion {
     let document = &imported.document;
     let command = storage
         .prepare_fixture_completion(yomoku_core::completion::PageCompletionIntent {
@@ -215,7 +223,7 @@ fn complete(
             page: key(imported).page,
             page_length: storage.page_length().unwrap(),
             departing_position: position(document, 0),
-            completed_at_unix_ms: 500,
+            completed_at_unix_ms: timestamp,
         })
         .unwrap();
     assert!(matches!(
@@ -306,6 +314,10 @@ fn counts_include_repetitions_rereads_and_other_documents_but_never_base_forms_o
     let second = import(&mut storage, "試験語だった 試験語");
 
     assert_eq!(lookup(&mut storage, &dictionary, &first, 0).encountered, 0);
+    assert_eq!(
+        lookup(&mut storage, &dictionary, &first, 0).last_seen_unix_ms,
+        None
+    );
     let command = complete(&mut storage, &first);
     assert_eq!(
         storage.record_effective_page_completion(&command).unwrap(),
@@ -314,15 +326,19 @@ fn counts_include_repetitions_rereads_and_other_documents_but_never_base_forms_o
     assert_eq!(lookup(&mut storage, &dictionary, &first, 0).encountered, 2);
     assert_eq!(lookup(&mut storage, &dictionary, &first, 1).encountered, 2);
     assert_eq!(lookup(&mut storage, &dictionary, &second, 0).encountered, 2);
-    complete(&mut storage, &second);
+    complete_at(&mut storage, &second, 700);
     storage
         .save_document_reading_position(first.document.document_id, position(&first.document, 0))
         .map(|value| value.map(crate::tests::as_paste))
         .unwrap();
-    complete(&mut storage, &first);
+    complete_at(&mut storage, &first, 600);
     drop(storage);
     let mut storage = Storage::open(database.path()).unwrap();
     assert_eq!(lookup(&mut storage, &dictionary, &first, 0).encountered, 5);
+    assert_eq!(
+        lookup(&mut storage, &dictionary, &first, 0).last_seen_unix_ms,
+        Some(700)
+    );
     assert_eq!(lookup(&mut storage, &dictionary, &first, 2).encountered, 3);
     let id = lookup(&mut storage, &dictionary, &first, 0)
         .token
@@ -340,6 +356,7 @@ fn counts_include_repetitions_rereads_and_other_documents_but_never_base_forms_o
         let details = lookup(&mut storage, &dictionary, &second, 0);
         assert_eq!(details.token.vocabulary.unwrap().status, status);
         assert_eq!(details.encountered, 5);
+        assert_eq!(details.last_seen_unix_ms, Some(700));
     }
 }
 
@@ -364,6 +381,10 @@ fn document_deletion_preserves_counts_vocabulary_deletion_erases_them_without_lo
         .unwrap()
         .is_none());
     assert_eq!(lookup(&mut storage, &dictionary, &second, 0).encountered, 2);
+    assert_eq!(
+        lookup(&mut storage, &dictionary, &second, 0).last_seen_unix_ms,
+        Some(500)
+    );
     let reimported = import(&mut storage, "試験語 試験語");
     assert_eq!(
         lookup(&mut storage, &dictionary, &reimported, 0).encountered,
@@ -376,6 +397,7 @@ fn document_deletion_preserves_counts_vocabulary_deletion_erases_them_without_lo
     let absent = lookup(&mut storage, &dictionary, &second, 0);
     assert!(absent.token.vocabulary.is_none());
     assert_eq!(absent.encountered, 0);
+    assert_eq!(absent.last_seen_unix_ms, None);
     assert!(!absent.candidates.words.is_empty());
     assert!(storage
         .vocabulary_entry(&Surface::new("試験語").unwrap())

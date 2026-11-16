@@ -202,6 +202,7 @@ private fun EffectiveReaderWordContent(
                 ReaderDictionary(
                     details.encountered,
                     details.candidates,
+                    lastSeenUnixMs = details.lastSeenUnixMs,
                     action = { entry ->
                         AnkiEntryAction(
                             view.ankiEntries.find {

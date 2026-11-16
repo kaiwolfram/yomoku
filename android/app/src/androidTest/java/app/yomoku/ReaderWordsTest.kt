@@ -230,7 +230,12 @@ class ReaderWordsTest {
                 assertEquals(savedEncounters, count(db, encountersSql))
                 compose
                     .onNodeWithTag("word_encountered")
-                    .assertTextEquals("Encountered ${savedEncounters + 2} times")
+                    .assertTextEquals(
+                        seenHistory(
+                            (savedEncounters + 2).toULong(),
+                            core().view.effectiveReaderWord!!.details!!.lastSeenUnixMs,
+                        )
+                    )
             }
             tapSurface("猫")
             assertCats(VocabularyStatus.NEW)
@@ -351,7 +356,7 @@ class ReaderWordsTest {
             assertTrue(details.candidates.names.isNotEmpty())
             compose
                 .onNodeWithTag("word_encountered")
-                .assertTextEquals("Encountered ${encountered + 1} times")
+                .assertTextEquals(seenHistory((encountered + 1).toULong(), details.lastSeenUnixMs))
             assertDictionaryEntries(compose)
             compose.onNodeWithTag("word_names").performScrollTo().assertIsDisplayed()
             for (candidate in details.candidates.words) {
@@ -404,7 +409,12 @@ class ReaderWordsTest {
             tapSurface("東京")
             compose
                 .onNodeWithTag("word_encountered")
-                .assertTextEquals("Encountered ${encountered + 2} times")
+                .assertTextEquals(
+                    seenHistory(
+                        (encountered + 2).toULong(),
+                        core().view.effectiveReaderWord!!.details!!.lastSeenUnixMs,
+                    )
+                )
             compose.runOnUiThread { core().dispatch(Event.OpenSettings) }
             compose.onNodeWithTag("reader_word_panel").assertDoesNotExist()
             compose.waitUntil(30_000) { !core().view.storageBusy }
@@ -606,7 +616,7 @@ class ReaderWordsTest {
                     )
             }
             compose.onNodeWithTag("word_no_match").performScrollTo().assertIsDisplayed()
-            compose.onNodeWithTag("word_encountered").assertTextEquals("Encountered 2 times")
+            compose.onNodeWithTag("word_encountered").assertTextEquals("Seen 2 times")
             compose.onNodeWithTag("word_lookup_error").assertDoesNotExist()
             compose.onNodeWithTag("retry_word_details").assertDoesNotExist()
             assertEquals(1, events.filterIsInstance<Event.LoadEffectiveReaderWord>().size)

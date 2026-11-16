@@ -272,6 +272,28 @@ class VocabularyScreenTest {
     }
 
     @Test
+    fun vocabularyRowsShowSharedSeenHistoryAndSingularWording() {
+        frame.value =
+            frame.value.copy(
+                vocabulary =
+                    frame.value.vocabulary.copy(
+                        matchingCount = 1UL,
+                        rows =
+                            listOf(
+                                vocabularyRow(1)
+                                    .copy(
+                                        encounteredCount = 1UL,
+                                        lastSeenUnixMs =
+                                            System.currentTimeMillis() - 21L * 24 * 60 * 60 * 1000,
+                                    )
+                            ),
+                    )
+            )
+        render()
+        compose.onNodeWithText("Seen 1 time · 3 weeks ago").assertIsDisplayed()
+    }
+
+    @Test
     fun literalSearchAllStatusSubsetsSortsAndExactUnsignedLabels() {
         frame.value =
             frame.value.copy(
@@ -285,7 +307,7 @@ class VocabularyScreenTest {
         compose
             .onNodeWithTag("vocabulary_count")
             .assertTextEquals("Matching words: ${ULong.MAX_VALUE}")
-        compose.onNodeWithText("Encountered ${ULong.MAX_VALUE} times").assertIsDisplayed()
+        compose.onNodeWithText("Seen ${ULong.MAX_VALUE} times").assertIsDisplayed()
         val prefix = " 食べ%_𠮷"
         compose.onNodeWithTag("vocabulary_search").performTextReplacement(prefix)
         assertEquals(prefix, (events.last() as Event.SetVocabularyQuery).value.prefix)
@@ -530,7 +552,7 @@ class VocabularyScreenTest {
                         )
                 )
         }
-        compose.onNodeWithTag("word_encountered").assertTextEquals("Encountered 7 times")
+        compose.onNodeWithTag("word_encountered").assertTextEquals("Seen 7 times")
         compose.onNodeWithTag("word_no_match").assertExists()
         compose.onNodeWithTag("vocabulary_delete_selected").assertDoesNotExist()
         val before = System.currentTimeMillis()

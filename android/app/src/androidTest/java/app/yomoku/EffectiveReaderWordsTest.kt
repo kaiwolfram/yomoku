@@ -141,6 +141,7 @@ class EffectiveReaderWordsTest {
                                         event.value,
                                         token,
                                         ULong.MAX_VALUE,
+                                        null,
                                         DictionaryCandidates(
                                             token.surface,
                                             token.dictionaryForm,
@@ -317,6 +318,31 @@ class EffectiveReaderWordsTest {
     }
 
     @Test
+    fun readerShowsSavedSeenDateWithProjectedOccurrenceCount() {
+        show()
+        tap()
+        compose.runOnUiThread {
+            val word = frame.value.effectiveReaderWord!!
+            frame.value =
+                frame.value.copy(
+                    effectiveReaderWord =
+                        word.copy(
+                            details =
+                                word.details!!.copy(
+                                    encountered = 1UL,
+                                    lastSeenUnixMs =
+                                        System.currentTimeMillis() - 21L * 24 * 60 * 60 * 1000,
+                                )
+                        )
+                )
+        }
+        compose
+            .onNodeWithTag("word_encountered")
+            .performScrollTo()
+            .assertTextEquals("Seen 1 time · 3 weeks ago")
+    }
+
+    @Test
     fun manualUnicodeSelectionUsesCompactIdentityAndAllFiveStatusesWithoutGuessingMetadata() {
         show()
         compose.onNodeWithText("Edit word boundaries").assertDoesNotExist()
@@ -333,7 +359,7 @@ class EffectiveReaderWordsTest {
         compose
             .onNodeWithTag("word_encountered")
             .performScrollTo()
-            .assertTextEquals("Encountered ${ULong.MAX_VALUE} times")
+            .assertTextEquals("Seen ${ULong.MAX_VALUE} times")
         compose.onNodeWithTag("word_no_match").assertExists()
         val selectedStatus = frame.value.effectiveReaderTokens!!.tokens.first().vocabulary!!.status
         compose.onNodeWithText("Close").assertDoesNotExist()
@@ -500,10 +526,7 @@ class EffectiveReaderWordsTest {
         for (status in VocabularyStatus.entries) compose
             .onNodeWithTag("word_status_$status")
             .assertIsNotEnabled()
-        compose
-            .onNodeWithTag("word_encountered")
-            .performScrollTo()
-            .assertTextEquals("Encountered 0 times")
+        compose.onNodeWithTag("word_encountered").performScrollTo().assertTextEquals("Seen 0 times")
         assertEquals(1, events.filterIsInstance<Event.LoadEffectiveReaderWord>().size)
     }
 

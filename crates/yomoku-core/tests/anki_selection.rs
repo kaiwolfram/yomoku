@@ -72,6 +72,7 @@ impl Fixture {
             },
             token,
             encountered: 47,
+            last_seen_unix_ms: None,
             candidates: DictionaryCandidates {
                 surface: surface.into(),
                 dictionary_form: None,

@@ -25,6 +25,7 @@ fn loaded() -> (
         key: snapshot.key().unwrap(),
         token,
         encountered: 7,
+        last_seen_unix_ms: None,
         candidates: DictionaryCandidates {
             surface: "猫".into(),
             dictionary_form: None,

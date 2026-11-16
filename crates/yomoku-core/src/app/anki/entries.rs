@@ -1365,6 +1365,7 @@ mod tests {
             },
             token,
             encountered: 0,
+            last_seen_unix_ms: None,
         };
         let note = AnkiNote::from_effective_entry(
             chapter,

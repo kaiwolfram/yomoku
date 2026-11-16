@@ -65,7 +65,7 @@ internal fun verifyReaderWordBridge() {
                     loaded.effectiveReaderWord.selection == selection &&
                         loaded.effectiveReaderWord.error == null
                 )
-                check(word.token == token && word.encountered == 2UL)
+                check(word.token == token && word.encountered == 2UL && word.lastSeenUnixMs == null)
                 check(word.candidates.words.isNotEmpty() && word.candidates.names.isNotEmpty())
                 check(
                     word.candidates.words.all {
@@ -146,7 +146,7 @@ internal fun verifyReaderWordBridge() {
                         .effectiveReaderWord
                         ?.details
                 )
-            check(details.encountered == 4UL)
+            check(details.encountered == 4UL && details.lastSeenUnixMs == 5678L)
             check(fresh.calls.get() == 0 && fresh.wordCalls.get() == 1)
             check(before.contentEquals(database.readBytes()))
         }

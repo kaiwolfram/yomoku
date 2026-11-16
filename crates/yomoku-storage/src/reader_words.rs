@@ -17,7 +17,9 @@ use crate::{
     Storage, StorageError,
 };
 
-const COUNT_SQL: &str = "SELECT COUNT(*) FROM reading_occurrences WHERE vocabulary_id = ?1";
+const COUNT_SQL: &str = "SELECT COUNT(*), MAX(c.completed_at_unix_ms)
+    FROM reading_occurrences o LEFT JOIN reading_completions c USING (command_id)
+    WHERE o.vocabulary_id = ?1";
 
 mod selection_cache;
 pub(crate) use selection_cache::{SelectionRevision, ValidatedSelection};
@@ -84,7 +86,7 @@ impl Storage {
         };
         let components = component_forms_in(&transaction, key, token.anchor)?;
         let parts = dictionary.parts(&token.surface, components)?;
-        let (encountered, candidates) = word_details_in(
+        let (encountered, last_seen_unix_ms, candidates) = word_details_in(
             &transaction,
             dictionary,
             &token.surface,
@@ -103,6 +105,7 @@ impl Storage {
             parts,
             token,
             encountered,
+            last_seen_unix_ms,
             candidates,
         }))
     }
@@ -140,18 +143,26 @@ fn word_details_in(
     surface: &str,
     dictionary_form: Option<&str>,
     vocabulary: Option<ReaderVocabulary>,
-) -> Result<(u64, DictionaryCandidates), ReaderWordError> {
-    let encountered = match vocabulary {
+) -> Result<(u64, Option<i64>, DictionaryCandidates), ReaderWordError> {
+    let (encountered, last_seen_unix_ms) = match vocabulary {
         Some(entry) => {
-            let count: i64 = connection
-                .query_row(COUNT_SQL, [i64::from(entry.id)], |row| row.get(0))
+            let (count, last_seen): (i64, Option<i64>) = connection
+                .query_row(COUNT_SQL, [i64::from(entry.id)], |row| {
+                    Ok((row.get(0)?, row.get(1)?))
+                })
                 .map_err(StorageError::from)?;
-            u64::try_from(count).map_err(|_| StorageError::InvalidVocabulary)?
+            if (count == 0) != last_seen.is_none() || last_seen.is_some_and(|date| date < 0) {
+                return Err(StorageError::InvalidVocabulary.into());
+            }
+            (
+                u64::try_from(count).map_err(|_| StorageError::InvalidVocabulary)?,
+                last_seen,
+            )
         }
-        None => 0,
+        None => (0, None),
     };
     let candidates = dictionary.lookup(surface, dictionary_form)?;
-    Ok((encountered, candidates))
+    Ok((encountered, last_seen_unix_ms, candidates))
 }
 
 fn component_forms_in(
@@ -208,6 +219,11 @@ mod tests {
             .unwrap()
             .collect::<Result<_, _>>()
             .unwrap();
-        assert!(plan.iter().any(|line| line.contains("SEARCH reading_occurrences USING COVERING INDEX reading_occurrences_by_entry (vocabulary_id=?)")), "{plan:?}");
+        assert!(
+            plan.iter().any(|line| line.contains(
+                "SEARCH o USING COVERING INDEX reading_occurrences_by_entry (vocabulary_id=?)"
+            )),
+            "{plan:?}"
+        );
     }
 }

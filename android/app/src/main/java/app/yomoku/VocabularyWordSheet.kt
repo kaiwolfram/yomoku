@@ -54,6 +54,7 @@ internal fun VocabularyWordSheet(
             ReaderDictionary(
                 word.row.encounteredCount,
                 candidates,
+                lastSeenUnixMs = word.row.lastSeenUnixMs,
                 action = { key ->
                     AnkiEntryAction(
                         view.ankiEntries.find { it.selection == selection && it.key == key },

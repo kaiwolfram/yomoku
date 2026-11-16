@@ -234,6 +234,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             selection: effective_selection,
             token: effective_page.tokens[1].clone(),
             encountered: u64::MAX,
+            last_seen_unix_ms: None,
             candidates: yomoku_core::dictionary::DictionaryCandidates {
                 surface: "𠮷".into(),
                 dictionary_form: Some("原形𠮷\0".into()),

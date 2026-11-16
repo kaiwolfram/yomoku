@@ -196,6 +196,7 @@ fn details(f: &Fixture, selection: EffectiveReaderSelection) -> EffectiveReaderW
         },
         token,
         encountered: 7,
+        last_seen_unix_ms: None,
     }
 }
 

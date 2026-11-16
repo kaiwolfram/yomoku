@@ -19,6 +19,7 @@ pub struct EffectiveWordDetails {
     pub selection: EffectiveReaderSelection,
     pub token: EffectivePageToken,
     pub encountered: u64,
+    pub last_seen_unix_ms: Option<i64>,
     pub candidates: DictionaryCandidates,
 }
 #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
@@ -90,6 +91,7 @@ impl EffectiveReaderSession {
             details.token.vocabulary = vocabulary;
             if vocabulary.is_none() {
                 details.encountered = 0;
+                details.last_seen_unix_ms = None;
             }
         }
     }
@@ -184,7 +186,8 @@ impl EffectiveReaderSession {
         details: EffectiveReaderWordDetails,
     ) -> Result<EffectiveWordDetails, DocumentError> {
         let selection = request.command.selection();
-        if &details.key != request.command.key()
+        if details.last_seen_unix_ms.is_some_and(|date| date < 0)
+            || &details.key != request.command.key()
             || !crate::dictionary::valid_parts(&details.token.surface, &details.parts)
             || details.token.segment_index != selection.segment_index
             || details.candidates.surface != details.token.surface
@@ -227,6 +230,7 @@ impl EffectiveReaderSession {
             selection,
             token,
             encountered: details.encountered,
+            last_seen_unix_ms: details.last_seen_unix_ms,
             candidates: details.candidates,
         })
     }

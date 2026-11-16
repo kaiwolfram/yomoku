@@ -118,6 +118,7 @@ pub(super) fn fixture() -> (Model, AnkiSelection) {
             key: snapshot.key().unwrap(),
             token: snapshot.tokens[1].clone(),
             encountered: 47,
+            last_seen_unix_ms: None,
             candidates,
         };
         assert!(session.accept(request, snapshot));

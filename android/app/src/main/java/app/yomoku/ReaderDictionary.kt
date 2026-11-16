@@ -70,11 +70,12 @@ private fun translationText(translation: Translation): String {
 internal fun ReaderDictionary(
     encountered: ULong,
     candidates: DictionaryCandidates,
+    lastSeenUnixMs: Long? = null,
     action: @Composable (AnkiEntryKey) -> Unit = {},
     notice: @Composable (AnkiEntryKey) -> Unit = {},
 ) {
     Text(
-        stringResource(R.string.word_encountered, encountered.toString()),
+        seenHistory(encountered, lastSeenUnixMs),
         modifier = Modifier.testTag("word_encountered"),
     )
     if (candidates.words.isEmpty() && candidates.names.isEmpty()) {

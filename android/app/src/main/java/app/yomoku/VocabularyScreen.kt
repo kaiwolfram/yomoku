@@ -149,10 +149,7 @@ internal fun VocabularyScreen(
                         Text(row.surface, style = MaterialTheme.typography.titleMedium)
                         Text(stringResource(row.status.labelResource()))
                         Text(
-                            stringResource(
-                                R.string.word_encountered,
-                                row.encounteredCount.toString(),
-                            ),
+                            seenHistory(row.encounteredCount, row.lastSeenUnixMs),
                             style = MaterialTheme.typography.bodySmall,
                         )
                         HorizontalDivider(Modifier.padding(top = 8.dp))
