@@ -29,10 +29,65 @@ fn import_router(
     path: PathBuf,
     loader: AnalyzerLoader,
 ) -> std::io::Result<(EffectRouter, AnalyzerLifecycle)> {
-    yomoku_runtime::effect_router(path, loader, Box::new(|| Err(DocumentError::Unavailable)))
+    let word_path = path.with_extension("words.sqlite3");
+    // Synthetic analyzer fixtures have identical C/B/A boundaries. Real Full
+    // fixtures delegate component analysis to the actual analyzer below.
+    struct Components {
+        inner: Box<dyn PasteAnalyzer>,
+        last: Option<ChapterAnalysis>,
+    }
+    impl PasteAnalyzer for Components {
+        fn analyze(&mut self, chapter: &ChapterText) -> Result<ChapterAnalysis, DocumentError> {
+            let result = self.inner.analyze(chapter)?;
+            self.last = Some(result.clone());
+            Ok(result)
+        }
+        fn analyze_mode(
+            &mut self,
+            chapter: &ChapterText,
+            mode: SplitMode,
+            profile: &AnalysisProfile,
+        ) -> Result<ChapterAnalysis, DocumentError> {
+            if profile.engine_revision.starts_with("sudachi.rs@") {
+                return self.inner.analyze_mode(chapter, mode, profile);
+            }
+            let mut result = self.last.clone().ok_or(DocumentError::Unavailable)?;
+            result.mode = mode;
+            result.profile = profile.clone();
+            Ok(result)
+        }
+    }
+    let mut loader = loader;
+    yomoku_runtime::effect_router(
+        path,
+        Box::new(move || {
+            Ok(Box::new(Components {
+                inner: loader()?,
+                last: None,
+            }))
+        }),
+        Box::new(move || {
+            if !word_path.exists() {
+                let connection =
+                    Connection::open(&word_path).map_err(|_| DocumentError::Unavailable)?;
+                connection
+                    .execute_batch(
+                        "PRAGMA application_id = 1498367049; PRAGMA user_version = 1;
+                CREATE TABLE entries(source TEXT, entry_id INTEGER, payload TEXT);
+                CREATE TABLE forms(surface TEXT COLLATE BINARY, source TEXT, entry_id INTEGER);
+                CREATE INDEX forms_by_surface ON forms(surface);",
+                    )
+                    .map_err(|_| DocumentError::Unavailable)?;
+            }
+            Ok(word_path.clone())
+        }),
+    )
 }
 
 const TIMEOUT: Duration = Duration::from_secs(10);
+
+#[path = "imports/refinement.rs"]
+mod refinement;
 
 #[path = "imports/document_deletion.rs"]
 mod document_deletion;
@@ -410,11 +465,7 @@ fn worker_imports_deduplicate_preserve_status_and_progress_and_reopen() {
         yomoku_core::app::ImportOutcome::Existing
     );
     assert_eq!(duplicate.documents, saved.documents);
-    assert!(matches!(
-        trace.recv_timeout(TIMEOUT).unwrap(),
-        Trace::Load(_)
-    ));
-    assert!(trace.try_recv().is_err());
+    assert!(trace.try_recv().is_err()); // Existing pastes never load either asset.
     assert_eq!(totals(&database.path()), before);
     finish_worker(router, lifecycle, &trace);
 }
@@ -568,10 +619,8 @@ fn background_releases_cache_hidden_imports_release_and_foreground_is_lazy() {
     dispatch(&router, Event::RefreshLibrary);
     assert!(trace.try_recv().is_err());
     dispatch(&router, Event::CreatePaste("猫".into()));
-    assert_eq!(trace.recv_timeout(TIMEOUT).unwrap(), Trace::Load(worker));
-    assert!(trace.try_recv().is_err()); // duplicate did not tokenize
+    assert!(trace.try_recv().is_err()); // duplicate did not load or tokenize
     drop(router);
-    assert_eq!(trace.recv_timeout(TIMEOUT).unwrap(), Trace::Drop(worker));
     assert!(trace.recv_timeout(TIMEOUT).is_err());
     assert!(lifecycle.set_foreground(false).is_err());
 }
@@ -1267,6 +1316,16 @@ fn background_and_close_drain_atomic_import_and_reject_duplicate_callbacks(
     }
 }
 impl PasteAnalyzer for FullAnalyzer {
+    fn analyze_mode(
+        &mut self,
+        chapter: &ChapterText,
+        mode: SplitMode,
+        profile: &AnalysisProfile,
+    ) -> Result<ChapterAnalysis, DocumentError> {
+        self.analyzer
+            .analyze_components(chapter, mode, profile)
+            .map_err(|_| DocumentError::Unavailable)
+    }
     fn analyze(&mut self, chapter: &ChapterText) -> Result<ChapterAnalysis, DocumentError> {
         assert_eq!(thread::current().id(), self.worker);
         self.trace.send(Trace::Analyze(self.worker)).unwrap();
@@ -1330,7 +1389,19 @@ fn real_full_worker_import_and_lazy_reopen_preserve_mode_c_unicode_and_vocabular
         .set_vocabulary_status(cat_entry.id, VocabularyStatus::Familiar, 20)
         .unwrap()
         .unwrap();
-    let (router, lifecycle) = import_router(database.path(), loader).unwrap();
+    let (router, lifecycle) = yomoku_runtime::effect_router(
+        database.path(),
+        loader,
+        Box::new(|| {
+            Ok(std::env::var_os("YOMOKU_WORD_DICTIONARY")
+                .map(PathBuf::from)
+                .unwrap_or_else(|| {
+                    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                        .join("../../.local/dictionaries/index-v1-20261025/dictionary.sqlite3")
+                }))
+        }),
+    )
+    .unwrap();
     dispatch(&router, Event::RefreshLibrary);
     assert!(trace.try_recv().is_err());
     let text = "国家公務員。猫と猫が食べた。\r\nｶﾞｯﾂﾎﾟｰｽﾞと𰻞 English 123 📖\0猫";
@@ -1364,11 +1435,20 @@ fn real_full_worker_import_and_lazy_reopen_preserve_mode_c_unicode_and_vocabular
     assert_eq!(analysis.mode, SplitMode::C);
     assert_eq!(
         analysis.profile.engine_revision,
-        yomoku_analysis::ENGINE_REVISION
+        format!(
+            "{}{}",
+            yomoku_analysis::ENGINE_REVISION,
+            yomoku_core::analysis::IMPORT_POLICY_SUFFIX
+        )
     );
     assert_eq!(
         analysis.profile.dictionary_revision,
-        yomoku_analysis::DICTIONARY_REVISION
+        format!(
+            "{}{}{}",
+            yomoku_analysis::DICTIONARY_REVISION,
+            yomoku_core::analysis::WORD_DICTIONARY_PREFIX,
+            yomoku_storage::dictionary::IMPORT_DICTIONARY_SHA256
+        )
     );
     let surfaces: Vec<_> = analysis
         .tokens
@@ -1407,9 +1487,9 @@ fn real_full_worker_import_and_lazy_reopen_preserve_mode_c_unicode_and_vocabular
         dispatch(&router, Event::CreatePaste(text.into())).documents,
         imported.documents
     );
-    assert_eq!(trace.recv_timeout(TIMEOUT).unwrap(), Trace::Load(worker));
     assert!(trace.try_recv().is_err());
     dispatch(&router, Event::CreatePaste("𰻞と猫。".into()));
+    assert_eq!(trace.recv_timeout(TIMEOUT).unwrap(), Trace::Load(worker));
     assert_eq!(trace.recv_timeout(TIMEOUT).unwrap(), Trace::Analyze(worker));
     assert_eq!(storage.list_documents().unwrap().len(), 2);
     assert_eq!(storage.vocabulary_entry(&cat).unwrap(), Some(familiar));

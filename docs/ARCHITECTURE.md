@@ -18,17 +18,22 @@ production reader and a versioned release schema.
 Core has no SQL or platform I/O. `YomokuBridge::new` and `effect_router` require
 both dictionary loaders; imports always analyze atomically. There is no text-only
 fallback or alternative reader constructor. Full and word dictionaries load lazily
-on the worker. Android verifies immutable bundled assets before providing them.
+on the worker. New imports validate and deduplicate before loading both assets,
+before the write transaction. Android verifies immutable bundled assets before providing them.
 Lifecycle background events release Full after queued work, without eager reload.
 
 ## Production reader
 
 `Model::default()` owns an `EffectiveReaderSession`. Stored Mode C analysis is
-the reader's segmentation. For new imports the version-2 adapter joins conjugated
-verb/adjective endings and allowlisted non-independent helper chains before storage;
-existing C snapshots remain immutable. Raw A/B components can still be generated
-under the original version-1 profile with the unchanged pinned engine/dictionary.
-A/B analyses remain available for dictionary components;
+the reader's segmentation. For new imports the version-3 adapter joins conjugated
+verb/adjective and copula endings and allowlisted non-independent helper chains.
+The worker then retains dictionary-backed C tokens or uses dictionary-backed B/A
+components only when they cover the complete source span. Payload-free membership
+checks are cached within each import. The stored profile identifies the import
+policy and pinned JMdict/JMnedict index, in addition to Sudachi. Dictionary errors
+roll back the entire import; existing C snapshots remain immutable. Raw A/B
+components still honor version-1, version-2 and current import profiles with the
+unchanged pinned Sudachi dictionary. A/B analyses remain available for dictionary components;
 they do not select another reader. The native session retains chapter data and
 validates each page. The shell receives a compact page and revision identity;
 selections contain that identity and a segment index. Stale callbacks cannot attach

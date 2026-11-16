@@ -19,7 +19,11 @@ impl Morpheme {
     }
 
     fn head(&self) -> bool {
-        self.token.is_japanese && matches!(self.pos(0), "動詞" | "形容詞") && self.conjugates()
+        self.token.is_japanese
+            && (matches!(self.pos(0), "動詞" | "形容詞")
+                || (self.pos(0) == "助動詞"
+                    && matches!(self.normalized_form.as_str(), "だ" | "です")))
+            && self.conjugates()
     }
 
     fn continuative(&self) -> bool {

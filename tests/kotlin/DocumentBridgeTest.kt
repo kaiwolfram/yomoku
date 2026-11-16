@@ -227,7 +227,7 @@ internal fun verifyDocumentBridge() {
                     listener.dispatch(bridge, Event.CreatePaste(text)).importSummary?.outcome ==
                         ImportOutcome.EXISTING
                 )
-                check(dictionary.calls.get() == 3)
+                check(dictionary.calls.get() == 2) // duplicate skips asset loading
                 check(
                     listener.dispatch(bridge, Event.CreatePaste(" \n")).documentError ==
                         DocumentError.EMPTYPASTE

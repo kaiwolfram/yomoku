@@ -57,7 +57,8 @@ class DocumentSessionTest {
         val actual = sudachiDictionaryProvider(context)
         val provider =
             object : DictionaryProvider {
-                override fun verifiedWordDictionaryPath(): String = ""
+                override fun verifiedWordDictionaryPath(): String =
+                    actual.verifiedWordDictionaryPath()
 
                 override fun openVerifiedDictionary(): Long {
                     calls.incrementAndGet()

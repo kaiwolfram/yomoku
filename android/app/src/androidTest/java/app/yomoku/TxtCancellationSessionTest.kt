@@ -51,7 +51,7 @@ class TxtCancellationSessionTest {
     ): DictionaryProvider {
         val actual = sudachiDictionaryProvider(context)
         return object : DictionaryProvider {
-            override fun verifiedWordDictionaryPath(): String = ""
+            override fun verifiedWordDictionaryPath(): String = actual.verifiedWordDictionaryPath()
 
             override fun openVerifiedDictionary(): Long {
                 check(Looper.myLooper() != Looper.getMainLooper())

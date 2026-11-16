@@ -17,6 +17,10 @@ pub enum SplitMode {
     C,
 }
 
+/// Import policy metadata is independent of the raw analyzer's A/B semantics.
+pub const IMPORT_POLICY_SUFFIX: &str = ";yomoku-dictionary-refinement-v1";
+pub const WORD_DICTIONARY_PREFIX: &str = ";jmdict-jmnedict-sha256:";
+
 /// Exact engine revision and dictionary artifact identity, not a moving "latest".
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 pub struct AnalysisProfile {

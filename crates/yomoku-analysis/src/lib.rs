@@ -22,8 +22,11 @@ use yomoku_core::{
 pub const LEGACY_ENGINE_REVISION: &str =
     "sudachi.rs@5de0410b6edfd428fc510cc9763440772e9619d5+android-loader-v1;yomoku-adapter-v1;embedded-defaults";
 /// Version 2 joins conjugations in production C while preserving raw A/B.
-pub const ENGINE_REVISION: &str =
+pub const CONJUGATION_ENGINE_REVISION: &str =
     "sudachi.rs@5de0410b6edfd428fc510cc9763440772e9619d5+android-loader-v1;yomoku-adapter-v2-conjugations;embedded-defaults";
+/// Version 3 also joins copula stems with grammatical endings.
+pub const ENGINE_REVISION: &str =
+    "sudachi.rs@5de0410b6edfd428fc510cc9763440772e9619d5+android-loader-v1;yomoku-adapter-v3-copulas;embedded-defaults";
 pub const DICTIONARY_SHA256: &str =
     "7c797531dea76f06b629fad39cb3a5bdb3a9e54c67ef3d9a869e61418426a7d1";
 pub const DICTIONARY_REVISION: &str =
@@ -126,12 +129,29 @@ impl Analyzer {
         mode: SplitMode,
         profile: &AnalysisProfile,
     ) -> Result<ChapterAnalysis, AnalysisError> {
+        use yomoku_core::analysis::{IMPORT_POLICY_SUFFIX, WORD_DICTIONARY_PREFIX};
+        let engine = profile.engine_revision.strip_suffix(IMPORT_POLICY_SUFFIX);
+        let dictionary = profile
+            .dictionary_revision
+            .split_once(WORD_DICTIONARY_PREFIX);
+        let (engine, dictionary) = match (engine, dictionary) {
+            (Some(engine), Some((dictionary, hash)))
+                if hash.len() == 64 && hash.bytes().all(|c| c.is_ascii_hexdigit()) =>
+            {
+                (engine, dictionary)
+            }
+            (None, None) => (
+                profile.engine_revision.as_str(),
+                profile.dictionary_revision.as_str(),
+            ),
+            _ => return Err(AnalysisError::UnsupportedProfile),
+        };
         if mode == SplitMode::C
             || !matches!(
-                profile.engine_revision.as_str(),
-                ENGINE_REVISION | LEGACY_ENGINE_REVISION
+                engine,
+                ENGINE_REVISION | CONJUGATION_ENGINE_REVISION | LEGACY_ENGINE_REVISION
             )
-            || profile.dictionary_revision != DICTIONARY_REVISION
+            || dictionary != DICTIONARY_REVISION
         {
             return Err(AnalysisError::UnsupportedProfile);
         }

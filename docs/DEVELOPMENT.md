@@ -56,8 +56,9 @@ cargo clippy --workspace --all-targets --all-features --locked --offline -- -D w
 tools/test-sudachi.sh
 ```
 
-The workspace suite explicitly ignores fixtures requiring Full; the last command
-runs them with both owned and mapped Full loaders. The full read-only storage index fixture uses
+The workspace suite explicitly ignores fixtures requiring Full and bundled word
+dictionaries; the last command runs them with both owned and mapped Full loaders.
+`YOMOKU_SUDACHI_DICTIONARY` and `YOMOKU_WORD_DICTIONARY` override prepared asset paths. The full read-only storage index fixture uses
 `YOMOKU_DICTIONARY_INDEX` pointing to the prepared index and `cargo test -p
 yomoku-storage --locked --offline -- --ignored`.
 Follow scripts' environment requirements rather than treating ignored tests as

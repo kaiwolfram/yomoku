@@ -1362,3 +1362,37 @@ fn joined_surfaces_register_once_retain_status_and_count_once_across_pages() {
     drop(reopened);
     std::fs::remove_dir_all(directory).unwrap();
 }
+
+#[test]
+#[ignore = "requires pinned Sudachi Full; run tools/test-sudachi.sh"]
+fn copula_past_keeps_nouns_separate_and_preserves_source_reading_and_base() {
+    let result = analyze("学生だった。先生でした。", SplitMode::C);
+    assert_eq!(
+        surfaces(&result),
+        ["学生", "だった", "。", "先生", "でした", "。"]
+    );
+    assert_eq!(result.tokens[1].reading.as_deref(), Some("ダッタ"));
+    assert_eq!(
+        result.tokens[1].dictionary_form.as_ref().unwrap().as_str(),
+        "だ"
+    );
+    let raw = analyze("学生だった。", SplitMode::B);
+    assert_eq!(surfaces(&raw), ["学生", "だっ", "た", "。"]);
+    let chapter = chapter("学生だった。");
+    for revision in [
+        yomoku_analysis::LEGACY_ENGINE_REVISION,
+        yomoku_analysis::CONJUGATION_ENGINE_REVISION,
+    ] {
+        let profile = yomoku_core::analysis::AnalysisProfile {
+            engine_revision: revision.into(),
+            dictionary_revision: DICTIONARY_REVISION.into(),
+        };
+        assert_eq!(
+            analyzer()
+                .analyze_components(&chapter, SplitMode::B, &profile)
+                .unwrap()
+                .tokens,
+            raw.tokens
+        );
+    }
+}

@@ -22,6 +22,10 @@ use yomoku_storage::{
 
 use crate::storage::{map_error, Job};
 
+mod refinement;
+use refinement::Refinement;
+use yomoku_storage::dictionary::Dictionary;
+
 /// A ready analyzer, created, reused and dropped exclusively on the FIFO worker.
 /// Do not perform database work or publish provisional chapter IDs in `analyze`.
 /// A closure capturing a Sudachi Analyzer implements this without requiring Send.
@@ -223,11 +227,12 @@ impl Imports {
         result
     }
 
-    pub(crate) fn import_txt(
+    pub(crate) fn import_txt<'a>(
         &mut self,
         storage: &mut Storage,
         input: &TxtImport,
         cancellation: &ImportCancellation,
+        load_dictionary: impl FnOnce() -> Result<&'a Dictionary, DocumentError>,
     ) -> Result<StorageResult, DocumentError> {
         if cancellation.is_cancelled() {
             return Ok(StorageResult::ImportCancelled);
@@ -261,6 +266,7 @@ impl Imports {
         if self.analyzer.is_none() {
             self.analyzer = Some((self.loader)()?);
         }
+        let mut refinement = Refinement::new(load_dictionary()?);
         let analyzer = self.analyzer.as_mut().expect("loaded analyzer");
         match storage.import_analyzed_txt_cancellable(
             &input.original_bytes,
@@ -268,7 +274,7 @@ impl Imports {
             selection,
             registration_timestamp()?,
             cancellation,
-            |chapter| analyzer.analyze(chapter),
+            |chapter| refinement.analyze(analyzer.as_mut(), chapter),
         ) {
             Ok(None) => Ok(StorageResult::ImportCancelled),
             Ok(Some(TxtImportOutcome::Created(imported))) => Ok(StorageResult::Created(
@@ -291,11 +297,12 @@ impl Imports {
         }
     }
 
-    pub(crate) fn import_srt(
+    pub(crate) fn import_srt<'a>(
         &mut self,
         storage: &mut Storage,
         input: &SrtImport,
         cancellation: &ImportCancellation,
+        load_dictionary: impl FnOnce() -> Result<&'a Dictionary, DocumentError>,
     ) -> Result<StorageResult, DocumentError> {
         if cancellation.is_cancelled() {
             return Ok(StorageResult::ImportCancelled);
@@ -333,6 +340,7 @@ impl Imports {
         if self.analyzer.is_none() {
             self.analyzer = Some((self.loader)()?);
         }
+        let mut refinement = Refinement::new(load_dictionary()?);
         let analyzer = self.analyzer.as_mut().expect("loaded analyzer");
         match storage.import_analyzed_srt_cancellable(
             &input.original_bytes,
@@ -340,7 +348,7 @@ impl Imports {
             selection,
             registration_timestamp()?,
             cancellation,
-            |chapter| analyzer.analyze(chapter),
+            |chapter| refinement.analyze(analyzer.as_mut(), chapter),
         ) {
             Ok(None) => Ok(StorageResult::ImportCancelled),
             Ok(Some(SrtImportOutcome::Created(imported))) => Ok(StorageResult::Created(
@@ -364,11 +372,12 @@ impl Imports {
         }
     }
 
-    pub(crate) fn import_epub(
+    pub(crate) fn import_epub<'a>(
         &mut self,
         storage: &mut Storage,
         input: &EpubImport,
         cancellation: &ImportCancellation,
+        load_dictionary: impl FnOnce() -> Result<&'a Dictionary, DocumentError>,
     ) -> Result<StorageResult, DocumentError> {
         if cancellation.is_cancelled() {
             return Ok(StorageResult::ImportCancelled);
@@ -397,13 +406,14 @@ impl Imports {
         if self.analyzer.is_none() {
             self.analyzer = Some((self.loader)()?);
         }
+        let mut refinement = Refinement::new(load_dictionary()?);
         let analyzer = self.analyzer.as_mut().expect("loaded analyzer");
         match storage.import_analyzed_epub_cancellable(
             &input.original_bytes,
             &input.filename,
             registration_timestamp()?,
             cancellation,
-            |chapter| analyzer.analyze(chapter),
+            |chapter| refinement.analyze(analyzer.as_mut(), chapter),
         ) {
             Ok(None) => Ok(StorageResult::ImportCancelled),
             Ok(Some(EpubImportOutcome::Created(imported))) => {
@@ -441,20 +451,32 @@ impl Imports {
         }
     }
 
-    pub(crate) fn import(
+    pub(crate) fn import<'a>(
         &mut self,
         storage: &mut Storage,
         paste: &PasteText,
+        load_dictionary: impl FnOnce() -> Result<&'a Dictionary, DocumentError>,
     ) -> Result<StorageResult, DocumentError> {
+        if let Some(document) = storage.find_imported_paste(paste).map_err(map_error)? {
+            let mut summary = document
+                .library_summary()
+                .map_err(|_| DocumentError::InvalidDocument)?;
+            summary.last_read_sequence = storage
+                .last_read_sequence(document.document_id)
+                .map_err(map_error)?;
+            return Ok(StorageResult::Existing(summary));
+        }
         if self.analyzer.is_none() {
             self.analyzer = Some((self.loader)()?);
         }
         // Wall time dates registration history; active reading uses a separate
         // monotonic clock and is never started/committed by an import.
         let timestamp = registration_timestamp()?;
+        let mut refinement = Refinement::new(load_dictionary()?);
         let analyzer = self.analyzer.as_mut().expect("loaded analyzer");
-        let result =
-            storage.import_analyzed_paste(paste, timestamp, |chapter| analyzer.analyze(chapter));
+        let result = storage.import_analyzed_paste(paste, timestamp, |chapter| {
+            refinement.analyze(analyzer.as_mut(), chapter)
+        });
         match result {
             Ok(PasteImportOutcome::Created(imported)) => Ok(StorageResult::Created(
                 imported

@@ -62,6 +62,17 @@ impl<E> From<StorageError> for PasteImportError<E> {
 }
 
 impl Storage {
+    /// Read-only preflight; the atomic import repeats this lookup under its write lock.
+    pub fn find_imported_paste(
+        &mut self,
+        text: &PasteText,
+    ) -> Result<Option<PastedDocument>, StorageError> {
+        let transaction = self.connection.transaction()?;
+        let document = find_imported_paste_in(&transaction, text)?;
+        transaction.commit()?;
+        Ok(document)
+    }
+
     /// Atomically deduplicate exact pasted UTF-8 bytes before analyzing a new
     /// document. The callback is never invoked for an existing document.
     /// Hashes are committed atomically with every new paste.
@@ -75,27 +86,11 @@ impl Storage {
         if registered_at_unix_ms < 0 {
             return Err(StorageError::InvalidVocabulary.into());
         }
-        let digest = Sha256::digest(text.as_str().as_bytes());
         let transaction = self
             .connection
             .transaction_with_behavior(TransactionBehavior::Immediate)
             .map_err(StorageError::from)?;
-        let existing: Option<i64> = transaction
-            .query_row(
-                "SELECT document_id FROM paste_content_hashes WHERE sha256 = ?1
-                 ORDER BY document_id LIMIT 1",
-                [digest.as_slice()],
-                |row| row.get(0),
-            )
-            .optional()
-            .map_err(StorageError::from)?;
-        let outcome = if let Some(id) = existing {
-            let id = DocumentId::try_from(id).map_err(|_| StorageError::InvalidDocument)?;
-            let document = load_paste_in(&transaction, id)?.ok_or(StorageError::InvalidDocument)?;
-            // A stale/corrupt digest (or collision) must never reference unrelated text.
-            if document.chapter.text != text.as_str() {
-                return Err(StorageError::InvalidDocument.into());
-            }
+        let outcome = if let Some(document) = find_imported_paste_in(&transaction, text)? {
             PasteImportOutcome::Existing(document)
         } else {
             let imported =
@@ -166,4 +161,24 @@ pub(crate) fn store_analyzed_chapter_in(
         .map_err(|_| StorageError::InvalidAnalysis)?;
     let registered_surfaces = register_vocabulary_in(connection, &surfaces, registered_at_unix_ms)?;
     Ok((analysis_id, registered_surfaces))
+}
+
+fn find_imported_paste_in(
+    connection: &Connection,
+    text: &PasteText,
+) -> Result<Option<PastedDocument>, StorageError> {
+    let digest = Sha256::digest(text.as_str().as_bytes());
+    let existing: Option<i64> = connection.query_row(
+        "SELECT document_id FROM paste_content_hashes WHERE sha256 = ?1 ORDER BY document_id LIMIT 1",
+        [digest.as_slice()], |row| row.get(0),
+    ).optional()?;
+    let Some(id) = existing else {
+        return Ok(None);
+    };
+    let id = DocumentId::try_from(id).map_err(|_| StorageError::InvalidDocument)?;
+    let document = load_paste_in(connection, id)?.ok_or(StorageError::InvalidDocument)?;
+    if document.chapter.text != text.as_str() {
+        return Err(StorageError::InvalidDocument);
+    }
+    Ok(Some(document))
 }

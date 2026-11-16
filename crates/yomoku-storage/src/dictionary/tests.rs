@@ -489,3 +489,21 @@ fn component_queries_keep_full_token_first_and_deduplicate_entries_and_forms() {
     assert_eq!(found.names.len(), 1);
     assert_eq!(found.names[0].forms.len(), 2);
 }
+
+#[test]
+fn exact_membership_reads_forms_in_both_sources_without_decoding_payloads() {
+    let file = fixture();
+    let sql = Connection::open(file.path()).unwrap();
+    sql.execute("UPDATE entries SET payload = 'not JSON'", [])
+        .unwrap();
+    let dictionary = Dictionary::open(file.path()).unwrap();
+    assert!(dictionary.contains("試験語").unwrap());
+    assert!(!dictionary.contains("試験").unwrap());
+    assert!(!dictionary.contains("試験語末").unwrap());
+    assert!(dictionary.contains("").is_err());
+    let pinned: serde_json::Value = serde_json::from_str(include_str!(
+        "../../../../third_party/dictionaries/android.lock.json"
+    ))
+    .unwrap();
+    assert_eq!(pinned["index_sha256"], IMPORT_DICTIONARY_SHA256);
+}

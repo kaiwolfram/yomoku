@@ -8,6 +8,10 @@ use yomoku_core::dictionary::{
     matching_readings, NameEntry, Reading, Spelling, Translation, WordEntry,
 };
 
+/// Exact immutable index identity supplied by the verified platform publisher.
+pub const IMPORT_DICTIONARY_SHA256: &str =
+    "0be9d4493aa3fa4474dbb27291820a63a27748dbc63e5517f67be39ffea8e152";
+
 const APPLICATION_ID: i64 = 0x594f4449;
 const SCHEMA_VERSION: i64 = 1;
 const LOOKUP_SQL: &str = "SELECT e.source, e.entry_id, e.payload
@@ -70,6 +74,18 @@ pub struct Dictionary {
 }
 
 impl Dictionary {
+    /// Exact form membership in either source, without reading definition payloads.
+    pub fn contains(&self, form: &str) -> Result<bool, DictionaryError> {
+        if form.trim().is_empty() {
+            return Err(DictionaryError::InvalidQuery);
+        }
+        Ok(self.connection.query_row(
+            "SELECT EXISTS(SELECT 1 FROM forms WHERE surface = ?1 COLLATE BINARY)",
+            [form],
+            |row| row.get(0),
+        )?)
+    }
+
     /// One ordered index seek answers exact membership and prefix viability.
     /// Payloads are intentionally left unread until a choice is active.
     fn first_form(

@@ -76,6 +76,13 @@ class ReaderWordsTest {
         return id.value
     }
 
+    private fun mountReader(session: CoreSession) {
+        testCore = session
+        compose.activity.setContent {
+            YomokuTheme { ReaderScreen(session.view, session.sessionKey, session::dispatch) }
+        }
+    }
+
     private fun key(): ReaderTokenKey {
         val view = core().view
         val page = view.reader!!
@@ -447,22 +454,26 @@ class ReaderWordsTest {
                     return publisher.verifiedWordDictionaryPath()
                 }
             }
+        val directory =
+            File(compose.activity.cacheDir, "word-close-${System.nanoTime()}").apply { mkdirs() }
+        val databasePath = File(directory, "reader.sqlite3").path
         lateinit var session: CoreSession
         compose.runOnUiThread {
-            session = CoreSession(":memory:", provider)
-            testCore = session
-            compose.activity.setContent {
-                YomokuTheme {
-                    ReaderScreen(
-                        session.view,
-                        session.sessionKey,
-                        session::dispatch,
-                    )
-                }
-            }
+            session = CoreSession(databasePath, publisher)
+            mountReader(session)
         }
         try {
             openDocument()
+            val id = session.view.reader!!.documentId
+            compose.runOnUiThread {
+                compose.activity.setContent {}
+                session.close()
+                session = CoreSession(databasePath, provider)
+                mountReader(session)
+            }
+            compose.waitUntil(30_000) { !session.view.storageBusy }
+            compose.runOnUiThread { session.dispatch(Event.OpenReader(id)) }
+            awaitWords()
             activateSurface("東京")
             assertTrue(entered.await(30, TimeUnit.SECONDS))
             assertNull(session.view.effectiveReaderWord?.details)
@@ -487,6 +498,7 @@ class ReaderWordsTest {
                 testCore = null
             }
             compose.waitUntil(30_000) { session.isClosed }
+            assertTrue(directory.deleteRecursively())
         }
     }
 
@@ -539,22 +551,26 @@ class ReaderWordsTest {
                     return if (fail.get()) "" else publisher.verifiedWordDictionaryPath()
                 }
             }
+        val directory =
+            File(compose.activity.cacheDir, "word-retry-${System.nanoTime()}").apply { mkdirs() }
+        val databasePath = File(directory, "reader.sqlite3").path
         lateinit var session: CoreSession
         compose.runOnUiThread {
-            session = CoreSession(":memory:", provider)
-            testCore = session
-            compose.activity.setContent {
-                YomokuTheme {
-                    ReaderScreen(
-                        session.view,
-                        session.sessionKey,
-                        session::dispatch,
-                    )
-                }
-            }
+            session = CoreSession(databasePath, publisher)
+            mountReader(session)
         }
         try {
             openDocument()
+            val id = session.view.reader!!.documentId
+            compose.runOnUiThread {
+                compose.activity.setContent {}
+                session.close()
+                session = CoreSession(databasePath, provider)
+                mountReader(session)
+            }
+            compose.waitUntil(30_000) { !session.view.storageBusy }
+            compose.runOnUiThread { session.dispatch(Event.OpenReader(id)) }
+            awaitWords()
             tapSurface("猫")
             compose.onNodeWithTag("word_lookup_error").assertExists()
             compose.onNodeWithTag("word_no_match").assertDoesNotExist()
@@ -626,6 +642,7 @@ class ReaderWordsTest {
                 session.close()
                 testCore = null
             }
+            assertTrue(directory.deleteRecursively())
             compose.waitUntil(30_000) { session.isClosed }
         }
     }

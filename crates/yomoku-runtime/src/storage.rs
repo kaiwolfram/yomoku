@@ -230,7 +230,14 @@ fn execute(
         *storage = Some(Storage::open(path).map_err(map_error)?);
     }
     let storage = storage.as_mut().expect("opened storage");
-    match operation {
+    let importing = matches!(
+        operation,
+        StorageOperation::CreatePaste(_)
+            | StorageOperation::ImportTxt(_)
+            | StorageOperation::ImportSrt(_)
+            | StorageOperation::ImportEpub(_)
+    );
+    let result = match operation {
         StorageOperation::LookupDictionary(query) => {
             let result = word_dictionary(dictionary, word_loader)?
                 .lookup(&query.surface, query.dictionary_form.as_deref());
@@ -311,22 +318,27 @@ fn execute(
             Ok(StorageResult::DocumentRenamed { document_id, title })
         }
         StorageOperation::CreatePaste(_) => {
-            imports.import(storage, &paste.expect("validated paste"))
+            imports.import(storage, &paste.expect("validated paste"), || {
+                word_dictionary(dictionary, word_loader)
+            })
         }
         StorageOperation::ImportTxt(input) => imports.import_txt(
             storage,
             &input,
             cancellation.expect("TXT attempt published before enqueue"),
+            || word_dictionary(dictionary, word_loader),
         ),
         StorageOperation::ImportSrt(input) => imports.import_srt(
             storage,
             &input,
             cancellation.expect("SRT attempt published before enqueue"),
+            || word_dictionary(dictionary, word_loader),
         ),
         StorageOperation::ImportEpub(input) => imports.import_epub(
             storage,
             &input,
             cancellation.expect("EPUB attempt published before enqueue"),
+            || word_dictionary(dictionary, word_loader),
         ),
 
         StorageOperation::OpenReader(id) => storage
@@ -367,7 +379,11 @@ fn execute(
             .map_err(map_error)?
             .map(StorageResult::PositionSaved)
             .ok_or(DocumentError::NotFound),
+    };
+    if importing && result.is_err() {
+        *dictionary = None;
     }
+    result
 }
 
 pub(crate) fn map_error(error: StorageError) -> DocumentError {

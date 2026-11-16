@@ -34,12 +34,15 @@ internal fun verifyReaderWordBridge() {
     val provider = HostDictionary()
     val database = directory.resolve("user.sqlite3")
     try {
-        val id =
+        val importedId =
             NativeBridge(database.path, listener, provider).use { bridge ->
                 dispatch(bridge, Event.RefreshLibrary)
                 check(provider.wordCalls.get() == 0)
-                val id =
-                    dispatch(bridge, Event.CreatePaste("東京 東京 食べた")).documents.single().documentId
+                dispatch(bridge, Event.CreatePaste("東京 東京 食べた")).documents.single().documentId
+            }
+        val id =
+            NativeBridge(database.path, listener, provider).use { bridge ->
+                val id = importedId
                 val opened = dispatch(bridge, Event.OpenReader(id))
                 val page = checkNotNull(opened.reader)
                 val key = ReaderTokenKey(id, page.anchor, checkNotNull(opened.readerAnalysis))
@@ -47,7 +50,7 @@ internal fun verifyReaderWordBridge() {
                     checkNotNull(
                         dispatch(bridge, Event.LoadReaderTokens(key)).effectiveReaderTokens
                     )
-                check(provider.wordCalls.get() == 0)
+                check(provider.wordCalls.get() == 1)
                 val token = tokens.tokens.first { it.surface == "東京" }
                 val selection = EffectiveReaderSelection(tokens.identity, token.segmentIndex)
                 val before = database.readBytes()
@@ -93,7 +96,7 @@ internal fun verifyReaderWordBridge() {
                     check(cached.contentEquals(database.readBytes()))
                 }
                 check(loaded.reader == page && loaded.completionNotice == null)
-                check(provider.wordCalls.get() == 2)
+                check(provider.wordCalls.get() == 3)
                 check(provider.wordThreads.all { it != Thread.currentThread() })
                 val inflected = tokens.tokens.first { it.surface == "食べた" }
                 val inflectedDetails =
@@ -114,7 +117,7 @@ internal fun verifyReaderWordBridge() {
                 check(inflectedDetails.token.dictionaryForm == "食べる")
                 check(inflectedDetails.candidates.dictionaryForm == "食べる")
                 check(inflectedDetails.candidates.words.isNotEmpty())
-                check(provider.wordCalls.get() == 2) // same worker keeps the immutable index open
+                check(provider.wordCalls.get() == 3) // same worker keeps the immutable index open
                 dispatch(
                     bridge,
                     Event.CompleteEffectiveReaderPage(tokens.identity, page.position, 5678L),

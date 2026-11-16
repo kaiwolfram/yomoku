@@ -10,6 +10,12 @@ if [[ ! -f "$dictionary" ]]; then
     exit 1
 fi
 export YOMOKU_SUDACHI_DICTIONARY="$dictionary"
+words="${YOMOKU_WORD_DICTIONARY:-$repo_dir/.local/dictionaries/index-v1-20261025/dictionary.sqlite3}"
+if [[ ! -f "$words" ]]; then
+    echo 'Prepare the pinned JMdict/JMnedict index with tools/prepare-dictionaries.py first.' >&2
+    exit 1
+fi
+export YOMOKU_WORD_DICTIONARY="$words"
 # Keep the prepared dictionary immutable until both processes exit. Never run
 # preparation or replace/truncate these bytes concurrently with mapped tests.
 for storage in owned mapped; do
@@ -17,4 +23,5 @@ for storage in owned mapped; do
     YOMOKU_SUDACHI_STORAGE="$storage" cargo test -p yomoku-analysis --test full_dictionary --locked --offline -- --ignored
     YOMOKU_SUDACHI_STORAGE="$storage" cargo test -p yomoku-runtime --test imports --locked --offline -- --ignored
 done
+cargo test -p yomoku-runtime --lib --locked --offline -- --ignored
 cargo test -p yomoku-ffi --test effective_reader --locked --offline -- --ignored

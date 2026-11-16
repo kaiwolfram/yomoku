@@ -61,13 +61,14 @@ class AnalyzedImportSessionTest {
             ) {
                 context.assets.open("sudachi/system_full.dic")
             }
-        val publisher = sudachiDictionaryProvider(files)
+        val publisher = sudachiDictionaryProvider(files, wordDictionaryFiles(context))
         val calls = AtomicInteger()
         val workers = mutableSetOf<Int>()
         val fail = AtomicBoolean(true)
         val provider =
             object : DictionaryProvider {
-                override fun verifiedWordDictionaryPath(): String = ""
+                override fun verifiedWordDictionaryPath(): String =
+                    publisher.verifiedWordDictionaryPath()
 
                 override fun openVerifiedDictionary(): Long {
                     check(Looper.myLooper() != Looper.getMainLooper())
@@ -163,23 +164,23 @@ class AnalyzedImportSessionTest {
                 instrumentation.runOnMainSync { core.setForeground(false) }
                 dispatch(core, Event.RefreshLibrary) // FIFO barrier after release
                 awaitUnmapped(dictionaryDirectory)
-                // Hidden work is accepted atomically, then releases its own cache.
+                // Duplicate pastes do not reload either asset while hidden or foreground.
                 assertEquals(
                     ImportOutcome.EXISTING,
                     dispatch(core, Event.CreatePaste(text)).importSummary!!.outcome,
                 )
-                assertEquals(3, calls.get())
+                assertEquals(2, calls.get())
                 awaitUnmapped(dictionaryDirectory)
                 instrumentation.runOnMainSync { core.setForeground(true) }
                 dispatch(core, Event.RefreshLibrary)
-                assertEquals(3, calls.get())
+                assertEquals(2, calls.get())
                 assertEquals(position, dispatch(core, Event.OpenReader(id)).reader!!.position)
                 dispatch(core, Event.CloseDocument)
                 assertEquals(
                     ImportOutcome.EXISTING,
                     dispatch(core, Event.CreatePaste(text)).importSummary!!.outcome,
                 )
-                assertEquals(4, calls.get())
+                assertEquals(2, calls.get())
                 assertEquals(1, synchronized(workers) { workers.size })
                 // Accepted work drains after close; Android UI never joins the worker.
                 db.beginTransaction()
@@ -192,6 +193,8 @@ class AnalyzedImportSessionTest {
                 } finally {
                     db.endTransaction()
                 }
+                assertNull(awaitIdle(core).documentError)
+                instrumentation.runOnMainSync { assertTrue(core.isClosed) }
                 awaitUnmapped(dictionaryDirectory)
                 assertEquals(2L, count("documents"))
                 assertEquals(2L, count("chapter_analyses"))

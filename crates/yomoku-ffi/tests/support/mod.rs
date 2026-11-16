@@ -24,7 +24,7 @@ impl PasteAnalyzer for TestAnalyzer {
                     },
                 },
                 surface: chapter.text.clone(),
-                is_japanese: true,
+                is_japanese: false,
                 reading: None,
                 dictionary_form: None,
             }],
@@ -35,10 +35,17 @@ pub fn bridge(
     path: std::path::PathBuf,
     callback: impl Fn(Result<Vec<u8>, FfiError>) + Send + Sync + 'static,
 ) -> Result<(YomokuBridge, AnalyzerLifecycle), FfiError> {
+    let index = path.with_extension("words.sqlite3");
     YomokuBridge::new(
         path,
         Box::new(|| Ok(Box::new(TestAnalyzer))),
-        Box::new(|| Err(DocumentError::Unavailable)),
+        Box::new(move || {
+            let sql = rusqlite::Connection::open(&index).map_err(|_| DocumentError::Unavailable)?;
+            sql.execute_batch("PRAGMA application_id=0x594f4449; PRAGMA user_version=1;
+                CREATE TABLE IF NOT EXISTS entries(source TEXT, entry_id INTEGER, payload TEXT);
+                CREATE TABLE IF NOT EXISTS forms(surface TEXT COLLATE BINARY, source TEXT, entry_id INTEGER);").map_err(|_| DocumentError::Unavailable)?;
+            Ok(index.clone())
+        }),
         callback,
     )
 }

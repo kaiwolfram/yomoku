@@ -257,6 +257,8 @@ private fun verifyVocabularyWordBridge() {
                     .documentId
             dispatch(bridge, Event.RequestDocumentDeletion(book))
             dispatch(bridge, Event.ConfirmDocumentDeletion(book), 1)
+        }
+        NativeBridge(database.path, listener, provider).use { bridge ->
             dispatch(bridge, Event.SelectDestination(Destination.VOCABULARY))
             val rows = dispatch(bridge, Event.LoadVocabulary, 1).vocabulary.rows
             val tokyo = rows.single { it.surface == "東京" }

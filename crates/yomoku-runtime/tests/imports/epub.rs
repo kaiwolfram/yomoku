@@ -82,10 +82,16 @@ fn whole_book_import_registers_all_chapters_without_encounters_and_reopens_witho
         let ReaderAnalysis::Available(id) = original.analysis else {
             panic!("missing original B")
         };
-        assert_eq!(
-            storage.chapter_analysis(id).unwrap().unwrap(),
-            fixture(&stored.chapter)
-        );
+        let analysis = storage.chapter_analysis(id).unwrap().unwrap();
+        assert_eq!(analysis.tokens, fixture(&stored.chapter).tokens);
+        assert!(analysis
+            .profile
+            .engine_revision
+            .ends_with(yomoku_core::analysis::IMPORT_POLICY_SUFFIX));
+        assert!(analysis
+            .profile
+            .dictionary_revision
+            .ends_with(yomoku_storage::dictionary::IMPORT_DICTIONARY_SHA256));
     }
     assert_eq!(
         storage

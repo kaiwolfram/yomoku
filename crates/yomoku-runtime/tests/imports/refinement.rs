@@ -1,0 +1,317 @@
+use super::*;
+use yomoku_core::analysis::{IMPORT_POLICY_SUFFIX, WORD_DICTIONARY_PREFIX};
+use yomoku_storage::dictionary::IMPORT_DICTIONARY_SHA256;
+
+struct RealAnalyzer(yomoku_analysis::Analyzer);
+impl PasteAnalyzer for RealAnalyzer {
+    fn analyze(&mut self, chapter: &ChapterText) -> Result<ChapterAnalysis, DocumentError> {
+        self.0
+            .analyze(chapter)
+            .map_err(|_| DocumentError::Unavailable)
+    }
+    fn analyze_mode(
+        &mut self,
+        chapter: &ChapterText,
+        mode: SplitMode,
+        profile: &AnalysisProfile,
+    ) -> Result<ChapterAnalysis, DocumentError> {
+        self.0
+            .analyze_components(chapter, mode, profile)
+            .map_err(|_| DocumentError::Unavailable)
+    }
+}
+
+fn real_loader() -> AnalyzerLoader {
+    Box::new(|| {
+        let path = std::env::var_os("YOMOKU_SUDACHI_DICTIONARY")
+            .map(PathBuf::from)
+            .unwrap_or_else(|| {
+                PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                    .join("../../.local/sudachi/full-20261015/system_full.dic")
+            });
+        let analyzer = if std::env::var("YOMOKU_SUDACHI_STORAGE").as_deref() == Ok("mapped") {
+            let file = std::fs::File::open(path).unwrap();
+            // SAFETY: the real-data suite keeps the pinned asset immutable.
+            unsafe { yomoku_analysis::Analyzer::open_full_mapped(&file) }
+        } else {
+            yomoku_analysis::Analyzer::open_full(path)
+        }
+        .unwrap();
+        Ok(Box::new(RealAnalyzer(analyzer)))
+    })
+}
+
+#[test]
+#[ignore = "requires pinned Sudachi Full and word dictionaries; run tools/test-sudachi.sh"]
+fn all_import_formats_refine_dictionary_missing_words_and_preserve_unicode_history_and_duplicates()
+{
+    let database = Database::new();
+    let index = std::env::var_os("YOMOKU_WORD_DICTIONARY")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| {
+            PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .join("../../.local/dictionaries/index-v1-20261025/dictionary.sqlite3")
+        });
+    let (router, lifecycle) = yomoku_runtime::effect_router(
+        database.path(),
+        real_loader(),
+        Box::new(move || Ok(index.clone())),
+    )
+    .unwrap();
+    let text = "学生だった。制服姿。食べました。国家公務員。新幹線通学。𠮷か\u{3099}😀。制服姿。";
+    let events = [
+        Event::CreatePaste(text.into()),
+        Event::ImportTxt(TxtImport {
+            original_bytes: text.as_bytes().to_vec(),
+            filename: "refined.txt".into(),
+            encoding: None,
+        }),
+        Event::ImportSrt(SrtImport {
+            original_bytes: format!("1\n00:00:00,000 --> 00:00:01,000\n{text}\n").into_bytes(),
+            filename: "refined.srt".into(),
+            encoding: None,
+        }),
+        Event::ImportEpub(yomoku_core::imports::EpubImport {
+            original_bytes: epub_fixture::book(false, &format!("<p>{text}</p>")),
+            filename: "refined.epub".into(),
+        }),
+    ];
+    let mut storage = Storage::open(database.path()).unwrap();
+    for event in events {
+        let view = dispatch_with_timeout(&router, event.clone(), Duration::from_secs(90));
+        assert_eq!(view.document_error, None);
+        let id = view.import_summary.unwrap().document_id;
+        let document = storage.load_document_reader_snapshot(id).unwrap().unwrap();
+        let mut occurrences = Vec::new();
+        for (chapter, metadata) in document.document.chapters.iter().zip(&document.analyses) {
+            let ReaderAnalysis::Available(analysis_id) = metadata.analysis else {
+                panic!("analysis required");
+            };
+            let analysis = storage.chapter_analysis(analysis_id).unwrap().unwrap();
+            analysis.validate(chapter).unwrap();
+            assert!(analysis
+                .profile
+                .engine_revision
+                .ends_with(IMPORT_POLICY_SUFFIX));
+            assert!(analysis.profile.dictionary_revision.ends_with(&format!(
+                "{WORD_DICTIONARY_PREFIX}{IMPORT_DICTIONARY_SHA256}"
+            )));
+            if chapter.text.contains(text) {
+                let japanese: Vec<_> = analysis
+                    .tokens
+                    .iter()
+                    .filter(|t| t.is_japanese)
+                    .map(|t| t.surface.as_str())
+                    .collect();
+                assert_eq!(
+                    japanese,
+                    [
+                        "学生",
+                        "だった",
+                        "制服",
+                        "姿",
+                        "食べました",
+                        "国家公務員",
+                        "新幹線",
+                        "通学",
+                        "𠮷",
+                        "か\u{3099}",
+                        "制服",
+                        "姿"
+                    ]
+                );
+                for token in &analysis.tokens {
+                    assert_eq!(token.anchor.slice(chapter).unwrap(), token.surface);
+                }
+                let ate = analysis
+                    .tokens
+                    .iter()
+                    .find(|t| t.surface == "食べました")
+                    .unwrap();
+                assert_eq!(ate.dictionary_form.as_ref().unwrap().as_str(), "食べる");
+                let copula = analysis
+                    .tokens
+                    .iter()
+                    .find(|t| t.surface == "だった")
+                    .unwrap();
+                assert_eq!(copula.dictionary_form.as_ref().unwrap().as_str(), "だ");
+                assert_eq!(copula.reading.as_deref(), Some("ダッタ"));
+            }
+            occurrences.extend(
+                analysis
+                    .tokens
+                    .iter()
+                    .filter(|t| t.is_japanese)
+                    .map(|t| t.surface.clone()),
+            );
+        }
+        assert!(storage
+            .vocabulary_entry(&Surface::new("制服姿").unwrap())
+            .unwrap()
+            .is_none());
+        for surface in &occurrences {
+            assert!(storage
+                .vocabulary_entry(&Surface::new(surface).unwrap())
+                .unwrap()
+                .is_some());
+        }
+        let before = totals(&database.path());
+        let duplicate = dispatch(&router, event);
+        assert_eq!(
+            duplicate.import_summary.unwrap().outcome,
+            yomoku_core::app::ImportOutcome::Existing
+        );
+        assert_eq!(totals(&database.path()), before);
+        let mut current = dispatch(&router, Event::OpenReader(id));
+        loop {
+            let page = current.reader.clone().unwrap();
+            current = dispatch(
+                &router,
+                Event::LoadReaderTokens(yomoku_core::reader::ReaderTokenKey {
+                    document_id: id,
+                    page: page.anchor,
+                    analysis: current.reader_analysis.unwrap(),
+                }),
+            );
+            let identity = current.effective_reader_tokens.unwrap().identity;
+            current = settled(
+                &router,
+                Event::CompleteEffectiveReaderPage {
+                    identity,
+                    position: page.position,
+                    completed_at_unix_ms: 1000,
+                },
+            );
+            if current.reader.is_none() {
+                break;
+            }
+        }
+        let sql = Connection::open(database.path()).unwrap();
+        let saved: i64 = sql.query_row("SELECT COUNT(*) FROM reading_occurrences o JOIN reading_completions c USING(command_id) WHERE c.document_id=?1", [i64::from(id)], |r|r.get(0)).unwrap();
+        assert_eq!(saved as usize, occurrences.len());
+    }
+    drop(router);
+    drop(lifecycle);
+}
+
+fn settled(router: &EffectRouter, event: Event) -> ViewModel {
+    let (send, receive) = mpsc::channel();
+    router.update(event, move |_| {
+        let _ = send.send(());
+    });
+    loop {
+        receive.recv_timeout(TIMEOUT).unwrap();
+        let view = router.view();
+        if !view.storage_busy {
+            assert_eq!(view.document_error, None);
+            return view;
+        }
+    }
+}
+
+#[test]
+fn dictionary_load_and_later_membership_failures_roll_back_each_format_and_duplicates_skip_assets()
+{
+    use std::sync::atomic::AtomicBool;
+    fn schema(path: &PathBuf) {
+        Connection::open(path).unwrap().execute_batch("PRAGMA application_id=0x594f4449; PRAGMA user_version=1;
+            CREATE TABLE IF NOT EXISTS entries(source TEXT, entry_id INTEGER, payload TEXT);
+            CREATE TABLE IF NOT EXISTS forms(surface TEXT COLLATE BINARY, source TEXT, entry_id INTEGER);").unwrap();
+    }
+    let events = [
+        Event::CreatePaste("猫".into()),
+        Event::ImportTxt(TxtImport {
+            original_bytes: "猫".as_bytes().to_vec(),
+            filename: "retry.txt".into(),
+            encoding: Some(TextEncoding::Utf8),
+        }),
+        Event::ImportSrt(SrtImport {
+            original_bytes: "1\n00:00:00,000 --> 00:00:01,000\n猫\n".as_bytes().to_vec(),
+            filename: "retry.srt".into(),
+            encoding: Some(TextEncoding::Utf8),
+        }),
+        Event::ImportEpub(yomoku_core::imports::EpubImport {
+            original_bytes: epub_fixture::book(false, "<p>猫</p>"),
+            filename: "retry.epub".into(),
+        }),
+    ];
+    for event in events {
+        let database = Database::new();
+        let index = database.0.join("words.sqlite3");
+        schema(&index);
+        let unavailable = Arc::new(AtomicBool::new(true));
+        let corrupt = Arc::new(AtomicBool::new(true));
+        let loads = Arc::new(AtomicUsize::new(0));
+        let word_path = index.clone();
+        let fail = unavailable.clone();
+        let calls = loads.clone();
+        let analyzer_path = index.clone();
+        let damage = corrupt.clone();
+        let loader: AnalyzerLoader = Box::new(move || {
+            let path = analyzer_path.clone();
+            let damage = damage.clone();
+            Ok(Box::new(move |chapter: &ChapterText| {
+                let analysis = fixture(chapter);
+                // Fault injection mutates only this synthetic index. Production
+                // publisher bytes remain immutable. EPUB fails in its later chapter.
+                let sql = Connection::open(&path).unwrap();
+                if chapter.text.trim() == "猫" && damage.load(Ordering::Relaxed) {
+                    sql.execute_batch("DROP TABLE forms").unwrap();
+                } else {
+                    for token in &analysis.tokens {
+                        sql.execute("INSERT INTO forms VALUES (?1,'JMdict',1)", [&token.surface])
+                            .unwrap();
+                    }
+                }
+                Ok(analysis)
+            }))
+        });
+        let (router, lifecycle) = yomoku_runtime::effect_router(
+            database.path(),
+            loader,
+            Box::new(move || {
+                calls.fetch_add(1, Ordering::Relaxed);
+                if fail.load(Ordering::Relaxed) {
+                    return Err(DocumentError::Unavailable);
+                }
+                // Acquiring a second writer here proves asset loading precedes the
+                // user-database write transaction.
+                let sql = Connection::open(word_path.with_file_name("import.sqlite3")).unwrap();
+                sql.execute_batch("BEGIN IMMEDIATE; ROLLBACK").unwrap();
+                Ok(word_path.clone())
+            }),
+        )
+        .unwrap();
+        let baseline = {
+            Storage::open(database.path()).unwrap();
+            totals(&database.path())
+        };
+        assert_eq!(
+            dispatch(&router, event.clone()).document_error,
+            Some(DocumentError::Unavailable)
+        );
+        assert_eq!(totals(&database.path()), baseline);
+        unavailable.store(false, Ordering::Relaxed);
+        assert_eq!(
+            dispatch(&router, event.clone()).document_error,
+            Some(DocumentError::Unavailable)
+        );
+        assert_eq!(totals(&database.path()), baseline);
+        corrupt.store(false, Ordering::Relaxed);
+        schema(&index);
+        let created = dispatch(&router, event.clone());
+        assert_eq!(created.document_error, None);
+        assert_eq!(created.documents.len(), 1);
+        unavailable.store(true, Ordering::Relaxed);
+        let before = loads.load(Ordering::Relaxed);
+        let duplicate = dispatch(&router, event);
+        assert_eq!(duplicate.document_error, None);
+        assert_eq!(
+            duplicate.import_summary.unwrap().outcome,
+            yomoku_core::app::ImportOutcome::Existing
+        );
+        assert_eq!(loads.load(Ordering::Relaxed), before);
+        drop(router);
+        drop(lifecycle);
+    }
+}

@@ -58,19 +58,18 @@ class ReaderWordDetailsSessionTest {
         try {
             awaitIdle(core)
             assertEquals(0, wordCalls.get())
+            val failedImport = dispatch(core, Event.CreatePaste("東京 東京 食べた"))
+            assertNotNull(failedImport.documentError)
+            assertTrue(failedImport.documents.isEmpty())
+            fail.set(false)
             val id = dispatch(core, Event.CreatePaste("東京 東京 食べた")).documents.single().documentId
             val opened = dispatch(core, Event.OpenReader(id))
             val page = opened.reader!!
             val key = ReaderTokenKey(id, page.anchor, opened.readerAnalysis!!)
             val tokens = dispatch(core, Event.LoadReaderTokens(key)).effectiveReaderTokens!!
-            assertEquals(0, wordCalls.get())
+            assertEquals(2, wordCalls.get())
             val tokyo = tokens.tokens.first { it.surface == "東京" }
             val selection = EffectiveReaderSelection(tokens.identity, tokyo.segmentIndex)
-            val failed = dispatch(core, Event.LoadEffectiveReaderWord(selection))
-            assertNotNull(failed.effectiveReaderWord?.error)
-            assertNull(failed.documentError)
-            assertNull(failed.effectiveReaderWord?.details)
-            fail.set(false)
             val loaded = dispatch(core, Event.LoadEffectiveReaderWord(selection))
             val details = loaded.effectiveReaderWord!!.details!!
             assertEquals(selection, loaded.effectiveReaderWord.selection)
