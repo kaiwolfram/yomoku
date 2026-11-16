@@ -11,6 +11,7 @@ import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
+import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -105,6 +106,72 @@ class ReaderNavigationTest {
                 .fetchSemanticsNode()
                 .config[SemanticsProperties.VerticalScrollAxisRange]
         assertEquals(0f, scroll.value(), 0f)
+    }
+
+    @Test
+    fun skipRetriesPositionFailureAndSurvivesRecreationWithoutReadingHistory() {
+        val id = openDocument()
+        database().use { db ->
+            fun history() =
+                listOf(
+                        "reading_completions",
+                        "reading_occurrences",
+                        "completion_commands",
+                        "vocabulary_status_events",
+                    )
+                    .map { table ->
+                        db.rawQuery("SELECT COUNT(*) FROM $table", null).use {
+                            it.moveToFirst()
+                            it.getLong(0)
+                        }
+                    }
+            val before = history()
+            fun skip() {
+                compose.onNodeWithTag("next_page").performScrollTo().performTouchInput {
+                    longClick()
+                }
+                compose.onNodeWithTag("skip_page").performClick()
+            }
+            try {
+                db.execSQL(
+                    "CREATE TRIGGER fail_skip BEFORE INSERT ON reading_positions WHEN NEW.document_id = $id BEGIN SELECT RAISE(ABORT, 'test skip'); END"
+                )
+                skip()
+                compose.waitUntil(30_000) {
+                    !core().view.storageBusy && core().view.documentError != null
+                }
+                assertEquals(1UL, core().view.reader!!.pageNumber)
+                assertEquals(before, history())
+                db.execSQL("DROP TRIGGER fail_skip")
+                skip()
+                awaitReady()
+                assertEquals(2UL, core().view.reader!!.pageNumber)
+                assertTop()
+                assertEquals(before, history())
+                assertTrue(
+                    core().view.completionNotice == null && core().view.bookCompletionNotice == null
+                )
+                val position = core().view.reader!!.position
+                compose.activityRule.scenario.recreate()
+                awaitReady()
+                assertEquals(position, core().view.reader!!.position)
+                assertTop()
+                compose.onNodeWithContentDescription("Back").performClick()
+                awaitReady()
+                compose.runOnUiThread {
+                    core().dispatch(Event.OpenReader(app.yomoku.shared.DocumentId(id)))
+                }
+                awaitReady()
+                assertEquals(position, core().view.reader!!.position)
+                skip()
+                awaitReady()
+                assertEquals(3UL, core().view.reader!!.pageNumber)
+                assertTrue(!core().view.reader!!.finishedAtLeastOnce)
+                assertEquals(before, history())
+            } finally {
+                db.execSQL("DROP TRIGGER IF EXISTS fail_skip")
+            }
+        }
     }
 
     @Test

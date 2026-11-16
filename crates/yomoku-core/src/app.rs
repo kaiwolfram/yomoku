@@ -189,6 +189,12 @@ pub enum Event {
         page: TextAnchor,
         position: ReadingPosition,
     },
+    /// Position-only forward navigation; never completes the departing page.
+    SkipReaderPage {
+        document_id: DocumentId,
+        page: TextAnchor,
+        position: ReadingPosition,
+    },
     /// Consume before starting the transient celebration; stale acknowledgments ignore.
     DismissBookCompletionNotice(CompletionCommandId),
     /// Explicit refresh; stale UI callbacks cannot request another page's tokens.
@@ -457,13 +463,23 @@ impl App for Yomoku {
         if let Some(command) = self.update_effective(&event, model) {
             return command;
         }
+        let mut skip_position = None;
         if let Event::PreviousReaderPage {
+            document_id,
+            page,
+            position,
+        }
+        | Event::SkipReaderPage {
             document_id,
             page,
             position,
         } = event
         {
-            if model.content_route != ContentRoute::Reader
+            let skip = matches!(event, Event::SkipReaderPage { .. });
+            if model.storage_busy()
+                || model.effective_mutation_pending()
+                || model.deferred_reader_event.is_some()
+                || model.content_route != ContentRoute::Reader
                 || model.settings_open
                 || model.completion_pending()
                 || !model.reader.as_ref().is_some_and(|reader| {
@@ -482,23 +498,32 @@ impl App for Yomoku {
             else {
                 return Command::done();
             };
-            let Some(previous) = pages
+            let Some(destination) = pages
                 .page_at(position)
                 .ok()
-                .and_then(|index| index.checked_sub(1))
-                .map(|index| pages.pages()[index])
+                .and_then(|index| {
+                    if skip {
+                        index.checked_add(1)
+                    } else {
+                        index.checked_sub(1)
+                    }
+                })
+                .and_then(|index| pages.pages().get(index).copied())
             else {
                 return Command::done();
             };
-            return self.update(
-                Event::SaveReadingPosition(ReadingPosition {
-                    source_id: previous.source_id,
-                    chapter_id: previous.chapter_id,
-                    offset: previous.range.start,
-                }),
-                model,
-            );
+            let target = ReadingPosition {
+                source_id: destination.source_id,
+                chapter_id: destination.chapter_id,
+                offset: destination.range.start,
+            };
+            if skip {
+                skip_position = Some(target);
+            } else {
+                return self.update(Event::SaveReadingPosition(target), model);
+            }
         }
+
         if (model.completion_pending() || model.effective_mutation_pending())
             && matches!(
                 event,
@@ -579,6 +604,12 @@ impl App for Yomoku {
                 }
                 Some(StorageOperation::SavePageLength(*length))
             }
+            Event::SkipReaderPage { document_id, .. } => {
+                Some(StorageOperation::SaveReadingPosition {
+                    document_id: *document_id,
+                    position: skip_position.expect("validated skip destination"),
+                })
+            }
             Event::SaveReadingPosition(position) => {
                 let Some(reader) = model
                     .reader
@@ -652,10 +683,13 @@ impl App for Yomoku {
                     | StorageOperation::ImportEpub(_)
                     | StorageOperation::SavePageLength(_)
                     | StorageOperation::SaveReadingPosition { .. }
-            ) {
+            ) && !matches!(event, Event::SkipReaderPage { .. })
+            {
                 model.invalidate_effective_page();
                 model.clear_reader_word();
             }
+            // Skip retains the current projection until the position save succeeds,
+            // so a failed save can retry the same menu action without reloading words.
 
             if matches!(
                 event,
@@ -1015,6 +1049,7 @@ impl App for Yomoku {
             | Event::SaveReadingPosition(_) => unreachable!(),
             Event::RetryReaderCompletion
             | Event::PreviousReaderPage { .. }
+            | Event::SkipReaderPage { .. }
             | Event::CompleteEffectiveReaderPage { .. }
             | Event::LoadEffectiveReaderWord(_)
             | Event::SetEffectiveReaderStatus { .. }

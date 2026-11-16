@@ -98,6 +98,7 @@
     <string name="retry">Retry</string>
     <string name="page_counter">%1$d / %2$d</string>
     <string name="previous_page">Previous</string>
+    <string name="skip_page">Skip page</string>
     <string name="next_page">Next</string>
     <string name="finish_book">Finish Book</string>
     <string name="book_completed">Book completed</string>

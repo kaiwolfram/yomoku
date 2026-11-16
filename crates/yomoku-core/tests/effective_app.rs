@@ -600,3 +600,66 @@ fn accepted_failed_completion_blocks_typography_and_imports_until_explicit_retry
         .process_event(Event::RetryReaderCompletion)
         .is_empty());
 }
+
+#[test]
+fn skip_saves_only_next_position_retries_and_rejects_busy_stale_and_final_actions() {
+    let f = Fixture::new(true);
+    f.load();
+    let before = f.core.view();
+    let page = before.reader.clone().unwrap();
+    let skip = || Event::SkipReaderPage {
+        document_id: page.document_id,
+        page: page.anchor,
+        position: page.position,
+    };
+    let mut effects = f.core.process_event(skip());
+    let StorageOperation::SaveReadingPosition {
+        document_id,
+        position,
+    } = operation(&effects)
+    else {
+        panic!("skip must only save position")
+    };
+    assert_eq!(document_id, page.document_id);
+    assert_eq!(position.offset, page.anchor.range.end);
+    assert!(f.core.process_event(skip()).is_empty());
+    assert_eq!(f.core.view().reader, before.reader);
+    assert!(!f.core.view().completion_save_pending);
+    resolve(
+        &f.core,
+        &mut effects,
+        StorageResult::Failed(DocumentError::Unavailable),
+    );
+    assert_eq!(f.core.view().reader, before.reader);
+    assert_eq!(
+        f.core.view().effective_reader_tokens,
+        before.effective_reader_tokens
+    );
+    let mut retry = f.core.process_event(skip());
+    assert_eq!(
+        operation(&retry),
+        StorageOperation::SaveReadingPosition {
+            document_id,
+            position
+        }
+    );
+    let mut document = f.document.clone();
+    document.reading_position = Some(position);
+    resolve(&f.core, &mut retry, StorageResult::PositionSaved(document));
+    let after = f.core.view();
+    assert_eq!(after.reader.unwrap().page_number, 2);
+    assert!(after.completion_notice.is_none() && after.book_completion_notice.is_none());
+    assert!(!after.completion_save_pending);
+    assert!(f.core.process_event(skip()).is_empty());
+
+    let f = Fixture::new(false);
+    let page = f.core.view().reader.unwrap();
+    assert!(f
+        .core
+        .process_event(Event::SkipReaderPage {
+            document_id: page.document_id,
+            page: page.anchor,
+            position: page.position,
+        })
+        .is_empty());
+}

@@ -100,6 +100,64 @@ class EffectiveReaderNavigationTest {
         events.filterIsInstance<Event.CompleteEffectiveReaderPage>().last()
 
     @Test
+    fun nextLongPressOpensSkipWithoutCompletingAndDismissalDoesNotAdvance() {
+        show()
+        fun openMenu() {
+            compose.onNodeWithTag("next_page").performScrollTo().performTouchInput { longClick() }
+            compose.onNodeWithTag("skip_page").assertIsDisplayed()
+            assertTrue(events.isEmpty())
+        }
+        openMenu()
+        androidx.test.espresso.Espresso.pressBack()
+        compose.waitForIdle()
+        compose.waitUntil(5_000) {
+            compose.onAllNodesWithTag("skip_page").fetchSemanticsNodes().isEmpty()
+        }
+        assertTrue(events.isEmpty())
+        openMenu()
+        // Route this tap through Android's window manager so the popup receives
+        // ACTION_OUTSIDE; Compose root-local injection bypasses that routing.
+        val bounds = compose.onNodeWithTag("reader_scroll").fetchSemanticsNode().boundsInWindow
+        val downTime = android.os.SystemClock.uptimeMillis()
+        for (action in
+            listOf(android.view.MotionEvent.ACTION_DOWN, android.view.MotionEvent.ACTION_UP)) {
+            val touch =
+                android.view.MotionEvent.obtain(
+                    downTime,
+                    android.os.SystemClock.uptimeMillis(),
+                    action,
+                    bounds.left + 8f,
+                    bounds.top + 8f,
+                    0,
+                )
+            touch.source = android.view.InputDevice.SOURCE_TOUCHSCREEN
+            androidx.test.platform.app.InstrumentationRegistry.getInstrumentation()
+                .sendPointerSync(touch)
+            touch.recycle()
+        }
+        compose.waitForIdle()
+        compose.waitUntil(5_000) {
+            compose.onAllNodesWithTag("skip_page").fetchSemanticsNodes().isEmpty()
+        }
+        assertTrue(events.isEmpty())
+        openMenu()
+        compose.onNodeWithTag("skip_page").performClick()
+        val page = frame.value.reader!!
+        assertEquals(
+            Event.SkipReaderPage(page.documentId, page.anchor, page.position),
+            events.single(),
+        )
+        compose.runOnUiThread {
+            events.clear()
+            frame.value = frame.value.copy(reader = page.copy(pageNumber = 3UL))
+        }
+        compose
+            .onNodeWithTag("next_page")
+            .assert(SemanticsMatcher.keyNotDefined(SemanticsActions.OnLongClick))
+        compose.onNodeWithTag("skip_page").assertDoesNotExist()
+    }
+
+    @Test
     fun navigationButtonsAlignToEdgesAndCounterStaysCenteredForNextAndFinish() {
         show()
         for (number in listOf(2UL, 3UL)) {

@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
@@ -37,6 +38,7 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import app.yomoku.shared.DocumentError
@@ -333,6 +335,7 @@ internal fun ReaderScreen(
     val currentKey by rememberUpdatedState(navigationKey)
     val currentCanAdvance by rememberUpdatedState(canAdvance)
     val currentCanGoBack by rememberUpdatedState(canGoBack)
+    var skipMenuOpen by remember(navigationKey, canNavigate) { mutableStateOf(false) }
     var finishCenter by remember { mutableStateOf<Offset?>(null) }
     val next = {
         if (canAdvance && currentCanAdvance && currentKey == navigationKey) {
@@ -397,23 +400,67 @@ internal fun ReaderScreen(
                     modifier = Modifier.testTag("page_counter"),
                 )
                 Box(Modifier.weight(1f), contentAlignment = Alignment.CenterEnd) {
-                    TextButton(
-                        onClick = next,
-                        enabled = canAdvance,
-                        modifier =
-                            Modifier.testTag("next_page").onGloballyPositioned {
-                                finishCenter =
-                                    it.localToWindow(
-                                        Offset(it.size.width / 2f, it.size.height / 2f)
+                    Box {
+                        Box(
+                            contentAlignment = Alignment.Center,
+                            modifier =
+                                Modifier.testTag("next_page")
+                                    .onGloballyPositioned {
+                                        finishCenter =
+                                            it.localToWindow(
+                                                Offset(it.size.width / 2f, it.size.height / 2f)
+                                            )
+                                    }
+                                    .defaultMinSize(minWidth = 64.dp, minHeight = 48.dp)
+                                    .combinedClickable(
+                                        enabled = canAdvance,
+                                        role = Role.Button,
+                                        onClick = next,
+                                        onLongClick =
+                                            if (page.pageNumber < page.totalPages) {
+                                                {
+                                                    if (
+                                                        currentCanAdvance &&
+                                                            currentKey == navigationKey
+                                                    )
+                                                        skipMenuOpen = true
+                                                }
+                                            } else null,
                                     )
-                            },
-                    ) {
-                        Text(
-                            stringResource(
-                                if (page.pageNumber == page.totalPages) R.string.finish_book
-                                else R.string.next_page
+                                    .padding(horizontal = 12.dp),
+                        ) {
+                            Text(
+                                stringResource(
+                                    if (page.pageNumber == page.totalPages) R.string.finish_book
+                                    else R.string.next_page
+                                ),
+                                style = MaterialTheme.typography.labelLarge,
+                                color =
+                                    if (canAdvance) MaterialTheme.colorScheme.primary
+                                    else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
                             )
-                        )
+                        }
+                        DropdownMenu(
+                            expanded = skipMenuOpen,
+                            onDismissRequest = { skipMenuOpen = false },
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.skip_page)) },
+                                modifier = Modifier.testTag("skip_page"),
+                                onClick = {
+                                    skipMenuOpen = false
+                                    if (currentCanAdvance && currentKey == navigationKey) {
+                                        dispatch(
+                                            Event.SkipReaderPage(
+                                                page.documentId,
+                                                page.anchor,
+                                                page.position,
+                                            )
+                                        )
+                                    }
+                                },
+                            )
+                        }
                     }
                 }
             }

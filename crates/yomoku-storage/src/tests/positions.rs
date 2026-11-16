@@ -159,3 +159,61 @@ fn corrupt_position_is_rejected_without_repair_and_document_deletion_removes_onl
         1
     );
 }
+
+#[test]
+fn skipping_logical_pages_persists_without_completion_history_status_or_finished_changes() {
+    use yomoku_core::{
+        pagination::{LogicalPages, PageLength},
+        vocabulary::{Surface, VocabularyStatus},
+    };
+    let database = TestDatabase::new();
+    let mut storage = Storage::open(database.path()).unwrap();
+    let document = storage
+        .unanalyzed_fixture(&PasteText::new("猫。\n".repeat(300)).unwrap())
+        .unwrap();
+    let surface = Surface::new("猫").unwrap();
+    storage
+        .register_vocabulary(std::slice::from_ref(&surface), 10)
+        .unwrap();
+    let entry = storage.vocabulary_entry(&surface).unwrap().unwrap();
+    storage
+        .set_vocabulary_status(entry.id, VocabularyStatus::Learning, 20)
+        .unwrap();
+    let entry = storage.vocabulary_entry(&surface).unwrap().unwrap();
+    let pages = LogicalPages::new(
+        std::slice::from_ref(&document.chapter),
+        PageLength::default(),
+    )
+    .unwrap();
+    for page in &pages.pages()[1..] {
+        let target = ReadingPosition {
+            source_id: page.source_id,
+            chapter_id: page.chapter_id,
+            offset: page.range.start,
+        };
+        storage
+            .save_document_reading_position(document.document_id, target)
+            .unwrap()
+            .unwrap();
+        drop(storage);
+        storage = Storage::open(database.path()).unwrap();
+        let saved = storage.load_paste(document.document_id).unwrap().unwrap();
+        assert_eq!(saved.reading_position, Some(target));
+        assert!(!saved.finished_at_least_once);
+        assert_eq!(
+            storage.vocabulary_entry(&surface).unwrap(),
+            Some(entry.clone())
+        );
+        for table in [
+            "reading_completions",
+            "completion_commands",
+            "reading_occurrences",
+        ] {
+            let count: i64 = storage
+                .connection
+                .query_row(&format!("SELECT COUNT(*) FROM {table}"), [], |r| r.get(0))
+                .unwrap();
+            assert_eq!(count, 0);
+        }
+    }
+}
