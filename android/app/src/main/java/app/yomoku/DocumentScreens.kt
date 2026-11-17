@@ -31,6 +31,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshots.SnapshotStateMap
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -46,6 +47,7 @@ import app.yomoku.shared.Event
 import app.yomoku.shared.LibrarySort
 import app.yomoku.shared.ReaderAnalysis
 import app.yomoku.shared.ReaderTokenKey
+import app.yomoku.shared.TextAnchor
 import app.yomoku.shared.ViewModel
 
 @Composable
@@ -303,6 +305,8 @@ internal fun ReaderScreen(
     imageLoader: EpubImageLoader? = null,
     ankiBrowser: AnkiNoteBrowser? = null,
     onFinishRequested: (Offset) -> Unit = {},
+    pageMarkers: SnapshotStateMap<TextAnchor, TextAnchor> =
+        rememberReaderPageMarkers(view, sessionKey),
 ) {
     val scroll =
         remember(sessionKey, view.reader?.documentId, view.reader?.anchor) { ScrollState(0) }
@@ -376,6 +380,7 @@ internal fun ReaderScreen(
                 dispatch,
                 imageLoader,
                 ankiBrowser,
+                pageMarkers,
             )
 
             Row(

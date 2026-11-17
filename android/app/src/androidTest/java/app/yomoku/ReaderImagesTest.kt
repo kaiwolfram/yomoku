@@ -164,13 +164,29 @@ class ReaderImagesTest {
         } finally {
             instrumentation.removeMonitor(monitor)
         }
+        fun assertCatMarker() {
+            val marked =
+                fragments().flatMap { text ->
+                    text.getStringAnnotations(READER_MARKER, 0, text.length).map {
+                        text.text.substring(it.start, it.end)
+                    }
+                }
+            assertEquals(listOf("猫"), marked)
+        }
         tapWord("猫")
         compose.onNodeWithTag("word_surface").assertTextEquals("猫")
+        assertCatMarker()
         instrumentation.sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_BACK)
+        assertCatMarker()
         compose.activityRule.scenario.recreate()
         awaitReader()
         awaitImages(2)
         assertEquals(first.position, core().view.reader!!.position)
+        tapWord("猫")
+        compose.onNodeWithTag("word_surface").assertTextEquals("猫")
+        assertCatMarker()
+        instrumentation.sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_BACK)
+        assertCatMarker()
         compose.onNodeWithTag("next_page").performScrollTo().performClick()
         compose.waitUntil(30_000) { core().view.reader?.pageNumber == 2UL }
         awaitReader()
@@ -182,6 +198,7 @@ class ReaderImagesTest {
         awaitReader()
         awaitImages(2)
         assertEquals(first.anchor, core().view.reader!!.anchor)
+        assertCatMarker()
         compose.runOnUiThread { core().dispatch(Event.OpenSettings) }
         compose.waitUntil(30_000) {
             !core().view.storageBusy

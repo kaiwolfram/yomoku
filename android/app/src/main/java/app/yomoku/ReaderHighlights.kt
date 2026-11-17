@@ -5,6 +5,7 @@ import androidx.compose.ui.text.TextLayoutResult
 
 // String annotations survive AnnotatedString.subSequence for image and visual-line blocks.
 internal const val READER_HIGHLIGHT = "reader_highlight"
+internal const val READER_MARKER = "reader_marker"
 
 /** Shared visible fragments for paint and touch, preserving line wraps and bidi runs. */
 internal fun readerTextFragmentRects(

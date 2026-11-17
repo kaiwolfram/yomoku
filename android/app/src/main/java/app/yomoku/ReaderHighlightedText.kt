@@ -3,6 +3,7 @@ package app.yomoku
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -12,6 +13,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.takeOrElse
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.changedToUpIgnoreConsumed
 import androidx.compose.ui.input.pointer.pointerInput
@@ -39,6 +42,7 @@ internal fun ReaderHighlightedText(
                 .orEmpty()
         }
     val dark = isSystemInDarkTheme()
+    val markerColor = style.color.takeOrElse { LocalContentColor.current }.copy(alpha = 0.3f)
     Text(
         text,
         style = style,
@@ -111,6 +115,16 @@ internal fun ReaderHighlightedText(
                                     }
                             }
                             .orEmpty()
+                    val markers =
+                        layout
+                            ?.let { result ->
+                                text.getStringAnnotations(READER_MARKER, 0, text.length).flatMap {
+                                    range ->
+                                    readerTextFragmentRects(result, range.start, range.end)
+                                }
+                            }
+                            .orEmpty()
+                    val thickness = 1.dp.toPx()
                     onDrawWithContent {
                         for ((rect, color) in highlights) drawRect(
                             color,
@@ -118,6 +132,11 @@ internal fun ReaderHighlightedText(
                             rect.size,
                         )
                         drawContent()
+                        for (rect in markers) drawRect(
+                            markerColor,
+                            Offset(rect.left, rect.bottom - thickness),
+                            Size(rect.width, thickness),
+                        )
                     }
                 },
     )

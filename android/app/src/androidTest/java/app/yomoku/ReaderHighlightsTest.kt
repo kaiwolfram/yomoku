@@ -11,6 +11,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
@@ -40,7 +41,13 @@ class ReaderHighlightsTest {
             listOf(
                 ReaderAnnotatedToken(0UL, VocabularyStatus.NEW, 0, 1),
                 ReaderAnnotatedToken(1UL, VocabularyStatus.LEARNING, 1, 2),
-                ReaderAnnotatedToken(2UL, VocabularyStatus.FAMILIAR, 2, text.length - 1),
+                ReaderAnnotatedToken(
+                    2UL,
+                    VocabularyStatus.FAMILIAR,
+                    2,
+                    text.length - 1,
+                    marked = true,
+                ),
                 ReaderAnnotatedToken(3UL, VocabularyStatus.KNOWN, text.length - 1, text.length),
             )
         var inset = 0f
@@ -62,7 +69,7 @@ class ReaderHighlightsTest {
                             text,
                             tokens,
                             night.value,
-                            Color.Black,
+                            if (night.value) Color.White else Color.Black,
                             emptyList(),
                             Color.Blue,
                             {},
@@ -70,7 +77,8 @@ class ReaderHighlightsTest {
                         )
                     ReaderHighlightedText(
                         annotated,
-                        readerTextStyle(null),
+                        readerTextStyle(null)
+                            .copy(color = if (night.value) Color.White else Color.Black),
                         Modifier.width(140.dp)
                             .background(if (night.value) Color.Black else Color.White)
                             .testTag("highlight_text"),
@@ -116,6 +124,24 @@ class ReaderHighlightsTest {
                     )
                 }
             }
+            val foreground = if (dark) Color.White else Color.Black
+            val expectedMarker =
+                foreground
+                    .copy(alpha = 0.3f)
+                    .compositeOver(vocabularyBackground(VocabularyStatus.FAMILIAR, dark))
+            for (rect in readerTextFragmentRects(layout, 2, text.length - 1)) {
+                val y = (rect.bottom - inset / 2).toInt().coerceIn(0, pixels.height - 1)
+                assertTrue(
+                    "Marker must underline every wrapped fragment",
+                    (rect.left.toInt() + inset.toInt() until rect.right.toInt() - inset.toInt())
+                        .any { x ->
+                            val pixel = pixels[x, y]
+                            kotlin.math.abs(pixel.red - expectedMarker.red) < 0.01f &&
+                                kotlin.math.abs(pixel.green - expectedMarker.green) < 0.01f &&
+                                kotlin.math.abs(pixel.blue - expectedMarker.blue) < 0.01f
+                        },
+                )
+            }
             node.performTouchInput { click(layout.getBoundingBox(0).center) }
             assertEquals(0UL, taps.last())
             node.performTouchInput { click(layout.getBoundingBox(1).center) }
@@ -130,6 +156,14 @@ class ReaderHighlightsTest {
             assertEquals(
                 0,
                 fragment.getStringAnnotations(READER_HIGHLIGHT, 0, fragment.length).single().start,
+            )
+            assertEquals(
+                0,
+                fragment.getStringAnnotations(READER_MARKER, 0, fragment.length).single().start,
+            )
+            assertEquals(
+                fragment.length,
+                fragment.getStringAnnotations(READER_MARKER, 0, fragment.length).single().end,
             )
         }
     }

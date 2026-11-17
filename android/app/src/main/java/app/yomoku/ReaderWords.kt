@@ -58,6 +58,7 @@ import androidx.compose.ui.window.PopupProperties
 import app.yomoku.shared.ReaderTextSpan
 import app.yomoku.shared.ReaderTextStyle
 import app.yomoku.shared.ReaderVocabulary
+import app.yomoku.shared.TextAnchor
 import app.yomoku.shared.VocabularyStatus
 
 internal fun vocabularyBackground(status: VocabularyStatus?, dark: Boolean): Color =
@@ -78,6 +79,7 @@ internal fun readerAnnotatedText(
     formatting: List<ReaderTextSpan> = emptyList(),
     linkColor: Color = foreground,
     onExternalLink: (String) -> Unit = {},
+    markedAnchor: TextAnchor? = null,
     onToken: (ULong) -> Unit,
 ): AnnotatedString =
     readerAnnotatedSpans(
@@ -88,6 +90,7 @@ internal fun readerAnnotatedText(
                 it.token.vocabulary?.status,
                 it.start,
                 it.end,
+                marked = it.token.anchor == markedAnchor,
             )
         },
         dark,
@@ -103,6 +106,7 @@ internal data class ReaderAnnotatedToken(
     val status: VocabularyStatus?,
     val start: Int,
     val end: Int,
+    val marked: Boolean = false,
 )
 
 /** Shared formatting/geometry only; each reader owns its selection identity. */
@@ -155,7 +159,8 @@ internal fun readerAnnotatedSpans(
             }
         }
     }
-    for ((index, status, start, end) in tokens) {
+    for ((index, status, start, end, marked) in tokens) {
+        if (marked) addStringAnnotation(READER_MARKER, "", start, end)
         if (status != null && status != VocabularyStatus.KNOWN) {
             addStringAnnotation(READER_HIGHLIGHT, status.name, start, end)
         }

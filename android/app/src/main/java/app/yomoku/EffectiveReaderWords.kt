@@ -11,10 +11,12 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshots.SnapshotStateMap
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.testTag
@@ -24,7 +26,16 @@ import app.yomoku.shared.AnkiSelection
 import app.yomoku.shared.EffectiveReaderSelection
 import app.yomoku.shared.Event
 import app.yomoku.shared.ReaderTokenKey
+import app.yomoku.shared.TextAnchor
 import app.yomoku.shared.ViewModel
+
+/** Stable source occurrences, scoped to the open book rather than token revisions or sheets. */
+@Composable
+internal fun rememberReaderPageMarkers(
+    view: ViewModel,
+    sessionKey: String,
+): SnapshotStateMap<TextAnchor, TextAnchor> =
+    remember(sessionKey, view.reader?.documentId, view.pageLength) { mutableStateMapOf() }
 
 /** Production word consumers using compact selections owned by the native session. */
 @Composable
@@ -34,6 +45,8 @@ internal fun EffectiveReaderWords(
     dispatch: (Event) -> Unit,
     imageLoader: EpubImageLoader? = null,
     ankiBrowser: AnkiNoteBrowser? = null,
+    pageMarkers: SnapshotStateMap<TextAnchor, TextAnchor> =
+        rememberReaderPageMarkers(view, sessionKey),
 ) {
     // Compact revisions belong to one native session. A replacement cannot reuse a selection/draft.
     key(sessionKey) {
@@ -43,6 +56,7 @@ internal fun EffectiveReaderWords(
             dispatch,
             imageLoader,
             ankiBrowser,
+            pageMarkers,
         )
     }
 }
@@ -54,6 +68,7 @@ private fun EffectiveReaderWordContent(
     dispatch: (Event) -> Unit,
     imageLoader: EpubImageLoader?,
     ankiBrowser: AnkiNoteBrowser?,
+    pageMarkers: SnapshotStateMap<TextAnchor, TextAnchor>,
 ) {
     val page = view.reader ?: return
     val word = view.effectiveReaderWord ?: return
@@ -96,8 +111,9 @@ private fun EffectiveReaderWordContent(
     val foreground = MaterialTheme.colorScheme.onSurface
     val linkColor = MaterialTheme.colorScheme.primary
     val uriHandler = LocalUriHandler.current
+    val marker = pageMarkers[page.anchor]
     val text =
-        remember(page, tokens, dark, foreground, linkColor, uriHandler) {
+        remember(page, tokens, dark, foreground, linkColor, uriHandler, marker) {
             readerAnnotatedText(
                 page.text,
                 tokens.orEmpty(),
@@ -105,6 +121,7 @@ private fun EffectiveReaderWordContent(
                 foreground,
                 page.formatting,
                 linkColor,
+                markedAnchor = marker,
                 onExternalLink = { target ->
                     try {
                         uriHandler.openUri(target.toUri().normalizeScheme().toString())
@@ -113,11 +130,15 @@ private fun EffectiveReaderWordContent(
                     }
                 },
             ) { index ->
-                val tapped = tokens?.singleOrNull { it.token.segmentIndex == index }?.selection
+                val tapped = tokens?.singleOrNull { it.token.segmentIndex == index }
                 // A retained accessibility/link callback cannot select the same index on a newer
                 // page.
-                if (tapped != null && currentTokens?.any { it.selection == tapped } == true) {
-                    selected = tapped
+                if (
+                    tapped != null &&
+                        currentTokens?.any { it.selection == tapped.selection } == true
+                ) {
+                    pageMarkers[page.anchor] = tapped.token.anchor
+                    selected = tapped.selection
                 }
             }
         }

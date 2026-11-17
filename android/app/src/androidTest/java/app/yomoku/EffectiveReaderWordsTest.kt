@@ -238,6 +238,150 @@ class EffectiveReaderWordsTest {
         }
     }
 
+    private fun assertMarker(index: Int?) {
+        val annotations = text().getStringAnnotations(READER_MARKER, 0, text().length)
+        if (index == null) assertTrue(annotations.isEmpty())
+        else {
+            val snapshot = frame.value.effectiveReaderTokens!!
+            val token =
+                effectiveDisplayTokens(frame.value.reader!!, snapshot.identity, snapshot)!![index]
+            assertEquals(token.start, annotations.single().start)
+            assertEquals(token.end, annotations.single().end)
+        }
+    }
+
+    @Test
+    fun pageMarkersReplaceOneOccurrenceAndSurviveDismissalStatusAndRevisitingPages() {
+        val first = frame.value
+        val page = first.reader!!
+        val snapshot = first.effectiveReaderTokens!!
+        val secondAnchor = anchor(200, 200 + page.text.toByteArray().size.toLong())
+        val second =
+            first.copy(
+                reader =
+                    page.copy(
+                        anchor = secondAnchor,
+                        position = page.position.copy(offset = TextOffset(200)),
+                        pageNumber = 2UL,
+                    ),
+                effectiveReaderTokens =
+                    snapshot.copy(
+                        identity =
+                            snapshot.identity.copy(
+                                revision = 2UL,
+                                base = snapshot.identity.base.copy(page = secondAnchor),
+                            ),
+                        tokens =
+                            snapshot.tokens.map { token ->
+                                token.copy(
+                                    anchor =
+                                        anchor(
+                                            token.anchor.range.start.value + 196,
+                                            token.anchor.range.end.value + 196,
+                                        )
+                                )
+                            },
+                    ),
+            )
+        show()
+        assertMarker(null)
+        tap(1)
+        assertMarker(1)
+        click("word_status_NEW")
+        compose.onNodeWithTag("reader_word_panel").assertDoesNotExist()
+        assertMarker(1)
+        tap(2)
+        assertMarker(2)
+        click("word_status_KNOWN")
+        assertTrue(events.last() is Event.SetEffectiveReaderStatus)
+        compose.runOnUiThread {
+            frame.value =
+                first.copy(
+                    effectiveReaderTokens =
+                        snapshot.copy(
+                            tokens =
+                                snapshot.tokens.map {
+                                    it.copy(
+                                        vocabulary =
+                                            it.vocabulary?.copy(status = VocabularyStatus.KNOWN)
+                                    )
+                                }
+                        )
+                )
+        }
+        assertMarker(2)
+        compose.runOnUiThread { frame.value = second }
+        assertMarker(null)
+        tap(0)
+        assertMarker(0)
+        compose.runOnUiThread {
+            frame.value =
+                first.copy(
+                    effectiveReaderTokens =
+                        snapshot.copy(identity = snapshot.identity.copy(revision = 3UL))
+                )
+        }
+        assertMarker(2)
+        compose.runOnUiThread {
+            frame.value =
+                second.copy(
+                    effectiveReaderTokens =
+                        second.effectiveReaderTokens!!.let {
+                            it.copy(identity = it.identity.copy(revision = 4UL))
+                        }
+                )
+        }
+        assertMarker(0)
+    }
+
+    @Test
+    fun typographyRetainsMarkerAndPageLengthSessionAndBookClosureResetIt() {
+        val first = frame.value
+        show()
+        tap(1)
+        click("word_status_NEW")
+        compose.runOnUiThread {
+            frame.value =
+                frame.value.copy(
+                    readerTypography =
+                        ReaderTypography(ReaderFontSize.SP24, ReaderLineSpacing.PERCENT200)
+                )
+        }
+        assertMarker(1)
+        compose.runOnUiThread {
+            frame.value = frame.value.copy(pageLength = PageLength.CHARACTERS750)
+        }
+        assertMarker(null)
+        tap(2)
+        click("word_status_NEW")
+        compose.runOnUiThread { owner.value = "replacement" }
+        assertMarker(null)
+        tap(0)
+        click("word_status_NEW")
+        compose.runOnUiThread { frame.value = frame.value.copy(reader = null) }
+        compose.onNodeWithTag("reader_text").assertDoesNotExist()
+        compose.runOnUiThread { frame.value = first }
+        assertMarker(null)
+    }
+
+    @Test
+    fun appRetainsMarkerAcrossSettingsAndClearsItAfterLeavingTheBook() {
+        val first = frame.value
+        compose.setContent { YomokuTheme { YomokuApp(frame.value, owner.value, ::dispatch) } }
+        tap(1)
+        click("word_status_NEW")
+        compose.runOnUiThread { frame.value = frame.value.copy(settingsOpen = true) }
+        compose.onNodeWithTag("reader_text").assertDoesNotExist()
+        compose.runOnUiThread { frame.value = frame.value.copy(settingsOpen = false) }
+        assertMarker(1)
+        compose.runOnUiThread {
+            frame.value = first.copy(reader = null, contentRoute = ContentRoute.MAIN)
+        }
+        compose.onNodeWithTag("reader_text").assertDoesNotExist()
+        compose.runOnUiThread { frame.value = first }
+        assertMarker(null)
+    }
+
     @Test
     fun copyUsesExactWholeOrSelectedSurfaceDuringLookupErrorsAndStatusWrites() {
         show()
