@@ -450,18 +450,17 @@ fn sense_html(labels: &[String], glosses: &[Translation], notes: &[String]) -> S
     if meanings.is_empty() {
         return String::new();
     }
-    let mut html = String::from("<li>");
+    let mut html = format!("<li>{}", super::escape(&meanings.join("; ")));
     let mut unique_labels = Vec::new();
     for label in labels {
         push_unique(&mut unique_labels, label);
     }
     if !unique_labels.is_empty() {
         html.push_str(&format!(
-            "<i class=\"yomoku-labels\">({})</i> ",
+            " <i class=\"yomoku-labels\">({})</i>",
             super::escape(&unique_labels.join(", "))
         ));
     }
-    html.push_str(&super::escape(&meanings.join("; ")));
     for note in notes {
         html.push_str(&format!(
             "<div class=\"yomoku-note\">{}</div>",
@@ -470,4 +469,82 @@ fn sense_html(labels: &[String], glosses: &[Translation], notes: &[String]) -> S
     }
     html.push_str("</li>");
     html
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::dictionary::*;
+
+    fn translation(text: &str) -> Translation {
+        Translation {
+            text: text.into(),
+            lang: "eng".into(),
+            g_type: None,
+            g_gend: None,
+        }
+    }
+
+    #[test]
+    fn senses_put_escaped_translations_before_deduplicated_labels_and_notes() {
+        assert_eq!(
+            sense_html(
+                &["noun <label>".into(), "usage & dialect".into(), "noun <label>".into()],
+                &[translation("cat & feline"), translation("<kitten>")],
+                &["literal [sound:cat.mp3] & note".into(), "second <note>".into()],
+            ),
+            "<li>cat &amp; feline; &lt;kitten&gt; <i class=\"yomoku-labels\">(noun &lt;label&gt;, usage &amp; dialect)</i><div class=\"yomoku-note\">literal &#91;sound:cat.mp3&#93; &amp; note</div><div class=\"yomoku-note\">second &lt;note&gt;</div></li>"
+        );
+        assert_eq!(sense_html(&[], &[translation("cat")], &[]), "<li>cat</li>");
+        assert_eq!(
+            sense_html(&[], &[translation("cat")], &["note".into()]),
+            "<li>cat<div class=\"yomoku-note\">note</div></li>"
+        );
+        assert_eq!(sense_html(&["noun".into()], &[], &["note".into()]), "");
+    }
+
+    #[test]
+    fn name_exports_use_translation_then_italic_category() {
+        let entry = NameEntry {
+            kanji: vec![],
+            readings: vec![Reading {
+                text: "いく".into(),
+                no_kanji: false,
+                re_restr: vec![],
+                re_inf: vec![],
+                re_pri: vec![],
+            }],
+            names: vec![NameGroup {
+                name_type: vec!["given name".into(), "given name".into()],
+                xref: vec![],
+                translations: vec![translation("Iku & <alias>")],
+            }],
+        };
+        let pair = ReadingMatch {
+            spelling_index: None,
+            reading_index: 0,
+        };
+        let candidates = DictionaryCandidates {
+            surface: "いく".into(),
+            dictionary_form: None,
+            words: vec![],
+            names: vec![NameCandidate {
+                entry_id: 1,
+                entry,
+                forms: vec![NameFormMatch {
+                    form: "いく".into(),
+                    matches: vec![pair],
+                }],
+            }],
+        };
+        let note = AnkiNote::from_vocabulary_entry(
+            &candidates,
+            super::super::AnkiEntryKey::Name {
+                entry_id: 1,
+                reading: pair,
+            },
+        )
+        .unwrap();
+        assert_eq!(note.fields()[2], "<div class=\"yomoku-dictionary\">JMnedict</div><ol><li>Iku &amp; &lt;alias&gt; <i class=\"yomoku-labels\">(given name)</i></li></ol>");
+    }
 }

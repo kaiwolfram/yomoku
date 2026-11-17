@@ -1269,7 +1269,7 @@ mod tests {
         let fields = exports[0].note().fields();
         assert_eq!(fields[1], "ねこ");
         assert!(fields[2]
-            .contains("<i class=\"yomoku-labels\">(noun &lt;label&gt;)</i> cat &amp; feline"));
+            .contains("<li>cat &amp; feline <i class=\"yomoku-labels\">(noun &lt;label&gt;)</i><div class=\"yomoku-note\">literal &#91;sound:cat.mp3&#93; &amp; note</div></li>"));
         assert!(fields[2].contains("literal &#91;sound:cat.mp3&#93; &amp; note"));
         assert!(!fields[2].contains("other reading"));
         assert_eq!(exports[1].note().reading(), "びょう");
