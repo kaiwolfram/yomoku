@@ -3,7 +3,7 @@
 use rusqlite::{params_from_iter, types::Value, OptionalExtension};
 use yomoku_core::{
     document::VocabularyId,
-    vocabulary::{Surface, VocabularyPage, VocabularyQuery, VocabularyRow},
+    vocabulary::{Surface, VocabularyPage, VocabularyQuery, VocabularyRow, VocabularyStatus},
 };
 
 use crate::{
@@ -76,14 +76,11 @@ pub(super) fn matching(query: &VocabularyQuery) -> (String, Vec<Value>) {
         predicate.push_str(" AND v.surface < ?");
         values.push(Value::Text(upper));
     }
-    let statuses: Vec<_> = VocabularyQuery::default()
-        .statuses
+    let statuses: Vec<_> = VocabularyStatus::ALL
         .into_iter()
-        .filter(|status| query.statuses.contains(status))
+        .filter(|status| query.matches_status(*status))
         .collect();
-    if statuses.is_empty() {
-        predicate.push_str(" AND 0");
-    } else if statuses.len() < 5 {
+    if statuses.len() < VocabularyStatus::ALL.len() {
         predicate.push_str(" AND v.status IN (");
         // Canonicalize duplicates and bound the number of SQL parameters to five.
         let mut separator = "";

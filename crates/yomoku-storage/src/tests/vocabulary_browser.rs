@@ -189,7 +189,7 @@ fn prefix_never_matches_reading_or_dictionary_form_and_lookup_never_registers() 
 fn all_status_subsets_intersect_prefix_and_empty_and_duplicate_filters_are_explicit() {
     let database = TestDatabase::new();
     let mut storage = Storage::open(database.path()).unwrap();
-    let statuses = VocabularyQuery::default().statuses;
+    let statuses = VocabularyStatus::ALL.to_vec();
     for (index, status) in statuses.iter().enumerate() {
         let id = register(&mut storage, &format!("語{index}"), 100);
         storage.set_vocabulary_status(id, *status, 200).unwrap();
@@ -206,9 +206,17 @@ fn all_status_subsets_intersect_prefix_and_empty_and_duplicate_filters_are_expli
         let mut query = query("語", VocabularySort::Alphabetical);
         query.statuses = selected.iter().chain(&selected).copied().collect();
         let page = storage.vocabulary_page(&query, 0).unwrap();
-        assert_eq!(page.matching_count, selected.len() as u64);
-        assert_eq!(page.rows.len(), selected.len());
-        assert!(page.rows.iter().all(|row| selected.contains(&row.status)));
+        let count = if selected.is_empty() {
+            5
+        } else {
+            selected.len()
+        };
+        assert_eq!(page.matching_count, count as u64);
+        assert_eq!(page.rows.len(), count);
+        assert!(page
+            .rows
+            .iter()
+            .all(|row| selected.is_empty() || selected.contains(&row.status)));
     }
 }
 
@@ -238,13 +246,14 @@ fn hundred_row_pages_keep_exact_counts_stable_ties_and_no_gaps_for_every_sort() 
     ] {
         for filter in [
             vec![VocabularyStatus::New],
-            VocabularyQuery::default().statuses,
+            VocabularyStatus::ALL.to_vec(),
+            vec![],
         ] {
             let mut query = query("語", sort);
             query.statuses = filter.clone();
             let mut expected: Vec<_> = expected
                 .iter()
-                .filter(|row| filter.contains(&row.3))
+                .filter(|row| filter.is_empty() || filter.contains(&row.3))
                 .collect();
             expected.sort_by(|a, b| match sort {
                 VocabularySort::Alphabetical => a.1.cmp(&b.1),
@@ -559,7 +568,7 @@ fn metric_pages_keep_exact_histories_ties_filters_and_unread_rows_across_boundar
         }
     }
     for (index, row) in expected.iter_mut().enumerate() {
-        row.status = VocabularyQuery::default().statuses[index % 5];
+        row.status = VocabularyStatus::ALL.to_vec()[index % 5];
         storage
             .set_vocabulary_status(row.id, row.status, 1_000)
             .unwrap();
@@ -581,7 +590,7 @@ fn metric_pages_keep_exact_histories_ties_filters_and_unread_rows_across_boundar
     ] {
         for prefix in ["", "語0", "語1", "不存在"] {
             for statuses in [
-                VocabularyQuery::default().statuses,
+                VocabularyStatus::ALL.to_vec(),
                 vec![VocabularyStatus::New, VocabularyStatus::Known],
                 vec![],
             ] {
@@ -593,7 +602,8 @@ fn metric_pages_keep_exact_histories_ties_filters_and_unread_rows_across_boundar
                 let mut matching: Vec<_> = expected
                     .iter()
                     .filter(|row| {
-                        row.surface.starts_with(prefix) && query.statuses.contains(&row.status)
+                        row.surface.starts_with(prefix)
+                            && (query.statuses.is_empty() || query.statuses.contains(&row.status))
                     })
                     .cloned()
                     .collect();

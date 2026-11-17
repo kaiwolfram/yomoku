@@ -144,12 +144,14 @@ class VocabularyProductionTest {
             search(surfaces.first())
             assertEquals(1UL, core().view.vocabulary.matchingCount)
             assertEquals(surfaces.first(), core().view.vocabulary.rows.single().surface)
-            compose.onNodeWithTag("vocabulary_status_NEW").performClick()
+            compose.onNodeWithTag("vocabulary_status_NEW").assertIsNotSelected().performClick()
             idle()
-            assertEquals(0UL, core().view.vocabulary.matchingCount)
-            compose.onNodeWithText("No matching words.").assertIsDisplayed()
-            compose.onNodeWithTag("vocabulary_status_NEW").performClick()
+            assertEquals(1UL, core().view.vocabulary.matchingCount)
+            compose.onNodeWithTag("vocabulary_status_NEW").assertIsSelected().performClick()
             idle()
+            assertTrue(core().view.vocabulary.query.statuses.isEmpty())
+            assertEquals(1UL, core().view.vocabulary.matchingCount)
+            assertEquals(surfaces.first(), core().view.vocabulary.rows.single().surface)
             listOf(
                     VocabularySort.NEWEST,
                     VocabularySort.FREQUENCY,

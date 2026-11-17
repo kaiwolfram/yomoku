@@ -116,8 +116,8 @@ impl Yomoku {
                     return Some(render::render());
                 }
                 model.vocabulary_status_changes_membership =
-                    model.vocabulary.query.statuses.contains(&word.row.status)
-                        != model.vocabulary.query.statuses.contains(&command.status);
+                    model.vocabulary.query.matches_status(word.row.status)
+                        != model.vocabulary.query.matches_status(command.status);
                 model.vocabulary.word_status = Some(command.clone());
                 return Some(self.dispatch_vocabulary_word(
                     StorageOperation::SetVocabularyWordStatus(command.clone()),
@@ -255,8 +255,7 @@ impl Yomoku {
                     // the accepted command's source status, even after dismissal/retry.
                     let changes_membership =
                         std::mem::take(&mut model.vocabulary_status_changes_membership);
-                    if !changes_membership
-                        && model.vocabulary.query.statuses.contains(&command.status)
+                    if !changes_membership && model.vocabulary.query.matches_status(command.status)
                     {
                         model.patch_vocabulary_status(command.id, command.status);
                     }

@@ -265,7 +265,7 @@ class VocabularyScreenTest {
             assertEquals(top.value, chip.getUnclippedBoundsInRoot().top.value, 0.5f)
             chip.performScrollTo().assertIsDisplayed().assertIsEnabled().performClick()
             assertEquals(
-                VocabularyStatus.entries.filter { it.ordinal > status.ordinal },
+                VocabularyStatus.entries.filter { it.ordinal <= status.ordinal },
                 frame.value.vocabulary.query.statuses,
             )
         }
@@ -317,18 +317,22 @@ class VocabularyScreenTest {
             compose
                 .onNodeWithTag("vocabulary_status_${status.name}")
                 .performScrollTo()
-                .assertIsSelected()
+                .assertIsNotSelected()
                 .performClick()
-            compose.onNodeWithTag("vocabulary_status_${status.name}").assertIsNotSelected()
+            compose.onNodeWithTag("vocabulary_status_${status.name}").assertIsSelected()
         }
-        assertTrue(frame.value.vocabulary.query.statuses.isEmpty())
+        assertEquals(VocabularyStatus.entries, frame.value.vocabulary.query.statuses)
         VocabularyStatus.entries.forEach { status ->
             compose
                 .onNodeWithTag("vocabulary_status_${status.name}")
                 .performScrollTo()
                 .performClick()
         }
-        assertEquals(VocabularyStatus.entries, frame.value.vocabulary.query.statuses)
+        assertTrue(frame.value.vocabulary.query.statuses.isEmpty())
+        compose
+            .onNodeWithTag("vocabulary_count")
+            .assertTextEquals("Matching words: ${ULong.MAX_VALUE}")
+        compose.onNodeWithTag("vocabulary_row_1").assertExists()
         listOf(
                 VocabularySort.NEWEST,
                 VocabularySort.FREQUENCY,
@@ -684,7 +688,7 @@ private fun vocabularyView() =
         ankiEntries = emptyList(),
         vocabulary =
             VocabularyState(
-                VocabularyQuery("", VocabularyStatus.entries.toList(), VocabularySort.NEWEST),
+                VocabularyQuery("", emptyList(), VocabularySort.NEWEST),
                 rows = emptyList(),
                 loading = false,
             ),

@@ -22,30 +22,14 @@ pub enum VocabularySort {
     AlphabeticalDescending,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, Eq)]
 #[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
 pub struct VocabularyQuery {
     /// Literal written prefix; no normalization, trimming or wildcard syntax.
     pub prefix: String,
-    /// OR within this set, AND with the prefix. Empty means no matches.
+    /// OR within this set, AND with the prefix. Empty matches every status.
     pub statuses: Vec<VocabularyStatus>,
     pub sort: VocabularySort,
-}
-
-impl Default for VocabularyQuery {
-    fn default() -> Self {
-        Self {
-            prefix: String::new(),
-            statuses: vec![
-                VocabularyStatus::New,
-                VocabularyStatus::Learning,
-                VocabularyStatus::Familiar,
-                VocabularyStatus::Known,
-                VocabularyStatus::Ignored,
-            ],
-            sort: VocabularySort::default(),
-        }
-    }
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
@@ -90,11 +74,14 @@ pub struct VocabularyState {
 }
 
 impl VocabularyQuery {
+    pub fn matches_status(&self, status: VocabularyStatus) -> bool {
+        self.statuses.is_empty() || self.statuses.contains(&status)
+    }
+
     /// A status filter is a set. Preserve literal spelling while making equal
     /// subsets independent of checkbox order or duplicate shell values.
     pub fn canonicalized(mut self) -> Self {
-        self.statuses = VocabularyQuery::default()
-            .statuses
+        self.statuses = VocabularyStatus::ALL
             .into_iter()
             .filter(|status| self.statuses.contains(status))
             .collect();

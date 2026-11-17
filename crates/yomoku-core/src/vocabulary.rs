@@ -28,6 +28,16 @@ pub enum VocabularyStatus {
     Ignored,
 }
 
+impl VocabularyStatus {
+    pub const ALL: [Self; 5] = [
+        Self::New,
+        Self::Learning,
+        Self::Familiar,
+        Self::Known,
+        Self::Ignored,
+    ];
+}
+
 /// A validated written surface supplied by the Japanese analyzer.
 ///
 /// This type rejects blank values; it does not attempt Japanese detection.

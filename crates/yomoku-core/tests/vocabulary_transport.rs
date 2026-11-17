@@ -61,6 +61,7 @@ fn request(query: VocabularyQuery, offset: u64) -> StorageOperation {
 fn lazy_defaults_empty_results_settings_and_three_pages_are_retained() {
     for core in cores() {
         assert_eq!(core.view().vocabulary.query, VocabularyQuery::default());
+        assert!(core.view().vocabulary.query.statuses.is_empty());
         assert!(core.process_event(Event::LoadVocabulary).is_empty());
         enter(&core);
         let mut effects = core.process_event(Event::LoadVocabulary);
@@ -206,6 +207,10 @@ fn filters_are_sets_all_sorts_and_literal_prefix_survive_navigation() {
             };
             let mut effects = core.process_event(Event::SetVocabularyQuery(q.clone()));
             let canonical = q.clone().canonicalized();
+            assert_eq!(
+                canonical.statuses,
+                [VocabularyStatus::Known, VocabularyStatus::Ignored]
+            );
             assert_eq!(operation(&effects), Some(&request(canonical.clone(), 0)));
             resolve(&core, &mut effects, loaded(&q.prefix, 0, 0));
             assert!(core.process_event(Event::SetVocabularyQuery(q)).is_empty());
@@ -223,6 +228,81 @@ fn filters_are_sets_all_sorts_and_literal_prefix_survive_navigation() {
         }));
         resolve(&core, &mut effects, loaded("", 0, 0));
         assert!(core.view().vocabulary.query.statuses.is_empty());
+    }
+}
+
+#[test]
+fn empty_and_all_status_filters_accept_the_same_prefix_pages() {
+    for core in cores() {
+        enter(&core);
+        let mut expected = None;
+        for statuses in [vec![], VocabularyStatus::ALL.to_vec()] {
+            let query = VocabularyQuery {
+                prefix: "猫".into(),
+                statuses,
+                ..Default::default()
+            };
+            assert_eq!(query.clone().canonicalized(), query);
+            let mut effects = core.process_event(Event::SetVocabularyQuery(query));
+            for offset in [0, 100, 200] {
+                if offset > 0 {
+                    effects = core.process_event(Event::LoadMoreVocabulary);
+                }
+                let StorageResult::VocabularyLoaded(mut page) = loaded("猫", offset, 205) else {
+                    unreachable!()
+                };
+                for (index, row) in page.rows.iter_mut().enumerate() {
+                    row.status = VocabularyStatus::ALL[index % 5];
+                }
+                resolve(&core, &mut effects, StorageResult::VocabularyLoaded(page));
+                assert_eq!(core.view().vocabulary.error, None);
+            }
+            let state = core.view().vocabulary;
+            let result = (state.rows, state.matching_count, state.next_offset);
+            if let Some(expected) = &expected {
+                assert_eq!(&result, expected);
+            } else {
+                expected = Some(result);
+            }
+        }
+    }
+}
+
+#[test]
+fn empty_and_all_status_filters_patch_status_changes_without_refreshing_results() {
+    use yomoku_core::vocabulary::VocabularyWordStatusCommand;
+    for statuses in [vec![], VocabularyStatus::ALL.to_vec()] {
+        for core in cores() {
+            enter(&core);
+            let q = VocabularyQuery {
+                statuses: statuses.clone(),
+                ..query("猫")
+            };
+            let mut effects = core.process_event(Event::SetVocabularyQuery(q));
+            resolve(&core, &mut effects, loaded("猫", 0, 5));
+            let original = core.view().vocabulary;
+            let row = &original.rows[0];
+            let mut lookup = core.process_event(Event::OpenVocabularyWord(row.id));
+            let details = word_details(&core);
+            resolve(&core, &mut lookup, details);
+            let command = VocabularyWordStatusCommand {
+                id: row.id,
+                status: VocabularyStatus::Known,
+                occurred_at_unix_ms: 1000,
+            };
+            let mut write = core.process_event(Event::SetVocabularyWordStatus(command.clone()));
+            let effects = resolve(
+                &core,
+                &mut write,
+                StorageResult::VocabularyWordStatusChanged(command),
+            );
+            assert!(operation(&effects).is_none());
+            let state = core.view().vocabulary;
+            assert_eq!(state.rows[0].status, VocabularyStatus::Known);
+            assert_eq!(state.matching_count, original.matching_count);
+            assert_eq!(state.next_offset, original.next_offset);
+            assert_eq!(&state.rows[1..], &original.rows[1..]);
+        }
     }
 }
 

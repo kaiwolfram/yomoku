@@ -249,7 +249,7 @@ fn valid_page(page: &VocabularyPage, request: &VocabularyRequest, rows: &[Vocabu
         && page.rows.iter().all(|row| {
             !row.surface.trim().is_empty()
                 && row.surface.starts_with(&request.query.prefix)
-                && request.query.statuses.contains(&row.status)
+                && request.query.matches_status(row.status)
                 && row.registered_at_unix_ms >= 0
                 && row.last_seen_unix_ms.is_none_or(|date| date >= 0)
                 && ids.insert(row.id)
