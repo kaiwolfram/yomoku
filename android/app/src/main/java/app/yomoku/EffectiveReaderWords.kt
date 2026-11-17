@@ -183,9 +183,14 @@ private fun EffectiveReaderWordContent(
                     )
                 }
             },
+            copyText = details?.lookup?.copyText ?: token.surface,
             choices = {
                 if (details != null) {
-                    DictionaryPartChoices(details.lookup, canRead) {
+                    DictionaryPartChoices(
+                        details.lookup,
+                        canRead,
+                        statusWritePending = view.effectiveReaderStatus?.pending == true,
+                    ) {
                         dispatch(
                             Event.ChooseDictionaryPart(
                                 AnkiSelection.Effective(details.selection, details.lookup.revision),

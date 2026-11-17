@@ -43,8 +43,13 @@ internal fun VocabularyWordSheet(
                 )
             )
         },
+        copyText = word.lookup.copyText,
         choices = {
-            DictionaryPartChoices(word.lookup, enabled) {
+            DictionaryPartChoices(
+                word.lookup,
+                enabled,
+                statusWritePending = state.wordStatus != null,
+            ) {
                 dispatch(Event.ChooseDictionaryPart(checkNotNull(selection), it))
             }
         },

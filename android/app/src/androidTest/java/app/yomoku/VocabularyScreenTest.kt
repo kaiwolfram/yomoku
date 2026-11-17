@@ -499,6 +499,87 @@ class VocabularyScreenTest {
     }
 
     @Test
+    fun copyUsesExactWholeOrSelectedSurfaceDuringLookupErrorsAndStatusWrites() {
+        val row = vocabularyRow(1).copy(surface = "𠮷か\u3099")
+        frame.value =
+            frame.value.copy(
+                vocabulary =
+                    frame.value.vocabulary.copy(
+                        matchingCount = 1UL,
+                        rows = listOf(row),
+                        word =
+                            VocabularyWordState(
+                                copyLookup(),
+                                VocabularyAnkiSelection(row.id, 1UL),
+                                row,
+                                DictionaryCandidates(
+                                    row.surface,
+                                    words = emptyList(),
+                                    names = emptyList(),
+                                ),
+                            ),
+                    )
+            )
+        render()
+        fun setLookup(lookup: DictionaryLookup) {
+            compose.runOnUiThread {
+                val state = frame.value.vocabulary
+                frame.value =
+                    frame.value.copy(
+                        vocabulary = state.copy(word = state.word!!.copy(lookup = lookup))
+                    )
+            }
+        }
+        val before = events.size
+        assertCopiedWord(compose, compose.activity, row.surface)
+        assertEquals(before, events.size)
+        compose.onNodeWithTag("dictionary_part_0").performClick()
+        assertTrue(events.last() is Event.ChooseDictionaryPart)
+        setLookup(copyLookup().copy(active = 0UL))
+        assertCopiedWord(compose, compose.activity, "𠮷")
+        val settledEvents = events.toList()
+        for (busy in listOf(true, false, true)) {
+            compose.runOnUiThread {
+                frame.value =
+                    frame.value.copy(
+                        storageBusy = busy,
+                        vocabulary =
+                            frame.value.vocabulary.copy(
+                                wordStatus =
+                                    VocabularyWordStatusCommand(
+                                        row.id,
+                                        VocabularyStatus.LEARNING,
+                                        123,
+                                    ),
+                                wordStatusError = if (busy) null else DocumentError.UNAVAILABLE,
+                            ),
+                    )
+            }
+            compose.onNodeWithTag("dictionary_part_0").assertIsSelected().assertIsNotEnabled()
+            assertCopiedWord(compose, compose.activity, "𠮷")
+            assertEquals(settledEvents, events)
+        }
+        compose.runOnUiThread {
+            frame.value =
+                frame.value.copy(
+                    storageBusy = false,
+                    vocabulary =
+                        frame.value.vocabulary.copy(wordStatus = null, wordStatusError = null),
+                )
+        }
+        setLookup(copyLookup().copy(active = 1UL, error = DocumentError.UNAVAILABLE))
+        compose.onNodeWithTag("word_lookup_error").assertExists()
+        assertCopiedWord(compose, compose.activity, "か\u3099")
+        setLookup(copyLookup().copy(active = 1UL, loading = true))
+        assertCopiedWord(compose, compose.activity, "か\u3099")
+        setLookup(copyLookup().copy(active = 1UL))
+        compose.onNodeWithTag("dictionary_whole").performClick()
+        assertNull((events.last() as Event.ChooseDictionaryPart).part)
+        setLookup(copyLookup())
+        assertCopiedWord(compose, compose.activity, row.surface)
+    }
+
+    @Test
     fun wordSheetSharesLookupAndStatusControlsAndRetainsDismissedWriteRetry() {
         val row = vocabularyRow(1).copy(encounteredCount = 7UL)
         frame.value =
@@ -524,6 +605,7 @@ class VocabularyScreenTest {
         render()
         compose.onNodeWithTag("word_surface").assertTextEquals(row.surface)
         compose.onNodeWithTag("word_lookup_error").assertExists()
+        assertCopiedWord(compose, compose.activity, row.surface)
         compose.onNodeWithTag("retry_word_details").performClick()
         assertEquals(Event.RetryVocabularyWord, events.last())
         compose.onNodeWithTag("word_status_NEW").performClick()

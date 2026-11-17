@@ -239,6 +239,67 @@ class EffectiveReaderWordsTest {
     }
 
     @Test
+    fun copyUsesExactWholeOrSelectedSurfaceDuringLookupErrorsAndStatusWrites() {
+        show()
+        tap()
+        val whole = frame.value.effectiveReaderWord!!.details!!.token.surface
+        fun setLookup(lookup: DictionaryLookup) {
+            compose.runOnUiThread {
+                val word = frame.value.effectiveReaderWord!!
+                frame.value =
+                    frame.value.copy(
+                        effectiveReaderWord =
+                            word.copy(
+                                details =
+                                    word.details!!.copy(
+                                        lookup =
+                                            lookup.copy(whole = lookup.whole.copy(surface = whole))
+                                    )
+                            )
+                    )
+            }
+        }
+        setLookup(copyLookup())
+        val before = events.size
+        assertCopiedWord(compose, compose.activity, whole)
+        assertEquals(before, events.size)
+        click("dictionary_part_0")
+        assertTrue(events.last() is Event.ChooseDictionaryPart)
+        setLookup(copyLookup().copy(active = 0UL))
+        assertCopiedWord(compose, compose.activity, "𠮷")
+        val settledEvents = events.toList()
+        for (busy in listOf(true, false, true)) {
+            compose.runOnUiThread {
+                frame.value =
+                    frame.value.copy(
+                        storageBusy = busy,
+                        effectiveReaderStatus = EffectiveStatusState(true, busy),
+                    )
+            }
+            compose.onNodeWithTag("dictionary_part_0").assertIsSelected().assertIsNotEnabled()
+            assertCopiedWord(compose, compose.activity, "𠮷")
+            assertEquals(settledEvents, events)
+        }
+        compose.runOnUiThread {
+            frame.value =
+                frame.value.copy(
+                    storageBusy = false,
+                    effectiveReaderStatus = EffectiveStatusState(false, false),
+                )
+        }
+        setLookup(copyLookup().copy(active = 1UL, error = DocumentError.UNAVAILABLE))
+        compose.onNodeWithTag("word_lookup_error").assertExists()
+        assertCopiedWord(compose, compose.activity, "か\u3099")
+        setLookup(copyLookup().copy(active = 1UL, loading = true))
+        assertCopiedWord(compose, compose.activity, "か\u3099")
+        setLookup(copyLookup().copy(active = 1UL))
+        click("dictionary_whole")
+        assertNull((events.last() as Event.ChooseDictionaryPart).part)
+        setLookup(copyLookup())
+        assertCopiedWord(compose, compose.activity, whole)
+    }
+
+    @Test
     fun dictionaryAddUsesLoadedCompactSelectionAndRespectsReaderBusyGates() {
         frame.value =
             frame.value.copy(

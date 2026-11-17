@@ -1,5 +1,7 @@
 package app.yomoku
 
+import android.content.ClipData
+import android.content.ClipboardManager
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -10,6 +12,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
@@ -17,6 +20,8 @@ import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
@@ -30,9 +35,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.AnnotatedString
@@ -184,12 +191,15 @@ internal fun ReaderWordPanel(
     enabled: Boolean,
     onClose: () -> Unit,
     onStatus: (VocabularyStatus) -> Unit,
+    copyText: String = token.surface,
     choices: @Composable () -> Unit = {},
     details: @Composable () -> Unit,
 ) {
     val windowSize = LocalWindowInfo.current.containerSize
     val windowHeight = with(LocalDensity.current) { windowSize.height.toDp() }
     val wide = with(LocalDensity.current) { windowSize.width.toDp() >= 600.dp }
+    val context = LocalContext.current
+    val copyLabel = stringResource(R.string.word_copy)
     val content: @Composable () -> Unit = {
         Column(
             Modifier.heightIn(max = windowHeight * 0.75f)
@@ -199,11 +209,23 @@ internal fun ReaderWordPanel(
                 .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Text(
-                token.surface,
-                style = MaterialTheme.typography.headlineSmall,
-                modifier = Modifier.testTag("word_surface"),
-            )
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    token.surface,
+                    style = MaterialTheme.typography.headlineSmall,
+                    modifier = Modifier.weight(1f).testTag("word_surface"),
+                )
+                IconButton(
+                    onClick = {
+                        context
+                            .getSystemService(ClipboardManager::class.java)
+                            .setPrimaryClip(ClipData.newPlainText(copyLabel, copyText))
+                    },
+                    modifier = Modifier.size(48.dp).testTag("word_copy"),
+                ) {
+                    Icon(painterResource(R.drawable.ic_copy), contentDescription = copyLabel)
+                }
+            }
             choices()
             Row(
                 Modifier.fillMaxWidth()

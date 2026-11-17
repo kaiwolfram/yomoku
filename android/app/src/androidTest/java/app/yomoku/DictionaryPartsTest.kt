@@ -11,7 +11,9 @@ import androidx.test.platform.app.InstrumentationRegistry
 import app.yomoku.shared.*
 import app.yomoku.theme.YomokuTheme
 import java.io.File
+import java.util.concurrent.CompletableFuture
 import java.util.concurrent.CopyOnWriteArrayList
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 import org.junit.Assert.*
 import org.junit.Rule
@@ -62,6 +64,107 @@ class DictionaryPartsTest {
         val entry = core.view.ankiEntries.first { it.phase == AnkiEntryPhase.Add }
         click("anki_entry_${ankiEntryTag(entry.key)}")
         await { it.ankiEntries.any { entry -> entry.phase is AnkiEntryPhase.Existing } }
+    }
+
+    private fun checkStatusWrites(database: File, vocabulary: Boolean) {
+        fun lookup() =
+            if (vocabulary) core.view.vocabulary.word!!.lookup
+            else core.view.effectiveReaderWord!!.details!!.lookup
+        fun candidates() =
+            if (vocabulary) core.view.vocabulary.word!!.candidates
+            else core.view.effectiveReaderWord!!.details!!.candidates
+        fun pending() =
+            if (vocabulary) core.view.vocabulary.wordStatus != null
+            else core.view.effectiveReaderStatus?.pending == true
+        val selected = lookup()
+        val definitions = candidates()
+        val reads = queries.get()
+        val retryTag = if (vocabulary) "vocabulary_word_status_retry" else "effective_status_retry"
+        val expandedPart = selected.parts.indexOfFirst { !it.primary }
+        fun assertRetained() {
+            assertEquals(selected, lookup())
+            assertEquals(definitions, candidates())
+            assertEquals(reads, queries.get())
+            compose.onNodeWithTag("dictionary_part_${selected.active}").assertIsSelected()
+            compose.onNodeWithTag("dictionary_part_$expandedPart").assertExists()
+            compose.onNodeWithTag("dictionary_more_parts").assertDoesNotExist()
+            compose.onNodeWithTag("word_lookup_error").assertDoesNotExist()
+            if (pending()) {
+                compose.onNodeWithTag("dictionary_whole").assertIsNotEnabled().performClick()
+                compose
+                    .onNodeWithTag("dictionary_part_${selected.active}")
+                    .assertIsNotEnabled()
+                    .performClick()
+                compose.onNodeWithTag("word_status_FAMILIAR").assertIsNotEnabled().performClick()
+                assertEquals(selected, lookup())
+            }
+        }
+        val lock =
+            ProcessBuilder(
+                    "/system/bin/app_process",
+                    "/system/bin",
+                    "app.yomoku.SqliteWriteLock",
+                    database.path,
+                )
+                .apply {
+                    environment()["CLASSPATH"] = instrumentation.context.applicationInfo.sourceDir
+                    redirectErrorStream(true)
+                }
+                .start()
+        try {
+            CompletableFuture.runAsync {
+                    val output = lock.inputStream.bufferedReader()
+                    while (true) {
+                        val line = output.readLine() ?: error("Writer exited before locking")
+                        if (line == "locked") break
+                    }
+                }
+                .get(20, TimeUnit.SECONDS)
+            compose.onNodeWithTag("word_status_LEARNING").performScrollTo()
+            val scroll =
+                compose
+                    .onNodeWithTag("reader_word_panel")
+                    .fetchSemanticsNode()
+                    .config[SemanticsProperties.VerticalScrollAxisRange]
+                    .value()
+            compose.onNodeWithTag("word_status_LEARNING").performClick()
+            assertTrue(pending())
+            assertRetained()
+            assertEquals(
+                scroll,
+                compose
+                    .onNodeWithTag("reader_word_panel")
+                    .fetchSemanticsNode()
+                    .config[SemanticsProperties.VerticalScrollAxisRange]
+                    .value(),
+            )
+        } finally {
+            lock.outputStream.close()
+            if (!lock.waitFor(10, TimeUnit.SECONDS)) lock.destroyForcibly()
+        }
+        await { !pending() }
+        compose.onNodeWithTag("word_status_LEARNING").assertIsSelected()
+        assertRetained()
+        SQLiteDatabase.openDatabase(database.path, null, SQLiteDatabase.OPEN_READWRITE).use { sql ->
+            sql.execSQL(
+                "CREATE TRIGGER fail_parts_status BEFORE INSERT ON vocabulary_status_events BEGIN SELECT RAISE(ABORT, 'test status'); END"
+            )
+            try {
+                click("word_status_KNOWN")
+                await {
+                    if (vocabulary) it.vocabulary.wordStatusError != null
+                    else it.effectiveReaderStatus?.error != null
+                }
+                assertRetained()
+                sql.execSQL("DROP TRIGGER fail_parts_status")
+                click(retryTag)
+                await { !pending() }
+                compose.onNodeWithTag("word_status_KNOWN").assertIsSelected()
+                assertRetained()
+            } finally {
+                sql.execSQL("DROP TRIGGER IF EXISTS fail_parts_status")
+            }
+        }
     }
 
     @Test
@@ -153,11 +256,7 @@ class DictionaryPartsTest {
             }
             val selected = core.view.effectiveReaderWord!!.details!!
             val reads = queries.get()
-            click("word_status_LEARNING")
-            await {
-                it.effectiveReaderWord?.details?.token?.vocabulary?.status ==
-                    VocabularyStatus.LEARNING
-            }
+            checkStatusWrites(database, vocabulary = false)
             assertEquals(selected.lookup, core.view.effectiveReaderWord!!.details!!.lookup)
             assertEquals(reads, queries.get())
             assertEquals(before.encountered, core.view.effectiveReaderWord!!.details!!.encountered)
@@ -186,6 +285,8 @@ class DictionaryPartsTest {
             assertEquals(row, core.view.vocabulary.word!!.row)
             addEntry()
             assertEquals("", sentences.last())
+            click("dictionary_more_parts")
+            checkStatusWrites(database, vocabulary = true)
             click("dictionary_whole")
             await { it.vocabulary.word!!.lookup.active == null }
             compose.onNodeWithTag("word_no_match").assertExists()

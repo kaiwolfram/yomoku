@@ -1,4 +1,5 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
+    <string name="word_copy">Copy word</string>
     <string name="word_whole">Whole word</string>
     <string name="word_more_parts">More parts</string>
     <string name="app_loading">Loading</string>

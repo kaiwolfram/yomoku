@@ -573,6 +573,7 @@ class ReaderWordsTest {
             awaitWords()
             tapSurface("猫")
             compose.onNodeWithTag("word_lookup_error").assertExists()
+            assertCopiedWord(compose, compose.activity, "猫")
             compose.onNodeWithTag("word_no_match").assertDoesNotExist()
             assertEquals(1, calls.get())
             fail.set(false)
