@@ -1155,28 +1155,51 @@ fn joining_stops_at_particles_independent_words_gaps_and_sentence_boundaries() {
 #[test]
 #[ignore = "requires pinned Sudachi Full; run tools/test-sudachi.sh"]
 fn previous_profile_supports_uncached_raw_components_but_cannot_be_retokenized() {
-    use yomoku_analysis::{AnalysisError, LEGACY_ENGINE_REVISION};
-    use yomoku_core::analysis::AnalysisProfile;
-    let input = chapter("食べました。国家公務員。");
+    use yomoku_analysis::{
+        AnalysisError, CONJUGATION_ENGINE_REVISION, COPULA_ENGINE_REVISION, LEGACY_ENGINE_REVISION,
+    };
+    use yomoku_core::analysis::{AnalysisProfile, IMPORT_POLICY_SUFFIX, WORD_DICTIONARY_PREFIX};
+    let input = chapter("食べました。ひとつ。国家公務員。");
     let mut profile = AnalysisProfile {
         engine_revision: LEGACY_ENGINE_REVISION.into(),
         dictionary_revision: DICTIONARY_REVISION.into(),
     };
-    for mode in [SplitMode::A, SplitMode::B] {
-        let legacy = analyzer()
-            .analyze_components(&input, mode, &profile)
-            .unwrap();
-        assert_eq!(legacy.profile, profile);
-        assert_eq!(&surfaces(&legacy)[..4], &["食べ", "まし", "た", "。"]);
-        assert_eq!(
-            legacy.tokens,
-            analyzer().analyze_mode(&input, mode).unwrap().tokens
-        );
+    for revision in [
+        LEGACY_ENGINE_REVISION,
+        CONJUGATION_ENGINE_REVISION,
+        COPULA_ENGINE_REVISION,
+        ENGINE_REVISION,
+    ] {
+        for refined in [false, true] {
+            profile.engine_revision = revision.into();
+            profile.dictionary_revision = DICTIONARY_REVISION.into();
+            if refined {
+                profile.engine_revision.push_str(IMPORT_POLICY_SUFFIX);
+                profile.dictionary_revision.push_str(&format!(
+                    "{WORD_DICTIONARY_PREFIX}{}",
+                    yomoku_storage::dictionary::IMPORT_DICTIONARY_SHA256
+                ));
+            }
+            for mode in [SplitMode::A, SplitMode::B] {
+                let legacy = analyzer()
+                    .analyze_components(&input, mode, &profile)
+                    .unwrap();
+                assert_eq!(legacy.profile, profile);
+                assert_eq!(
+                    &surfaces(&legacy)[..7],
+                    &["食べ", "まし", "た", "。", "ひと", "つ", "。"]
+                );
+                assert_eq!(
+                    legacy.tokens,
+                    analyzer().analyze_mode(&input, mode).unwrap().tokens
+                );
+            }
+            assert!(matches!(
+                analyzer().analyze_components(&input, SplitMode::C, &profile),
+                Err(AnalysisError::UnsupportedProfile)
+            ));
+        }
     }
-    assert!(matches!(
-        analyzer().analyze_components(&input, SplitMode::C, &profile),
-        Err(AnalysisError::UnsupportedProfile)
-    ));
     profile.engine_revision = "unknown".into();
     assert!(matches!(
         analyzer().analyze_components(&input, SplitMode::A, &profile),
@@ -1394,5 +1417,104 @@ fn copula_past_keeps_nouns_separate_and_preserves_source_reading_and_base() {
                 .tokens,
             raw.tokens
         );
+    }
+}
+
+#[test]
+#[ignore = "requires pinned Sudachi Full; run tools/test-sudachi.sh"]
+fn kimi_no_na_wa_hitotsu_keeps_the_following_particle_separate() {
+    let text = "失ったものは未だひとつもなく、とても甘やかな気持ちが、じんじんと体に満ちている。";
+    let analysis = analyze(text, SplitMode::C);
+    let index = analysis
+        .tokens
+        .iter()
+        .position(|t| t.surface == "ひとつ")
+        .unwrap();
+    let counted = &analysis.tokens[index];
+    assert_eq!(counted.dictionary_form.as_ref().unwrap().as_str(), "ひとつ");
+    assert_eq!(counted.reading.as_deref(), Some("ヒトツ"));
+    assert_eq!(analysis.tokens[index + 1].surface, "も");
+    assert_eq!(
+        i64::from(counted.anchor.range.start),
+        text.find("ひとつ").unwrap() as i64
+    );
+    assert_eq!(
+        counted.anchor.range.end,
+        analysis.tokens[index + 1].anchor.range.start
+    );
+}
+
+#[test]
+#[ignore = "requires pinned Sudachi Full; run tools/test-sudachi.sh"]
+fn numeral_counter_pairs_join_with_complete_dictionary_forms() {
+    for (text, reading) in [
+        ("ひとつ", Some("ヒトツ")),
+        ("ふたつ", Some("フタツ")),
+        ("みっつ", Some("ミッツ")),
+        ("一つ", None),
+        ("二個", None),
+        ("三匹", None),
+        ("2枚", None),
+    ] {
+        let joined = analyze(text, SplitMode::C);
+        assert_eq!(surfaces(&joined), [text], "{text}");
+        let token = &joined.tokens[0];
+        assert!(token.is_japanese, "{text}");
+        assert_eq!(token.dictionary_form.as_ref().unwrap().as_str(), text);
+        assert_eq!(token.reading.as_deref(), reading, "{text}");
+        for mode in [SplitMode::A, SplitMode::B] {
+            let raw = analyze(text, mode);
+            assert_eq!(raw.tokens.len(), 2, "{text}: {mode:?}");
+            assert_eq!(surfaces(&raw).concat(), text);
+        }
+    }
+}
+
+#[test]
+#[ignore = "requires pinned Sudachi Full; run tools/test-sudachi.sh"]
+fn counter_joining_preserves_gaps_particles_nouns_and_other_suffixes() {
+    for (text, expected) in [
+        ("一 つ", vec!["一", "つ"]),
+        ("一　つ", vec!["一", "つ"]),
+        ("一\tつ", vec!["一", "つ"]),
+        ("一\nつ", vec!["一", "つ"]),
+        ("一、つ", vec!["一", "、", "つ"]),
+        ("一。つ", vec!["一", "。", "つ"]),
+        ("一猫", vec!["一", "猫"]),
+        ("猫つ", vec!["猫", "つ"]),
+        ("一つを", vec!["一つ", "を"]),
+        ("三本の本", vec!["三本", "の", "本"]),
+        // The pinned dictionary tags 冊 as a general suffix, not a counter.
+        ("三冊", vec!["三", "冊"]),
+    ] {
+        assert_eq!(surfaces(&analyze(text, SplitMode::C)), expected, "{text}");
+    }
+}
+
+#[test]
+#[ignore = "requires pinned Sudachi Full and word dictionaries; run tools/test-sudachi.sh"]
+fn counted_whole_word_lookup_excludes_numeral_only_entries() {
+    let path = std::env::var_os("YOMOKU_WORD_DICTIONARY")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| {
+            PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .join("../../.local/dictionaries/index-v1-20261025/dictionary.sqlite3")
+        });
+    let dictionary = yomoku_storage::dictionary::Dictionary::open(path).unwrap();
+    for surface in ["ひとつ", "一つ"] {
+        let analysis = analyze(surface, SplitMode::C);
+        let token = &analysis.tokens[0];
+        let results = dictionary
+            .lookup(
+                &token.surface,
+                token.dictionary_form.as_ref().map(|form| form.as_str()),
+            )
+            .unwrap();
+        let expected = dictionary.lookup(surface, None).unwrap();
+        assert_eq!(results.words, expected.words);
+        assert_eq!(results.names, expected.names);
+        assert_eq!(results.words.len(), 1);
+        assert_eq!(results.words[0].entry_id, 1160820);
+        assert_eq!(results.words[0].forms[0].form, surface);
     }
 }

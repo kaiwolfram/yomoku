@@ -58,7 +58,7 @@ fn all_import_formats_refine_dictionary_missing_words_and_preserve_unicode_histo
         Box::new(move || Ok(index.clone())),
     )
     .unwrap();
-    let text = "学生だった。制服姿。食べました。国家公務員。新幹線通学。𠮷か\u{3099}😀。制服姿。";
+    let text = "学生だった。制服姿。食べました。国家公務員。新幹線通学。𠮷か\u{3099}😀。制服姿。ひとつ。ふたつ。みっつ。一つ。二個。";
     let events = [
         Event::CreatePaste(text.into()),
         Event::ImportTxt(TxtImport {
@@ -117,7 +117,14 @@ fn all_import_formats_refine_dictionary_missing_words_and_preserve_unicode_histo
                         "𠮷",
                         "か\u{3099}",
                         "制服",
-                        "姿"
+                        "姿",
+                        "ひとつ",
+                        "ふたつ",
+                        "みっつ",
+                        "一つ",
+                        // Dictionary-missing counted forms still undergo refinement.
+                        "二",
+                        "個"
                     ]
                 );
                 for token in &analysis.tokens {
@@ -136,6 +143,14 @@ fn all_import_formats_refine_dictionary_missing_words_and_preserve_unicode_histo
                     .unwrap();
                 assert_eq!(copula.dictionary_form.as_ref().unwrap().as_str(), "だ");
                 assert_eq!(copula.reading.as_deref(), Some("ダッタ"));
+                for surface in ["ひとつ", "ふたつ", "みっつ", "一つ"] {
+                    let counted = analysis
+                        .tokens
+                        .iter()
+                        .find(|t| t.surface == surface)
+                        .unwrap();
+                    assert_eq!(counted.dictionary_form.as_ref().unwrap().as_str(), surface);
+                }
             }
             occurrences.extend(
                 analysis

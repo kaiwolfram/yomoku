@@ -1,6 +1,6 @@
 //! Production Mode C post-processing; A/B output stays raw for dictionary lookup.
 
-use yomoku_core::analysis::AnalyzedToken;
+use yomoku_core::{analysis::AnalyzedToken, vocabulary::Surface};
 
 pub(super) struct Morpheme {
     pub token: AnalyzedToken,
@@ -64,6 +64,15 @@ impl Morpheme {
     fn adjacent(&self, next: &Self) -> bool {
         self.token.anchor.range.end == next.token.anchor.range.start
     }
+
+    fn counter_after(&self, previous: &Self) -> bool {
+        previous.pos(0) == "名詞"
+            && previous.pos(1) == "数詞"
+            && self.pos(0) == "接尾辞"
+            && self.pos(1) == "名詞的"
+            && self.pos(2) == "助数詞"
+            && previous.adjacent(self)
+    }
 }
 
 /// Called separately for each detector sentence: neither source gaps nor sentence
@@ -74,7 +83,12 @@ pub(super) fn join(morphemes: Vec<Morpheme>) -> Vec<AnalyzedToken> {
     while index < morphemes.len() {
         let head = &morphemes[index];
         let mut end = index + 1;
-        if head.head() {
+        let counted = morphemes
+            .get(end)
+            .is_some_and(|next| next.counter_after(head));
+        if counted {
+            end += 1;
+        } else if head.head() {
             while end < morphemes.len() {
                 let previous = &morphemes[end - 1];
                 let next = &morphemes[end];
@@ -99,6 +113,7 @@ pub(super) fn join(morphemes: Vec<Morpheme>) -> Vec<AnalyzedToken> {
         for part in &morphemes[index + 1..end] {
             token.surface.push_str(&part.token.surface);
             token.anchor.range.end = part.token.anchor.range.end;
+            token.is_japanese |= part.token.is_japanese;
             token.reading =
                 token
                     .reading
@@ -107,6 +122,10 @@ pub(super) fn join(morphemes: Vec<Morpheme>) -> Vec<AnalyzedToken> {
                         reading.push_str(suffix);
                         reading
                     });
+        }
+        if counted {
+            // A numeral's lemma would add unrelated number-only lookup results.
+            token.dictionary_form = Surface::new(&token.surface).ok();
         }
         output.push(token);
         index = end;
@@ -121,6 +140,51 @@ mod tests {
         document::{TextAnchor, TextOffset, TextRange},
         vocabulary::Surface,
     };
+
+    #[test]
+    fn counter_joining_requires_both_pos_tags_and_exact_adjacency() {
+        let numeral = ["名詞", "数詞", "*", "*", "*", "*"];
+        let noun = ["名詞", "普通名詞", "一般", "*", "*", "*"];
+        let counter = ["接尾辞", "名詞的", "助数詞", "*", "*", "*"];
+        let suffix = ["接尾辞", "名詞的", "一般", "*", "*", "*"];
+        let morpheme = |surface: &str, start: i64, pos: [&str; 6]| Morpheme {
+            token: AnalyzedToken {
+                anchor: TextAnchor {
+                    source_id: 1.try_into().unwrap(),
+                    chapter_id: 1.try_into().unwrap(),
+                    range: TextRange {
+                        start: start.try_into().unwrap(),
+                        end: (start + surface.len() as i64).try_into().unwrap(),
+                    },
+                },
+                surface: surface.into(),
+                is_japanese: true,
+                reading: Some(surface.into()),
+                dictionary_form: Some(Surface::new(surface).unwrap()),
+            },
+            pos: pos.map(str::to_owned).to_vec(),
+            normalized_form: surface.into(),
+        };
+        for (head, tail, gap, expected) in [
+            (numeral, counter, 0, 1),
+            (noun, counter, 0, 2),
+            (numeral, suffix, 0, 2),
+            (numeral, counter, 1, 2),
+        ] {
+            let joined = join(vec![
+                morpheme("ひと", 0, head),
+                morpheme("つ", "ひと".len() as i64 + gap, tail),
+            ]);
+            assert_eq!(joined.len(), expected);
+            if expected == 1 {
+                assert_eq!(joined[0].reading.as_deref(), Some("ひとつ"));
+                assert_eq!(
+                    joined[0].dictionary_form.as_ref().unwrap().as_str(),
+                    "ひとつ"
+                );
+            }
+        }
+    }
 
     #[test]
     fn joined_reading_requires_every_part_and_base_form_belongs_to_head() {

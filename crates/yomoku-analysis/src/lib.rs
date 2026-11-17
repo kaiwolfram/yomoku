@@ -25,8 +25,11 @@ pub const LEGACY_ENGINE_REVISION: &str =
 pub const CONJUGATION_ENGINE_REVISION: &str =
     "sudachi.rs@5de0410b6edfd428fc510cc9763440772e9619d5+android-loader-v1;yomoku-adapter-v2-conjugations;embedded-defaults";
 /// Version 3 also joins copula stems with grammatical endings.
-pub const ENGINE_REVISION: &str =
+pub const COPULA_ENGINE_REVISION: &str =
     "sudachi.rs@5de0410b6edfd428fc510cc9763440772e9619d5+android-loader-v1;yomoku-adapter-v3-copulas;embedded-defaults";
+/// Version 4 also joins numerals with grammatically tagged counter suffixes.
+pub const ENGINE_REVISION: &str =
+    "sudachi.rs@5de0410b6edfd428fc510cc9763440772e9619d5+android-loader-v1;yomoku-adapter-v4-counters;embedded-defaults";
 pub const DICTIONARY_SHA256: &str =
     "7c797531dea76f06b629fad39cb3a5bdb3a9e54c67ef3d9a869e61418426a7d1";
 pub const DICTIONARY_REVISION: &str =
@@ -116,7 +119,7 @@ impl Analyzer {
         Ok(Self { dictionary })
     }
 
-    /// Production Mode C with joined conjugations for new imports.
+    /// Production Mode C with joined conjugations and counters for new imports.
     pub fn analyze(&self, chapter: &ChapterText) -> Result<ChapterAnalysis, AnalysisError> {
         self.analyze_mode(chapter, SplitMode::default())
     }
@@ -149,7 +152,10 @@ impl Analyzer {
         if mode == SplitMode::C
             || !matches!(
                 engine,
-                ENGINE_REVISION | CONJUGATION_ENGINE_REVISION | LEGACY_ENGINE_REVISION
+                ENGINE_REVISION
+                    | COPULA_ENGINE_REVISION
+                    | CONJUGATION_ENGINE_REVISION
+                    | LEGACY_ENGINE_REVISION
             )
             || dictionary != DICTIONARY_REVISION
         {
