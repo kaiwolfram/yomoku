@@ -6,7 +6,7 @@ use yomoku_core::{
 };
 
 #[test]
-fn reservation_authenticates_every_completion_field_before_and_after_recording_or_deletion() {
+fn pending_command_and_committed_receipt_reject_mismatched_fields() {
     let database = TestDatabase::new();
     let mut storage = Storage::open(database.path()).unwrap();
     let imported = storage
@@ -43,8 +43,8 @@ fn reservation_authenticates_every_completion_field_before_and_after_recording_o
                 9 => changed.page_length = yomoku_core::pagination::PageLength::Characters500,
                 _ => changed.completed_at_unix_ms += 1,
             }
-            // Invalid anchors fail at construction; all other payload changes
-            // must fail reservation authentication without touching persisted state.
+            // Invalid anchors fail at construction. Reject other field changes
+            // against the pending fingerprint or committed receipt.
             if let Ok(forged) = effective.freeze_completion(changed) {
                 assert!(
                     matches!(
@@ -56,11 +56,86 @@ fn reservation_authenticates_every_completion_field_before_and_after_recording_o
             }
             assert_eq!(fs::read(database.path()).unwrap(), before);
         }
+        let original = fixture(&imported.document.chapter).unwrap();
+        let mut different_engine = original.clone();
+        different_engine.profile.engine_revision.push('2');
+        let mut different_dictionary = original.clone();
+        different_dictionary.profile.dictionary_revision.push('2');
+        for (analysis_id, analysis) in [
+            (i64::MAX.try_into().unwrap(), &original),
+            (imported.analysis_id, &different_engine),
+            (imported.analysis_id, &different_dictionary),
+        ] {
+            let forged =
+                EffectiveReaderChapter::resolve(&imported.document.chapter, analysis_id, analysis)
+                    .unwrap()
+                    .freeze_completion(receipt)
+                    .unwrap();
+            assert!(matches!(
+                storage.record_effective_page_completion(&forged),
+                Err(StorageError::InvalidCompletion)
+            ));
+            assert_eq!(fs::read(database.path()).unwrap(), before);
+        }
     }
+    reader_work::take();
     assert_eq!(
         storage.record_effective_page_completion(&frozen).unwrap(),
         AnalyzedCompletionOutcome::AlreadyRecorded
     );
+    assert_eq!(reader_work::take(), (0, 0, Vec::new()));
+}
+
+#[test]
+fn commit_verifies_occurrences_then_clears_the_fingerprint() {
+    let database = TestDatabase::new();
+    let mut storage = Storage::open(database.path()).unwrap();
+    let imported = storage
+        .analyzed_fixture(&PasteText::new("猫".into()).unwrap(), 0, fixture)
+        .unwrap();
+    let frozen = reserve_current(&mut storage, imported.document.document_id, 500);
+    let pending_fingerprint = |storage: &Storage| -> Option<[u8; 32]> {
+        storage
+            .connection
+            .query_row(
+                "SELECT pending_fingerprint FROM completion_commands",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap()
+    };
+    let pending = pending_fingerprint(&storage).unwrap();
+    let mut changed = fixture(&imported.document.chapter).unwrap();
+    changed.tokens[0].reading = Some("ネコ".into());
+    let changed =
+        EffectiveReaderChapter::resolve(&imported.document.chapter, imported.analysis_id, &changed)
+            .unwrap()
+            .freeze_completion(frozen.completion())
+            .unwrap();
+    assert!(matches!(
+        storage.record_effective_page_completion(&changed),
+        Err(StorageError::InvalidCompletion)
+    ));
+    assert_eq!(pending_fingerprint(&storage), Some(pending));
+    assert_eq!(
+        storage.record_effective_page_completion(&frozen).unwrap(),
+        AnalyzedCompletionOutcome::Recorded { newly_known: 1 }
+    );
+    assert_eq!(pending_fingerprint(&storage), None);
+    let before = fs::read(database.path()).unwrap();
+    drop(storage);
+
+    // The response was lost. Reopening and retrying uses the receipt alone.
+    let mut storage = Storage::open(database.path()).unwrap();
+    reader_work::take();
+    for command in [frozen, changed] {
+        assert_eq!(
+            storage.record_effective_page_completion(&command).unwrap(),
+            AnalyzedCompletionOutcome::AlreadyRecorded
+        );
+    }
+    assert_eq!(reader_work::take(), (0, 0, Vec::new()));
+    assert_eq!(fs::read(database.path()).unwrap(), before);
 }
 
 #[test]

@@ -1,7 +1,7 @@
 > Historical measurements and development record. Current reader behavior is in
 > [ARCHITECTURE.md](ARCHITECTURE.md); saved completion format is in [DATA_MODEL.md](DATA_MODEL.md).
-> Legacy reader alternatives, boundary editing and whole-chapter saved reservations
-> below have been removed. Preserve measurements with their original context.
+> Legacy reader alternatives, boundary editing and saved JSON reservations below
+> have been removed. These measurements retain their original context.
 
 # Effective reader payload review
 

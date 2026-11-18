@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- All backup/restore is manual and encrypted; exclude automatic extraction. -->
+<!-- Exclude app data from automatic extraction. -->
 <full-backup-content>
     <exclude domain="root" path="." />
     <exclude domain="file" path="." />

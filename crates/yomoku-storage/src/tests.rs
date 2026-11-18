@@ -12,8 +12,6 @@ use super::*;
 
 mod analysis;
 mod anki_settings;
-mod backup_candidate;
-mod backup_snapshot;
 mod completions;
 mod document_deletion;
 mod document_rename;
@@ -122,7 +120,6 @@ fn initial_schema_has_only_release_tables_and_reopens_without_writes() {
         "reading_positions",
         "library_read_clock",
         "completion_commands",
-        "effective_completion_commands",
         "reading_completions",
         "completion_analyses",
         "reading_occurrences",
@@ -142,6 +139,32 @@ fn initial_schema_has_only_release_tables_and_reopens_without_writes() {
         .collect::<Result<_, _>>()
         .unwrap();
     assert!(!columns.iter().any(|name| name == "active_time_ms"));
+    let command_columns: Vec<(String, String, bool)> = storage
+        .connection
+        .prepare("SELECT name, type, [notnull] FROM pragma_table_info('completion_commands')")
+        .unwrap()
+        .query_map([], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)))
+        .unwrap()
+        .collect::<Result<_, _>>()
+        .unwrap();
+    assert_eq!(
+        command_columns,
+        [
+            ("id".into(), "INTEGER".into(), false),
+            ("pending_fingerprint".into(), "BLOB".into(), false),
+        ]
+    );
+    for invalid in ["zeroblob(31)", "zeroblob(33)", "printf('%032d', 0)"] {
+        assert!(storage
+            .connection
+            .execute(
+                &format!(
+                    "INSERT INTO completion_commands (pending_fingerprint) VALUES ({invalid})"
+                ),
+                [],
+            )
+            .is_err());
+    }
     let import_columns: Vec<String> = storage
         .connection
         .prepare("PRAGMA table_info(imported_files)")
@@ -170,7 +193,7 @@ fn initial_schema_has_only_release_tables_and_reopens_without_writes() {
     );
     assert_eq!(
         history(&database.path()),
-        [(1, "0001_canonical_import_initial_schema".into())]
+        [(1, "0001_completion_receipts_initial_schema".into())]
     );
     assert_eq!(
         storage
@@ -217,8 +240,36 @@ fn concurrent_initialization_records_initial_schema_once() {
     });
     assert_eq!(
         history(&database.path()),
-        [(1, "0001_canonical_import_initial_schema".into())]
+        [(1, "0001_completion_receipts_initial_schema".into())]
     );
+}
+
+#[test]
+fn previous_version_one_journal_and_completion_payload_are_untouched() {
+    let database = TestDatabase::new();
+    let connection = Connection::open(database.path()).unwrap();
+    connection
+        .execute_batch(
+            "CREATE TABLE schema_migrations (version INTEGER PRIMARY KEY, name TEXT NOT NULL) STRICT;
+             INSERT INTO schema_migrations VALUES (1, '0001_canonical_import_initial_schema');
+             CREATE TABLE completion_commands (id INTEGER PRIMARY KEY AUTOINCREMENT CHECK (id > 0)) STRICT;
+             CREATE TABLE effective_completion_commands (
+                 command_id INTEGER PRIMARY KEY REFERENCES completion_commands(id),
+                 semantics_version INTEGER NOT NULL CHECK (semantics_version = 2),
+                 payload TEXT NOT NULL CHECK (json_valid(payload))
+             ) STRICT;
+             INSERT INTO completion_commands DEFAULT VALUES;
+             INSERT INTO effective_completion_commands VALUES (1, 2, '{\"occurrences\":[\"猫\"]}');",
+        )
+        .unwrap();
+    drop(connection);
+    let before = fs::read(database.path()).unwrap();
+    assert!(matches!(
+        Storage::open(database.path()),
+        Err(StorageError::InvalidMigrationHistory)
+    ));
+    assert_eq!(fs::read(database.path()).unwrap(), before);
+    assert_eq!(fs::read_dir(&database.0).unwrap().count(), 1);
 }
 
 #[test]

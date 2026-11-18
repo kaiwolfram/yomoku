@@ -14,18 +14,15 @@ const LIFETIME_SQL: &str = "
     WITH completed AS (
         SELECT c.command_id,
                c.semantics_version AS completion_version,
-               a.semantics_version AS analysis_version,
-               e.semantics_version AS effective_version
+               a.semantics_version AS analysis_version
         FROM reading_completions c
         JOIN completion_analyses a USING (command_id)
-        LEFT JOIN effective_completion_commands e USING (command_id)
     )
     SELECT
         (SELECT COUNT(*) FROM reading_occurrences JOIN completed USING (command_id)),
         NOT EXISTS (
             SELECT 1 FROM completed
             WHERE completion_version <> 1 OR analysis_version <> 1
-               OR (effective_version IS NOT NULL AND effective_version <> 2)
         )";
 
 impl Storage {
@@ -79,16 +76,14 @@ impl Storage {
 fn reading_timeline(
     connection: &rusqlite::Connection,
 ) -> Result<Vec<ReadingTimelinePoint>, StorageError> {
-    // Count surviving actual occurrences, never the frozen reservation payload.
+    // Count surviving occurrences from committed history.
     let mut statement = connection.prepare(
         "SELECT c.completed_at_unix_ms,
                 SUM((SELECT COUNT(*) FROM reading_occurrences o
                      WHERE o.command_id = c.command_id)),
-                MIN(c.semantics_version = 1 AND a.semantics_version = 1
-                    AND (e.semantics_version IS NULL OR e.semantics_version = 2))
+                MIN(c.semantics_version = 1 AND a.semantics_version = 1)
          FROM reading_completions c
          JOIN completion_analyses a USING (command_id)
-         LEFT JOIN effective_completion_commands e USING (command_id)
          GROUP BY c.completed_at_unix_ms
          ORDER BY c.completed_at_unix_ms",
     )?;

@@ -57,7 +57,7 @@ pub(crate) fn page_sql(sort: VocabularySort, predicate: &str) -> String {
         )
     };
     // Scalar indexed probes avoid grouping the entire occurrence table or
-    // multiplying one entry by its readings/forms/events. No reservation JSON.
+    // multiplying one entry by its readings/forms/events.
     let count = if sort == VocabularySort::Frequency {
         "page_v.encountered_count".to_owned()
     } else {
@@ -75,10 +75,8 @@ pub(crate) fn page_sql(sort: VocabularySort, predicate: &str) -> String {
             NOT EXISTS (SELECT 1 FROM reading_occurrences o
              LEFT JOIN reading_completions c USING (command_id)
              LEFT JOIN completion_analyses a USING (command_id)
-             LEFT JOIN effective_completion_commands e USING (command_id)
              WHERE o.vocabulary_id = {alias}.id AND
                 (c.semantics_version IS NOT 1 OR a.semantics_version IS NOT 1
-                 OR (e.semantics_version IS NOT NULL AND e.semantics_version <> 2)
                  OR c.completed_at_unix_ms < 0)) AS valid_history
          FROM {source} {suffix}"
     )

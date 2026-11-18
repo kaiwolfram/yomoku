@@ -12,17 +12,17 @@ Inspired by [Lute](https://github.com/LuteOrg/lute-v3).
 The production reader uses stored Mode C analysis, with A/B dictionary components,
 base-text rendering, word highlights, five vocabulary statuses, EPUB images
 and links. Completion saves occurrences, status changes and position
-atomically; deliberate rereads count again. Imports retain original bytes and
-canonical content, deduplicate atomically and return to Library.
+atomically. Deliberate rereads count again. Imports retain canonical content and
+deduplication digests, then return to Library.
 
 AnkiDroid is optional. Settings selects a deck and verifies the Yomoku v2 model;
 dictionary entries offer Add or existing-note actions based on fresh provider
 queries. Only the default deck is persisted. Interrupted external writes are never
 automatically replayed. There are no custom dictionary entries or Anki export logs.
 
-The app is under development. Manual encrypted backup/restore remains unfinished
-release work. Existing development databases and backups are unsupported and are
-rejected without automatic clearing. Reading durations are not collected or saved.
+The app is under development. Manual encrypted backup and restore are deferred to
+a future release. Incompatible development databases are rejected intact. Reading
+durations are not collected or saved.
 Nostr/Feed is no longer planned.
 The [product specification](docs/PRODUCT_SPEC.md) defines scope.
 
@@ -65,11 +65,9 @@ Cargo verification separately from Android native generation.
 | `crates/yomoku-storage/` | SQLite repositories and initial schema |
 | `crates/yomoku-analysis/`, `crates/yomoku-import/` | Analysis and pure format parsing |
 | `crates/yomoku-ffi/` | Typed bridge and codec generation |
-| `crates/yomoku-backup/` | Authenticated snapshot stream primitives |
 | `third_party/`, `tools/` | Pinned assets, notices and CLI tooling |
 
-See [architecture](docs/ARCHITECTURE.md), [data model](docs/DATA_MODEL.md),
-[Anki provider contract](docs/ANKIDROID_API.md) and
-[backup format](docs/BACKUP_FORMAT.md). Historical
+See [architecture](docs/ARCHITECTURE.md), [data model](docs/DATA_MODEL.md) and
+[Anki provider contract](docs/ANKIDROID_API.md). Historical
 [Sudachi measurements](docs/SUDACHI_MEASUREMENTS.md) remain available; they do not
 override current product behavior or establish current device compatibility.

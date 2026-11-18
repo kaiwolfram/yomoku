@@ -4,8 +4,6 @@
 
 mod analysis;
 mod anki_settings;
-mod backup_candidate;
-mod backup_snapshot;
 mod completions;
 pub mod dictionary;
 mod documents;
@@ -28,8 +26,6 @@ mod txt;
 mod vocabulary;
 mod vocabulary_browser;
 
-pub use backup_candidate::{BackupCandidate, CandidateError, SchemaCheckedBackup};
-pub use backup_snapshot::{BackupSnapshot, SnapshotError};
 pub use epub::{
     AnalyzedEpub, EpubImportError, EpubImportOutcome, StoredEpubChapter, StoredEpubDocument,
 };
@@ -51,8 +47,8 @@ struct Migration {
 
 const MIGRATIONS: &[Migration] = &[Migration {
     version: 1,
-    name: "0001_canonical_import_initial_schema",
-    sql: include_str!("../migrations/0001_canonical_import_initial_schema.sql"),
+    name: "0001_completion_receipts_initial_schema",
+    sql: include_str!("../migrations/0001_completion_receipts_initial_schema.sql"),
 }];
 
 /// Failures are returned to the runtime; opening never resets a database.

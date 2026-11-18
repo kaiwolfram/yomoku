@@ -1,8 +1,8 @@
 # Data model
 
-The authoritative SQL is [0001_canonical_import_initial_schema.sql](../crates/yomoku-storage/migrations/0001_canonical_import_initial_schema.sql).
-The release schema version is **1**, journal name `0001_canonical_import_initial_schema`.
-It has **26 application tables** plus SQLite's internal `sqlite_sequence` table.
+The authoritative SQL is [0001_completion_receipts_initial_schema.sql](../crates/yomoku-storage/migrations/0001_completion_receipts_initial_schema.sql).
+The release schema version is **1** with journal name `0001_completion_receipts_initial_schema`.
+It has **25 application tables** plus SQLite's internal `sqlite_sequence` table.
 Earlier development schemas and journals are unsupported, including the previous
 schema-1 journal. They are rejected without migration or modification.
 
@@ -10,7 +10,7 @@ schema-1 journal. They are rejected without migration or modification.
 | --- | --- |
 | Content | `sources`, `chapters`, `documents`, `chapter_texts`, `paste_content_hashes`, `imported_files`, `epub_documents`, `epub_chapters`, `epub_spans`, `epub_assets`, `epub_inline_images` |
 | Analysis and vocabulary | `chapter_analyses`, `analyzed_tokens`, `vocabulary`, `vocabulary_status_events` |
-| Progress and history | `reading_positions`, `library_read_clock`, `completion_commands`, `effective_completion_commands`, `reading_completions`, `completion_analyses`, `reading_occurrences` |
+| Progress and history | `reading_positions`, `library_read_clock`, `completion_commands`, `reading_completions`, `completion_analyses`, `reading_occurrences` |
 | Settings and schema | `reader_settings`, `anki_settings`, `statistics_settings`, `schema_migrations` |
 
 ## Initialization and compatibility
@@ -20,7 +20,6 @@ applies the initial schema once. Concurrent opens serialize. Foreign keys are
 enabled on every repository connection. Unknown, future and historical development
 journals are errors. The runner does not reset incompatible databases, delete user
 files or backfill development data. Additional upgrades can add migrations.
-Backup candidates must match the exact trusted schema and journal before adoption.
 
 ## Content and analysis
 
@@ -53,19 +52,18 @@ existing books to register it again. There are no custom dictionary records.
 
 ## Completion
 
-`prepare_effective_page_completion` validates the rendered key and allocates retry
-identity in `completion_commands` within the reservation transaction.
-`record_effective_page_completion` is the sole completion writer. A version-2
-`effective_completion_commands` payload freezes the page command, analysis ID,
-profile, mode C and counted occurrences. It excludes whole-chapter text, token
-segmentation and unrelated chapter content. `completion_analyses` records actual
-C provenance. Receipt/history semantics remain version 1; these version numbers
-are distinct from the database schema version.
+`prepare_effective_page_completion` validates the rendered page and allocates an ID
+in `completion_commands` with a 32-byte SHA-256 fingerprint covering the page
+command, Mode C analysis provenance and accepted occurrences. The frozen command
+lives in the native session.
 
-One transaction applies occurrence counts, New-to-Known transitions, completion
-history and next position/finish marker. Retry of the
-same command is idempotent, including after content deletion. A deliberate reread
-uses a new command and counts again.
+`record_effective_page_completion` verifies the pending fingerprint and clears it
+in the transaction that writes `reading_completions`, `completion_analyses`,
+occurrences, New-to-Known transitions, progress and the finish marker. A retry of
+a committed command matches its ID, page, departing position, page length,
+timestamp and analysis provenance against the receipt. This works after content
+deletion. A deliberate reread uses a new command ID and counts again. Statistics
+and Vocabulary query committed history directly.
 Previous/reflow preserve exact position without recording completion. No reading
 durations or pending-time state are persisted.
 
@@ -93,14 +91,6 @@ New AnkiDroid note insertions include `yomoku` in the provider’s space-separat
 `tags` value; existing duplicate notes are never retagged.
 There are no submission/model-creation journals, export history or startup replay.
 
-## Backup boundary
-
-A compact snapshot retains all the tables and ID sequences above. It excludes
-bundled dictionaries and all transient provider/session state. Incompatible
-pre-release databases/backups are rejected without clearing them. Restoring never
-replays Anki writes and has no Anki recovery gate. Full manual encrypted restore
-is unfinished; [RESTORE_VALIDATION.md](RESTORE_VALIDATION.md) states its limits.
-
 ## Statistics preference
 
 The initial schema includes `statistics_settings`, a required singleton (`id = 1`) with a
@@ -109,7 +99,6 @@ validated timeframe: `last_week`, `last_month`, `last_six_months`, `last_year`, 
 read/save effects share the SQLite FIFO; one preference request runs at a time,
 coalescing later selections even after navigation. Statistics Retry retries failed
 preference operations. Missing or invalid settings are errors and are never repaired.
-Backup validation requires the exact initial schema and all settings singletons.
 
 Statistics maps the initial schema’s `last_six_months` preference slot to the rolling
 three-month `LastQuarter` interval. The slot and schema stay unchanged so saved

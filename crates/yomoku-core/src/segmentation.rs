@@ -8,8 +8,7 @@ use crate::{
     vocabulary::Surface,
 };
 
-/// Identity fields are retained in serialized completion occurrences for the
-/// existing version-2 reservation format. Readings and base forms remain optional.
+/// Provenance and optional dictionary metadata for an immutable Mode C token.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 pub struct SegmentMetadata {
     pub analysis_id: AnalysisId,

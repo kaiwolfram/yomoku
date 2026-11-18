@@ -1,5 +1,5 @@
 //! Rust-only effective reader effects, consumed by the session's SQLite FIFO.
-//! Full chapter provenance and durable command payloads never cross the shell.
+//! Full chapter provenance and frozen completion commands stay in Rust.
 
 use std::sync::Arc;
 

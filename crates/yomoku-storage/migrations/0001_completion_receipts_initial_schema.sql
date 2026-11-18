@@ -1,4 +1,4 @@
--- Initial release schema. Development databases and backups are unsupported.
+-- Initial release schema. Earlier development databases are unsupported.
 
 CREATE TABLE schema_migrations (
     version INTEGER PRIMARY KEY CHECK (version > 0),
@@ -40,7 +40,8 @@ CREATE TABLE reader_settings (
     CHECK (line_spacing IN (125, 150, 175, 200))) STRICT;
 
 CREATE TABLE completion_commands (
-    id INTEGER PRIMARY KEY AUTOINCREMENT CHECK (id > 0)
+    id INTEGER PRIMARY KEY AUTOINCREMENT CHECK (id > 0),
+    pending_fingerprint BLOB CHECK (length(pending_fingerprint) = 32)
 ) STRICT;
 
 CREATE TABLE reading_completions (
@@ -196,12 +197,6 @@ CREATE TABLE epub_inline_images (
     FOREIGN KEY (chapter_id, document_id) REFERENCES epub_chapters(chapter_id, document_id) ON DELETE CASCADE,
     FOREIGN KEY (document_id, path) REFERENCES epub_assets(document_id, path),
     PRIMARY KEY (chapter_id, image_index)
-) STRICT;
-
-CREATE TABLE effective_completion_commands (
-    command_id INTEGER PRIMARY KEY REFERENCES completion_commands(id),
-    semantics_version INTEGER NOT NULL CHECK (semantics_version = 2),
-    payload TEXT NOT NULL CHECK (json_valid(payload))
 ) STRICT;
 
 CREATE TABLE library_read_clock (

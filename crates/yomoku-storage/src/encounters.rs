@@ -49,8 +49,7 @@ pub(crate) fn record_effective_occurrences_in(
 ) -> Result<usize, StorageError> {
     let completion = frozen.completion();
     let segmentation = &frozen.key().segmentation;
-    // This header identifies the immutable Mode C basis. The versioned effective
-    // reservation preserves exact token metadata for retries and backup validation.
+    // Keep the immutable Mode C provenance in the receipt even after deletion.
     connection.execute(
         "INSERT INTO completion_analyses
          (command_id, semantics_version, analysis_id, engine_revision, dictionary_revision, split_mode)

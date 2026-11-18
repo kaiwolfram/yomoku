@@ -42,7 +42,7 @@ Set `JAVA_HOME` to a JDK 17 directory and `ANDROID_HOME` to your SDK. An optiona
 restricted environments, bypass rustup launcher maintenance with the installed
 stable toolchain's `bin` in PATH. Gradle/ADB/emulator need local socket access.
 Do not clear an incompatible database to make a build or trial succeed. The only
-accepted initial journal is `0001_canonical_import_initial_schema` (schema version 1),
+accepted initial journal is `0001_completion_receipts_initial_schema` (schema version 1),
 which includes the Statistics timeframe preference.
 Use a new disposable AVD for checks that require a fresh installation.
 
@@ -195,6 +195,3 @@ creation, opens the browser and restarts the Yomoku session.
 "$ANDROID_HOME/platform-tools/adb" -e shell pm grant app.yomoku com.ichi2.anki.permission.READ_WRITE_DATABASE
 "$ANDROID_HOME/platform-tools/adb" -e shell am instrument -w -r -e class app.yomoku.AnkiInstalledProviderTest -e disposableAnkiTrial true app.yomoku.test/androidx.test.runner.AndroidJUnitRunner
 ```
-
-Manual encrypted backup/restore is unfinished separate release work. A successful
-APK build or primitive backup round trip does not complete that requirement.

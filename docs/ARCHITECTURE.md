@@ -10,10 +10,9 @@ production reader and a versioned release schema.
 | Kotlin/Compose | Rendering, lifecycle, file descriptors, permissions, AnkiDroid ContentResolver and browser intents |
 | `yomoku-core` | Pure Crux model/events, pagination, dictionary projection, vocabulary rules and in-memory operation ownership |
 | `yomoku-runtime` | EffectRouter, lazy analyzer/dictionary loaders and one FIFO SQLite/analysis worker |
-| `yomoku-storage` | SQLite repositories, atomic imports/completions, schema runner and private backup candidates |
+| `yomoku-storage` | SQLite repositories, atomic imports/completions and schema runner |
 | `yomoku-analysis` / `yomoku-import` | Sudachi adapter and pure EPUB/TXT/SRT parsing |
 | `yomoku-ffi` | Narrow typed Crux/BoltFFI interface and generated Kotlin codecs |
-| `yomoku-backup` | Bounded authenticated snapshot streams, separate from app restore orchestration |
 
 Core has no SQL or platform I/O. `YomokuBridge::new` and `effect_router` require
 both dictionary loaders; imports always analyze atomically. There is no text-only
@@ -51,12 +50,13 @@ validation; other changes and failed writes discard it and require full validati
 Shared text styling, links and images remain independent of word
 selection. Whole-document payloads are not part of the live view.
 
-Completion freezes identity and reserves a command ID. The
-stored version-2 reservation contains the page command, Mode C analysis identity/
-profile and counted occurrences; it omits whole-chapter segmentation. Retry uses
-the same reservation. Completion atomically commits history, status changes
-and position; deletion-safe receipt lookup prevents duplicate counting. Explicit
-rereads use new commands and count again. Previous moves position without counting.
+Preparation validates the rendered page, reserves a command ID and saves a SHA-256
+fingerprint of the completion command, Mode C provenance and accepted occurrences.
+The native session retains the command for retries. Commit verifies and clears the
+fingerprint in the transaction that records history, status changes, progress and
+finish state. Storage acknowledges committed retries from the receipt even after
+document deletion. Explicit rereads use new commands and count again. Previous
+moves position without counting.
 Reading durations are not collected or persisted.
 
 The worker uses whole-document snapshot/open/position operations and effective
@@ -108,7 +108,7 @@ See [ANKIDROID_API.md](ANKIDROID_API.md) for provider details.
 
 ## Persistence and builds
 
-The [data model](DATA_MODEL.md) contains 26 application tables. The initial schema
+The [data model](DATA_MODEL.md) contains 25 application tables. The initial schema
 includes the Statistics preference. A transactional migration runner/journal remains
 for future releases; historical development files are rejected without clearing them. Bundled dictionaries are separate read-only assets.
 
@@ -117,6 +117,5 @@ outputs. Native generation tasks serialize and use a cross-process lock because
 BoltFFI metadata expansion shares Cargo artifacts. Release includes both supported
 ABIs and excludes debug probes. See [DEVELOPMENT.md](DEVELOPMENT.md).
 
-Encrypted backup primitives and private validation exist. App secret handoff,
-confirmation, crash cleanup and atomic replacement remain separate release work;
-there is no Anki recovery prerequisite. See [BACKUP_FORMAT.md](BACKUP_FORMAT.md).
+Manual encrypted backup and restore are deferred. Android cloud backup and device
+transfer exclude the app’s data.

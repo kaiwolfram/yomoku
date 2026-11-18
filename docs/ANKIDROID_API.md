@@ -57,8 +57,7 @@ begin/finish steps, export journals, recovery UI or startup reconciliation.
 After interruption, an explicit action performs fresh queries. A successful empty
 query can allow a new explicit insertion; it does not prove an earlier external
 operation never completed. There is no exactly-once guarantee across process death.
-Failed/incomplete observations remain errors. Restoring a Yomoku backup has no
-Anki recovery prerequisite and never replays a provider write.
+Failed/incomplete observations remain errors.
 
 ## Verification boundary
 

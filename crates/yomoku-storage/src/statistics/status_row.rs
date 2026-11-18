@@ -29,7 +29,6 @@ pub(super) fn decode(row: &rusqlite::Row<'_>) -> Result<VocabularyStatusChange, 
     let command: Option<i64> = row.get(7)?;
     let completion_version: Option<i64> = row.get(8)?;
     let analysis_version: Option<i64> = row.get(9)?;
-    let effective_version: Option<i64> = row.get(10)?;
     let valid_cause = match cause {
         "registration" => old.is_none() && new == VocabularyStatus::New && command.is_none(),
         "manual" => old.is_some() && old != Some(new) && command.is_none(),
@@ -39,7 +38,6 @@ pub(super) fn decode(row: &rusqlite::Row<'_>) -> Result<VocabularyStatusChange, 
                 && command.is_some()
                 && completion_version == Some(1)
                 && analysis_version == Some(1)
-                && effective_version.is_none_or(|version| version == 2)
         }
         _ => false,
     };
@@ -69,7 +67,7 @@ mod tests {
         // the borrowed decoder itself never coerces them or accepts NULL text.
         let connection = Connection::open_in_memory().unwrap();
         let mut statement = connection
-            .prepare("SELECT 1, 1, 1, ?1, ?2, ?3, 100, NULL, NULL, NULL, NULL")
+            .prepare("SELECT 1, 1, 1, ?1, ?2, ?3, 100, NULL, NULL, NULL")
             .unwrap();
         for (index, spelling) in ["new", "known", "manual"].into_iter().enumerate() {
             for invalid in [

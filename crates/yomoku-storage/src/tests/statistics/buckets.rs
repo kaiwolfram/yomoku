@@ -232,7 +232,6 @@ fn invalid_versions_dates_and_time_fail_without_repair_or_leaving_a_transaction_
     for sql in [
         "UPDATE reading_completions SET semantics_version = 2",
         "UPDATE completion_analyses SET semantics_version = 2",
-        "UPDATE effective_completion_commands SET semantics_version = 3",
         "UPDATE reading_completions SET completed_at_unix_ms = -1",
         "UPDATE reading_completions SET completed_at_unix_ms = 9223372036854775807",
     ] {

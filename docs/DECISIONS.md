@@ -65,19 +65,20 @@ Pinned inputs, patches, licenses and notices are in
 
 ## Persistence and history
 
-Use one initial SQL schema, version 1, journal `0001_canonical_import_initial_schema`,
-with 26 application tables. Retain the immediate-transaction runner/journal for
-future published upgrades. Previous development databases and backups, including
+Use one initial SQL schema, version 1, journal `0001_completion_receipts_initial_schema`,
+with 25 application tables. Retain the immediate-transaction runner/journal for
+future published upgrades. Previous development databases, including
 the prior schema-1 journal, fail validation without migration, clearing or repair.
 Keep SQLite I/O in `yomoku-storage`, with foreign keys on each connection and
 transactional rollback on statement or deferred-commit failures.
 
 Vocabulary identity preserves exact surface spelling without normalization.
-Completion reserves one frozen effective command and records occurrences,
-New-to-Known transitions, history, next position and permanent finish state
-atomically. Exact retries retain the reservation and remain safe after deletion;
-deliberate rereads reserve fresh IDs and count again. Previous/reflow save position
-without completion. Reading durations are not collected or persisted.
+Completion preparation stores only a pending SHA-256 fingerprint of the accepted
+command. Commit clears it atomically with occurrences, New-to-Known transitions,
+history, next position and permanent finish state. Reusing the committed receipt
+avoids duplicating per-page occurrence data and supports retries after deletion.
+Deliberate rereads reserve fresh IDs and count again. Previous and reflow save
+position without completion. Reading durations are not collected or persisted.
 
 Document deletion is individual and confirmed. It removes live content/progress
 while retaining source/chapter provenance, global vocabulary and history.
@@ -101,29 +102,14 @@ rejects duplicate dispatch and stale callbacks. Partial/incompatible models are
 never overwritten. Existing-note navigation uses fresh verified note IDs.
 
 An interrupted external write can survive. An explicit retry starts with fresh
-queries; there is no durable export/recovery journal or cross-process exactly-once
-promise. Startup and restore never replay external writes. This tradeoff keeps
-backup/restore independent of Anki recovery. The
+queries. Startup never replays external writes. The
 [provider contract](ANKIDROID_API.md) retains the pinned primary source links and
 verification limits.
 
-## Backup security
+## Backup scope
 
-Keep bounded authenticated stream cryptography separate from SQLite snapshots and
-app activation. Preserve the version-1 envelope: explicit Argon2id profile,
-XChaCha20Poly1305 STREAM BE32 framing, fresh salt/nonce and authenticated finality.
-Passwords are literal UTF-8 and must not enter serializable state or logs. Owned
-Rust secret/plaintext buffers are zeroized; JVM/OS copies are outside that guarantee.
-
-Create compact snapshots with bound `VACUUM INTO` into new private staging.
-Authenticate/decrypt completely before inspecting a candidate; compare exact
-trusted schema/journal, then integrity, foreign keys and semantic domains. Do not
-execute candidate SQL, repair data or replay reservations. Opaque validation values
-grant no replacement authority. Secret handoff, confirmation, crash cleanup and
-atomic activation remain unfinished release work. The crypto profile, exact
-reviewed dependency APIs and supporting RFC/SQLite/security sources remain in
-[BACKUP_FORMAT.md](BACKUP_FORMAT.md); validation limits are in
-[RESTORE_VALIDATION.md](RESTORE_VALIDATION.md).
+Manual encrypted backup and restore are deferred to a future release. Android
+cloud backup and device transfer exclude app data.
 
 ## Dependencies and builds
 

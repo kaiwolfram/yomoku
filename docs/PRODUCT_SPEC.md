@@ -16,7 +16,7 @@ must not change without user approval.
 
 ## 1. Product scope and priorities
 
-**v1 includes:** native Android app; native Japanese reader; local library of imported EPUB/TXT/SRT and pasted text; offline word segmentation and dictionaries; vocabulary status workflows; historical reading/vocabulary statistics; optional AnkiDroid integration; secure manual encrypted backups; configurable settings; release tooling.
+**v1 includes:** native Android app, native Japanese reader, local library of imported EPUB/TXT/SRT and pasted text, offline word segmentation and dictionaries, vocabulary status workflows, historical reading/vocabulary statistics, optional AnkiDroid integration, configurable settings, and release tooling.
 
 **Important late scope changes that override earlier brainstorming:**
 
@@ -26,7 +26,7 @@ must not change without user approval.
 - **No custom dictionary entries in v1**: no editor, fallback definitions, saved custom records or custom-entry Anki export. Bundled dictionaries alone supply definitions; unmatched words show the no-match state.
 - **No in-app AI features in v1**, including BYOK API keys/provider/model settings, AI-generated definitions or translations, and AI regeneration. Do not scaffold AI merely because older design notes might mention it.
 - **Only EPUB, TXT, SRT, and pasted text**. No WebVTT `.vtt`, no ASS/SSA `.ass`, no PDF, no NHK integration, and no Android Share-intent import in v1.
-- **No Nostr multi-device sync or Blossom cloud backups in v1.** Secure **manual encrypted export/import** remains.
+- Nostr multi-device sync, Blossom cloud backups, and manual encrypted backup and restore are outside v1 scope.
 - No full-text book search, no bookmarks, no editing of imported content, no in-app audio/video players, no custom goals or streaks, and no calendar heatmap.
 - An online marketing site (possibly `yomoku.app`) is not part of the essential Android MVP. Concentrate on the app and tests first.
 
@@ -158,14 +158,10 @@ they must not drive implementation unless the user explicitly reopens this scope
 
 - Confirmed AnkiDroid insertions show `Added to AnkiDroid.` once. Duplicate, failed or uncertain results do not show success. App toasts replace the current toast; transient notices are consumed before display.
 
-## 7. Secure manual backup and restore
+## 7. Local data and backup scope
 
-- **Manual export/import only**: all content, reading position/completion, vocabulary and history, and settings. The first MVP has no Nostr mnemonic/identity to export. No Nostr sync, Blossom, cloud account, or automatic backups.
-- Password-encrypted archive with a well-reviewed authenticated design (e.g. **Argon2id** KDF and **AEAD** encryption); record schema/format version, salt/nonce/KDF parameters. Do not invent home-grown cryptography or log secrets.
-- Restore is a **complete replacement, never merge**. Authenticate/decrypt and validate backup before destructive work, warn and confirm before replacement, swap atomically/transactionally as possible. An incorrect password/corrupt backup must **leave existing installation intact**.
-- Anki export history and recovery records are excluded from saved data and backups. Restoring a Yomoku backup does not require Anki recovery. Restoring never replays external writes.
-- Existing development databases and backups are unsupported. Incompatible databases produce an error and are never automatically cleared. The first release uses one initial schema, including the Statistics timeframe preference, with a migration journal for future releases.
-- Tests: correct password round trip, bad password, tampering, interrupted restore, new version/backward-compatible schema strategy, and complete state restoration.
+- Manual encrypted backup and restore are deferred to a future release. Android cloud backup and device transfer exclude Yomoku app data.
+- Incompatible development databases produce an error and stay intact. The first release uses one initial schema, including the Statistics timeframe preference, with a migration journal for future releases.
 
 ## 8. UX and other confirmed decisions
 

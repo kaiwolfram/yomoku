@@ -1,5 +1,5 @@
 [workspace]
-members = ["crates/yomoku-core", "crates/yomoku-runtime", "crates/yomoku-ffi", "crates/yomoku-storage", "crates/yomoku-analysis", "crates/yomoku-import", "crates/yomoku-backup"]
+members = ["crates/yomoku-core", "crates/yomoku-runtime", "crates/yomoku-ffi", "crates/yomoku-storage", "crates/yomoku-analysis", "crates/yomoku-import"]
 resolver = "2"
 exclude = ["third_party/sudachi/engine"]
 

@@ -205,7 +205,6 @@ fn unknown_event_versions_fail_without_repair() {
     for sql in [
         "UPDATE reading_completions SET semantics_version = 2",
         "UPDATE completion_analyses SET semantics_version = 2",
-        "UPDATE effective_completion_commands SET semantics_version = 3",
     ] {
         let database = TestDatabase::new();
         let mut storage = Storage::open(database.path()).unwrap();
@@ -229,72 +228,4 @@ fn unknown_event_versions_fail_without_repair() {
         );
         assert_eq!(fs::read(database.path()).unwrap(), before);
     }
-}
-
-#[test]
-fn compact_mode_c_reservation_excludes_other_pages_and_keeps_atomic_deletion_safe_retries() {
-    let database = TestDatabase::new();
-    let mut storage = Storage::open(database.path()).unwrap();
-    let imported = import(
-        &mut storage,
-        &format!("猫\n{}\nUNRELATED_CHAPTER_MARKER", "English ".repeat(1000)),
-    );
-    let frozen = prepare(&mut storage, &imported);
-    let (version, payload): (i64, String) = storage
-        .connection
-        .query_row(
-            "SELECT semantics_version, payload FROM effective_completion_commands",
-            [],
-            |row| Ok((row.get(0)?, row.get(1)?)),
-        )
-        .unwrap();
-    assert_eq!(version, 2);
-    assert!(!payload.contains("UNRELATED_CHAPTER_MARKER"));
-    let record: serde_json::Value = serde_json::from_str(&payload).unwrap();
-    assert_eq!(record["mode"], "C");
-    assert_eq!(record["analysis_id"], i64::from(imported.analysis_id));
-    assert!(record.get("key").is_none());
-    assert!(record.get("segmentation").is_none());
-    assert_eq!(record["occurrences"].as_array().unwrap().len(), 1);
-    // Native segmentation refactors must keep version-2 reservation JSON stable.
-    let occurrence = &record["occurrences"][0];
-    let metadata = &occurrence["metadata"];
-    assert_eq!(metadata["analysis_id"], i64::from(imported.analysis_id));
-    assert_eq!(metadata["mode"], "C");
-    assert_eq!(metadata["token_index"], occurrence["segment_index"]);
-    assert_eq!(metadata["is_japanese"], true);
-    assert!(metadata.get("reading").is_some());
-    assert!(metadata.get("dictionary_form").is_some());
-    assert_eq!(metadata.as_object().unwrap().len(), 6);
-    assert!(payload.len() < imported.document.chapter.text.len());
-    storage.connection.execute_batch("CREATE TRIGGER fail_receipt BEFORE INSERT ON reading_occurrences BEGIN SELECT RAISE(ABORT, 'fixture'); END;").unwrap();
-    assert!(storage.record_effective_page_completion(&frozen).is_err());
-    assert_totals(&storage, 0);
-
-    storage
-        .connection
-        .execute_batch("DROP TRIGGER fail_receipt")
-        .unwrap();
-    assert!(matches!(
-        storage.record_effective_page_completion(&frozen).unwrap(),
-        AnalyzedCompletionOutcome::Recorded { .. }
-    ));
-    assert_totals(&storage, 1);
-    let mode: String = storage
-        .connection
-        .query_row("SELECT split_mode FROM completion_analyses", [], |row| {
-            row.get(0)
-        })
-        .unwrap();
-    assert_eq!(mode, "c");
-    storage
-        .delete_document(imported.document.document_id)
-        .unwrap();
-    drop(storage);
-    let mut storage = Storage::open(database.path()).unwrap();
-    assert_eq!(
-        storage.record_effective_page_completion(&frozen).unwrap(),
-        AnalyzedCompletionOutcome::AlreadyRecorded
-    );
-    assert_totals(&storage, 1);
 }

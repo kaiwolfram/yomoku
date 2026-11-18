@@ -31,7 +31,7 @@ fn history(storage: &Storage) -> Vec<Vec<Vec<Value>>> {
         "reading_occurrences",
         "reading_completions",
         "completion_analyses",
-        "effective_completion_commands",
+        "completion_commands",
         "sqlite_sequence",
     ]
     .map(|name| table(storage, name))
@@ -144,7 +144,7 @@ fn deletion_recalculates_original_effective_charts_without_rescan_and_new_appear
             "reading_positions",
             "reading_completions",
             "completion_analyses",
-            "effective_completion_commands",
+            "completion_commands",
         ]
         .map(|name| table(&storage, name))
         .to_vec();
@@ -161,7 +161,7 @@ fn deletion_recalculates_original_effective_charts_without_rescan_and_new_appear
                 "reading_positions",
                 "reading_completions",
                 "completion_analyses",
-                "effective_completion_commands"
+                "completion_commands"
             ]
             .map(|name| table(&storage, name))
             .to_vec()

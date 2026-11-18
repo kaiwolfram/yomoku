@@ -273,6 +273,7 @@ fn every_write_and_deferred_commit_failure_roll_back_all_completion_effects() {
         ("position insert", "CREATE TRIGGER fail BEFORE INSERT ON reading_positions BEGIN SELECT RAISE(ABORT, 'fixture'); END;"),
         ("position update", "CREATE TRIGGER fail BEFORE UPDATE ON reading_positions BEGIN SELECT RAISE(ABORT, 'fixture'); END;"),
         ("finish marker", "CREATE TRIGGER fail BEFORE UPDATE OF finished_at_least_once ON documents BEGIN SELECT RAISE(ABORT, 'fixture'); END;"),
+        ("clear fingerprint", "CREATE TRIGGER fail BEFORE UPDATE OF pending_fingerprint ON completion_commands BEGIN SELECT RAISE(ABORT, 'fixture'); END;"),
         ("commit", "CREATE TABLE deferred_failure (id INTEGER REFERENCES documents(id) DEFERRABLE INITIALLY DEFERRED); CREATE TRIGGER fail AFTER INSERT ON reading_occurrences BEGIN INSERT INTO deferred_failure VALUES (-1); END;"),
     ] {
         let database = TestDatabase::new();
@@ -287,7 +288,9 @@ fn every_write_and_deferred_commit_failure_roll_back_all_completion_effects() {
         let before = totals(&storage);
         let saved = storage.load_paste(imported.document.document_id).unwrap();
         storage.connection.execute_batch(sql).unwrap();
+        let before_bytes = fs::read(database.path()).unwrap();
         assert!(matches!(storage.record_effective_page_completion(&completion), Err(StorageError::Sqlite(_))), "{stage}");
+        assert_eq!(fs::read(database.path()).unwrap(), before_bytes, "{stage}");
         assert_eq!(totals(&storage), before, "{stage}");
         assert_eq!(storage.finished_at_least_once(imported.document.document_id).unwrap(), Some(false), "{stage}");
         assert_eq!(entry(&storage, "猫").status, VocabularyStatus::New, "{stage}");
