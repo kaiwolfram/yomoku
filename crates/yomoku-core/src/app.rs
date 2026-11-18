@@ -13,6 +13,8 @@ mod effective;
 mod pending_storage;
 use pending_storage::{DocumentRequest, PendingStorage};
 mod dictionary_lookup;
+#[cfg(test)]
+mod file_import_tests;
 mod statistics;
 mod statistics_preference;
 mod vocabulary;
@@ -111,6 +113,7 @@ pub struct Model {
     pending_storage: PendingStorage,
     storage_sequence: u64,
     document_error: Option<DocumentError>,
+    file_import_error: Option<DocumentError>,
     content_route: ContentRoute,
     reader: Option<ReaderPage>,
     reader_analysis: Option<ReaderAnalysis>,
@@ -660,10 +663,20 @@ impl App for Yomoku {
                 return render::render();
             };
             model.storage_sequence = attempt;
-            model.pending_storage = PendingStorage::Document {
-                attempt,
-                request: DocumentRequest::capture(&operation),
-            };
+            let request = DocumentRequest::capture(&operation);
+            if !matches!(request, DocumentRequest::LibraryWords) {
+                model.file_import_error = None;
+            }
+            if !matches!(
+                request,
+                DocumentRequest::FileImport
+                    | DocumentRequest::LibraryWords
+                    | DocumentRequest::Delete(_)
+                    | DocumentRequest::Rename(..)
+            ) {
+                model.document_error = None;
+            }
+            model.pending_storage = PendingStorage::Document { attempt, request };
             if let StorageOperation::RenameDocument { .. } = &operation {
                 if let Some(draft) = model.library_rename.as_mut() {
                     draft.error = None;
@@ -683,14 +696,6 @@ impl App for Yomoku {
             if operation.loads_library_words() {
                 model.library_word_distributions = None;
                 model.library_word_error = None;
-            }
-            if !matches!(
-                operation,
-                StorageOperation::LoadEffectiveLibraryWordDistributions
-                    | StorageOperation::DeleteDocument(_)
-                    | StorageOperation::RenameDocument { .. }
-            ) {
-                model.document_error = None;
             }
 
             // Every accepted operation that invalidates page tokens also retires
@@ -866,7 +871,10 @@ impl App for Yomoku {
             }
             Event::DismissReaderWord => model.clear_reader_word(),
             Event::CloseSettings => model.settings_open = false,
-            Event::DismissImportSummary => model.import_summary = None,
+            Event::DismissImportSummary => {
+                model.import_summary = None;
+                model.file_import_error = None;
+            }
             Event::DismissAnkiAddedNotice(id) => {
                 if model.anki_added_notice == Some(id) {
                     model.anki_added_notice = None;
@@ -987,11 +995,19 @@ impl App for Yomoku {
                     }
                     StorageResult::PageLengthSaved(length) => model.apply_page_length(length),
                     StorageResult::Created(document) | StorageResult::Existing(document) => {
-                        model.invalidate_library_words();
+                        let outcome = import_outcome.expect("import result");
+                        if outcome == ImportOutcome::Created
+                            || !model
+                                .documents
+                                .iter()
+                                .any(|entry| entry.document_id == document.document_id)
+                        {
+                            model.invalidate_library_words();
+                        }
                         model.import_summary = Some(ImportSummary {
                             document_id: document.document_id,
                             title: document.title.clone(),
-                            outcome: import_outcome.expect("import result"),
+                            outcome,
                         });
                         if let Some(entry) = model
                             .documents
@@ -1064,6 +1080,8 @@ impl App for Yomoku {
                             }
                         } else if loading_library_words {
                             model.library_word_error = Some(error);
+                        } else if matches!(request, DocumentRequest::FileImport) {
+                            model.file_import_error = Some(error);
                         } else {
                             model.document_error = Some(error);
                         }
@@ -1163,7 +1181,7 @@ impl App for Yomoku {
             library_delete_error: model.library_delete_error,
             library_rename: model.library_rename.clone(),
             storage_busy: model.storage_busy(),
-            document_error: model.document_error,
+            document_error: model.file_import_error.or(model.document_error),
             content_route: model.content_route,
             reader: model.reader.clone(),
             reader_analysis: model.reader_analysis,

@@ -75,6 +75,10 @@ pub(super) fn matching(query: &VocabularyQuery) -> (String, Vec<Value>) {
     if let Some(upper) = prefix_end(&query.prefix) {
         predicate.push_str(" AND v.surface < ?");
         values.push(Value::Text(upper));
+    } else if !query.prefix.is_empty() {
+        // A prefix of maximum Unicode scalars has no text successor. All TEXT
+        // sorts below BLOB, giving SQLite an index range with both bounds.
+        predicate.push_str(" AND v.surface < X''");
     }
     let statuses: Vec<_> = VocabularyStatus::ALL
         .into_iter()

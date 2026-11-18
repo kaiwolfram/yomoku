@@ -426,6 +426,7 @@ fn prefix_query_plans_search_existing_surface_and_occurrence_indexes_for_all_sor
     for prefix in ["語00", "%", "語\0", "\u{10ffff}"] {
         for sort in [
             VocabularySort::Newest,
+            VocabularySort::Oldest,
             VocabularySort::Frequency,
             VocabularySort::LastSeen,
             VocabularySort::Alphabetical,
@@ -470,6 +471,78 @@ fn prefix_query_plans_search_existing_surface_and_occurrence_indexes_for_all_sor
                     );
                 }
             }
+        }
+    }
+}
+
+#[test]
+fn version_two_registration_pages_keep_order_with_less_sql_work() {
+    let database = TestDatabase::new();
+    let mut connection = Connection::open(database.path()).unwrap();
+    migrate(&mut connection, &MIGRATIONS[..2]).unwrap();
+    connection
+        .execute_batch(
+            "WITH RECURSIVE n(i) AS (VALUES(1) UNION ALL SELECT i+1 FROM n WHERE i<4096)
+             INSERT INTO vocabulary (surface, status, registered_at_unix_ms)
+             SELECT printf('語%04d', i), 'new', (i * 19) % 997 FROM n;",
+        )
+        .unwrap();
+    let measure = |connection: &Connection, sort, prefix| {
+        let (predicate, mut values) = crate::vocabulary_browser::matching(&query(prefix, sort));
+        let sql = crate::vocabulary_browser::page_sql(sort, &predicate);
+        values.push(Value::Integer(0));
+        let mut statement = connection.prepare(&sql).unwrap();
+        let ids = statement
+            .query_map(params_from_iter(&values), |row| row.get::<_, i64>(0))
+            .unwrap()
+            .collect::<Result<Vec<_>, _>>()
+            .unwrap();
+        let plan = connection
+            .prepare(&format!("EXPLAIN QUERY PLAN {sql}"))
+            .unwrap()
+            .query_map(params_from_iter(&values), |row| row.get::<_, String>(3))
+            .unwrap()
+            .collect::<Result<Vec<_>, _>>()
+            .unwrap();
+        (
+            ids,
+            statement.get_status(rusqlite::StatementStatus::VmStep),
+            plan,
+        )
+    };
+    let cases = [
+        (VocabularySort::Newest, ""),
+        (VocabularySort::Oldest, ""),
+        (VocabularySort::Newest, "語012"),
+        (VocabularySort::Oldest, "語012"),
+    ];
+    let before = cases.map(|(sort, prefix)| measure(&connection, sort, prefix));
+    drop(connection);
+    let storage = Storage::open(database.path()).unwrap();
+    assert_eq!(storage.schema_version().unwrap(), 3);
+    let count: i64 = storage
+        .connection
+        .query_row("SELECT COUNT(*) FROM vocabulary", [], |row| row.get(0))
+        .unwrap();
+    assert_eq!(count, 4096);
+    for ((sort, prefix), (ids, steps, _)) in cases.into_iter().zip(before) {
+        let (actual, indexed_steps, plan) = measure(&storage.connection, sort, prefix);
+        assert_eq!(actual, ids);
+        eprintln!("{sort:?} {prefix:?} SQLite VM steps: {steps} -> {indexed_steps}");
+        if prefix.is_empty() {
+            assert!(
+                plan.iter()
+                    .any(|line| line.contains("vocabulary_by_registration")),
+                "{plan:?}"
+            );
+            assert!(indexed_steps < steps);
+        } else {
+            assert!(
+                plan.iter()
+                    .any(|line| line.contains("SEARCH v USING") && line.contains("surface>")),
+                "{plan:?}"
+            );
+            assert!(indexed_steps <= steps);
         }
     }
 }

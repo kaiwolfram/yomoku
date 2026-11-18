@@ -272,7 +272,6 @@ internal class FileImports(
                     result =
                         summary?.let { FileImportResult(current.filename, it.outcome, it.title) },
                 )
-            core.dispatch(Event.DismissImportSummary)
             refreshNotifications()
             settleCancellation()
             return
@@ -283,13 +282,12 @@ internal class FileImports(
             refreshNotifications()
             return
         }
-        core.dispatch(Event.DismissImportSummary)
         finish(
             FileImportResult(
                 filename,
                 outcome = summary?.outcome,
                 title = summary?.title,
-                error = error,
+                error = error.takeIf { summary == null },
                 message =
                     if (error == null && summary == null) R.string.error_storage_unavailable
                     else null,
@@ -340,8 +338,7 @@ internal class FileImports(
     private fun complete(result: FileImportResult?) {
         phase = FileImportPhase.Finished(result)
         observer?.finished(result)
-        // Clear transient errors; retain the terminal outcome for the result dialog.
-        core.dispatch(Event.RefreshLibrary)
+        core.dispatch(Event.DismissImportSummary)
     }
 
     fun dismissSummary() {

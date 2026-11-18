@@ -60,6 +60,67 @@ fn import_file(storage: &mut Storage, kind: &str) -> DocumentId {
 }
 
 #[test]
+fn asset_delete_checks_foreign_keys_via_the_document_path_index() {
+    let database = TestDatabase::new();
+    let mut storage = Storage::open(database.path()).unwrap();
+    let mut first = None;
+    for i in 0..20 {
+        let outcome = storage
+            .import_analyzed_epub(
+                &epub_fixture::book(true, &format!("<p>猫 犬 {i}</p>")),
+                "fixture.epub",
+                100,
+                fixture,
+            )
+            .unwrap();
+        let EpubImportOutcome::Created(value) = outcome else {
+            unreachable!()
+        };
+        first.get_or_insert(value.document.document_id);
+    }
+    // The cover has no inline reference. Retain the other books' inline rows so
+    // the foreign-key probe would have to scan them without the index.
+    let id = i64::from(first.unwrap());
+    let sql = "DELETE FROM epub_assets WHERE document_id = ?1 AND path = 'OPS/images/cover.png'";
+    let measure = |connection: &Connection| {
+        connection.execute_batch("SAVEPOINT asset_check").unwrap();
+        let (steps, plan) = {
+            let mut statement = connection.prepare(sql).unwrap();
+            assert_eq!(statement.execute([id]).unwrap(), 1);
+            let plan = connection
+                .prepare(&format!("EXPLAIN QUERY PLAN {sql}"))
+                .unwrap()
+                .query_map([id], |row| row.get::<_, String>(3))
+                .unwrap()
+                .collect::<Result<Vec<_>, _>>()
+                .unwrap();
+            (
+                statement.get_status(rusqlite::StatementStatus::VmStep),
+                plan,
+            )
+        };
+        connection
+            .execute_batch("ROLLBACK TO asset_check; RELEASE asset_check")
+            .unwrap();
+        (steps, plan)
+    };
+    let (indexed, plan) = measure(&storage.connection);
+    assert!(
+        plan.iter().any(|line| line.contains(
+            "SEARCH epub_inline_images USING COVERING INDEX epub_inline_images_by_asset"
+        )),
+        "{plan:?}"
+    );
+    storage
+        .connection
+        .execute_batch("DROP INDEX epub_inline_images_by_asset")
+        .unwrap();
+    let (unindexed, _) = measure(&storage.connection);
+    eprintln!("Asset delete SQLite VM steps: {unindexed} -> {indexed}");
+    assert!(indexed < unindexed);
+}
+
+#[test]
 fn document_deletion_cleans_all_file_formats_chapters_assets_and_live_dedup_only() {
     for kind in ["txt", "srt", "epub"] {
         let database = TestDatabase::new();

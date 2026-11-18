@@ -28,6 +28,7 @@ pub(super) enum DocumentRequest {
     Rename(DocumentId, String),
     SetRead(DocumentId, bool),
     Import,
+    FileImport,
     PageLength,
     Typography,
     Position,
@@ -47,10 +48,10 @@ impl DocumentRequest {
                 document_id,
                 is_read,
             } => Self::SetRead(*document_id, *is_read),
-            StorageOperation::CreatePaste(_)
-            | StorageOperation::ImportTxt(_)
+            StorageOperation::CreatePaste(_) => Self::Import,
+            StorageOperation::ImportTxt(_)
             | StorageOperation::ImportSrt(_)
-            | StorageOperation::ImportEpub(_) => Self::Import,
+            | StorageOperation::ImportEpub(_) => Self::FileImport,
             StorageOperation::SavePageLength(_) => Self::PageLength,
             StorageOperation::SaveReaderTypography(_) => Self::Typography,
             StorageOperation::SaveReadingPosition { .. } => Self::Position,

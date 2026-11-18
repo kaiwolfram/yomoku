@@ -69,7 +69,7 @@ fn library_words_are_core_owned_and_sort_settings_preserve_the_snapshot() {
 }
 
 #[test]
-fn library_words_refresh_on_return_import_duplicate_and_library_reload() {
+fn library_words_refresh_on_return_new_import_and_library_reload() {
     for core in cores() {
         loaded(&core);
         core.process_event(Event::OpenPaste);
@@ -91,9 +91,14 @@ fn library_words_refresh_on_return_import_duplicate_and_library_reload() {
             StorageResult::Existing(document),
         ] {
             loaded(&core);
+            let previous = core.view().library_word_distributions;
+            let duplicate = matches!(result, StorageResult::Existing(_));
             let mut effects = core.process_event(Event::CreatePaste("本".into()));
             finish(&core, &mut effects, result);
-            assert_eq!(core.view().library_word_distributions, None);
+            assert_eq!(
+                core.view().library_word_distributions,
+                if duplicate { previous } else { None }
+            );
         }
         loaded(&core);
         let mut effects = core.process_event(Event::RefreshLibrary);

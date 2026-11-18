@@ -3,13 +3,15 @@
 use std::collections::{btree_map::Entry, BTreeMap, BTreeSet};
 
 use yomoku_core::{
+    analysis::SplitMode,
     document::{ChapterId, DocumentId},
     library::{LibraryWordDistribution, WordStatusCounts},
+    reader::ReaderAnalysis,
     vocabulary::{Surface, VocabularyStatus},
 };
 
 use crate::{
-    analysis::{read_chapter, read_effective_reader_chapter_in},
+    analysis::{read_analysis_for_chapter, read_chapter, read_reader_analysis},
     vocabulary::read_entry_by_surface,
     Storage, StorageError,
 };
@@ -54,14 +56,23 @@ impl Storage {
                     &transaction,
                     ChapterId::try_from(chapter_id).map_err(|_| StorageError::InvalidAnalysis)?,
                 )?;
-                let Some(effective) = read_effective_reader_chapter_in(&transaction, &chapter)?
+                let ReaderAnalysis::Available(id) =
+                    read_reader_analysis(&transaction, chapter.chapter_id)?
                 else {
                     available = false;
                     continue;
                 };
-                for surface in effective.eligible_surfaces() {
-                    surfaces
-                        .insert(Surface::new(surface).map_err(|_| StorageError::InvalidAnalysis)?);
+                let analysis = read_analysis_for_chapter(&transaction, id, Some(&chapter))?
+                    .filter(|analysis| analysis.mode == SplitMode::C)
+                    .ok_or(StorageError::InvalidAnalysis)?;
+                for token in analysis
+                    .tokens
+                    .into_iter()
+                    .filter(|token| token.is_japanese)
+                {
+                    surfaces.insert(
+                        Surface::new(token.surface).map_err(|_| StorageError::InvalidAnalysis)?,
+                    );
                 }
             }
             let mut counts = WordStatusCounts::default();

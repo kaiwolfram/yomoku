@@ -116,20 +116,34 @@ pub(crate) fn read_analysis(
     connection: &Connection,
     id: AnalysisId,
 ) -> Result<Option<ChapterAnalysis>, StorageError> {
+    read_analysis_for_chapter(connection, id, None)
+}
+
+pub(crate) fn read_analysis_for_chapter(
+    connection: &Connection,
+    id: AnalysisId,
+    chapter: Option<&ChapterText>,
+) -> Result<Option<ChapterAnalysis>, StorageError> {
     let header = connection.query_row(
         "SELECT semantics_version, chapter_id, engine_revision, dictionary_revision, split_mode FROM chapter_analyses WHERE id = ?1",
         [i64::from(id)], |row| Ok((row.get::<_, i64>(0)?, row.get::<_, i64>(1)?, row.get::<_, String>(2)?, row.get::<_, String>(3)?, row.get::<_, String>(4)?)),
     ).optional()?;
-    let Some((version, chapter, engine_revision, dictionary_revision, mode)) = header else {
+    let Some((version, chapter_id, engine_revision, dictionary_revision, mode)) = header else {
         return Ok(None);
     };
     if version != 1 {
         return Err(StorageError::InvalidAnalysis);
     }
-    let chapter = read_chapter(
-        connection,
-        ChapterId::try_from(chapter).map_err(|_| StorageError::InvalidAnalysis)?,
-    )?;
+    let chapter_id = ChapterId::try_from(chapter_id).map_err(|_| StorageError::InvalidAnalysis)?;
+    let loaded;
+    let chapter = match chapter {
+        Some(chapter) if chapter.chapter_id == chapter_id => chapter,
+        Some(_) => return Err(StorageError::InvalidAnalysis),
+        None => {
+            loaded = read_chapter(connection, chapter_id)?;
+            &loaded
+        }
+    };
     let mode = match mode.as_str() {
         "a" => SplitMode::A,
         "b" => SplitMode::B,
@@ -178,7 +192,7 @@ pub(crate) fn read_analysis(
         tokens,
     };
     analysis
-        .validate(&chapter)
+        .validate(chapter)
         .map_err(|_| StorageError::InvalidAnalysis)?;
     Ok(Some(analysis))
 }

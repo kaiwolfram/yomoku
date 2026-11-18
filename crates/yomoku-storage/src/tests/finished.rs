@@ -65,7 +65,7 @@ fn schema_one_books_inherit_completion_and_keep_saved_positions() {
     drop(connection);
 
     let mut storage = Storage::open(database.path()).unwrap();
-    assert_eq!(storage.schema_version().unwrap(), 2);
+    assert_eq!(storage.schema_version().unwrap(), 3);
     let summaries = storage.list_documents().unwrap();
     assert_eq!(summaries.len(), 2);
     assert_eq!(summaries[0].document_id, partial.document_id);

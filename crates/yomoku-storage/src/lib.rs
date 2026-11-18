@@ -56,6 +56,11 @@ const MIGRATIONS: &[Migration] = &[
         name: "0002_library_read_override",
         sql: include_str!("../migrations/0002_library_read_override.sql"),
     },
+    Migration {
+        version: 3,
+        name: "0003_hot_path_indexes",
+        sql: include_str!("../migrations/0003_hot_path_indexes.sql"),
+    },
 ];
 
 /// Failures are returned to the runtime; opening never resets a database.
