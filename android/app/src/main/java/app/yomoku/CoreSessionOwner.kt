@@ -40,19 +40,22 @@ private constructor(
     val importBookRequest = ImportBookRequest()
     val session =
         CoreSession(
-            File(isolatedDirectory ?: application.filesDir, "yomoku.sqlite3").absolutePath,
-            sudachiDictionaryProvider(application),
-            readAnkiPreflight = AnkiPreflightReader(AnkiProviderReader(application))::read,
-            invokeAnkiLive = AnkiLiveDispatcher(application)::invoke,
-            needsAnkiPermission = {
-                val environment = AndroidAnkiProviderEnvironment(application)
-                environment.provider() != null && !environment.hasPermission()
-            },
-            readAnkiDecks = AnkiProviderReader(application)::decks,
-            resolveAnkiNotes = AnkiProviderReader(application)::existingNotesIntent,
-            resolveAnkiNote = AnkiProviderReader(application)::existingNoteIntent,
-            onClosed = { isolatedDirectory?.deleteRecursively() },
-        )
+                File(isolatedDirectory ?: application.filesDir, "yomoku.sqlite3").absolutePath,
+                sudachiDictionaryProvider(application),
+                readAnkiPreflight = AnkiPreflightReader(AnkiProviderReader(application))::read,
+                invokeAnkiLive = AnkiLiveDispatcher(application)::invoke,
+                needsAnkiPermission = {
+                    val environment = AndroidAnkiProviderEnvironment(application)
+                    environment.provider() != null && !environment.hasPermission()
+                },
+                readAnkiDecks = AnkiProviderReader(application)::decks,
+                resolveAnkiNotes = AnkiProviderReader(application)::existingNotesIntent,
+                resolveAnkiNote = AnkiProviderReader(application)::existingNoteIntent,
+            )
+            .also { session ->
+                if (isolatedDirectory != null)
+                    session.onClosed = { isolatedDirectory.deleteRecursively() }
+            }
     val fileImports: FileImports =
         FileImports(
             application.contentResolver,

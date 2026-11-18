@@ -7,7 +7,39 @@ use yomoku_import::txt::TextEncoding;
 
 use crate::{reader_documents::load_reader_document_in, Storage, StorageError};
 
+pub enum FilePreflight<T> {
+    Existing(LibraryDocument),
+    Prepared(PreparedFile<T>),
+}
+
+/// Source identity and bounded parser output from the same input bytes.
+pub struct PreparedFile<T> {
+    pub(crate) digest: [u8; 32],
+    pub(crate) filename: String,
+    pub(crate) parsed: T,
+}
+
 impl Storage {
+    pub(crate) fn prepare_file<T, E: From<StorageError>>(
+        &mut self,
+        original_bytes: &[u8],
+        filename: &str,
+        parse: impl FnOnce(&[u8]) -> Result<T, E>,
+    ) -> Result<FilePreflight<T>, E> {
+        let digest: [u8; 32] = Sha256::digest(original_bytes).into();
+        if let Some(document) = self.find_imported_digest(&digest)? {
+            return Ok(FilePreflight::Existing(document));
+        }
+        if filename.trim().is_empty() {
+            return Err(StorageError::InvalidDocument.into());
+        }
+        Ok(FilePreflight::Prepared(PreparedFile {
+            digest,
+            filename: filename.to_owned(),
+            parsed: parse(original_bytes)?,
+        }))
+    }
+
     /// Format-independent read-only preflight. A duplicate's identity is enough
     /// to reference its existing interpretation without a single-chapter payload.
     pub fn find_imported_file_id(
@@ -29,8 +61,15 @@ impl Storage {
         original_bytes: &[u8],
     ) -> Result<Option<LibraryDocument>, StorageError> {
         let digest = Sha256::digest(original_bytes);
+        self.find_imported_digest(digest.as_slice())
+    }
+
+    fn find_imported_digest(
+        &mut self,
+        digest: &[u8],
+    ) -> Result<Option<LibraryDocument>, StorageError> {
         let transaction = self.connection.transaction()?;
-        let document = find_imported_in(&transaction, digest.as_slice())?;
+        let document = find_imported_in(&transaction, digest)?;
         transaction.commit()?;
         Ok(document)
     }

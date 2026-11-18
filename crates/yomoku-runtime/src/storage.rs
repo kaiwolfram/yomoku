@@ -339,19 +339,19 @@ fn execute(
         }
         StorageOperation::ImportTxt(input) => imports.import_txt(
             storage,
-            &input,
+            input,
             cancellation.expect("TXT attempt published before enqueue"),
             || word_dictionary(dictionary, word_loader),
         ),
         StorageOperation::ImportSrt(input) => imports.import_srt(
             storage,
-            &input,
+            input,
             cancellation.expect("SRT attempt published before enqueue"),
             || word_dictionary(dictionary, word_loader),
         ),
         StorageOperation::ImportEpub(input) => imports.import_epub(
             storage,
-            &input,
+            input,
             cancellation.expect("EPUB attempt published before enqueue"),
             || word_dictionary(dictionary, word_loader),
         ),

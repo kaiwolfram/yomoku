@@ -3,7 +3,6 @@
 use std::{error::Error, fmt};
 
 use rusqlite::TransactionBehavior;
-use sha2::{Digest, Sha256};
 use yomoku_core::{
     analysis::ChapterAnalysis,
     document::{ChapterText, LibraryDocument},
@@ -17,7 +16,7 @@ use crate::{
     documents::create_single_text_in,
     files::{find_imported_in, store_imported_text_in},
     imports::store_analyzed_document_in,
-    AnalyzedPaste, ImportCancellation, Storage, StorageError,
+    AnalyzedPaste, FilePreflight, ImportCancellation, PreparedFile, Storage, StorageError,
 };
 
 #[derive(Debug)]
@@ -105,7 +104,49 @@ impl Storage {
         if registered_at_unix_ms < 0 {
             return Err(StorageError::InvalidVocabulary.into());
         }
-        let digest = Sha256::digest(original_bytes);
+        match self.prepare_srt(original_bytes, filename, selection)? {
+            FilePreflight::Existing(document) => {
+                cancellation.commit(|| Ok(SrtImportOutcome::Existing(document)))
+            }
+            FilePreflight::Prepared(prepared) => {
+                self.import_prepared_srt(prepared, registered_at_unix_ms, cancellation, analyze)
+            }
+        }
+    }
+
+    pub fn prepare_srt<E>(
+        &mut self,
+        original_bytes: &[u8],
+        filename: &str,
+        selection: Option<TextEncoding>,
+    ) -> Result<FilePreflight<(TextEncoding, srt::SrtDocument)>, SrtImportError<E>> {
+        self.prepare_file(original_bytes, filename, |bytes| {
+            let (encoding, decoded) = decode(bytes, selection).map_err(SrtImportError::Decode)?;
+            Ok((
+                encoding,
+                srt::parse(&decoded).map_err(SrtImportError::Empty)?,
+            ))
+        })
+    }
+
+    pub fn import_prepared_srt<E>(
+        &mut self,
+        prepared: PreparedFile<(TextEncoding, srt::SrtDocument)>,
+        registered_at_unix_ms: i64,
+        cancellation: &ImportCancellation,
+        analyze: impl FnOnce(&ChapterText) -> Result<ChapterAnalysis, E>,
+    ) -> Result<Option<SrtImportOutcome>, SrtImportError<E>> {
+        if cancellation.is_cancelled() {
+            return Ok(None);
+        }
+        if registered_at_unix_ms < 0 {
+            return Err(StorageError::InvalidVocabulary.into());
+        }
+        let PreparedFile {
+            digest,
+            filename,
+            parsed: (encoding, parsed),
+        } = prepared;
         let transaction = self
             .connection
             .transaction_with_behavior(TransactionBehavior::Immediate)
@@ -116,16 +157,10 @@ impl Storage {
         let outcome = if let Some(document) = find_imported_in(&transaction, digest.as_slice())? {
             SrtImportOutcome::Existing(document)
         } else {
-            if filename.trim().is_empty() {
-                return Err(StorageError::InvalidDocument.into());
-            }
-            let (encoding, decoded) =
-                decode(original_bytes, selection).map_err(SrtImportError::Decode)?;
-            let parsed = srt::parse(&decoded).map_err(SrtImportError::Empty)?;
             if cancellation.is_cancelled() {
                 return Ok(None);
             }
-            let document = create_single_text_in(&transaction, "srt", filename, &parsed.text)?;
+            let document = create_single_text_in(&transaction, "srt", &filename, &parsed.text)?;
             store_imported_text_in(
                 &transaction,
                 document.document_id,

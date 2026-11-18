@@ -30,6 +30,7 @@ pub use epub::{
     AnalyzedEpub, EpubImportError, EpubImportOutcome, StoredEpubChapter, StoredEpubDocument,
 };
 pub use epub_assets::{EpubCoverReference, MAX_EPUB_ASSET_BYTES};
+pub use files::{FilePreflight, PreparedFile};
 pub use import_cancellation::ImportCancellation;
 pub use imports::{AnalyzedPaste, PasteImportError, PasteImportOutcome};
 pub use srt::{SrtImportError, SrtImportOutcome};

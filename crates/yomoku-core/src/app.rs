@@ -549,6 +549,21 @@ impl App for Yomoku {
             model.invalidate_effective_page();
             return render::render();
         }
+        if matches!(
+            event,
+            Event::ImportTxt(_) | Event::ImportSrt(_) | Event::ImportEpub(_)
+        ) {
+            if !model.can_start_document_storage() {
+                return Command::done();
+            }
+            let operation = match event {
+                Event::ImportTxt(input) => StorageOperation::ImportTxt(input),
+                Event::ImportSrt(input) => StorageOperation::ImportSrt(input),
+                Event::ImportEpub(input) => StorageOperation::ImportEpub(input),
+                _ => unreachable!(),
+            };
+            return self.start_document_storage(operation, false, model);
+        }
         let operation = match &event {
             Event::RefreshLibrary => Some(StorageOperation::List),
             Event::SaveDocumentTitle(id) => {
@@ -604,9 +619,6 @@ impl App for Yomoku {
                 Some(StorageOperation::LoadEffectiveLibraryWordDistributions)
             }
             Event::CreatePaste(text) => Some(StorageOperation::CreatePaste(text.clone())),
-            Event::ImportTxt(input) => Some(StorageOperation::ImportTxt(input.clone())),
-            Event::ImportSrt(input) => Some(StorageOperation::ImportSrt(input.clone())),
-            Event::ImportEpub(input) => Some(StorageOperation::ImportEpub(input.clone())),
 
             Event::OpenReader(id) => Some(StorageOperation::OpenReader(*id)),
 
@@ -652,96 +664,10 @@ impl App for Yomoku {
             _ => None,
         };
         if let Some(operation) = operation {
-            // One in-flight command per session prevents duplicate submissions and
-            // stale load/list callbacks from replacing a newer snapshot.
-            if model.storage_busy()
-                || model.effective_mutation_pending()
-                || model.completion_pending()
-            {
+            if !model.can_start_document_storage() {
                 return Command::done();
             }
-            let Some(attempt) = model.storage_sequence.checked_add(1) else {
-                model.document_error = Some(DocumentError::Unavailable);
-                return render::render();
-            };
-            model.storage_sequence = attempt;
-            let request = DocumentRequest::capture(&operation);
-            if !matches!(request, DocumentRequest::LibraryWords) {
-                model.file_import_error = None;
-            }
-            if !matches!(
-                request,
-                DocumentRequest::FileImport
-                    | DocumentRequest::LibraryWords
-                    | DocumentRequest::Delete(_)
-                    | DocumentRequest::Rename(..)
-            ) {
-                model.document_error = None;
-            }
-            model.pending_storage = PendingStorage::Document { attempt, request };
-            if let StorageOperation::RenameDocument { .. } = &operation {
-                if let Some(draft) = model.library_rename.as_mut() {
-                    draft.error = None;
-                }
-            } else if !operation.loads_library_words() {
-                model.library_rename = None;
-            }
-            match &operation {
-                StorageOperation::DeleteDocument(_) => {
-                    model.library_delete_error = None;
-                }
-                StorageOperation::LoadEffectiveLibraryWordDistributions => {}
-                _ => {
-                    model.clear_library_delete();
-                }
-            }
-            if operation.loads_library_words() {
-                model.library_word_distributions = None;
-                model.library_word_error = None;
-            }
-
-            // Every accepted operation that invalidates page tokens also retires
-            // its selected-word result, even if the resulting anchor is unchanged.
-            if matches!(
-                operation,
-                |StorageOperation::List| StorageOperation::OpenReader(_)
-                    | StorageOperation::CreatePaste(_)
-                    | StorageOperation::ImportTxt(_)
-                    | StorageOperation::ImportSrt(_)
-                    | StorageOperation::ImportEpub(_)
-                    | StorageOperation::SavePageLength(_)
-                    | StorageOperation::SaveReadingPosition { .. }
-            ) && !matches!(event, Event::SkipReaderPage { .. })
-            {
-                model.invalidate_effective_page();
-                model.clear_reader_word();
-            }
-            // Skip retains the current projection until the position save succeeds,
-            // so a failed save can retry the same menu action without reloading words.
-
-            if matches!(
-                event,
-                Event::CreatePaste(_)
-                    | Event::ImportTxt(_)
-                    | Event::ImportSrt(_)
-                    | Event::ImportEpub(_)
-                    | Event::OpenReader(_)
-            ) {
-                model.import_summary = None;
-                model.completion_notice = None;
-                model.book_completion_notice = None;
-            }
-
-            if let Event::OpenReader(_) = event {
-                model.destination = Destination::Library;
-                model.settings_open = false;
-                model.content_route = ContentRoute::Reader;
-                model.clear_reader_presentation();
-            }
-            return render::render().and(
-                Command::request_from_shell(operation)
-                    .then_send(move |result| Event::StorageFinished(attempt, result)),
-            );
+            return self.start_document_storage(operation, skip_position.is_some(), model);
         }
         match event {
             Event::RequestDocumentRename(id) => {
@@ -1200,7 +1126,103 @@ impl App for Yomoku {
     }
 }
 
+impl Yomoku {
+    fn start_document_storage(
+        &self,
+        operation: StorageOperation,
+        skip: bool,
+        model: &mut Model,
+    ) -> Command<Effect, Event> {
+        let Some(attempt) = model.storage_sequence.checked_add(1) else {
+            model.document_error = Some(DocumentError::Unavailable);
+            return render::render();
+        };
+        model.storage_sequence = attempt;
+        let request = DocumentRequest::capture(&operation);
+        if !matches!(request, DocumentRequest::LibraryWords) {
+            model.file_import_error = None;
+        }
+        if !matches!(
+            request,
+            DocumentRequest::FileImport
+                | DocumentRequest::LibraryWords
+                | DocumentRequest::Delete(_)
+                | DocumentRequest::Rename(..)
+        ) {
+            model.document_error = None;
+        }
+        model.pending_storage = PendingStorage::Document { attempt, request };
+        if let StorageOperation::RenameDocument { .. } = &operation {
+            if let Some(draft) = model.library_rename.as_mut() {
+                draft.error = None;
+            }
+        } else if !operation.loads_library_words() {
+            model.library_rename = None;
+        }
+        match &operation {
+            StorageOperation::DeleteDocument(_) => {
+                model.library_delete_error = None;
+            }
+            StorageOperation::LoadEffectiveLibraryWordDistributions => {}
+            _ => {
+                model.clear_library_delete();
+            }
+        }
+        if operation.loads_library_words() {
+            model.library_word_distributions = None;
+            model.library_word_error = None;
+        }
+
+        // Every accepted operation that invalidates page tokens also retires
+        // its selected-word result, even if the resulting anchor is unchanged.
+        if matches!(
+            operation,
+            |StorageOperation::List| StorageOperation::OpenReader(_)
+                | StorageOperation::CreatePaste(_)
+                | StorageOperation::ImportTxt(_)
+                | StorageOperation::ImportSrt(_)
+                | StorageOperation::ImportEpub(_)
+                | StorageOperation::SavePageLength(_)
+                | StorageOperation::SaveReadingPosition { .. }
+        ) && !skip
+        {
+            model.invalidate_effective_page();
+            model.clear_reader_word();
+        }
+        // Skip retains the current projection until the position save succeeds,
+        // so a failed save can retry the same menu action without reloading words.
+
+        if matches!(
+            operation,
+            StorageOperation::CreatePaste(_)
+                | StorageOperation::ImportTxt(_)
+                | StorageOperation::ImportSrt(_)
+                | StorageOperation::ImportEpub(_)
+                | StorageOperation::OpenReader(_)
+        ) {
+            model.import_summary = None;
+            model.completion_notice = None;
+            model.book_completion_notice = None;
+        }
+
+        if matches!(operation, StorageOperation::OpenReader(_)) {
+            model.destination = Destination::Library;
+            model.settings_open = false;
+            model.content_route = ContentRoute::Reader;
+            model.clear_reader_presentation();
+        }
+        render::render().and(
+            Command::request_from_shell(operation)
+                .then_send(move |result| Event::StorageFinished(attempt, result)),
+        )
+    }
+}
+
 impl Model {
+    fn can_start_document_storage(&self) -> bool {
+        !self.storage_busy() && !self.effective_mutation_pending() && !self.completion_pending()
+    }
+
     fn library_visible(&self) -> bool {
         self.destination == Destination::Library
             && self.content_route == ContentRoute::Main

@@ -84,6 +84,16 @@ private sealed interface FileImportPhase {
 
     data class ChoosingEncoding(val input: FileInput, val error: DocumentError) : FileImportPhase
 
+    data class Encoding(val input: FileInput) : FileImportPhase
+
+    data class Prepared(
+        val input: FileInput,
+        val encoded: ByteArray,
+        val generation: Long,
+        val session: String,
+        val encodeNanos: Long?,
+    ) : FileImportPhase
+
     data class Importing(val input: FileInput) : FileImportPhase
 
     // Native cancellation and its storage result can return in either order.
@@ -104,6 +114,7 @@ internal class FileImports(
     private val observer: FileImportObserver? = null,
     private val notificationsAvailable: () -> Boolean = { false },
     private val availableImportMemory: () -> Long = FileImportMemory::availableBytes,
+    private val encodeFileEvent: (Event) -> ByteArray = Event::bincodeSerialize,
 ) : AutoCloseable {
     private val handler = Handler(Looper.getMainLooper())
     private var reader = Executors.newSingleThreadExecutor()
@@ -130,6 +141,8 @@ internal class FileImports(
             when (val current = phase) {
                 is FileImportPhase.Reading -> current.filename
                 is FileImportPhase.ChoosingEncoding -> current.input.filename
+                is FileImportPhase.Encoding -> current.input.filename
+                is FileImportPhase.Prepared -> current.input.filename
                 is FileImportPhase.Importing -> current.input.filename
                 is FileImportPhase.Cancelling -> current.filename
                 else -> ""
@@ -159,8 +172,7 @@ internal class FileImports(
         if (closed || active) return
         val view = core.view
         if (
-            view.storageBusy ||
-                view.completionSavePending ||
+            view.completionSavePending ||
                 view.contentRoute != ContentRoute.MAIN ||
                 view.destination != Destination.LIBRARY ||
                 view.settingsOpen
@@ -232,31 +244,85 @@ internal class FileImports(
                     if (loaded == null) {
                         finish(FileImportResult(name, message = R.string.import_supported_files))
                     } else {
-                        submit(loaded)
+                        prepare(loaded)
                     }
                 }
             }
         }
     }
 
-    private fun submit(input: FileInput) {
-        try {
-            FileImportMemory.requireSubmissionRoom(
-                input.bytes.size,
-                input.filename,
-                availableImportMemory(),
-            )
-        } catch (_: ImportMemoryExceeded) {
-            finish(FileImportResult(input.filename, message = R.string.import_file_too_large))
+    private fun prepare(input: FileInput) {
+        val generation = readGeneration
+        val session = core.sessionKey
+        val measure = core.onRequestsMeasured != null
+        phase = FileImportPhase.Encoding(input)
+        reader.execute {
+            if (generation != readGeneration) return@execute
+            val prepared =
+                try {
+                    FileImportMemory.requireSubmissionRoom(
+                        input.bytes.size,
+                        input.filename,
+                        availableImportMemory(),
+                    )
+                    val event = input.event()
+                    val start = if (measure) System.nanoTime() else 0L
+                    val encoded = encodeFileEvent(event)
+                    val elapsed = if (measure) System.nanoTime() - start else null
+                    FileImportPhase.Prepared(input, encoded, generation, session, elapsed)
+                } catch (error: Exception) {
+                    handler.post {
+                        if (generation == readGeneration) {
+                            val message =
+                                if (error is ImportMemoryExceeded) R.string.import_file_too_large
+                                else R.string.error_storage_unavailable
+                            finish(FileImportResult(input.filename, message = message))
+                        }
+                    }
+                    return@execute
+                }
+            if (generation != readGeneration) return@execute
+            handler.post {
+                if (generation == readGeneration) {
+                    phase = prepared
+                    submitPrepared(prepared)
+                }
+            }
+        }
+    }
+
+    private fun submitPrepared(prepared: FileImportPhase.Prepared) {
+        if (prepared.generation != readGeneration) return
+        val view = core.view
+        if (
+            !core.acceptsFileImport(prepared.session) ||
+                view.contentRoute != ContentRoute.MAIN ||
+                view.destination != Destination.LIBRARY ||
+                view.settingsOpen ||
+                view.completionSavePending
+        ) {
+            complete(null)
             return
         }
-        phase = FileImportPhase.Importing(input)
-        core.dispatch(input.event())
+        if (view.storageBusy) return
+        if (prepared.encoded.size > FileImportMemory.sourceLimit(availableImportMemory())) {
+            finish(
+                FileImportResult(prepared.input.filename, message = R.string.import_file_too_large)
+            )
+            return
+        }
+        phase = FileImportPhase.Importing(prepared.input)
+        core.dispatchEncodedImport(prepared.encoded, prepared.encodeNanos)
     }
 
     private fun receive() {
-        if (closed || core.view.storageBusy) return
+        if (closed) return
         val current = phase
+        if (current is FileImportPhase.Prepared) {
+            submitPrepared(current)
+            return
+        }
+        if (core.view.storageBusy) return
         if (
             current !is FileImportPhase.Importing &&
                 !(current is FileImportPhase.Cancelling && current.waitingForCore)
@@ -299,7 +365,7 @@ internal class FileImports(
         checkMainThread()
         if (closed) return
         val current = phase as? FileImportPhase.ChoosingEncoding ?: return
-        submit(current.input.copy(encoding = encoding))
+        prepare(current.input.copy(encoding = encoding))
         refreshNotifications()
     }
 
@@ -338,7 +404,7 @@ internal class FileImports(
     private fun complete(result: FileImportResult?) {
         phase = FileImportPhase.Finished(result)
         observer?.finished(result)
-        core.dispatch(Event.DismissImportSummary)
+        if (core.acceptsFileImport(core.sessionKey)) core.dispatch(Event.DismissImportSummary)
     }
 
     fun dismissSummary() {

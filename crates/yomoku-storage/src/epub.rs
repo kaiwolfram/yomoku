@@ -16,8 +16,8 @@ use yomoku_import::epub::{
 };
 
 use crate::{
-    files::find_imported_in, imports::store_analyzed_chapter_in, ImportCancellation, Storage,
-    StorageError,
+    files::find_imported_in, imports::store_analyzed_chapter_in, FilePreflight, ImportCancellation,
+    PreparedFile, Storage, StorageError,
 };
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -121,6 +121,39 @@ impl Storage {
         filename: &str,
         registered_at_unix_ms: i64,
         cancellation: &ImportCancellation,
+        analyze: impl FnMut(&ChapterText) -> Result<ChapterAnalysis, E>,
+    ) -> Result<Option<EpubImportOutcome>, EpubImportError<E>> {
+        if cancellation.is_cancelled() {
+            return Ok(None);
+        }
+        if registered_at_unix_ms < 0 {
+            return Err(StorageError::InvalidVocabulary.into());
+        }
+        match self.prepare_epub(original_bytes, filename)? {
+            FilePreflight::Existing(document) => {
+                cancellation.commit(|| Ok(EpubImportOutcome::Existing(document)))
+            }
+            FilePreflight::Prepared(prepared) => {
+                self.import_prepared_epub(prepared, registered_at_unix_ms, cancellation, analyze)
+            }
+        }
+    }
+
+    pub fn prepare_epub<E>(
+        &mut self,
+        original_bytes: &[u8],
+        filename: &str,
+    ) -> Result<FilePreflight<epub::EpubDocument>, EpubImportError<E>> {
+        self.prepare_file(original_bytes, filename, |bytes| {
+            epub::parse(bytes).map_err(EpubImportError::Parse)
+        })
+    }
+
+    pub fn import_prepared_epub<E>(
+        &mut self,
+        prepared: PreparedFile<epub::EpubDocument>,
+        registered_at_unix_ms: i64,
+        cancellation: &ImportCancellation,
         mut analyze: impl FnMut(&ChapterText) -> Result<ChapterAnalysis, E>,
     ) -> Result<Option<EpubImportOutcome>, EpubImportError<E>> {
         if cancellation.is_cancelled() {
@@ -129,7 +162,11 @@ impl Storage {
         if registered_at_unix_ms < 0 {
             return Err(StorageError::InvalidVocabulary.into());
         }
-        let digest = Sha256::digest(original_bytes);
+        let PreparedFile {
+            digest,
+            filename,
+            parsed,
+        } = prepared;
         let transaction = self
             .connection
             .transaction_with_behavior(TransactionBehavior::Immediate)
@@ -140,15 +177,10 @@ impl Storage {
         let outcome = if let Some(reference) = find_imported_in(&transaction, digest.as_slice())? {
             EpubImportOutcome::Existing(reference)
         } else {
-            if filename.trim().is_empty() {
-                return Err(StorageError::InvalidDocument.into());
-            }
-            // Always use the bounded parser; no stored metadata can tune limits.
-            let parsed = epub::parse(original_bytes).map_err(EpubImportError::Parse)?;
             if cancellation.is_cancelled() {
                 return Ok(None);
             }
-            let title = parsed.title.as_deref().unwrap_or(filename);
+            let title = parsed.title.as_deref().unwrap_or(&filename);
             transaction
                 .execute(
                     "INSERT INTO sources (kind, original_title) VALUES ('epub', ?1)",
@@ -170,7 +202,7 @@ impl Storage {
                 (i64::from(document_id), digest.as_slice()),
             ).map_err(StorageError::from)?;
             transaction.execute("INSERT INTO epub_documents (document_id, filename, metadata_title, cover_path, chapter_count, asset_count) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
-                (i64::from(document_id), filename, &parsed.title, &parsed.cover, number(parsed.chapters.len())?, number(parsed.images.len())?)).map_err(StorageError::from)?;
+                (i64::from(document_id), &filename, &parsed.title, &parsed.cover, number(parsed.chapters.len())?, number(parsed.images.len())?)).map_err(StorageError::from)?;
             for (path, image) in &parsed.images {
                 if cancellation.is_cancelled() {
                     return Ok(None);
@@ -233,7 +265,7 @@ impl Storage {
                     document_id,
                     source_id,
                     title: title.to_owned(),
-                    filename: filename.to_owned(),
+                    filename,
                     finished_at_least_once: false,
                     read_override: None,
                     reading_position: None,

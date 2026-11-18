@@ -63,21 +63,25 @@ class FileImportAdmissionTest {
                 assertNull(core.view.documentError)
             }
             assertEquals(4, results.size)
-            // Acquisition fits, but transport headroom may disappear before main-thread submit.
-            var memoryReads = 0
-            compose.runOnIdle {
-                imports.close()
-                imports =
-                    FileImports(
-                        compose.activity.contentResolver,
-                        core,
-                        availableImportMemory = { if (++memoryReads == 1) 8192 else 0 },
-                    )
-                imports.start(FileImportFixtures.uri("$prefix.txt", "small".toByteArray()))
+            // Reject before encoding and again before JNI if headroom is lost.
+            for (admittedChecks in 1..2) {
+                var memoryReads = 0
+                compose.runOnIdle {
+                    imports.close()
+                    imports =
+                        FileImports(
+                            compose.activity.contentResolver,
+                            core,
+                            availableImportMemory = {
+                                if (++memoryReads <= admittedChecks) 8192 else 0
+                            },
+                        )
+                    imports.start(FileImportFixtures.uri("$prefix.txt", "small".toByteArray()))
+                }
+                compose.waitUntil(30_000) { !imports.active && !core.view.storageBusy }
+                assertEquals(R.string.import_file_too_large, imports.result?.message)
+                assertEquals(initialCount, core.view.documents.size)
             }
-            compose.waitUntil(30_000) { !imports.active && !core.view.storageBusy }
-            assertEquals(R.string.import_file_too_large, imports.result?.message)
-            assertEquals(initialCount, core.view.documents.size)
             compose.runOnIdle {
                 imports.close()
                 imports =
@@ -99,7 +103,7 @@ class FileImportAdmissionTest {
                 memory.set(0)
                 imports.selectEncoding(TextEncoding.UTF8)
             }
-            assertFalse(imports.active)
+            compose.waitUntil(30_000) { !imports.active }
             assertEquals(R.string.import_file_too_large, imports.result?.message)
             assertEquals(initialCount, core.view.documents.size)
             compose.waitUntil(30_000) { !core.view.storageBusy }
@@ -109,7 +113,8 @@ class FileImportAdmissionTest {
                     FileImportFixtures.uri("$prefix-last.txt", "\uFEFF$prefix 猫。".toByteArray())
                 )
             }
-            compose.waitUntil(30_000) { !imports.active && !core.view.storageBusy }
+            // This first successful import may provision both dictionaries on a fresh install.
+            compose.waitUntil(90_000) { !imports.active && !core.view.storageBusy }
             assertEquals(ImportOutcome.CREATED, imports.result?.outcome)
             assertEquals(initialCount + 1, core.view.documents.size)
         } finally {

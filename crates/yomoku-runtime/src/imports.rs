@@ -11,13 +11,11 @@ use yomoku_core::{
     imports::{EpubImport, SrtImport, TextEncoding, TxtImport},
     storage::{DocumentError, StorageResult},
 };
-use yomoku_import::{
-    epub, srt,
-    txt::{self, TextEncoding as Decoding, TxtError},
-};
+use yomoku_import::txt::{TextEncoding as Decoding, TxtError};
 use yomoku_storage::{
-    EpubImportError, EpubImportOutcome, ImportCancellation, PasteImportError, PasteImportOutcome,
-    SrtImportError, SrtImportOutcome, Storage, StorageError, TxtImportError, TxtImportOutcome,
+    EpubImportError, EpubImportOutcome, FilePreflight, ImportCancellation, PasteImportError,
+    PasteImportOutcome, SrtImportError, SrtImportOutcome, Storage, StorageError, TxtImportError,
+    TxtImportOutcome,
 };
 
 use crate::storage::{map_error, Job};
@@ -230,36 +228,39 @@ impl Imports {
     pub(crate) fn import_txt<'a>(
         &mut self,
         storage: &mut Storage,
-        input: &TxtImport,
+        input: TxtImport,
         cancellation: &ImportCancellation,
         load_dictionary: impl FnOnce() -> Result<&'a Dictionary, DocumentError>,
     ) -> Result<StorageResult, DocumentError> {
         if cancellation.is_cancelled() {
             return Ok(StorageResult::ImportCancelled);
         }
-        // Avoid dictionary extraction/loading for an existing file, including
-        // after background release or a fresh session. No title/encoding changes.
-        if let Some(document) = storage
-            .find_imported_file(&input.original_bytes)
-            .map_err(map_error)?
-        {
-            return Ok(if cancellation.is_cancelled() {
-                StorageResult::ImportCancelled
-            } else {
-                StorageResult::Existing(document)
-            });
-        }
-        if input.filename.trim().is_empty() {
-            return Err(DocumentError::InvalidDocument);
-        }
         let selection = input.encoding.map(|encoding| match encoding {
             TextEncoding::Utf8 => Decoding::Utf8,
             TextEncoding::ShiftJis => Decoding::ShiftJis,
         });
-        // Validate before loading Full and before acquiring the write lock.
-        // The repository parses again under its authoritative atomic lookup so
-        // concurrent creators cannot overwrite an existing interpretation.
-        txt::parse(&input.original_bytes, selection).map_err(map_txt_error)?;
+        let preflight = storage
+            .prepare_txt::<std::convert::Infallible>(
+                &input.original_bytes,
+                &input.filename,
+                selection,
+            )
+            .map_err(|error| match error {
+                TxtImportError::Parse(error) => map_txt_error(error),
+                TxtImportError::Storage(error) => map_error(error),
+                TxtImportError::Analysis(error) => match error {},
+            })?;
+        drop(input);
+        let prepared = match preflight {
+            FilePreflight::Existing(document) => {
+                return Ok(if cancellation.is_cancelled() {
+                    StorageResult::ImportCancelled
+                } else {
+                    StorageResult::Existing(document)
+                })
+            }
+            FilePreflight::Prepared(prepared) => prepared,
+        };
         if cancellation.is_cancelled() {
             return Ok(StorageResult::ImportCancelled);
         }
@@ -268,10 +269,8 @@ impl Imports {
         }
         let mut refinement = Refinement::new(load_dictionary()?);
         let analyzer = self.analyzer.as_mut().expect("loaded analyzer");
-        match storage.import_analyzed_txt_cancellable(
-            &input.original_bytes,
-            &input.filename,
-            selection,
+        match storage.import_prepared_txt(
+            prepared,
             registration_timestamp()?,
             cancellation,
             |chapter| refinement.analyze(analyzer.as_mut(), chapter),
@@ -300,40 +299,40 @@ impl Imports {
     pub(crate) fn import_srt<'a>(
         &mut self,
         storage: &mut Storage,
-        input: &SrtImport,
+        input: SrtImport,
         cancellation: &ImportCancellation,
         load_dictionary: impl FnOnce() -> Result<&'a Dictionary, DocumentError>,
     ) -> Result<StorageResult, DocumentError> {
         if cancellation.is_cancelled() {
             return Ok(StorageResult::ImportCancelled);
         }
-        // Avoid dictionary extraction/loading for an existing file, including
-        // after background release or a fresh session. No title/encoding changes.
-        if let Some(document) = storage
-            .find_imported_file(&input.original_bytes)
-            .map_err(map_error)?
-        {
-            return Ok(if cancellation.is_cancelled() {
-                StorageResult::ImportCancelled
-            } else {
-                StorageResult::Existing(document)
-            });
-        }
-        if input.filename.trim().is_empty() {
-            return Err(DocumentError::InvalidDocument);
-        }
         let selection = input.encoding.map(|encoding| match encoding {
             TextEncoding::Utf8 => Decoding::Utf8,
             TextEncoding::ShiftJis => Decoding::ShiftJis,
         });
-        // Validate before loading Full and before acquiring the write lock.
-        // The repository parses again under its authoritative atomic lookup so
-        // concurrent creators cannot overwrite an existing interpretation.
-        {
-            let (_, decoded) =
-                txt::decode(&input.original_bytes, selection).map_err(map_srt_decode_error)?;
-            srt::parse(&decoded).map_err(|_| DocumentError::EmptySrt)?;
-        }
+        let preflight = storage
+            .prepare_srt::<std::convert::Infallible>(
+                &input.original_bytes,
+                &input.filename,
+                selection,
+            )
+            .map_err(|error| match error {
+                SrtImportError::Decode(error) => map_srt_decode_error(error),
+                SrtImportError::Empty(_) => DocumentError::EmptySrt,
+                SrtImportError::Storage(error) => map_error(error),
+                SrtImportError::Analysis(error) => match error {},
+            })?;
+        drop(input);
+        let prepared = match preflight {
+            FilePreflight::Existing(document) => {
+                return Ok(if cancellation.is_cancelled() {
+                    StorageResult::ImportCancelled
+                } else {
+                    StorageResult::Existing(document)
+                })
+            }
+            FilePreflight::Prepared(prepared) => prepared,
+        };
         if cancellation.is_cancelled() {
             return Ok(StorageResult::ImportCancelled);
         }
@@ -342,10 +341,8 @@ impl Imports {
         }
         let mut refinement = Refinement::new(load_dictionary()?);
         let analyzer = self.analyzer.as_mut().expect("loaded analyzer");
-        match storage.import_analyzed_srt_cancellable(
-            &input.original_bytes,
-            &input.filename,
-            selection,
+        match storage.import_prepared_srt(
+            prepared,
             registration_timestamp()?,
             cancellation,
             |chapter| refinement.analyze(analyzer.as_mut(), chapter),
@@ -375,31 +372,31 @@ impl Imports {
     pub(crate) fn import_epub<'a>(
         &mut self,
         storage: &mut Storage,
-        input: &EpubImport,
+        input: EpubImport,
         cancellation: &ImportCancellation,
         load_dictionary: impl FnOnce() -> Result<&'a Dictionary, DocumentError>,
     ) -> Result<StorageResult, DocumentError> {
         if cancellation.is_cancelled() {
             return Ok(StorageResult::ImportCancelled);
         }
-        // Exact original bytes win before filename/container validation or Full.
-        if let Some(document) = storage
-            .find_imported_file(&input.original_bytes)
-            .map_err(map_error)?
-        {
-            return Ok(if cancellation.is_cancelled() {
-                StorageResult::ImportCancelled
-            } else {
-                StorageResult::Existing(document)
-            });
-        }
-        if input.filename.trim().is_empty() {
-            return Err(DocumentError::InvalidDocument);
-        }
-        // Bound and validate the container before loading Full/taking the write
-        // lock. Drop this projection; the repository repeats its authoritative
-        // duplicate check and parse inside the whole-book transaction.
-        epub::parse(&input.original_bytes).map_err(|_| DocumentError::InvalidEpub)?;
+        let preflight = storage
+            .prepare_epub::<std::convert::Infallible>(&input.original_bytes, &input.filename)
+            .map_err(|error| match error {
+                EpubImportError::Parse(_) => DocumentError::InvalidEpub,
+                EpubImportError::Storage(error) => map_error(error),
+                EpubImportError::Analysis(error) => match error {},
+            })?;
+        drop(input);
+        let prepared = match preflight {
+            FilePreflight::Existing(document) => {
+                return Ok(if cancellation.is_cancelled() {
+                    StorageResult::ImportCancelled
+                } else {
+                    StorageResult::Existing(document)
+                })
+            }
+            FilePreflight::Prepared(prepared) => prepared,
+        };
         if cancellation.is_cancelled() {
             return Ok(StorageResult::ImportCancelled);
         }
@@ -408,9 +405,8 @@ impl Imports {
         }
         let mut refinement = Refinement::new(load_dictionary()?);
         let analyzer = self.analyzer.as_mut().expect("loaded analyzer");
-        match storage.import_analyzed_epub_cancellable(
-            &input.original_bytes,
-            &input.filename,
+        match storage.import_prepared_epub(
+            prepared,
             registration_timestamp()?,
             cancellation,
             |chapter| refinement.analyze(analyzer.as_mut(), chapter),

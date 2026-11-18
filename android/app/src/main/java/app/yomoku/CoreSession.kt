@@ -82,7 +82,6 @@ internal class CoreSession(
     resolveAnkiNote: (AnkiProviderNoteId) -> AnkiReadResult<Intent?> = {
         AnkiReadResult.Failed(AnkiReadError.ProviderUnavailable)
     },
-    private val onClosed: () -> Unit = {},
 ) : AutoCloseable {
     // Retained with this handle across Activity recreation; never restored into a new handle.
     val sessionKey: String = UUID.randomUUID().toString()
@@ -96,6 +95,7 @@ internal class CoreSession(
     private var scheduledAnkiPreparation: ULong? = null
     private var checkedAnkiDeck: Long? = null
     private var ankiSetupScheduled = false
+    var onClosed: (() -> Unit)? = null
     private val closeRetry = Runnable {
         closeRetryScheduled = false
         if (closing) {
@@ -308,6 +308,19 @@ internal class CoreSession(
         finishClosing()
     }
 
+    fun acceptsFileImport(session: String): Boolean {
+        requireMainThread()
+        return !closing && session == sessionKey
+    }
+
+    /** The import worker has encoded the typed event. Submit on main with other events. */
+    fun dispatchEncodedImport(bytes: ByteArray, encodeNanos: Long?) {
+        requireMainThread()
+        check(!closing && !view.storageBusy)
+        sendEncoded(bytes, encodeNanos)
+        finishClosing()
+    }
+
     fun setForeground(foreground: Boolean) {
         requireMainThread()
         check(!closing) { "CoreSession is closing or closed" }
@@ -340,10 +353,21 @@ internal class CoreSession(
         }
         val start = System.nanoTime()
         val bytes = event.bincodeSerialize()
-        val encoded = System.nanoTime()
+        sendEncoded(bytes, System.nanoTime() - start)
+    }
+
+    private fun sendEncoded(bytes: ByteArray, encodeNanos: Long?) {
+        if (onRequestsMeasured == null) {
+            render(bridge.update(bytes))
+            return
+        }
+        val start = System.nanoTime()
         val requests = bridge.update(bytes)
-        val updated = System.nanoTime()
-        render(requests, eventEncodeNanos = encoded - start, nativeUpdateNanos = updated - encoded)
+        render(
+            requests,
+            eventEncodeNanos = encodeNanos,
+            nativeUpdateNanos = System.nanoTime() - start,
+        )
     }
 
     private fun finishClosing() {
@@ -354,7 +378,7 @@ internal class CoreSession(
                 bridge.close()
                 cancellationExecutor.shutdown()
                 ankiExecutor.shutdown()
-                onClosed()
+                onClosed?.invoke()
             } else if (!view.storageBusy) {
                 // onCleared has no UI left for Retry. Keep the exact core obligation alive.
                 scheduleCloseRetry(1_000L)

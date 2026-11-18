@@ -4,14 +4,18 @@ import android.content.ContentResolver
 import android.content.res.AssetFileDescriptor
 import android.database.Cursor
 import android.database.CursorWrapper
+import android.database.sqlite.SQLiteDatabase
 import android.net.Uri
+import android.os.Looper
 import android.os.ParcelFileDescriptor
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.lifecycle.ViewModelProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import app.yomoku.shared.Event
 import app.yomoku.shared.ImportOutcome
 import app.yomoku.shared.TextEncoding
 import java.io.FileInputStream
+import java.nio.file.Files
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Semaphore
 import java.util.concurrent.TimeUnit
@@ -34,6 +38,147 @@ class FileImportCancellationTest {
         EOF,
         CLOSE,
         ERROR,
+    }
+
+    @Test
+    fun cancellingDuringEncodingDropsTheOldEventAndAllowsAFreshImport() {
+        val core = ViewModelProvider(compose.activity)[CoreSessionOwner::class.java].session
+        compose.waitUntil(30_000) { !core.view.storageBusy }
+        val gate = Gate()
+        val encodes = AtomicInteger()
+        var retired: Thread? = null
+        val prefix = "encode-${System.nanoTime()}"
+        val stale = FileImportFixtures.uri("$prefix-old.txt", "\uFEFF$prefix 猫。".toByteArray())
+        val fresh = FileImportFixtures.uri("$prefix-new.txt", "\uFEFF$prefix 犬。".toByteArray())
+        val previousObserver = core.onViewChanged
+        val initialCount = core.view.documents.size
+        lateinit var imports: FileImports
+        compose.runOnIdle {
+            imports =
+                FileImports(
+                    ContentResolver.wrap(TxtFixtureProvider()),
+                    core,
+                    encodeFileEvent = { event ->
+                        assertNotSame(Looper.getMainLooper().thread, Thread.currentThread())
+                        if (encodes.incrementAndGet() == 1) {
+                            retired = Thread.currentThread()
+                            gate.block()
+                        }
+                        event.bincodeSerialize()
+                    },
+                )
+            imports.start(stale)
+        }
+        try {
+            gate.awaitEntered()
+            compose.runOnIdle {
+                assertTrue(imports.active)
+                assertFalse(core.view.storageBusy)
+                imports.cancel()
+                assertFalse(imports.active)
+                imports.start(fresh)
+            }
+            compose.waitUntil(90_000) { !imports.active && !core.view.storageBusy }
+            assertEquals(ImportOutcome.CREATED, imports.result?.outcome)
+            gate.release()
+            retired?.join(30_000)
+            assertFalse(checkNotNull(retired).isAlive)
+            compose.runOnIdle {
+                assertEquals(initialCount + 1, core.view.documents.size)
+                assertEquals("$prefix-new.txt", imports.result?.title)
+                assertEquals(2, encodes.get())
+            }
+        } finally {
+            gate.release()
+            compose.runOnIdle {
+                imports.close()
+                core.onViewChanged = previousObserver
+            }
+        }
+    }
+
+    @Test
+    fun encodedImportWaitsForTheStorageSlotAndSubmitsOnlyOnce() {
+        val activity = compose.activity
+        val directory =
+            Files.createTempDirectory(activity.cacheDir.toPath(), "prepared-import-").toFile()
+        val database = directory.resolve("storage.sqlite3")
+        lateinit var core: CoreSession
+        lateinit var imports: FileImports
+        val gate = Gate()
+        val encoded = CountDownLatch(1)
+        val encodes = AtomicInteger()
+        compose.runOnIdle {
+            core = CoreSession(database.path, sudachiDictionaryProvider(activity))
+            core.onClosed = { directory.deleteRecursively() }
+            imports =
+                FileImports(
+                    ContentResolver.wrap(TxtFixtureProvider()),
+                    core,
+                    encodeFileEvent = { event ->
+                        if (encodes.incrementAndGet() == 1) gate.block()
+                        event.bincodeSerialize().also { encoded.countDown() }
+                    },
+                )
+        }
+        try {
+            compose.waitUntil(30_000) { !core.view.storageBusy }
+            SQLiteDatabase.openDatabase(database.path, null, SQLiteDatabase.OPEN_READWRITE).use {
+                lock ->
+                lock.beginTransactionNonExclusive()
+                try {
+                    compose.runOnIdle {
+                        core.dispatch(Event.CreatePaste("先行\n猫"))
+                        assertTrue(core.view.storageBusy)
+                        imports.start(
+                            FileImportFixtures.uri("queued.txt", "\uFEFF犬。".toByteArray())
+                        )
+                    }
+                    gate.awaitEntered()
+                    gate.release()
+                    assertTrue(encoded.await(30, TimeUnit.SECONDS))
+                    compose.runOnIdle {
+                        assertTrue(core.view.storageBusy)
+                        assertTrue(imports.active)
+                        assertNull(imports.result)
+                    }
+                    lock.setTransactionSuccessful()
+                } finally {
+                    lock.endTransaction()
+                }
+            }
+            compose.waitUntil(90_000) { !imports.active && !core.view.storageBusy }
+            assertEquals(1, encodes.get())
+            assertEquals(ImportOutcome.CREATED, imports.result?.outcome)
+            assertEquals(listOf("queued.txt", "先行"), core.view.documents.map { it.title })
+
+            compose.runOnIdle { core.dispatch(Event.LoadLibraryWordDistributions) }
+            compose.waitUntil(30_000) { !core.view.storageBusy }
+            val distributions = checkNotNull(core.view.libraryWordDistributions)
+            var callbacks = 0
+            compose.runOnIdle {
+                core.onCallbackMeasured = { callbacks++ }
+                imports.start(FileImportFixtures.uri("unsupported.zip", byteArrayOf()))
+            }
+            compose.waitUntil(30_000) { !imports.active }
+            compose.runOnIdle {
+                assertEquals(0, callbacks)
+                assertEquals(distributions, core.view.libraryWordDistributions)
+                imports.start(FileImportFixtures.uri("queued.txt", "\uFEFF犬。".toByteArray()))
+            }
+            compose.waitUntil(30_000) { !imports.active && !core.view.storageBusy }
+            compose.runOnIdle {
+                assertEquals(ImportOutcome.EXISTING, imports.result?.outcome)
+                assertEquals(1, callbacks)
+                assertEquals(distributions, core.view.libraryWordDistributions)
+            }
+        } finally {
+            gate.release()
+            compose.runOnIdle {
+                imports.close()
+                core.close()
+            }
+        }
     }
 
     private class Gate {

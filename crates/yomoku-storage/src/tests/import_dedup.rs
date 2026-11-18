@@ -61,6 +61,43 @@ fn state(storage: &Storage) -> Vec<i64> {
 }
 
 #[test]
+fn prepared_import_rechecks_digest_under_the_write_lock_and_skips_losing_analysis() {
+    let database = TestDatabase::new();
+    let mut loser = Storage::open(database.path()).unwrap();
+    let mut winner = Storage::open(database.path()).unwrap();
+    let bytes = "猫 犬\n".as_bytes();
+    let encoding = Some(yomoku_import::txt::TextEncoding::Utf8);
+    let FilePreflight::Prepared(prepared) = loser
+        .prepare_txt::<Infallible>(bytes, "loser.txt", encoding)
+        .unwrap()
+    else {
+        panic!("digest must be absent during preflight");
+    };
+    let TxtImportOutcome::Created(committed) = winner
+        .import_analyzed_txt(bytes, "winner.txt", encoding, 10, fixture)
+        .unwrap()
+    else {
+        panic!("second connection must win");
+    };
+    let before = fs::read(database.path()).unwrap();
+    let Some(TxtImportOutcome::Existing(existing)) = loser
+        .import_prepared_txt(
+            prepared,
+            20,
+            &ImportCancellation::default(),
+            must_not_analyze,
+        )
+        .unwrap()
+    else {
+        panic!("losing import must reference the committed document");
+    };
+    assert_eq!(existing.document_id, committed.document.document_id);
+    assert_eq!(existing.title, "winner.txt");
+    assert_eq!(count(&loser, "imported_files"), 1);
+    assert_eq!(fs::read(database.path()).unwrap(), before);
+}
+
+#[test]
 fn duplicate_reopens_existing_title_position_status_and_analysis_without_writes() {
     let database = TestDatabase::new();
     let mut storage = Storage::open(database.path()).unwrap();
