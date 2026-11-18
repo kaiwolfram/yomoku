@@ -621,7 +621,10 @@ fn background_releases_cache_hidden_imports_release_and_foreground_is_lazy() {
     dispatch(&router, Event::CreatePaste("猫".into()));
     assert!(trace.try_recv().is_err()); // duplicate did not load or tokenize
     drop(router);
-    assert!(trace.recv_timeout(TIMEOUT).is_err());
+    assert_eq!(
+        trace.recv_timeout(TIMEOUT),
+        Err(mpsc::RecvTimeoutError::Disconnected)
+    );
     assert!(lifecycle.set_foreground(false).is_err());
 }
 
@@ -669,7 +672,10 @@ fn background_and_close_wait_for_accepted_atomic_work_without_blocking_dispatch(
             assert_eq!(router.view().documents.len(), 1);
             finish_worker(router, lifecycle, &trace);
         } else {
-            assert!(trace.recv_timeout(TIMEOUT).is_err());
+            assert_eq!(
+                trace.recv_timeout(TIMEOUT),
+                Err(mpsc::RecvTimeoutError::Disconnected)
+            );
             assert!(lifecycle.set_foreground(false).is_err());
         }
         assert_eq!(totals(&database.path())[0], 1);

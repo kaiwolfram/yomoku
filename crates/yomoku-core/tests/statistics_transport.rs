@@ -141,7 +141,14 @@ fn rapid_changes_coalesce_and_discard_old_successes_and_failures() {
     for core in cores() {
         enter(&core);
         let first = query(Timeframe::LastWeek, NOW);
-        let mut effects = core.process_event(Event::LoadStatistics { as_of_unix_ms: NOW });
+        let mut initial = core.process_event(Event::LoadStatistics { as_of_unix_ms: NOW });
+        resolve(&core, &mut initial, loaded(first));
+        let previous = core.view().statistics.data.unwrap();
+        let pending = query(Timeframe::LastYear, NOW + 1);
+        let mut effects = core.process_event(Event::SetStatisticsTimeframe {
+            timeframe: pending.timeframe,
+            as_of_unix_ms: pending.as_of_unix_ms,
+        });
         for timeframe in [
             Timeframe::LastMonth,
             Timeframe::LastQuarter,
@@ -154,14 +161,15 @@ fn rapid_changes_coalesce_and_discard_old_successes_and_failures() {
             assert!(operation(&changed).is_none());
             assert_eq!(core.view().statistics.timeframe, timeframe);
             assert!(core.view().statistics.loading);
+            assert_eq!(core.view().statistics.data.as_ref(), Some(&previous));
         }
         let latest = query(Timeframe::AllTime, NOW + 1);
-        let mut next = resolve(&core, &mut effects, loaded(first));
+        let mut next = resolve(&core, &mut effects, loaded(pending));
         assert_eq!(
             operation(&next),
             Some(&StorageOperation::LoadStatistics(latest))
         );
-        assert!(core.view().statistics.data.is_none());
+        assert_eq!(core.view().statistics.data.as_ref(), Some(&previous));
         core.process_event(Event::SetStatisticsTimeframe {
             timeframe: Timeframe::LastMonth,
             as_of_unix_ms: NOW + 2,
@@ -177,7 +185,22 @@ fn rapid_changes_coalesce_and_discard_old_successes_and_failures() {
             operation(&final_read),
             Some(&StorageOperation::LoadStatistics(final_query))
         );
-        resolve(&core, &mut final_read, loaded(final_query));
+        resolve(
+            &core,
+            &mut final_read,
+            StorageResult::Failed(DocumentError::Unavailable),
+        );
+        assert_eq!(core.view().statistics.data.as_ref(), Some(&previous));
+        assert_eq!(
+            core.view().statistics.error,
+            Some(DocumentError::Unavailable)
+        );
+        let mut retry = core.process_event(Event::RetryStatistics);
+        assert_eq!(
+            operation(&retry),
+            Some(&StorageOperation::LoadStatistics(final_query))
+        );
+        resolve(&core, &mut retry, loaded(final_query));
         assert_eq!(core.view().statistics.query, Some(final_query));
         assert_eq!(
             core.view().statistics.data.unwrap().timeframe,

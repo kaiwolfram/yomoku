@@ -4,6 +4,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.*
@@ -25,6 +26,7 @@ internal fun StatisticsScreen(
     view: ViewModel,
     sessionKey: String,
     dispatch: (Event) -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val state = view.statistics
     // Reuse a retained cutoff across Settings/recreation. Capture now only for
@@ -36,9 +38,11 @@ internal fun StatisticsScreen(
     }
     val data = state.data
     val scroll = rememberLazyListState()
+    // The error has its own short list. Keep the chart list's index and offset for Retry.
+    val errorScroll = remember(sessionKey) { LazyListState() }
     LazyColumn(
-        Modifier.fillMaxSize().testTag("statistics_scroll"),
-        state = scroll,
+        modifier.fillMaxSize().testTag("statistics_scroll"),
+        state = if (state.error == null) scroll else errorScroll,
         contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
@@ -58,17 +62,17 @@ internal fun StatisticsScreen(
                     },
                 )
                 Text(
-                    stringResource(state.timeframe.grouping()),
+                    stringResource((data?.timeframe ?: state.timeframe).grouping()),
                     style = MaterialTheme.typography.bodySmall,
                 )
             }
         }
-        if (state.loading || (data == null && state.error == null))
-            item {
+        if (data == null && state.error == null)
+            item(key = "loading") {
                 Text(stringResource(R.string.statistics_loading))
             }
         if (state.error != null)
-            item {
+            item(key = "error") {
                 Text(
                     stringResource(R.string.statistics_error),
                     modifier = Modifier.testTag("statistics_error"),
@@ -77,8 +81,8 @@ internal fun StatisticsScreen(
                     Text(stringResource(R.string.retry))
                 }
             }
-        if (data != null) {
-            item {
+        if (data != null && state.error == null) {
+            item(key = "range") {
                 Text(
                     stringResource(
                         R.string.statistics_range,

@@ -65,9 +65,13 @@ impl Yomoku {
         // Automatic loads do not retry a failed identical query. Resume only
         // unattempted reads that were coalesced while hidden in Settings.
         if model.statistics.query == Some(query) {
+            let loaded = model.statistics.data.as_ref().is_some_and(|data| {
+                data.timeframe == query.timeframe
+                    && query.as_of_unix_ms.checked_add(1) == Some(data.end_exclusive_unix_ms)
+            });
             return Some(save.and(
                 if model.statistics_request().is_none()
-                    && model.statistics.data.is_none()
+                    && !loaded
                     && model.statistics.error.is_none()
                 {
                     self.dispatch_statistics(model)
@@ -77,7 +81,6 @@ impl Yomoku {
             ));
         }
         model.statistics.query = Some(query);
-        model.statistics.data = None;
         model.statistics.error = None;
         Some(save.and(if model.statistics_request().is_some() {
             // Coalesce rapid selections; the old callback still owns the FIFO.

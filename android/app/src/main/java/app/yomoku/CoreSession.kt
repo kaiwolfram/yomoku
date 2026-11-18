@@ -82,6 +82,7 @@ internal class CoreSession(
     resolveAnkiNote: (AnkiProviderNoteId) -> AnkiReadResult<Intent?> = {
         AnkiReadResult.Failed(AnkiReadError.ProviderUnavailable)
     },
+    private val onClosed: () -> Unit = {},
 ) : AutoCloseable {
     // Retained with this handle across Activity recreation; never restored into a new handle.
     val sessionKey: String = UUID.randomUUID().toString()
@@ -353,6 +354,7 @@ internal class CoreSession(
                 bridge.close()
                 cancellationExecutor.shutdown()
                 ankiExecutor.shutdown()
+                onClosed()
             } else if (!view.storageBusy) {
                 // onCleared has no UI left for Retry. Keep the exact core obligation alive.
                 scheduleCloseRetry(1_000L)

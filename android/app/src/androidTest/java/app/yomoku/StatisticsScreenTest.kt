@@ -1,11 +1,15 @@
 package app.yomoku
 
 import androidx.activity.ComponentActivity
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.height
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
+import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.yomoku.shared.*
 import app.yomoku.theme.YomokuTheme
@@ -98,6 +102,58 @@ class StatisticsScreenTest {
         compose.waitForIdle()
         compose.onNodeWithTag("statistics_timeframe").assertTextContains("Last month")
         assertEquals(y, vertical(), 0.5f)
+    }
+
+    @Test
+    fun shortViewportKeepsChartAnchorAcrossPendingSelectionsAndFailureRetry() {
+        compose.setContent {
+            YomokuTheme {
+                Box(Modifier.height(260.dp)) {
+                    StatisticsScreen(frame.value, "short-statistics", events::add)
+                }
+            }
+        }
+        val list = compose.onNodeWithTag("statistics_scroll")
+        val chart = compose.onNodeWithTag("statistics_card_STATUSES")
+        list.performScrollToKey(StatisticsChart.STATUSES.name)
+        fun chartTop() = chart.assertIsDisplayed().getUnclippedBoundsInRoot().top.value
+        val top = chartTop()
+        val previous = checkNotNull(frame.value.statistics.data)
+        fun show(
+            timeframe: StatisticsTimeframe,
+            loading: Boolean,
+            data: StatisticsBuckets,
+            error: DocumentError? = null,
+        ) {
+            compose.runOnUiThread {
+                frame.value =
+                    frame.value.copy(
+                        storageBusy = loading,
+                        statistics =
+                            StatisticsState(
+                                timeframe,
+                                StatisticsQuery(timeframe, data.endExclusiveUnixMs - 1),
+                                loading,
+                                error,
+                                data,
+                            ),
+                    )
+            }
+        }
+        show(StatisticsTimeframe.LASTMONTH, true, previous)
+        assertEquals(top, chartTop(), 0.5f)
+        show(StatisticsTimeframe.LASTYEAR, true, previous)
+        assertEquals(top, chartTop(), 0.5f)
+        show(StatisticsTimeframe.ALLTIME, false, previous, DocumentError.UNAVAILABLE)
+        compose.onNodeWithTag("statistics_error").assertIsDisplayed()
+        compose.onNodeWithText("Retry").performClick()
+        assertEquals(Event.RetryStatistics, events.last())
+        show(StatisticsTimeframe.ALLTIME, true, previous)
+        assertEquals(top, chartTop(), 0.5f)
+        show(StatisticsTimeframe.ALLTIME, false, statisticsFixture(StatisticsTimeframe.ALLTIME))
+        assertEquals(top, chartTop(), 0.5f)
+        list.performScrollToKey("header")
+        compose.onNodeWithText("Monthly · UTC · lifetime values").assertIsDisplayed()
     }
 
     @Test

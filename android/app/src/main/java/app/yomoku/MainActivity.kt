@@ -1,6 +1,7 @@
 package app.yomoku
 
 import android.Manifest
+import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
@@ -36,7 +37,12 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        owner = ViewModelProvider(this)[CoreSessionOwner::class.java]
+        val isolated =
+            (applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0 &&
+                intent.getBooleanExtra(CoreSessionOwner.ISOLATED_DATABASE, false)
+        owner =
+            ViewModelProvider(this, CoreSessionOwner.factory(application, isolated))[
+                CoreSessionOwner::class.java]
         core = owner.session
         fileImports = owner.fileImports
         importBookRequest = owner.importBookRequest

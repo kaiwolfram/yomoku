@@ -1,8 +1,7 @@
 package app.yomoku
 
 import androidx.compose.ui.test.*
-import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
-import androidx.lifecycle.ViewModelProvider
+import androidx.compose.ui.test.junit4.v2.createEmptyComposeRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.yomoku.shared.*
 import org.junit.Assert.*
@@ -12,9 +11,10 @@ import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
 class LibrarySortTest {
-    @get:Rule val compose = createAndroidComposeRule<MainActivity>()
+    @get:Rule(order = 0) val compose = createEmptyComposeRule()
+    @get:Rule(order = 1) internal val isolated = IsolatedMainActivity()
 
-    private fun core() = ViewModelProvider(compose.activity)[CoreSessionOwner::class.java].session
+    private fun core() = isolated.core
 
     private fun idle() =
         compose.waitUntil(90_000) {
@@ -47,17 +47,17 @@ class LibrarySortTest {
         assertOrder(expected)
     }
 
-    private var importedIds = emptyList<DocumentId>()
-
     private fun assertOrder(expected: List<DocumentId>) {
-        assertEquals(
-            expected,
-            core().view.documents.map { it.documentId }.filter { it in importedIds },
-        )
-        expected.forEach { id ->
-            compose.onNodeWithTag("library_documents").performScrollToKey(id.value)
-            compose.onNodeWithTag("document_${id.value}").assertIsDisplayed()
+        assertEquals(expected, core().view.documents.map { it.documentId })
+        compose.onNodeWithTag("library_documents").performScrollToIndex(0)
+        val positions = expected.map { id ->
+            compose
+                .onNodeWithTag("document_${id.value}")
+                .assertIsDisplayed()
+                .getUnclippedBoundsInRoot()
+                .top
         }
+        assertTrue(positions.zipWithNext().all { (above, below) -> above < below })
     }
 
     @Test
@@ -77,7 +77,6 @@ class LibrarySortTest {
             checkNotNull(core().view.importSummary).documentId
         }
         compose.runOnUiThread { core().dispatch(Event.DismissImportSummary) }
-        importedIds = ids
         assertOrder(ids.reversed())
         reverseSort(LibrarySort.LASTREADASCENDING, ids)
         reverseSort(LibrarySort.LASTREAD, ids.reversed())
@@ -86,7 +85,7 @@ class LibrarySortTest {
         compose.onNodeWithTag("library_sort").assertTextContains("Sort: Title")
         reverseSort(LibrarySort.TITLEDESCENDING, listOf(ids[0], ids[1], ids[2]))
         val session = core()
-        compose.activityRule.scenario.recreate()
+        isolated.recreate()
         compose.waitForIdle()
         assertSame(session, core())
         compose.onNodeWithTag("library_sort").assertTextContains("Sort: Title")

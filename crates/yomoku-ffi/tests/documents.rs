@@ -93,7 +93,10 @@ fn async_open_failure_is_typed_retryable_and_preserves_invalid_files() {
         .document_error
         .is_none());
     drop(native);
-    assert!(callbacks.recv_timeout(Duration::from_secs(10)).is_err());
+    assert_eq!(
+        callbacks.recv_timeout(Duration::from_secs(10)),
+        Err(mpsc::RecvTimeoutError::Disconnected)
+    );
     std::fs::write(db.path(), b"not a database").unwrap();
     let (native, callbacks, _) = bridge(&db.path());
     assert_eq!(
@@ -113,20 +116,26 @@ fn blocked_sqlite_write_does_not_block_dispatch_view_or_navigation() {
     blocker.execute_batch("BEGIN IMMEDIATE").unwrap();
     let mut bytes = vec![];
     BincodeFfiFormat::serialize(&mut bytes, &Event::CreatePaste("blocked paste".into())).unwrap();
-    let started = std::time::Instant::now();
-    native.update(&bytes).unwrap();
-    assert!(started.elapsed() < Duration::from_secs(1));
-    assert!(callbacks.recv_timeout(Duration::from_millis(100)).is_err());
-    assert!(view(&native).storage_busy);
-    bytes.clear();
-    BincodeFfiFormat::serialize(
-        &mut bytes,
-        &Event::SelectDestination(Destination::Vocabulary),
-    )
-    .unwrap();
-    native.update(&bytes).unwrap();
-    assert_eq!(view(&native).destination, Destination::Vocabulary);
-    blocker.execute_batch("COMMIT").unwrap();
+    thread::scope(|scope| {
+        let (returned, dispatch) = mpsc::channel();
+        let native = &native;
+        scope.spawn(move || {
+            native.update(&bytes).unwrap();
+            bytes.clear();
+            BincodeFfiFormat::serialize(
+                &mut bytes,
+                &Event::SelectDestination(Destination::Vocabulary),
+            )
+            .unwrap();
+            native.update(&bytes).unwrap();
+            returned.send(view(native)).unwrap();
+        });
+        let result = dispatch.recv_timeout(Duration::from_secs(2));
+        blocker.execute_batch("COMMIT").unwrap();
+        let during_lock = result.expect("dispatch did not return while SQLite was locked");
+        assert!(during_lock.storage_busy);
+        assert_eq!(during_lock.destination, Destination::Vocabulary);
+    });
     callbacks.recv_timeout(Duration::from_secs(10)).unwrap();
     assert_eq!(view(&native).documents.len(), 1);
     assert!(!view(&native).storage_busy);

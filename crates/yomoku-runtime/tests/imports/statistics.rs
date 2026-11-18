@@ -170,11 +170,9 @@ fn statistics_worker_corruption_and_bad_dates_fail_read_only_then_retry_exact_qu
         .unwrap();
     let retried = dispatch(&router, Event::RetryStatistics);
     assert_eq!(retried.statistics.query.unwrap().as_of_unix_ms, NOW);
+    let previous = retried.statistics.data.unwrap();
     assert_eq!(
-        retried
-            .statistics
-            .data
-            .unwrap()
+        previous
             .buckets
             .last()
             .unwrap()
@@ -188,7 +186,7 @@ fn statistics_worker_corruption_and_bad_dates_fail_read_only_then_retry_exact_qu
         failed.statistics.error,
         Some(DocumentError::IncompatibleDatabase)
     );
-    assert!(failed.statistics.data.is_none());
+    assert_eq!(failed.statistics.data, Some(previous));
     assert!(trace.try_recv().is_err());
     drop((router, lifecycle));
 }

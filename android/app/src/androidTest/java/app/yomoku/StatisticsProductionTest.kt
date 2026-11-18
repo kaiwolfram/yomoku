@@ -1,8 +1,7 @@
 package app.yomoku
 
 import androidx.compose.ui.test.*
-import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
-import androidx.lifecycle.ViewModelProvider
+import androidx.compose.ui.test.junit4.v2.createEmptyComposeRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.yomoku.shared.*
 import org.junit.Assert.*
@@ -12,9 +11,10 @@ import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
 class StatisticsProductionTest {
-    @get:Rule val compose = createAndroidComposeRule<MainActivity>()
+    @get:Rule(order = 0) val compose = createEmptyComposeRule()
+    @get:Rule(order = 1) internal val isolated = IsolatedMainActivity()
 
-    private fun core() = ViewModelProvider(compose.activity)[CoreSessionOwner::class.java].session
+    private fun core() = isolated.core
 
     private fun idle() {
         compose.waitForIdle()
@@ -23,7 +23,10 @@ class StatisticsProductionTest {
             !view.storageBusy &&
                 !view.completionSavePending &&
                 (view.destination != Destination.STATISTICS ||
-                    view.statistics.data != null ||
+                    view.statistics.data?.let {
+                        it.timeframe == view.statistics.timeframe &&
+                            it.endExclusiveUnixMs - 1 == view.statistics.query?.asOfUnixMs
+                    } == true ||
                     view.statistics.error != null)
         }
         assertNull(core().view.statistics.error)
@@ -62,7 +65,7 @@ class StatisticsProductionTest {
         visit()
         val imported = totals()
         assertEquals(before.reading, imported.reading)
-        assertTrue(imported.statuses.new >= before.statuses.new)
+        assertEquals(before.statuses.new + 2UL, imported.statuses.new)
 
         compose.onNode(hasText("Library") and hasClickAction()).performClick()
         idle()
@@ -127,7 +130,7 @@ class StatisticsProductionTest {
         compose.onNodeWithTag("statistics_card_OCCURRENCES").assertIsDisplayed()
         val original = core()
         val query = original.view.statistics.query
-        compose.activityRule.scenario.recreate()
+        isolated.recreate()
         idle()
         assertSame(original, core())
         assertEquals(query, core().view.statistics.query)
@@ -135,7 +138,7 @@ class StatisticsProductionTest {
         compose.onNodeWithTag("statistics_card_OCCURRENCES").assertIsDisplayed()
         compose.onNodeWithText("Settings").performClick()
         compose.onNodeWithTag("screen_title").assertTextEquals("Settings")
-        compose.runOnUiThread { compose.activity.onBackPressedDispatcher.onBackPressed() }
+        compose.runOnUiThread { isolated.activity.onBackPressedDispatcher.onBackPressed() }
         compose.onNodeWithTag("screen_title").assertTextEquals("Statistics")
         idle()
         compose.onNodeWithTag("statistics_card_OCCURRENCES").assertIsDisplayed()
