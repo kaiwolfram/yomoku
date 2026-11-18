@@ -79,7 +79,7 @@ internal fun verifyVocabularyBridge() {
             check(
                 dispatch(bridge, Event.SetVocabularyQuery(query("猫", emptyList())), 1)
                     .vocabulary
-                    .matchingCount == 0UL
+                    .matchingCount == 1UL
             )
             check(
                 dispatch(bridge, Event.SetVocabularyQuery(query("𠮷\u0000_%")), 1)

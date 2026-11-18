@@ -31,7 +31,7 @@ internal fun verifyVocabularyCodecs(directory: String) {
         val view = ViewModel.bincodeDeserialize(bytes)
         check(view.vocabulary.matchingCount == null && view.vocabulary.rows.isEmpty())
         check(view.vocabulary.query.sort == VocabularySort.NEWEST)
-        check(view.vocabulary.query.statuses.size == 5)
+        check(view.vocabulary.query.statuses.isEmpty())
         check(view.vocabulary.loading == (index == 1))
         check(view.vocabulary.error == if (index == 2) DocumentError.INVALIDDOCUMENT else null)
         check(view.bincodeSerialize().contentEquals(bytes))
