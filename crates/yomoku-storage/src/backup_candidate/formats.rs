@@ -1,11 +1,7 @@
-//! Exact saved file identity and text annotations; never import or allocate IDs.
+//! Saved file identity metadata and canonical text integrity.
 
 use rusqlite::{types::ValueRef, Connection, Row};
 use sha2::{Digest, Sha256};
-use yomoku_import::{
-    srt,
-    txt::{self, TextEncoding},
-};
 
 use super::{check_cancelled, CandidateError};
 
@@ -64,7 +60,7 @@ fn check_files(
     cancelled: &mut impl FnMut() -> bool,
 ) -> Result<(), CandidateError> {
     let mut statement = connection.prepare(
-        "SELECT s.kind, f.document_id, f.sha256, f.original_bytes, f.text_encoding,
+        "SELECT s.kind, f.document_id, f.sha256, f.text_encoding, f.canonical_text_sha256,
                 t.text
          FROM main.documents d JOIN main.sources s ON s.id = d.source_id
          LEFT JOIN main.imported_files f ON f.document_id = d.id
@@ -80,37 +76,12 @@ fn check_files(
             continue;
         }
         require(row.get_ref(1)? != ValueRef::Null)?;
-        let bytes = blob(row, 3)?;
-        check_hash(bytes, blob(row, 2)?, cancelled)?;
-        let encoding = text(row, 4)?;
-        if kind == "epub" {
-            require(encoding == "epub")?;
-            // Container/asset/chapter metadata validation is a separate group.
-            continue;
-        }
-        let encoding = match encoding {
-            "utf8" => TextEncoding::Utf8,
-            "shift_jis" => TextEncoding::ShiftJis,
-            _ => return Err(CandidateError::InvalidData),
-        };
-        let canonical = text(row, 5)?;
-        check_cancelled(cancelled)?;
-        // Pure adapters derive expected content using the saved explicit choice.
-        // No dedup, analyzer, identity allocation, writes or external resolution.
-        match kind {
-            "txt" => {
-                let parsed =
-                    txt::parse(bytes, Some(encoding)).map_err(|_| CandidateError::InvalidData)?;
-                check_cancelled(cancelled)?;
-                require(parsed.text == canonical)?;
-            }
-            "srt" => {
-                let (_, decoded) =
-                    txt::decode(bytes, Some(encoding)).map_err(|_| CandidateError::InvalidData)?;
-                check_cancelled(cancelled)?;
-                let parsed = srt::parse(&decoded).map_err(|_| CandidateError::InvalidData)?;
-                check_cancelled(cancelled)?;
-                require(parsed.text == canonical)?;
+        // The input digest identifies duplicates. Only canonical content is retained.
+        require(blob(row, 2)?.len() == 32)?;
+        match (kind, text(row, 3)?) {
+            ("epub", "epub") => require(row.get_ref(4)? == ValueRef::Null)?,
+            ("txt" | "srt", "utf8" | "shift_jis") => {
+                check_hash(text(row, 5)?.as_bytes(), blob(row, 4)?, cancelled)?;
             }
             _ => return Err(CandidateError::InvalidData),
         }

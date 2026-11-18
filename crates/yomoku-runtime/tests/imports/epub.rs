@@ -63,7 +63,6 @@ fn whole_book_import_registers_all_chapters_without_encounters_and_reopens_witho
         .load_epub_document(summary.document_id)
         .unwrap()
         .unwrap();
-    assert_eq!(stored.original_bytes, bytes);
     assert_eq!(stored.images, parsed.images);
     assert_eq!(stored.chapters.len(), 2);
     let snapshot = storage

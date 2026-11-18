@@ -1,7 +1,7 @@
 # Data model
 
-The authoritative SQL is [0001_base_text_initial_schema.sql](../crates/yomoku-storage/migrations/0001_base_text_initial_schema.sql).
-The release schema version is **1**, journal name `0001_base_text_initial_schema`.
+The authoritative SQL is [0001_canonical_import_initial_schema.sql](../crates/yomoku-storage/migrations/0001_canonical_import_initial_schema.sql).
+The release schema version is **1**, journal name `0001_canonical_import_initial_schema`.
 It has **26 application tables** plus SQLite's internal `sqlite_sequence` table.
 Earlier development schemas and journals are unsupported, including the previous
 schema-1 journal. They are rejected without migration or modification.
@@ -24,19 +24,19 @@ Backup candidates must match the exact trusted schema and journal before adoptio
 
 ## Content and analysis
 
-A live document owns one source and ordered chapter text, with original imported
-bytes and canonical text/annotations/images retained. TXT/SRT retain explicit saved
-encoding; EPUB retains asset metadata/bytes and ordered spine chapters. Paste
-SHA-256 is saved in the same transaction as the paste; imported-file identities use
-original bytes. Duplicate imports preserve existing title, status and progress.
+A live document owns one source and ordered canonical chapter text. File imports
+retain the input SHA-256 for duplicate detection and discard the input bytes.
+TXT/SRT retain the selected encoding and a digest of the canonical UTF-8 text.
+EPUB retains ordered spine chapters, formatting, and extracted image assets.
+Pastes use a digest of their exact text. Duplicate imports preserve existing
+title, status and progress.
 Deletion removes live content while preserving supported historical provenance.
 Only individually confirmed document deletion is exposed in the app. Vocabulary
 rows open word sheets with individual status controls; there is no bulk action.
 
 SRT cue parsing is transient: canonical text preserves blank-line separators.
 EPUB stores heading/emphasis/strong and HTTP(S) link spans. Internal and unsupported
-links contribute visible text without annotation rows. Original bytes, saved
-encoding/hashes, images and history remain durable. Recognized EPUB/Aozora reading
+links contribute visible text without annotation rows. Recognized EPUB/Aozora reading
 annotations are discarded while preserving their base text; no ruby metadata is stored.
 
 Offsets are UTF-8 byte positions at scalar boundaries, never UTF-16 indices.

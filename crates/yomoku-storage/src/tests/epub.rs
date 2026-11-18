@@ -79,7 +79,7 @@ fn sequences(storage: &Storage) -> Vec<(String, i64)> {
 }
 
 #[test]
-fn repeated_spine_items_import_once_preserve_original_bytes_and_reopen_as_exact_duplicate() {
+fn repeated_spine_items_import_once_and_reopen_as_exact_duplicate() {
     let database = TestDatabase::new();
     let bytes = super::epub_fixture::book_with_spine(
         true,
@@ -106,7 +106,6 @@ fn repeated_spine_items_import_once_preserve_original_bytes_and_reopen_as_exact_
             .collect::<Vec<_>>()
     );
     assert_eq!(imported.analysis_ids.len(), expected.chapters.len());
-    assert_eq!(imported.document.original_bytes, bytes);
     assert_eq!(
         imported
             .document
@@ -156,7 +155,6 @@ fn epub_chapters_assets_metadata_and_original_analysis_reopen_read_only() {
     assert_eq!(calls, 2);
     assert_eq!(imported.document.title, "日本語の本 & EPUB");
     assert_eq!(imported.document.filename, "原本.epub");
-    assert_eq!(imported.document.original_bytes, bytes);
     assert_eq!(imported.document.metadata_title, parsed.title);
     assert_eq!(imported.document.cover, parsed.cover);
     assert_eq!(imported.document.images, parsed.images);
@@ -625,7 +623,6 @@ fn epub_concurrent_creators_commit_one_complete_book() {
 #[test]
 fn epub_corrupt_saved_content_assets_identity_or_ranges_fail_without_repair() {
     for corruption in [
-        "UPDATE imported_files SET original_bytes = X'00'",
         "DELETE FROM epub_documents",
         "DELETE FROM epub_spans WHERE span_index = 0",
         "UPDATE epub_spans SET start_byte = 1 WHERE span_index = 0",
@@ -665,12 +662,6 @@ fn epub_corrupt_saved_content_assets_identity_or_ranges_fail_without_repair() {
             "reference: {corruption}"
         );
         assert_eq!(fs::read(database.path()).unwrap(), before);
-        if corruption.contains("original_bytes") {
-            assert!(matches!(
-                storage.find_imported_file_id(&bytes),
-                Err(StorageError::InvalidDocument)
-            ));
-        }
     }
 }
 
@@ -881,9 +872,14 @@ fn epub_cover_reference_is_metadata_only_read_only_and_content_addressed() {
         asset: image_asset(&path),
         sha256: Sha256::digest(&image.bytes).into(),
     };
-    // Unrelated BLOB corruption must not trigger full-book integrity reads.
+    // Unrelated content corruption must not trigger full-book integrity reads.
     // The descriptor advertises metadata; the existing asset API verifies bytes.
-    storage.connection.execute_batch("UPDATE imported_files SET original_bytes = X'00'; UPDATE chapter_texts SET text = 'damaged'; UPDATE epub_assets SET bytes = X'00'").unwrap();
+    storage
+        .connection
+        .execute_batch(
+            "UPDATE chapter_texts SET text = 'damaged'; UPDATE epub_assets SET bytes = X'00'",
+        )
+        .unwrap();
     drop(storage);
     let before = fs::read(database.path()).unwrap();
     let mut storage = Storage::open(database.path()).unwrap();
@@ -966,7 +962,7 @@ fn epub_cover_reference_absence_scopes_and_reimport_do_not_reuse_ids() {
 fn epub_cover_reference_rejects_damaged_metadata_without_repairs() {
     for corruption in [
         "DELETE FROM epub_documents",
-        "UPDATE imported_files SET text_encoding = 'utf8'",
+        "UPDATE imported_files SET text_encoding = 'utf8', canonical_text_sha256 = zeroblob(32)",
         "UPDATE epub_documents SET cover_path = 'missing.png'",
         "UPDATE epub_assets SET media_type = 'text/plain'",
         "UPDATE epub_assets SET sha256 = X'00'",
@@ -1079,7 +1075,7 @@ fn epub_asset_corruption_invalid_keys_and_media_mismatch_fail_without_writes() {
         "UPDATE epub_assets SET bytes = X'00'",
         "UPDATE epub_assets SET sha256 = zeroblob(32)",
         "UPDATE epub_assets SET media_type = 'image/jpeg'",
-        "UPDATE imported_files SET text_encoding = 'utf8'",
+        "UPDATE imported_files SET text_encoding = 'utf8', canonical_text_sha256 = zeroblob(32)",
         "DELETE FROM epub_documents",
     ] {
         let database = TestDatabase::new();
@@ -1199,7 +1195,12 @@ fn epub_asset_budget_is_checked_before_copy_and_other_blobs_are_not_loaded() {
         .unwrap();
     // A narrow image read intentionally does not rehash the full source or
     // unrelated assets. Ordinary document loads retain their stronger checks.
-    storage.connection.execute_batch("UPDATE imported_files SET original_bytes = zeroblob(1); UPDATE epub_assets SET bytes = zeroblob(33554433) WHERE path = 'OPS/images/cover.png'").unwrap();
+    storage
+        .connection
+        .execute_batch(
+            "UPDATE epub_assets SET bytes = zeroblob(33554433) WHERE path = 'OPS/images/cover.png'",
+        )
+        .unwrap();
     assert_eq!(
         storage
             .load_epub_image_asset(id, &asset)

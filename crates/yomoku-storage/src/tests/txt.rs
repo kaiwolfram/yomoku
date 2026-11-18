@@ -288,7 +288,7 @@ fn txt_cancellable_commit_failure_rolls_back_and_releases_cancel_gate() {
 }
 
 #[test]
-fn txt_atomic_canonical_original_bytes_analysis_and_filename_survive_reopen() {
+fn txt_atomic_canonical_text_digest_analysis_and_filename_survive_reopen() {
     let database = TestDatabase::new();
     let mut storage = Storage::open(database.path()).unwrap();
     let observer = Storage::open(database.path()).unwrap();
@@ -321,15 +321,18 @@ fn txt_atomic_canonical_original_bytes_analysis_and_filename_survive_reopen() {
         })
         .unwrap();
     assert_eq!(kind, ("txt".into(), "本.txt".into()));
-    let source = StoredTxtSource {
-        original_bytes: bytes.to_vec(),
-        encoding: TextEncoding::Utf8,
-    };
+    let digests: (Vec<u8>, Vec<u8>) = storage
+        .connection
+        .query_row(
+            "SELECT sha256, canonical_text_sha256 FROM imported_files",
+            [],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )
+        .unwrap();
+    assert_eq!(digests.0, Sha256::digest(bytes).as_slice());
     assert_eq!(
-        storage
-            .load_txt_source(imported.document.document_id)
-            .unwrap(),
-        Some(source.clone())
+        digests.1,
+        Sha256::digest(imported.document.chapter.text.as_bytes()).as_slice()
     );
     drop(storage);
     let mut storage = Storage::open(database.path()).unwrap();
@@ -340,9 +343,9 @@ fn txt_atomic_canonical_original_bytes_analysis_and_filename_survive_reopen() {
         .unwrap();
     assert_eq!(
         storage
-            .load_txt_source(imported.document.document_id)
+            .load_txt_encoding(imported.document.document_id)
             .unwrap(),
-        Some(source)
+        Some(TextEncoding::Utf8)
     );
     assert_eq!(
         storage.find_imported_txt(bytes).unwrap(),
@@ -425,7 +428,7 @@ fn txt_existing_bypasses_decoding_and_preserves_title_progress_analysis_and_stat
         VocabularyStatus::Ignored
     );
     assert_eq!(
-        storage.load_txt_source(id).unwrap().unwrap().encoding,
+        storage.load_txt_encoding(id).unwrap().unwrap(),
         TextEncoding::Utf8
     );
     assert_eq!(
@@ -438,7 +441,7 @@ fn txt_existing_bypasses_decoding_and_preserves_title_progress_analysis_and_stat
 fn txt_identity_uses_original_bytes_not_filename_encoding_or_canonical_text_or_paste() {
     let database = TestDatabase::new();
     let mut storage = Storage::open(database.path()).unwrap();
-    // All three become the same base text; retain three distinct original sources.
+    // All four become the same base text and retain distinct input digests.
     for (bytes, selection) in [
         ("猫".as_bytes(), Some(TextEncoding::Utf8)),
         ("\u{feff}猫".as_bytes(), None),
@@ -452,12 +455,8 @@ fn txt_identity_uses_original_bytes_not_filename_encoding_or_canonical_text_or_p
         );
         assert_eq!(imported.document.chapter.text, "猫");
         assert_eq!(
-            storage
-                .load_txt_source(imported.document.document_id)
-                .unwrap()
-                .unwrap()
-                .original_bytes,
-            bytes
+            storage.find_imported_file_id(bytes).unwrap(),
+            Some(imported.document.document_id)
         );
     }
     let paste = storage
@@ -467,7 +466,7 @@ fn txt_identity_uses_original_bytes_not_filename_encoding_or_canonical_text_or_p
         panic!("paste identity must be independent")
     };
     assert!(storage
-        .load_txt_source(paste.document.document_id)
+        .load_txt_encoding(paste.document.document_id)
         .unwrap()
         .is_none());
     assert_eq!(count(&storage, "documents"), 5);
@@ -723,7 +722,7 @@ fn txt_delete_reimport_resets_live_identity_but_preserves_global_vocabulary_and_
         .unwrap();
     assert_eq!(count(&storage, "imported_files"), 0);
     assert!(storage
-        .load_txt_source(document.document_id)
+        .load_txt_encoding(document.document_id)
         .unwrap()
         .is_none());
     let new = created(
@@ -749,53 +748,20 @@ fn txt_delete_reimport_resets_live_identity_but_preserves_global_vocabulary_and_
 }
 
 #[test]
-fn txt_corrupt_digest_fails_closed_without_repair_or_reanalysis() {
-    for corruption in [
-        "UPDATE imported_files SET original_bytes = X'00'",
-        "DELETE FROM imported_files",
-    ] {
-        let database = TestDatabase::new();
-        let mut storage = Storage::open(database.path()).unwrap();
-        let bytes = "｜猫《ねこ》".as_bytes();
-        let imported = created(
-            storage
-                .import_analyzed_txt(bytes, "ruby.txt", Some(TextEncoding::Utf8), 1, fixture)
-                .unwrap(),
-        );
-        storage.connection.execute_batch(corruption).unwrap();
-        assert!(matches!(
-            storage.load_txt_source(imported.document.document_id),
-            Err(StorageError::InvalidDocument)
-        ));
-        if corruption.contains("original_bytes") {
-            assert!(matches!(
-                storage.find_imported_txt(bytes),
-                Err(StorageError::InvalidDocument)
-            ));
-            assert!(matches!(
-                storage.import_analyzed_txt(bytes, "retry.txt", None, 2, no_analysis),
-                Err(TxtImportError::Storage(StorageError::InvalidDocument))
-            ));
-        }
-    }
-    // Corrupt the digest so it falsely claims another file's identity.
+fn txt_encoding_rejects_missing_import_metadata() {
     let database = TestDatabase::new();
     let mut storage = Storage::open(database.path()).unwrap();
-    created(
+    let imported = created(
         storage
             .import_analyzed_txt(b"English", "old.txt", None, 1, fixture)
             .unwrap(),
     );
     storage
         .connection
-        .execute(
-            "UPDATE imported_files SET sha256 = ?1",
-            [Sha256::digest(b"other").as_slice()],
-        )
+        .execute("DELETE FROM imported_files", [])
         .unwrap();
     assert!(matches!(
-        storage.import_analyzed_txt(b"other", "new.txt", None, 2, no_analysis),
-        Err(TxtImportError::Storage(StorageError::InvalidDocument))
+        storage.load_txt_encoding(imported.document.document_id),
+        Err(StorageError::InvalidDocument)
     ));
-    assert_eq!(count(&storage, "documents"), 1);
 }

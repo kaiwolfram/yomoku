@@ -112,7 +112,7 @@ fn srt_duplicate_of_txt_skips_decoding_and_unavailable_full() {
             .as_bytes(),
         bytes
     );
-    assert!(storage.load_txt_source(id).unwrap().is_some());
+    assert!(storage.load_txt_encoding(id).unwrap().is_some());
     assert!(
         storage_fixture::srt_file(&rusqlite::Connection::open(database.path()).unwrap(), id)
             .unwrap()
@@ -262,7 +262,7 @@ fn srt_duplicates_preserve_first_interpretation_status_position_and_skip_full_af
         storage_fixture::srt_file(&rusqlite::Connection::open(database.path()).unwrap(), id)
             .unwrap()
             .unwrap();
-    assert_eq!(source.original_bytes, bytes);
+    assert_eq!(source.encoding, "utf8");
     assert_eq!(
         yomoku_import::srt::parse(std::str::from_utf8(bytes).unwrap())
             .unwrap()

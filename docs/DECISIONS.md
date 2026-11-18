@@ -34,13 +34,13 @@ base text only. Page fragments retain complete
 word identities. UTF-8 byte anchors and scalar boundaries are canonical; Kotlin
 converts validated visible ranges to UTF-16 only at rendering boundaries.
 
-Imports preserve original bytes, encoding and hashes, canonical base text
-and EPUB image/format metadata. Recognized source readings are discarded; dictionary
+Imports preserve encoding, input hashes, canonical base text and EPUB images and
+formatting. Input bytes are discarded after extraction. Recognized source readings are discarded; dictionary
 readings remain available in word sheets. Exact duplicates retain their live document.
 EPUB imports tolerate repeated spine references by keeping each manifest item's
 first occurrence. This accepts books with duplicated cover entries without
-duplicating canonical chapters, analysis or reading content; original bytes and
-file hashes remain unchanged. Ambiguous manifest entries remain invalid.
+duplicating canonical chapters, analysis or reading content. The file digest still
+covers the full input. Ambiguous manifest entries remain invalid.
 SRT cue boundaries are transient and preserve canonical blank-line separators.
 Internal and unsupported EPUB links retain text without annotation records;
 HTTP(S) links retain browser targets. Imported content is not editable.
@@ -65,7 +65,7 @@ Pinned inputs, patches, licenses and notices are in
 
 ## Persistence and history
 
-Use one initial SQL schema, version 1, journal `0001_base_text_initial_schema`,
+Use one initial SQL schema, version 1, journal `0001_canonical_import_initial_schema`,
 with 26 application tables. Retain the immediate-transaction runner/journal for
 future published upgrades. Previous development databases and backups, including
 the prior schema-1 journal, fail validation without migration, clearing or repair.

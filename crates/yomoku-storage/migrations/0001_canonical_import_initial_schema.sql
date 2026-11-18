@@ -135,8 +135,11 @@ CREATE TABLE "sources" (
 CREATE TABLE "imported_files" (
     document_id INTEGER PRIMARY KEY REFERENCES documents(id) ON DELETE CASCADE,
     sha256 BLOB NOT NULL UNIQUE CHECK (length(sha256) = 32),
-    original_bytes BLOB NOT NULL,
-    text_encoding TEXT NOT NULL CHECK (text_encoding IN ('utf8', 'shift_jis', 'epub'))
+    text_encoding TEXT NOT NULL CHECK (text_encoding IN ('utf8', 'shift_jis', 'epub')),
+    canonical_text_sha256 BLOB,
+    CHECK ((text_encoding = 'epub' AND canonical_text_sha256 IS NULL)
+        OR (text_encoding IN ('utf8', 'shift_jis')
+            AND canonical_text_sha256 IS NOT NULL AND length(canonical_text_sha256) = 32))
 ) STRICT;
 
 CREATE TABLE epub_documents (

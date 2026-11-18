@@ -123,7 +123,7 @@ fn document_rename_preserves_all_content_provenance_history_time_statuses_and_du
 }
 
 #[test]
-fn document_rename_file_formats_preserve_original_bytes_assets_and_live_duplicate_titles() {
+fn document_rename_file_formats_preserve_content_assets_and_live_duplicate_titles() {
     for kind in ["txt", "srt", "epub"] {
         let database = TestDatabase::new();
         let mut storage = Storage::open(database.path()).unwrap();

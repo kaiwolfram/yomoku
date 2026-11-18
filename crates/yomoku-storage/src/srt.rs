@@ -15,7 +15,7 @@ use yomoku_import::{
 
 use crate::{
     documents::create_single_text_in,
-    files::{encoding_name, find_imported_in},
+    files::{find_imported_in, store_imported_text_in},
     imports::store_analyzed_document_in,
     AnalyzedPaste, ImportCancellation, Storage, StorageError,
 };
@@ -113,9 +113,7 @@ impl Storage {
         if cancellation.is_cancelled() {
             return Ok(None);
         }
-        let outcome = if let Some(document) =
-            find_imported_in(&transaction, original_bytes, digest.as_slice())?
-        {
+        let outcome = if let Some(document) = find_imported_in(&transaction, digest.as_slice())? {
             SrtImportOutcome::Existing(document)
         } else {
             if filename.trim().is_empty() {
@@ -128,11 +126,13 @@ impl Storage {
                 return Ok(None);
             }
             let document = create_single_text_in(&transaction, "srt", filename, &parsed.text)?;
-            transaction.execute(
-                "INSERT INTO imported_files (document_id, sha256, original_bytes, text_encoding)
-                 VALUES (?1, ?2, ?3, ?4)",
-                (i64::from(document.document_id), digest.as_slice(), original_bytes, encoding_name(encoding)),
-            ).map_err(StorageError::from)?;
+            store_imported_text_in(
+                &transaction,
+                document.document_id,
+                digest.as_slice(),
+                encoding,
+                &parsed.text,
+            )?;
             let analysis = analyze(&document.chapter).map_err(SrtImportError::Analysis)?;
             if cancellation.is_cancelled() {
                 return Ok(None);

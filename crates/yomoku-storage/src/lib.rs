@@ -37,7 +37,7 @@ pub use epub_assets::{EpubCoverReference, MAX_EPUB_ASSET_BYTES};
 pub use import_cancellation::ImportCancellation;
 pub use imports::{AnalyzedPaste, PasteImportError, PasteImportOutcome};
 pub use srt::{SrtImportError, SrtImportOutcome};
-pub use txt::{StoredTxtSource, TxtImportError, TxtImportOutcome};
+pub use txt::{TxtImportError, TxtImportOutcome};
 
 use std::{error::Error, fmt, path::Path, time::Duration};
 
@@ -51,8 +51,8 @@ struct Migration {
 
 const MIGRATIONS: &[Migration] = &[Migration {
     version: 1,
-    name: "0001_base_text_initial_schema",
-    sql: include_str!("../migrations/0001_base_text_initial_schema.sql"),
+    name: "0001_canonical_import_initial_schema",
+    sql: include_str!("../migrations/0001_canonical_import_initial_schema.sql"),
 }];
 
 /// Failures are returned to the runtime; opening never resets a database.

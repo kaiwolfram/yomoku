@@ -98,8 +98,8 @@ impl BackupCandidate {
     /// domains, plus detached effective payloads and their receipts.
     /// Also checks canonical text ownership/order and saved position/time anchors.
     /// Validates retained analysis coverage and frozen effective text/page/analysis
-    /// associations, exact paste/file hashes and format ownership, and TXT/SRT
-    /// text/annotations derived from saved bytes. EPUB metadata/assets, rule
+    /// associations, file identity metadata and format ownership, and saved
+    /// paste/TXT/SRT text digests. EPUB metadata/assets, rule
     /// provenance and other history checks are incomplete.
     /// Other application invariants are NOT yet validated: this cannot authorize
     /// confirmation, replacement, reads through Storage, or external Anki writes.
@@ -162,8 +162,8 @@ impl Write for BackupCandidate {
 /// Structural preflight result only. Intentionally exposes neither a path nor a
 /// connection/reader nor activation/confirmation authority. Application-level
 /// validation beyond journals/control records/saved entries/detached effective
-/// records/canonical text/live anchors/analysis associations/file identity and
-/// TXT/SRT annotations is required before restore-ready.
+/// records/canonical text/live anchors/analysis associations/file identity is
+/// required before restore-ready.
 pub struct SchemaCheckedBackup {
     staging: StagingDirectory,
     original_schema: u32,

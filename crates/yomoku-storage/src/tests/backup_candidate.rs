@@ -434,7 +434,13 @@ fn previous_initial_journal_and_schema_are_rejected_without_changing_source_file
     let database = TestDatabase::new();
     let mut storage = Storage::open(database.path()).unwrap();
     super::backup_snapshot::populate(&mut storage);
-    storage.connection.execute_batch("UPDATE schema_migrations SET name = '0001_initial_schema' WHERE version = 1; CREATE TABLE subtitle_cues (chapter_id INTEGER, cue_index INTEGER, start_byte INTEGER, end_byte INTEGER);").unwrap();
+    storage
+        .connection
+        .execute_batch(
+            "UPDATE schema_migrations SET name = '0001_base_text_initial_schema' WHERE version = 1;
+         ALTER TABLE imported_files ADD COLUMN original_bytes BLOB NOT NULL DEFAULT X'636174';",
+        )
+        .unwrap();
     let before = fs::read(database.path()).unwrap();
     assert!(matches!(
         Storage::open(database.path()),

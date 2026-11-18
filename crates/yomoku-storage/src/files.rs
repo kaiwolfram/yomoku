@@ -1,4 +1,4 @@
-//! Exact original-byte identity shared by supported file adapters.
+//! Input file digest identity shared by supported file adapters.
 
 use rusqlite::OptionalExtension;
 use sha2::{Digest, Sha256};
@@ -16,21 +16,21 @@ impl Storage {
     ) -> Result<Option<DocumentId>, StorageError> {
         let digest = Sha256::digest(original_bytes);
         let transaction = self.connection.transaction()?;
-        let id = find_imported_id_in(&transaction, original_bytes, digest.as_slice())?;
+        let id = find_imported_id_in(&transaction, digest.as_slice())?;
         transaction.commit()?;
         Ok(id)
     }
 
     /// Format-independent read-only reference across TXT/SRT/EPUB. Read the
     /// persisted title, whole-book progress and finish marker atomically with
-    /// exact-byte identity, without decoding, analysis or resetting progress.
+    /// file digest identity, without decoding, analysis or resetting progress.
     pub fn find_imported_file(
         &mut self,
         original_bytes: &[u8],
     ) -> Result<Option<LibraryDocument>, StorageError> {
         let digest = Sha256::digest(original_bytes);
         let transaction = self.connection.transaction()?;
-        let document = find_imported_in(&transaction, original_bytes, digest.as_slice())?;
+        let document = find_imported_in(&transaction, digest.as_slice())?;
         transaction.commit()?;
         Ok(document)
     }
@@ -38,10 +38,9 @@ impl Storage {
 
 pub(crate) fn find_imported_in(
     connection: &rusqlite::Connection,
-    original_bytes: &[u8],
     digest: &[u8],
 ) -> Result<Option<LibraryDocument>, StorageError> {
-    let Some(id) = find_imported_id_in(connection, original_bytes, digest)? else {
+    let Some(id) = find_imported_id_in(connection, digest)? else {
         return Ok(None);
     };
     // Import duplicate checks always perform a fresh one-shot validation.
@@ -58,32 +57,45 @@ pub(crate) fn find_imported_in(
     Ok(Some(summary))
 }
 
-/// Exact live file identity; callers may load a format-independent reference in
+/// Live file identity; callers may load a format-independent reference in
 /// the same transaction through find_imported_in.
 pub(crate) fn find_imported_id_in(
     connection: &rusqlite::Connection,
-    original_bytes: &[u8],
     digest: &[u8],
 ) -> Result<Option<DocumentId>, StorageError> {
-    let existing: Option<(i64, Vec<u8>)> = connection
+    let existing: Option<i64> = connection
         .query_row(
-            "SELECT document_id, original_bytes FROM imported_files WHERE sha256 = ?1",
+            "SELECT document_id FROM imported_files WHERE sha256 = ?1",
             [digest],
-            |row| Ok((row.get(0)?, row.get(1)?)),
+            |row| row.get(0),
         )
         .optional()?;
-    let Some((id, stored_bytes)) = existing else {
-        return Ok(None);
-    };
-    // Fail closed on a stale/corrupt key or digest collision.
-    if stored_bytes != original_bytes {
-        return Err(StorageError::InvalidDocument);
-    }
-    let id = DocumentId::try_from(id).map_err(|_| StorageError::InvalidDocument)?;
-    Ok(Some(id))
+    existing
+        .map(|id| DocumentId::try_from(id).map_err(|_| StorageError::InvalidDocument))
+        .transpose()
 }
 
-pub(crate) fn encoding_name(encoding: TextEncoding) -> &'static str {
+pub(crate) fn store_imported_text_in(
+    connection: &rusqlite::Connection,
+    document_id: DocumentId,
+    digest: &[u8],
+    encoding: TextEncoding,
+    text: &str,
+) -> Result<(), StorageError> {
+    connection.execute(
+        "INSERT INTO imported_files (document_id, sha256, text_encoding, canonical_text_sha256)
+         VALUES (?1, ?2, ?3, ?4)",
+        (
+            i64::from(document_id),
+            digest,
+            encoding_name(encoding),
+            Sha256::digest(text.as_bytes()).as_slice(),
+        ),
+    )?;
+    Ok(())
+}
+
+fn encoding_name(encoding: TextEncoding) -> &'static str {
     match encoding {
         TextEncoding::Utf8 => "utf8",
         TextEncoding::ShiftJis => "shift_jis",

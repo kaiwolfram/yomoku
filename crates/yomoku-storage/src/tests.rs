@@ -142,6 +142,23 @@ fn initial_schema_has_only_release_tables_and_reopens_without_writes() {
         .collect::<Result<_, _>>()
         .unwrap();
     assert!(!columns.iter().any(|name| name == "active_time_ms"));
+    let import_columns: Vec<String> = storage
+        .connection
+        .prepare("PRAGMA table_info(imported_files)")
+        .unwrap()
+        .query_map([], |row| row.get(1))
+        .unwrap()
+        .collect::<Result<_, _>>()
+        .unwrap();
+    assert_eq!(
+        import_columns,
+        [
+            "document_id",
+            "sha256",
+            "text_encoding",
+            "canonical_text_sha256"
+        ]
+    );
     assert_eq!(storage.anki_default_deck().unwrap(), None);
     assert_eq!(
         storage.page_length().unwrap(),
@@ -153,7 +170,7 @@ fn initial_schema_has_only_release_tables_and_reopens_without_writes() {
     );
     assert_eq!(
         history(&database.path()),
-        [(1, "0001_base_text_initial_schema".into())]
+        [(1, "0001_canonical_import_initial_schema".into())]
     );
     assert_eq!(
         storage
@@ -200,7 +217,7 @@ fn concurrent_initialization_records_initial_schema_once() {
     });
     assert_eq!(
         history(&database.path()),
-        [(1, "0001_base_text_initial_schema".into())]
+        [(1, "0001_canonical_import_initial_schema".into())]
     );
 }
 
@@ -210,6 +227,7 @@ fn incompatible_development_unknown_and_future_databases_are_never_cleared() {
         None,
         Some((1, "0001_initial_schema")),
         Some((1, "0001_simplified_initial_schema")),
+        Some((1, "0001_base_text_initial_schema")),
         Some((1, "0001_migration_history")),
         Some((24, "0024_anki_settings")),
         Some((2, "0002_future")),

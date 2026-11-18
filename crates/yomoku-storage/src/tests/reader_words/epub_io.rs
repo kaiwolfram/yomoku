@@ -63,8 +63,7 @@ fn deny_binaries(connection: &mut Connection, annotations: bool) {
             AuthAction::Read {
                 table_name,
                 column_name,
-            } if (table_name == "imported_files" && column_name == "original_bytes")
-                || (table_name == "epub_assets" && column_name == "bytes")
+            } if (table_name == "epub_assets" && column_name == "bytes")
                 || (annotations && matches!(table_name, "epub_spans" | "epub_inline_images")) =>
             {
                 Authorization::Deny
@@ -208,9 +207,7 @@ fn cached_integrity_rejects_local_external_and_triggered_corruption_on_the_next_
     for journal in ["DELETE", "WAL"] {
         for external in [false, true] {
             for sql in [
-                "UPDATE imported_files SET original_bytes = X'00'",
                 "UPDATE epub_assets SET bytes = X'00'",
-                "UPDATE imported_files SET sha256 = zeroblob(32)",
                 "UPDATE epub_assets SET sha256 = zeroblob(32)",
                 "UPDATE epub_assets SET media_type = 'text/html'",
                 "UPDATE chapter_texts SET text = '破損' WHERE chapter_id = (SELECT MIN(chapter_id) FROM chapter_texts)",

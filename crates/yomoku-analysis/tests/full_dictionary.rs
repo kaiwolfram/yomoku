@@ -580,10 +580,9 @@ fn real_txt_import_analyzes_only_canonical_text_and_completes_with_original_anch
         .collect();
     assert_eq!(imported.registered_surfaces, unique.len());
     let source = storage
-        .load_txt_source(document.document_id)
+        .load_txt_encoding(document.document_id)
         .unwrap()
         .unwrap();
-    assert_eq!(source.original_bytes, bytes);
     for surface in &unique {
         assert_eq!(
             storage.vocabulary_entry(surface).unwrap().unwrap().status,
@@ -643,7 +642,7 @@ fn real_txt_import_analyzes_only_canonical_text_and_completes_with_original_anch
     drop(storage);
     let mut storage = Storage::open(&path).unwrap();
     assert_eq!(
-        storage.load_txt_source(document.document_id).unwrap(),
+        storage.load_txt_encoding(document.document_id).unwrap(),
         Some(source)
     );
     let TxtImportOutcome::Existing(existing) = storage
@@ -737,7 +736,7 @@ fn real_srt_import_analyzes_only_canonical_text_and_completes_with_original_anch
     )
     .unwrap()
     .unwrap();
-    assert_eq!(source.original_bytes, bytes);
+    assert_eq!(source.encoding, "utf8");
     assert_eq!(
         canonical.split("\n\n").collect::<Vec<_>>(),
         ["猫と猫が食べた。", "国家公務員。𠮷 English 📖\0"]

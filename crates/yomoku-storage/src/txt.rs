@@ -12,7 +12,7 @@ use yomoku_import::txt::{self, TextEncoding, TxtError};
 
 use crate::{
     documents::create_single_text_in,
-    files::{encoding_name, find_imported_in},
+    files::{find_imported_in, store_imported_text_in},
     imports::store_analyzed_document_in,
     AnalyzedPaste, ImportCancellation, Storage, StorageError,
 };
@@ -54,13 +54,6 @@ impl<E> From<StorageError> for TxtImportError<E> {
     fn from(error: StorageError) -> Self {
         Self::Storage(error)
     }
-}
-
-/// Original bytes and the selected decoder for a saved TXT source.
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct StoredTxtSource {
-    pub original_bytes: Vec<u8>,
-    pub encoding: TextEncoding,
 }
 
 impl Storage {
@@ -128,9 +121,7 @@ impl Storage {
         if cancellation.is_cancelled() {
             return Ok(None);
         }
-        let outcome = if let Some(document) =
-            find_imported_in(&transaction, original_bytes, digest.as_slice())?
-        {
+        let outcome = if let Some(document) = find_imported_in(&transaction, digest.as_slice())? {
             TxtImportOutcome::Existing(document)
         } else {
             if filename.trim().is_empty() {
@@ -141,11 +132,13 @@ impl Storage {
                 return Ok(None);
             }
             let document = create_single_text_in(&transaction, "txt", filename, &parsed.text)?;
-            transaction.execute(
-                "INSERT INTO imported_files (document_id, sha256, original_bytes, text_encoding)
-                 VALUES (?1, ?2, ?3, ?4)",
-                (i64::from(document.document_id), digest.as_slice(), original_bytes, encoding_name(parsed.encoding)),
-            ).map_err(StorageError::from)?;
+            store_imported_text_in(
+                &transaction,
+                document.document_id,
+                digest.as_slice(),
+                parsed.encoding,
+                &parsed.text,
+            )?;
             if cancellation.is_cancelled() {
                 return Ok(None);
             }
@@ -170,48 +163,29 @@ impl Storage {
         })
     }
 
-    /// Read original bytes, selected encoding without parsing
-    /// or loading the analyzer. None means no live TXT document with this ID.
-    pub fn load_txt_source(
-        &mut self,
+    /// Read the selected decoder for a live TXT document.
+    pub fn load_txt_encoding(
+        &self,
         document_id: DocumentId,
-    ) -> Result<Option<StoredTxtSource>, StorageError> {
-        let transaction = self.connection.transaction()?;
-        let kind: Option<String> = transaction.query_row(
-            "SELECT s.kind FROM documents d JOIN sources s ON s.id = d.source_id WHERE d.id = ?1",
-            [i64::from(document_id)], |row| row.get(0),
-        ).optional()?;
-        if kind.as_deref() != Some("txt") {
-            return Ok(None);
-        }
-        let source = transaction
+    ) -> Result<Option<TextEncoding>, StorageError> {
+        let encoding: Option<Option<String>> = self
+            .connection
             .query_row(
-                "SELECT f.original_bytes, f.text_encoding, f.sha256 FROM imported_files f
-             JOIN documents d ON d.id = f.document_id JOIN sources s ON s.id = d.source_id
-             WHERE d.id = ?1 AND s.kind = 'txt'",
+                "SELECT f.text_encoding FROM documents d
+                 JOIN sources s ON s.id = d.source_id
+                 LEFT JOIN imported_files f ON f.document_id = d.id
+                 WHERE d.id = ?1 AND s.kind = 'txt'",
                 [i64::from(document_id)],
-                |row| {
-                    Ok((
-                        row.get::<_, Vec<u8>>(0)?,
-                        row.get::<_, String>(1)?,
-                        row.get::<_, Vec<u8>>(2)?,
-                    ))
-                },
+                |row| row.get(0),
             )
             .optional()?;
-        let (original_bytes, encoding, digest) = source.ok_or(StorageError::InvalidDocument)?;
-        if Sha256::digest(&original_bytes).as_slice() != digest {
-            return Err(StorageError::InvalidDocument);
+        match encoding {
+            None => Ok(None),
+            Some(encoding) => match encoding.as_deref() {
+                Some("utf8") => Ok(Some(TextEncoding::Utf8)),
+                Some("shift_jis") => Ok(Some(TextEncoding::ShiftJis)),
+                _ => Err(StorageError::InvalidDocument),
+            },
         }
-        let encoding = match encoding.as_str() {
-            "utf8" => TextEncoding::Utf8,
-            "shift_jis" => TextEncoding::ShiftJis,
-            _ => return Err(StorageError::InvalidDocument),
-        };
-        transaction.commit()?;
-        Ok(Some(StoredTxtSource {
-            original_bytes,
-            encoding,
-        }))
     }
 }

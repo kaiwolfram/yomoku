@@ -66,7 +66,7 @@ pub fn prepare(
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SrtFile {
-    pub original_bytes: Vec<u8>,
+    pub sha256: Vec<u8>,
     pub encoding: String,
 }
 pub fn srt_file(
@@ -74,8 +74,8 @@ pub fn srt_file(
     id: yomoku_core::document::DocumentId,
 ) -> rusqlite::Result<Option<SrtFile>> {
     use rusqlite::OptionalExtension;
-    connection.query_row("SELECT f.original_bytes, f.text_encoding FROM imported_files f JOIN documents d ON d.id = f.document_id JOIN sources s ON s.id = d.source_id WHERE d.id = ?1 AND s.kind = 'srt'", [i64::from(id)], |row| {
+    connection.query_row("SELECT f.sha256, f.text_encoding FROM imported_files f JOIN documents d ON d.id = f.document_id JOIN sources s ON s.id = d.source_id WHERE d.id = ?1 AND s.kind = 'srt'", [i64::from(id)], |row| {
         let encoding: String = row.get(1)?;
-        Ok(SrtFile { original_bytes: row.get(0)?, encoding })
+        Ok(SrtFile { sha256: row.get(0)?, encoding })
     }).optional()
 }

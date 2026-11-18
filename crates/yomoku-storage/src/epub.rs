@@ -36,7 +36,6 @@ pub struct StoredEpubDocument {
     pub filename: String,
     pub finished_at_least_once: bool,
     pub reading_position: Option<ReadingPosition>,
-    pub original_bytes: Vec<u8>,
     pub metadata_title: Option<String>,
     pub cover: Option<String>,
     pub images: BTreeMap<String, EpubImage>,
@@ -137,9 +136,7 @@ impl Storage {
         if cancellation.is_cancelled() {
             return Ok(None);
         }
-        let outcome = if let Some(reference) =
-            find_imported_in(&transaction, original_bytes, digest.as_slice())?
-        {
+        let outcome = if let Some(reference) = find_imported_in(&transaction, digest.as_slice())? {
             EpubImportOutcome::Existing(reference)
         } else {
             if filename.trim().is_empty() {
@@ -167,8 +164,10 @@ impl Storage {
                 .map_err(StorageError::from)?;
             let document_id = DocumentId::try_from(transaction.last_insert_rowid())
                 .map_err(|_| StorageError::InvalidDocument)?;
-            transaction.execute("INSERT INTO imported_files (document_id, sha256, original_bytes, text_encoding) VALUES (?1, ?2, ?3, 'epub')",
-                (i64::from(document_id), digest.as_slice(), original_bytes)).map_err(StorageError::from)?;
+            transaction.execute(
+                "INSERT INTO imported_files (document_id, sha256, text_encoding) VALUES (?1, ?2, 'epub')",
+                (i64::from(document_id), digest.as_slice()),
+            ).map_err(StorageError::from)?;
             transaction.execute("INSERT INTO epub_documents (document_id, filename, metadata_title, cover_path, chapter_count, asset_count) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
                 (i64::from(document_id), filename, &parsed.title, &parsed.cover, number(parsed.chapters.len())?, number(parsed.images.len())?)).map_err(StorageError::from)?;
             for (path, image) in &parsed.images {
@@ -236,7 +235,6 @@ impl Storage {
                     filename: filename.to_owned(),
                     finished_at_least_once: false,
                     reading_position: None,
-                    original_bytes: original_bytes.to_vec(),
                     metadata_title: parsed.title,
                     cover: parsed.cover,
                     images: parsed.images,
@@ -312,18 +310,6 @@ pub(crate) fn load_epub_in(
     let Some(metadata) = load_epub_metadata_in(connection, document_id)? else {
         return Ok(None);
     };
-    let original_bytes = connection.query_row(
-        "SELECT original_bytes, sha256 FROM imported_files WHERE document_id = ?1",
-        [i64::from(document_id)],
-        |row| {
-            let bytes: Vec<u8> = row.get(0)?;
-            let digest: Vec<u8> = row.get(1)?;
-            Ok((bytes, digest))
-        },
-    )?;
-    if Sha256::digest(&original_bytes.0).as_slice() != original_bytes.1 {
-        return Err(StorageError::InvalidDocument);
-    }
     let mut images = BTreeMap::new();
     let mut statement = connection.prepare(
         "SELECT path, media_type, bytes, sha256 FROM epub_assets WHERE document_id = ?1",
@@ -350,7 +336,6 @@ pub(crate) fn load_epub_in(
         filename: metadata.filename,
         finished_at_least_once: metadata.finished_at_least_once,
         reading_position: metadata.reading_position,
-        original_bytes: original_bytes.0,
         metadata_title: metadata.metadata_title,
         cover: metadata.cover,
         images,

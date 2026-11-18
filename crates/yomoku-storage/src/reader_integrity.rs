@@ -8,7 +8,7 @@ use std::{
     },
 };
 
-use rusqlite::{Connection, OptionalExtension};
+use rusqlite::Connection;
 use sha2::{Digest, Sha256};
 use yomoku_core::document::{DocumentId, SourceId};
 
@@ -38,10 +38,10 @@ impl ReaderIntegrity {
     pub fn install(connection: &mut Connection) -> Result<Self, StorageError> {
         let integrity = Self::default();
         let epoch = integrity.binary_epoch.clone();
-        // These are ordinary rowid tables. Trigger/cascade writes also fire the
+        // epub_assets is a rowid table. Trigger/cascade writes also fire the
         // hook. Metadata/count checks still detect deleted rows on every load.
         connection.update_hook(Some(move |_, database: &str, table: &str, _| {
-            if database == "main" && matches!(table, "imported_files" | "epub_assets") {
+            if database == "main" && table == "epub_assets" {
                 epoch.fetch_add(1, Ordering::Relaxed);
             }
         }))?;
@@ -78,16 +78,6 @@ impl ReaderIntegrity {
             return Ok(());
         }
         self.binaries.replace(None);
-        let original_valid = connection
-            .query_row(
-                "SELECT original_bytes, sha256 FROM imported_files WHERE document_id = ?1",
-                [i64::from(document_id)],
-                valid_binary,
-            )
-            .optional()?;
-        if original_valid != Some(true) {
-            return Err(StorageError::InvalidDocument);
-        }
         let mut statement =
             connection.prepare("SELECT bytes, sha256 FROM epub_assets WHERE document_id = ?1")?;
         let mut rows = statement.query([i64::from(document_id)])?;
@@ -123,7 +113,7 @@ impl ReaderIntegrity {
 }
 
 fn valid_binary(row: &rusqlite::Row<'_>) -> rusqlite::Result<bool> {
-    // Borrow SQLite's current row rather than allocating another archive/image.
+    // Borrow SQLite's current row rather than allocating another image.
     let bytes = row.get_ref(0)?.as_blob()?;
     let digest = row.get_ref(1)?.as_blob()?;
     Ok(Sha256::digest(bytes).as_slice() == digest)

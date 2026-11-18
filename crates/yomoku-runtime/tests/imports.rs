@@ -1065,7 +1065,7 @@ fn txt_typed_decoding_errors_skip_full_and_manual_choices_retry_without_partial_
     let id = selected.documents[0].document_id;
     assert_eq!(storage.load_paste(id).unwrap().unwrap().chapter.text, "ﾂｩ");
     assert_eq!(
-        storage.load_txt_source(id).unwrap().unwrap().encoding,
+        storage.load_txt_encoding(id).unwrap().unwrap(),
         yomoku_import::txt::TextEncoding::ShiftJis
     );
     let unicode = dispatch(
@@ -1126,8 +1126,8 @@ fn txt_duplicates_after_reopen_preserve_source_status_progress_and_skip_unavaila
         .set_vocabulary_status(cat_entry.id, VocabularyStatus::Known, 123)
         .unwrap()
         .unwrap();
-    let source = storage.load_txt_source(id).unwrap().unwrap();
-    assert_eq!(source.original_bytes, bytes);
+    let source = storage.load_txt_encoding(id).unwrap().unwrap();
+    assert_eq!(source, yomoku_import::txt::TextEncoding::Utf8);
     let before = file_totals(&database.path());
     lifecycle.set_foreground(false).unwrap();
     assert_eq!(trace.recv_timeout(TIMEOUT).unwrap(), Trace::Drop(worker));
@@ -1154,7 +1154,7 @@ fn txt_duplicates_after_reopen_preserve_source_status_progress_and_skip_unavaila
         storage.load_paste(id).unwrap().unwrap().reading_position,
         Some(position)
     );
-    assert_eq!(storage.load_txt_source(id).unwrap(), Some(source));
+    assert_eq!(storage.load_txt_encoding(id).unwrap(), Some(source));
     assert_eq!(storage.vocabulary_entry(&cat).unwrap(), Some(known));
     assert!(trace.try_recv().is_err());
     finish_worker(router, lifecycle, &trace);

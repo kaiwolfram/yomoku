@@ -75,7 +75,7 @@ fn accept_prefix(database: &TestDatabase, version: usize) {
 }
 
 #[test]
-fn backup_candidate_formats_preserve_exact_files_annotations_and_paste_hashes() {
+fn backup_candidate_formats_preserve_canonical_content_and_file_digests() {
     {
         let version = 1;
         let (database, storage) = setup();
@@ -111,27 +111,13 @@ fn backup_candidate_formats_reject_wrong_paste_hashes_and_file_hash_ownership() 
 }
 
 #[test]
-fn backup_candidate_formats_require_file_records_matching_kind_encoding_and_exact_digest() {
-    {
-        let version = 1;
-        for sql in [
-            "DELETE FROM imported_files WHERE document_id = 3",
-            "UPDATE imported_files SET sha256 = zeroblob(32) WHERE document_id = 3",
-            "UPDATE imported_files SET original_bytes = X'ff' WHERE document_id = 3",
-            "UPDATE imported_files SET document_id = 1 WHERE document_id = 3",
-            "UPDATE imported_files SET text_encoding = 'shift_jis' WHERE document_id = 3",
-        ] {
-            let (database, storage) = setup();
-            storage.connection.execute_batch(sql).unwrap();
-            check_rejected(&database, version as u32, CandidateError::InvalidData);
-        }
-    }
+fn backup_candidate_formats_require_file_records_matching_kind_and_encoding() {
     for sql in [
-        "UPDATE imported_files SET text_encoding = 'epub' WHERE document_id = 3",
-        "UPDATE imported_files SET text_encoding = 'utf8' WHERE document_id = 5",
+        "DELETE FROM imported_files WHERE document_id = 3",
+        "UPDATE imported_files SET document_id = 1 WHERE document_id = 3",
+        "UPDATE imported_files SET text_encoding = 'epub', canonical_text_sha256 = NULL WHERE document_id = 3",
+        "UPDATE imported_files SET text_encoding = 'utf8', canonical_text_sha256 = zeroblob(32) WHERE document_id = 5",
         "DELETE FROM imported_files WHERE document_id = 5",
-        "UPDATE imported_files SET sha256 = zeroblob(32) WHERE document_id = 5",
-        "UPDATE imported_files SET original_bytes = X'00' WHERE document_id = 5",
         "DELETE FROM epub_documents WHERE document_id = 5",
         "UPDATE epub_documents SET document_id = 1 WHERE document_id = 5",
     ] {
@@ -146,23 +132,16 @@ fn backup_candidate_formats_require_file_records_matching_kind_encoding_and_exac
 }
 
 #[test]
-fn backup_candidate_formats_reject_undecodable_or_different_text_even_with_updated_hash() {
-    for (document, bytes) in [
-        (3, b"different TXT".as_slice()),
-        (3, &[0xff]),
-        (4, b"different SRT".as_slice()),
-        (4, &[0xff]),
-        (4, b"  ".as_slice()),
-    ] {
-        let (database, storage) = setup();
-        storage
-            .connection
-            .execute(
-                "UPDATE imported_files SET original_bytes = ?1, sha256 = ?2 WHERE document_id = ?3",
-                (bytes, Sha256::digest(bytes).as_slice(), document),
-            )
-            .unwrap();
-        check_rejected(&database, 1, CandidateError::InvalidData);
+fn backup_candidate_formats_reject_tampered_txt_and_srt_canonical_text() {
+    for id in [3, 4] {
+        for sql in [
+            "UPDATE chapter_texts SET text = 'different text' WHERE chapter_id = ?1",
+            "UPDATE imported_files SET canonical_text_sha256 = zeroblob(32) WHERE document_id = ?1",
+        ] {
+            let (database, storage) = setup();
+            storage.connection.execute(sql, [id]).unwrap();
+            check_rejected(&database, 1, CandidateError::InvalidData);
+        }
     }
 }
 

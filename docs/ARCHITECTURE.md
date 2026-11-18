@@ -62,7 +62,7 @@ Reading durations are not collected or persisted.
 The worker uses whole-document snapshot/open/position operations and effective
 page/word lookups. The reader renders canonical base text only. EPUB reader
 projections contain canonical text, annotations and image metadata, separately
-from original archive and image payloads. Lazy A/B analysis requests canonical
+from extracted image payloads. Lazy A/B analysis requests canonical
 chapter text directly rather than a whole-document snapshot.
 
 Storage retains bounded integrity markers for one EPUB's binaries and one

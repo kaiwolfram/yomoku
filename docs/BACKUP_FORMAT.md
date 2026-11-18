@@ -12,15 +12,15 @@ The format is independent of Crux/Bincode/FFI payloads.
 
 The payload is one compact consistent SQLite snapshot of the **initial schema 1**,
 with the [26 application tables](DATA_MODEL.md) and `sqlite_sequence`. It retains
-original imported bytes, canonical base text/images/formatting, analysis identities,
+file digests and encoding, canonical base text/images/formatting, analysis identities,
 vocabulary/status history, counted occurrences/completions, progress,
 reader settings, Statistics timeframe, default Anki deck, migration journal and ID high-water marks.
 There are no custom entries, segmentation overrides, Anki export journals or
-recovery records. SRT cues are transient, while canonical blank-line separators
-and original subtitle bytes remain in the snapshot. Only HTTP(S) EPUB links have
+recovery records. SRT cues are transient and canonical blank-line separators
+remain in the snapshot. Only HTTP(S) EPUB links have
 annotation rows. Reading durations are not saved.
 
-The journal is `0001_base_text_initial_schema`, schema version 1, including the
+The journal is `0001_canonical_import_initial_schema`, schema version 1, including the
 Statistics timeframe preference. Earlier development schemas and journals are
 rejected unchanged; no clearing is attempted. The cryptographic envelope and stream format are unchanged.
 

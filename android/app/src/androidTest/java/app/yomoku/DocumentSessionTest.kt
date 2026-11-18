@@ -123,13 +123,19 @@ class DocumentSessionTest {
                     android.database.sqlite.SQLiteDatabase.OPEN_READONLY,
                 )
                 .use { db ->
-                    db.rawQuery("SELECT original_bytes, text_encoding FROM imported_files", null)
-                        .use {
-                            assertTrue(it.moveToFirst())
-                            assertTrue(bytes.contentEquals(it.getBlob(0)))
-                            assertEquals("utf8", it.getString(1))
-                            assertFalse(it.moveToNext())
+                    db.rawQuery("SELECT sha256, text_encoding FROM imported_files", null).use {
+                        assertTrue(it.moveToFirst())
+                        val digest = java.security.MessageDigest.getInstance("SHA-256")
+                        assertTrue(digest.digest(bytes).contentEquals(it.getBlob(0)))
+                        assertEquals("utf8", it.getString(1))
+                        assertFalse(it.moveToNext())
+                    }
+                    db.rawQuery("PRAGMA table_info(imported_files)", null).use {
+                        val columnName = it.getColumnIndexOrThrow("name")
+                        while (it.moveToNext()) {
+                            assertFalse(it.getString(columnName) == "original_bytes")
                         }
+                    }
                     db.rawQuery("SELECT count(*) FROM reading_completions", null).use {
                         assertTrue(it.moveToFirst())
                         assertEquals(0, it.getInt(0))
