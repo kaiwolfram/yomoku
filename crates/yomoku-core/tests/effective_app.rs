@@ -118,7 +118,7 @@ impl Fixture {
         }
     }
 
-    fn resolved(&self) -> EffectiveReaderChapter<'_> {
+    fn resolved(&self) -> EffectiveReaderChapter {
         EffectiveReaderChapter::resolve(
             &self.document.chapters[0],
             4.try_into().unwrap(),

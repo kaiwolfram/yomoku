@@ -1,19 +1,19 @@
 //! Selected-word read composition for the runtime's I/O worker. Dictionary
 //! assets remain separate from mutable state; neither connection is written.
 
-use std::{error::Error, fmt};
+use std::{error::Error, fmt, sync::Arc};
 
 use rusqlite::Connection;
 use yomoku_core::{
     dictionary::DictionaryCandidates,
     effective_reader::{EffectiveReaderToken, EffectiveReaderTokenKey, EffectiveReaderWordDetails},
     reader::ReaderVocabulary,
+    vocabulary::Surface,
 };
 
 use crate::{
     dictionary::{Dictionary, DictionaryError},
-    reader_integrity::ReaderIntegrity,
-    reader_tokens::load_effective_reader_tokens_in,
+    reader_integrity::{ActiveChapter, ReaderIntegrity},
     Storage, StorageError,
 };
 
@@ -79,13 +79,39 @@ impl Storage {
         self.validated_reader_selection = None;
         let transaction = self.connection.transaction().map_err(StorageError::from)?;
         let revision = SelectionRevision::read(&transaction)?;
-        let Some(token) =
+        let Some((chapter, mut token)) =
             selected_effective_token_in(&transaction, key, segment_index, &self.reader_integrity)?
         else {
             return Ok(None);
         };
-        let components = component_forms_in(&transaction, key, token.anchor)?;
-        let parts = dictionary.parts(&token.surface, components)?;
+        let surface = Surface::new(&token.surface).map_err(|_| StorageError::InvalidAnalysis)?;
+        token.vocabulary =
+            crate::vocabulary::read_entry_by_surface(&transaction, &surface)?.map(|entry| {
+                ReaderVocabulary {
+                    id: entry.id,
+                    status: entry.status,
+                }
+            });
+        let components = self
+            .reader_integrity
+            .components(|| component_analyses_in(&transaction, key, &chapter.text))?;
+        let anchor = token.anchor;
+        let forms = yomoku_core::dictionary::component_parts(
+            components
+                .iter()
+                .flat_map(|analysis| {
+                    let start = analysis
+                        .tokens
+                        .partition_point(|t| t.anchor.range.start < anchor.range.start);
+                    analysis.tokens[start..]
+                        .iter()
+                        .take_while(|t| t.anchor.range.end <= anchor.range.end)
+                        .cloned()
+                })
+                .collect(),
+            anchor.range.start,
+        );
+        let parts = dictionary.parts(&token.surface, forms)?;
         let (encountered, last_seen_unix_ms, candidates) = word_details_in(
             &transaction,
             dictionary,
@@ -119,21 +145,20 @@ pub(crate) fn selected_effective_token_in(
     key: &EffectiveReaderTokenKey,
     segment_index: u64,
     integrity: &ReaderIntegrity,
-) -> Result<Option<EffectiveReaderToken>, ReaderWordError> {
-    let Some(snapshot) =
-        load_effective_reader_tokens_in(connection, key.document_id, key.page, integrity)?
-    else {
+) -> Result<Option<(Arc<ActiveChapter>, EffectiveReaderToken)>, ReaderWordError> {
+    let Some(chapter) = integrity.chapter(connection, key.document_id, key.page.chapter_id)? else {
         return Ok(None);
     };
-    if snapshot.segmentation.as_ref() != Some(&key.segmentation) {
-        return Err(ReaderWordError::InvalidSelection);
-    }
-    snapshot
-        .tokens
-        .into_iter()
-        .find(|token| token.segment_index == segment_index)
-        .map(Some)
-        .ok_or(ReaderWordError::InvalidSelection)
+    let effective = chapter
+        .effective
+        .as_ref()
+        .filter(|effective| effective.segmentation() == &key.segmentation)
+        .ok_or(ReaderWordError::InvalidSelection)?;
+    let token = effective
+        .token_on_page(key.page, segment_index)
+        .map_err(|_| StorageError::InvalidAnalysis)?
+        .ok_or(ReaderWordError::InvalidSelection)?;
+    Ok(Some((chapter, token)))
 }
 
 /// Exact-surface counts and bundled dictionary candidates for a validated selection.
@@ -165,41 +190,31 @@ fn word_details_in(
     Ok((encountered, last_seen_unix_ms, candidates))
 }
 
-fn component_forms_in(
+fn component_analyses_in(
     connection: &Connection,
     key: &EffectiveReaderTokenKey,
-    anchor: yomoku_core::document::TextAnchor,
-) -> Result<Vec<yomoku_core::dictionary::DictionaryPart>, ReaderWordError> {
-    let chapter = crate::analysis::read_chapter(connection, anchor.chapter_id)?;
-    let mut statement = connection.prepare("SELECT id FROM chapter_analyses WHERE chapter_id = ?1 AND engine_revision = ?2 AND dictionary_revision = ?3 AND split_mode IN ('a','b') ORDER BY split_mode").map_err(StorageError::from)?;
+    chapter: &yomoku_core::document::ChapterText,
+) -> Result<Vec<yomoku_core::analysis::ChapterAnalysis>, StorageError> {
+    let mut statement = connection.prepare("SELECT id FROM chapter_analyses WHERE chapter_id = ?1 AND engine_revision = ?2 AND dictionary_revision = ?3 AND split_mode IN ('a','b') ORDER BY split_mode")?;
     let ids = statement
         .query_map(
             (
-                i64::from(anchor.chapter_id),
+                i64::from(chapter.chapter_id),
                 &key.segmentation.profile.engine_revision,
                 &key.segmentation.profile.dictionary_revision,
             ),
             |row| row.get::<_, i64>(0),
-        )
-        .map_err(StorageError::from)?
-        .collect::<Result<Vec<_>, _>>()
-        .map_err(StorageError::from)?;
+        )?
+        .collect::<Result<Vec<_>, _>>()?;
     let mut components = Vec::new();
     for id in ids {
         let id = id.try_into().map_err(|_| StorageError::InvalidAnalysis)?;
-        let analysis =
-            crate::analysis::read_analysis(connection, id)?.ok_or(StorageError::InvalidAnalysis)?;
-        analysis
-            .validate(&chapter)
-            .map_err(|_| StorageError::InvalidAnalysis)?;
-        components.extend(analysis.tokens.into_iter().filter(|t| {
-            t.anchor.range.start >= anchor.range.start && t.anchor.range.end <= anchor.range.end
-        }));
+        components.push(
+            crate::analysis::read_analysis_for_chapter(connection, id, Some(chapter))?
+                .ok_or(StorageError::InvalidAnalysis)?,
+        );
     }
-    Ok(yomoku_core::dictionary::component_parts(
-        components,
-        anchor.range.start,
-    ))
+    Ok(components)
 }
 
 #[cfg(test)]

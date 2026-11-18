@@ -45,6 +45,8 @@ pub(crate) mod reader_work {
     thread_local! {
         pub static DOCUMENTS: Cell<usize> = const { Cell::new(0) };
         pub static CHAPTERS: Cell<usize> = const { Cell::new(0) };
+        pub static LAYOUTS: Cell<usize> = const { Cell::new(0) };
+        pub static ANALYSES: Cell<usize> = const { Cell::new(0) };
         pub static SURFACES: RefCell<Vec<String>> = const { RefCell::new(Vec::new()) };
     }
 

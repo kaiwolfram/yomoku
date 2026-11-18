@@ -7,7 +7,7 @@ use crate::{
         AnalysisId, ChapterId, DocumentId, InvalidTextValue, LibraryDocument, PastedDocument,
         ReaderDocument, TextAnchor, VocabularyId,
     },
-    pagination::{LogicalPages, PageLength, ReadingPosition},
+    pagination::{PageLayout, PageLength, ReadingPosition},
     vocabulary::VocabularyStatus,
 };
 
@@ -106,16 +106,23 @@ impl ReaderPage {
         length: PageLength,
     ) -> Result<Self, InvalidTextValue> {
         document.validate()?;
-        let pages = LogicalPages::new(&document.chapters, length)?;
-        let page_index = pages.page_at(position)?;
+        let pages = PageLayout::new(&document.chapters, length)?;
+        Self::at_layout(document, position, &pages)
+    }
+
+    pub(crate) fn at_layout(
+        document: &ReaderDocument,
+        position: ReadingPosition,
+        pages: &PageLayout,
+    ) -> Result<Self, InvalidTextValue> {
+        let chapter = document.chapter(position.chapter_id)?;
+        let page_index = pages.page_at(chapter, position)?;
         let anchor = pages.pages()[page_index];
         Ok(Self {
             document_id: document.document_id,
             title: document.title.clone(),
             finished_at_least_once: document.finished_at_least_once,
-            text: anchor
-                .slice(document.chapter(anchor.chapter_id)?)?
-                .to_owned(),
+            text: anchor.slice(chapter)?.to_owned(),
             anchor,
             position,
             page_number: page_index as u64 + 1,
@@ -124,14 +131,14 @@ impl ReaderPage {
                 .formatting
                 .iter()
                 .find(|item| item.chapter_id == anchor.chapter_id)
-                .map(|item| item.on_page(document.chapter(anchor.chapter_id)?, anchor.range))
+                .map(|item| item.on_page(chapter, anchor.range))
                 .transpose()?
                 .unwrap_or_default(),
             images: document
                 .images
                 .iter()
                 .find(|item| item.chapter_id == anchor.chapter_id)
-                .map(|item| item.on_page(document.chapter(anchor.chapter_id)?, anchor.range))
+                .map(|item| item.on_page(chapter, anchor.range))
                 .transpose()?
                 .unwrap_or_default(),
         })

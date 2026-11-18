@@ -106,16 +106,19 @@ pub(super) fn execute(
             .map(|prepared| EffectiveStorageResult::CompletionPrepared(Arc::new(prepared)))
             .map_err(map_error),
         EffectiveStorageOperation::CompletePage(prepared) => {
-            let outcome = storage
-                .record_effective_page_completion(&prepared)
+            let (outcome, document) = storage
+                .commit_effective_page_completion(&prepared)
                 .map_err(map_error)?;
-            // Preserve the reservation for an exact retry if the follow-up read
-            // fails. The repository prevents duplicate history/status changes.
-            let document = storage
-                .load_document_reader_snapshot(prepared.completion().document_id)
-                .map_err(map_error)?
-                .ok_or(DocumentError::NotFound)?
-                .document;
+            let document = match document {
+                Some(document) => document,
+                None => {
+                    storage
+                        .load_document_reader_snapshot(prepared.completion().document_id)
+                        .map_err(map_error)?
+                        .ok_or(DocumentError::NotFound)?
+                        .document
+                }
+            };
             Ok(EffectiveStorageResult::PageCompleted(document, outcome))
         }
     }

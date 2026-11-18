@@ -8,7 +8,6 @@ use yomoku_core::{
 };
 
 use crate::{
-    analysis::read_effective_reader_chapter_in, reader_documents::load_reader_chapter_in,
     reader_integrity::ReaderIntegrity, vocabulary::read_entry_by_surface, Storage, StorageError,
 };
 
@@ -39,20 +38,18 @@ pub(crate) fn load_effective_reader_tokens_in(
     page: TextAnchor,
     integrity: &ReaderIntegrity,
 ) -> Result<Option<EffectiveReaderTokenSnapshot>, StorageError> {
-    let Some(chapter) =
-        load_reader_chapter_in(connection, document_id, page.chapter_id, integrity)?
-    else {
+    let Some(chapter) = integrity.chapter(connection, document_id, page.chapter_id)? else {
         return Ok(None);
     };
     if page
-        .slice(&chapter)
+        .slice(&chapter.text)
         .map_err(|_| StorageError::InvalidAnalysis)?
         .is_empty()
     {
         return Err(StorageError::InvalidAnalysis);
     }
-    let effective = read_effective_reader_chapter_in(connection, &chapter)?;
-    let mut tokens = effective
+    let mut tokens = chapter
+        .effective
         .as_ref()
         .map(|effective| effective.tokens_on_page(page))
         .transpose()
@@ -79,7 +76,10 @@ pub(crate) fn load_effective_reader_tokens_in(
     let snapshot = EffectiveReaderTokenSnapshot {
         document_id,
         page,
-        segmentation: effective.map(|chapter| chapter.into_segmentation()),
+        segmentation: chapter
+            .effective
+            .as_ref()
+            .map(|chapter| chapter.segmentation().clone()),
         tokens,
     };
     Ok(Some(snapshot))

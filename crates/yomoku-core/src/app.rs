@@ -11,6 +11,8 @@ use serde::{Deserialize, Serialize};
 mod anki;
 mod effective;
 mod pending_storage;
+#[cfg(test)]
+mod reader_layout_tests;
 use pending_storage::{DocumentRequest, PendingStorage};
 mod dictionary_lookup;
 #[cfg(test)]
@@ -32,7 +34,7 @@ use crate::{
     },
     imports::{EpubImport, SrtImport, TxtImport},
     library::{valid_document_title, LibraryRenameState, LibrarySort, LibraryWordDistribution},
-    pagination::{LogicalPages, PageLength, ReadingPosition},
+    pagination::{PageLayout, PageLength, ReadingPosition},
     reader::{ReaderAnalysis, ReaderChapterAnalysis, ReaderPage, ReaderTokenKey},
     storage::{DocumentError, StorageOperation, StorageResult},
 };
@@ -118,6 +120,7 @@ pub struct Model {
     reader: Option<ReaderPage>,
     reader_analysis: Option<ReaderAnalysis>,
     reader_document: Option<ReaderDocument>,
+    reader_layout: Option<PageLayout>,
     reader_analyses: Vec<ReaderChapterAnalysis>,
     page_length: Option<PageLength>,
     reader_typography: Option<ReaderTypography>,
@@ -497,16 +500,15 @@ impl App for Yomoku {
             {
                 return Command::done();
             }
-            let Some(document) = model.reader_document.as_ref() else {
-                return Command::done();
-            };
-            let Ok(pages) =
-                LogicalPages::new(&document.chapters, model.page_length.unwrap_or_default())
+            let (Some(document), Some(pages)) = (&model.reader_document, &model.reader_layout)
             else {
                 return Command::done();
             };
+            let Ok(chapter) = document.chapter(position.chapter_id) else {
+                return Command::done();
+            };
             let Some(destination) = pages
-                .page_at(position)
+                .page_at(chapter, position)
                 .ok()
                 .and_then(|index| {
                     if skip {
@@ -1043,7 +1045,7 @@ impl App for Yomoku {
                         if pending_reader == Some(document.document_id)
                             && model.content_route == ContentRoute::Reader
                         {
-                            match ReaderPage::open_document(&document, snapshot.page_length) {
+                            match model.project_reader(&document) {
                                 Ok(reader) => {
                                     model.reader_analysis = snapshot
                                         .analyses
@@ -1052,7 +1054,7 @@ impl App for Yomoku {
                                         .map(|entry| entry.analysis);
                                     model.reader_analyses = snapshot.analyses;
                                     model.reader = Some(reader);
-                                    model.reader_document = Some(document.clone());
+                                    model.reader_document = Some(document);
                                 }
                                 Err(_) => {
                                     model.document_error = Some(DocumentError::InvalidDocument)
@@ -1252,6 +1254,7 @@ impl Model {
         self.invalidate_effective_page();
         self.clear_reader_word();
         self.reader_document = None;
+        self.reader_layout = None;
         self.reader_analyses.clear();
     }
 
@@ -1275,7 +1278,7 @@ impl Model {
                 .as_ref()
                 .is_some_and(|reader| reader.document_id == document.document_id)
         {
-            match ReaderPage::open_document(&document, self.page_length.unwrap_or_default()) {
+            match self.project_reader(&document) {
                 Ok(reader) => {
                     self.invalidate_effective_page();
                     self.clear_reader_word();
@@ -1285,11 +1288,31 @@ impl Model {
                         .find(|entry| entry.chapter_id == reader.anchor.chapter_id)
                         .map(|entry| entry.analysis);
                     self.reader = Some(reader);
-                    self.reader_document = Some(document.clone());
+                    self.reader_document = Some(document);
                 }
                 Err(_) => self.document_error = Some(DocumentError::InvalidDocument),
             }
         }
+    }
+
+    fn project_reader(
+        &mut self,
+        document: &ReaderDocument,
+    ) -> Result<ReaderPage, crate::document::InvalidTextValue> {
+        let length = self.page_length.unwrap_or_default();
+        let position = document.current_position()?;
+        if self
+            .reader_layout
+            .as_ref()
+            .is_none_or(|layout| layout.length() != length)
+            || self
+                .reader_document
+                .as_ref()
+                .is_none_or(|previous| previous.chapters != document.chapters)
+        {
+            self.reader_layout = Some(PageLayout::new(&document.chapters, length)?);
+        }
+        ReaderPage::at_layout(document, position, self.reader_layout.as_ref().unwrap())
     }
 
     fn update_library(&mut self, document: &ReaderDocument) {
@@ -1312,13 +1335,24 @@ impl Model {
     fn apply_page_length(&mut self, length: PageLength) {
         self.page_length = Some(length);
         if let (Some(reader), Some(document)) = (&self.reader, &self.reader_document) {
-            match ReaderPage::at_document(document, reader.position, length) {
-                Ok(page) => {
+            if self
+                .reader_layout
+                .as_ref()
+                .is_some_and(|layout| layout.length() == length)
+            {
+                return;
+            }
+            let reflow = PageLayout::new(&document.chapters, length).and_then(|layout| {
+                ReaderPage::at_layout(document, reader.position, &layout).map(|page| (page, layout))
+            });
+            match reflow {
+                Ok((page, layout)) => {
                     if page.anchor != reader.anchor {
                         self.invalidate_effective_page();
                         self.clear_reader_word();
                     }
                     self.reader = Some(page);
+                    self.reader_layout = Some(layout);
                 }
                 Err(_) => self.document_error = Some(DocumentError::InvalidDocument),
             }

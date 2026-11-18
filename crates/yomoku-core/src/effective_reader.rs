@@ -1,6 +1,7 @@
 //! Read-only reader projections over validated effective segmentation.
 
 use serde::{Deserialize, Serialize};
+use std::sync::Arc;
 
 use crate::{
     analysis::{ChapterAnalysis, InvalidAnalysis},
@@ -41,7 +42,7 @@ pub struct EffectiveReaderToken {
 pub struct EffectiveReaderTokenSnapshot {
     pub document_id: DocumentId,
     pub page: TextAnchor,
-    pub segmentation: Option<EffectiveChapterSegmentation>,
+    pub segmentation: Option<Arc<EffectiveChapterSegmentation>>,
     pub tokens: Vec<EffectiveReaderToken>,
 }
 
@@ -52,7 +53,7 @@ pub struct EffectiveReaderTokenSnapshot {
 pub struct EffectiveReaderTokenKey {
     pub document_id: DocumentId,
     pub page: TextAnchor,
-    pub segmentation: EffectiveChapterSegmentation,
+    pub segmentation: Arc<EffectiveChapterSegmentation>,
 }
 
 impl EffectiveReaderTokenSnapshot {
@@ -81,39 +82,42 @@ pub struct EffectiveReaderWordDetails {
 /// Construction validates the entire snapshot before any page is projected.
 /// Private fields prevent callers from replacing validated boundaries/metadata.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct EffectiveReaderChapter<'a> {
-    chapter: &'a ChapterText,
-    segmentation: EffectiveChapterSegmentation,
+pub struct EffectiveReaderChapter {
+    chapter: Arc<ChapterText>,
+    segmentation: Arc<EffectiveChapterSegmentation>,
 }
 
-impl<'a> EffectiveReaderChapter<'a> {
+impl EffectiveReaderChapter {
     pub fn resolve(
-        chapter: &'a ChapterText,
+        chapter: &ChapterText,
         original_id: AnalysisId,
         original: &ChapterAnalysis,
     ) -> Result<Self, InvalidAnalysis> {
+        Self::resolve_shared(Arc::new(chapter.clone()), original_id, original)
+    }
+
+    pub fn resolve_shared(
+        chapter: Arc<ChapterText>,
+        original_id: AnalysisId,
+        original: &ChapterAnalysis,
+    ) -> Result<Self, InvalidAnalysis> {
+        let segmentation = Arc::new(resolve_effective_segmentation(
+            &chapter,
+            original_id,
+            original,
+        )?);
         Ok(Self {
-            segmentation: resolve_effective_segmentation(chapter, original_id, original)?,
             chapter,
+            segmentation,
         })
     }
 
-    pub fn segmentation(&self) -> &EffectiveChapterSegmentation {
+    pub fn segmentation(&self) -> &Arc<EffectiveChapterSegmentation> {
         &self.segmentation
     }
 
-    pub fn into_segmentation(self) -> EffectiveChapterSegmentation {
+    pub fn into_segmentation(self) -> Arc<EffectiveChapterSegmentation> {
         self.segmentation
-    }
-
-    /// Borrow whole-chapter reading surfaces without allocating page tokens or
-    /// cloning metadata. Library membership uses the same eligibility as reading
-    /// and completion; callers deduplicate exact spellings across chapters.
-    pub fn eligible_surfaces(&self) -> impl Iterator<Item = &str> {
-        self.segmentation
-            .segments
-            .iter()
-            .filter_map(|segment| segment_eligibility(segment).map(|_| segment.surface.as_str()))
     }
 
     /// Crossing tokens remain selectable on both pages with a complete surface,
@@ -140,45 +144,85 @@ impl<'a> EffectiveReaderChapter<'a> {
         starts_only: bool,
     ) -> Result<Vec<EffectiveReaderToken>, InvalidAnalysis> {
         if page
-            .slice(self.chapter)
+            .slice(&self.chapter)
             .map_err(|_| InvalidAnalysis)?
             .is_empty()
         {
             return Err(InvalidAnalysis);
         }
-        let mut tokens = Vec::new();
-        for (index, segment) in self.segmentation.segments.iter().enumerate() {
-            let Some(eligibility) = segment_eligibility(segment) else {
-                continue;
-            };
-            if segment.anchor.range.start >= page.range.end
-                || segment.anchor.range.end <= page.range.start
-                || (starts_only && segment.anchor.range.start < page.range.start)
-            {
-                continue;
+        let segments = &self.segmentation.segments;
+        let start = segments.partition_point(|segment| {
+            if starts_only {
+                segment.anchor.range.start < page.range.start
+            } else {
+                segment.anchor.range.end <= page.range.start
             }
-            tokens.push(EffectiveReaderToken {
-                segment_index: u64::try_from(index).map_err(|_| InvalidAnalysis)?,
-                anchor: segment.anchor,
-                display_range: TextRange {
-                    start: TextOffset::try_from(
-                        i64::from(segment.anchor.range.start.max(page.range.start))
-                            - i64::from(page.range.start),
-                    )
-                    .map_err(|_| InvalidAnalysis)?,
-                    end: TextOffset::try_from(
-                        i64::from(segment.anchor.range.end.min(page.range.end))
-                            - i64::from(page.range.start),
-                    )
-                    .map_err(|_| InvalidAnalysis)?,
-                },
-                surface: segment.surface.clone(),
-                eligibility,
-                metadata: segment.metadata.clone(),
-                vocabulary: None,
-            });
+        });
+        segments[start..]
+            .iter()
+            .take_while(|segment| segment.anchor.range.start < page.range.end)
+            .enumerate()
+            .filter_map(|(index, segment)| {
+                segment_eligibility(segment).map(|eligibility| {
+                    Self::project_segment(page, start + index, segment, eligibility)
+                })
+            })
+            .collect()
+    }
+
+    pub fn token_on_page(
+        &self,
+        page: TextAnchor,
+        index: u64,
+    ) -> Result<Option<EffectiveReaderToken>, InvalidAnalysis> {
+        if page
+            .slice(&self.chapter)
+            .map_err(|_| InvalidAnalysis)?
+            .is_empty()
+        {
+            return Err(InvalidAnalysis);
         }
-        Ok(tokens)
+        let index = usize::try_from(index).map_err(|_| InvalidAnalysis)?;
+        self.segmentation
+            .segments
+            .get(index)
+            .filter(|segment| {
+                segment.anchor.range.start < page.range.end
+                    && page.range.start < segment.anchor.range.end
+            })
+            .and_then(|segment| {
+                segment_eligibility(segment)
+                    .map(|eligibility| Self::project_segment(page, index, segment, eligibility))
+            })
+            .transpose()
+    }
+
+    fn project_segment(
+        page: TextAnchor,
+        index: usize,
+        segment: &EffectiveSegment,
+        eligibility: EffectiveTokenEligibility,
+    ) -> Result<EffectiveReaderToken, InvalidAnalysis> {
+        Ok(EffectiveReaderToken {
+            segment_index: u64::try_from(index).map_err(|_| InvalidAnalysis)?,
+            anchor: segment.anchor,
+            display_range: TextRange {
+                start: TextOffset::try_from(
+                    i64::from(segment.anchor.range.start.max(page.range.start))
+                        - i64::from(page.range.start),
+                )
+                .map_err(|_| InvalidAnalysis)?,
+                end: TextOffset::try_from(
+                    i64::from(segment.anchor.range.end.min(page.range.end))
+                        - i64::from(page.range.start),
+                )
+                .map_err(|_| InvalidAnalysis)?,
+            },
+            surface: segment.surface.clone(),
+            eligibility,
+            metadata: segment.metadata.clone(),
+            vocabulary: None,
+        })
     }
 }
 
@@ -213,7 +257,7 @@ impl EffectivePageCompletion {
     }
 }
 
-impl EffectiveReaderChapter<'_> {
+impl EffectiveReaderChapter {
     pub fn freeze_completion(
         &self,
         completion: PageCompletion,

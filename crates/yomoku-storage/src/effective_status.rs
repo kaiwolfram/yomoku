@@ -41,7 +41,7 @@ impl Storage {
             match cached.filter(|cached| cached.matches(key, segment_index, revision)) {
                 Some(cached) => cached,
                 None => {
-                    let token = selected_effective_token_in(
+                    let (_, token) = selected_effective_token_in(
                         &transaction,
                         key,
                         segment_index,

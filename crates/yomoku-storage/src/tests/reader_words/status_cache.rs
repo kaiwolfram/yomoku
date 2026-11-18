@@ -60,7 +60,7 @@ fn lookup_and_status_validation_prime_one_selection_and_hits_only_read_selected_
     f.save(VocabularyStatus::Learning).unwrap().unwrap();
     let (documents, chapters, surfaces) = reader_work::take();
     assert_eq!((documents, chapters), (1, 1));
-    assert!(surfaces.contains(&"別語".to_owned()));
+    assert_eq!(surfaces, ["試験語"]);
     for status in [
         VocabularyStatus::Known,
         VocabularyStatus::Known,
@@ -105,10 +105,10 @@ fn different_segment_page_and_key_never_reuse_the_cached_selection() {
         .set_effective_reader_status(&f.key, 1, f.id, VocabularyStatus::Known, 1234)
         .unwrap()
         .unwrap();
-    assert_eq!(reader_work::take().0, 1);
+    assert_eq!(reader_work::take(), (0, 0, vec!["試験語".to_owned()]));
     // The one-entry cache now belongs to segment 1.
     f.save(VocabularyStatus::Learning).unwrap().unwrap();
-    assert_eq!(reader_work::take().0, 1);
+    assert_eq!(reader_work::take(), (0, 0, vec!["試験語".to_owned()]));
     let mut other_page = f.key.clone();
     other_page.page.range.end =
         TextOffset::at(&f.imported.document.chapter.text, "試験語".len()).unwrap();
@@ -116,10 +116,9 @@ fn different_segment_page_and_key_never_reuse_the_cached_selection() {
         .set_effective_reader_status(&other_page, 0, f.id, VocabularyStatus::Known, 1234)
         .unwrap()
         .unwrap();
-    assert_eq!(reader_work::take().0, 1);
+    assert_eq!(reader_work::take(), (0, 0, vec!["試験語".to_owned()]));
     let mut stale = other_page;
-    stale
-        .segmentation
+    std::sync::Arc::make_mut(&mut stale.segmentation)
         .profile
         .engine_revision
         .push_str("-stale");
@@ -128,7 +127,7 @@ fn different_segment_page_and_key_never_reuse_the_cached_selection() {
             .set_effective_reader_status(&stale, 0, f.id, VocabularyStatus::New, 1234),
         Err(ReaderWordError::InvalidSelection)
     ));
-    assert_eq!(reader_work::take().0, 1);
+    assert_eq!(reader_work::take(), (0, 0, Vec::new()));
     assert!(f.storage.validated_reader_selection.is_none());
     f.prime();
     assert!(matches!(
@@ -156,7 +155,7 @@ fn failed_lookup_and_invalid_status_timestamp_clear_prior_validation() {
     ));
     assert!(f.storage.validated_reader_selection.is_none());
     f.save(VocabularyStatus::Known).unwrap().unwrap();
-    assert_eq!(reader_work::take().0, 1);
+    assert_eq!(reader_work::take(), (0, 0, vec!["試験語".to_owned()]));
 }
 
 #[test]
@@ -170,7 +169,9 @@ fn local_dml_ddl_and_rolled_back_writes_force_full_validation() {
         f.prime();
         f.storage.connection.execute_batch(sql).unwrap();
         f.save(VocabularyStatus::Learning).unwrap().unwrap();
-        assert_eq!(reader_work::take().0, 1, "{sql}");
+        let (documents, chapters, _) = reader_work::take();
+        let expected = usize::from(!sql.starts_with("UPDATE"));
+        assert_eq!((documents, chapters), (expected, expected), "{sql}");
         f.save(VocabularyStatus::Known).unwrap().unwrap();
         assert_eq!(reader_work::take(), (0, 0, vec!["試験語".to_owned()]));
     }
@@ -216,7 +217,11 @@ fn local_and_external_changes_reject_corrupt_changed_or_deleted_analysis_and_doc
                     "{result:?}"
                 );
             }
-            assert_eq!(reader_work::take().0, 1);
+            let (documents, _, _) = reader_work::take();
+            assert_eq!(
+                documents,
+                usize::from(external || sql == "DELETE FROM documents")
+            );
             assert!(f.storage.validated_reader_selection.is_none());
             let events: i64 = f
                 .storage
@@ -360,5 +365,5 @@ fn unexpected_trigger_writes_discard_validation_even_when_status_save_succeeds()
         f.save(VocabularyStatus::Learning),
         Err(ReaderWordError::InvalidSelection)
     ));
-    assert_eq!(reader_work::take().0, 1);
+    assert_eq!(reader_work::take().1, 1);
 }

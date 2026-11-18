@@ -6,7 +6,7 @@ use crate::{
     document::{
         AnalysisId, CompletionCommandId, DocumentId, InvalidTextValue, ReaderDocument, TextAnchor,
     },
-    pagination::{LogicalPages, PageLength, ReadingPosition},
+    pagination::{PageLayout, PageLength, ReadingPosition},
 };
 
 /// Freeze this payload once per forward action, including its timestamp, and
@@ -49,15 +49,33 @@ impl PageCompletion {
         self,
         document: &ReaderDocument,
     ) -> Result<ReadingPosition, InvalidTextValue> {
-        if self.document_id != document.document_id || self.completed_at_unix_ms < 0 {
+        let pages = PageLayout::new(&document.chapters, self.page_length)?;
+        let current = document.current_position()?;
+        self.next_position_with_layout(
+            document.document_id,
+            current,
+            document.chapter(current.chapter_id)?,
+            &pages,
+        )
+    }
+
+    pub fn next_position_with_layout(
+        self,
+        document_id: DocumentId,
+        current: ReadingPosition,
+        chapter: &crate::document::ChapterText,
+        pages: &PageLayout,
+    ) -> Result<ReadingPosition, InvalidTextValue> {
+        if self.document_id != document_id
+            || self.completed_at_unix_ms < 0
+            || pages.length() != self.page_length
+        {
             return Err(InvalidTextValue);
         }
-        let current = document.current_position()?;
         if self.departing_position != current {
             return Err(InvalidTextValue);
         }
-        let pages = LogicalPages::new(&document.chapters, self.page_length)?;
-        let index = pages.page_at(current)?;
+        let index = pages.page_at(chapter, current)?;
         if pages.pages()[index] != self.page {
             return Err(InvalidTextValue);
         }

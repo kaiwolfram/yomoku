@@ -1,4 +1,5 @@
 use super::*;
+use crate::tests::reader_work;
 
 fn effective_snapshot(
     storage: &mut Storage,
@@ -179,4 +180,26 @@ fn longest_token_lookup_suggests_parts_without_registering_or_counting_them() {
         effective_snapshot(&mut storage, &imported).key().unwrap(),
         frozen
     );
+    reader_work::ANALYSES.set(0);
+    assert_eq!(
+        storage
+            .load_effective_reader_word(&dictionary, &frozen, 0)
+            .unwrap()
+            .unwrap(),
+        word
+    );
+    assert_eq!(reader_work::ANALYSES.get(), 0);
+    for sql in [
+        "CREATE TABLE word_cache_revision (id INTEGER)",
+        "BEGIN; UPDATE analyzed_tokens SET reading = '一時'; ROLLBACK",
+        "UPDATE analyzed_tokens SET reading = '変更' WHERE analysis_id IN (SELECT id FROM chapter_analyses WHERE split_mode = 'a')",
+    ] {
+        storage.connection.execute_batch(sql).unwrap();
+        reader_work::ANALYSES.set(0);
+        assert_eq!(
+            storage.load_effective_reader_word(&dictionary, &frozen, 0).unwrap().unwrap(),
+            word
+        );
+        assert_eq!(reader_work::ANALYSES.get(), 3, "{sql}");
+    }
 }

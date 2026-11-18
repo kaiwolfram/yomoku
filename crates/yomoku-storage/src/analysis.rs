@@ -1,4 +1,5 @@
 use rusqlite::{Connection, OptionalExtension, TransactionBehavior};
+use std::sync::Arc;
 use yomoku_core::{
     analysis::{AnalysisProfile, AnalyzedToken, ChapterAnalysis, SplitMode},
     document::{AnalysisId, ChapterId, ChapterText, SourceId, TextAnchor, TextOffset, TextRange},
@@ -10,18 +11,19 @@ use yomoku_core::{
 use crate::{Storage, StorageError};
 
 /// Resolve the pinned longest-token snapshot in one transaction.
-pub(crate) fn read_effective_reader_chapter_in<'a>(
+pub(crate) fn read_effective_reader_chapter_in(
     connection: &Connection,
-    chapter: &'a ChapterText,
-) -> Result<Option<EffectiveReaderChapter<'a>>, StorageError> {
+    chapter: Arc<ChapterText>,
+) -> Result<Option<EffectiveReaderChapter>, StorageError> {
     #[cfg(test)]
     crate::tests::reader_work::CHAPTERS.update(|count| count + 1);
     let ReaderAnalysis::Available(id) = read_reader_analysis(connection, chapter.chapter_id)?
     else {
         return Ok(None);
     };
-    let original = read_analysis(connection, id)?.ok_or(StorageError::InvalidAnalysis)?;
-    EffectiveReaderChapter::resolve(chapter, id, &original)
+    let original = read_analysis_for_chapter(connection, id, Some(&chapter))?
+        .ok_or(StorageError::InvalidAnalysis)?;
+    EffectiveReaderChapter::resolve_shared(chapter, id, &original)
         .map(Some)
         .map_err(|_| StorageError::InvalidAnalysis)
 }
@@ -153,6 +155,8 @@ pub(crate) fn read_analysis_for_chapter(
     let mut statement = connection.prepare(
         "SELECT token_index, start_byte, end_byte, surface, is_japanese, reading, dictionary_form FROM analyzed_tokens WHERE analysis_id = ?1 ORDER BY token_index",
     )?;
+    #[cfg(test)]
+    crate::tests::reader_work::ANALYSES.update(|count| count + 1);
     let mut rows = statement.query([i64::from(id)])?;
     let mut tokens = Vec::new();
     while let Some(row) = rows.next()? {

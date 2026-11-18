@@ -1,6 +1,6 @@
 //! Logical pages over immutable chapter text, independent of display dimensions.
 
-use std::collections::HashSet;
+use std::{collections::HashMap, ops::Range};
 
 use serde::{Deserialize, Serialize};
 
@@ -64,7 +64,14 @@ impl ReadingPosition {
 #[derive(Debug)]
 pub struct LogicalPages<'a> {
     chapters: &'a [ChapterText],
+    layout: PageLayout,
+}
+
+/// Owned page anchors for one canonical chapter sequence and page length.
+#[derive(Debug)]
+pub struct PageLayout {
     pages: Vec<TextAnchor>,
+    chapter_pages: HashMap<ChapterId, Range<usize>>,
     length: PageLength,
 }
 
@@ -79,17 +86,62 @@ impl<'a> LogicalPages<'a> {
     /// Input order is authoritative. Only supplied chapters create boundaries;
     /// titles, headings and blank lines never infer additional chapters.
     pub fn new(chapters: &'a [ChapterText], length: PageLength) -> Result<Self, InvalidTextValue> {
-        let mut seen = HashSet::new();
-        let mut pages = Vec::new();
-        for chapter in chapters {
-            if chapter.source_id != chapters[0].source_id || !seen.insert(chapter.chapter_id) {
-                return Err(InvalidTextValue);
-            }
-            paginate_chapter(chapter, length, &mut pages)?;
-        }
         Ok(Self {
             chapters,
+            layout: PageLayout::new(chapters, length)?,
+        })
+    }
+
+    pub fn pages(&self) -> &[TextAnchor] {
+        self.layout.pages()
+    }
+
+    pub fn length(&self) -> PageLength {
+        self.layout.length()
+    }
+
+    pub fn page_at(&self, position: ReadingPosition) -> Result<usize, InvalidTextValue> {
+        let chapter = self
+            .chapters
+            .iter()
+            .find(|chapter| chapter.chapter_id == position.chapter_id)
+            .ok_or(InvalidTextValue)?;
+        self.layout.page_at(chapter, position)
+    }
+
+    pub fn reflow(
+        &self,
+        length: PageLength,
+        position: ReadingPosition,
+    ) -> Result<Reflow<'a>, InvalidTextValue> {
+        self.page_at(position)?;
+        let pages = Self::new(self.chapters, length)?;
+        let page_index = pages.page_at(position)?;
+        Ok(Reflow {
             pages,
+            position,
+            page_index,
+        })
+    }
+}
+
+impl PageLayout {
+    pub fn new(chapters: &[ChapterText], length: PageLength) -> Result<Self, InvalidTextValue> {
+        let mut chapter_pages = HashMap::new();
+        let mut pages = Vec::new();
+        for chapter in chapters {
+            if chapter.source_id != chapters[0].source_id
+                || chapter_pages.contains_key(&chapter.chapter_id)
+            {
+                return Err(InvalidTextValue);
+            }
+            let first = pages.len();
+            paginate_chapter(chapter, length, &mut pages)?;
+            chapter_pages.insert(chapter.chapter_id, first..pages.len());
+        }
+        Ok(Self {
+            pages,
+            chapter_pages,
             length,
         })
     }
@@ -103,40 +155,25 @@ impl<'a> LogicalPages<'a> {
     }
 
     /// A boundary belongs to the following page; chapter EOF to its final page.
-    pub fn page_at(&self, position: ReadingPosition) -> Result<usize, InvalidTextValue> {
-        let chapter = self
-            .chapters
-            .iter()
-            .find(|chapter| {
-                chapter.source_id == position.source_id && chapter.chapter_id == position.chapter_id
-            })
-            .ok_or(InvalidTextValue)?;
-        let index = position.offset.byte_index(&chapter.text)?;
-        self.pages
-            .iter()
-            .position(|page| {
-                page.chapter_id == position.chapter_id
-                    && page.range.start <= position.offset
-                    && (position.offset < page.range.end
-                        || (index == chapter.text.len() && position.offset == page.range.end))
-            })
-            .ok_or(InvalidTextValue)
-    }
-
-    pub fn reflow(
+    pub fn page_at(
         &self,
-        length: PageLength,
+        chapter: &ChapterText,
         position: ReadingPosition,
-    ) -> Result<Reflow<'a>, InvalidTextValue> {
-        // Validate against the original layout before deriving a replacement.
-        self.page_at(position)?;
-        let pages = Self::new(self.chapters, length)?;
-        let page_index = pages.page_at(position)?;
-        Ok(Reflow {
-            pages,
-            position,
-            page_index,
-        })
+    ) -> Result<usize, InvalidTextValue> {
+        position.validate(chapter)?;
+        let range = self
+            .chapter_pages
+            .get(&position.chapter_id)
+            .ok_or(InvalidTextValue)?;
+        let pages = &self.pages[range.clone()];
+        let last = pages.last().ok_or(InvalidTextValue)?;
+        if last.source_id != position.source_id
+            || last.range.end.byte_index(&chapter.text)? != chapter.text.len()
+        {
+            return Err(InvalidTextValue);
+        }
+        let index = pages.partition_point(|page| page.range.end <= position.offset);
+        Ok(range.start + index.min(pages.len() - 1))
     }
 }
 

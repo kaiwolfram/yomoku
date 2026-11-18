@@ -294,6 +294,21 @@ class EffectiveReaderPerformanceTest {
                     }
                 }
             }
+            val current = checkNotNull(core.view.reader)
+            if (current.totalPages - current.pageNumber > iterations.toULong()) {
+                measure(name, "mode_c", "warm_forward", iterations) {
+                    val page = checkNotNull(core.view.reader)
+                    val identity = checkNotNull(core.view.effectiveReaderTokens).identity
+                    val sample =
+                        command(
+                            core,
+                            Event.CompleteEffectiveReaderPage(identity, page.position, 2_000),
+                        )
+                    assertEquals(page.pageNumber + 1UL, sample.view.reader?.pageNumber)
+                    loadTokens(core)
+                    sample
+                }
+            }
         } finally {
             instrumentation.runOnMainSync { core.close() }
             val deadline = SystemClock.elapsedRealtime() + 30_000

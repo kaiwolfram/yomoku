@@ -65,29 +65,31 @@ projections contain canonical text, annotations and image metadata, separately
 from extracted image payloads. Lazy A/B analysis requests canonical
 chapter text directly rather than a whole-document snapshot.
 
-Storage retains bounded integrity markers for one EPUB's binaries and one
-validated document; it retains no payloads in these caches. Whole-document
-validation is reused for chapter/page/word reads only at the exact SQLite local
-change, external data and schema revision. A revision change requires full
-text/annotation/ownership checks again, including chapters outside the page.
-Binary digests are checked on first access and after local writes to either
-binary table, transaction rollback, schema changes or external commits.
-Connection-local update/rollback hooks invalidate binary validation, including
-trigger writes; normal local status, analysis and position writes reuse it.
-The binary tables must remain rowid tables for the
-[SQLite update hook](https://sqlite.org/c3ref/update_hook.html). Missing rows are
-also rejected by the live metadata/count checks. Revisions are sampled inside
-the operation's transaction before content reads and are never advanced after
-COMMIT. Cold opens still verify all binary bytes, borrowing each SQLite row
-without retaining the archive or all assets. Explicit image/cover asset reads
-always hash the requested bytes independently of these markers.
+The core and storage retain page anchors for the open document and page length.
+Storage shares the active chapter's validated Mode C segmentation across page,
+word and completion operations, and loads its A/B snapshots on the first word
+lookup. Ordered spans bound token projection to the visible page or selected
+word. Status and encounters are read from the current database transaction.
+
+Storage validates the document after canonical content writes and invalidates
+chapter analyses after relevant local writes. Rollbacks, schema changes and
+external commits also invalidate the cached revision. The same checks cover
+trigger writes and EPUB binary digests. Cold opens verify binary bytes from
+borrowed SQLite rows. Explicit image and cover reads independently hash their
+requested bytes. The connection tracks row changes with the
+[SQLite update hook](https://sqlite.org/c3ref/update_hook.html).
+
+Completion preparation uses the retained anchors and active segmentation. A new
+commit returns the document validated in its write transaction with saved progress
+and finish state. An exact retry or an intervening content change requires a fresh
+validated document read after the receipt is committed.
 
 | Operation | Production API |
 | --- | --- |
 | Snapshot / explicit entry | `load_document_reader_snapshot` / `open_document_reader_snapshot` |
 | Position | `save_document_reading_position` |
 | Page / selected word | `load_effective_reader_tokens` / `load_effective_reader_word` |
-| Completion | `prepare_effective_page_completion` / `record_effective_page_completion` |
+| Completion | `prepare_effective_page_completion` / `commit_effective_page_completion` |
 
 ## AnkiDroid
 

@@ -26,7 +26,7 @@ internal object FileImportFixtures {
         val output = ByteArrayOutputStream()
         ZipOutputStream(output).use { zip ->
             fun entry(path: String, text: String) {
-                zip.putNextEntry(ZipEntry(path))
+                zip.putNextEntry(ZipEntry(path).apply { time = 0L })
                 zip.write(text.toByteArray())
                 zip.closeEntry()
             }
@@ -57,7 +57,7 @@ internal object FileImportFixtures {
                 """<html xmlns="http://www.w3.org/1999/xhtml"><body>$secondBody</body></html>""",
             )
             for ((path, image) in images) {
-                zip.putNextEntry(ZipEntry(path))
+                zip.putNextEntry(ZipEntry(path).apply { time = 0L })
                 zip.write(image.second)
                 zip.closeEntry()
             }

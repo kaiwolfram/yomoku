@@ -2,14 +2,14 @@ use rusqlite::{named_params, OptionalExtension, TransactionBehavior};
 use sha2::{Digest, Sha256};
 use yomoku_core::{
     completion::{AnalyzedCompletionOutcome, PageCompletion, PageCompletionIntent},
-    document::CompletionCommandId,
+    document::{ChapterId, CompletionCommandId, DocumentId, ReaderDocument, SourceId, TextOffset},
     effective_reader::{EffectivePageCompletion, EffectiveReaderTokenKey},
+    pagination::ReadingPosition,
 };
 
 use crate::{
-    analysis::read_effective_reader_chapter_in, documents::write_position_in,
-    encounters::record_effective_occurrences_in, reader_documents::load_reader_document_in,
-    settings::read_page_length, Storage, StorageError,
+    documents::write_position_in, encounters::record_effective_occurrences_in,
+    reader_documents::load_reader_document_in, settings::read_page_length, Storage, StorageError,
 };
 
 impl Storage {
@@ -31,17 +31,46 @@ impl Storage {
         {
             return Err(StorageError::InvalidCompletion);
         }
-        let document =
-            load_reader_document_in(&transaction, intent.document_id, &self.reader_integrity)?
+        let revision = self.reader_integrity.revision(&transaction)?;
+        let layout = match self.reader_integrity.cached_layout(
+            intent.document_id,
+            intent.page_length,
+            revision,
+        ) {
+            Some(layout) => layout,
+            None => {
+                let document = load_reader_document_in(
+                    &transaction,
+                    intent.document_id,
+                    &self.reader_integrity,
+                )?
                 .ok_or(StorageError::InvalidCompletion)?;
-        let chapter = document
-            .chapter(intent.page.chapter_id)
-            .map_err(|_| StorageError::InvalidCompletion)?;
-        let effective = read_effective_reader_chapter_in(&transaction, chapter)?
+                self.reader_integrity
+                    .layout(&document, intent.page_length, revision)?
+            }
+        };
+        let chapter = self
+            .reader_integrity
+            .chapter(&transaction, intent.document_id, intent.page.chapter_id)?
+            .ok_or(StorageError::InvalidCompletion)?;
+        let effective = chapter
+            .effective
+            .as_ref()
             .ok_or(StorageError::InvalidAnalysis)?;
         if effective.segmentation() != &key.segmentation {
             return Err(StorageError::InvalidCompletion);
         }
+        let first = layout
+            .pages()
+            .first()
+            .ok_or(StorageError::InvalidCompletion)?;
+        let current = saved_position(&transaction, intent.document_id, first.source_id)?.unwrap_or(
+            ReadingPosition {
+                source_id: first.source_id,
+                chapter_id: first.chapter_id,
+                offset: first.range.start,
+            },
+        );
         transaction.execute("INSERT INTO completion_commands DEFAULT VALUES", [])?;
         let completion = PageCompletion {
             command_id: CompletionCommandId::try_from(transaction.last_insert_rowid())
@@ -53,7 +82,7 @@ impl Storage {
             completed_at_unix_ms: intent.completed_at_unix_ms,
         };
         completion
-            .next_document_position(&document)
+            .next_position_with_layout(intent.document_id, current, &chapter.text, &layout)
             .map_err(|_| StorageError::InvalidCompletion)?;
         let frozen = effective
             .freeze_completion(completion)
@@ -75,6 +104,16 @@ impl Storage {
         &mut self,
         frozen: &EffectivePageCompletion,
     ) -> Result<AnalyzedCompletionOutcome, StorageError> {
+        self.commit_effective_page_completion(frozen)
+            .map(|(outcome, _)| outcome)
+    }
+
+    /// A fresh commit can return its validated document. An exact retry or a
+    /// content write within the transaction requires the caller to reload.
+    pub fn commit_effective_page_completion(
+        &mut self,
+        frozen: &EffectivePageCompletion,
+    ) -> Result<(AnalyzedCompletionOutcome, Option<ReaderDocument>), StorageError> {
         let completion = frozen.completion();
         let segmentation = &frozen.key().segmentation;
         let transaction = self
@@ -132,18 +171,28 @@ impl Storage {
                 return Err(StorageError::InvalidCompletion);
             }
             transaction.commit()?;
-            return Ok(AnalyzedCompletionOutcome::AlreadyRecorded);
+            return Ok((AnalyzedCompletionOutcome::AlreadyRecorded, None));
         };
         if pending != completion_fingerprint(frozen)?
             || read_page_length(&transaction)? != completion.page_length
         {
             return Err(StorageError::InvalidCompletion);
         }
-        let document =
+        let revision = self.reader_integrity.revision(&transaction)?;
+        let mut document =
             load_reader_document_in(&transaction, completion.document_id, &self.reader_integrity)?
                 .ok_or(StorageError::InvalidCompletion)?;
+        let layout = self
+            .reader_integrity
+            .layout(&document, completion.page_length, revision)?;
+        let current = document
+            .current_position()
+            .map_err(|_| StorageError::InvalidCompletion)?;
+        let chapter = document
+            .chapter(current.chapter_id)
+            .map_err(|_| StorageError::InvalidCompletion)?;
         let next = completion
-            .next_document_position(&document)
+            .next_position_with_layout(document.document_id, current, chapter, &layout)
             .map_err(|_| StorageError::InvalidCompletion)?;
         transaction.execute(
             "INSERT INTO reading_completions
@@ -154,11 +203,13 @@ impl Storage {
         )?;
         let newly_known = record_effective_occurrences_in(&transaction, frozen)?;
         write_position_in(&transaction, completion.document_id, next)?;
+        document.reading_position = Some(next);
         // A new final-page completion sets the finish marker and clears the Library override.
         let last = document
             .chapters
             .last()
             .ok_or(StorageError::InvalidCompletion)?;
+        let mut document_writes = 0;
         if completion.page.chapter_id == last.chapter_id
             && next.chapter_id == last.chapter_id
             && next
@@ -167,21 +218,59 @@ impl Storage {
                 .map_err(|_| StorageError::InvalidCompletion)?
                 == last.text.len()
         {
-            transaction.execute(
+            document_writes = transaction.execute(
                 "UPDATE documents SET finished_at_least_once = 1, read_override = NULL
                  WHERE id = ?1 AND (finished_at_least_once = 0 OR read_override IS NOT NULL)",
                 [i64::from(completion.document_id)],
-            )?;
+            )? as u64;
+            document.finished_at_least_once = true;
+            document.read_override = None;
         }
         transaction.execute(
             "UPDATE completion_commands SET pending_fingerprint = NULL WHERE id = ?1",
             [i64::from(completion.command_id)],
         )?;
+        let expected_position = saved_position(&transaction, document.document_id, next.source_id)
+            .is_ok_and(|position| position == Some(next));
         transaction.commit()?;
-        Ok(AnalyzedCompletionOutcome::Recorded {
-            newly_known: newly_known as u64,
-        })
+        let reusable = expected_position
+            && self.reader_integrity.snapshot_unchanged(
+                &self.connection,
+                revision,
+                document_writes,
+            )?;
+        Ok((
+            AnalyzedCompletionOutcome::Recorded {
+                newly_known: newly_known as u64,
+            },
+            reusable.then_some(document),
+        ))
     }
+}
+
+fn saved_position(
+    connection: &rusqlite::Connection,
+    document_id: DocumentId,
+    source_id: SourceId,
+) -> Result<Option<ReadingPosition>, StorageError> {
+    let stored = connection
+        .query_row(
+            "SELECT chapter_id, byte_offset FROM reading_positions WHERE document_id = ?1",
+            [i64::from(document_id)],
+            |row| Ok((row.get::<_, i64>(0)?, row.get::<_, i64>(1)?)),
+        )
+        .optional()?;
+    stored
+        .map(|(chapter, offset)| {
+            Ok(ReadingPosition {
+                source_id,
+                chapter_id: ChapterId::try_from(chapter)
+                    .map_err(|_| StorageError::InvalidCompletion)?,
+                offset: TextOffset::try_from(offset)
+                    .map_err(|_| StorageError::InvalidCompletion)?,
+            })
+        })
+        .transpose()
 }
 
 fn completion_fingerprint(frozen: &EffectivePageCompletion) -> Result<[u8; 32], StorageError> {

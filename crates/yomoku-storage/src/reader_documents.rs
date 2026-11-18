@@ -65,6 +65,7 @@ impl Storage {
         let transaction = self
             .connection
             .transaction_with_behavior(TransactionBehavior::Immediate)?;
+        let before = self.reader_integrity.revision(&transaction)?;
         let Some(mut document) =
             load_reader_document_in(&transaction, document_id, &self.reader_integrity)?
         else {
@@ -83,7 +84,22 @@ impl Storage {
             }
         }
         record_reader_entry_in(&transaction, document_id)?;
+        if !self
+            .reader_integrity
+            .snapshot_unchanged(&transaction, before, 1)?
+        {
+            document = load_reader_document_in(&transaction, document_id, &self.reader_integrity)?
+                .ok_or(StorageError::InvalidDocument)?;
+        }
         let snapshot = snapshot_in(&transaction, document)?;
+        let revision = self.reader_integrity.revision(&transaction)?;
+        self.reader_integrity.remember_document(
+            document_id,
+            snapshot.document.chapters[0].source_id,
+            revision,
+        );
+        self.reader_integrity
+            .layout(&snapshot.document, snapshot.page_length, revision)?;
         transaction.commit()?;
         Ok(Some(snapshot))
     }
@@ -266,9 +282,7 @@ pub(crate) fn load_reader_document_in(
     document
         .validate()
         .map_err(|_| StorageError::InvalidDocument)?;
-    if kind.as_deref() == Some("epub") {
-        integrity.remember_document(document_id, document.chapters[0].source_id, revision);
-    }
+    integrity.remember_document(document_id, document.chapters[0].source_id, revision);
     Ok(Some(document))
 }
 

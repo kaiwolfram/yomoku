@@ -1,8 +1,9 @@
 # Data model
 
-The release schema version is **2**. The SQL lives in
-[0001_completion_receipts_initial_schema.sql](../crates/yomoku-storage/migrations/0001_completion_receipts_initial_schema.sql)
-and [0002_library_read_override.sql](../crates/yomoku-storage/migrations/0002_library_read_override.sql).
+The release schema version is **3**. The SQL lives in the
+[initial schema](../crates/yomoku-storage/migrations/0001_completion_receipts_initial_schema.sql),
+[Library read override migration](../crates/yomoku-storage/migrations/0002_library_read_override.sql),
+and [index migration](../crates/yomoku-storage/migrations/0003_hot_path_indexes.sql).
 It has **25 application tables** plus SQLite's internal `sqlite_sequence` table.
 Databases with the `0001_completion_receipts_initial_schema` journal upgrade in
 place. Earlier development journals remain unsupported.
@@ -21,6 +22,9 @@ applies missing migrations in order. Concurrent opens serialize. Foreign keys ar
 enabled on every repository connection. Unknown, future and historical development
 journals are errors. The runner does not reset incompatible databases, delete user
 files or backfill development data.
+
+Version 3 indexes vocabulary by registration time and ID, and EPUB inline images
+by document ID and asset path. Existing rows keep their values and ordering.
 
 ## Content and analysis
 
@@ -66,7 +70,7 @@ in `completion_commands` with a 32-byte SHA-256 fingerprint covering the page
 command, Mode C analysis provenance and accepted occurrences. The frozen command
 lives in the native session.
 
-`record_effective_page_completion` verifies the pending fingerprint and clears it
+`commit_effective_page_completion` verifies the pending fingerprint and clears it
 in the transaction that writes `reading_completions`, `completion_analyses`,
 occurrences, New-to-Known transitions, and progress. On the final page it also sets
 the finish marker and clears the Library read override. A retry of

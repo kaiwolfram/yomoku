@@ -143,7 +143,9 @@ fn foreign_word_results_fail_closed_without_consuming_another_request() {
         match case {
             0 => returned.page.revision += 1,
             1 => details.key.document_id = 99.try_into().unwrap(),
-            2 => details.key.segmentation.segments[0].surface.push('別'),
+            2 => std::sync::Arc::make_mut(&mut details.key.segmentation).segments[0]
+                .surface
+                .push('別'),
             3 => details.token.segment_index += 1,
             4 => details.token.surface.push('別'),
             5 => details.token.display_range = range(0, 1),

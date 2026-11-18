@@ -10,4 +10,4 @@ facet_typegen = ["dep:facet"]
 [dependencies]
 facet = { version = "=0.46.5", optional = true }
 crux_core = "=0.20.0"
-serde = { version = "=1.0.229", features = ["derive"] }
+serde = { version = "=1.0.229", features = ["derive", "rc"] }

@@ -83,7 +83,7 @@ impl Fixture {
         }
     }
 
-    fn resolved(&self) -> EffectiveReaderChapter<'_> {
+    fn resolved(&self) -> EffectiveReaderChapter {
         EffectiveReaderChapter::resolve(
             &self.document.chapters[0],
             self.intent.analysis_id,
