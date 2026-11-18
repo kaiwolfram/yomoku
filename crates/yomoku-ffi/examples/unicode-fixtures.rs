@@ -119,6 +119,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             .collect(),
         }],
         finished_at_least_once: true,
+        read_override: Some(false),
         chapters: CASES
             .iter()
             .enumerate()
@@ -148,6 +149,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         document_id: DocumentId::try_from(i64::MAX)?,
         title: "挿絵 📖".into(),
         finished_at_least_once: false,
+        read_override: None,
         chapter: ChapterText {
             source_id: SourceId::try_from((1 << 53) + 1)?,
             chapter_id: ChapterId::try_from(i64::MAX)?,

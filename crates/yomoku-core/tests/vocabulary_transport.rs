@@ -413,7 +413,7 @@ fn changed_count_restarts_at_zero_and_import_invalidates_without_resetting_query
                 document_id: 1.try_into().unwrap(),
                 title: "猫".into(),
                 progress_percent: 0,
-                finished_at_least_once: false,
+                is_read: false,
                 last_read_sequence: None,
             }),
         );

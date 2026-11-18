@@ -72,6 +72,7 @@ impl Fixture {
                 document_id: intent.document_id,
                 title: "fixture".into(),
                 finished_at_least_once: false,
+                read_override: None,
                 chapters: vec![chapter],
                 formatting: vec![],
                 images: vec![],

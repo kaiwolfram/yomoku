@@ -283,9 +283,9 @@ internal fun verifyDocumentBridge() {
             check(notice.newlyKnown > 0UL && notice.commandId.value > 0L)
             check(
                 completed.documents.single().progressPercent == 100UL &&
-                    completed.documents.single().finishedAtLeastOnce
+                    completed.documents.single().isRead
             )
-            check(completed.documents.single().finishedAtLeastOnce)
+            check(completed.documents.single().isRead)
             check(completed.documents.single().progressPercent == 100UL)
             val committedView = bridge.view()
             bridge.update(request.bincodeSerialize()) // Late duplicate retains the committed view.
@@ -293,10 +293,21 @@ internal fun verifyDocumentBridge() {
             check(bridge.view().contentEquals(committedView))
             bridge.update(Event.DismissCompletionNotice.bincodeSerialize())
             check(ViewModel.bincodeDeserialize(bridge.view()).completionNotice == null)
+            val unread =
+                reopened.dispatch(bridge, Event.SetDocumentRead(document.documentId, false))
+            check(
+                !unread.documents.single().isRead &&
+                    unread.documents.single().progressPercent == 100UL
+            )
+            val duplicate = reopened.dispatch(bridge, Event.CreatePaste(text))
+            check(duplicate.importSummary?.outcome == ImportOutcome.EXISTING)
+            check(duplicate.documents == unread.documents)
             val reopenedBook = reopened.dispatch(bridge, Event.OpenReader(document.documentId))
             check(reopenedBook.bookCompletionNotice == null)
             check(reopenedBook.reader?.finishedAtLeastOnce == true)
+            check(!reopenedBook.documents.single().isRead)
             val rereadPage = checkNotNull(reopenedBook.reader)
+            check(rereadPage.pageNumber == 1UL && rereadPage.position.offset.value == 0L)
             val knownTokens =
                 checkNotNull(
                     reopened
@@ -323,6 +334,7 @@ internal fun verifyDocumentBridge() {
                 )
             check(reread.documentError == null && reread.completionNotice == null)
             check(reread.reader == null && reread.contentRoute == ContentRoute.MAIN)
+            check(reread.documents.single().isRead)
             check(
                 reread.bookCompletionNotice != null &&
                     reread.bookCompletionNotice != completed.bookCompletionNotice
@@ -334,13 +346,16 @@ internal fun verifyDocumentBridge() {
         val finishedListener = DocumentListener()
         NativeBridge(database.path, finishedListener, unavailableDictionary).use { bridge ->
             val summary = finishedListener.dispatch(bridge, Event.RefreshLibrary).documents.single()
-            check(summary.finishedAtLeastOnce && summary.progressPercent == 100UL)
+            check(summary.isRead && summary.progressPercent == 100UL)
+            finishedListener.dispatch(bridge, Event.SetDocumentRead(document.documentId, false))
+            val marked =
+                finishedListener.dispatch(bridge, Event.SetDocumentRead(document.documentId, true))
+            check(marked.documents.single() == summary)
             val opened = finishedListener.dispatch(bridge, Event.OpenReader(document.documentId))
             check(opened.reader?.position?.offset?.value == 0L)
             check(opened.reader.finishedAtLeastOnce && opened.reader.pageNumber == 1UL)
             check(
-                opened.documents.single().finishedAtLeastOnce &&
-                    opened.documents.single().progressPercent == 0UL
+                opened.documents.single().isRead && opened.documents.single().progressPercent == 0UL
             )
             check(opened.readerAnalysis == analysis)
             check(

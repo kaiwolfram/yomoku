@@ -403,8 +403,10 @@ fn txt_existing_bypasses_decoding_and_preserves_title_progress_analysis_and_stat
     let expected = PastedDocument {
         title: "renamed".into(),
         finished_at_least_once: true,
+        read_override: Some(false),
         ..saved
     };
+    assert!(storage.set_document_read(id, false).unwrap());
     let before = totals(&storage);
     // An absent or different selection must not reinterpret an existing file.
     for selection in [None, Some(TextEncoding::ShiftJis)] {

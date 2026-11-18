@@ -10,6 +10,7 @@ fn document() -> ReaderDocument {
         document_id: 7.try_into().unwrap(),
         title: "本".into(),
         finished_at_least_once: false,
+        read_override: None,
         // Deliberately not ID-sorted: source order is authoritative.
         chapters: [
             (30, format!("{}\n𠮷 か\u{3099}\0終", "猫。".repeat(900))),
@@ -155,6 +156,7 @@ fn single_chapter_adapter_preserves_legacy_projection_and_completion() {
         document_id: original.document_id,
         title: original.title,
         finished_at_least_once: true,
+        read_override: None,
         chapter: original.chapters[0].clone(),
         reading_position: None,
     };

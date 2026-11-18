@@ -422,6 +422,7 @@ impl Imports {
                     document_id: stored.document_id,
                     title: stored.title,
                     finished_at_least_once: stored.finished_at_least_once,
+                    read_override: stored.read_override,
                     reading_position: stored.reading_position,
                     formatting: Vec::new(),
                     images: Vec::new(),

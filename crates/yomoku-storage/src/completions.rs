@@ -154,8 +154,7 @@ impl Storage {
         )?;
         let newly_known = record_effective_occurrences_in(&transaction, frozen)?;
         write_position_in(&transaction, completion.document_id, next)?;
-        // Only the whole document's final page sets the permanent marker.
-        // Intermediate chapter EOF, position-only movement and retries do not.
+        // A new final-page completion sets the finish marker and clears the Library override.
         let last = document
             .chapters
             .last()
@@ -169,8 +168,8 @@ impl Storage {
                 == last.text.len()
         {
             transaction.execute(
-                "UPDATE documents SET finished_at_least_once = 1
-                 WHERE id = ?1 AND finished_at_least_once = 0",
+                "UPDATE documents SET finished_at_least_once = 1, read_override = NULL
+                 WHERE id = ?1 AND (finished_at_least_once = 0 OR read_override IS NOT NULL)",
                 [i64::from(completion.document_id)],
             )?;
         }

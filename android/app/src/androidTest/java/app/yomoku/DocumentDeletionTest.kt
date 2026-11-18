@@ -140,7 +140,7 @@ class DocumentDeletionTest {
         assertTrue(newId.value > id.value)
         val newDocument = core().view.documents.single { it.documentId == newId }
         assertEquals(0UL, newDocument.progressPercent)
-        assertFalse(newDocument.finishedAtLeastOnce)
+        assertFalse(newDocument.isRead)
         assertNull(newDocument.lastReadSequence)
         compose
             .onNodeWithTag("finished_${newId.value}", useUnmergedTree = true)

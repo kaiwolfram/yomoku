@@ -65,6 +65,7 @@ impl Fixture {
             document_id: 1.try_into().unwrap(),
             title: "effective application".into(),
             finished_at_least_once: false,
+            read_override: None,
             reading_position: Some(ReadingPosition {
                 source_id: chapter.source_id,
                 chapter_id: chapter.chapter_id,

@@ -241,7 +241,7 @@ fn ordered_reader_worker_crosses_chapters_with_original_analysis_time_and_whole_
     assert_eq!(moved.reader_analysis, Some(original.analyses[1].analysis));
 
     assert!(moved.documents[0].progress_percent > 0 && moved.documents[0].progress_percent < 100);
-    assert!(!moved.documents[0].finished_at_least_once);
+    assert!(!moved.documents[0].is_read);
     let before_previous = totals(&database.path());
     let back = dispatch(
         &router,
@@ -301,7 +301,7 @@ fn ordered_reader_worker_crosses_chapters_with_original_analysis_time_and_whole_
     assert_eq!(finished.content_route, ContentRoute::Main);
     assert!(finished.reader.is_none() && finished.book_completion_notice.is_some());
     assert_eq!(finished.documents[0].progress_percent, 100);
-    assert!(finished.documents[0].finished_at_least_once);
+    assert!(finished.documents[0].is_read);
     assert_eq!(
         storage
             .load_document_reader_snapshot(id)
@@ -387,7 +387,7 @@ fn image_only_chapter_worker_can_load_tokens_and_finish_without_words() {
     let finished = complete(&router, 11);
     assert!(finished.book_completion_notice.is_some());
     assert!(finished.completion_notice.is_none());
-    assert!(finished.documents[0].finished_at_least_once);
+    assert!(finished.documents[0].is_read);
     drop(router);
     drop(lifecycle);
 }

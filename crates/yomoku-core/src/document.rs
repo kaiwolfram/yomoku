@@ -108,6 +108,7 @@ pub struct PastedDocument {
     pub document_id: DocumentId,
     pub title: String,
     pub finished_at_least_once: bool,
+    pub read_override: Option<bool>,
     pub chapter: ChapterText,
     pub reading_position: Option<crate::pagination::ReadingPosition>,
 }
@@ -120,6 +121,7 @@ pub struct ReaderDocument {
     pub document_id: DocumentId,
     pub title: String,
     pub finished_at_least_once: bool,
+    pub read_override: Option<bool>,
     pub chapters: Vec<ChapterText>,
     pub formatting: Vec<crate::reader_formatting::ReaderChapterFormatting>,
     pub images: Vec<crate::reader_images::ReaderChapterImages>,
@@ -132,6 +134,7 @@ impl From<PastedDocument> for ReaderDocument {
             document_id: document.document_id,
             title: document.title,
             finished_at_least_once: document.finished_at_least_once,
+            read_override: document.read_override,
             chapters: vec![document.chapter],
             formatting: Vec::new(),
             images: Vec::new(),
@@ -307,7 +310,7 @@ impl TextAnchor {
     }
 }
 
-/// Current progress and a permanent finish marker that is independent of position.
+/// Current progress and the effective Library read status.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "facet_typegen", derive(facet::Facet))]
 pub struct LibraryDocument {
@@ -316,5 +319,5 @@ pub struct LibraryDocument {
     pub document_id: DocumentId,
     pub title: String,
     pub progress_percent: u64,
-    pub finished_at_least_once: bool,
+    pub is_read: bool,
 }

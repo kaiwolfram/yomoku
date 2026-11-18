@@ -159,7 +159,7 @@ impl ReaderDocument {
             document_id: self.document_id,
             title: self.title.clone(),
             progress_percent: progress_percent(offset, total)?,
-            finished_at_least_once: self.finished_at_least_once,
+            is_read: self.read_override.unwrap_or(self.finished_at_least_once),
         })
     }
 }
@@ -185,7 +185,7 @@ impl PastedDocument {
             last_read_sequence: None,
             document_id: self.document_id,
             title: self.title.clone(),
-            finished_at_least_once: self.finished_at_least_once,
+            is_read: self.read_override.unwrap_or(self.finished_at_least_once),
             progress_percent: progress_percent(
                 self.reading_position
                     .map_or(0, |position| position.offset.into()),

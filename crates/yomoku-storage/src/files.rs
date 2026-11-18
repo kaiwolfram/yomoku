@@ -22,7 +22,7 @@ impl Storage {
     }
 
     /// Format-independent read-only reference across TXT/SRT/EPUB. Read the
-    /// persisted title, whole-book progress and finish marker atomically with
+    /// persisted title, whole-book progress and read status atomically with
     /// file digest identity, without decoding, analysis or resetting progress.
     pub fn find_imported_file(
         &mut self,

@@ -56,6 +56,7 @@ fn main() {
             document_id: 1.try_into().unwrap(),
             title: "Synthetic payload fixture".into(),
             finished_at_least_once: false,
+            read_override: None,
             chapter: chapter.clone(),
             reading_position: None,
         };

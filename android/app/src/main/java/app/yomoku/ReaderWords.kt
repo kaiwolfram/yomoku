@@ -228,7 +228,11 @@ internal fun ReaderWordPanel(
                     },
                     modifier = Modifier.size(48.dp).testTag("word_copy"),
                 ) {
-                    Icon(painterResource(R.drawable.ic_copy), contentDescription = copyLabel)
+                    Icon(
+                        painterResource(R.drawable.ic_copy),
+                        contentDescription = copyLabel,
+                        modifier = Modifier.size(12.dp).testTag("word_copy_icon"),
+                    )
                 }
             }
             choices()

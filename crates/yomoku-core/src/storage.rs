@@ -35,6 +35,10 @@ pub enum StorageOperation {
     ImportTxt(TxtImport),
     ImportSrt(SrtImport),
     ImportEpub(EpubImport),
+    SetDocumentRead {
+        document_id: DocumentId,
+        is_read: bool,
+    },
     /// Native FIFO read. Only the compact chart values in ViewModel cross FFI.
     #[serde(skip)]
     #[cfg_attr(feature = "facet_typegen", facet(skip))]
@@ -136,6 +140,10 @@ pub enum StorageResult {
 
     /// Cooperative file cancellation rolled back the current file, without error.
     ImportCancelled,
+    DocumentReadSet {
+        document_id: DocumentId,
+        is_read: bool,
+    },
     #[serde(skip)]
     #[cfg_attr(feature = "facet_typegen", facet(skip))]
     StatisticsLoaded(Box<crate::statistics::StatisticsBuckets>),

@@ -234,6 +234,7 @@ pub(crate) fn load_reader_document_in(
                 document_id,
                 title: stored.title,
                 finished_at_least_once: stored.finished_at_least_once,
+                read_override: stored.read_override,
                 reading_position: stored.reading_position,
                 formatting,
                 images,

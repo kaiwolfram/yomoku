@@ -1,10 +1,11 @@
 # Data model
 
-The authoritative SQL is [0001_completion_receipts_initial_schema.sql](../crates/yomoku-storage/migrations/0001_completion_receipts_initial_schema.sql).
-The release schema version is **1** with journal name `0001_completion_receipts_initial_schema`.
+The release schema version is **2**. The SQL lives in
+[0001_completion_receipts_initial_schema.sql](../crates/yomoku-storage/migrations/0001_completion_receipts_initial_schema.sql)
+and [0002_library_read_override.sql](../crates/yomoku-storage/migrations/0002_library_read_override.sql).
 It has **25 application tables** plus SQLite's internal `sqlite_sequence` table.
-Earlier development schemas and journals are unsupported, including the previous
-schema-1 journal. They are rejected without migration or modification.
+Databases with the `0001_completion_receipts_initial_schema` journal upgrade in
+place. Earlier development journals remain unsupported.
 
 | Area | Tables |
 | --- | --- |
@@ -16,10 +17,10 @@ schema-1 journal. They are rejected without migration or modification.
 ## Initialization and compatibility
 
 The small migration runner opens an immediate transaction, reads the journal and
-applies the initial schema once. Concurrent opens serialize. Foreign keys are
+applies missing migrations in order. Concurrent opens serialize. Foreign keys are
 enabled on every repository connection. Unknown, future and historical development
 journals are errors. The runner does not reset incompatible databases, delete user
-files or backfill development data. Additional upgrades can add migrations.
+files or backfill development data.
 
 ## Content and analysis
 
@@ -50,6 +51,14 @@ surfaces without changing existing status. Explicit status history supports the
 five statuses. Deleting vocabulary removes its events/occurrences without causing
 existing books to register it again. There are no custom dictionary records.
 
+## Library read status
+
+`documents.read_override` is nullable. The effective Library status uses the
+override when present and otherwise inherits `documents.finished_at_least_once`.
+Migration 2 leaves the override NULL for existing books. Manual marking updates
+only the override on the live document. The permanent finish marker still
+governs whether opening the reader resets the position to page one.
+
 ## Completion
 
 `prepare_effective_page_completion` validates the rendered page and allocates an ID
@@ -59,11 +68,13 @@ lives in the native session.
 
 `record_effective_page_completion` verifies the pending fingerprint and clears it
 in the transaction that writes `reading_completions`, `completion_analyses`,
-occurrences, New-to-Known transitions, progress and the finish marker. A retry of
+occurrences, New-to-Known transitions, and progress. On the final page it also sets
+the finish marker and clears the Library read override. A retry of
 a committed command matches its ID, page, departing position, page length,
-timestamp and analysis provenance against the receipt. This works after content
-deletion. A deliberate reread uses a new command ID and counts again. Statistics
-and Vocabulary query committed history directly.
+timestamp and analysis provenance against the receipt. A replay preserves later
+manual read changes and also works after content deletion. A deliberate reread
+uses a new command ID and counts again. Statistics and Vocabulary query
+committed history directly.
 Previous/reflow preserve exact position without recording completion. No reading
 durations or pending-time state are persisted.
 

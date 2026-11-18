@@ -265,6 +265,10 @@ pub enum Event {
         part: Option<u64>,
     },
     RetryDictionaryPart(crate::anki::AnkiSelection),
+    SetDocumentRead {
+        document_id: DocumentId,
+        is_read: bool,
+    },
     #[serde(skip)]
     #[cfg_attr(feature = "facet_typegen", facet(skip))]
     AnkiEntryChecked(
@@ -555,6 +559,23 @@ impl App for Yomoku {
                 Some(StorageOperation::RenameDocument {
                     document_id: *id,
                     title: draft.title.clone(),
+                })
+            }
+            Event::SetDocumentRead {
+                document_id,
+                is_read,
+            } => {
+                if !model.library_visible()
+                    || !model
+                        .documents
+                        .iter()
+                        .any(|entry| entry.document_id == *document_id && entry.is_read != *is_read)
+                {
+                    return Command::done();
+                }
+                Some(StorageOperation::SetDocumentRead {
+                    document_id: *document_id,
+                    is_read: *is_read,
                 })
             }
             Event::ConfirmDocumentDeletion(id) => {
@@ -876,8 +897,8 @@ impl App for Yomoku {
                     DocumentRequest::Delete(id) => Some(id),
                     _ => None,
                 };
-                let document_rename = match request {
-                    DocumentRequest::Rename(id, title) => Some((id, title)),
+                let document_rename = match &request {
+                    DocumentRequest::Rename(id, title) => Some((*id, title)),
                     _ => None,
                 };
                 let import_outcome = match &result {
@@ -892,8 +913,7 @@ impl App for Yomoku {
                 match result {
                     StorageResult::DocumentRenamed { document_id, title } => {
                         if document_rename
-                            .as_ref()
-                            .is_some_and(|(id, expected)| *id == document_id && *expected == title)
+                            .is_some_and(|(id, expected)| id == document_id && expected == &title)
                         {
                             if let Some(document) = model
                                 .documents
@@ -917,6 +937,22 @@ impl App for Yomoku {
                     StorageResult::DocumentDeleted(id) => {
                         if document_delete == Some(id) {
                             model.apply_document_deletion(id);
+                        }
+                    }
+                    StorageResult::DocumentReadSet {
+                        document_id,
+                        is_read,
+                    } => {
+                        if matches!(request, DocumentRequest::SetRead(id, read)
+                            if id == document_id && read == is_read)
+                        {
+                            if let Some(document) = model
+                                .documents
+                                .iter_mut()
+                                .find(|entry| entry.document_id == document_id)
+                            {
+                                document.is_read = is_read;
+                            }
                         }
                     }
                     // Effective results must arrive through their captured request,
@@ -1036,6 +1072,7 @@ impl App for Yomoku {
             }
             Event::RefreshLibrary
             | Event::SaveDocumentTitle(_)
+            | Event::SetDocumentRead { .. }
             | Event::ConfirmDocumentDeletion(_)
             | Event::LoadLibraryWordDistributions
             | Event::CreatePaste(_)

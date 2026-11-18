@@ -36,7 +36,7 @@ fn loaded_count(count: i64) -> Core<Yomoku> {
                     document_id: id(n),
                     title: format!("本𠮷 {n}"),
                     progress_percent: 75,
-                    finished_at_least_once: true,
+                    is_read: true,
                     last_read_sequence: Some(n),
                 })
                 .collect(),

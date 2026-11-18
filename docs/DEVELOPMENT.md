@@ -43,7 +43,8 @@ restricted environments, bypass rustup launcher maintenance with the installed
 stable toolchain's `bin` in PATH. Gradle/ADB/emulator need local socket access.
 Do not clear an incompatible database to make a build or trial succeed. The only
 accepted initial journal is `0001_completion_receipts_initial_schema` (schema version 1),
-which includes the Statistics timeframe preference.
+which includes the Statistics timeframe preference. It upgrades in place to
+`0002_library_read_override` (schema version 2).
 Use a new disposable AVD for checks that require a fresh installation.
 
 ## Rust verification

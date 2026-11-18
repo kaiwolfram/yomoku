@@ -377,7 +377,7 @@ fn all_presets_complete_chapters_in_order_with_exact_tokens_progress_and_finish(
             .save_document_reading_position(id, position(&document, 0, 0))
             .unwrap();
         assert_eq!(counts(&storage), before);
-        assert!(storage.list_documents().unwrap()[0].finished_at_least_once);
+        assert!(storage.list_documents().unwrap()[0].is_read);
         assert_eq!(storage.list_documents().unwrap()[0].progress_percent, 0);
         let reread = prepare(&mut storage, id);
         assert_eq!(

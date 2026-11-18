@@ -26,6 +26,7 @@ pub(super) enum DocumentRequest {
     Reader(DocumentId),
     Delete(DocumentId),
     Rename(DocumentId, String),
+    SetRead(DocumentId, bool),
     Import,
     PageLength,
     Typography,
@@ -42,6 +43,10 @@ impl DocumentRequest {
             StorageOperation::RenameDocument { document_id, title } => {
                 Self::Rename(*document_id, title.clone())
             }
+            StorageOperation::SetDocumentRead {
+                document_id,
+                is_read,
+            } => Self::SetRead(*document_id, *is_read),
             StorageOperation::CreatePaste(_)
             | StorageOperation::ImportTxt(_)
             | StorageOperation::ImportSrt(_)

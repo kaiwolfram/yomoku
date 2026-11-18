@@ -17,6 +17,7 @@ fn document() -> ReaderDocument {
         document_id: 1.try_into().unwrap(),
         title: "本".into(),
         finished_at_least_once: false,
+        read_override: None,
         chapter: ChapterText {
             source_id: 2.try_into().unwrap(),
             chapter_id: 3.try_into().unwrap(),

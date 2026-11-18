@@ -83,7 +83,7 @@ fn library_words_refresh_on_return_import_duplicate_and_library_reload() {
             document_id: 1.try_into().unwrap(),
             title: "本".into(),
             progress_percent: 0,
-            finished_at_least_once: false,
+            is_read: false,
             last_read_sequence: None,
         };
         for result in [
@@ -173,7 +173,7 @@ fn library_reads_preserve_literal_rename_and_frozen_bulk_delete_prompts() {
             document_id: 1.try_into().unwrap(),
             title: "本".into(),
             progress_percent: 75,
-            finished_at_least_once: true,
+            is_read: true,
             last_read_sequence: Some(10),
         };
         let mut effects = core.process_event(Event::RefreshLibrary);

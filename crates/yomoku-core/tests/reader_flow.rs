@@ -33,6 +33,7 @@ fn document(text: &str) -> PastedDocument {
         document_id: DocumentId::try_from(1).unwrap(),
         title: "題𠮷".into(),
         finished_at_least_once: false,
+        read_override: None,
         reading_position: None,
         chapter: ChapterText {
             source_id: SourceId::try_from(2).unwrap(),

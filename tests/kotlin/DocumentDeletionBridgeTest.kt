@@ -86,7 +86,7 @@ internal fun verifyDocumentDeletionBridge() {
             check(database.readBytes().contentEquals(beforeBytes))
             val prompt =
                 checkNotNull(dispatch(Event.RequestDocumentDeletion(first)).libraryDeleteTarget)
-            check(prompt.documentId == first && prompt.finishedAtLeastOnce)
+            check(prompt.documentId == first && prompt.isRead)
             dispatch(Event.CancelDocumentDeletion)
             check(view().libraryDeleteTarget == null)
             check(database.readBytes().contentEquals(beforeBytes))
@@ -111,9 +111,7 @@ internal fun verifyDocumentDeletionBridge() {
                 reimported.documents
                     .single { it.documentId == newId }
                     .let {
-                        it.progressPercent == 0UL &&
-                            !it.finishedAtLeastOnce &&
-                            it.lastReadSequence == null
+                        it.progressPercent == 0UL && !it.isRead && it.lastReadSequence == null
                     }
             )
         }
@@ -122,7 +120,7 @@ internal fun verifyDocumentDeletionBridge() {
             checkNotNull(effects.poll(60, TimeUnit.SECONDS))
             val view = ViewModel.bincodeDeserialize(bridge.view())
             check(view.documents.size == 2 && view.libraryDeleteTarget == null)
-            check(view.documents.none { it.finishedAtLeastOnce })
+            check(view.documents.none { it.isRead })
         }
     } finally {
         directory.deleteRecursively()

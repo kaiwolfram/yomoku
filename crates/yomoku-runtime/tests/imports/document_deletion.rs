@@ -43,7 +43,7 @@ fn confirmed_document_deletion_runs_on_fifo_without_analysis_and_retries_transac
     let new_id = created.import_summary.unwrap().document_id;
     assert!(new_id > id);
     assert_eq!(created.documents[0].progress_percent, 0);
-    assert!(!created.documents[0].finished_at_least_once);
+    assert!(!created.documents[0].is_read);
     assert_eq!(created.documents[0].last_read_sequence, None);
     finish_worker(router, lifecycle, &trace);
 }

@@ -2,6 +2,7 @@ package app.yomoku
 
 import android.content.ClipboardManager
 import android.content.Context
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.ComposeTestRule
 import androidx.compose.ui.unit.dp
@@ -25,14 +26,18 @@ internal fun copyLookup() =
     )
 
 internal fun assertCopiedWord(compose: ComposeTestRule, context: Context, expected: String) {
-    compose
-        .onNodeWithTag("word_copy")
+    val button = compose.onNodeWithTag("word_copy")
+    button
         .performScrollTo()
         .assertIsEnabled()
         .assertContentDescriptionEquals("Copy word")
-        .assertWidthIsAtLeast(48.dp)
-        .assertHeightIsAtLeast(48.dp)
-        .performClick()
+        .assertWidthIsEqualTo(48.dp)
+        .assertHeightIsEqualTo(48.dp)
+    compose
+        .onNodeWithTag("word_copy_icon", useUnmergedTree = true)
+        .assertWidthIsEqualTo(12.dp)
+        .assertHeightIsEqualTo(12.dp)
+    button.performTouchInput { click(Offset(4f, centerY)) }
     compose.runOnIdle {
         val clip = context.getSystemService(ClipboardManager::class.java).primaryClip!!
         assertEquals(1, clip.itemCount)

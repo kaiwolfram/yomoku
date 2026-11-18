@@ -102,7 +102,7 @@ class LibraryCoversTest {
                 reference.progressPercent,
                 core().view.documents.single { it.documentId == id }.progressPercent,
             )
-            assertFalse(core().view.documents.single { it.documentId == id }.finishedAtLeastOnce)
+            assertFalse(core().view.documents.single { it.documentId == id }.isRead)
         }
     }
 

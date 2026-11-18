@@ -8,6 +8,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.assertContentDescriptionEquals
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
@@ -275,6 +277,56 @@ class ReaderNavigationTest {
     }
 
     @Test
+    fun libraryReadMenuClosesAndCanRetryAfterStorageFailure() {
+        val id = openDocument()
+        compose.onNodeWithContentDescription("Back").performClick()
+        awaitReady()
+        val before = core().view.documents
+        val row = compose.onNodeWithTag("document_$id")
+        val checkmark = compose.onNodeWithTag("finished_$id", useUnmergedTree = true)
+        val markRead = compose.onNodeWithText("Mark as read")
+        val markUnread = compose.onNodeWithText("Mark as unread")
+        compose.onNodeWithTag("library_documents").performScrollToKey(id)
+        checkmark.assertDoesNotExist()
+        database().use { db ->
+            db.execSQL(
+                "CREATE TRIGGER fail_read_ui BEFORE UPDATE OF read_override ON documents WHEN NEW.id = $id BEGIN SELECT RAISE(ABORT, 'fixture'); END"
+            )
+            try {
+                row.performTouchInput { longClick() }
+                markUnread.assertDoesNotExist()
+                markRead.assertIsDisplayed().performClick()
+                compose.waitUntil(30_000) { core().view.documentError != null }
+                compose
+                    .onNodeWithText("Storage is unavailable. Please try again.")
+                    .assertIsDisplayed()
+                markRead.assertDoesNotExist()
+                checkmark.assertDoesNotExist()
+                assertEquals(before, core().view.documents)
+            } finally {
+                db.execSQL("DROP TRIGGER fail_read_ui")
+            }
+        }
+        row.performTouchInput { longClick() }
+        markRead.performClick()
+        awaitReady()
+        markRead.assertDoesNotExist()
+        checkmark.assertIsDisplayed().assertContentDescriptionEquals("Read")
+        assertEquals(
+            before.map { if (it.documentId.value == id) it.copy(isRead = true) else it },
+            core().view.documents,
+        )
+
+        row.performTouchInput { longClick() }
+        markRead.assertDoesNotExist()
+        markUnread.assertIsDisplayed().performClick()
+        awaitReady()
+        markUnread.assertDoesNotExist()
+        checkmark.assertDoesNotExist()
+        assertEquals(before, core().view.documents)
+    }
+
+    @Test
     fun finishCheckmarkPersistsThroughRetryRecreationAndRereadsWhileReopeningResetsPosition() {
         val id = openDocument()
         database().use { db ->
@@ -325,13 +377,17 @@ class ReaderNavigationTest {
             compose
                 .onNodeWithTag("finished_$id", useUnmergedTree = true)
                 .performScrollTo()
-                .assertExists()
+                .assertContentDescriptionEquals("Read")
             compose.onNodeWithTag("progress_$id", useUnmergedTree = true).assertTextEquals("100%")
             compose.onNodeWithTag("document_$id").performClick()
             awaitReady()
             assertEquals(1UL, core().view.reader!!.pageNumber)
             assertEquals(0L, core().view.reader!!.position.offset.value)
             assertTrue(core().view.reader!!.finishedAtLeastOnce)
+            compose.onNodeWithTag("reader_finished").assertDoesNotExist()
+            compose
+                .onNodeWithContentDescription("Read", useUnmergedTree = true)
+                .assertDoesNotExist()
             assertEquals(
                 0UL,
                 core().view.documents.single { it.documentId.value == id }.progressPercent,
@@ -340,9 +396,7 @@ class ReaderNavigationTest {
             repeat(3) {
                 compose.onNodeWithTag("next_page").performScrollTo().performClick()
                 awaitReady()
-                assertTrue(
-                    core().view.documents.single { it.documentId.value == id }.finishedAtLeastOnce
-                )
+                assertTrue(core().view.documents.single { it.documentId.value == id }.isRead)
             }
             assertEquals(ContentRoute.MAIN, core().view.contentRoute)
             assertEquals(6L, completions(db, id))

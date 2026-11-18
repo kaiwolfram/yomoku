@@ -36,7 +36,7 @@ class StatisticsScreenTest {
                             documentId = DocumentId(it),
                             title = "Book $it",
                             progressPercent = 0UL,
-                            finishedAtLeastOnce = false,
+                            isRead = false,
                         )
                     },
                 readerTypography =

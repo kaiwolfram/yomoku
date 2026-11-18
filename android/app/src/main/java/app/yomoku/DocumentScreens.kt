@@ -170,11 +170,16 @@ internal fun LibraryScreen(
                                         style = MaterialTheme.typography.titleMedium,
                                         modifier = Modifier.weight(1f),
                                     )
-                                    if (document.finishedAtLeastOnce) {
-                                        FinishedCheckmark(
-                                            Modifier.testTag(
-                                                "finished_${document.documentId.value}"
-                                            )
+                                    if (document.isRead) {
+                                        Icon(
+                                            painterResource(R.drawable.ic_finished),
+                                            contentDescription =
+                                                stringResource(R.string.library_read),
+                                            modifier =
+                                                Modifier.testTag(
+                                                    "finished_${document.documentId.value}"
+                                                ),
+                                            tint = MaterialTheme.colorScheme.primary,
                                         )
                                     }
                                 }
@@ -208,6 +213,22 @@ internal fun LibraryScreen(
                                     Modifier.testTag(
                                         "rename_document_${document.documentId.value}"
                                     ),
+                            )
+                            DropdownMenuItem(
+                                text = {
+                                    Text(
+                                        stringResource(
+                                            if (document.isRead) R.string.library_mark_as_unread
+                                            else R.string.library_mark_as_read
+                                        )
+                                    )
+                                },
+                                onClick = {
+                                    menuExpanded = false
+                                    dispatch(
+                                        Event.SetDocumentRead(document.documentId, !document.isRead)
+                                    )
+                                },
                             )
                             DropdownMenuItem(
                                 text = { Text(stringResource(R.string.library_delete)) },
@@ -370,10 +391,6 @@ internal fun ReaderScreen(
         StorageStatus(view)
         ReaderSaveRetry(view, dispatch)
         page?.let { page ->
-            if (page.finishedAtLeastOnce) {
-                FinishedCheckmark(Modifier.testTag("reader_finished"))
-            }
-
             EffectiveReaderWords(
                 view,
                 sessionKey,
@@ -471,16 +488,6 @@ internal fun ReaderScreen(
             }
         }
     }
-}
-
-@Composable
-private fun FinishedCheckmark(modifier: Modifier = Modifier) {
-    Icon(
-        painterResource(R.drawable.ic_finished),
-        contentDescription = stringResource(R.string.finished_at_least_once),
-        modifier = modifier,
-        tint = MaterialTheme.colorScheme.primary,
-    )
 }
 
 @Composable

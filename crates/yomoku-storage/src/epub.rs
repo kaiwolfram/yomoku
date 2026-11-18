@@ -35,6 +35,7 @@ pub struct StoredEpubDocument {
     pub title: String,
     pub filename: String,
     pub finished_at_least_once: bool,
+    pub read_override: Option<bool>,
     pub reading_position: Option<ReadingPosition>,
     pub metadata_title: Option<String>,
     pub cover: Option<String>,
@@ -234,6 +235,7 @@ impl Storage {
                     title: title.to_owned(),
                     filename: filename.to_owned(),
                     finished_at_least_once: false,
+                    read_override: None,
                     reading_position: None,
                     metadata_title: parsed.title,
                     cover: parsed.cover,
@@ -296,6 +298,7 @@ pub(crate) struct EpubMetadata {
     pub title: String,
     pub filename: String,
     pub finished_at_least_once: bool,
+    pub read_override: Option<bool>,
     pub reading_position: Option<ReadingPosition>,
     pub metadata_title: Option<String>,
     pub cover: Option<String>,
@@ -335,6 +338,7 @@ pub(crate) fn load_epub_in(
         title: metadata.title,
         filename: metadata.filename,
         finished_at_least_once: metadata.finished_at_least_once,
+        read_override: metadata.read_override,
         reading_position: metadata.reading_position,
         metadata_title: metadata.metadata_title,
         cover: metadata.cover,
@@ -347,9 +351,9 @@ pub(crate) fn load_epub_metadata_in(
     connection: &Connection,
     document_id: DocumentId,
 ) -> Result<Option<EpubMetadata>, StorageError> {
-    let header = connection.query_row("SELECT d.source_id, d.title, d.finished_at_least_once, s.kind FROM documents d JOIN sources s ON s.id = d.source_id WHERE d.id = ?1",
-        [i64::from(document_id)], |row| Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?, row.get::<_, bool>(2)?, row.get::<_, String>(3)?))).optional()?;
-    let Some((source_id, title, finished_at_least_once, kind)) = header else {
+    let header = connection.query_row("SELECT d.source_id, d.title, d.finished_at_least_once, d.read_override, s.kind FROM documents d JOIN sources s ON s.id = d.source_id WHERE d.id = ?1",
+        [i64::from(document_id)], |row| Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?, row.get::<_, bool>(2)?, row.get::<_, Option<bool>>(3)?, row.get::<_, String>(4)?))).optional()?;
+    let Some((source_id, title, finished_at_least_once, read_override, kind)) = header else {
         return Ok(None);
     };
     if kind != "epub" {
@@ -475,6 +479,7 @@ pub(crate) fn load_epub_metadata_in(
         title,
         filename,
         finished_at_least_once,
+        read_override,
         reading_position,
         metadata_title,
         cover,

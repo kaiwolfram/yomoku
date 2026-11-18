@@ -317,6 +317,21 @@ fn execute(
             }
             Ok(StorageResult::DocumentRenamed { document_id, title })
         }
+        StorageOperation::SetDocumentRead {
+            document_id,
+            is_read,
+        } => {
+            if !storage
+                .set_document_read(document_id, is_read)
+                .map_err(map_error)?
+            {
+                return Err(DocumentError::NotFound);
+            }
+            Ok(StorageResult::DocumentReadSet {
+                document_id,
+                is_read,
+            })
+        }
         StorageOperation::CreatePaste(_) => {
             imports.import(storage, &paste.expect("validated paste"), || {
                 word_dictionary(dictionary, word_loader)

@@ -77,7 +77,7 @@ class DocumentRenameTest {
         val before = core().view.documents.single { it.documentId == id }
         val history = sourceAndHistory(id.value)
         val counts = core().view.libraryWordDistributions
-        assertTrue(before.finishedAtLeastOnce)
+        assertTrue(before.isRead)
         assertEquals("1", history[2])
         val title = "  改題𠮷 か\u3099  "
         compose.onNodeWithTag("document_${id.value}").performTouchInput { longClick() }

@@ -47,6 +47,7 @@ fun verifyTextBoundaries(directory: String) {
     val orderedBytes = File(dir, "ordered.bin").readBytes()
     val ordered = ReaderDocument.bincodeDeserialize(orderedBytes)
     check(ordered.documentId.value == Long.MAX_VALUE && ordered.finishedAtLeastOnce)
+    check(ordered.readOverride == false)
     check(ordered.chapters.size == 7 && ordered.chapters.first().text.isEmpty())
     check(ordered.chapters.map { it.chapterId.value } == (0L..6L).map { Long.MAX_VALUE - it })
     check(ordered.readingPosition?.chapterId == ordered.chapters[2].chapterId)

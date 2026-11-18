@@ -44,6 +44,18 @@ impl Storage {
         Ok(true)
     }
 
+    /// Save the Library override for a live document. False means the ID is absent.
+    pub fn set_document_read(
+        &mut self,
+        document_id: DocumentId,
+        is_read: bool,
+    ) -> Result<bool, StorageError> {
+        Ok(self.connection.execute(
+            "UPDATE documents SET read_override = ?2 WHERE id = ?1",
+            (i64::from(document_id), is_read),
+        )? == 1)
+    }
+
     /// Remove live content and Library state atomically, retaining source/chapter
     /// provenance, global vocabulary and completed-reading history.
     /// An absent ID is an idempotent no-op, including an explicit lost-response retry.
@@ -102,7 +114,7 @@ impl Storage {
                 FROM chapter_lengths GROUP BY source_id
               )
               SELECT d.id, d.title, totals.bytes, p.chapter_id, p.byte_offset,
-                     c.bytes, d.finished_at_least_once, d.source_id, c.source_id,
+                     c.bytes, COALESCE(d.read_override, d.finished_at_least_once), d.source_id, c.source_id,
                      totals.complete,
                      (SELECT COALESCE(SUM(prior.bytes), 0) FROM chapter_lengths prior
                       WHERE prior.source_id = d.source_id AND prior.chapter_index < c.chapter_index),
@@ -137,7 +149,7 @@ impl Storage {
                 position_chapter,
                 offset,
                 chapter_bytes,
-                finished_at_least_once,
+                is_read,
                 source,
                 position_source,
                 complete,
@@ -160,7 +172,7 @@ impl Storage {
                 last_read_sequence,
                 document_id: DocumentId::try_from(id).map_err(|_| StorageError::InvalidDocument)?,
                 title,
-                finished_at_least_once,
+                is_read,
                 progress_percent: progress_percent(offset, total_bytes)
                     .map_err(|_| StorageError::InvalidDocument)?,
             })
@@ -200,18 +212,19 @@ pub(crate) fn load_paste_in(
 ) -> Result<Option<PastedDocument>, StorageError> {
     let document = connection
         .query_row(
-            "SELECT source_id, title, finished_at_least_once FROM documents WHERE id = ?1",
+            "SELECT source_id, title, finished_at_least_once, read_override FROM documents WHERE id = ?1",
             [i64::from(document_id)],
             |row| {
                 Ok((
                     row.get::<_, i64>(0)?,
                     row.get::<_, String>(1)?,
                     row.get::<_, bool>(2)?,
+                    row.get::<_, Option<bool>>(3)?,
                 ))
             },
         )
         .optional()?;
-    let Some((source_id, title, finished_at_least_once)) = document else {
+    let Some((source_id, title, finished_at_least_once, read_override)) = document else {
         return Ok(None);
     };
     let source_id = SourceId::try_from(source_id).map_err(|_| StorageError::InvalidDocument)?;
@@ -250,6 +263,7 @@ pub(crate) fn load_paste_in(
         document_id,
         title,
         finished_at_least_once,
+        read_override,
         reading_position,
         chapter: ChapterText {
             source_id,
@@ -312,6 +326,7 @@ pub(crate) fn create_single_text_in(
         document_id,
         title: title.to_owned(),
         finished_at_least_once: false,
+        read_override: None,
         reading_position: None,
         chapter: ChapterText {
             source_id,

@@ -104,7 +104,6 @@
     <string name="book_completed">Book completed</string>
     <string name="words_marked_known">%1$s new words marked as Known</string>
     <string name="reading_progress">%1$d%%</string>
-    <string name="finished_at_least_once">Finished at least once</string>
     <string name="error_empty_paste">Enter some text to import.</string>
     <string name="error_storage_unavailable">Storage is unavailable. Please try again.</string>
     <string name="error_incompatible_database">This database version cannot be opened.</string>
@@ -155,6 +154,9 @@
     <string name="library_words_error">Could not load word status.</string>
     <string name="library_delete">Delete</string>
     <string name="library_rename">Rename</string>
+    <string name="library_read">Read</string>
+    <string name="library_mark_as_read">Mark as read</string>
+    <string name="library_mark_as_unread">Mark as unread</string>
     <string name="save">Save</string>
     <string name="library_document_title">Title</string>
     <string name="library_rename_error">Could not rename this document. Retry or cancel.</string>

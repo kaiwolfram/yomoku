@@ -274,8 +274,10 @@ fn epub_duplicates_preserve_live_state_skip_parser_and_share_original_file_ident
             [],
         )
         .unwrap();
+    assert!(storage.set_document_read(id, false).unwrap());
     let before = storage.load_epub_document(id).unwrap();
     let reference = storage.list_documents().unwrap().remove(0);
+    assert!(!reference.is_read);
     let counts = totals(&storage);
     let seq = sequences(&storage);
     for filename in ["other.epub", "", "other.txt"] {

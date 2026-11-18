@@ -46,6 +46,127 @@ fn command(
 }
 
 #[test]
+fn schema_one_books_inherit_completion_and_keep_saved_positions() {
+    use crate::documents::{create_paste_in, record_reader_entry_in, write_position_in};
+    let database = TestDatabase::new();
+    let mut connection = Connection::open(database.path()).unwrap();
+    migrate(&mut connection, &MIGRATIONS[..1]).unwrap();
+    let partial = create_paste_in(&connection, &PasteText::new("猫犬".into()).unwrap()).unwrap();
+    let finished = create_paste_in(&connection, &PasteText::new("犬猫".into()).unwrap()).unwrap();
+    write_position_in(&connection, partial.document_id, position(&partial, 3)).unwrap();
+    write_position_in(&connection, finished.document_id, position(&finished, 6)).unwrap();
+    record_reader_entry_in(&connection, partial.document_id).unwrap();
+    connection
+        .execute(
+            "UPDATE documents SET finished_at_least_once = 1 WHERE id = ?1",
+            [i64::from(finished.document_id)],
+        )
+        .unwrap();
+    drop(connection);
+
+    let mut storage = Storage::open(database.path()).unwrap();
+    assert_eq!(storage.schema_version().unwrap(), 2);
+    let summaries = storage.list_documents().unwrap();
+    assert_eq!(summaries.len(), 2);
+    assert_eq!(summaries[0].document_id, partial.document_id);
+    assert_eq!(summaries[0].progress_percent, 50);
+    assert_eq!(summaries[0].last_read_sequence, Some(1));
+    assert!(!summaries[0].is_read);
+    assert_eq!(summaries[1].document_id, finished.document_id);
+    assert_eq!(summaries[1].progress_percent, 100);
+    assert!(summaries[1].is_read);
+    for id in [partial.document_id, finished.document_id] {
+        assert_eq!(storage.load_paste(id).unwrap().unwrap().read_override, None);
+    }
+    assert!(storage
+        .connection
+        .execute("UPDATE documents SET read_override = 2", [])
+        .is_err());
+}
+
+#[test]
+fn manual_read_status_survives_restart_and_replay_until_a_new_finish() {
+    let database = TestDatabase::new();
+    let mut storage = Storage::open(database.path()).unwrap();
+    let document = paste(&mut storage, &format!("{}\n終。", "猫".repeat(500)));
+    let id = document.document_id;
+    let partial = position(&document, "猫".repeat(500).len() + 1);
+    storage.save_document_reading_position(id, partial).unwrap();
+    let before = storage.list_documents().unwrap().remove(0);
+    assert!(storage.set_document_read(id, true).unwrap());
+    let mut marked = before;
+    marked.is_read = true;
+    assert_eq!(storage.list_documents().unwrap(), [marked]);
+    drop(storage);
+
+    let mut storage = Storage::open(database.path()).unwrap();
+    let opened = storage.open_document_reader_snapshot(id).unwrap().unwrap();
+    assert_eq!(opened.document.reading_position, Some(partial));
+    assert!(opened.document.library_summary().unwrap().is_read);
+    assert!(!opened.document.finished_at_least_once);
+    let first = command(&mut storage, &document);
+    storage.record_effective_page_completion(&first).unwrap();
+    assert_eq!(storage.load_paste(id).unwrap().unwrap().read_override, None);
+    let mut expected = storage.list_documents().unwrap().remove(0);
+    assert!(expected.is_read);
+    assert_eq!(expected.progress_percent, 100);
+
+    storage
+        .connection
+        .execute_batch(
+            "CREATE TRIGGER fail_read_override BEFORE UPDATE OF read_override ON documents
+         BEGIN SELECT RAISE(ABORT, 'fixture'); END;",
+        )
+        .unwrap();
+    assert!(matches!(
+        storage.set_document_read(id, false),
+        Err(StorageError::Sqlite(_))
+    ));
+    assert_eq!(storage.list_documents().unwrap(), [expected.clone()]);
+    storage
+        .connection
+        .execute_batch("DROP TRIGGER fail_read_override")
+        .unwrap();
+    assert!(storage.set_document_read(id, false).unwrap());
+    expected.is_read = false;
+    assert!(!storage
+        .set_document_read(DocumentId::try_from(i64::MAX).unwrap(), true)
+        .unwrap());
+    drop(storage);
+
+    let mut storage = Storage::open(database.path()).unwrap();
+    assert_eq!(storage.list_documents().unwrap(), [expected.clone()]);
+    assert_eq!(
+        storage.record_effective_page_completion(&first).unwrap(),
+        AnalyzedCompletionOutcome::AlreadyRecorded
+    );
+    assert_eq!(storage.list_documents().unwrap(), [expected]);
+    let opened = storage.open_document_reader_snapshot(id).unwrap().unwrap();
+    assert!(opened.document.finished_at_least_once);
+    assert!(!opened.document.library_summary().unwrap().is_read);
+    assert_eq!(
+        opened.document.reading_position,
+        Some(position(&document, 0))
+    );
+    let moved = storage
+        .save_document_reading_position(id, partial)
+        .unwrap()
+        .unwrap();
+    assert!(!moved.library_summary().unwrap().is_read);
+    let reread = command(&mut storage, &document);
+    storage.record_effective_page_completion(&reread).unwrap();
+    assert!(storage.list_documents().unwrap()[0].is_read);
+    assert_eq!(storage.load_paste(id).unwrap().unwrap().read_override, None);
+    let count: i64 = storage
+        .connection
+        .query_row("SELECT COUNT(*) FROM reading_completions", [], |row| {
+            row.get(0)
+        })
+        .unwrap();
+    assert_eq!(count, 2);
+}
+
+#[test]
 fn finished_marker_survives_backward_position_reflow_reopen_and_each_reread() {
     let database = TestDatabase::new();
     let mut storage = Storage::open(database.path()).unwrap();
@@ -291,7 +412,7 @@ fn explicit_finished_open_resets_durably_but_loads_and_completion_reloads_keep_p
             .document,
         completed.clone().into()
     );
-    assert!(storage.list_documents().unwrap()[0].finished_at_least_once);
+    assert!(storage.list_documents().unwrap()[0].is_read);
     assert_eq!(storage.list_documents().unwrap()[0].progress_percent, 100);
 
     for length in PageLength::ALL {
@@ -335,7 +456,7 @@ fn explicit_finished_open_resets_durably_but_loads_and_completion_reloads_keep_p
         );
 
         let summary = &storage.list_documents().unwrap()[0];
-        assert!(summary.finished_at_least_once);
+        assert!(summary.is_read);
         assert_eq!(summary.progress_percent, 0);
         assert_eq!(
             storage

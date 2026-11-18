@@ -4,7 +4,7 @@ use yomoku_core::{
     document::{ChapterText, LibraryDocument, PastedDocument},
     library::LibrarySort,
     reader::{DocumentReaderSnapshot, ReaderAnalysis, ReaderChapterAnalysis},
-    storage::{DocumentError, StorageResult},
+    storage::{DocumentError, StorageOperation, StorageResult},
 };
 
 fn documents() -> Vec<LibraryDocument> {
@@ -21,7 +21,7 @@ fn documents() -> Vec<LibraryDocument> {
         title: title.into(),
         last_read_sequence: sequence,
         progress_percent: index as u64 * 10,
-        finished_at_least_once: index == 2,
+        is_read: index == 2,
     })
     .collect()
 }
@@ -137,6 +137,85 @@ fn hidden_sort_callbacks_cannot_change_session_sort() {
 }
 
 #[test]
+fn set_read_requires_a_visible_row_and_updates_only_after_matching_confirmation() {
+    let core = Core::<Yomoku>::new();
+    load(&core);
+    let before = core.view().documents;
+    let document_id = before[0].document_id;
+    let change = Event::SetDocumentRead {
+        document_id,
+        is_read: true,
+    };
+    assert!(core
+        .process_event(Event::SetDocumentRead {
+            document_id: 999.try_into().unwrap(),
+            is_read: true,
+        })
+        .is_empty());
+    core.process_event(Event::OpenSettings);
+    assert!(core.process_event(change.clone()).is_empty());
+    core.process_event(Event::CloseSettings);
+
+    let mut pending = core.process_event(change.clone());
+    assert!(pending.iter().any(|effect| matches!(effect,
+        Effect::Storage(request) if request.operation == StorageOperation::SetDocumentRead {
+            document_id,
+            is_read: true,
+        }
+    )));
+    assert!(core.view().storage_busy);
+    assert_eq!(core.view().documents, before);
+    assert!(core.process_event(change.clone()).is_empty());
+    assert!(core.process_event(Event::RefreshLibrary).is_empty());
+    finish(
+        &core,
+        &mut pending,
+        StorageResult::Failed(DocumentError::Unavailable),
+    );
+    assert_eq!(core.view().document_error, Some(DocumentError::Unavailable));
+    assert_eq!(core.view().documents, before);
+
+    let mut pending = core.process_event(change.clone());
+    finish(
+        &core,
+        &mut pending,
+        StorageResult::DocumentReadSet {
+            document_id: before[2].document_id,
+            is_read: true,
+        },
+    );
+    assert_eq!(core.view().documents, before);
+    let mut pending = core.process_event(change.clone());
+    finish(
+        &core,
+        &mut pending,
+        StorageResult::DocumentReadSet {
+            document_id,
+            is_read: true,
+        },
+    );
+    let mut marked = before.clone();
+    marked[0].is_read = true;
+    assert_eq!(core.view().documents, marked);
+    assert!(core.view().document_error.is_none());
+    assert!(core.process_event(change).is_empty());
+
+    let mut pending = core.process_event(Event::SetDocumentRead {
+        document_id,
+        is_read: false,
+    });
+    finish(
+        &core,
+        &mut pending,
+        StorageResult::DocumentReadSet {
+            document_id,
+            is_read: false,
+        },
+    );
+    assert_eq!(core.view().documents, before);
+}
+
+#[test]
 fn opened_snapshot_recency_survives_position_updates_and_duplicate_import_results() {
     let core = Core::<Yomoku>::new();
     load(&core);
@@ -144,6 +223,7 @@ fn opened_snapshot_recency_survives_position_updates_and_duplicate_import_result
         document_id: 1.try_into().unwrap(),
         title: "beta".into(),
         finished_at_least_once: false,
+        read_override: Some(true),
         chapter: ChapterText {
             source_id: 1.try_into().unwrap(),
             chapter_id: 1.try_into().unwrap(),
@@ -168,10 +248,12 @@ fn opened_snapshot_recency_survives_position_updates_and_duplicate_import_result
         }),
     );
     assert_eq!(ids(&core.view().documents), vec![1, 2, 3, 4]);
+    assert!(core.view().documents[0].is_read);
     let position = core.view().reader.unwrap().position;
     let mut effects = core.process_event(Event::SaveReadingPosition(position));
     finish(&core, &mut effects, StorageResult::PositionSaved(document));
     assert_eq!(core.view().documents[0].last_read_sequence, Some(3));
+    assert!(core.view().documents[0].is_read);
     core.process_event(Event::CloseDocument);
     let mut duplicate = core.view().documents[0].clone();
     duplicate.progress_percent = 77;

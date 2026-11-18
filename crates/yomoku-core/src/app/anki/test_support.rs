@@ -22,6 +22,7 @@ pub(super) fn fixture() -> (Model, AnkiSelection) {
         document_id: 3.try_into().unwrap(),
         title: "Anki current owner".into(),
         finished_at_least_once: false,
+        read_override: None,
         reading_position: None,
         chapters: vec![chapter.clone()],
         formatting: vec![],
