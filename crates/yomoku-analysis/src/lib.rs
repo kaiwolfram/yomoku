@@ -14,7 +14,7 @@ use sudachi::{
     sentence_detector::{NonBreakChecker, SentenceDetector},
 };
 use yomoku_core::{
-    analysis::{AnalysisProfile, AnalyzedToken, ChapterAnalysis, SplitMode},
+    analysis::{AnalysisProfile, AnalyzedToken, ChapterAnalysis, ImportAnalysis, SplitMode},
     document::{ChapterText, TextAnchor, TextOffset, TextRange},
     vocabulary::Surface,
 };
@@ -119,9 +119,17 @@ impl Analyzer {
         Ok(Self { dictionary })
     }
 
-    /// Production Mode C with joined conjugations and counters for new imports.
+    /// Mode C with the base conjugation and counter rules.
     pub fn analyze(&self, chapter: &ChapterText) -> Result<ChapterAnalysis, AnalysisError> {
         self.analyze_mode(chapter, SplitMode::default())
+    }
+
+    /// Import-only grammar repair, with context for dictionary matching on the I/O worker.
+    pub fn analyze_for_import(
+        &self,
+        chapter: &ChapterText,
+    ) -> Result<ImportAnalysis, AnalysisError> {
+        self.analyze_chapter(chapter, SplitMode::C, true)
     }
 
     /// A/B semantics and dictionary bytes are unchanged from version 1. Honor
@@ -132,8 +140,12 @@ impl Analyzer {
         mode: SplitMode,
         profile: &AnalysisProfile,
     ) -> Result<ChapterAnalysis, AnalysisError> {
-        use yomoku_core::analysis::{IMPORT_POLICY_SUFFIX, WORD_DICTIONARY_PREFIX};
-        let engine = profile.engine_revision.strip_suffix(IMPORT_POLICY_SUFFIX);
+        use yomoku_core::analysis::{
+            IMPORT_POLICY_SUFFIX, LEGACY_IMPORT_POLICY_SUFFIX, WORD_DICTIONARY_PREFIX,
+        };
+        let engine = [IMPORT_POLICY_SUFFIX, LEGACY_IMPORT_POLICY_SUFFIX]
+            .iter()
+            .find_map(|suffix| profile.engine_revision.strip_suffix(suffix));
         let dictionary = profile
             .dictionary_revision
             .split_once(WORD_DICTIONARY_PREFIX);
@@ -171,6 +183,15 @@ impl Analyzer {
         chapter: &ChapterText,
         mode: SplitMode,
     ) -> Result<ChapterAnalysis, AnalysisError> {
+        Ok(self.analyze_chapter(chapter, mode, false)?.analysis)
+    }
+
+    fn analyze_chapter(
+        &self,
+        chapter: &ChapterText,
+        mode: SplitMode,
+        for_import: bool,
+    ) -> Result<ImportAnalysis, AnalysisError> {
         let mut tokenizer = StatefulTokenizer::new(
             &self.dictionary,
             match mode {
@@ -183,6 +204,7 @@ impl Analyzer {
         let detector = SentenceDetector::with_limit(4096);
         let checker = NonBreakChecker::new(self.dictionary.lexicon());
         let mut tokens = Vec::new();
+        let mut context = Vec::new();
         let mut base = 0;
         while base < chapter.text.len() {
             let remaining = &chapter.text[base..];
@@ -227,10 +249,13 @@ impl Analyzer {
                     },
                     surface: surface.to_owned(),
                     is_japanese,
-                    reading: resolved
-                        .then(|| morpheme.reading_form())
-                        .filter(|reading| !reading.trim().is_empty())
-                        .map(str::to_owned),
+                    reading: (resolved
+                        || (for_import
+                            && conjugations::standalone_small_tsu(surface)
+                            && !morpheme.is_oov()))
+                    .then(|| morpheme.reading_form())
+                    .filter(|reading| !reading.trim().is_empty())
+                    .map(str::to_owned),
                     dictionary_form: resolved
                         .then(|| Surface::new(morpheme.dictionary_form()).ok())
                         .flatten(),
@@ -246,7 +271,12 @@ impl Analyzer {
                 }
             }
             if mode == SplitMode::C {
-                tokens.extend(conjugations::join(sentence));
+                for (token, grammar) in conjugations::join(&sentence, for_import) {
+                    tokens.push(token);
+                    if for_import {
+                        context.push(grammar);
+                    }
+                }
             }
             base += length;
         }
@@ -261,7 +291,10 @@ impl Analyzer {
         result
             .validate(chapter)
             .map_err(|_| AnalysisError::InvalidOutput)?;
-        Ok(result)
+        Ok(ImportAnalysis {
+            analysis: result,
+            context,
+        })
     }
 }
 

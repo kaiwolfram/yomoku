@@ -18,7 +18,8 @@ pub enum SplitMode {
 }
 
 /// Import policy metadata is independent of the raw analyzer's A/B semantics.
-pub const IMPORT_POLICY_SUFFIX: &str = ";yomoku-dictionary-refinement-v1";
+pub const LEGACY_IMPORT_POLICY_SUFFIX: &str = ";yomoku-dictionary-refinement-v1";
+pub const IMPORT_POLICY_SUFFIX: &str = ";yomoku-dictionary-refinement-v2";
 pub const WORD_DICTIONARY_PREFIX: &str = ";jmdict-jmnedict-sha256:";
 
 /// Exact engine revision and dictionary artifact identity, not a moving "latest".
@@ -44,6 +45,31 @@ pub struct ChapterAnalysis {
     pub profile: AnalysisProfile,
     pub mode: SplitMode,
     pub tokens: Vec<AnalyzedToken>,
+}
+
+/// Transient analyzer context aligned with Mode C tokens. Only the resulting
+/// ChapterAnalysis is stored; dictionary components still use raw A/B tokens.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct ImportTokenContext {
+    pub starts_sentence: bool,
+    pub standalone_grammar: bool,
+    pub inflected: bool,
+    pub pending_ending: bool,
+    pub preserve_join: bool,
+}
+
+pub struct ImportAnalysis {
+    pub analysis: ChapterAnalysis,
+    pub context: Vec<ImportTokenContext>,
+}
+
+impl From<ChapterAnalysis> for ImportAnalysis {
+    fn from(analysis: ChapterAnalysis) -> Self {
+        Self {
+            context: vec![ImportTokenContext::default(); analysis.tokens.len()],
+            analysis,
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

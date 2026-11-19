@@ -6,7 +6,7 @@ use std::{
 };
 
 use yomoku_core::{
-    analysis::{AnalysisProfile, ChapterAnalysis, SplitMode},
+    analysis::{AnalysisProfile, ChapterAnalysis, ImportAnalysis, SplitMode},
     document::{ChapterText, PasteText, ReaderDocument},
     imports::{EpubImport, SrtImport, TextEncoding, TxtImport},
     storage::{DocumentError, StorageResult},
@@ -29,6 +29,13 @@ use yomoku_storage::dictionary::Dictionary;
 /// A closure capturing a Sudachi Analyzer implements this without requiring Send.
 pub trait PasteAnalyzer {
     fn analyze(&mut self, chapter: &ChapterText) -> Result<ChapterAnalysis, DocumentError>;
+
+    fn analyze_for_import(
+        &mut self,
+        chapter: &ChapterText,
+    ) -> Result<ImportAnalysis, DocumentError> {
+        self.analyze(chapter).map(ImportAnalysis::from)
+    }
 
     /// Dictionary component analysis only. Implementations must honor the pinned
     /// import profile; a newer engine/dictionary cannot reinterpret old content.
@@ -267,7 +274,7 @@ impl Imports {
         if self.analyzer.is_none() {
             self.analyzer = Some((self.loader)()?);
         }
-        let mut refinement = Refinement::new(load_dictionary()?);
+        let mut refinement = Refinement::new(load_dictionary()?)?;
         let analyzer = self.analyzer.as_mut().expect("loaded analyzer");
         match storage.import_prepared_txt(
             prepared,
@@ -339,7 +346,7 @@ impl Imports {
         if self.analyzer.is_none() {
             self.analyzer = Some((self.loader)()?);
         }
-        let mut refinement = Refinement::new(load_dictionary()?);
+        let mut refinement = Refinement::new(load_dictionary()?)?;
         let analyzer = self.analyzer.as_mut().expect("loaded analyzer");
         match storage.import_prepared_srt(
             prepared,
@@ -403,7 +410,7 @@ impl Imports {
         if self.analyzer.is_none() {
             self.analyzer = Some((self.loader)()?);
         }
-        let mut refinement = Refinement::new(load_dictionary()?);
+        let mut refinement = Refinement::new(load_dictionary()?)?;
         let analyzer = self.analyzer.as_mut().expect("loaded analyzer");
         match storage.import_prepared_epub(
             prepared,
@@ -469,7 +476,7 @@ impl Imports {
         // Wall time dates registration history; active reading uses a separate
         // monotonic clock and is never started/committed by an import.
         let timestamp = registration_timestamp()?;
-        let mut refinement = Refinement::new(load_dictionary()?);
+        let mut refinement = Refinement::new(load_dictionary()?)?;
         let analyzer = self.analyzer.as_mut().expect("loaded analyzer");
         let result = storage.import_analyzed_paste(paste, timestamp, |chapter| {
             refinement.analyze(analyzer.as_mut(), chapter)

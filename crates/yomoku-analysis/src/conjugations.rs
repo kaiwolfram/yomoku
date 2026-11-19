@@ -1,6 +1,9 @@
 //! Production Mode C post-processing; A/B output stays raw for dictionary lookup.
 
-use yomoku_core::{analysis::AnalyzedToken, vocabulary::Surface};
+use yomoku_core::{
+    analysis::{AnalyzedToken, ImportTokenContext},
+    vocabulary::Surface,
+};
 
 pub(super) struct Morpheme {
     pub token: AnalyzedToken,
@@ -30,6 +33,10 @@ impl Morpheme {
         self.conjugates() && self.pos(5).starts_with("連用形")
     }
 
+    fn adjectival(&self) -> bool {
+        self.pos(0) == "形容詞" || (self.pos(0) == "接尾辞" && self.pos(1) == "形容詞的")
+    }
+
     fn ending_after(&self, previous: &Self) -> bool {
         self.token.is_japanese
             && self.conjugates()
@@ -38,7 +45,7 @@ impl Morpheme {
                 || (self.pos(0) == "形容詞"
                     && self.pos(1) == "非自立可能"
                     && self.normalized_form == "無い"
-                    && previous.pos(0) == "形容詞"
+                    && previous.adjectival()
                     && previous.continuative()))
     }
 
@@ -73,44 +80,93 @@ impl Morpheme {
             && self.pos(2) == "助数詞"
             && previous.adjacent(self)
     }
+
+    fn small_tsu_suffix(&self) -> bool {
+        self.pos(0) == "接尾辞" && self.token.surface.starts_with(['っ', 'ッ', 'ｯ'])
+    }
 }
 
-/// Called separately for each detector sentence: neither source gaps nor sentence
-/// boundaries can be swallowed. A connector is consumed only with a valid helper.
-pub(super) fn join(morphemes: Vec<Morpheme>) -> Vec<AnalyzedToken> {
-    let mut output = Vec::with_capacity(morphemes.len());
+pub(super) fn standalone_small_tsu(surface: &str) -> bool {
+    matches!(surface, "っ" | "ッ" | "ｯ")
+}
+
+/// Called separately for each detector sentence, preserving gaps and boundaries.
+pub(super) fn join(
+    morphemes: &[Morpheme],
+    for_import: bool,
+) -> impl Iterator<Item = (AnalyzedToken, ImportTokenContext)> + '_ {
     let mut index = 0;
-    while index < morphemes.len() {
-        let head = &morphemes[index];
+    std::iter::from_fn(move || {
+        let head = morphemes.get(index)?;
         let mut end = index + 1;
+        let mut grammatical = index;
+        let mut suffix = None;
+        let mut preserve_join = false;
         let counted = morphemes
             .get(end)
             .is_some_and(|next| next.counter_after(head));
         if counted {
+            preserve_join =
+                for_import && head.token.is_japanese && morphemes[end].small_tsu_suffix();
             end += 1;
-        } else if head.head() {
-            while end < morphemes.len() {
-                let previous = &morphemes[end - 1];
-                let next = &morphemes[end];
-                if !previous.adjacent(next) {
-                    break;
-                }
-                if next.ending_after(previous) {
+        }
+        let mut pending_ending = false;
+        while let Some(next) = morphemes.get(end) {
+            if !morphemes[end - 1].adjacent(next) {
+                break;
+            }
+            if for_import && head.token.is_japanese {
+                if standalone_small_tsu(&next.token.surface) {
+                    preserve_join = true;
                     end += 1;
-                } else if previous.continuative()
-                    && next.connector()
-                    && morphemes
-                        .get(end + 1)
-                        .is_some_and(|helper| next.adjacent(helper) && helper.helper())
+                    continue;
+                }
+                if next.small_tsu_suffix() {
+                    preserve_join = true;
+                    suffix = Some(end);
+                    grammatical = end;
+                    end += 1;
+                    continue;
+                }
+            }
+            if !head.head() && suffix.is_none() {
+                break;
+            }
+            let previous = &morphemes[grammatical];
+            if next.ending_after(previous) {
+                grammatical = end;
+                end += 1;
+            } else if previous.continuative() && next.connector() {
+                let small_tsu_connector = for_import
+                    && previous.pos(0) == "動詞"
+                    && (previous.pos(5) == "連用形-促音便" || grammatical < end - 1)
+                    && next.token.surface == "て";
+                if morphemes
+                    .get(end + 1)
+                    .is_some_and(|helper| next.adjacent(helper) && helper.helper())
                 {
+                    preserve_join |= small_tsu_connector;
+                    grammatical = end + 1;
                     end += 2;
+                } else if small_tsu_connector {
+                    preserve_join = true;
+                    grammatical = end;
+                    end += 1;
                 } else {
+                    pending_ending = true;
                     break;
                 }
+            } else {
+                break;
             }
         }
         let mut token = head.token.clone();
-        for part in &morphemes[index + 1..end] {
+        for (part_index, part) in (index + 1..end).zip(&morphemes[index + 1..end]) {
+            if suffix == Some(part_index) {
+                token.dictionary_form = part.token.dictionary_form.as_ref().and_then(|base| {
+                    Surface::new(format!("{}{}", token.surface, base.as_str())).ok()
+                });
+            }
             token.surface.push_str(&part.token.surface);
             token.anchor.range.end = part.token.anchor.range.end;
             token.is_japanese |= part.token.is_japanese;
@@ -123,14 +179,24 @@ pub(super) fn join(morphemes: Vec<Morpheme>) -> Vec<AnalyzedToken> {
                         reading
                     });
         }
-        if counted {
+        if counted && suffix.is_none() {
             // A numeral's lemma would add unrelated number-only lookup results.
             token.dictionary_form = Surface::new(&token.surface).ok();
         }
-        output.push(token);
+        let lemma_head = suffix.unwrap_or(index);
+        let lemma = &morphemes[lemma_head];
+        let context = ImportTokenContext {
+            starts_sentence: index == 0,
+            standalone_grammar: matches!(head.pos(0), "助詞" | "助動詞"),
+            inflected: lemma.conjugates()
+                && (grammatical > lemma_head
+                    || !matches!(lemma.pos(5), "終止形-一般" | "連体形-一般")),
+            pending_ending,
+            preserve_join,
+        };
         index = end;
-    }
-    output
+        Some((token, context))
+    })
 }
 
 #[cfg(test)]
@@ -140,6 +206,10 @@ mod tests {
         document::{TextAnchor, TextOffset, TextRange},
         vocabulary::Surface,
     };
+
+    fn tokens(morphemes: Vec<Morpheme>) -> Vec<AnalyzedToken> {
+        join(&morphemes, false).map(|(token, _)| token).collect()
+    }
 
     #[test]
     fn counter_joining_requires_both_pos_tags_and_exact_adjacency() {
@@ -171,7 +241,7 @@ mod tests {
             (numeral, suffix, 0, 2),
             (numeral, counter, 1, 2),
         ] {
-            let joined = join(vec![
+            let joined = tokens(vec![
                 morpheme("ひと", 0, head),
                 morpheme("つ", "ひと".len() as i64 + gap, tail),
             ]);
@@ -184,6 +254,16 @@ mod tests {
                 );
             }
         }
+
+        let counted = [
+            morpheme("一", 0, numeral),
+            morpheme("ッ", "一".len() as i64, counter),
+        ];
+        let mut joined = join(&counted, true);
+        let (token, context) = joined.next().unwrap();
+        assert_eq!(token.surface, "一ッ");
+        assert!(context.preserve_join);
+        assert!(joined.next().is_none());
     }
 
     #[test]
@@ -217,7 +297,7 @@ mod tests {
                         normalized_form: base.into(),
                     }
                 };
-            let output = join(vec![
+            let output = tokens(vec![
                 morpheme("食べ", 0i64, 6i64, "動詞", "食べる", head_reading),
                 morpheme("た", 6, 9, "助動詞", "た", ending_reading),
             ]);

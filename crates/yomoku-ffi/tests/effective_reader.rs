@@ -245,9 +245,14 @@ fn serialized_missing_analysis_and_legacy_commands_fail_closed() {
 #[ignore = "requires pinned Sudachi Full; run tools/test-sudachi.sh"]
 fn native_previous_profile_book_lazily_loads_components_without_changing_boundaries() {
     use std::{fs::File, os::fd::IntoRawFd};
-    use yomoku_analysis::{Analyzer, LEGACY_ENGINE_REVISION};
-    use yomoku_core::{effective_session::EffectiveReaderSelection, vocabulary::VocabularyStatus};
+    use yomoku_analysis::Analyzer;
+    use yomoku_core::{
+        analysis::{LEGACY_IMPORT_POLICY_SUFFIX, WORD_DICTIONARY_PREFIX},
+        effective_session::EffectiveReaderSelection,
+        vocabulary::VocabularyStatus,
+    };
     use yomoku_ffi::native::{DictionaryProvider, EffectsListener, NativeBridge};
+    use yomoku_storage::dictionary::IMPORT_DICTIONARY_SHA256;
 
     struct Provider(PathBuf, PathBuf);
     impl DictionaryProvider for Provider {
@@ -278,22 +283,31 @@ fn native_previous_profile_book_lazily_loads_components_without_changing_boundar
     let mut storage = Storage::open(f.path()).unwrap();
     let yomoku_storage::PasteImportOutcome::Created(imported) = storage
         .import_analyzed_paste(
-            &PasteText::new("食べました。".into()).unwrap(),
+            &PasteText::new("その日。食べました。".into()).unwrap(),
             100,
             |chapter| {
-                // For this fixture raw B and original raw C are identical. Pin the
-                // exact old surfaces and profile; no component cache is supplied.
-                let mut original = engine.analyze_mode(chapter, SplitMode::B)?;
+                // These are the saved v1 boundaries. The v2 matcher would join その日.
+                let mut original = engine.analyze(chapter)?;
                 assert_eq!(
                     original
                         .tokens
                         .iter()
                         .map(|t| t.surface.as_str())
                         .collect::<Vec<_>>(),
-                    ["食べ", "まし", "た", "。"]
+                    ["その", "日", "。", "食べました", "。"]
                 );
-                original.mode = SplitMode::C;
-                original.profile.engine_revision = LEGACY_ENGINE_REVISION.into();
+                original
+                    .profile
+                    .engine_revision
+                    .push_str(LEGACY_IMPORT_POLICY_SUFFIX);
+                original
+                    .profile
+                    .dictionary_revision
+                    .push_str(WORD_DICTIONARY_PREFIX);
+                original
+                    .profile
+                    .dictionary_revision
+                    .push_str(IMPORT_DICTIONARY_SHA256);
                 Ok::<_, yomoku_analysis::AnalysisError>(original)
             },
         )
@@ -305,7 +319,7 @@ fn native_previous_profile_book_lazily_loads_components_without_changing_boundar
         .chapter_analysis(imported.analysis_id)
         .unwrap()
         .unwrap();
-    let surface = Surface::new("食べ").unwrap();
+    let surface = Surface::new("食べました").unwrap();
     let entry = storage.vocabulary_entry(&surface).unwrap().unwrap();
     storage
         .set_vocabulary_status(entry.id, VocabularyStatus::Familiar, 200)
@@ -357,9 +371,9 @@ fn native_previous_profile_book_lazily_loads_components_without_changing_boundar
             .iter()
             .map(|t| t.surface.as_str())
             .collect::<Vec<_>>(),
-        ["食べ", "まし", "た"]
+        ["その", "日", "食べました"]
     );
-    let selected = &page.tokens[0];
+    let selected = &page.tokens[2];
     assert_eq!(
         selected.vocabulary.unwrap().status,
         VocabularyStatus::Familiar
@@ -369,12 +383,17 @@ fn native_previous_profile_book_lazily_loads_components_without_changing_boundar
         segment_index: selected.segment_index,
     }));
     let details = view.effective_reader_word.unwrap().details.unwrap();
-    assert_eq!(details.token.surface, "食べ");
+    assert_eq!(details.token.surface, "食べました");
     assert_eq!(
         details.candidates.dictionary_form.as_deref(),
         Some("食べる")
     );
     assert!(!details.candidates.words.is_empty());
+    assert!(details
+        .lookup
+        .parts
+        .iter()
+        .any(|part| part.surface == "食べ" && part.dictionary_form.as_deref() == Some("食べる")));
     let mut storage = Storage::open(f.path()).unwrap();
     assert_eq!(
         storage
@@ -393,7 +412,7 @@ fn native_previous_profile_book_lazily_loads_components_without_changing_boundar
             .unwrap());
     }
     assert!(storage
-        .vocabulary_entry(&Surface::new("食べました").unwrap())
+        .vocabulary_entry(&Surface::new("その日").unwrap())
         .unwrap()
         .is_none());
     assert_eq!(

@@ -67,6 +67,64 @@ fn surfaces(result: &ChapterAnalysis) -> Vec<&str> {
 
 #[test]
 #[ignore = "requires pinned Sudachi Full; run tools/test-sudachi.sh"]
+fn import_grammar_repairs_small_tsu_and_retains_particle_and_source_boundaries() {
+    for (text, expected) in [
+        (
+            "すごっ。すごッ。すごｯ。",
+            vec!["すごっ", "。", "すごッ", "。", "すごｯ", "。"],
+        ),
+        (
+            "端っこ。猫っぽかった。猫っぽくない。",
+            vec!["端っこ", "。", "猫っぽかった", "。", "猫っぽくない", "。"],
+        ),
+        (
+            "走って帰る。走っている。",
+            vec!["走って", "帰る", "。", "走っている", "。"],
+        ),
+        (
+            "それって何だっけ。",
+            vec!["それ", "って", "何", "だ", "っけ", "。"],
+        ),
+        (
+            "猫 っ。猫、っ。猫。っ。猫\nっ。",
+            vec![
+                "猫", "っ", "。", "猫", "、", "っ", "。", "猫", "。", "っ", "。", "猫", "っ", "。",
+            ],
+        ),
+        (
+            "走っ て。走っ、て。",
+            vec!["走っ", "て", "。", "走っ", "、", "て", "。"],
+        ),
+    ] {
+        let chapter = chapter(text);
+        let result = analyzer().analyze_for_import(&chapter).unwrap();
+        result.analysis.validate(&chapter).unwrap();
+        assert_eq!(surfaces(&result.analysis), expected, "{text}");
+        for (token, context) in result.analysis.tokens.iter().zip(result.context) {
+            assert_eq!(token.anchor.slice(&chapter).unwrap(), token.surface);
+            match token.surface.as_str() {
+                "すごっ" | "すごッ" | "すごｯ" => {
+                    assert!(context.preserve_join);
+                    assert_eq!(token.dictionary_form.as_ref().unwrap().as_str(), "すごい");
+                    assert_eq!(token.reading.as_deref(), Some("スゴッ"));
+                }
+                "猫っぽかった" | "猫っぽくない" => {
+                    assert!(context.preserve_join && context.inflected);
+                    assert_eq!(token.dictionary_form.as_ref().unwrap().as_str(), "猫っぽい");
+                }
+                "走って" => {
+                    assert!(context.preserve_join && context.inflected);
+                    assert_eq!(token.dictionary_form.as_ref().unwrap().as_str(), "走る");
+                }
+                "って" | "っけ" => assert!(context.standalone_grammar),
+                _ => {}
+            }
+        }
+    }
+}
+
+#[test]
+#[ignore = "requires pinned Sudachi Full; run tools/test-sudachi.sh"]
 fn mapped_and_owned_outputs_are_identical_including_profiles_and_anchors() {
     let path = std::env::var_os("YOMOKU_SUDACHI_DICTIONARY")
         .map(PathBuf::from)
@@ -1157,7 +1215,9 @@ fn previous_profile_supports_uncached_raw_components_but_cannot_be_retokenized()
     use yomoku_analysis::{
         AnalysisError, CONJUGATION_ENGINE_REVISION, COPULA_ENGINE_REVISION, LEGACY_ENGINE_REVISION,
     };
-    use yomoku_core::analysis::{AnalysisProfile, IMPORT_POLICY_SUFFIX, WORD_DICTIONARY_PREFIX};
+    use yomoku_core::analysis::{
+        AnalysisProfile, IMPORT_POLICY_SUFFIX, LEGACY_IMPORT_POLICY_SUFFIX, WORD_DICTIONARY_PREFIX,
+    };
     let input = chapter("食べました。ひとつ。国家公務員。");
     let mut profile = AnalysisProfile {
         engine_revision: LEGACY_ENGINE_REVISION.into(),
@@ -1169,11 +1229,15 @@ fn previous_profile_supports_uncached_raw_components_but_cannot_be_retokenized()
         COPULA_ENGINE_REVISION,
         ENGINE_REVISION,
     ] {
-        for refined in [false, true] {
+        for suffix in [
+            None,
+            Some(LEGACY_IMPORT_POLICY_SUFFIX),
+            Some(IMPORT_POLICY_SUFFIX),
+        ] {
             profile.engine_revision = revision.into();
             profile.dictionary_revision = DICTIONARY_REVISION.into();
-            if refined {
-                profile.engine_revision.push_str(IMPORT_POLICY_SUFFIX);
+            if let Some(suffix) = suffix {
+                profile.engine_revision.push_str(suffix);
                 profile.dictionary_revision.push_str(&format!(
                     "{WORD_DICTIONARY_PREFIX}{}",
                     yomoku_storage::dictionary::IMPORT_DICTIONARY_SHA256

@@ -17,6 +17,36 @@ const SCHEMA_VERSION: i64 = 1;
 const LOOKUP_SQL: &str = "SELECT e.source, e.entry_id, e.payload
     FROM forms f JOIN entries e ON e.source = f.source AND e.entry_id = f.entry_id
     WHERE f.surface = ?1 COLLATE BINARY ORDER BY e.source, e.entry_id";
+const FIRST_FORM_SQL: &str =
+    "SELECT surface FROM forms WHERE surface >= ?1 COLLATE BINARY ORDER BY surface LIMIT 1";
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum IndexedForm {
+    Missing,
+    Prefix,
+    Exact,
+}
+
+pub struct FormIndex<'a>(rusqlite::Statement<'a>);
+
+impl FormIndex<'_> {
+    /// One ordered index seek answers exact membership and prefix viability.
+    fn first(&mut self, prefix: &str) -> Result<Option<String>, DictionaryError> {
+        use rusqlite::OptionalExtension;
+        Ok(self.0.query_row([prefix], |row| row.get(0)).optional()?)
+    }
+
+    pub fn find(&mut self, form: &str) -> Result<IndexedForm, DictionaryError> {
+        if form.trim().is_empty() {
+            return Err(DictionaryError::InvalidQuery);
+        }
+        Ok(match self.first(form)?.as_deref() {
+            Some(first) if first == form => IndexedForm::Exact,
+            Some(first) if first.starts_with(form) => IndexedForm::Prefix,
+            _ => IndexedForm::Missing,
+        })
+    }
+}
 
 #[derive(Debug)]
 pub enum DictionaryError {
@@ -86,14 +116,8 @@ impl Dictionary {
         )?)
     }
 
-    /// One ordered index seek answers exact membership and prefix viability.
-    /// Payloads are intentionally left unread until a choice is active.
-    fn first_form(
-        statement: &mut rusqlite::Statement<'_>,
-        prefix: &str,
-    ) -> Result<Option<String>, DictionaryError> {
-        use rusqlite::OptionalExtension;
-        Ok(statement.query_row([prefix], |row| row.get(0)).optional()?)
+    pub fn form_index(&self) -> Result<FormIndex<'_>, DictionaryError> {
+        Ok(FormIndex(self.connection.prepare(FIRST_FORM_SQL)?))
     }
 
     pub fn parts(
@@ -105,9 +129,7 @@ impl Dictionary {
             dictionary::DictionaryPart,
             document::{TextOffset, TextRange},
         };
-        let mut statement = self.connection.prepare(
-            "SELECT surface FROM forms WHERE surface >= ?1 COLLATE BINARY ORDER BY surface LIMIT 1",
-        )?;
+        let mut index = self.form_index()?;
         let mut parts: Vec<DictionaryPart> = Vec::new();
         let mut retain = |part: DictionaryPart| {
             if let Some(existing) = parts.iter_mut().find(|old| old.surface == part.surface) {
@@ -125,14 +147,13 @@ impl Dictionary {
             {
                 continue;
             }
-            let exact = Self::first_form(&mut statement, &component.surface)?.as_deref()
-                == Some(&component.surface);
+            let exact = index.find(&component.surface)? == IndexedForm::Exact;
             let base = match component
                 .dictionary_form
                 .as_deref()
                 .filter(|base| !base.trim().is_empty())
             {
-                Some(base) => Self::first_form(&mut statement, base)?.as_deref() == Some(base),
+                Some(base) => index.find(base)? == IndexedForm::Exact,
                 None => false,
             };
             if exact || base {
@@ -143,7 +164,7 @@ impl Dictionary {
             for (offset, scalar) in surface[start..].char_indices() {
                 let end = start + offset + scalar.len_utf8();
                 let part = &surface[start..end];
-                let Some(first) = Self::first_form(&mut statement, part)? else {
+                let Some(first) = index.first(part)? else {
                     break;
                 };
                 if !first.starts_with(part) {

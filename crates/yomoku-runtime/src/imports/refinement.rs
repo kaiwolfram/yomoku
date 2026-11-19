@@ -3,36 +3,138 @@ use super::PasteAnalyzer;
 use std::collections::HashMap;
 use yomoku_core::{
     analysis::{
-        AnalyzedToken, ChapterAnalysis, SplitMode, IMPORT_POLICY_SUFFIX, WORD_DICTIONARY_PREFIX,
+        AnalyzedToken, ChapterAnalysis, ImportAnalysis, ImportTokenContext, SplitMode,
+        IMPORT_POLICY_SUFFIX, WORD_DICTIONARY_PREFIX,
     },
-    document::ChapterText,
+    document::{ChapterText, TextRange},
     storage::DocumentError,
+    vocabulary::Surface,
 };
-use yomoku_storage::dictionary::{Dictionary, IMPORT_DICTIONARY_SHA256};
+use yomoku_storage::dictionary::{Dictionary, FormIndex, IndexedForm, IMPORT_DICTIONARY_SHA256};
 
 pub(super) struct Refinement<'a> {
     dictionary: &'a Dictionary,
-    membership: HashMap<String, bool>,
+    index: FormIndex<'a>,
+    forms: HashMap<String, IndexedForm>,
+    readings: HashMap<String, Option<String>>,
 }
 
 impl<'a> Refinement<'a> {
-    pub(super) fn new(dictionary: &'a Dictionary) -> Self {
-        Self {
+    pub(super) fn new(dictionary: &'a Dictionary) -> Result<Self, DocumentError> {
+        Ok(Self {
             dictionary,
-            membership: HashMap::new(),
+            index: dictionary
+                .form_index()
+                .map_err(|_| DocumentError::Unavailable)?,
+            forms: HashMap::new(),
+            readings: HashMap::new(),
+        })
+    }
+
+    fn indexed_form(&mut self, form: &str) -> Result<IndexedForm, DocumentError> {
+        if let Some(indexed) = self.forms.get(form) {
+            return Ok(*indexed);
         }
+        let indexed = self
+            .index
+            .find(form)
+            .map_err(|_| DocumentError::Unavailable)?;
+        self.forms.insert(form.to_owned(), indexed);
+        Ok(indexed)
     }
 
     fn contains(&mut self, form: &str) -> Result<bool, DocumentError> {
-        if let Some(found) = self.membership.get(form) {
-            return Ok(*found);
+        Ok(self.indexed_form(form)? == IndexedForm::Exact)
+    }
+
+    /// Load only the selected compound's reading, in dictionary order, with
+    /// JMdict preferred when both sources contain the matched form.
+    fn reading(&mut self, form: &str) -> Result<Option<String>, DocumentError> {
+        if let Some(reading) = self.readings.get(form) {
+            return Ok(reading.clone());
         }
-        let found = self
+        let candidates = self
             .dictionary
-            .contains(form)
+            .lookup(form, None)
             .map_err(|_| DocumentError::Unavailable)?;
-        self.membership.insert(form.to_owned(), found);
-        Ok(found)
+        let reading = candidates
+            .words
+            .iter()
+            .find_map(|word| {
+                let matched = word.forms.first()?.matches.first()?;
+                Some(&word.entry.readings[matched.reading.reading_index].text)
+            })
+            .or_else(|| {
+                candidates.names.iter().find_map(|name| {
+                    let matched = name.forms.first()?.matches.first()?;
+                    Some(&name.entry.readings[matched.reading_index].text)
+                })
+            })
+            .cloned();
+        self.readings.insert(form.to_owned(), reading.clone());
+        Ok(reading)
+    }
+
+    fn longest_compound(
+        &mut self,
+        chapter: &ChapterText,
+        tokens: &[AnalyzedToken],
+        context: &[ImportTokenContext],
+    ) -> Result<Option<(usize, AnalyzedToken)>, DocumentError> {
+        let first = &tokens[0];
+        let mut longest = None;
+        let start = first.anchor.range.start;
+        let mut end = first.anchor.range.end;
+        if !first.is_japanese || context[0].standalone_grammar {
+            return Ok(None);
+        }
+        for (index, (token, grammar)) in tokens.iter().zip(context).enumerate().skip(1) {
+            if !token.is_japanese
+                || grammar.standalone_grammar
+                || grammar.starts_sentence
+                || end != token.anchor.range.start
+            {
+                break;
+            }
+            let prefix = TextRange { start, end }
+                .slice(&chapter.text)
+                .map_err(|_| DocumentError::InvalidDocument)?;
+            if self.indexed_form(prefix)? == IndexedForm::Missing {
+                break;
+            }
+            end = token.anchor.range.end;
+            let surface = TextRange { start, end }
+                .slice(&chapter.text)
+                .map_err(|_| DocumentError::InvalidDocument)?;
+            let indexed = self.indexed_form(surface)?;
+            let exact = indexed == IndexedForm::Exact && !grammar.pending_ending;
+            let mut base = None;
+            if grammar.inflected {
+                if let Some(lemma) = token
+                    .dictionary_form
+                    .as_ref()
+                    .filter(|lemma| lemma.as_str() != token.surface)
+                {
+                    let candidate = format!("{prefix}{}", lemma.as_str());
+                    if self.contains(&candidate)? {
+                        base = Some(candidate);
+                    }
+                }
+            }
+            if exact || base.is_some() {
+                longest = Some((index + 1, surface, end, exact, base));
+            }
+        }
+        let Some((consumed, surface, end, exact, base)) = longest else {
+            return Ok(None);
+        };
+        let mut compound = first.clone();
+        compound.anchor.range.end = end;
+        compound.surface = surface.to_owned();
+        let base = base.as_deref().unwrap_or(surface);
+        compound.dictionary_form = Surface::new(base).ok();
+        compound.reading = self.reading(if exact { surface } else { base })?;
+        Ok(Some((consumed, compound)))
     }
 
     fn matches(&mut self, token: &AnalyzedToken) -> Result<bool, DocumentError> {
@@ -86,18 +188,31 @@ impl<'a> Refinement<'a> {
         analyzer: &mut dyn PasteAnalyzer,
         chapter: &ChapterText,
     ) -> Result<ChapterAnalysis, DocumentError> {
-        let mut original = analyzer.analyze(chapter)?;
+        let ImportAnalysis {
+            analysis: mut original,
+            context,
+        } = analyzer.analyze_for_import(chapter)?;
         original
             .validate(chapter)
             .map_err(|_| DocumentError::InvalidDocument)?;
-        if original.mode != SplitMode::C {
+        if original.mode != SplitMode::C || original.tokens.len() != context.len() {
             return Err(DocumentError::InvalidDocument);
         }
         let mut b = None;
         let mut a = None;
         let mut tokens = Vec::with_capacity(original.tokens.len());
-        for token in &original.tokens {
-            if !token.is_japanese || self.matches(token)? {
+        let mut index = 0;
+        while let Some(token) = original.tokens.get(index) {
+            if let Some((consumed, compound)) =
+                self.longest_compound(chapter, &original.tokens[index..], &context[index..])?
+            {
+                tokens.push(compound);
+                index += consumed;
+                continue;
+            }
+            let preserve_join = context[index].preserve_join;
+            index += 1;
+            if !token.is_japanese || preserve_join || self.matches(token)? {
                 tokens.push(token.clone());
                 continue;
             }
@@ -165,6 +280,53 @@ mod tests {
         vocabulary::Surface,
     };
 
+    fn pinned_dictionary() -> Dictionary {
+        let path = std::env::var_os("YOMOKU_WORD_DICTIONARY")
+            .map(PathBuf::from)
+            .unwrap_or_else(|| {
+                PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                    .join("../../.local/dictionaries/index-v1-20261025/dictionary.sqlite3")
+            });
+        Dictionary::open(path).unwrap()
+    }
+
+    fn chapter(text: &str) -> ChapterText {
+        ChapterText {
+            source_id: 1.try_into().unwrap(),
+            chapter_id: 1.try_into().unwrap(),
+            text: text.into(),
+        }
+    }
+
+    fn tokens(
+        chapter: &ChapterText,
+        parts: impl IntoIterator<Item = String>,
+    ) -> Vec<AnalyzedToken> {
+        let mut start = 0;
+        parts
+            .into_iter()
+            .map(|surface| {
+                let end = start + surface.len();
+                let token = AnalyzedToken {
+                    anchor: TextAnchor {
+                        source_id: chapter.source_id,
+                        chapter_id: chapter.chapter_id,
+                        range: TextRange {
+                            start: TextOffset::at(&chapter.text, start).unwrap(),
+                            end: TextOffset::at(&chapter.text, end).unwrap(),
+                        },
+                    },
+                    dictionary_form: Some(Surface::new(&surface).unwrap()),
+                    surface,
+                    is_japanese: true,
+                    reading: None,
+                };
+                start = end;
+                token
+            })
+            .collect()
+    }
+
     struct FixtureAnalyzer;
     impl PasteAnalyzer for FixtureAnalyzer {
         fn analyze(&mut self, chapter: &ChapterText) -> Result<ChapterAnalysis, DocumentError> {
@@ -193,33 +355,10 @@ mod tests {
                 SplitMode::B => vec!["東京大学".into(), format!("制服{last}")],
                 SplitMode::A => vec!["東京".into(), "大学".into(), "制服".into(), last.into()],
             };
-            let mut start = 0;
-            let tokens = parts
-                .into_iter()
-                .map(|surface| {
-                    let end = start + surface.len();
-                    let token = AnalyzedToken {
-                        anchor: TextAnchor {
-                            source_id: chapter.source_id,
-                            chapter_id: chapter.chapter_id,
-                            range: TextRange {
-                                start: TextOffset::at(&chapter.text, start).unwrap(),
-                                end: TextOffset::at(&chapter.text, end).unwrap(),
-                            },
-                        },
-                        dictionary_form: Some(Surface::new(&surface).unwrap()),
-                        surface,
-                        is_japanese: true,
-                        reading: None,
-                    };
-                    start = end;
-                    token
-                })
-                .collect();
             Ok(ChapterAnalysis {
                 profile: profile.clone(),
                 mode,
-                tokens,
+                tokens: tokens(chapter, parts),
             })
         }
     }
@@ -228,23 +367,14 @@ mod tests {
     #[ignore = "requires bundled word dictionary; run tools/test-sudachi.sh"]
     fn real_membership_keeps_larger_b_parts_refines_only_missing_parts_and_rejects_incomplete_coverage(
     ) {
-        let path = std::env::var_os("YOMOKU_WORD_DICTIONARY")
-            .map(PathBuf::from)
-            .unwrap_or_else(|| {
-                PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-                    .join("../../.local/dictionaries/index-v1-20261025/dictionary.sqlite3")
-            });
-        let dictionary = Dictionary::open(path).unwrap();
+        let dictionary = pinned_dictionary();
         for (text, expected) in [
             ("東京大学制服姿", vec!["東京大学", "制服", "姿"]),
             ("東京大学制服𰻞", vec!["東京大学制服𰻞"]),
         ] {
-            let chapter = ChapterText {
-                source_id: 1.try_into().unwrap(),
-                chapter_id: 1.try_into().unwrap(),
-                text: text.into(),
-            };
+            let chapter = chapter(text);
             let result = Refinement::new(&dictionary)
+                .unwrap()
                 .analyze(&mut FixtureAnalyzer, &chapter)
                 .unwrap();
             assert_eq!(
@@ -256,6 +386,59 @@ mod tests {
                 expected
             );
             result.validate(&chapter).unwrap();
+        }
+    }
+
+    #[test]
+    #[ignore = "requires bundled word dictionary; run tools/test-sudachi.sh"]
+    fn real_compound_search_prefers_longest_then_leftmost_and_respects_grammar() {
+        let dictionary = pinned_dictionary();
+        let mut refinement = Refinement::new(&dictionary).unwrap();
+        let context = [ImportTokenContext::default(); 3];
+        // These token boundaries expose both the short and long forms, as well
+        // as a match starting inside the earlier 日本語学校 match.
+        for (parts, consumed, expected) in [
+            (["その", "日", "暮らし"], 3, "その日暮らし"),
+            (["日本語", "学校", "教育"], 2, "日本語学校"),
+        ] {
+            let chapter = chapter(&parts.concat());
+            let tokens = tokens(&chapter, parts.map(str::to_owned));
+            let (count, token) = refinement
+                .longest_compound(&chapter, &tokens, &context)
+                .unwrap()
+                .unwrap();
+            assert_eq!((count, token.surface.as_str()), (consumed, expected));
+            assert_eq!(token.anchor.slice(&chapter).unwrap(), expected);
+        }
+
+        let name = chapter("神宮前");
+        let name_tokens = tokens(&name, ["神宮", "前"].map(str::to_owned));
+        let (_, token) = refinement
+            .longest_compound(&name, &name_tokens, &context[..2])
+            .unwrap()
+            .unwrap();
+        assert_eq!(token.reading.as_deref(), Some("じんぐうまえ"));
+
+        let phrase = chapter("その日");
+        let phrase_tokens = tokens(&phrase, ["その", "日"].map(str::to_owned));
+        for blocked in [
+            ImportTokenContext {
+                starts_sentence: true,
+                ..Default::default()
+            },
+            ImportTokenContext {
+                standalone_grammar: true,
+                ..Default::default()
+            },
+            ImportTokenContext {
+                pending_ending: true,
+                ..Default::default()
+            },
+        ] {
+            assert!(refinement
+                .longest_compound(&phrase, &phrase_tokens, &[context[0], blocked])
+                .unwrap()
+                .is_none());
         }
     }
 }

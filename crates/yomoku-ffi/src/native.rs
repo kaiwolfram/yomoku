@@ -4,7 +4,7 @@ use crate::{FfiError, YomokuBridge};
 use std::{fs::File, os::fd::FromRawFd, sync::Arc};
 use yomoku_analysis::{AnalysisError, Analyzer};
 use yomoku_core::{
-    analysis::{AnalysisProfile, ChapterAnalysis, SplitMode},
+    analysis::{AnalysisProfile, ChapterAnalysis, ImportAnalysis, SplitMode},
     document::{ChapterText, DocumentId},
     reader_images::ReaderImageAsset,
     storage::DocumentError,
@@ -17,6 +17,15 @@ impl PasteAnalyzer for NativeAnalyzer {
     fn analyze(&mut self, chapter: &ChapterText) -> Result<ChapterAnalysis, DocumentError> {
         self.0
             .analyze(chapter)
+            .map_err(|_| DocumentError::InvalidDocument)
+    }
+
+    fn analyze_for_import(
+        &mut self,
+        chapter: &ChapterText,
+    ) -> Result<ImportAnalysis, DocumentError> {
+        self.0
+            .analyze_for_import(chapter)
             .map_err(|_| DocumentError::InvalidDocument)
     }
 

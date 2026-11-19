@@ -1,5 +1,8 @@
 use super::*;
-use yomoku_core::analysis::{IMPORT_POLICY_SUFFIX, WORD_DICTIONARY_PREFIX};
+use yomoku_core::{
+    analysis::{ImportAnalysis, IMPORT_POLICY_SUFFIX, WORD_DICTIONARY_PREFIX},
+    effective_session::EffectiveReaderSelection,
+};
 use yomoku_storage::dictionary::IMPORT_DICTIONARY_SHA256;
 
 struct RealAnalyzer(yomoku_analysis::Analyzer);
@@ -7,6 +10,14 @@ impl PasteAnalyzer for RealAnalyzer {
     fn analyze(&mut self, chapter: &ChapterText) -> Result<ChapterAnalysis, DocumentError> {
         self.0
             .analyze(chapter)
+            .map_err(|_| DocumentError::Unavailable)
+    }
+    fn analyze_for_import(
+        &mut self,
+        chapter: &ChapterText,
+    ) -> Result<ImportAnalysis, DocumentError> {
+        self.0
+            .analyze_for_import(chapter)
             .map_err(|_| DocumentError::Unavailable)
     }
     fn analyze_mode(
@@ -58,7 +69,11 @@ fn all_import_formats_refine_dictionary_missing_words_and_preserve_unicode_histo
         Box::new(move || Ok(index.clone())),
     )
     .unwrap();
-    let text = "学生だった。制服姿。食べました。国家公務員。新幹線通学。𠮷か\u{3099}😀。制服姿。ひとつ。ふたつ。みっつ。一つ。二個。";
+    let text = concat!(
+        "学生だった。制服姿。食べました。国家公務員。新幹線通学。𠮷か\u{3099}😀。制服姿。ひとつ。ふたつ。みっつ。一つ。二個。",
+        "すごっ。端っこ。猫っぽかった。走って帰る。その日。動き出した。それって何だっけ。",
+        "その 日。その、日。その。日。その日暮らし。日本語学校教育。その日。"
+    );
     let events = [
         Event::CreatePaste(text.into()),
         Event::ImportTxt(TxtImport {
@@ -83,6 +98,7 @@ fn all_import_formats_refine_dictionary_missing_words_and_preserve_unicode_histo
         let id = view.import_summary.unwrap().document_id;
         let document = storage.load_document_reader_snapshot(id).unwrap().unwrap();
         let mut occurrences = Vec::new();
+        let mut checked_chapter = false;
         for (chapter, metadata) in document.document.chapters.iter().zip(&document.analyses) {
             let ReaderAnalysis::Available(analysis_id) = metadata.analysis else {
                 panic!("analysis required");
@@ -97,6 +113,7 @@ fn all_import_formats_refine_dictionary_missing_words_and_preserve_unicode_histo
                 "{WORD_DICTIONARY_PREFIX}{IMPORT_DICTIONARY_SHA256}"
             )));
             if chapter.text.contains(text) {
+                checked_chapter = true;
                 let japanese: Vec<_> = analysis
                     .tokens
                     .iter()
@@ -124,7 +141,29 @@ fn all_import_formats_refine_dictionary_missing_words_and_preserve_unicode_histo
                         "一つ",
                         // Dictionary-missing counted forms still undergo refinement.
                         "二",
-                        "個"
+                        "個",
+                        "すごっ",
+                        "端っこ",
+                        "猫っぽかった",
+                        "走って",
+                        "帰る",
+                        "その日",
+                        "動き出した",
+                        "それ",
+                        "って",
+                        "何",
+                        "だ",
+                        "っけ",
+                        "その",
+                        "日",
+                        "その",
+                        "日",
+                        "その",
+                        "日",
+                        "その日暮らし",
+                        "日本語",
+                        "学校教育",
+                        "その日",
                     ]
                 );
                 for token in &analysis.tokens {
@@ -151,20 +190,33 @@ fn all_import_formats_refine_dictionary_missing_words_and_preserve_unicode_histo
                         .unwrap();
                     assert_eq!(counted.dictionary_form.as_ref().unwrap().as_str(), surface);
                 }
+                for (surface, base, reading) in [
+                    ("その日", "その日", "そのひ"),
+                    ("動き出した", "動き出す", "うごきだす"),
+                ] {
+                    let token = analysis
+                        .tokens
+                        .iter()
+                        .find(|t| t.surface == surface)
+                        .unwrap();
+                    assert_eq!(token.dictionary_form.as_ref().unwrap().as_str(), base);
+                    assert_eq!(token.reading.as_deref(), Some(reading));
+                }
             }
             occurrences.extend(
                 analysis
                     .tokens
                     .iter()
                     .filter(|t| t.is_japanese)
-                    .map(|t| t.surface.clone()),
+                    .map(|t| (t.anchor, t.surface.clone())),
             );
         }
+        assert!(checked_chapter);
         assert!(storage
             .vocabulary_entry(&Surface::new("制服姿").unwrap())
             .unwrap()
             .is_none());
-        for surface in &occurrences {
+        for (_, surface) in &occurrences {
             assert!(storage
                 .vocabulary_entry(&Surface::new(surface).unwrap())
                 .unwrap()
@@ -178,6 +230,7 @@ fn all_import_formats_refine_dictionary_missing_words_and_preserve_unicode_histo
         );
         assert_eq!(totals(&database.path()), before);
         let mut current = dispatch(&router, Event::OpenReader(id));
+        let mut looked_up = [false; 4];
         loop {
             let page = current.reader.clone().unwrap();
             current = dispatch(
@@ -188,11 +241,47 @@ fn all_import_formats_refine_dictionary_missing_words_and_preserve_unicode_histo
                     analysis: current.reader_analysis.unwrap(),
                 }),
             );
-            let identity = current.effective_reader_tokens.unwrap().identity;
+            let loaded = current.effective_reader_tokens.unwrap();
+            for ((surface, base, dictionary_entry), checked) in [
+                ("端っこ", "端っこ", 2181850),
+                ("走って", "走る", 1402540),
+                ("その日", "その日", 2002320),
+                ("動き出した", "動き出す", 2012540),
+            ]
+            .into_iter()
+            .zip(&mut looked_up)
+            {
+                if let Some(token) = loaded.tokens.iter().find(|t| t.surface == surface) {
+                    let details = settled(
+                        &router,
+                        Event::LoadEffectiveReaderWord(EffectiveReaderSelection {
+                            page: loaded.identity,
+                            segment_index: token.segment_index,
+                        }),
+                    )
+                    .effective_reader_word
+                    .unwrap()
+                    .details
+                    .unwrap();
+                    assert_eq!(details.token.anchor, token.anchor);
+                    assert_eq!(details.candidates.surface, surface);
+                    assert_eq!(details.candidates.dictionary_form.as_deref(), Some(base));
+                    assert!(
+                        details
+                            .candidates
+                            .words
+                            .iter()
+                            .any(|entry| entry.entry_id == dictionary_entry
+                                && entry.forms.iter().any(|form| form.form == base)),
+                        "{surface}: {details:?}"
+                    );
+                    *checked = true;
+                }
+            }
             current = settled(
                 &router,
                 Event::CompleteEffectiveReaderPage {
-                    identity,
+                    identity: loaded.identity,
                     position: page.position,
                     completed_at_unix_ms: 1000,
                 },
@@ -201,9 +290,36 @@ fn all_import_formats_refine_dictionary_missing_words_and_preserve_unicode_histo
                 break;
             }
         }
+        assert!(looked_up.into_iter().all(|checked| checked));
         let sql = Connection::open(database.path()).unwrap();
-        let saved: i64 = sql.query_row("SELECT COUNT(*) FROM reading_occurrences o JOIN reading_completions c USING(command_id) WHERE c.document_id=?1", [i64::from(id)], |r|r.get(0)).unwrap();
-        assert_eq!(saved as usize, occurrences.len());
+        let mut statement = sql
+            .prepare(
+                "SELECT c.chapter_id, o.start_byte, o.end_byte, o.surface
+            FROM reading_occurrences o JOIN reading_completions c USING(command_id)
+            WHERE c.document_id=?1 ORDER BY c.command_id, o.token_index",
+            )
+            .unwrap();
+        let saved: Vec<(i64, i64, i64, String)> = statement
+            .query_map([i64::from(id)], |r| {
+                Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?))
+            })
+            .unwrap()
+            .collect::<Result<_, _>>()
+            .unwrap();
+        assert_eq!(
+            saved,
+            occurrences
+                .into_iter()
+                .map(|(anchor, surface)| {
+                    (
+                        i64::from(anchor.chapter_id),
+                        i64::from(anchor.range.start),
+                        i64::from(anchor.range.end),
+                        surface,
+                    )
+                })
+                .collect::<Vec<_>>()
+        );
     }
     drop(router);
     drop(lifecycle);

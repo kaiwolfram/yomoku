@@ -45,8 +45,12 @@ internal fun verifyConjugationBridge() {
                 .effectiveReaderTokens
         )
     }
-    fun word(bridge: NativeBridge, page: EffectiveReaderPage): EffectiveWordDetails {
-        val token = page.tokens.first { it.surface == "食べました" }
+    fun word(
+        bridge: NativeBridge,
+        page: EffectiveReaderPage,
+        surface: String = "食べました",
+    ): EffectiveWordDetails {
+        val token = page.tokens.first { it.surface == surface }
         return checkNotNull(
             dispatch(
                     bridge,
@@ -128,9 +132,22 @@ internal fun verifyConjugationBridge() {
             val page = tokens(bridge)
             check(page.tokens.single().vocabulary?.status == VocabularyStatus.LEARNING)
             check(word(bridge, page).encountered == 3UL)
+
+            val text = "すごっ。端っこ。猫っぽかった。走って帰る。その日。動き出した。"
+            val imported = checkNotNull(dispatch(bridge, Event.CreatePaste(text)).importSummary)
+            dispatch(bridge, Event.OpenReader(imported.documentId))
+            val merged = tokens(bridge)
+            check(
+                merged.tokens.map { it.surface } ==
+                    listOf("すごっ", "端っこ", "猫っぽかった", "走って", "帰る", "その日", "動き出した")
+            )
+            val details = word(bridge, merged, "動き出した")
+            check(details.candidates.surface == "動き出した")
+            check(details.candidates.dictionaryForm == "動き出す")
+            check(details.candidates.words.flatMap { it.forms }.any { it.form == "動き出す" })
         }
         println(
-            "PASS: joined conjugation JNI identity, base/components, cross-page counts, status, Library and reopen"
+            "PASS: joined grammar and compounds through JNI, base/components, counts, status and reopen"
         )
     } finally {
         directory.deleteRecursively()
