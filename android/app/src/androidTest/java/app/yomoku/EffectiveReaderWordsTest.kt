@@ -34,8 +34,8 @@ class EffectiveReaderWordsTest {
             TextRange(TextOffset(start), TextOffset(end)),
         )
 
-    private fun fixture(): ViewModel {
-        val text = "😀 𠮷か\u3099\u0000 猫 猫"
+    private fun fixture(firstSurface: String = "𠮷か\u3099\u0000"): ViewModel {
+        val text = "😀 $firstSurface 猫 猫"
         val page =
             ReaderPage(
                 DocumentId(Long.MAX_VALUE),
@@ -56,7 +56,7 @@ class EffectiveReaderWordsTest {
                 ReaderTokenKey(page.documentId, page.anchor, analysis),
             )
         val tokens =
-            listOf("𠮷か\u3099\u0000", "猫", "猫").mapIndexed { index, surface ->
+            listOf(firstSurface, "猫", "猫").mapIndexed { index, surface ->
                 val charStart = if (index == 2) text.lastIndexOf(surface) else text.indexOf(surface)
                 val start = text.substring(0, charStart).toByteArray().size.toLong()
                 val end = start + surface.toByteArray().size
@@ -125,6 +125,7 @@ class EffectiveReaderWordsTest {
                 }
             frame.value =
                 frame.value.copy(
+                    readerWordMarker = token.anchor,
                     effectiveReaderWord =
                         EffectiveReaderWordState(
                             selection = event.value,
@@ -151,7 +152,7 @@ class EffectiveReaderWordsTest {
                                     ),
                             error = if (failLookup) DocumentError.UNAVAILABLE else null,
                             busy = false,
-                        )
+                        ),
                 )
         }
         if (event == Event.DismissReaderWord)
@@ -251,7 +252,7 @@ class EffectiveReaderWordsTest {
     }
 
     @Test
-    fun pageMarkersReplaceOneOccurrenceAndSurviveDismissalStatusAndRevisitingPages() {
+    fun oneBookMarkerReplacesTheExactOccurrenceAcrossPages() {
         val first = frame.value
         val page = first.reader!!
         val snapshot = first.effectiveReaderTokens!!
@@ -296,7 +297,7 @@ class EffectiveReaderWordsTest {
         assertTrue(events.last() is Event.SetEffectiveReaderStatus)
         compose.runOnUiThread {
             frame.value =
-                first.copy(
+                frame.value.copy(
                     effectiveReaderTokens =
                         snapshot.copy(
                             tokens =
@@ -310,33 +311,36 @@ class EffectiveReaderWordsTest {
                 )
         }
         assertMarker(2)
-        compose.runOnUiThread { frame.value = second }
+        compose.runOnUiThread {
+            frame.value = second.copy(readerWordMarker = frame.value.readerWordMarker)
+        }
         assertMarker(null)
         tap(0)
         assertMarker(0)
         compose.runOnUiThread {
             frame.value =
                 first.copy(
+                    readerWordMarker = frame.value.readerWordMarker,
                     effectiveReaderTokens =
-                        snapshot.copy(identity = snapshot.identity.copy(revision = 3UL))
+                        snapshot.copy(identity = snapshot.identity.copy(revision = 3UL)),
                 )
         }
-        assertMarker(2)
+        assertMarker(null)
         compose.runOnUiThread {
             frame.value =
                 second.copy(
+                    readerWordMarker = frame.value.readerWordMarker,
                     effectiveReaderTokens =
                         second.effectiveReaderTokens!!.let {
                             it.copy(identity = it.identity.copy(revision = 4UL))
-                        }
+                        },
                 )
         }
         assertMarker(0)
     }
 
     @Test
-    fun typographyRetainsMarkerAndPageLengthSessionAndBookClosureResetIt() {
-        val first = frame.value
+    fun typographyAndPageLengthChangesRetainTheMarker() {
         show()
         tap(1)
         click("word_status_NEW")
@@ -351,21 +355,11 @@ class EffectiveReaderWordsTest {
         compose.runOnUiThread {
             frame.value = frame.value.copy(pageLength = PageLength.CHARACTERS750)
         }
-        assertMarker(null)
-        tap(2)
-        click("word_status_NEW")
-        compose.runOnUiThread { owner.value = "replacement" }
-        assertMarker(null)
-        tap(0)
-        click("word_status_NEW")
-        compose.runOnUiThread { frame.value = frame.value.copy(reader = null) }
-        compose.onNodeWithTag("reader_text").assertDoesNotExist()
-        compose.runOnUiThread { frame.value = first }
-        assertMarker(null)
+        assertMarker(1)
     }
 
     @Test
-    fun appRetainsMarkerAcrossSettingsAndClearsItAfterLeavingTheBook() {
+    fun appRestoresTheMarkerAtPageTopWithoutOpeningTheSheet() {
         val first = frame.value
         compose.setContent { YomokuTheme { YomokuApp(frame.value, owner.value, ::dispatch) } }
         tap(1)
@@ -374,12 +368,32 @@ class EffectiveReaderWordsTest {
         compose.onNodeWithTag("reader_text").assertDoesNotExist()
         compose.runOnUiThread { frame.value = frame.value.copy(settingsOpen = false) }
         assertMarker(1)
+        val saved = frame.value.readerWordMarker
         compose.runOnUiThread {
             frame.value = first.copy(reader = null, contentRoute = ContentRoute.MAIN)
         }
         compose.onNodeWithTag("reader_text").assertDoesNotExist()
-        compose.runOnUiThread { frame.value = first }
-        assertMarker(null)
+        compose.runOnUiThread {
+            owner.value = "replacement"
+            frame.value = first.copy(readerWordMarker = saved, effectiveReaderTokens = null)
+        }
+        val text = text()
+        val mark = text.getStringAnnotations(READER_MARKER, 0, text.length).single()
+        assertEquals(text.text.indexOf("猫"), mark.start)
+        assertEquals(mark.start + 1, mark.end)
+        compose.onNodeWithTag("reader_word_panel").assertDoesNotExist()
+        val scroll = compose.onNodeWithTag("reader_scroll").fetchSemanticsNode()
+        assertEquals(0f, scroll.config[SemanticsProperties.VerticalScrollAxisRange].value(), 0f)
+    }
+
+    @Test
+    fun copyIconIsCenteredBesideTheWrappedReaderSurface() {
+        val surface = "𠮷か\u3099".repeat(24)
+        frame.value = fixture(surface)
+        show()
+        tap()
+        assertWrappedWordHeader(compose)
+        assertCopiedWord(compose, compose.activity, surface)
     }
 
     @Test

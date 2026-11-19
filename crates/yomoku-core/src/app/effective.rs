@@ -92,6 +92,7 @@ impl Yomoku {
                 }
                 let request = model.effective_reader.begin_word_load(*selection);
                 Some(request.map_or_else(Command::done, |request| {
+                    model.reader_word_marker = Some(request.anchor());
                     self.dispatch_effective(EffectiveReaderRequest::Word(request), model)
                 }))
             }

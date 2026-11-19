@@ -126,11 +126,19 @@ impl EffectivePageCommand {
 pub struct EffectiveSelectionCommand {
     page: EffectivePageCommand,
     selection: EffectiveReaderSelection,
+    range: TextRange,
 }
 
 impl EffectiveSelectionCommand {
     pub fn selection(&self) -> EffectiveReaderSelection {
         self.selection
+    }
+
+    pub fn anchor(&self) -> TextAnchor {
+        TextAnchor {
+            range: self.range,
+            ..self.key().page
+        }
     }
 
     pub fn key(&self) -> &EffectiveReaderTokenKey {
@@ -261,25 +269,21 @@ impl EffectiveReaderSession {
         &self,
         selection: EffectiveReaderSelection,
     ) -> Option<EffectiveSelectionCommand> {
-        self.resolve_selection(selection)?;
         Some(EffectiveSelectionCommand {
             page: self.freeze_page(selection.page)?,
             selection,
+            range: self.selection_token(selection)?.anchor.range,
         })
     }
 
     /// Only Japanese segments actually visible on the retained page are valid.
     /// Crossing segments keep their whole-chapter identity on either page.
-    pub fn resolve_selection(
-        &self,
-        selection: EffectiveReaderSelection,
-    ) -> Option<&EffectiveReaderTokenKey> {
-        let key = self.resolve(selection.page)?;
-        self.page()?
+    fn selection_token(&self, selection: EffectiveReaderSelection) -> Option<&EffectivePageToken> {
+        self.page()
+            .filter(|page| page.identity == selection.page)?
             .tokens
             .iter()
-            .any(|token| token.segment_index == selection.segment_index)
-            .then_some(key)
+            .find(|token| token.segment_index == selection.segment_index)
     }
 }
 

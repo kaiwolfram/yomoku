@@ -237,6 +237,7 @@ fn opened_snapshot_recency_survives_position_updates_and_duplicate_import_result
         &core,
         &mut effects,
         StorageResult::Loaded(DocumentReaderSnapshot {
+            word_marker: None,
             last_read_sequence: Some(3),
             typography: Default::default(),
             document: document.clone(),

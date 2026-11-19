@@ -102,6 +102,7 @@ fn reader_snapshot_pins_original_mode_b_with_exact_position_and_preset_after_reo
             .load_document_reader_snapshot(document.document_id)
             .unwrap(),
         Some(DocumentReaderSnapshot {
+            word_marker: None,
             analyses: vec![yomoku_core::reader::ReaderChapterAnalysis {
                 chapter_id,
                 analysis: ReaderAnalysis::Available(original)

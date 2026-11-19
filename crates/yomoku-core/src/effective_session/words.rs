@@ -36,6 +36,10 @@ pub struct EffectiveWordRequest {
     command: EffectiveSelectionCommand,
 }
 impl EffectiveWordRequest {
+    pub fn anchor(&self) -> crate::document::TextAnchor {
+        self.command.anchor()
+    }
+
     pub fn operation(&self) -> Operation {
         Operation::LoadWord(self.command.clone())
     }
@@ -155,7 +159,7 @@ impl EffectiveReaderSession {
         }
         let selection = request.command.selection();
         let visible =
-            self.words.selection == Some(selection) && self.resolve_selection(selection).is_some();
+            self.words.selection == Some(selection) && self.selection_token(selection).is_some();
         let result = match result {
             Ok(Output::WordLoaded(returned, details)) if returned == selection => {
                 self.compact_word(request, *details)

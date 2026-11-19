@@ -44,7 +44,8 @@ stable toolchain's `bin` in PATH. Gradle/ADB/emulator need local socket access.
 Do not clear an incompatible database to make a build or trial succeed. The only
 accepted initial journal is `0001_completion_receipts_initial_schema` (schema version 1),
 which includes the Statistics timeframe preference. It upgrades in place through
-`0002_library_read_override` to `0003_hot_path_indexes` (schema version 3).
+`0002_library_read_override`, `0003_hot_path_indexes`, and
+`0004_reader_word_markers` (schema version 4).
 Use a new disposable AVD for checks that require a fresh installation.
 
 ## Rust verification

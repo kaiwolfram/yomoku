@@ -81,6 +81,7 @@ impl Fixture {
             &core,
             &mut effects,
             StorageResult::Loaded(DocumentReaderSnapshot {
+                word_marker: None,
                 document: document.clone(),
                 page_length: PageLength::default(),
                 typography: yomoku_core::typography::ReaderTypography::default(),
@@ -513,6 +514,7 @@ fn missing_analysis_stays_plain_and_cannot_complete_or_rescan() {
         &f.core,
         &mut effects,
         StorageResult::Loaded(DocumentReaderSnapshot {
+            word_marker: None,
             document: f.document.clone(),
             page_length: PageLength::default(),
             typography: Default::default(),

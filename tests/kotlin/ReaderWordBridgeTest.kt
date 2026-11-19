@@ -40,7 +40,7 @@ internal fun verifyReaderWordBridge() {
                 check(provider.wordCalls.get() == 0)
                 dispatch(bridge, Event.CreatePaste("東京 東京 食べた")).documents.single().documentId
             }
-        val id =
+        val savedMarker =
             NativeBridge(database.path, listener, provider).use { bridge ->
                 val id = importedId
                 val opened = dispatch(bridge, Event.OpenReader(id))
@@ -51,7 +51,7 @@ internal fun verifyReaderWordBridge() {
                         dispatch(bridge, Event.LoadReaderTokens(key)).effectiveReaderTokens
                     )
                 check(provider.wordCalls.get() == 1)
-                val token = tokens.tokens.first { it.surface == "東京" }
+                val token = tokens.tokens.last { it.surface == "東京" }
                 val selection = EffectiveReaderSelection(tokens.identity, token.segmentIndex)
                 val before = database.readBytes()
                 provider.failWords = true
@@ -61,6 +61,7 @@ internal fun verifyReaderWordBridge() {
                         failed.effectiveReaderWord?.error != null
                 )
                 check(failed.documentError == null)
+                check(failed.readerWordMarker == token.anchor)
                 provider.failWords = false
                 val loaded = dispatch(bridge, Event.LoadEffectiveReaderWord(selection))
                 val word = checkNotNull(loaded.effectiveReaderWord?.details)
@@ -88,7 +89,7 @@ internal fun verifyReaderWordBridge() {
                 check(ViewModel.bincodeDeserialize(loaded.bincodeSerialize()) == loaded)
                 check(
                     !before.contentEquals(database.readBytes())
-                ) // First lookup caches A/B analysis.
+                ) // First lookup saves the marker and caches A/B analysis.
                 val cached = database.readBytes()
                 repeat(3) {
                     val repeated = dispatch(bridge, Event.LoadEffectiveReaderWord(selection))
@@ -123,21 +124,23 @@ internal fun verifyReaderWordBridge() {
                     Event.CompleteEffectiveReaderPage(tokens.identity, page.position, 5678L),
                     2,
                 )
-                id
+                inflected.anchor
             }
         val fresh = HostDictionary()
         NativeBridge(database.path, listener, fresh).use { bridge ->
-            val opened = dispatch(bridge, Event.OpenReader(id))
+            val opened = dispatch(bridge, Event.OpenReader(importedId))
             check(
                 opened.effectiveReaderWord?.details == null &&
                     opened.effectiveReaderWord?.selection == null
             )
+            check(opened.readerWordMarker == savedMarker)
+            check(opened.effectiveReaderTokens == null)
+            check(fresh.calls.get() == 0 && fresh.wordCalls.get() == 0)
             val page = checkNotNull(opened.reader)
-            val key = ReaderTokenKey(id, page.anchor, checkNotNull(opened.readerAnalysis))
+            val key = ReaderTokenKey(importedId, page.anchor, checkNotNull(opened.readerAnalysis))
             val tokens =
                 checkNotNull(dispatch(bridge, Event.LoadReaderTokens(key)).effectiveReaderTokens)
             val token = tokens.tokens.first { it.surface == "東京" }
-            val before = database.readBytes()
             val details =
                 checkNotNull(
                     dispatch(
@@ -151,7 +154,7 @@ internal fun verifyReaderWordBridge() {
                 )
             check(details.encountered == 4UL && details.lastSeenUnixMs == 5678L)
             check(fresh.calls.get() == 0 && fresh.wordCalls.get() == 1)
-            check(before.contentEquals(database.readBytes()))
+            check(ViewModel.bincodeDeserialize(bridge.view()).readerWordMarker == token.anchor)
         }
         NativeBridge(directory.resolve("missing.sqlite3").path, listener, HostDictionary()).use {
             bridge ->

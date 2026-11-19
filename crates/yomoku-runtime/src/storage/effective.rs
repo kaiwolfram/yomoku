@@ -56,6 +56,10 @@ pub(super) fn execute(
         EffectiveStorageOperation::LoadWord(command) => {
             let selection = command.selection();
             let key = command.key();
+            storage
+                .save_reader_word_marker(key.document_id, command.anchor())
+                .map_err(map_error)?
+                .ok_or(DocumentError::NotFound)?;
             let mut component_chapter = None;
             for mode in [
                 yomoku_core::analysis::SplitMode::A,

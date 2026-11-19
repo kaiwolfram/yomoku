@@ -17,6 +17,7 @@ fn snapshot(
     analysis: ReaderAnalysis,
 ) -> StorageResult {
     StorageResult::Loaded(DocumentReaderSnapshot {
+        word_marker: None,
         last_read_sequence: None,
         typography: Default::default(),
         analyses: vec![ReaderChapterAnalysis {
@@ -849,6 +850,7 @@ fn ordered_snapshot_rejects_missing_duplicate_and_foreign_chapter_analysis() {
             &core,
             &mut effects,
             StorageResult::Loaded(DocumentReaderSnapshot {
+                word_marker: None,
                 last_read_sequence: None,
                 typography: Default::default(),
                 document: document.clone(),
@@ -874,6 +876,7 @@ fn ordered_snapshot_rejects_missing_duplicate_and_foreign_chapter_analysis() {
         &core,
         &mut effects,
         StorageResult::Loaded(DocumentReaderSnapshot {
+            word_marker: None,
             last_read_sequence: None,
             typography: Default::default(),
             document: document.clone(),

@@ -120,6 +120,7 @@ pub struct Model {
     reader: Option<ReaderPage>,
     reader_analysis: Option<ReaderAnalysis>,
     reader_document: Option<ReaderDocument>,
+    reader_word_marker: Option<TextAnchor>,
     reader_layout: Option<PageLayout>,
     reader_analyses: Vec<ReaderChapterAnalysis>,
     page_length: Option<PageLength>,
@@ -383,6 +384,7 @@ pub struct ViewModel {
     pub document_error: Option<DocumentError>,
     pub content_route: ContentRoute,
     pub reader: Option<ReaderPage>,
+    pub reader_word_marker: Option<TextAnchor>,
     /// Present only for an opened reader; Missing identifies unavailable stored analysis.
     pub reader_analysis: Option<ReaderAnalysis>,
     /// None until persisted settings have been loaded successfully.
@@ -981,6 +983,7 @@ impl App for Yomoku {
                                     model.reader_analyses = snapshot.analyses;
                                     model.reader = Some(reader);
                                     model.reader_document = Some(document);
+                                    model.reader_word_marker = snapshot.word_marker;
                                 }
                                 Err(_) => {
                                     model.document_error = Some(DocumentError::InvalidDocument)
@@ -1112,6 +1115,7 @@ impl App for Yomoku {
             document_error: model.file_import_error.or(model.document_error),
             content_route: model.content_route,
             reader: model.reader.clone(),
+            reader_word_marker: model.reader_word_marker,
             reader_analysis: model.reader_analysis,
             page_length: model.page_length,
             reader_typography: model.reader_typography,
@@ -1272,6 +1276,7 @@ impl Model {
     /// and completion retries remain owned by the session and shared storage slot.
     fn clear_reader_presentation(&mut self) {
         self.reader = None;
+        self.reader_word_marker = None;
         self.reader_analysis = None;
         self.invalidate_effective_page();
         self.clear_reader_word();

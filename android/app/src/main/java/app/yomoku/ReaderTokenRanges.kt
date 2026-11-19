@@ -89,6 +89,17 @@ private constructor(
     private val page: ReaderPage,
     private val boundaries: Map<Long, Int>,
 ) {
+    fun markerRange(anchor: TextAnchor): IntRange? {
+        if (anchor.sourceId != page.anchor.sourceId || anchor.chapterId != page.anchor.chapterId)
+            return null
+        val pageStart = page.anchor.range.start.value
+        val pageEnd = page.anchor.range.end.value
+        val start =
+            boundaries[maxOf(anchor.range.start.value, pageStart) - pageStart] ?: return null
+        val end = boundaries[minOf(anchor.range.end.value, pageEnd) - pageStart] ?: return null
+        return (start until end).takeIf { start < end }
+    }
+
     fun displayRange(anchor: TextAnchor, display: TextRange, surface: String): IntRange? {
         val start = boundaries[display.start.value] ?: return null
         val end = boundaries[display.end.value] ?: return null
@@ -130,3 +141,6 @@ private constructor(
         }
     }
 }
+
+internal fun readerMarkerRange(page: ReaderPage, anchor: TextAnchor): IntRange? =
+    ReaderTokenRanges.create(page)?.markerRange(anchor)

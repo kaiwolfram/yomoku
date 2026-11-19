@@ -503,6 +503,38 @@ class VocabularyScreenTest {
     }
 
     @Test
+    fun copyIconIsCenteredBesideTheWrappedVocabularySurface() {
+        val row = vocabularyRow(1).copy(surface = "𠮷か\u3099".repeat(24))
+        frame.value =
+            frame.value.copy(
+                vocabulary =
+                    frame.value.vocabulary.copy(
+                        rows = listOf(row),
+                        matchingCount = 1UL,
+                        word =
+                            VocabularyWordState(
+                                DictionaryLookup(
+                                    DictionaryQuery(row.surface, null),
+                                    emptyList(),
+                                    revision = 1UL,
+                                    loading = false,
+                                ),
+                                VocabularyAnkiSelection(row.id, 1UL),
+                                row,
+                                DictionaryCandidates(
+                                    row.surface,
+                                    words = emptyList(),
+                                    names = emptyList(),
+                                ),
+                            ),
+                    )
+            )
+        render()
+        assertWrappedWordHeader(compose)
+        assertCopiedWord(compose, compose.activity, row.surface)
+    }
+
+    @Test
     fun copyUsesExactWholeOrSelectedSurfaceDuringLookupErrorsAndStatusWrites() {
         val row = vocabularyRow(1).copy(surface = "𠮷か\u3099")
         frame.value =

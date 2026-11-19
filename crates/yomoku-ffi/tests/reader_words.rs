@@ -169,7 +169,7 @@ fn selection(
 }
 
 #[test]
-fn selected_word_bridge_loads_lazily_retries_both_failure_kinds_reuses_fifo_and_never_writes() {
+fn selected_word_bridge_retries_marker_and_lookup_failures_and_restores_the_saved_occurrence() {
     let fixture = Fixture::new();
     let id = fixture.seed();
     index(&fixture.index(), true);
@@ -196,9 +196,37 @@ fn selected_word_bridge_loads_lazily_retries_both_failure_kinds_reuses_fifo_and_
     )
     .unwrap();
     dispatch(&bridge, &callbacks, Event::RefreshLibrary);
-    let selected = selection(&bridge, &callbacks, id);
+    let selected = EffectiveReaderSelection {
+        segment_index: 1,
+        ..selection(&bridge, &callbacks, id)
+    };
+    let marker = view(&bridge).effective_reader_tokens.unwrap().tokens[1].anchor;
     assert!(loads.try_recv().is_err());
-    let user_before = std::fs::read(fixture.user()).unwrap();
+    let connection = Connection::open(fixture.user()).unwrap();
+    connection
+        .execute_batch(
+            "CREATE TRIGGER fail_marker BEFORE INSERT ON reader_word_markers
+         BEGIN SELECT RAISE(ABORT, 'fixture marker failure'); END;",
+        )
+        .unwrap();
+    let write_failed = dispatch(
+        &bridge,
+        &callbacks,
+        Event::LoadEffectiveReaderWord(selected),
+    );
+    assert!(write_failed.effective_reader_word.unwrap().error.is_some());
+    assert_eq!(write_failed.reader_word_marker, Some(marker));
+    assert!(loads.try_recv().is_err());
+    assert_eq!(
+        connection
+            .query_row("SELECT COUNT(*) FROM reader_word_markers", [], |row| row
+                .get::<_, i64>(0))
+            .unwrap(),
+        0
+    );
+    connection
+        .execute_batch("DROP TRIGGER fail_marker;")
+        .unwrap();
     let failed = dispatch(
         &bridge,
         &callbacks,
@@ -211,6 +239,15 @@ fn selected_word_bridge_loads_lazily_retries_both_failure_kinds_reuses_fifo_and_
         Some(DocumentError::Unavailable)
     );
     assert!(failed.document_error.is_none());
+    assert_eq!(
+        Storage::open(fixture.user())
+            .unwrap()
+            .load_document_reader_snapshot(id)
+            .unwrap()
+            .unwrap()
+            .word_marker,
+        Some(marker)
+    );
     fail.store(false, Ordering::SeqCst);
     let malformed = dispatch(
         &bridge,
@@ -267,8 +304,26 @@ fn selected_word_bridge_loads_lazily_retries_both_failure_kinds_reuses_fifo_and_
     assert!(absent.candidates.words.is_empty() && absent.candidates.names.is_empty());
     assert_eq!(absent.encountered, 1);
     assert!(loads.try_recv().is_err());
-    assert_eq!(std::fs::read(fixture.user()).unwrap(), user_before);
     assert_eq!(std::fs::read(fixture.index()).unwrap(), index_before);
+    drop(bridge);
+    drop(lifecycle);
+
+    let (tx, callbacks) = mpsc::channel();
+    let (fresh, _) = YomokuBridge::new(
+        fixture.user(),
+        Box::new(|| panic!("reopening never loads analyzer")),
+        Box::new(|| panic!("reopening never loads dictionary")),
+        move |result| {
+            result.unwrap();
+            tx.send(thread::current().id()).unwrap();
+        },
+    )
+    .unwrap();
+    let reopened = dispatch(&fresh, &callbacks, Event::OpenReader(id));
+    assert_eq!(reopened.reader, loaded.reader);
+    assert_eq!(reopened.reader_word_marker, Some(absent.token.anchor));
+    assert!(reopened.effective_reader_tokens.is_none());
+    assert!(reopened.effective_reader_word.unwrap().selection.is_none());
 }
 
 #[test]
@@ -297,11 +352,15 @@ fn selected_word_bridge_discards_a_dismissed_selection_while_provider_is_blocked
     let selected = selection(&bridge, &callbacks, id);
     send(&bridge, Event::LoadEffectiveReaderWord(selected));
     entered.recv_timeout(TIMEOUT).unwrap();
-    assert!(view(&bridge).storage_busy);
+    let pending = view(&bridge);
+    assert!(pending.storage_busy);
+    let marker = pending.effective_reader_tokens.unwrap().tokens[0].anchor;
+    assert_eq!(pending.reader_word_marker, Some(marker));
     send(&bridge, Event::DismissReaderWord);
     release.send(()).unwrap();
     callbacks.recv_timeout(TIMEOUT).unwrap();
     assert!(!view(&bridge).storage_busy);
+    assert_eq!(view(&bridge).reader_word_marker, Some(marker));
     assert!(view(&bridge)
         .effective_reader_word
         .unwrap()

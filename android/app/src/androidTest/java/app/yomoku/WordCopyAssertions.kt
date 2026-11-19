@@ -3,11 +3,14 @@ package app.yomoku
 import android.content.ClipboardManager
 import android.content.Context
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.ComposeTestRule
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.unit.dp
 import app.yomoku.shared.*
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 
 internal fun copyLookup() =
     DictionaryLookup(
@@ -33,14 +36,33 @@ internal fun assertCopiedWord(compose: ComposeTestRule, context: Context, expect
         .assertContentDescriptionEquals("Copy word")
         .assertWidthIsEqualTo(48.dp)
         .assertHeightIsEqualTo(48.dp)
-    compose
-        .onNodeWithTag("word_copy_icon", useUnmergedTree = true)
-        .assertWidthIsEqualTo(12.dp)
-        .assertHeightIsEqualTo(12.dp)
+    val icon =
+        compose
+            .onNodeWithTag("word_copy_icon", useUnmergedTree = true)
+            .assertWidthIsEqualTo(18.dp)
+            .assertHeightIsEqualTo(18.dp)
+    val surface =
+        compose.onNodeWithTag("word_surface", useUnmergedTree = true).getUnclippedBoundsInRoot()
+    val iconBounds = icon.getUnclippedBoundsInRoot()
+    assertEquals(
+        (surface.top.value + surface.bottom.value) / 2,
+        (iconBounds.top.value + iconBounds.bottom.value) / 2,
+        1f,
+    )
     button.performTouchInput { click(Offset(4f, centerY)) }
     compose.runOnIdle {
         val clip = context.getSystemService(ClipboardManager::class.java).primaryClip!!
         assertEquals(1, clip.itemCount)
         assertEquals(expected, clip.getItemAt(0).text.toString())
     }
+}
+
+internal fun assertWrappedWordHeader(compose: ComposeTestRule) {
+    val layouts = mutableListOf<TextLayoutResult>()
+    compose.onNodeWithTag("word_surface", useUnmergedTree = true).performSemanticsAction(
+        SemanticsActions.GetTextLayoutResult
+    ) {
+        it(layouts)
+    }
+    assertTrue(layouts.single().lineCount > 1)
 }

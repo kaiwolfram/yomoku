@@ -1,6 +1,6 @@
 use yomoku_core::{
     completion::{AnalyzedCompletionOutcome, PageCompletionIntent},
-    document::{DocumentId, PasteText, ReaderDocument, TextOffset},
+    document::{DocumentId, PasteText, ReaderDocument, TextAnchor, TextOffset, TextRange},
     pagination::{LogicalPages, PageLength, ReadingPosition},
     reader::{DocumentReaderSnapshot, ReaderAnalysis, ReaderPage},
     reader_formatting::ReaderTextStyle,
@@ -21,6 +21,97 @@ fn import(storage: &mut Storage, second: &str) -> AnalyzedEpub {
 
 fn snapshot(storage: &mut Storage, id: DocumentId) -> DocumentReaderSnapshot {
     storage.load_document_reader_snapshot(id).unwrap().unwrap()
+}
+
+#[test]
+fn word_markers_upgrade_in_place_replace_across_pages_and_follow_live_books() {
+    let database = TestDatabase::new();
+    let mut connection = Connection::open(database.path()).unwrap();
+    migrate(&mut connection, &MIGRATIONS[..3]).unwrap();
+    let text = PasteText::new(format!("{}\n\n𠮷犬", "猫".repeat(250))).unwrap();
+    let transaction = connection.transaction().unwrap();
+    let book = crate::documents::create_paste_in(&transaction, &text).unwrap();
+    let other =
+        crate::documents::create_paste_in(&transaction, &PasteText::new("犬".into()).unwrap())
+            .unwrap();
+    transaction.commit().unwrap();
+    drop(connection);
+
+    let mut storage = Storage::open(database.path()).unwrap();
+    assert_eq!(storage.schema_version().unwrap(), 4);
+    let original = snapshot(&mut storage, book.document_id);
+    assert_eq!(original.document, ReaderDocument::from(book.clone()));
+    assert_eq!(original.word_marker, None);
+
+    let occurrence = |chapter: &yomoku_core::document::ChapterText, start, end| TextAnchor {
+        source_id: chapter.source_id,
+        chapter_id: chapter.chapter_id,
+        range: TextRange {
+            start: TextOffset::at(&chapter.text, start).unwrap(),
+            end: TextOffset::at(&chapter.text, end).unwrap(),
+        },
+    };
+    let first = occurrence(&book.chapter, 3, 6);
+    let start = book.chapter.text.find('𠮷').unwrap();
+    let second = occurrence(&book.chapter, start, start + '𠮷'.len_utf8());
+    let other_marker = occurrence(&other.chapter, 0, 3);
+    for (id, marker) in [(book.document_id, first), (other.document_id, other_marker)] {
+        assert_eq!(
+            storage.save_reader_word_marker(id, marker).unwrap(),
+            Some(())
+        );
+    }
+    assert_eq!(
+        snapshot(&mut storage, book.document_id).word_marker,
+        Some(first)
+    );
+    let second_page = storage
+        .save_document_reading_position(book.document_id, position(&original.document, 0, start))
+        .unwrap()
+        .unwrap();
+    assert_eq!(
+        ReaderPage::open_document(&second_page, original.page_length)
+            .unwrap()
+            .page_number,
+        2
+    );
+    assert_eq!(
+        storage
+            .save_reader_word_marker(book.document_id, second)
+            .unwrap(),
+        Some(())
+    );
+    assert!(storage
+        .save_reader_word_marker(book.document_id, other_marker)
+        .is_err());
+    drop(storage);
+
+    let mut storage = Storage::open(database.path()).unwrap();
+    let restored = snapshot(&mut storage, book.document_id);
+    assert_eq!(restored.word_marker, Some(second));
+    assert_eq!(restored.document, second_page);
+    assert_eq!(
+        snapshot(&mut storage, other.document_id).word_marker,
+        Some(other_marker)
+    );
+    storage.delete_document(book.document_id).unwrap();
+    let count: i64 = storage
+        .connection
+        .query_row("SELECT COUNT(*) FROM reader_word_markers", [], |row| {
+            row.get(0)
+        })
+        .unwrap();
+    assert_eq!(count, 1);
+    let crate::PasteImportOutcome::Created(reimported) =
+        storage.import_analyzed_paste(&text, 10, fixture).unwrap()
+    else {
+        panic!("expected a fresh import after deletion");
+    };
+    assert_ne!(reimported.document.document_id, book.document_id);
+    assert_eq!(
+        snapshot(&mut storage, reimported.document.document_id).word_marker,
+        None
+    );
 }
 
 fn position(document: &ReaderDocument, index: usize, offset: usize) -> ReadingPosition {
@@ -636,6 +727,7 @@ fn explicit_finished_open_rolls_back_on_reset_analysis_or_commit_failure_then_re
         assert_eq!(
             repeated,
             DocumentReaderSnapshot {
+                word_marker: None,
                 last_read_sequence: repeated.last_read_sequence,
                 ..opened
             }

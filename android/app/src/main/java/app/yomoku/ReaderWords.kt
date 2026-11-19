@@ -44,11 +44,13 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.LinkAnnotation
+import androidx.compose.ui.text.PlatformTextStyle
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextLinkStyles
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.LineHeightStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
@@ -58,7 +60,6 @@ import androidx.compose.ui.window.PopupProperties
 import app.yomoku.shared.ReaderTextSpan
 import app.yomoku.shared.ReaderTextStyle
 import app.yomoku.shared.ReaderVocabulary
-import app.yomoku.shared.TextAnchor
 import app.yomoku.shared.VocabularyStatus
 
 internal fun vocabularyBackground(status: VocabularyStatus?, dark: Boolean): Color =
@@ -79,7 +80,7 @@ internal fun readerAnnotatedText(
     formatting: List<ReaderTextSpan> = emptyList(),
     linkColor: Color = foreground,
     onExternalLink: (String) -> Unit = {},
-    markedAnchor: TextAnchor? = null,
+    markerRange: IntRange? = null,
     onToken: (ULong) -> Unit,
 ): AnnotatedString =
     readerAnnotatedSpans(
@@ -90,7 +91,6 @@ internal fun readerAnnotatedText(
                 it.token.vocabulary?.status,
                 it.start,
                 it.end,
-                marked = it.token.anchor == markedAnchor,
             )
         },
         dark,
@@ -98,6 +98,7 @@ internal fun readerAnnotatedText(
         formatting,
         linkColor,
         onExternalLink,
+        markerRange,
         onToken,
     )
 
@@ -106,7 +107,6 @@ internal data class ReaderAnnotatedToken(
     val status: VocabularyStatus?,
     val start: Int,
     val end: Int,
-    val marked: Boolean = false,
 )
 
 /** Shared formatting/geometry only; each reader owns its selection identity. */
@@ -118,9 +118,13 @@ internal fun readerAnnotatedSpans(
     formatting: List<ReaderTextSpan>,
     linkColor: Color,
     onExternalLink: (String) -> Unit,
+    markerRange: IntRange? = null,
     onToken: (ULong) -> Unit,
 ): AnnotatedString = buildAnnotatedString {
     append(text)
+    if (markerRange != null) {
+        addStringAnnotation(READER_MARKER, "", markerRange.first, markerRange.last + 1)
+    }
     val spans = readerDisplayFormatting(text, formatting).orEmpty()
     val external = mutableListOf<IntRange>()
     for ((style, start, end) in spans) {
@@ -159,8 +163,7 @@ internal fun readerAnnotatedSpans(
             }
         }
     }
-    for ((index, status, start, end, marked) in tokens) {
-        if (marked) addStringAnnotation(READER_MARKER, "", start, end)
+    for ((index, status, start, end) in tokens) {
         if (status != null && status != VocabularyStatus.KNOWN) {
             addStringAnnotation(READER_HIGHLIGHT, status.name, start, end)
         }
@@ -217,7 +220,15 @@ internal fun ReaderWordPanel(
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     token.surface,
-                    style = MaterialTheme.typography.headlineSmall,
+                    style =
+                        MaterialTheme.typography.headlineSmall.copy(
+                            platformStyle = PlatformTextStyle(includeFontPadding = false),
+                            lineHeightStyle =
+                                LineHeightStyle(
+                                    LineHeightStyle.Alignment.Center,
+                                    LineHeightStyle.Trim.Both,
+                                ),
+                        ),
                     modifier = Modifier.weight(1f).testTag("word_surface"),
                 )
                 IconButton(
@@ -231,7 +242,7 @@ internal fun ReaderWordPanel(
                     Icon(
                         painterResource(R.drawable.ic_copy),
                         contentDescription = copyLabel,
-                        modifier = Modifier.size(12.dp).testTag("word_copy_icon"),
+                        modifier = Modifier.size(18.dp).testTag("word_copy_icon"),
                     )
                 }
             }

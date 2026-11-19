@@ -21,6 +21,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.style.ResolvedTextDirection
 import androidx.compose.ui.unit.dp
 import app.yomoku.shared.VocabularyStatus
 
@@ -42,7 +43,7 @@ internal fun ReaderHighlightedText(
                 .orEmpty()
         }
     val dark = isSystemInDarkTheme()
-    val markerColor = style.color.takeOrElse { LocalContentColor.current }.copy(alpha = 0.3f)
+    val markerColor = style.color.takeOrElse { LocalContentColor.current }.copy(alpha = 0.7f)
     Text(
         text,
         style = style,
@@ -125,6 +126,31 @@ internal fun ReaderHighlightedText(
                             }
                             .orEmpty()
                     val thickness = 1.dp.toPx()
+                    val dotRadius = 2.dp.toPx()
+                    val dotDistance = 6.dp.toPx()
+                    val dots =
+                        layout
+                            ?.let { result ->
+                                markers
+                                    .map { result.getLineForVerticalPosition(it.center.y) }
+                                    .distinct()
+                                    .map { line ->
+                                        val x =
+                                            if (
+                                                result.getParagraphDirection(
+                                                    result.getLineStart(line)
+                                                ) == ResolvedTextDirection.Rtl
+                                            )
+                                                result.getLineRight(line) + dotDistance
+                                            else result.getLineLeft(line) - dotDistance
+                                        Offset(
+                                            x,
+                                            (result.getLineTop(line) + result.getLineBottom(line)) /
+                                                2f,
+                                        )
+                                    }
+                            }
+                            .orEmpty()
                     onDrawWithContent {
                         for ((rect, color) in highlights) drawRect(
                             color,
@@ -137,6 +163,7 @@ internal fun ReaderHighlightedText(
                             Offset(rect.left, rect.bottom - thickness),
                             Size(rect.width, thickness),
                         )
+                        for (dot in dots) drawCircle(markerColor, dotRadius, dot)
                     }
                 },
     )

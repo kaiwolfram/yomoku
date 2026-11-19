@@ -28,6 +28,7 @@ pub struct DocumentReaderSnapshot {
     pub last_read_sequence: Option<i64>,
     pub typography: crate::typography::ReaderTypography,
     pub document: ReaderDocument,
+    pub word_marker: Option<TextAnchor>,
     pub page_length: PageLength,
     pub analyses: Vec<ReaderChapterAnalysis>,
 }
@@ -44,6 +45,12 @@ impl DocumentReaderSnapshot {
     /// Entries are keyed by chapter identity, not by their vector order.
     pub fn validate(&self) -> Result<(), InvalidTextValue> {
         self.document.validate()?;
+        if let Some(marker) = self.word_marker {
+            let chapter = self.document.chapter(marker.chapter_id)?;
+            if marker.slice(chapter)?.is_empty() {
+                return Err(InvalidTextValue);
+            }
+        }
         if self.last_read_sequence.is_some_and(|value| value <= 0) {
             return Err(InvalidTextValue);
         }

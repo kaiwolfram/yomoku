@@ -344,7 +344,6 @@ fn effective_worker_reads_exact_analyzer_metadata_live_status_and_literal_custom
     let fixture = Fixture::new();
     let router = fixture.router();
     let mut session = EffectiveReaderSession::default();
-    let before = std::fs::read(fixture.path()).unwrap();
     load(&router, &mut session, fixture.base);
     let manual = select(&session, "食べた");
     let details = word(&router, manual.clone());
@@ -357,7 +356,15 @@ fn effective_worker_reads_exact_analyzer_metadata_live_status_and_literal_custom
     assert_eq!(details.encountered, 0);
     let cat = select(&session, "猫");
     assert_eq!(word(&router, cat.clone()).candidates.words.len(), 1);
-    assert_eq!(std::fs::read(fixture.path()).unwrap(), before);
+    assert_eq!(
+        fixture
+            .storage()
+            .load_document_reader_snapshot(fixture.base.document_id)
+            .unwrap()
+            .unwrap()
+            .word_marker,
+        Some(cat.anchor())
+    );
     let id = word(&router, cat.clone()).token.vocabulary.unwrap().id;
     fixture
         .storage()

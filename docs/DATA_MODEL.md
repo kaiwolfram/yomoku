@@ -1,10 +1,11 @@
 # Data model
 
-The release schema version is **3**. The SQL lives in the
+The release schema version is **4**. The SQL lives in the
 [initial schema](../crates/yomoku-storage/migrations/0001_completion_receipts_initial_schema.sql),
 [Library read override migration](../crates/yomoku-storage/migrations/0002_library_read_override.sql),
-and [index migration](../crates/yomoku-storage/migrations/0003_hot_path_indexes.sql).
-It has **25 application tables** plus SQLite's internal `sqlite_sequence` table.
+[index migration](../crates/yomoku-storage/migrations/0003_hot_path_indexes.sql),
+and [reader word marker migration](../crates/yomoku-storage/migrations/0004_reader_word_markers.sql).
+It has **26 application tables** plus SQLite's internal `sqlite_sequence` table.
 Databases with the `0001_completion_receipts_initial_schema` journal upgrade in
 place. Earlier development journals remain unsupported.
 
@@ -12,7 +13,7 @@ place. Earlier development journals remain unsupported.
 | --- | --- |
 | Content | `sources`, `chapters`, `documents`, `chapter_texts`, `paste_content_hashes`, `imported_files`, `epub_documents`, `epub_chapters`, `epub_spans`, `epub_assets`, `epub_inline_images` |
 | Analysis and vocabulary | `chapter_analyses`, `analyzed_tokens`, `vocabulary`, `vocabulary_status_events` |
-| Progress and history | `reading_positions`, `library_read_clock`, `completion_commands`, `reading_completions`, `completion_analyses`, `reading_occurrences` |
+| Progress and history | `reading_positions`, `reader_word_markers`, `library_read_clock`, `completion_commands`, `reading_completions`, `completion_analyses`, `reading_occurrences` |
 | Settings and schema | `reader_settings`, `anki_settings`, `statistics_settings`, `schema_migrations` |
 
 ## Initialization and compatibility
@@ -25,6 +26,12 @@ files or backfill development data.
 
 Version 3 indexes vocabulary by registration time and ID, and EPUB inline images
 by document ID and asset path. Existing rows keep their values and ordering.
+
+Version 4 adds `reader_word_markers`. Existing books start with no marker.
+Each row stores one live document’s selected chapter and half-open UTF-8 byte
+range. The reader snapshot loads it independently of the reading position.
+Accepting a selection replaces the row before dictionary lookup. Deleting the
+document cascades to its marker.
 
 ## Content and analysis
 

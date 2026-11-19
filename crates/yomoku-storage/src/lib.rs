@@ -62,6 +62,11 @@ const MIGRATIONS: &[Migration] = &[
         name: "0003_hot_path_indexes",
         sql: include_str!("../migrations/0003_hot_path_indexes.sql"),
     },
+    Migration {
+        version: 4,
+        name: "0004_reader_word_markers",
+        sql: include_str!("../migrations/0004_reader_word_markers.sql"),
+    },
 ];
 
 /// Failures are returned to the runtime; opening never resets a database.

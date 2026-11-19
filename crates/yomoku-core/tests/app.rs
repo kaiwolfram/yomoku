@@ -124,6 +124,7 @@ fn starts_in_library() {
             content_route: yomoku_core::app::ContentRoute::Main,
             reader: None,
             reader_analysis: None,
+            reader_word_marker: None,
             effective_reader_tokens: None,
             effective_reader_word: Some(Default::default()),
             effective_reader_status: Some(yomoku_core::effective_session::EffectiveStatusState {

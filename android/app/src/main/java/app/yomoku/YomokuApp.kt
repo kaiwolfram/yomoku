@@ -74,7 +74,6 @@ internal fun YomokuApp(
     ankiBrowser: AnkiNoteBrowser? = null,
     onImportBook: (() -> Unit)? = null,
 ) {
-    val readerPageMarkers = rememberReaderPageMarkers(view, sessionKey)
     val context = LocalContext.current
     val toasts = androidx.compose.runtime.remember(context) { AppToasts(context) }
     androidx.compose.runtime.DisposableEffect(toasts) { onDispose { toasts.cancel() } }
@@ -226,7 +225,6 @@ internal fun YomokuApp(
                                 imageLoader,
                                 ankiBrowser,
                                 onFinishRequested = { completionOrigin = it - overlayPosition },
-                                pageMarkers = readerPageMarkers,
                             )
                         view.destination == Destination.LIBRARY ->
                             LibraryScreen(

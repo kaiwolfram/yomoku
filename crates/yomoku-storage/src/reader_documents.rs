@@ -2,7 +2,9 @@
 
 use rusqlite::{Connection, OptionalExtension, TransactionBehavior};
 use yomoku_core::{
-    document::{ChapterId, ChapterText, DocumentId, ReaderDocument, TextOffset, TextRange},
+    document::{
+        ChapterId, ChapterText, DocumentId, ReaderDocument, TextAnchor, TextOffset, TextRange,
+    },
     pagination::ReadingPosition,
     reader::{DocumentReaderSnapshot, ReaderChapterAnalysis},
     reader_formatting::{ReaderChapterFormatting, ReaderTextSpan, ReaderTextStyle},
@@ -22,6 +24,46 @@ use crate::{
 };
 
 impl Storage {
+    pub fn save_reader_word_marker(
+        &mut self,
+        document_id: DocumentId,
+        anchor: TextAnchor,
+    ) -> Result<Option<()>, StorageError> {
+        let transaction = self
+            .connection
+            .transaction_with_behavior(TransactionBehavior::Immediate)?;
+        let Some(chapter) =
+            self.reader_integrity
+                .chapter(&transaction, document_id, anchor.chapter_id)?
+        else {
+            return Ok(None);
+        };
+        if anchor
+            .slice(&chapter.text)
+            .map_err(|_| StorageError::InvalidDocument)?
+            .is_empty()
+        {
+            return Err(StorageError::InvalidDocument);
+        }
+        transaction.execute(
+            "INSERT INTO reader_word_markers (document_id, chapter_id, start_byte, end_byte)
+             VALUES (?1, ?2, ?3, ?4)
+             ON CONFLICT (document_id) DO UPDATE SET chapter_id = excluded.chapter_id,
+                 start_byte = excluded.start_byte, end_byte = excluded.end_byte
+             WHERE (reader_word_markers.chapter_id, reader_word_markers.start_byte,
+                    reader_word_markers.end_byte) <>
+                   (excluded.chapter_id, excluded.start_byte, excluded.end_byte)",
+            (
+                i64::from(document_id),
+                i64::from(anchor.chapter_id),
+                i64::from(anchor.range.start),
+                i64::from(anchor.range.end),
+            ),
+        )?;
+        transaction.commit()?;
+        Ok(Some(()))
+    }
+
     /// Validated canonical chapter for lazy dictionary component analysis.
     pub fn load_reader_chapter(
         &mut self,
@@ -149,10 +191,41 @@ fn snapshot_in(
     Ok(DocumentReaderSnapshot {
         last_read_sequence: read_last_read_sequence_in(connection, document.document_id)?,
         typography: crate::settings::read_reader_typography(connection)?,
+        word_marker: read_word_marker(connection, &document)?,
         document,
         page_length: read_page_length(connection)?,
         analyses,
     })
+}
+
+fn read_word_marker(
+    connection: &Connection,
+    document: &ReaderDocument,
+) -> Result<Option<TextAnchor>, StorageError> {
+    let row = connection
+        .query_row(
+            "SELECT chapter_id, start_byte, end_byte FROM reader_word_markers WHERE document_id = ?1",
+            [i64::from(document.document_id)],
+            |row| Ok((row.get::<_, i64>(0)?, row.get::<_, i64>(1)?, row.get::<_, i64>(2)?)),
+        )
+        .optional()?;
+    row.map(|(chapter, start, end)| {
+        let chapter = document.chapter(chapter.try_into()?)?;
+        let anchor = TextAnchor {
+            source_id: chapter.source_id,
+            chapter_id: chapter.chapter_id,
+            range: TextRange {
+                start: start.try_into()?,
+                end: end.try_into()?,
+            },
+        };
+        if anchor.slice(chapter)?.is_empty() {
+            return Err(yomoku_core::document::InvalidTextValue);
+        }
+        Ok(anchor)
+    })
+    .transpose()
+    .map_err(|_| StorageError::InvalidDocument)
 }
 
 pub(crate) fn load_reader_document_in(

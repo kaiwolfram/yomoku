@@ -182,6 +182,8 @@ class ReaderImagesTest {
         awaitReader()
         awaitImages(2)
         assertEquals(first.position, core().view.reader!!.position)
+        assertCatMarker()
+        compose.onNodeWithTag("reader_word_panel").assertDoesNotExist()
         tapWord("猫")
         compose.onNodeWithTag("word_surface").assertTextEquals("猫")
         assertCatMarker()

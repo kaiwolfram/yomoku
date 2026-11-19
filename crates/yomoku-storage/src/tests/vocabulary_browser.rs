@@ -519,7 +519,7 @@ fn version_two_registration_pages_keep_order_with_less_sql_work() {
     let before = cases.map(|(sort, prefix)| measure(&connection, sort, prefix));
     drop(connection);
     let storage = Storage::open(database.path()).unwrap();
-    assert_eq!(storage.schema_version().unwrap(), 3);
+    assert_eq!(storage.schema_version().unwrap(), 4);
     let count: i64 = storage
         .connection
         .query_row("SELECT COUNT(*) FROM vocabulary", [], |row| row.get(0))

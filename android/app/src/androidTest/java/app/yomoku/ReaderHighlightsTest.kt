@@ -3,6 +3,8 @@ package app.yomoku
 import android.content.res.Configuration
 import androidx.activity.ComponentActivity
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
@@ -36,7 +38,8 @@ class ReaderHighlightsTest {
     fun insetPaintPreservesUnicodeWrappedTextAndAdjacentTapTargetsInBothThemes() {
         val night = mutableStateOf(false)
         val taps = mutableListOf<ULong>()
-        val text = "猫犬𠮷か\u3099東京日本語東京日本語猫"
+        val text = "猫犬𠮷か\u3099東京日本語東京日本語猫\n。"
+        val markEnd = text.lastIndexOf("猫")
         val tokens =
             listOf(
                 ReaderAnnotatedToken(0UL, VocabularyStatus.NEW, 0, 1),
@@ -45,10 +48,9 @@ class ReaderHighlightsTest {
                     2UL,
                     VocabularyStatus.FAMILIAR,
                     2,
-                    text.length - 1,
-                    marked = true,
+                    markEnd,
                 ),
-                ReaderAnnotatedToken(3UL, VocabularyStatus.KNOWN, text.length - 1, text.length),
+                ReaderAnnotatedToken(3UL, VocabularyStatus.KNOWN, markEnd, markEnd + 1),
             )
         var inset = 0f
         compose.setContent {
@@ -73,16 +75,21 @@ class ReaderHighlightsTest {
                             emptyList(),
                             Color.Blue,
                             {},
-                            taps::add,
+                            markerRange = 2 until markEnd,
+                            onToken = taps::add,
                         )
-                    ReaderHighlightedText(
-                        annotated,
-                        readerTextStyle(null)
-                            .copy(color = if (night.value) Color.White else Color.Black),
-                        Modifier.width(140.dp)
+                    Box(
+                        Modifier.testTag("text_with_margin")
                             .background(if (night.value) Color.Black else Color.White)
-                            .testTag("highlight_text"),
-                    )
+                            .padding(horizontal = 16.dp)
+                    ) {
+                        ReaderHighlightedText(
+                            annotated,
+                            readerTextStyle(null)
+                                .copy(color = if (night.value) Color.White else Color.Black),
+                            Modifier.width(140.dp).testTag("highlight_text"),
+                        )
+                    }
                 }
             }
         }
@@ -98,7 +105,7 @@ class ReaderHighlightsTest {
             val first = readerTextFragmentRects(layout, 0, 1, inset).single()
             val second = readerTextFragmentRects(layout, 1, 2, inset).single()
             assertEquals(inset * 2, second.left - first.right, 0.6f)
-            val wrapped = readerTextFragmentRects(layout, 2, text.length - 1, inset)
+            val wrapped = readerTextFragmentRects(layout, 2, markEnd, inset)
             assertTrue(wrapped.size > 1)
             val pixels = node.captureToImage().toPixelMap()
             for ((index, status) in
@@ -127,9 +134,9 @@ class ReaderHighlightsTest {
             val foreground = if (dark) Color.White else Color.Black
             val expectedMarker =
                 foreground
-                    .copy(alpha = 0.3f)
+                    .copy(alpha = 0.7f)
                     .compositeOver(vocabularyBackground(VocabularyStatus.FAMILIAR, dark))
-            for (rect in readerTextFragmentRects(layout, 2, text.length - 1)) {
+            for (rect in readerTextFragmentRects(layout, 2, markEnd)) {
                 val y = (rect.bottom - inset / 2).toInt().coerceIn(0, pixels.height - 1)
                 assertTrue(
                     "Marker must underline every wrapped fragment",
@@ -142,17 +149,34 @@ class ReaderHighlightsTest {
                         },
                 )
             }
+            val withMargin = compose.onNodeWithTag("text_with_margin")
+            val marginPixels = withMargin.captureToImage().toPixelMap()
+            val textOffset =
+                node.fetchSemanticsNode().positionInRoot -
+                    withMargin.fetchSemanticsNode().positionInRoot
+            val background = if (dark) Color.Black else Color.White
+            val expectedDot = foreground.copy(alpha = 0.7f).compositeOver(background)
+            for (line in 0 until layout.lineCount) {
+                val x = (textOffset.x + layout.getLineLeft(line) - 6 * inset).toInt()
+                val y =
+                    (textOffset.y + (layout.getLineTop(line) + layout.getLineBottom(line)) / 2)
+                        .toInt()
+                val actual = marginPixels[x, y]
+                val marked =
+                    line in layout.getLineForOffset(2)..layout.getLineForOffset(markEnd - 1)
+                assertEquals(if (marked) expectedDot.red else background.red, actual.red, 0.01f)
+            }
             node.performTouchInput { click(layout.getBoundingBox(0).center) }
             assertEquals(0UL, taps.last())
             node.performTouchInput { click(layout.getBoundingBox(1).center) }
             assertEquals(1UL, taps.last())
             assertTrue(
                 layout.layoutInput.text
-                    .getStringAnnotations(READER_HIGHLIGHT, text.length - 1, text.length)
+                    .getStringAnnotations(READER_HIGHLIGHT, markEnd, markEnd + 1)
                     .isEmpty()
             )
             // The same annotations are retained and clipped by both image and block splitting.
-            val fragment = layout.layoutInput.text.subSequence(4, text.length - 2)
+            val fragment = layout.layoutInput.text.subSequence(4, markEnd - 1)
             assertEquals(
                 0,
                 fragment.getStringAnnotations(READER_HIGHLIGHT, 0, fragment.length).single().start,

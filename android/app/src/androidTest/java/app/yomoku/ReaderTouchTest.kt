@@ -76,7 +76,7 @@ class ReaderTouchTest {
                             emptyList(),
                             Color.Blue,
                             {},
-                            { taps.add(surfaces[it.toInt()]) },
+                            onToken = { taps.add(surfaces[it.toInt()]) },
                         ),
                         readerTextStyle(null)
                             .copy(
@@ -160,7 +160,7 @@ class ReaderTouchTest {
                         emptyList(),
                         Color.Blue,
                         {},
-                        { taps.add(if (it == 0UL) "𠮷か\u3099😀" else "猫") },
+                        onToken = { taps.add(if (it == 0UL) "𠮷か\u3099😀" else "猫") },
                     )
                 )
                 .apply {
@@ -237,7 +237,7 @@ class ReaderTouchTest {
                     emptyList(),
                     Color.Blue,
                     {},
-                    taps::add,
+                    onToken = taps::add,
                 )
             )
         lateinit var scroll: androidx.compose.foundation.ScrollState
