@@ -10,6 +10,10 @@ do not resume deferred features unless requested.
   for the affected feature; historical reports are reference material.
 - Use `/home/kai/Documents/books/japanese` as the default directory for local
   Japanese book examples. Keep book files outside Git.
+- Store finished signed APKs for local testing in the Git-ignored `.local/apks/`
+  directory at the repository root. Name new release builds
+  `yomoku-<version>-<short-commit>-release-signed.apk`. Keep associated checksums
+  and signature sidecars in the same directory.
 - Use Kotlin/Compose for Android, a pure Rust Crux core, separate Rust SQLite I/O
   and EffectRouter, and a narrow typed FFI. Do not put SQL/platform I/O in core.
 - Do not invent product behavior, add excluded features, or change major
