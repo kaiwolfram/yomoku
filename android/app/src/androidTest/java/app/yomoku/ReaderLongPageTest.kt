@@ -44,6 +44,7 @@ class ReaderLongPageTest {
 
     private fun verifyLayout(source: String, split: Boolean) {
         val tapped = mutableListOf<ULong>()
+        val dotStart = source.lastIndexOf("𠮷")
         val text =
             readerAnnotatedSpans(
                 source,
@@ -54,6 +55,7 @@ class ReaderLongPageTest {
                 emptyList(),
                 Color.Blue,
                 {},
+                marker = ReaderMarker(2 until (dotStart + "𠮷".length), endsOnPage = true),
             ) {
                 tapped.add(it)
             }
@@ -153,6 +155,16 @@ class ReaderLongPageTest {
                     line++
                 }
                 val annotated = block.layoutInput.text
+                val dots = annotated.getStringAnnotations(READER_MARKER_DOT, 0, annotated.length)
+                if (dotStart in offset until (offset + annotated.length)) {
+                    assertEquals(dotStart - offset, dots.single().start)
+                    assertEquals(
+                        "𠮷",
+                        annotated.text.substring(dots.single().start, dots.single().end),
+                    )
+                } else {
+                    assertTrue(dots.isEmpty())
+                }
                 val link = annotated.getLinkAnnotations(0, annotated.length).single().item
                 assertEquals(TextLinkStyles(), link.styles)
                 link.linkInteractionListener!!.onClick(link)

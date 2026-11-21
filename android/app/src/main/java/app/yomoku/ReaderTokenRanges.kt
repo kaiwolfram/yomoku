@@ -45,6 +45,8 @@ internal data class EffectiveDisplayToken(
     val end: Int,
 )
 
+internal data class ReaderMarker(val underline: IntRange, val endsOnPage: Boolean)
+
 /** Keep the effective segment/revision on every tap, including crossing/manual words. */
 internal fun effectiveDisplayTokens(
     page: ReaderPage,
@@ -89,7 +91,7 @@ private constructor(
     private val page: ReaderPage,
     private val boundaries: Map<Long, Int>,
 ) {
-    fun markerRange(anchor: TextAnchor): IntRange? {
+    fun marker(anchor: TextAnchor): ReaderMarker? {
         if (anchor.sourceId != page.anchor.sourceId || anchor.chapterId != page.anchor.chapterId)
             return null
         val pageStart = page.anchor.range.start.value
@@ -97,7 +99,8 @@ private constructor(
         val start =
             boundaries[maxOf(anchor.range.start.value, pageStart) - pageStart] ?: return null
         val end = boundaries[minOf(anchor.range.end.value, pageEnd) - pageStart] ?: return null
-        return (start until end).takeIf { start < end }
+        if (start >= end) return null
+        return ReaderMarker(start until end, endsOnPage = anchor.range.end.value <= pageEnd)
     }
 
     fun displayRange(anchor: TextAnchor, display: TextRange, surface: String): IntRange? {
@@ -142,5 +145,5 @@ private constructor(
     }
 }
 
-internal fun readerMarkerRange(page: ReaderPage, anchor: TextAnchor): IntRange? =
-    ReaderTokenRanges.create(page)?.markerRange(anchor)
+internal fun readerMarker(page: ReaderPage, anchor: TextAnchor): ReaderMarker? =
+    ReaderTokenRanges.create(page)?.marker(anchor)

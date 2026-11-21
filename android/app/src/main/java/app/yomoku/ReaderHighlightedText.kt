@@ -128,29 +128,24 @@ internal fun ReaderHighlightedText(
                     val thickness = 1.dp.toPx()
                     val dotRadius = 2.dp.toPx()
                     val dotDistance = 6.dp.toPx()
-                    val dots =
-                        layout
-                            ?.let { result ->
-                                markers
-                                    .map { result.getLineForVerticalPosition(it.center.y) }
-                                    .distinct()
-                                    .map { line ->
-                                        val x =
-                                            if (
-                                                result.getParagraphDirection(
-                                                    result.getLineStart(line)
-                                                ) == ResolvedTextDirection.Rtl
-                                            )
-                                                result.getLineRight(line) + dotDistance
-                                            else result.getLineLeft(line) - dotDistance
-                                        Offset(
-                                            x,
-                                            (result.getLineTop(line) + result.getLineBottom(line)) /
-                                                2f,
-                                        )
-                                    }
+                    val dot = layout?.let { result ->
+                        text
+                            .getStringAnnotations(READER_MARKER_DOT, 0, text.length)
+                            .singleOrNull()
+                            ?.let { range ->
+                                val line = result.getLineForOffset(range.start)
+                                val direction =
+                                    result.getParagraphDirection(result.getLineStart(line))
+                                val x =
+                                    if (direction == ResolvedTextDirection.Rtl)
+                                        result.getLineRight(line) + dotDistance
+                                    else result.getLineLeft(line) - dotDistance
+                                Offset(
+                                    x,
+                                    (result.getLineTop(line) + result.getLineBottom(line)) / 2f,
+                                )
                             }
-                            .orEmpty()
+                    }
                     onDrawWithContent {
                         for ((rect, color) in highlights) drawRect(
                             color,
@@ -163,7 +158,7 @@ internal fun ReaderHighlightedText(
                             Offset(rect.left, rect.bottom - thickness),
                             Size(rect.width, thickness),
                         )
-                        for (dot in dots) drawCircle(markerColor, dotRadius, dot)
+                        if (dot != null) drawCircle(markerColor, dotRadius, dot)
                     }
                 },
     )

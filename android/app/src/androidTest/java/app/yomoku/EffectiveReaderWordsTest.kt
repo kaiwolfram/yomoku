@@ -252,6 +252,51 @@ class EffectiveReaderWordsTest {
     }
 
     @Test
+    fun crossingMarkerUnderlinesBothPagesAndPutsTheDotOnTheEndingPage() {
+        val initial = fixture("猫𠮷")
+        val page = initial.reader!!
+        val marker = initial.effectiveReaderTokens!!.tokens.first().anchor
+        val split = page.text.indexOf("𠮷")
+        val firstText = page.text.substring(0, split)
+        val boundary = page.anchor.range.start.value + firstText.toByteArray().size
+        frame.value =
+            initial.copy(
+                reader =
+                    page.copy(
+                        text = firstText,
+                        anchor = anchor(page.anchor.range.start.value, boundary),
+                    ),
+                effectiveReaderTokens = null,
+                readerWordMarker = marker,
+            )
+        show()
+
+        val first = text()
+        val firstUnderline = first.getStringAnnotations(READER_MARKER, 0, first.length).single()
+        assertEquals("猫", first.text.substring(firstUnderline.start, firstUnderline.end))
+        assertTrue(first.getStringAnnotations(READER_MARKER_DOT, 0, first.length).isEmpty())
+
+        compose.runOnUiThread {
+            frame.value =
+                frame.value.copy(
+                    reader =
+                        page.copy(
+                            text = page.text.substring(split),
+                            anchor = anchor(boundary, page.anchor.range.end.value),
+                            position = page.position.copy(offset = TextOffset(boundary)),
+                            pageNumber = 2UL,
+                        )
+                )
+        }
+        val second = text()
+        val secondUnderline = second.getStringAnnotations(READER_MARKER, 0, second.length).single()
+        val dot = second.getStringAnnotations(READER_MARKER_DOT, 0, second.length).single()
+        assertEquals("𠮷", second.text.substring(secondUnderline.start, secondUnderline.end))
+        assertEquals(secondUnderline.start, dot.start)
+        assertEquals(secondUnderline.end, dot.end)
+    }
+
+    @Test
     fun oneBookMarkerReplacesTheExactOccurrenceAcrossPages() {
         val first = frame.value
         val page = first.reader!!

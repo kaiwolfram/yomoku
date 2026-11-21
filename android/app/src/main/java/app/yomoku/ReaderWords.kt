@@ -80,7 +80,7 @@ internal fun readerAnnotatedText(
     formatting: List<ReaderTextSpan> = emptyList(),
     linkColor: Color = foreground,
     onExternalLink: (String) -> Unit = {},
-    markerRange: IntRange? = null,
+    marker: ReaderMarker? = null,
     onToken: (ULong) -> Unit,
 ): AnnotatedString =
     readerAnnotatedSpans(
@@ -98,7 +98,7 @@ internal fun readerAnnotatedText(
         formatting,
         linkColor,
         onExternalLink,
-        markerRange,
+        marker,
         onToken,
     )
 
@@ -118,12 +118,17 @@ internal fun readerAnnotatedSpans(
     formatting: List<ReaderTextSpan>,
     linkColor: Color,
     onExternalLink: (String) -> Unit,
-    markerRange: IntRange? = null,
+    marker: ReaderMarker? = null,
     onToken: (ULong) -> Unit,
 ): AnnotatedString = buildAnnotatedString {
     append(text)
-    if (markerRange != null) {
-        addStringAnnotation(READER_MARKER, "", markerRange.first, markerRange.last + 1)
+    if (marker != null) {
+        val end = marker.underline.last + 1
+        addStringAnnotation(READER_MARKER, "", marker.underline.first, end)
+        if (marker.endsOnPage) {
+            // Anchor the dot to the final Unicode scalar so it follows the text when split.
+            addStringAnnotation(READER_MARKER_DOT, "", text.offsetByCodePoints(end, -1), end)
+        }
     }
     val spans = readerDisplayFormatting(text, formatting).orEmpty()
     val external = mutableListOf<IntRange>()

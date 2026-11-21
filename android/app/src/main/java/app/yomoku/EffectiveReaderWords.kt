@@ -96,12 +96,12 @@ private fun EffectiveReaderWordContent(
     val foreground = MaterialTheme.colorScheme.onSurface
     val linkColor = MaterialTheme.colorScheme.primary
     val uriHandler = LocalUriHandler.current
-    val markerRange =
+    val marker =
         remember(page, view.readerWordMarker) {
-            view.readerWordMarker?.let { readerMarkerRange(page, it) }
+            view.readerWordMarker?.let { readerMarker(page, it) }
         }
     val text =
-        remember(page, tokens, dark, foreground, linkColor, uriHandler, markerRange) {
+        remember(page, tokens, dark, foreground, linkColor, uriHandler, marker) {
             readerAnnotatedText(
                 page.text,
                 tokens.orEmpty(),
@@ -109,7 +109,7 @@ private fun EffectiveReaderWordContent(
                 foreground,
                 page.formatting,
                 linkColor,
-                markerRange = markerRange,
+                marker = marker,
                 onExternalLink = { target ->
                     try {
                         uriHandler.openUri(target.toUri().normalizeScheme().toString())

@@ -38,8 +38,9 @@ class ReaderHighlightsTest {
     fun insetPaintPreservesUnicodeWrappedTextAndAdjacentTapTargetsInBothThemes() {
         val night = mutableStateOf(false)
         val taps = mutableListOf<ULong>()
-        val text = "猫犬𠮷か\u3099東京日本語東京日本語猫\n。"
+        val text = "猫犬𠮷か\u3099東京日本語東京日本語𠮷猫\n。"
         val markEnd = text.lastIndexOf("猫")
+        val dotStart = text.lastIndexOf("𠮷")
         val tokens =
             listOf(
                 ReaderAnnotatedToken(0UL, VocabularyStatus.NEW, 0, 1),
@@ -75,7 +76,7 @@ class ReaderHighlightsTest {
                             emptyList(),
                             Color.Blue,
                             {},
-                            markerRange = 2 until markEnd,
+                            marker = ReaderMarker(2 until markEnd, endsOnPage = true),
                             onToken = taps::add,
                         )
                     Box(
@@ -156,15 +157,19 @@ class ReaderHighlightsTest {
                     withMargin.fetchSemanticsNode().positionInRoot
             val background = if (dark) Color.Black else Color.White
             val expectedDot = foreground.copy(alpha = 0.7f).compositeOver(background)
+            val finalMarkedLine = layout.getLineForOffset(dotStart)
             for (line in 0 until layout.lineCount) {
                 val x = (textOffset.x + layout.getLineLeft(line) - 6 * inset).toInt()
                 val y =
                     (textOffset.y + (layout.getLineTop(line) + layout.getLineBottom(line)) / 2)
                         .toInt()
                 val actual = marginPixels[x, y]
-                val marked =
-                    line in layout.getLineForOffset(2)..layout.getLineForOffset(markEnd - 1)
-                assertEquals(if (marked) expectedDot.red else background.red, actual.red, 0.01f)
+                assertEquals(
+                    "Margin dot on line $line in dark mode $dark",
+                    if (line == finalMarkedLine) expectedDot.red else background.red,
+                    actual.red,
+                    0.01f,
+                )
             }
             node.performTouchInput { click(layout.getBoundingBox(0).center) }
             assertEquals(0UL, taps.last())
@@ -176,7 +181,7 @@ class ReaderHighlightsTest {
                     .isEmpty()
             )
             // The same annotations are retained and clipped by both image and block splitting.
-            val fragment = layout.layoutInput.text.subSequence(4, markEnd - 1)
+            val fragment = layout.layoutInput.text.subSequence(4, dotStart)
             assertEquals(
                 0,
                 fragment.getStringAnnotations(READER_HIGHLIGHT, 0, fragment.length).single().start,
@@ -188,6 +193,9 @@ class ReaderHighlightsTest {
             assertEquals(
                 fragment.length,
                 fragment.getStringAnnotations(READER_MARKER, 0, fragment.length).single().end,
+            )
+            assertTrue(
+                fragment.getStringAnnotations(READER_MARKER_DOT, 0, fragment.length).isEmpty()
             )
         }
     }
