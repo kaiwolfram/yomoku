@@ -219,6 +219,46 @@ class StatisticsScreenTest {
     }
 
     @Test
+    fun wordStatusLegendShowsPercentagesOfTheClosingTotal() {
+        val fixture = statisticsFixture()
+        val lastBucket = fixture.buckets.last()
+        fun data(closing: WordStatusCounts) =
+            fixture.copy(
+                opening =
+                    fixture.opening.copy(statuses = WordStatusCounts(12UL, 0UL, 0UL, 0UL, 0UL)),
+                buckets =
+                    fixture.buckets.dropLast(1) +
+                        lastBucket.copy(values = lastBucket.values.copy(statuses = closing)),
+            )
+        fun assertLegend(label: String) {
+            compose.onNodeWithTag("statistics_scroll").performScrollToNode(hasText(label))
+            compose.onNodeWithText(label).assertIsDisplayed()
+        }
+        frame.value =
+            frame.value.copy(
+                statistics =
+                    frame.value.statistics.copy(
+                        data = data(WordStatusCounts(4900UL, 5000UL, 5000UL, 4600UL, 0UL))
+                    )
+            )
+        render()
+        assertLegend("New: 4900 (25.1%)")
+        assertLegend("Ignored: 0 (0.0%)")
+        compose.runOnUiThread {
+            frame.value =
+                frame.value.copy(
+                    statistics =
+                        frame.value.statistics.copy(
+                            data = data(WordStatusCounts(0UL, 0UL, 0UL, 0UL, 0UL))
+                        )
+                )
+        }
+        for (status in listOf("New", "Learning", "Familiar", "Known", "Ignored")) {
+            assertLegend("$status: 0 (0.0%)")
+        }
+    }
+
+    @Test
     fun wordStatusOverlapUsesLatestCountsAndStatusOrder() {
         val fixture = statisticsFixture()
         val sharedCounts = WordStatusCounts(30UL, 30UL, 30UL, 30UL, 30UL)

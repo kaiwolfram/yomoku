@@ -122,6 +122,8 @@ private fun StatisticsPlot(dataset: StatisticsDataset, chart: StatisticsChart) {
     val title = stringResource(chart.title)
     val labels = chart.lines.map { stringResource(it) }
     val latestCounts = dataset.points.last().values
+    val latestTotal =
+        if (chart == StatisticsChart.STATUSES) latestCounts.sumOf { it.toDouble() } else 0.0
     val drawOrder =
         if (chart == StatisticsChart.STATUSES) {
             // Paint higher counts and earlier statuses last so they stay visible at overlaps.
@@ -180,6 +182,18 @@ private fun StatisticsPlot(dataset: StatisticsDataset, chart: StatisticsChart) {
             )
         }
         labels.forEachIndexed { index, label ->
+            val count = latestCounts[index]
+            val legend =
+                if (chart == StatisticsChart.STATUSES) {
+                    val percent =
+                        if (latestTotal == 0.0) 0.0 else count.toDouble() / latestTotal * 100
+                    stringResource(
+                        R.string.statistics_status_legend,
+                        label,
+                        count.toString(),
+                        percent,
+                    )
+                } else "$label: $count"
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Canvas(Modifier.size(24.dp, 16.dp)) {
                     drawLine(
@@ -189,10 +203,7 @@ private fun StatisticsPlot(dataset: StatisticsDataset, chart: StatisticsChart) {
                         strokeWidth = 3.dp.toPx(),
                     )
                 }
-                Text(
-                    "$label: ${latestCounts[index]}",
-                    style = MaterialTheme.typography.bodyMedium,
-                )
+                Text(legend, style = MaterialTheme.typography.bodyMedium)
             }
         }
     }

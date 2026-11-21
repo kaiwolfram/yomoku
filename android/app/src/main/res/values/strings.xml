@@ -48,6 +48,7 @@
     <string name="statistics_empty">No reading history yet.</string>
     <string name="statistics_occurrences">Japanese words read</string>
     <string name="statistics_statuses">Word statuses</string>
+    <string name="statistics_status_legend">%1$s: %2$s (%3$.1f%%)</string>
     <string name="statistics_month">Last month</string>
     <string name="statistics_quarter">Last quarter</string>
     <string name="statistics_year">Last year</string>
