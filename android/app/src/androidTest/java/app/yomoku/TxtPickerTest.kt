@@ -186,12 +186,16 @@ class TxtPickerTest {
         val uri = fixture("$token.txt", byteArrayOf(0xc2.toByte(), 0xa9.toByte()), token)
         val resolver = instrumentation.targetContext.contentResolver
         val imports = owner().fileImports
+        val dialogProgress = compose.onNodeWithTag("file_import_progress")
         try {
             start(uri)
             compose.waitUntil(30_000) { imports.filename == "$token.txt" }
             assertTrue(imports.active)
             assertFalse(imports.choosingEncoding)
             compose.onNodeWithText("$token.txt").assertIsDisplayed()
+            dialogProgress
+                .assertIsDisplayed()
+                .assertRangeInfoEquals(ProgressBarRangeInfo.Indeterminate)
             compose.mainClock.advanceTimeBy(320)
             compose
                 .onNodeWithTag("app_loading", useUnmergedTree = true)
@@ -199,8 +203,13 @@ class TxtPickerTest {
             compose.activityRule.scenario.recreate()
             assertSame(imports, owner().fileImports)
             compose.onNodeWithText("$token.txt").assertIsDisplayed()
+            dialogProgress
+                .assertIsDisplayed()
+                .assertRangeInfoEquals(ProgressBarRangeInfo.Indeterminate)
             resolver.call(uri, "release", token, null)
             compose.waitUntil(30_000) { imports.choosingEncoding }
+            compose.onNodeWithText("UTF-8").assertIsDisplayed()
+            dialogProgress.assertDoesNotExist()
             compose.onNodeWithText("Cancel").performClick()
             compose.waitUntil(30_000) { !imports.active }
             awaitIdle()

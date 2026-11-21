@@ -2,12 +2,16 @@ package app.yomoku
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -27,7 +31,18 @@ internal fun FileImportDialogs(imports: FileImports) {
             title = { Text(stringResource(R.string.importing_book)) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text(imports.filename)
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        if (!imports.choosingEncoding && !imports.cancelling) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(20.dp).testTag("file_import_progress"),
+                                strokeWidth = 2.dp,
+                            )
+                        }
+                        Text(imports.filename)
+                    }
                     if (imports.cancelling) Text(stringResource(R.string.import_cancelling))
                     if (imports.choosingEncoding) {
                         Text(stringResource(checkNotNull(imports.encodingError).messageResource()))
