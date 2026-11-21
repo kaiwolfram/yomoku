@@ -16,6 +16,7 @@ pub(super) struct Refinement<'a> {
     dictionary: &'a Dictionary,
     index: FormIndex<'a>,
     forms: HashMap<String, IndexedForm>,
+    word_forms: HashMap<Surface, bool>,
     readings: HashMap<String, Option<String>>,
 }
 
@@ -27,6 +28,7 @@ impl<'a> Refinement<'a> {
                 .form_index()
                 .map_err(|_| DocumentError::Unavailable)?,
             forms: HashMap::new(),
+            word_forms: HashMap::new(),
             readings: HashMap::new(),
         })
     }
@@ -45,6 +47,35 @@ impl<'a> Refinement<'a> {
 
     fn contains(&mut self, form: &str) -> Result<bool, DocumentError> {
         Ok(self.indexed_form(form)? == IndexedForm::Exact)
+    }
+
+    fn refine_verb(
+        &mut self,
+        token: &mut AnalyzedToken,
+        context: &ImportTokenContext,
+    ) -> Result<(), DocumentError> {
+        for candidate in context.derived_verbs.iter().rev() {
+            let matches = if let Some(matches) = self.word_forms.get(candidate) {
+                *matches
+            } else {
+                let matches = self
+                    .dictionary
+                    .contains_word(candidate.as_str())
+                    .map_err(|_| DocumentError::Unavailable)?;
+                self.word_forms.insert(candidate.clone(), matches);
+                matches
+            };
+            if matches {
+                token.dictionary_form = Some(candidate.clone());
+                return Ok(());
+            }
+        }
+        if let Some(normalized) = &context.normalized_verb {
+            if !self.matches(token)? && self.contains(normalized.as_str())? {
+                token.dictionary_form = Some(normalized.clone());
+            }
+        }
+        Ok(())
     }
 
     /// Load only the selected compound's reading, in dictionary order, with
@@ -197,6 +228,9 @@ impl<'a> Refinement<'a> {
             .map_err(|_| DocumentError::InvalidDocument)?;
         if original.mode != SplitMode::C || original.tokens.len() != context.len() {
             return Err(DocumentError::InvalidDocument);
+        }
+        for (token, grammar) in original.tokens.iter_mut().zip(&context) {
+            self.refine_verb(token, grammar)?;
         }
         let mut b = None;
         let mut a = None;
@@ -394,7 +428,7 @@ mod tests {
     fn real_compound_search_prefers_longest_then_leftmost_and_respects_grammar() {
         let dictionary = pinned_dictionary();
         let mut refinement = Refinement::new(&dictionary).unwrap();
-        let context = [ImportTokenContext::default(); 3];
+        let context: [_; 3] = std::array::from_fn(|_| ImportTokenContext::default());
         // These token boundaries expose both the short and long forms, as well
         // as a match starting inside the earlier 日本語学校 match.
         for (parts, consumed, expected) in [
@@ -436,7 +470,7 @@ mod tests {
             },
         ] {
             assert!(refinement
-                .longest_compound(&phrase, &phrase_tokens, &[context[0], blocked])
+                .longest_compound(&phrase, &phrase_tokens, &[context[0].clone(), blocked])
                 .unwrap()
                 .is_none());
         }

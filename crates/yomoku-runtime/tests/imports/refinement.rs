@@ -52,23 +52,22 @@ fn real_loader() -> AnalyzerLoader {
     })
 }
 
-#[test]
-#[ignore = "requires pinned Sudachi Full and word dictionaries; run tools/test-sudachi.sh"]
-fn all_import_formats_refine_dictionary_missing_words_and_preserve_unicode_history_and_duplicates()
-{
-    let database = Database::new();
+fn real_router(path: PathBuf) -> (EffectRouter, AnalyzerLifecycle) {
     let index = std::env::var_os("YOMOKU_WORD_DICTIONARY")
         .map(PathBuf::from)
         .unwrap_or_else(|| {
             PathBuf::from(env!("CARGO_MANIFEST_DIR"))
                 .join("../../.local/dictionaries/index-v1-20261025/dictionary.sqlite3")
         });
-    let (router, lifecycle) = yomoku_runtime::effect_router(
-        database.path(),
-        real_loader(),
-        Box::new(move || Ok(index.clone())),
-    )
-    .unwrap();
+    yomoku_runtime::effect_router(path, real_loader(), Box::new(move || Ok(index.clone()))).unwrap()
+}
+
+#[test]
+#[ignore = "requires pinned Sudachi Full and word dictionaries; run tools/test-sudachi.sh"]
+fn all_import_formats_refine_dictionary_missing_words_and_preserve_unicode_history_and_duplicates()
+{
+    let database = Database::new();
+    let (router, lifecycle) = real_router(database.path());
     let text = concat!(
         "学生だった。制服姿。食べました。国家公務員。新幹線通学。𠮷か\u{3099}😀。制服姿。ひとつ。ふたつ。みっつ。一つ。二個。",
         "すごっ。端っこ。猫っぽかった。走って帰る。その日。動き出した。それって何だっけ。",
@@ -337,6 +336,163 @@ fn settled(router: &EffectRouter, event: Event) -> ViewModel {
             assert_eq!(view.document_error, None);
             return view;
         }
+    }
+}
+
+#[test]
+#[ignore = "requires pinned Sudachi Full and word dictionaries; run tools/test-sudachi.sh"]
+fn japanese_grammar_joins_keep_written_spans_and_return_whole_word_definitions() {
+    let database = Database::new();
+    let (router, _lifecycle) = real_router(database.path());
+    let text = concat!(
+        "奇妙がられる。持って行った。持って行ってしまった。済ませて戻る。思いだせない。",
+        "店員として働く。どこかで待つ。しなければならない。",
+        "いいですか。どこか？どこ か。店員とし、て。店員としている。",
+        "食べなければ帰る。食べている。"
+    );
+    let imported = dispatch_with_timeout(
+        &router,
+        Event::CreatePaste(text.into()),
+        Duration::from_secs(90),
+    );
+    assert_eq!(imported.document_error, None);
+    let id = imported.import_summary.unwrap().document_id;
+    let opened = dispatch(&router, Event::OpenReader(id));
+    let page = opened.reader.unwrap();
+    let loaded = dispatch(
+        &router,
+        Event::LoadReaderTokens(yomoku_core::reader::ReaderTokenKey {
+            document_id: id,
+            page: page.anchor,
+            analysis: opened.reader_analysis.unwrap(),
+        }),
+    )
+    .effective_reader_tokens
+    .unwrap();
+    assert_eq!(
+        loaded
+            .tokens
+            .iter()
+            .map(|token| token.surface.as_str())
+            .collect::<Vec<_>>(),
+        [
+            "奇妙",
+            "がられる",
+            "持って行った",
+            "持って行ってしまった",
+            "済ませ",
+            "て",
+            "戻る",
+            "思いだせない",
+            "店員",
+            "として",
+            "働く",
+            "どこか",
+            "で",
+            "待つ",
+            "し",
+            "なければならない",
+            "いいです",
+            "か",
+            "どこ",
+            "か",
+            "どこ",
+            "か",
+            "店員",
+            "と",
+            "し",
+            "て",
+            "店員",
+            "と",
+            "している",
+            "食べなけれ",
+            "ば",
+            "帰る",
+            "食べている",
+        ]
+    );
+    for (surface, base, reading, entry_id, gloss) in [
+        ("奇妙", "奇妙", "キミョウ", 1219490, "odd"),
+        ("がられる", "がる", "ガラレル", 1631750, "to think"),
+        (
+            "持って行った",
+            "持って行く",
+            "モッテイッタ",
+            1315700,
+            "to take (something) along",
+        ),
+        (
+            "持って行ってしまった",
+            "持って行く",
+            "モッテイッテシマッタ",
+            1315700,
+            "to take (something) along",
+        ),
+        ("済ませ", "済ませる", "スマセ", 1295040, "to finish"),
+        (
+            "思いだせない",
+            "思い出す",
+            "オモイダセナイ",
+            1309260,
+            "to remember",
+        ),
+        (
+            "として",
+            "として",
+            "トシテ",
+            1008590,
+            "as (i.e. in the role of)",
+        ),
+        ("どこか", "どこか", "ドコカ", 1189000, "somewhere"),
+        ("し", "する", "シ", 1157170, "to do"),
+        (
+            "なければならない",
+            "なければならない",
+            "ナケレバナラナイ",
+            1632350,
+            "have to do",
+        ),
+        ("食べなけれ", "食べる", "タベナケレ", 1358280, "to eat"),
+        ("食べている", "食べる", "タベテイル", 1358280, "to eat"),
+    ] {
+        let token = loaded.tokens.iter().find(|t| t.surface == surface).unwrap();
+        assert_eq!(token.display_range.slice(&page.text).unwrap(), surface);
+        assert_eq!(token.reading.as_deref(), Some(reading), "{surface}");
+        assert!(token.vocabulary.is_some(), "{surface}");
+        let details = settled(
+            &router,
+            Event::LoadEffectiveReaderWord(EffectiveReaderSelection {
+                page: loaded.identity,
+                segment_index: token.segment_index,
+            }),
+        )
+        .effective_reader_word
+        .unwrap()
+        .details
+        .unwrap();
+        assert_eq!(details.token.anchor, token.anchor);
+        assert_eq!(details.candidates.surface, surface);
+        assert_eq!(details.candidates.dictionary_form.as_deref(), Some(base));
+        assert!(
+            details
+                .candidates
+                .words
+                .iter()
+                .any(|word| word.entry_id == entry_id
+                    && word
+                        .forms
+                        .iter()
+                        .filter(|form| form.form == base)
+                        .flat_map(|form| &form.matches)
+                        .flat_map(|matched| &matched.sense_indices)
+                        .any(|&index| word.entry.senses[index]
+                            .glosses
+                            .iter()
+                            .any(|g| g.text == gloss))),
+            "{surface} should return {gloss}: {:?}",
+            details.candidates
+        );
+        router.update(Event::DismissReaderWord, |_| {});
     }
 }
 

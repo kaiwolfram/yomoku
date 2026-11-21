@@ -21,9 +21,14 @@ impl Morpheme {
         self.pos(4) != "*" && self.pos(5) != "*"
     }
 
-    fn head(&self) -> bool {
+    fn verb_suffix(&self) -> bool {
+        self.pos(0) == "接尾辞" && self.pos(1) == "動詞的"
+    }
+
+    fn head(&self, for_import: bool) -> bool {
         self.token.is_japanese
             && (matches!(self.pos(0), "動詞" | "形容詞")
+                || (for_import && self.verb_suffix())
                 || (self.pos(0) == "助動詞"
                     && matches!(self.normalized_form.as_str(), "だ" | "です")))
             && self.conjugates()
@@ -53,6 +58,12 @@ impl Morpheme {
         self.pos(0) == "助詞"
             && self.pos(1) == "接続助詞"
             && matches!(self.token.surface.as_str(), "て" | "で")
+    }
+
+    fn causative(&self) -> bool {
+        self.pos(0) == "助動詞"
+            && self.conjugates()
+            && matches!(self.normalized_form.as_str(), "せる" | "させる")
     }
 
     fn helper(&self) -> bool {
@@ -86,6 +97,88 @@ impl Morpheme {
     }
 }
 
+fn contiguous(parts: &[Morpheme]) -> bool {
+    parts.windows(2).all(|pair| pair[0].adjacent(&pair[1]))
+}
+
+fn obligation_after(stem: &Morpheme, parts: &[Morpheme]) -> bool {
+    let [negative, conditional, become_verb, ending, ..] = parts else {
+        return false;
+    };
+    negative.token.surface == "なけれ"
+        && negative.pos(0) == "助動詞"
+        && negative.pos(4) == "助動詞-ナイ"
+        && negative.pos(5) == "仮定形-一般"
+        && conditional.token.surface == "ば"
+        && conditional.pos(0) == "助詞"
+        && conditional.pos(1) == "接続助詞"
+        && become_verb.token.surface == "なら"
+        && become_verb.pos(0) == "動詞"
+        && become_verb.pos(1) == "非自立可能"
+        && become_verb.pos(5) == "未然形-一般"
+        && ending.token.surface == "ない"
+        && ending.pos(0) == "助動詞"
+        && ending.pos(4) == "助動詞-ナイ"
+        && matches!(ending.pos(5), "終止形-一般" | "連体形-一般")
+        && (stem.pos(0) == "動詞" || stem.verb_suffix())
+        && stem.pos(5).starts_with("未然形")
+        && stem.adjacent(negative)
+        && contiguous(&parts[..4])
+}
+
+fn grammar_expression(morphemes: &[Morpheme], index: usize) -> Option<&[Morpheme]> {
+    let parts = &morphemes[index..];
+    let previous = index.checked_sub(1).map(|i| &morphemes[i]);
+    match parts {
+        [pronoun, particle, ..]
+            if pronoun.token.surface == "どこ"
+                && pronoun.pos(0) == "代名詞"
+                && particle.token.surface == "か"
+                && particle.pos(0) == "助詞"
+                && particle.pos(1) == "副助詞"
+                && pronoun.adjacent(particle) =>
+        {
+            Some(&parts[..2])
+        }
+        [particle, verb, connector, rest @ ..]
+            if particle.token.surface == "と"
+                && particle.pos(0) == "助詞"
+                && particle.pos(1) == "格助詞"
+                && previous
+                    .is_some_and(|noun| noun.pos(0) == "名詞" && noun.adjacent(particle))
+                && verb.token.surface == "し"
+                && verb.pos(0) == "動詞"
+                && verb.pos(1) == "非自立可能"
+                && verb.pos(4) == "サ行変格"
+                && verb.pos(5) == "連用形-一般"
+                && connector.token.surface == "て"
+                && connector.connector()
+                && contiguous(&parts[..3])
+                && !rest
+                    .first()
+                    .is_some_and(|helper| connector.adjacent(helper) && helper.helper()) =>
+        {
+            Some(&parts[..3])
+        }
+        _ if previous.is_some_and(|stem| obligation_after(stem, parts)) => Some(&parts[..4]),
+        _ => None,
+    }
+}
+
+fn append(token: &mut AnalyzedToken, part: &AnalyzedToken) {
+    token.surface.push_str(&part.surface);
+    token.anchor.range.end = part.anchor.range.end;
+    token.is_japanese |= part.is_japanese;
+    token.reading = token
+        .reading
+        .take()
+        .zip(part.reading.as_ref())
+        .map(|(mut reading, suffix)| {
+            reading.push_str(suffix);
+            reading
+        });
+}
+
 pub(super) fn standalone_small_tsu(surface: &str) -> bool {
     matches!(surface, "っ" | "ッ" | "ｯ")
 }
@@ -98,6 +191,25 @@ pub(super) fn join(
     let mut index = 0;
     std::iter::from_fn(move || {
         let head = morphemes.get(index)?;
+        if let Some(parts) = for_import
+            .then(|| grammar_expression(morphemes, index))
+            .flatten()
+        {
+            let mut token = head.token.clone();
+            for part in &parts[1..] {
+                append(&mut token, &part.token);
+            }
+            token.dictionary_form = Surface::new(&token.surface).ok();
+            index += parts.len();
+            return Some((
+                token,
+                ImportTokenContext {
+                    standalone_grammar: true,
+                    preserve_join: true,
+                    ..Default::default()
+                },
+            ));
+        }
         let mut end = index + 1;
         let mut grammatical = index;
         let mut suffix = None;
@@ -129,7 +241,10 @@ pub(super) fn join(
                     continue;
                 }
             }
-            if !head.head() && suffix.is_none() {
+            if !head.head(for_import) && suffix.is_none() {
+                break;
+            }
+            if for_import && obligation_after(&morphemes[end - 1], &morphemes[end..]) {
                 break;
             }
             let previous = &morphemes[grammatical];
@@ -138,7 +253,7 @@ pub(super) fn join(
                 end += 1;
             } else if previous.continuative() && next.connector() {
                 let small_tsu_connector = for_import
-                    && previous.pos(0) == "動詞"
+                    && (previous.pos(0) == "動詞" || previous.verb_suffix())
                     && (previous.pos(5) == "連用形-促音便" || grammatical < end - 1)
                     && next.token.surface == "て";
                 if morphemes
@@ -161,23 +276,20 @@ pub(super) fn join(
             }
         }
         let mut token = head.token.clone();
+        let mut derived_verbs = Vec::new();
         for (part_index, part) in (index + 1..end).zip(&morphemes[index + 1..end]) {
-            if suffix == Some(part_index) {
-                token.dictionary_form = part.token.dictionary_form.as_ref().and_then(|base| {
+            let derived_base = || {
+                part.token.dictionary_form.as_ref().and_then(|base| {
                     Surface::new(format!("{}{}", token.surface, base.as_str())).ok()
-                });
+                })
+            };
+            if suffix == Some(part_index) {
+                token.dictionary_form = derived_base();
             }
-            token.surface.push_str(&part.token.surface);
-            token.anchor.range.end = part.token.anchor.range.end;
-            token.is_japanese |= part.token.is_japanese;
-            token.reading =
-                token
-                    .reading
-                    .zip(part.token.reading.as_ref())
-                    .map(|(mut reading, suffix)| {
-                        reading.push_str(suffix);
-                        reading
-                    });
+            if for_import && (part.helper() || part.causative()) {
+                derived_verbs.extend(derived_base());
+            }
+            append(&mut token, &part.token);
         }
         if counted && suffix.is_none() {
             // A numeral's lemma would add unrelated number-only lookup results.
@@ -185,6 +297,15 @@ pub(super) fn join(
         }
         let lemma_head = suffix.unwrap_or(index);
         let lemma = &morphemes[lemma_head];
+        let normalized_verb = (for_import
+            && suffix.is_none()
+            && head.pos(0) == "動詞"
+            && token
+                .dictionary_form
+                .as_ref()
+                .is_some_and(|base| base.as_str() != head.normalized_form))
+        .then(|| Surface::new(&head.normalized_form).ok())
+        .flatten();
         let context = ImportTokenContext {
             starts_sentence: index == 0,
             standalone_grammar: matches!(head.pos(0), "助詞" | "助動詞"),
@@ -193,6 +314,8 @@ pub(super) fn join(
                     || !matches!(lemma.pos(5), "終止形-一般" | "連体形-一般")),
             pending_ending,
             preserve_join,
+            derived_verbs,
+            normalized_verb,
         };
         index = end;
         Some((token, context))

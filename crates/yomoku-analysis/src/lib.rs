@@ -141,11 +141,16 @@ impl Analyzer {
         profile: &AnalysisProfile,
     ) -> Result<ChapterAnalysis, AnalysisError> {
         use yomoku_core::analysis::{
-            IMPORT_POLICY_SUFFIX, LEGACY_IMPORT_POLICY_SUFFIX, WORD_DICTIONARY_PREFIX,
+            COMPOUND_IMPORT_POLICY_SUFFIX, IMPORT_POLICY_SUFFIX, LEGACY_IMPORT_POLICY_SUFFIX,
+            WORD_DICTIONARY_PREFIX,
         };
-        let engine = [IMPORT_POLICY_SUFFIX, LEGACY_IMPORT_POLICY_SUFFIX]
-            .iter()
-            .find_map(|suffix| profile.engine_revision.strip_suffix(suffix));
+        let engine = [
+            IMPORT_POLICY_SUFFIX,
+            COMPOUND_IMPORT_POLICY_SUFFIX,
+            LEGACY_IMPORT_POLICY_SUFFIX,
+        ]
+        .into_iter()
+        .find_map(|suffix| profile.engine_revision.strip_suffix(suffix));
         let dictionary = profile
             .dictionary_revision
             .split_once(WORD_DICTIONARY_PREFIX);

@@ -120,6 +120,15 @@ impl Dictionary {
         Ok(FormIndex(self.connection.prepare(FIRST_FORM_SQL)?))
     }
 
+    /// Exact JMdict membership for derived verb forms, without loading entries.
+    pub fn contains_word(&self, form: &str) -> Result<bool, DictionaryError> {
+        Ok(self.connection.query_row(
+            "SELECT EXISTS(SELECT 1 FROM forms WHERE surface = ?1 COLLATE BINARY AND source = 'JMdict')",
+            [form],
+            |row| row.get(0),
+        )?)
+    }
+
     pub fn parts(
         &self,
         surface: &str,
