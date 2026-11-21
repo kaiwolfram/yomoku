@@ -121,12 +121,18 @@ private fun StatisticsPlot(dataset: StatisticsDataset, chart: StatisticsChart) {
         }
     val title = stringResource(chart.title)
     val labels = chart.lines.map { stringResource(it) }
+    val latestCounts = dataset.points.last().values
+    val drawOrder =
+        if (chart == StatisticsChart.STATUSES) {
+            // Paint higher counts and earlier statuses last so they stay visible at overlaps.
+            labels.indices.sortedWith(compareBy<Int> { latestCounts[it] }.thenByDescending { it })
+        } else labels.indices
     val description =
         title +
             ": " +
             labels
                 .mapIndexed { index, label ->
-                    "$label ${dataset.points.first().values[index]} → ${dataset.points.last().values[index]}"
+                    "$label ${dataset.points.first().values[index]} → ${latestCounts[index]}"
                 }
                 .joinToString(", ")
     val axis = MaterialTheme.colorScheme.outline
@@ -144,7 +150,7 @@ private fun StatisticsPlot(dataset: StatisticsDataset, chart: StatisticsChart) {
             val height = (size.height - 2 * inset).coerceAtLeast(0f)
             drawLine(axis, Offset(inset, inset), Offset(inset, inset + height))
             drawLine(axis, Offset(inset, inset + height), Offset(inset + width, inset + height))
-            labels.indices.forEach { line ->
+            drawOrder.forEach { line ->
                 val path = Path()
                 var previousY = inset + dataset.y(dataset.points.first().values[line]) * height
                 path.moveTo(inset, previousY)
@@ -184,7 +190,7 @@ private fun StatisticsPlot(dataset: StatisticsDataset, chart: StatisticsChart) {
                     )
                 }
                 Text(
-                    "$label: ${dataset.points.last().values[index]}",
+                    "$label: ${latestCounts[index]}",
                     style = MaterialTheme.typography.bodyMedium,
                 )
             }

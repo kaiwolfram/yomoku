@@ -1,10 +1,12 @@
 package app.yomoku
 
+import android.content.res.Configuration
 import androidx.activity.ComponentActivity
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.height
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.*
@@ -213,6 +215,51 @@ class StatisticsScreenTest {
             compose
                 .onNodeWithTag("statistics_chart_${chart.name}")
                 .assertContentDescriptionEquals(description)
+        }
+    }
+
+    @Test
+    fun wordStatusOverlapUsesLatestCountsAndStatusOrder() {
+        val fixture = statisticsFixture()
+        val sharedCounts = WordStatusCounts(30UL, 30UL, 30UL, 30UL, 30UL)
+        val lastBucket = fixture.buckets.last()
+        val cases =
+            listOf(
+                WordStatusCounts(20UL, 35UL, 45UL, 25UL, 25UL) to VocabularyStatus.FAMILIAR,
+                WordStatusCounts(20UL, 40UL, 40UL, 25UL, 25UL) to VocabularyStatus.LEARNING,
+                sharedCounts to VocabularyStatus.NEW,
+                WordStatusCounts(20UL, 30UL, 35UL, 25UL, 40UL) to VocabularyStatus.IGNORED,
+            )
+        render()
+        val chartTag = "statistics_chart_STATUSES"
+        compose.onNodeWithTag("statistics_scroll").performScrollToNode(hasTestTag(chartTag))
+        val dark =
+            (compose.activity.resources.configuration.uiMode and
+                Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
+        for ((latestCounts, expectedStatus) in cases) {
+            val data =
+                fixture.copy(
+                    opening = fixture.opening.copy(statuses = sharedCounts),
+                    buckets =
+                        listOf(
+                            fixture.buckets.first(),
+                            lastBucket.copy(
+                                values = lastBucket.values.copy(statuses = latestCounts)
+                            ),
+                        ),
+                )
+            compose.runOnUiThread {
+                frame.value =
+                    frame.value.copy(statistics = frame.value.statistics.copy(data = data))
+            }
+            val pixels = compose.onNodeWithTag(chartTag).captureToImage().toPixelMap()
+            // The first segment spans a quarter of the plot. Its shared count of 30 is midway
+            // between the extrema of 10 and 50, which the first bucket supplies in every case.
+            assertEquals(
+                "Top status for $latestCounts should be $expectedStatus",
+                vocabularyBackground(expectedStatus, dark),
+                pixels[pixels.width / 8, pixels.height / 2],
+            )
         }
     }
 
