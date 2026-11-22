@@ -6,7 +6,7 @@
 
 <p align="center"><em>Learn Japanese by reading</em></p>
 
-Yomoku is an Android reader that keeps track of the Japanese words you come across. Open an EPUB, text file, or subtitle file, or paste in something you want to read.
+Yomoku is an Android reader that keeps track of the Japanese words you come across. Import EPUB books, plain-text files, and SRT subtitles, or paste Japanese text directly into the app.
 
 - **Look up words.** Tap a word to see its reading and English definition in the built-in offline dictionary.
 - **Track your vocabulary.** See how often you’ve come across a word and mark it as learning or known.
