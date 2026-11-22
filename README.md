@@ -1,73 +1,50 @@
-# Yomoku
+<p align="center">
+  <img src="android/app/src/main/res/mipmap-xhdpi/ic_launcher.webp" width="96" height="96" alt="Yomoku app icon">
+</p>
 
-*Learn Japanese by reading*
+<h1 align="center">Yomoku</h1>
 
-Yomoku is a native offline-first Android reader built with Kotlin/Compose,
-a pure Rust Crux core, SQLite and Sudachi Full. It imports EPUB, TXT and SRT,
-keeps exact reading positions, tracks vocabulary and reading history, and looks up
-words and names in bundled English JMdict/JMnedict dictionaries.
+<p align="center"><em>Learn Japanese by reading</em></p>
 
-Inspired by [Lute](https://github.com/LuteOrg/lute-v3).
+Yomoku is an Android reader that keeps track of the Japanese words you come across. Open an EPUB, text file, or subtitle file, or paste in something you want to read.
 
-The production reader uses stored Mode C analysis, with A/B dictionary components,
-base-text rendering, word highlights, five vocabulary statuses, EPUB images
-and links. Completion saves occurrences, status changes and position
-atomically. Deliberate rereads count again. Imports retain canonical content and
-deduplication digests, then return to Library.
+- **Look up words.** Tap a word to see its reading and English definition in the built-in offline dictionary.
+- **Track your vocabulary.** See how often you’ve come across a word and mark it as learning or known.
+- **Make Anki flashcards.** Send words to AnkiDroid with the original sentence when you export from the reader.
 
-AnkiDroid is optional. Settings selects a deck and verifies the Yomoku v2 model;
-dictionary entries offer Add or existing-note actions based on fresh provider
-queries. Only the default deck is persisted. Interrupted external writes are never
-automatically replayed. There are no custom dictionary entries or Anki export logs.
-
-The app is under development. Manual encrypted backup and restore are deferred to
-a future release. Incompatible development databases are rejected intact. Reading
-durations are not collected or saved.
-Nostr/Feed is no longer planned.
-The [product specification](docs/PRODUCT_SPEC.md) defines scope.
+I like learning Japanese by reading. I found Lute a hassle to set up, so I built Yomoku to bring the reading and vocabulary workflow I liked to my Android phone. [Lute project](https://github.com/LuteOrg/lute-v3)
 
 ## Build and verify
 
-Normal development uses Fedora-compatible CLI tools; Android Studio is optional.
-Install Rust/Cargo, a C compiler, JDK 17, Python 3.11+, Android SDK platform 36,
-build tools 36.0.0, platform-tools and NDK 30.0.16248370. See
-[DEVELOPMENT.md](docs/DEVELOPMENT.md) for pinned tools, dictionary preparation,
-Kotlin/JNI checks and device setup.
+Run these commands from the repository root.
+
+### Rust checks
 
 ```sh
 cargo fetch --locked
 cargo test --workspace --all-features --locked --offline
 cargo fmt --all -- --check
 cargo clippy --workspace --all-targets --all-features --locked --offline -- -D warnings
+```
 
-python3 tools/prepare-sudachi.py
-# Prepare the pinned JMdict/JMnedict index per third_party/dictionaries/README.md.
+### Android builds
+
+Use JDK 17, Android SDK platform 37.0, build tools 36.0.0, platform-tools, and NDK 30.0.16248370. To reproduce the Android dictionary bundle, use Python 3.14.8 with SQLite 3.51.2 and the pinned files in the [dictionary guide](third_party/dictionaries/README.md).
+
+```sh
 rustup target add aarch64-linux-android x86_64-linux-android
-cargo install boltffi_cli --version 0.30.1 --locked --root .local
+cargo install boltffi_cli --version 0.32.1 --locked --root .local
+python3 tools/prepare-sudachi.py
+python3 tools/prepare-dictionaries.py --sources .local/dictionaries/upstream
+
 export JAVA_HOME=/path/to/jdk-17
 export ANDROID_HOME="$HOME/Android/Sdk"
-./android/gradlew -p android :app:assembleDebug :app:lintDebug --console=plain
+./android/gradlew -p android :app:assembleDebug :app:lintDebug --offline --console=plain
 ./android/gradlew -p android :app:assembleRelease :app:lintRelease --offline --console=plain
 ```
 
-Gradle selects matching debug/release Rust profiles, generates Kotlin/JNI bindings
-and packages arm64-v8a and x86_64. The release APK is unsigned; signed publishing
-requires approval. Native generation is serialized; run host JNI and standalone
-Cargo verification separately from Android native generation.
+Omit Gradle’s `--offline` flag when downloading dependencies for the first time.
 
-## Repository
+[Development guide](docs/DEVELOPMENT.md) · [Architecture](docs/ARCHITECTURE.md) · [Product spec](docs/PRODUCT_SPEC.md)
 
-| Path | Purpose |
-| --- | --- |
-| `android/` | Compose and platform adapters |
-| `crates/yomoku-core/` | Pure application/domain rules |
-| `crates/yomoku-runtime/` | EffectRouter and FIFO I/O worker |
-| `crates/yomoku-storage/` | SQLite repositories and initial schema |
-| `crates/yomoku-analysis/`, `crates/yomoku-import/` | Analysis and pure format parsing |
-| `crates/yomoku-ffi/` | Typed bridge and codec generation |
-| `third_party/`, `tools/` | Pinned assets, notices and CLI tooling |
-
-See [architecture](docs/ARCHITECTURE.md), [data model](docs/DATA_MODEL.md) and
-[Anki provider contract](docs/ANKIDROID_API.md). Historical
-[Sudachi measurements](docs/SUDACHI_MEASUREMENTS.md) remain available; they do not
-override current product behavior or establish current device compatibility.
+Yomoku’s code is available under the [MIT License](LICENSE).
