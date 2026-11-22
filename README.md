@@ -10,7 +10,7 @@ Yomoku is an Android reader that keeps track of the Japanese words you come acro
 
 - **Look up words.** Tap a word to see its reading and English definition in the built-in offline dictionary.
 - **Track your vocabulary.** See how often you’ve come across a word and mark it as learning or known.
-- **Make Anki flashcards.** Send words to AnkiDroid with the original sentence when you export from the reader.
+- **Make Anki flashcards.** Send words to [AnkiDroid](https://github.com/ankidroid/Anki-Android) with the original sentence when you export from the reader.
 
 I like learning Japanese by reading. I found Lute a hassle to set up, so I built Yomoku to bring the reading and vocabulary workflow I liked to my Android phone. [Lute project](https://github.com/LuteOrg/lute-v3)
 
