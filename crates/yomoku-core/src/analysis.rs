@@ -21,7 +21,8 @@ pub enum SplitMode {
 pub const LEGACY_IMPORT_POLICY_SUFFIX: &str = ";yomoku-dictionary-refinement-v1";
 pub const COMPOUND_IMPORT_POLICY_SUFFIX: &str = ";yomoku-dictionary-refinement-v2";
 pub const IMPORT_POLICY_V3_SUFFIX: &str = ";yomoku-dictionary-refinement-v3";
-pub const IMPORT_POLICY_SUFFIX: &str = ";yomoku-dictionary-refinement-v4";
+pub const IMPORT_POLICY_V4_SUFFIX: &str = ";yomoku-dictionary-refinement-v4";
+pub const IMPORT_POLICY_SUFFIX: &str = ";yomoku-dictionary-refinement-v5";
 pub const WORD_DICTIONARY_PREFIX: &str = ";jmdict-jmnedict-sha256:";
 
 /// Exact engine revision and dictionary artifact identity, not a moving "latest".
@@ -55,8 +56,12 @@ pub struct ChapterAnalysis {
 pub struct ImportTokenContext {
     pub starts_sentence: bool,
     pub standalone_grammar: bool,
+    /// A preceding token cannot join across this boundary.
+    pub compound_boundary_before: bool,
     pub inflected: bool,
     pub pending_ending: bool,
+    /// A compound can include this stem only if it also includes the following verb.
+    pub honorific_stem: bool,
     pub preserve_join: bool,
     /// Source prefix plus the analyzer lemma of each joined helper or causative.
     pub derived_verbs: Vec<Surface>,

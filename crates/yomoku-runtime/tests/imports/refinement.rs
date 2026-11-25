@@ -191,7 +191,7 @@ fn all_import_formats_refine_dictionary_missing_words_and_preserve_unicode_histo
                 }
                 for (surface, base, reading) in [
                     ("その日", "その日", "そのひ"),
-                    ("動き出した", "動き出す", "うごきだす"),
+                    ("動き出した", "動き出す", "うごきだした"),
                 ] {
                     let token = analysis
                         .tokens
@@ -508,6 +508,102 @@ fn japanese_grammar_boundaries_keep_written_spans_and_return_whole_word_definiti
                             .any(|g| g.text == gloss))),
             "{surface} should return {gloss}: {:?}",
             details.candidates
+        );
+        router.update(Event::DismissReaderWord, |_| {});
+    }
+}
+
+#[test]
+#[ignore = "requires pinned Sudachi Full and word dictionaries; run tools/test-sudachi.sh"]
+fn compound_import_respects_predicates_honorifics_and_inflected_readings() {
+    let database = Database::new();
+    let (router, _lifecycle) = real_router(database.path());
+    let text = concat!(
+        "指紋がないように磨かれた。何かおとりしますか？タッチをお願いします。",
+        "丁寧に説明し、帰った。皆が泣き始めたときも、おにぎりの端っこを食べた。",
+        "このようにする。食べるようにする。おとりを使う。ないです。"
+    );
+    let imported = dispatch_with_timeout(
+        &router,
+        Event::CreatePaste(text.into()),
+        Duration::from_secs(90),
+    );
+    assert_eq!(imported.document_error, None);
+    let id = imported.import_summary.unwrap().document_id;
+    let opened = dispatch(&router, Event::OpenReader(id));
+    let page = opened.reader.unwrap();
+    let loaded = dispatch(
+        &router,
+        Event::LoadReaderTokens(yomoku_core::reader::ReaderTokenKey {
+            document_id: id,
+            page: page.anchor,
+            analysis: opened.reader_analysis.unwrap(),
+        }),
+    )
+    .effective_reader_tokens
+    .unwrap();
+    for (span, expected) in [
+        (
+            "指紋がないように",
+            &["指紋", "が", "ない", "よう", "に"][..],
+        ),
+        ("おとりします", &["お", "とり", "します"]),
+        ("お願いします", &["お願いします"]),
+        ("説明し", &["説明", "し"]),
+        ("泣き始めた", &["泣き始めた"]),
+        ("おにぎりの端っこ", &["おにぎり", "の", "端っこ"]),
+        ("このように", &["このよう", "に"]),
+        ("食べるように", &["食べる", "よう", "に"]),
+        ("おとりを", &["おとり", "を"]),
+        ("ないです", &["ない", "です"]),
+    ] {
+        let start = text.find(span).unwrap();
+        let end = TextOffset::at(&page.text, start + span.len()).unwrap();
+        let start = TextOffset::at(&page.text, start).unwrap();
+        let tokens: Vec<_> = loaded
+            .tokens
+            .iter()
+            .filter(|token| token.display_range.start < end && token.display_range.end > start)
+            .map(|token| token.display_range.slice(&page.text).unwrap())
+            .collect();
+        assert_eq!(tokens, expected, "{span}");
+    }
+    for (surface, base, reading, entry_id) in [
+        ("よう", "よう", "ヨウ", 1605840),
+        ("お", "お", "オ", 2826528),
+        ("とり", "とる", "トリ", 1326980),
+        ("します", "する", "シマス", 1157170),
+        ("お願いします", "お願いします", "おねがいします", 1001720),
+        ("説明", "説明", "セツメイ", 1386460),
+        ("し", "する", "シ", 1157170),
+        ("泣き始めた", "泣き始める", "なきはじめた", 2449530),
+        ("おにぎり", "おにぎり", "オニギリ", 1001620),
+        ("端っこ", "端っこ", "ハシッコ", 2181850),
+        ("です", "です", "デス", 1628500),
+    ] {
+        let token = loaded.tokens.iter().find(|t| t.surface == surface).unwrap();
+        assert_eq!(token.reading.as_deref(), Some(reading), "{surface}");
+        let details = settled(
+            &router,
+            Event::LoadEffectiveReaderWord(EffectiveReaderSelection {
+                page: loaded.identity,
+                segment_index: token.segment_index,
+            }),
+        )
+        .effective_reader_word
+        .unwrap()
+        .details
+        .unwrap();
+        assert_eq!(details.token.anchor, token.anchor);
+        assert_eq!(details.candidates.dictionary_form.as_deref(), Some(base));
+        assert!(
+            details
+                .candidates
+                .words
+                .iter()
+                .any(|word| word.entry_id == entry_id
+                    && word.forms.iter().any(|form| form.form == base)),
+            "{surface} should look up {base}"
         );
         router.update(Event::DismissReaderWord, |_| {});
     }

@@ -106,6 +106,27 @@ fn contiguous(parts: &[Morpheme]) -> bool {
     parts.windows(2).all(|pair| pair[0].adjacent(&pair[1]))
 }
 
+fn grammatical_you_after(predicate: &Morpheme, next: &Morpheme) -> bool {
+    next.normalized_form == "よう"
+        && next.pos(0) == "形状詞"
+        && next.pos(1) == "助動詞語幹"
+        && (predicate.pos(5).starts_with("連体形") || predicate.pos(5).starts_with("終止形"))
+        && predicate.adjacent(next)
+}
+
+fn honorific_stem(prefix: &Morpheme, stem: &Morpheme, verb: &Morpheme) -> bool {
+    prefix.pos(0) == "接頭辞"
+        && prefix.normalized_form == "御"
+        && stem.pos(0) == "動詞"
+        && stem.continuative()
+        && verb.pos(0) == "動詞"
+        && verb.pos(1) == "非自立可能"
+        && verb.pos(4) == "サ行変格"
+        && verb.normalized_form == "為る"
+        && prefix.adjacent(stem)
+        && stem.adjacent(verb)
+}
+
 fn obligation_after(stem: &Morpheme, parts: &[Morpheme]) -> bool {
     let [negative, conditional, become_verb, ending, ..] = parts else {
         return false;
@@ -318,13 +339,20 @@ pub(super) fn join(
                 .is_some_and(|base| base.as_str() != head.normalized_form))
         .then(|| Surface::new(&head.normalized_form).ok())
         .flatten();
+        let previous = index.checked_sub(1).map(|i| &morphemes[i]);
         let context = ImportTokenContext {
             starts_sentence: index == 0,
             standalone_grammar: matches!(head.pos(0), "助詞" | "助動詞"),
+            compound_boundary_before: for_import
+                && previous.is_some_and(|previous| grammatical_you_after(previous, head)),
             inflected: lemma.conjugates()
                 && (grammatical > lemma_head
                     || !matches!(lemma.pos(5), "終止形-一般" | "連体形-一般")),
             pending_ending,
+            honorific_stem: for_import
+                && previous
+                    .zip(morphemes.get(end))
+                    .is_some_and(|(prefix, verb)| honorific_stem(prefix, head, verb)),
             preserve_join,
             derived_verbs,
             normalized_verb,

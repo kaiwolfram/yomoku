@@ -1217,7 +1217,8 @@ fn previous_profile_supports_uncached_raw_components_but_cannot_be_retokenized()
     };
     use yomoku_core::analysis::{
         AnalysisProfile, COMPOUND_IMPORT_POLICY_SUFFIX, IMPORT_POLICY_SUFFIX,
-        IMPORT_POLICY_V3_SUFFIX, LEGACY_IMPORT_POLICY_SUFFIX, WORD_DICTIONARY_PREFIX,
+        IMPORT_POLICY_V3_SUFFIX, IMPORT_POLICY_V4_SUFFIX, LEGACY_IMPORT_POLICY_SUFFIX,
+        WORD_DICTIONARY_PREFIX,
     };
     let input = chapter("食べました。ひとつ。国家公務員。");
     let mut profile = AnalysisProfile {
@@ -1235,6 +1236,7 @@ fn previous_profile_supports_uncached_raw_components_but_cannot_be_retokenized()
             Some(LEGACY_IMPORT_POLICY_SUFFIX),
             Some(COMPOUND_IMPORT_POLICY_SUFFIX),
             Some(IMPORT_POLICY_V3_SUFFIX),
+            Some(IMPORT_POLICY_V4_SUFFIX),
             Some(IMPORT_POLICY_SUFFIX),
         ] {
             profile.engine_revision = revision.into();

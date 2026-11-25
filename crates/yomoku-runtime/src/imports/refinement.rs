@@ -17,7 +17,7 @@ pub(super) struct Refinement<'a> {
     index: FormIndex<'a>,
     forms: HashMap<String, IndexedForm>,
     word_forms: HashMap<Surface, bool>,
-    readings: HashMap<String, Option<String>>,
+    readings: HashMap<String, Vec<String>>,
 }
 
 impl<'a> Refinement<'a> {
@@ -78,32 +78,31 @@ impl<'a> Refinement<'a> {
         Ok(())
     }
 
-    /// Load only the selected compound's reading, in dictionary order, with
-    /// JMdict preferred when both sources contain the matched form.
-    fn reading(&mut self, form: &str) -> Result<Option<String>, DocumentError> {
-        if let Some(reading) = self.readings.get(form) {
-            return Ok(reading.clone());
+    /// Load applicable readings in dictionary order, with JMdict first.
+    fn readings(&mut self, form: &str) -> Result<&[String], DocumentError> {
+        if !self.readings.contains_key(form) {
+            let candidates = self
+                .dictionary
+                .lookup(form, None)
+                .map_err(|_| DocumentError::Unavailable)?;
+            let mut readings = Vec::new();
+            for word in candidates.words {
+                for matched in word.forms.iter().flat_map(|form| &form.matches) {
+                    readings.push(
+                        word.entry.readings[matched.reading.reading_index]
+                            .text
+                            .clone(),
+                    );
+                }
+            }
+            for name in candidates.names {
+                for matched in name.forms.iter().flat_map(|form| &form.matches) {
+                    readings.push(name.entry.readings[matched.reading_index].text.clone());
+                }
+            }
+            self.readings.insert(form.to_owned(), readings);
         }
-        let candidates = self
-            .dictionary
-            .lookup(form, None)
-            .map_err(|_| DocumentError::Unavailable)?;
-        let reading = candidates
-            .words
-            .iter()
-            .find_map(|word| {
-                let matched = word.forms.first()?.matches.first()?;
-                Some(&word.entry.readings[matched.reading.reading_index].text)
-            })
-            .or_else(|| {
-                candidates.names.iter().find_map(|name| {
-                    let matched = name.forms.first()?.matches.first()?;
-                    Some(&name.entry.readings[matched.reading_index].text)
-                })
-            })
-            .cloned();
-        self.readings.insert(form.to_owned(), reading.clone());
-        Ok(reading)
+        Ok(&self.readings[form])
     }
 
     fn longest_compound(
@@ -123,6 +122,7 @@ impl<'a> Refinement<'a> {
             if !token.is_japanese
                 || grammar.standalone_grammar
                 || grammar.starts_sentence
+                || grammar.compound_boundary_before
                 || end != token.anchor.range.start
             {
                 break;
@@ -134,11 +134,26 @@ impl<'a> Refinement<'a> {
                 break;
             }
             end = token.anchor.range.end;
+            // Continue scanning so a complete honorific expression can still match.
+            if grammar.honorific_stem {
+                continue;
+            }
             let surface = TextRange { start, end }
                 .slice(&chapter.text)
                 .map_err(|_| DocumentError::InvalidDocument)?;
             let indexed = self.indexed_form(surface)?;
             let exact = indexed == IndexedForm::Exact && !grammar.pending_ending;
+            let mut reading = None;
+            if exact && grammar.inflected {
+                if let Some(analyzed) = compound_reading(&tokens[..=index]) {
+                    reading = self
+                        .readings(surface)?
+                        .iter()
+                        .find(|reading| reading.chars().map(hiragana).eq(analyzed.chars()))
+                        .cloned();
+                }
+            }
+            let exact = exact && (!grammar.inflected || reading.is_some());
             let mut base = None;
             if grammar.inflected {
                 if let Some(lemma) = token
@@ -153,10 +168,10 @@ impl<'a> Refinement<'a> {
                 }
             }
             if exact || base.is_some() {
-                longest = Some((index + 1, surface, end, exact, base));
+                longest = Some((index + 1, surface, end, exact, base, reading));
             }
         }
-        let Some((consumed, surface, end, exact, base)) = longest else {
+        let Some((consumed, surface, end, exact, base, reading)) = longest else {
             return Ok(None);
         };
         let mut compound = first.clone();
@@ -164,7 +179,14 @@ impl<'a> Refinement<'a> {
         compound.surface = surface.to_owned();
         let base = base.as_deref().unwrap_or(surface);
         compound.dictionary_form = Surface::new(base).ok();
-        compound.reading = self.reading(if exact { surface } else { base })?;
+        compound.reading = if exact {
+            match reading {
+                Some(reading) => Some(reading),
+                None => self.readings(surface)?.first().cloned(),
+            }
+        } else {
+            compound_reading(&tokens[..consumed])
+        };
         Ok(Some((consumed, compound)))
     }
 
@@ -285,6 +307,21 @@ impl<'a> Refinement<'a> {
             .validate(chapter)
             .map_err(|_| DocumentError::InvalidDocument)?;
         Ok(original)
+    }
+}
+
+fn compound_reading(tokens: &[AnalyzedToken]) -> Option<String> {
+    let mut reading = String::new();
+    for token in tokens {
+        reading.extend(token.reading.as_deref()?.chars().map(hiragana));
+    }
+    Some(reading)
+}
+
+fn hiragana(ch: char) -> char {
+    match ch {
+        'ァ'..='ヶ' | 'ヽ' | 'ヾ' => char::from_u32(u32::from(ch) - 0x60).unwrap_or(ch),
+        _ => ch,
     }
 }
 
@@ -474,5 +511,32 @@ mod tests {
                 .unwrap()
                 .is_none());
         }
+    }
+
+    #[test]
+    #[ignore = "requires bundled word dictionary; run tools/test-sudachi.sh"]
+    fn inflected_exact_match_uses_the_agreeing_reading() {
+        let dictionary = pinned_dictionary();
+        let mut refinement = Refinement::new(&dictionary).unwrap();
+        let chapter = chapter("端っこ");
+        let mut tokens = tokens(&chapter, ["端", "っこ"].map(str::to_owned));
+        let context = [
+            ImportTokenContext::default(),
+            ImportTokenContext {
+                inflected: true,
+                ..Default::default()
+            },
+        ];
+        tokens[0].reading = Some("ハジ".into());
+        assert!(refinement
+            .longest_compound(&chapter, &tokens, &context)
+            .unwrap()
+            .is_none());
+        tokens[1].reading = Some("ッコ".into());
+        let (_, compound) = refinement
+            .longest_compound(&chapter, &tokens, &context)
+            .unwrap()
+            .unwrap();
+        assert_eq!(compound.reading.as_deref(), Some("はじっこ"));
     }
 }
