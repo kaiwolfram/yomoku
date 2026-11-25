@@ -32,7 +32,7 @@ fn presets_and_default_match_the_reader_setting() {
     assert_eq!(PageLength::default().characters(), 250);
     assert_eq!(
         PageLength::ALL.map(PageLength::characters),
-        [250, 500, 750, 1000, 1500]
+        [250, 500, 750, 1000]
     );
 }
 

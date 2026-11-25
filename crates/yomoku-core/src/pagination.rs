@@ -18,16 +18,14 @@ pub enum PageLength {
     Characters500,
     Characters750,
     Characters1000,
-    Characters1500,
 }
 
 impl PageLength {
-    pub const ALL: [Self; 5] = [
+    pub const ALL: [Self; 4] = [
         Self::Characters250,
         Self::Characters500,
         Self::Characters750,
         Self::Characters1000,
-        Self::Characters1500,
     ];
 
     pub const fn characters(self) -> usize {
@@ -36,7 +34,6 @@ impl PageLength {
             Self::Characters500 => 500,
             Self::Characters750 => 750,
             Self::Characters1000 => 1000,
-            Self::Characters1500 => 1500,
         }
     }
 }

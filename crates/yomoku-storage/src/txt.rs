@@ -56,16 +56,6 @@ impl<E> From<StorageError> for TxtImportError<E> {
 }
 
 impl Storage {
-    /// Compatibility preflight: references any supported live file format.
-    /// Exact duplicates need no decoder/analyzer.
-    /// New files still require the authoritative lookup in the import transaction.
-    pub fn find_imported_txt(
-        &mut self,
-        original_bytes: &[u8],
-    ) -> Result<Option<LibraryDocument>, StorageError> {
-        self.find_imported_file(original_bytes)
-    }
-
     /// Hash original bytes before decoding; existing live files bypass parsing,
     /// analysis and registration, preserving their title, encoding and progress.
     /// For a new file, filename is its literal display name (not a URI/path).

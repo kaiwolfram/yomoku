@@ -101,7 +101,7 @@ fn history(path: &Path) -> Vec<(i64, String)> {
 fn initial_schema_has_only_release_tables_and_reopens_without_writes() {
     let database = TestDatabase::new();
     let storage = Storage::open(database.path()).unwrap();
-    assert_eq!(storage.schema_version().unwrap(), 4);
+    assert_eq!(storage.schema_version().unwrap(), 1);
     let tables: Vec<String> = storage.connection.prepare("SELECT name FROM sqlite_schema WHERE type = 'table' AND name NOT GLOB 'sqlite_*' ORDER BY name").unwrap().query_map([], |r| r.get(0)).unwrap().collect::<Result<_, _>>().unwrap();
     let mut expected = vec![
         "sources",
@@ -133,6 +133,16 @@ fn initial_schema_has_only_release_tables_and_reopens_without_writes() {
     ];
     expected.sort();
     assert_eq!(tables, expected);
+    let hot_path_indexes: i64 = storage
+        .connection
+        .query_row(
+            "SELECT COUNT(*) FROM sqlite_schema WHERE type = 'index' AND name IN
+                ('vocabulary_by_registration', 'epub_inline_images_by_asset')",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap();
+    assert_eq!(hot_path_indexes, 2);
     let columns: Vec<String> = storage
         .connection
         .prepare("PRAGMA table_info(reading_completions)")
@@ -196,12 +206,7 @@ fn initial_schema_has_only_release_tables_and_reopens_without_writes() {
     );
     assert_eq!(
         history(&database.path()),
-        [
-            (1, "0001_completion_receipts_initial_schema".into()),
-            (2, "0002_library_read_override".into()),
-            (3, "0003_hot_path_indexes".into()),
-            (4, "0004_reader_word_markers".into()),
-        ]
+        [(1, "0001_release_initial_schema".into())]
     );
     assert_eq!(
         storage
@@ -223,7 +228,7 @@ fn initial_schema_has_only_release_tables_and_reopens_without_writes() {
     let bytes = fs::read(database.path()).unwrap();
     for _ in 0..3 {
         let storage = Storage::open(database.path()).unwrap();
-        assert_eq!(storage.schema_version().unwrap(), 4);
+        assert_eq!(storage.schema_version().unwrap(), 1);
         assert!(storage
             .connection
             .pragma_query_value(None, "foreign_keys", |r| r.get::<_, bool>(0))
@@ -242,18 +247,13 @@ fn concurrent_initialization_records_initial_schema_once() {
             let path = database.path();
             scope.spawn(move || {
                 barrier.wait();
-                assert_eq!(Storage::open(path).unwrap().schema_version().unwrap(), 4);
+                assert_eq!(Storage::open(path).unwrap().schema_version().unwrap(), 1);
             });
         }
     });
     assert_eq!(
         history(&database.path()),
-        [
-            (1, "0001_completion_receipts_initial_schema".into()),
-            (2, "0002_library_read_override".into()),
-            (3, "0003_hot_path_indexes".into()),
-            (4, "0004_reader_word_markers".into()),
-        ]
+        [(1, "0001_release_initial_schema".into())]
     );
 }
 
@@ -293,6 +293,7 @@ fn incompatible_development_unknown_and_future_databases_are_never_cleared() {
         Some((1, "0001_simplified_initial_schema")),
         Some((1, "0001_base_text_initial_schema")),
         Some((1, "0001_migration_history")),
+        Some((1, "0001_completion_receipts_initial_schema")),
         Some((24, "0024_anki_settings")),
         Some((2, "0002_future")),
         Some((1, "unexpected")),

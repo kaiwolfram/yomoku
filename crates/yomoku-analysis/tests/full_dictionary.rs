@@ -1211,75 +1211,88 @@ fn joining_stops_at_particles_independent_words_gaps_and_sentence_boundaries() {
 
 #[test]
 #[ignore = "requires pinned Sudachi Full; run tools/test-sudachi.sh"]
-fn previous_profile_supports_uncached_raw_components_but_cannot_be_retokenized() {
-    use yomoku_analysis::{
-        AnalysisError, CONJUGATION_ENGINE_REVISION, COPULA_ENGINE_REVISION, LEGACY_ENGINE_REVISION,
-    };
-    use yomoku_core::analysis::{
-        AnalysisProfile, COMPOUND_IMPORT_POLICY_SUFFIX, IMPORT_POLICY_SUFFIX,
-        IMPORT_POLICY_V3_SUFFIX, IMPORT_POLICY_V4_SUFFIX, IMPORT_POLICY_V5_SUFFIX,
-        LEGACY_IMPORT_POLICY_SUFFIX, WORD_DICTIONARY_PREFIX,
-    };
+fn raw_and_v6_profiles_support_ab_components_only() {
+    use yomoku_analysis::AnalysisError;
+    use yomoku_core::analysis::{AnalysisProfile, IMPORT_POLICY_SUFFIX, WORD_DICTIONARY_PREFIX};
+    use yomoku_storage::dictionary::IMPORT_DICTIONARY_SHA256;
+
     let input = chapter("食べました。ひとつ。国家公務員。");
-    let mut profile = AnalysisProfile {
-        engine_revision: LEGACY_ENGINE_REVISION.into(),
+    let raw = AnalysisProfile {
+        engine_revision: ENGINE_REVISION.into(),
         dictionary_revision: DICTIONARY_REVISION.into(),
     };
-    for revision in [
-        LEGACY_ENGINE_REVISION,
-        CONJUGATION_ENGINE_REVISION,
-        COPULA_ENGINE_REVISION,
-        ENGINE_REVISION,
-    ] {
-        for suffix in [
-            None,
-            Some(LEGACY_IMPORT_POLICY_SUFFIX),
-            Some(COMPOUND_IMPORT_POLICY_SUFFIX),
-            Some(IMPORT_POLICY_V3_SUFFIX),
-            Some(IMPORT_POLICY_V4_SUFFIX),
-            Some(IMPORT_POLICY_V5_SUFFIX),
-            Some(IMPORT_POLICY_SUFFIX),
-        ] {
-            profile.engine_revision = revision.into();
-            profile.dictionary_revision = DICTIONARY_REVISION.into();
-            if let Some(suffix) = suffix {
-                profile.engine_revision.push_str(suffix);
-                profile.dictionary_revision.push_str(&format!(
-                    "{WORD_DICTIONARY_PREFIX}{}",
-                    yomoku_storage::dictionary::IMPORT_DICTIONARY_SHA256
-                ));
-            }
-            for mode in [SplitMode::A, SplitMode::B] {
-                let legacy = analyzer()
-                    .analyze_components(&input, mode, &profile)
-                    .unwrap();
-                assert_eq!(legacy.profile, profile);
-                assert_eq!(
-                    &surfaces(&legacy)[..7],
-                    &["食べ", "まし", "た", "。", "ひと", "つ", "。"]
-                );
-                assert_eq!(
-                    legacy.tokens,
-                    analyzer().analyze_mode(&input, mode).unwrap().tokens
-                );
-            }
-            assert!(matches!(
-                analyzer().analyze_components(&input, SplitMode::C, &profile),
-                Err(AnalysisError::UnsupportedProfile)
-            ));
+    let refined = AnalysisProfile {
+        engine_revision: format!("{ENGINE_REVISION}{IMPORT_POLICY_SUFFIX}"),
+        dictionary_revision: format!(
+            "{DICTIONARY_REVISION}{WORD_DICTIONARY_PREFIX}{IMPORT_DICTIONARY_SHA256}"
+        ),
+    };
+    for profile in [&raw, &refined] {
+        for mode in [SplitMode::A, SplitMode::B] {
+            let components = analyzer()
+                .analyze_components(&input, mode, profile)
+                .unwrap();
+            assert_eq!(&components.profile, profile);
+            assert_eq!(
+                &surfaces(&components)[..7],
+                &["食べ", "まし", "た", "。", "ひと", "つ", "。"]
+            );
+            assert_eq!(components.tokens, analyze(&input.text, mode).tokens);
         }
+        assert!(matches!(
+            analyzer().analyze_components(&input, SplitMode::C, profile),
+            Err(AnalysisError::UnsupportedProfile)
+        ));
     }
-    profile.engine_revision = "unknown".into();
-    assert!(matches!(
-        analyzer().analyze_components(&input, SplitMode::A, &profile),
-        Err(AnalysisError::UnsupportedProfile)
-    ));
-    profile.engine_revision = ENGINE_REVISION.into();
-    profile.dictionary_revision = "unknown".into();
-    assert!(matches!(
-        analyzer().analyze_components(&input, SplitMode::B, &profile),
-        Err(AnalysisError::UnsupportedProfile)
-    ));
+
+    let assert_rejected = |profile: &AnalysisProfile| {
+        for mode in [SplitMode::A, SplitMode::B] {
+            assert!(
+                matches!(
+                    analyzer().analyze_components(&input, mode, profile),
+                    Err(AnalysisError::UnsupportedProfile)
+                ),
+                "{profile:?}"
+            );
+        }
+    };
+    for policy in 1..=5 {
+        assert_rejected(&AnalysisProfile {
+            engine_revision: format!("{ENGINE_REVISION};yomoku-dictionary-refinement-v{policy}"),
+            ..refined.clone()
+        });
+    }
+    for adapter in ["v1", "v2-conjugations", "v3-copulas"] {
+        let engine = ENGINE_REVISION.replace("v4-counters", adapter);
+        assert_rejected(&AnalysisProfile {
+            engine_revision: engine.clone(),
+            ..raw.clone()
+        });
+        assert_rejected(&AnalysisProfile {
+            engine_revision: format!("{engine}{IMPORT_POLICY_SUFFIX}"),
+            ..refined.clone()
+        });
+    }
+    for profile in [
+        AnalysisProfile {
+            engine_revision: raw.engine_revision.clone(),
+            ..refined.clone()
+        },
+        AnalysisProfile {
+            dictionary_revision: raw.dictionary_revision.clone(),
+            ..refined.clone()
+        },
+        AnalysisProfile {
+            dictionary_revision: format!("{DICTIONARY_REVISION}{WORD_DICTIONARY_PREFIX}invalid"),
+            ..refined
+        },
+        AnalysisProfile {
+            dictionary_revision: "unknown".into(),
+            ..raw
+        },
+    ] {
+        assert_rejected(&profile);
+    }
 }
 
 #[test]
@@ -1470,23 +1483,6 @@ fn copula_past_keeps_nouns_separate_and_preserves_source_reading_and_base() {
     );
     let raw = analyze("学生だった。", SplitMode::B);
     assert_eq!(surfaces(&raw), ["学生", "だっ", "た", "。"]);
-    let chapter = chapter("学生だった。");
-    for revision in [
-        yomoku_analysis::LEGACY_ENGINE_REVISION,
-        yomoku_analysis::CONJUGATION_ENGINE_REVISION,
-    ] {
-        let profile = yomoku_core::analysis::AnalysisProfile {
-            engine_revision: revision.into(),
-            dictionary_revision: DICTIONARY_REVISION.into(),
-        };
-        assert_eq!(
-            analyzer()
-                .analyze_components(&chapter, SplitMode::B, &profile)
-                .unwrap()
-                .tokens,
-            raw.tokens
-        );
-    }
 }
 
 #[test]

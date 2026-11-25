@@ -300,7 +300,6 @@ fn epub_duplicates_preserve_live_state_skip_parser_and_share_original_file_ident
         storage.find_imported_file(&bytes).unwrap(),
         Some(reference.clone())
     );
-    assert_eq!(storage.find_imported_txt(&bytes).unwrap(), Some(reference));
     storage
         .connection
         .pragma_update(None, "query_only", false)

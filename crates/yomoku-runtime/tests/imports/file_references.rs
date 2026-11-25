@@ -270,7 +270,6 @@ fn ordered_reader_worker_crosses_chapters_with_original_analysis_time_and_whole_
         yomoku_core::pagination::PageLength::Characters500,
         yomoku_core::pagination::PageLength::Characters750,
         yomoku_core::pagination::PageLength::Characters1000,
-        yomoku_core::pagination::PageLength::Characters1500,
         yomoku_core::pagination::PageLength::Characters250,
     ] {
         let reflowed = dispatch(&router, Event::SetPageLength(length));

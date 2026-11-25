@@ -89,6 +89,22 @@ fn invalid_or_missing_settings_are_rejected_without_repair() {
 }
 
 #[test]
+fn release_schema_rejects_retired_settings() {
+    let database = TestDatabase::new();
+    let storage = Storage::open(database.path()).unwrap();
+    for sql in [
+        "UPDATE reader_settings SET page_length = 1500",
+        "UPDATE statistics_settings SET timeframe = 'last_six_months'",
+    ] {
+        assert!(matches!(
+            storage.connection.execute(sql, []),
+            Err(rusqlite::Error::SqliteFailure(error, _))
+                if error.code == rusqlite::ErrorCode::ConstraintViolation
+        ));
+    }
+}
+
+#[test]
 fn all_typography_preferences_persist_without_changing_logical_pages_or_document_rows() {
     use yomoku_core::typography::{ReaderFontSize, ReaderLineSpacing, ReaderTypography};
     let database = TestDatabase::new();
@@ -180,21 +196,15 @@ fn corrupt_typography_is_rejected_without_writes_or_silent_repair() {
 fn statistics_timeframe_defaults_to_last_week_and_reopens_with_other_settings() {
     use yomoku_core::statistics::StatisticsTimeframe::*;
     let database = TestDatabase::new();
-    let mut connection = Connection::open(database.path()).unwrap();
-    migrate(&mut connection, &MIGRATIONS[..1]).unwrap();
-    connection
-        .execute("UPDATE reader_settings SET page_length = 750", [])
-        .unwrap();
-    drop(connection);
     let mut storage = Storage::open(database.path()).unwrap();
-    assert_eq!(storage.schema_version().unwrap(), 4);
     assert_eq!(storage.statistics_timeframe().unwrap(), LastWeek);
-    assert_eq!(storage.page_length().unwrap().characters(), 750);
+    storage.save_page_length(PageLength::Characters750).unwrap();
     for value in [LastWeek, LastMonth, LastQuarter, LastYear, AllTime] {
         assert_eq!(storage.save_statistics_timeframe(value).unwrap(), value);
         drop(storage);
         storage = Storage::open(database.path()).unwrap();
         assert_eq!(storage.statistics_timeframe().unwrap(), value);
+        assert_eq!(storage.page_length().unwrap(), PageLength::Characters750);
     }
     assert!(storage
         .connection
@@ -252,19 +262,10 @@ fn statistics_timeframe_write_failure_keeps_previous_value_and_can_retry() {
 }
 
 #[test]
-fn legacy_six_month_preference_slot_is_the_rolling_quarter_without_migration() {
+fn rolling_quarter_is_saved_under_its_own_name_and_restored() {
     use yomoku_core::statistics::StatisticsTimeframe::LastQuarter;
     let database = TestDatabase::new();
     let mut storage = Storage::open(database.path()).unwrap();
-    storage
-        .connection
-        .execute(
-            "UPDATE statistics_settings SET timeframe = 'last_six_months'",
-            [],
-        )
-        .unwrap();
-    assert_eq!(storage.statistics_timeframe().unwrap(), LastQuarter);
-    assert_eq!(storage.schema_version().unwrap(), 4);
     storage.save_statistics_timeframe(LastQuarter).unwrap();
     let slot: String = storage
         .connection
@@ -272,7 +273,7 @@ fn legacy_six_month_preference_slot_is_the_rolling_quarter_without_migration() {
             row.get(0)
         })
         .unwrap();
-    assert_eq!(slot, "last_six_months");
+    assert_eq!(slot, "last_quarter");
     drop(storage);
     assert_eq!(
         Storage::open(database.path())

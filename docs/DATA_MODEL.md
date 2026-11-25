@@ -1,13 +1,8 @@
 # Data model
 
-The release schema version is **4**. The SQL lives in the
-[initial schema](../crates/yomoku-storage/migrations/0001_completion_receipts_initial_schema.sql),
-[Library read override migration](../crates/yomoku-storage/migrations/0002_library_read_override.sql),
-[index migration](../crates/yomoku-storage/migrations/0003_hot_path_indexes.sql),
-and [reader word marker migration](../crates/yomoku-storage/migrations/0004_reader_word_markers.sql).
+The first release uses schema version **1** and one migration journal entry,
+[`0001_release_initial_schema`](../crates/yomoku-storage/migrations/0001_release_initial_schema.sql).
 It has **26 application tables** plus SQLite's internal `sqlite_sequence` table.
-Databases with the `0001_completion_receipts_initial_schema` journal upgrade in
-place. Earlier development journals remain unsupported.
 
 | Area | Tables |
 | --- | --- |
@@ -20,16 +15,14 @@ place. Earlier development journals remain unsupported.
 
 The small migration runner opens an immediate transaction, reads the journal and
 applies missing migrations in order. Concurrent opens serialize. Foreign keys are
-enabled on every repository connection. Unknown, future and historical development
-journals are errors. The runner does not reset incompatible databases, delete user
-files or backfill development data.
+enabled on every repository connection. Unknown, future and pre-release development
+journals produce the incompatible-database error and leave the database intact.
 
-Version 3 indexes vocabulary by registration time and ID, and EPUB inline images
-by document ID and asset path. Existing rows keep their values and ordering.
+The initial schema indexes vocabulary by registration time and ID, and EPUB
+inline images by document ID and asset path.
 
-Version 4 adds `reader_word_markers`. Existing books start with no marker.
-Each row stores one live document’s selected chapter and half-open UTF-8 byte
-range. The reader snapshot loads it independently of the reading position.
+`reader_word_markers` stores one live document’s selected chapter and half-open
+UTF-8 byte range. The reader snapshot loads it independently of the reading position.
 Accepting a selection replaces the row before dictionary lookup. Deleting the
 document cascades to its marker.
 
@@ -53,9 +46,10 @@ annotations are discarded while preserving their base text; no ruby metadata is 
 Offsets are UTF-8 byte positions at scalar boundaries, never UTF-16 indices.
 Analysis headers retain engine/dictionary profile and A/B/C mode; indexed tokens
 retain exact surface, anchor, classification, reading and dictionary form. The
-production reader uses C. A/B support dictionary components. Reading never silently
-replaces stored analysis with a newer dictionary. Bundled dictionaries live outside
-the user database and remain read-only.
+reader uses stored Mode C analysis from import policy v6. Reader dictionary lookups
+can generate A/B components for v6 books without changing saved boundaries.
+Import refinement and Vocabulary lookup use the current raw Sudachi profile.
+Bundled dictionaries live outside the user database and remain read-only.
 
 Vocabulary uses exact surface identity. Imports register previously unseen Japanese
 surfaces without changing existing status. Explicit status history supports the
@@ -66,8 +60,8 @@ existing books to register it again. There are no custom dictionary records.
 
 `documents.read_override` is nullable. The effective Library status uses the
 override when present and otherwise inherits `documents.finished_at_least_once`.
-Migration 2 leaves the override NULL for existing books. Manual marking updates
-only the override on the live document. The permanent finish marker still
+New books start with a NULL override. Manual marking updates only the override on
+the live document. The permanent finish marker still
 governs whether opening the reader resets the position to page one.
 
 ## Completion
@@ -92,10 +86,9 @@ durations or pending-time state are persisted.
 ## Settings
 
 The singleton reader settings default to 250 characters, 16 sp font, 150% line
-spacing. The 250-character seed applies only to fresh databases; saved
-preferences, including 500 and legacy 1,500, survive reopening without migration
-or automatic reflow. Page length is independent of typography. Library read
-recency uses a persisted monotonic sequence.
+spacing. The supported page lengths are 250, 500, 750 and 1,000 characters.
+Saved preferences survive reopening. Page length is independent of typography.
+Library read recency uses a persisted monotonic sequence.
 
 The entire Anki database state is:
 
@@ -115,13 +108,11 @@ There are no submission/model-creation journals, export history or startup repla
 
 ## Statistics preference
 
-The initial schema includes `statistics_settings`, a required singleton (`id = 1`) with a
-validated timeframe: `last_week`, `last_month`, `last_six_months`, `last_year`, or
-`all_time`. New databases default to `last_week`. Native typed
+The required `statistics_settings` singleton (`id = 1`) stores one of
+`last_week`, `last_month`, `last_quarter`, `last_year`, or `all_time`.
+New databases default to `last_week`. Native typed
 read/save effects share the SQLite FIFO; one preference request runs at a time,
 coalescing later selections even after navigation. Statistics Retry retries failed
 preference operations. Missing or invalid settings are errors and are never repaired.
 
-Statistics maps the initial schema’s `last_six_months` preference slot to the rolling
-three-month `LastQuarter` interval. The slot and schema stay unchanged so saved
-selections survive without a database migration.
+The `last_quarter` value selects the rolling three-month interval.

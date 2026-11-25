@@ -19,15 +19,6 @@ use yomoku_core::{
     vocabulary::Surface,
 };
 
-pub const LEGACY_ENGINE_REVISION: &str =
-    "sudachi.rs@5de0410b6edfd428fc510cc9763440772e9619d5+android-loader-v1;yomoku-adapter-v1;embedded-defaults";
-/// Version 2 joins conjugations in production C while preserving raw A/B.
-pub const CONJUGATION_ENGINE_REVISION: &str =
-    "sudachi.rs@5de0410b6edfd428fc510cc9763440772e9619d5+android-loader-v1;yomoku-adapter-v2-conjugations;embedded-defaults";
-/// Version 3 also joins copula stems with grammatical endings.
-pub const COPULA_ENGINE_REVISION: &str =
-    "sudachi.rs@5de0410b6edfd428fc510cc9763440772e9619d5+android-loader-v1;yomoku-adapter-v3-copulas;embedded-defaults";
-/// Version 4 also joins numerals with grammatically tagged counter suffixes.
 pub const ENGINE_REVISION: &str =
     "sudachi.rs@5de0410b6edfd428fc510cc9763440772e9619d5+android-loader-v1;yomoku-adapter-v4-counters;embedded-defaults";
 pub const DICTIONARY_SHA256: &str =
@@ -132,29 +123,15 @@ impl Analyzer {
         self.analyze_chapter(chapter, SplitMode::C, true)
     }
 
-    /// A/B semantics and dictionary bytes are unchanged from version 1. Honor
-    /// its profile for lazy components of existing books; never regenerate old C.
+    /// Use raw A/B boundaries with the current Sudachi or v6 import profile.
     pub fn analyze_components(
         &self,
         chapter: &ChapterText,
         mode: SplitMode,
         profile: &AnalysisProfile,
     ) -> Result<ChapterAnalysis, AnalysisError> {
-        use yomoku_core::analysis::{
-            COMPOUND_IMPORT_POLICY_SUFFIX, IMPORT_POLICY_SUFFIX, IMPORT_POLICY_V3_SUFFIX,
-            IMPORT_POLICY_V4_SUFFIX, IMPORT_POLICY_V5_SUFFIX, LEGACY_IMPORT_POLICY_SUFFIX,
-            WORD_DICTIONARY_PREFIX,
-        };
-        let engine = [
-            IMPORT_POLICY_SUFFIX,
-            IMPORT_POLICY_V5_SUFFIX,
-            IMPORT_POLICY_V4_SUFFIX,
-            IMPORT_POLICY_V3_SUFFIX,
-            COMPOUND_IMPORT_POLICY_SUFFIX,
-            LEGACY_IMPORT_POLICY_SUFFIX,
-        ]
-        .into_iter()
-        .find_map(|suffix| profile.engine_revision.strip_suffix(suffix));
+        use yomoku_core::analysis::{IMPORT_POLICY_SUFFIX, WORD_DICTIONARY_PREFIX};
+        let engine = profile.engine_revision.strip_suffix(IMPORT_POLICY_SUFFIX);
         let dictionary = profile
             .dictionary_revision
             .split_once(WORD_DICTIONARY_PREFIX);
@@ -170,16 +147,7 @@ impl Analyzer {
             ),
             _ => return Err(AnalysisError::UnsupportedProfile),
         };
-        if mode == SplitMode::C
-            || !matches!(
-                engine,
-                ENGINE_REVISION
-                    | COPULA_ENGINE_REVISION
-                    | CONJUGATION_ENGINE_REVISION
-                    | LEGACY_ENGINE_REVISION
-            )
-            || dictionary != DICTIONARY_REVISION
-        {
+        if mode == SplitMode::C || engine != ENGINE_REVISION || dictionary != DICTIONARY_REVISION {
             return Err(AnalysisError::UnsupportedProfile);
         }
         let mut analysis = self.analyze_mode(chapter, mode)?;

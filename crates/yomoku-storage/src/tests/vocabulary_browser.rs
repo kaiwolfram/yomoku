@@ -476,10 +476,10 @@ fn prefix_query_plans_search_existing_surface_and_occurrence_indexes_for_all_sor
 }
 
 #[test]
-fn version_two_registration_pages_keep_order_with_less_sql_work() {
+fn release_registration_index_preserves_order_with_less_sql_work() {
     let database = TestDatabase::new();
-    let mut connection = Connection::open(database.path()).unwrap();
-    migrate(&mut connection, &MIGRATIONS[..2]).unwrap();
+    let storage = Storage::open(database.path()).unwrap();
+    let connection = &storage.connection;
     connection
         .execute_batch(
             "WITH RECURSIVE n(i) AS (VALUES(1) UNION ALL SELECT i+1 FROM n WHERE i<4096)
@@ -516,17 +516,12 @@ fn version_two_registration_pages_keep_order_with_less_sql_work() {
         (VocabularySort::Newest, "語012"),
         (VocabularySort::Oldest, "語012"),
     ];
-    let before = cases.map(|(sort, prefix)| measure(&connection, sort, prefix));
-    drop(connection);
-    let storage = Storage::open(database.path()).unwrap();
-    assert_eq!(storage.schema_version().unwrap(), 4);
-    let count: i64 = storage
-        .connection
-        .query_row("SELECT COUNT(*) FROM vocabulary", [], |row| row.get(0))
+    let indexed = cases.map(|(sort, prefix)| measure(connection, sort, prefix));
+    connection
+        .execute_batch("DROP INDEX vocabulary_by_registration")
         .unwrap();
-    assert_eq!(count, 4096);
-    for ((sort, prefix), (ids, steps, _)) in cases.into_iter().zip(before) {
-        let (actual, indexed_steps, plan) = measure(&storage.connection, sort, prefix);
+    for ((sort, prefix), (actual, indexed_steps, plan)) in cases.into_iter().zip(indexed) {
+        let (ids, steps, _) = measure(connection, sort, prefix);
         assert_eq!(actual, ids);
         eprintln!("{sort:?} {prefix:?} SQLite VM steps: {steps} -> {indexed_steps}");
         if prefix.is_empty() {

@@ -246,7 +246,7 @@ internal fun verifyDocumentBridge() {
             val initial = reopened.dispatch(bridge, Event.RefreshLibrary)
             check(initial.importSummary == null)
             check(initial.documents.single().documentId == document.documentId)
-            check(initial.pageLength == PageLength.CHARACTERS1500)
+            check(initial.pageLength == PageLength.CHARACTERS1000)
             check(
                 initial.readerTypography ==
                     ReaderTypography(ReaderFontSize.SP24, ReaderLineSpacing.PERCENT200)

@@ -104,8 +104,7 @@ impl Storage {
         let value = match timeframe {
             LastWeek => "last_week",
             LastMonth => "last_month",
-            // Retain the initial schema preference slot; no migration is needed.
-            LastQuarter => "last_six_months",
+            LastQuarter => "last_quarter",
             LastYear => "last_year",
             AllTime => "all_time",
         };
@@ -132,7 +131,7 @@ fn read_statistics_timeframe(
     match value.as_deref() {
         Some("last_week") => Ok(LastWeek),
         Some("last_month") => Ok(LastMonth),
-        Some("last_six_months") => Ok(LastQuarter),
+        Some("last_quarter") => Ok(LastQuarter),
         Some("last_year") => Ok(LastYear),
         Some("all_time") => Ok(AllTime),
         _ => Err(StorageError::InvalidSettings),

@@ -146,6 +146,36 @@ fn statistics_fifo_returns_exact_all_timeframes_and_persists_choice_without_load
 }
 
 #[test]
+fn library_rejects_populated_development_database_without_writes() {
+    let database = Database::new();
+    let (storage, _) = seed(&database);
+    drop(storage);
+    let connection = Connection::open(database.path()).unwrap();
+    connection
+        .execute_batch(
+            "DELETE FROM schema_migrations;
+             INSERT INTO schema_migrations VALUES
+                (1, '0001_completion_receipts_initial_schema'),
+                (2, '0002_library_read_override'),
+                (3, '0003_hot_path_indexes'),
+                (4, '0004_reader_word_markers');",
+        )
+        .unwrap();
+    drop(connection);
+    let before = std::fs::read(database.path()).unwrap();
+    let Factory { loader, trace, .. } = Factory::new(false, None);
+    let (router, _lifecycle) = import_router(database.path(), loader).unwrap();
+    let view = dispatch(&router, Event::RefreshLibrary);
+    assert_eq!(
+        view.document_error,
+        Some(DocumentError::IncompatibleDatabase)
+    );
+    assert!(view.documents.is_empty());
+    assert_eq!(std::fs::read(database.path()).unwrap(), before);
+    assert!(trace.try_recv().is_err());
+}
+
+#[test]
 fn statistics_worker_corruption_and_bad_dates_fail_read_only_then_retry_exact_query() {
     let database = Database::new();
     let (_observer, _) = seed(&database);

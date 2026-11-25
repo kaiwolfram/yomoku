@@ -24,21 +24,14 @@ fn snapshot(storage: &mut Storage, id: DocumentId) -> DocumentReaderSnapshot {
 }
 
 #[test]
-fn word_markers_upgrade_in_place_replace_across_pages_and_follow_live_books() {
+fn word_markers_replace_across_pages_and_follow_live_books() {
     let database = TestDatabase::new();
-    let mut connection = Connection::open(database.path()).unwrap();
-    migrate(&mut connection, &MIGRATIONS[..3]).unwrap();
-    let text = PasteText::new(format!("{}\n\n𠮷犬", "猫".repeat(250))).unwrap();
-    let transaction = connection.transaction().unwrap();
-    let book = crate::documents::create_paste_in(&transaction, &text).unwrap();
-    let other =
-        crate::documents::create_paste_in(&transaction, &PasteText::new("犬".into()).unwrap())
-            .unwrap();
-    transaction.commit().unwrap();
-    drop(connection);
-
     let mut storage = Storage::open(database.path()).unwrap();
-    assert_eq!(storage.schema_version().unwrap(), 4);
+    let text = PasteText::new(format!("{}\n\n𠮷犬", "猫".repeat(250))).unwrap();
+    let book = storage.unanalyzed_fixture(&text).unwrap();
+    let other = storage
+        .unanalyzed_fixture(&PasteText::new("犬".into()).unwrap())
+        .unwrap();
     let original = snapshot(&mut storage, book.document_id);
     assert_eq!(original.document, ReaderDocument::from(book.clone()));
     assert_eq!(original.word_marker, None);

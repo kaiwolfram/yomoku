@@ -46,28 +46,11 @@ struct Migration {
     sql: &'static str,
 }
 
-const MIGRATIONS: &[Migration] = &[
-    Migration {
-        version: 1,
-        name: "0001_completion_receipts_initial_schema",
-        sql: include_str!("../migrations/0001_completion_receipts_initial_schema.sql"),
-    },
-    Migration {
-        version: 2,
-        name: "0002_library_read_override",
-        sql: include_str!("../migrations/0002_library_read_override.sql"),
-    },
-    Migration {
-        version: 3,
-        name: "0003_hot_path_indexes",
-        sql: include_str!("../migrations/0003_hot_path_indexes.sql"),
-    },
-    Migration {
-        version: 4,
-        name: "0004_reader_word_markers",
-        sql: include_str!("../migrations/0004_reader_word_markers.sql"),
-    },
-];
+const MIGRATIONS: &[Migration] = &[Migration {
+    version: 1,
+    name: "0001_release_initial_schema",
+    sql: include_str!("../migrations/0001_release_initial_schema.sql"),
+}];
 
 /// Failures are returned to the runtime; opening never resets a database.
 #[derive(Debug)]

@@ -46,26 +46,25 @@ fn command(
 }
 
 #[test]
-fn schema_one_books_inherit_completion_and_keep_saved_positions() {
+fn books_without_read_override_inherit_completion_and_keep_saved_positions() {
     use crate::documents::{create_paste_in, record_reader_entry_in, write_position_in};
     let database = TestDatabase::new();
-    let mut connection = Connection::open(database.path()).unwrap();
-    migrate(&mut connection, &MIGRATIONS[..1]).unwrap();
-    let partial = create_paste_in(&connection, &PasteText::new("猫犬".into()).unwrap()).unwrap();
-    let finished = create_paste_in(&connection, &PasteText::new("犬猫".into()).unwrap()).unwrap();
-    write_position_in(&connection, partial.document_id, position(&partial, 3)).unwrap();
-    write_position_in(&connection, finished.document_id, position(&finished, 6)).unwrap();
-    record_reader_entry_in(&connection, partial.document_id).unwrap();
+    let storage = Storage::open(database.path()).unwrap();
+    let connection = &storage.connection;
+    let partial = create_paste_in(connection, &PasteText::new("猫犬".into()).unwrap()).unwrap();
+    let finished = create_paste_in(connection, &PasteText::new("犬猫".into()).unwrap()).unwrap();
+    write_position_in(connection, partial.document_id, position(&partial, 3)).unwrap();
+    write_position_in(connection, finished.document_id, position(&finished, 6)).unwrap();
+    record_reader_entry_in(connection, partial.document_id).unwrap();
     connection
         .execute(
             "UPDATE documents SET finished_at_least_once = 1 WHERE id = ?1",
             [i64::from(finished.document_id)],
         )
         .unwrap();
-    drop(connection);
+    drop(storage);
 
     let mut storage = Storage::open(database.path()).unwrap();
-    assert_eq!(storage.schema_version().unwrap(), 4);
     let summaries = storage.list_documents().unwrap();
     assert_eq!(summaries.len(), 2);
     assert_eq!(summaries[0].document_id, partial.document_id);
@@ -179,7 +178,7 @@ fn finished_marker_survives_backward_position_reflow_reopen_and_each_reread() {
     );
     let first = command(&mut storage, &document);
     storage.record_effective_page_completion(&first).unwrap();
-    for length in [PageLength::Characters250, PageLength::Characters1500] {
+    for length in PageLength::ALL {
         storage.save_page_length(length).unwrap();
         let previous = storage
             .save_document_reading_position(document.document_id, position(&document, 0))
@@ -196,6 +195,7 @@ fn finished_marker_survives_backward_position_reflow_reopen_and_each_reread() {
 
         drop(storage);
         storage = Storage::open(database.path()).unwrap();
+        assert_eq!(storage.page_length().unwrap(), length);
         let before = storage.load_paste(document.document_id).unwrap();
         assert_eq!(
             storage.record_effective_page_completion(&first).unwrap(),
@@ -228,7 +228,14 @@ fn finished_marker_survives_backward_position_reflow_reopen_and_each_reread() {
         .connection
         .query_row("SELECT COUNT(*) FROM reading_completions", [], |r| r.get(0))
         .unwrap();
-    assert_eq!(count, 3);
+    assert_eq!(count, 1 + PageLength::ALL.len() as i64);
+    assert!(matches!(
+        storage
+            .connection
+            .execute("UPDATE reading_completions SET page_length = 1500", []),
+        Err(rusqlite::Error::SqliteFailure(error, _))
+            if error.code == rusqlite::ErrorCode::ConstraintViolation
+    ));
 }
 
 #[test]

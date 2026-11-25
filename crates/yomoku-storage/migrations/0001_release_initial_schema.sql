@@ -15,11 +15,12 @@ CREATE TABLE chapters (
 CREATE TABLE documents (
     id INTEGER PRIMARY KEY AUTOINCREMENT CHECK (id > 0),
     source_id INTEGER NOT NULL UNIQUE REFERENCES sources(id),
-    title TEXT NOT NULL
-, finished_at_least_once INTEGER NOT NULL DEFAULT 0
-    CHECK (finished_at_least_once IN (0, 1)), last_read_sequence INTEGER
-    CHECK (last_read_sequence IS NULL OR
-           (typeof(last_read_sequence) = 'integer' AND last_read_sequence > 0)));
+    title TEXT NOT NULL,
+    finished_at_least_once INTEGER NOT NULL DEFAULT 0 CHECK (finished_at_least_once IN (0, 1)),
+    last_read_sequence INTEGER CHECK (last_read_sequence IS NULL OR
+        (typeof(last_read_sequence) = 'integer' AND last_read_sequence > 0)),
+    read_override INTEGER CHECK (read_override IN (0, 1))
+);
 
 CREATE TABLE chapter_texts (
     chapter_id INTEGER PRIMARY KEY REFERENCES chapters(id),
@@ -32,12 +33,19 @@ CREATE TABLE reading_positions (
     byte_offset INTEGER NOT NULL CHECK (byte_offset >= 0)
 );
 
+CREATE TABLE reader_word_markers (
+    document_id INTEGER PRIMARY KEY REFERENCES documents(id) ON DELETE CASCADE,
+    chapter_id INTEGER NOT NULL REFERENCES chapters(id),
+    start_byte INTEGER NOT NULL CHECK (start_byte >= 0),
+    end_byte INTEGER NOT NULL CHECK (end_byte > start_byte)
+) STRICT;
+
 CREATE TABLE reader_settings (
     id INTEGER PRIMARY KEY CHECK (id = 1),
-    page_length INTEGER NOT NULL CHECK (page_length IN (250, 500, 750, 1000, 1500))
-, font_size INTEGER NOT NULL DEFAULT 16
-    CHECK (font_size IN (14, 16, 18, 20, 24)), line_spacing INTEGER NOT NULL DEFAULT 150
-    CHECK (line_spacing IN (125, 150, 175, 200))) STRICT;
+    page_length INTEGER NOT NULL CHECK (page_length IN (250, 500, 750, 1000)),
+    font_size INTEGER NOT NULL DEFAULT 16 CHECK (font_size IN (14, 16, 18, 20, 24)),
+    line_spacing INTEGER NOT NULL DEFAULT 150 CHECK (line_spacing IN (125, 150, 175, 200))
+) STRICT;
 
 CREATE TABLE completion_commands (
     id INTEGER PRIMARY KEY AUTOINCREMENT CHECK (id > 0),
@@ -54,8 +62,9 @@ CREATE TABLE reading_completions (
     end_byte_offset INTEGER NOT NULL CHECK (end_byte_offset >= start_byte_offset),
     departing_byte_offset INTEGER NOT NULL
         CHECK (departing_byte_offset >= start_byte_offset AND departing_byte_offset <= end_byte_offset),
-    page_length INTEGER NOT NULL CHECK (page_length IN (250, 500, 750, 1000, 1500)),
-    completed_at_unix_ms INTEGER NOT NULL CHECK (completed_at_unix_ms >= 0)) STRICT;
+    page_length INTEGER NOT NULL CHECK (page_length IN (250, 500, 750, 1000)),
+    completed_at_unix_ms INTEGER NOT NULL CHECK (completed_at_unix_ms >= 0)
+) STRICT;
 
 CREATE TABLE vocabulary (
     id INTEGER PRIMARY KEY AUTOINCREMENT CHECK (id > 0),
@@ -209,6 +218,11 @@ CREATE TABLE anki_settings (
     default_deck_id INTEGER CHECK (default_deck_id > 0)
 ) STRICT;
 
+CREATE TABLE statistics_settings (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    timeframe TEXT NOT NULL CHECK (timeframe IN ('last_week', 'last_month', 'last_quarter', 'last_year', 'all_time'))
+) STRICT;
+
 CREATE INDEX reading_completions_by_date ON reading_completions(completed_at_unix_ms, command_id);
 
 CREATE INDEX paste_content_hashes_by_digest ON paste_content_hashes(sha256, document_id);
@@ -222,12 +236,11 @@ CREATE INDEX vocabulary_status_events_by_entry ON vocabulary_status_events(vocab
 CREATE UNIQUE INDEX vocabulary_completion_status_once
     ON vocabulary_status_events(completion_command_id, vocabulary_id) WHERE cause = 'completion';
 
+CREATE INDEX vocabulary_by_registration ON vocabulary (registered_at_unix_ms, id);
+
+CREATE INDEX epub_inline_images_by_asset ON epub_inline_images (document_id, path);
+
 INSERT INTO reader_settings VALUES (1, 250, 16, 150);
 INSERT INTO library_read_clock VALUES (1, 0);
 INSERT INTO anki_settings VALUES (1, NULL);
-
-CREATE TABLE statistics_settings (
-    id INTEGER PRIMARY KEY CHECK (id = 1),
-    timeframe TEXT NOT NULL CHECK (timeframe IN ('last_week', 'last_month', 'last_six_months', 'last_year', 'all_time'))
-) STRICT;
 INSERT INTO statistics_settings (id, timeframe) VALUES (1, 'last_week');

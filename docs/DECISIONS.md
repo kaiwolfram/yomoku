@@ -65,10 +65,10 @@ Pinned inputs, patches, licenses and notices are in
 
 ## Persistence and history
 
-Use one initial SQL schema, version 1, journal `0001_completion_receipts_initial_schema`,
-with 25 application tables. Retain the immediate-transaction runner/journal for
-future published upgrades. Previous development databases, including
-the prior schema-1 journal, fail validation without migration, clearing or repair.
+Use one initial SQL schema, version 1, with journal `0001_release_initial_schema`
+and 26 application tables. Retain the immediate-transaction runner and journal
+for future published upgrades. Development databases fail validation and retain
+their data.
 Keep SQLite I/O in `yomoku-storage`, with foreign keys on each connection and
 transactional rollback on statement or deferred-commit failures.
 

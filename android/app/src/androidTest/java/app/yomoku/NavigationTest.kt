@@ -19,6 +19,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.yomoku.shared.Destination
 import app.yomoku.shared.Event
+import app.yomoku.shared.PageLength
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertThrows
@@ -72,24 +73,26 @@ class NavigationTest {
     }
 
     @Test
-    fun settingsExposesOnlyFourPageLengthsAndRetainsLegacyValue() {
+    fun settingsExposesFourPageLengthsAndRetainsSelection() {
         val core = ViewModelProvider(compose.activity)[CoreSessionOwner::class.java].session
         compose.waitUntil(30_000) { !core.view.storageBusy && core.view.pageLength != null }
         val original = core.view.pageLength!!
         try {
             compose.onNodeWithTag("navigation_settings").performClick()
-            compose.runOnUiThread {
-                core.dispatch(Event.SetPageLength(app.yomoku.shared.PageLength.CHARACTERS1500))
-            }
-            compose.waitUntil(30_000) { !core.view.storageBusy }
             compose.onNodeWithContentDescription("Back").assertDoesNotExist()
             for (size in listOf(250, 500, 750, 1000)) {
                 compose.onNodeWithTag("page_length_$size").performScrollTo().assertExists()
             }
             compose.onNodeWithTag("page_length_1500").assertDoesNotExist()
-            assertEquals(app.yomoku.shared.PageLength.CHARACTERS1500, core.view.pageLength)
+            val (pageLength, size) =
+                if (original == PageLength.CHARACTERS1000) PageLength.CHARACTERS750 to 750
+                else PageLength.CHARACTERS1000 to 1000
+            compose.onNodeWithTag("page_length_$size").performScrollTo().performClick()
+            compose.waitUntil(30_000) {
+                !core.view.storageBusy && core.view.pageLength == pageLength
+            }
             compose.activityRule.scenario.recreate()
-            assertEquals(app.yomoku.shared.PageLength.CHARACTERS1500, core.view.pageLength)
+            assertEquals(pageLength, core.view.pageLength)
             compose.onNode(hasText("Library") and hasClickAction()).performClick()
             compose.onNodeWithTag("screen_title").assertTextEquals("Library")
         } finally {

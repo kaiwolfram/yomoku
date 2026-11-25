@@ -151,7 +151,7 @@ fn txt_cancel_during_analysis_rolls_back_current_file_and_ids_but_keeps_complete
         VocabularyStatus::Known
     );
     assert!(storage
-        .find_imported_txt("｜猫《ねこ》 犬 𠮷".as_bytes())
+        .find_imported_file("｜猫《ねこ》 犬 𠮷".as_bytes())
         .unwrap()
         .is_none());
     // A fresh, explicit attempt works; the cancelled handle remains cancelled.
@@ -348,10 +348,10 @@ fn txt_atomic_canonical_text_digest_analysis_and_filename_survive_reopen() {
         Some(TextEncoding::Utf8)
     );
     assert_eq!(
-        storage.find_imported_txt(bytes).unwrap(),
+        storage.find_imported_file(bytes).unwrap(),
         Some(imported.document.library_summary().unwrap())
     );
-    assert!(storage.find_imported_txt(b"missing").unwrap().is_none());
+    assert!(storage.find_imported_file(b"missing").unwrap().is_none());
     let snapshot = storage
         .load_document_reader_snapshot(imported.document.document_id)
         .unwrap()

@@ -224,7 +224,7 @@ private fun verifyTxtCancellationBridge() {
                 }
             }
         NativeBridge(database.path, listener, provider).use { bridge ->
-            bridge.cancelTxtImport() // Idle calls cannot cancel the next accepted file.
+            bridge.cancelFileImport() // Idle calls cannot cancel the next accepted file.
             check(
                 listener.dispatch(bridge, Event.RefreshLibrary).documents.single().documentId ==
                     first
@@ -236,8 +236,8 @@ private fun verifyTxtCancellationBridge() {
             val cancel =
                 thread(name = "txt-cancel-host") {
                     try {
-                        bridge.cancelTxtImport()
-                        bridge.cancelTxtImport()
+                        bridge.cancelFileImport()
+                        bridge.cancelFileImport()
                     } catch (error: Throwable) {
                         failure.set(error)
                     } finally {
@@ -261,7 +261,7 @@ private fun verifyTxtCancellationBridge() {
                 listener.dispatch(bridge, Event.RefreshLibrary).documents.single().documentId ==
                     first
             )
-            bridge.cancelTxtImport()
+            bridge.cancelFileImport()
             val retry = listener.dispatch(bridge, event("犬 犬"))
             check(
                 retry.documents.size == 2 && retry.importSummary?.outcome == ImportOutcome.CREATED
@@ -283,7 +283,7 @@ private fun verifyTxtCancellationBridge() {
                     }
             )
             check(delegate.calls.get() == 1)
-            bridge.cancelTxtImport() // No effect on a committed file or on reader work.
+            bridge.cancelFileImport() // No effect on a committed file or on reader work.
         }
         NativeBridge(database.path, listener, HostDictionary().also { it.fail = true }).use { bridge
             ->

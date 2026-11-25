@@ -71,11 +71,6 @@ pub struct AnalyzerLifecycle {
 }
 
 impl AnalyzerLifecycle {
-    /// Compatibility entry point for existing TXT callers.
-    pub fn cancel_txt_import(&self) -> std::io::Result<()> {
-        self.cancel_file_import()
-    }
-
     /// Cancel the currently accepted EPUB/TXT/SRT attempt directly, never through FIFO.
     /// Call off the UI thread: an in-flight COMMIT can hold the per-file gate.
     /// Stop batch submission until this call and the import result both finish.

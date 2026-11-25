@@ -206,18 +206,9 @@ impl NativeBridge {
             .map_err(|_| FfiError::WorkerUnavailable)
     }
 
-    /// Compatibility entry point to cancel the current file attempt outside FIFO.
-    /// Call off Android's main
-    /// thread and wait for both this return and its async result before starting
+    /// Cancel the current EPUB/TXT/SRT attempt outside FIFO. Call off Android's main
+    /// thread and await both this return and the asynchronous outcome before starting
     /// another file. Already committed files remain completed.
-    pub fn cancel_txt_import(&self) -> Result<(), FfiError> {
-        self.lifecycle
-            .cancel_txt_import()
-            .map_err(|_| FfiError::WorkerUnavailable)
-    }
-
-    /// Cancel the current EPUB/TXT/SRT attempt outside FIFO. As with cancel_txt_import,
-    /// call off main and await both this return and the asynchronous outcome.
     pub fn cancel_file_import(&self) -> Result<(), FfiError> {
         self.lifecycle
             .cancel_file_import()
