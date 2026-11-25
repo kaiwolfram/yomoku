@@ -341,10 +341,11 @@ fn settled(router: &EffectRouter, event: Event) -> ViewModel {
 
 #[test]
 #[ignore = "requires pinned Sudachi Full and word dictionaries; run tools/test-sudachi.sh"]
-fn japanese_grammar_joins_keep_written_spans_and_return_whole_word_definitions() {
+fn japanese_grammar_boundaries_keep_written_spans_and_return_whole_word_definitions() {
     let database = Database::new();
     let (router, _lifecycle) = real_router(database.path());
     let text = concat!(
+        "二枚しかないです。無いです。高くないです。食べないです。いいです。危ないです。なかったです。",
         "奇妙がられる。持って行った。持って行ってしまった。済ませて戻る。思いだせない。",
         "店員として働く。どこかで待つ。しなければならない。",
         "いいですか。どこか？どこ か。店員とし、て。店員としている。",
@@ -376,6 +377,19 @@ fn japanese_grammar_joins_keep_written_spans_and_return_whole_word_definitions()
             .map(|token| token.surface.as_str())
             .collect::<Vec<_>>(),
         [
+            "二枚",
+            "しか",
+            "ない",
+            "です",
+            "無い",
+            "です",
+            "高くない",
+            "です",
+            "食べない",
+            "です",
+            "いいです",
+            "危ないです",
+            "なかったです",
             "奇妙",
             "がられる",
             "持って行った",
@@ -412,6 +426,9 @@ fn japanese_grammar_joins_keep_written_spans_and_return_whole_word_definitions()
         ]
     );
     for (surface, base, reading, entry_id, gloss) in [
+        ("ない", "ない", "ナイ", 1529520, "nonexistent"),
+        ("です", "です", "デス", 1628500, "be"),
+        ("無い", "無い", "ナイ", 1529520, "nonexistent"),
         ("奇妙", "奇妙", "キミョウ", 1219490, "odd"),
         ("がられる", "がる", "ガラレル", 1631750, "to think"),
         (

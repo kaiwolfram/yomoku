@@ -20,7 +20,8 @@ pub enum SplitMode {
 /// Import policy metadata is independent of the raw analyzer's A/B semantics.
 pub const LEGACY_IMPORT_POLICY_SUFFIX: &str = ";yomoku-dictionary-refinement-v1";
 pub const COMPOUND_IMPORT_POLICY_SUFFIX: &str = ";yomoku-dictionary-refinement-v2";
-pub const IMPORT_POLICY_SUFFIX: &str = ";yomoku-dictionary-refinement-v3";
+pub const IMPORT_POLICY_V3_SUFFIX: &str = ";yomoku-dictionary-refinement-v3";
+pub const IMPORT_POLICY_SUFFIX: &str = ";yomoku-dictionary-refinement-v4";
 pub const WORD_DICTIONARY_PREFIX: &str = ";jmdict-jmnedict-sha256:";
 
 /// Exact engine revision and dictionary artifact identity, not a moving "latest".

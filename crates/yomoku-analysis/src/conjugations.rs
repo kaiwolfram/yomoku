@@ -42,16 +42,21 @@ impl Morpheme {
         self.pos(0) == "形容詞" || (self.pos(0) == "接尾辞" && self.pos(1) == "形容詞的")
     }
 
+    fn negative_adjective(&self) -> bool {
+        self.pos(0) == "形容詞" && self.pos(1) == "非自立可能" && self.normalized_form == "無い"
+    }
+
+    fn plain_negative(&self) -> bool {
+        matches!(self.pos(5), "終止形-一般" | "連体形-一般")
+            && (self.pos(4) == "助動詞-ナイ" || self.negative_adjective())
+    }
+
     fn ending_after(&self, previous: &Self) -> bool {
         self.token.is_japanese
             && self.conjugates()
             && previous.conjugates()
             && (self.pos(0) == "助動詞"
-                || (self.pos(0) == "形容詞"
-                    && self.pos(1) == "非自立可能"
-                    && self.normalized_form == "無い"
-                    && previous.adjectival()
-                    && previous.continuative()))
+                || (self.negative_adjective() && previous.adjectival() && previous.continuative()))
     }
 
     fn connector(&self) -> bool {
@@ -245,6 +250,13 @@ pub(super) fn join(
                 break;
             }
             if for_import && obligation_after(&morphemes[end - 1], &morphemes[end..]) {
+                break;
+            }
+            if for_import
+                && next.pos(4) == "助動詞-デス"
+                && next.token.surface == "です"
+                && morphemes[end - 1].plain_negative()
+            {
                 break;
             }
             let previous = &morphemes[grammatical];
