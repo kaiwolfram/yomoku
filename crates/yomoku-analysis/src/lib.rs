@@ -142,10 +142,12 @@ impl Analyzer {
     ) -> Result<ChapterAnalysis, AnalysisError> {
         use yomoku_core::analysis::{
             COMPOUND_IMPORT_POLICY_SUFFIX, IMPORT_POLICY_SUFFIX, IMPORT_POLICY_V3_SUFFIX,
-            IMPORT_POLICY_V4_SUFFIX, LEGACY_IMPORT_POLICY_SUFFIX, WORD_DICTIONARY_PREFIX,
+            IMPORT_POLICY_V4_SUFFIX, IMPORT_POLICY_V5_SUFFIX, LEGACY_IMPORT_POLICY_SUFFIX,
+            WORD_DICTIONARY_PREFIX,
         };
         let engine = [
             IMPORT_POLICY_SUFFIX,
+            IMPORT_POLICY_V5_SUFFIX,
             IMPORT_POLICY_V4_SUFFIX,
             IMPORT_POLICY_V3_SUFFIX,
             COMPOUND_IMPORT_POLICY_SUFFIX,

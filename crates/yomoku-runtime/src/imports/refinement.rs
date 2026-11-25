@@ -120,7 +120,7 @@ impl<'a> Refinement<'a> {
         }
         for (index, (token, grammar)) in tokens.iter().zip(context).enumerate().skip(1) {
             if !token.is_japanese
-                || grammar.standalone_grammar
+                || (grammar.standalone_grammar && !grammar.compound_continuation)
                 || grammar.starts_sentence
                 || grammar.compound_boundary_before
                 || end != token.anchor.range.start
@@ -155,7 +155,8 @@ impl<'a> Refinement<'a> {
             }
             let exact = exact && (!grammar.inflected || reading.is_some());
             let mut base = None;
-            if grammar.inflected {
+            // Keep the copular に literal within ように.
+            if grammar.inflected && !grammar.compound_continuation {
                 if let Some(lemma) = token
                     .dictionary_form
                     .as_ref()

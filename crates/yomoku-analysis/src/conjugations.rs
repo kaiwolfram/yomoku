@@ -100,6 +100,10 @@ impl Morpheme {
     fn small_tsu_suffix(&self) -> bool {
         self.pos(0) == "接尾辞" && self.token.surface.starts_with(['っ', 'ッ', 'ｯ'])
     }
+
+    fn grammatical_you(&self) -> bool {
+        self.normalized_form == "よう" && self.pos(0) == "形状詞" && self.pos(1) == "助動詞語幹"
+    }
 }
 
 fn contiguous(parts: &[Morpheme]) -> bool {
@@ -107,11 +111,18 @@ fn contiguous(parts: &[Morpheme]) -> bool {
 }
 
 fn grammatical_you_after(predicate: &Morpheme, next: &Morpheme) -> bool {
-    next.normalized_form == "よう"
-        && next.pos(0) == "形状詞"
-        && next.pos(1) == "助動詞語幹"
+    next.grammatical_you()
         && (predicate.pos(5).starts_with("連体形") || predicate.pos(5).starts_with("終止形"))
         && predicate.adjacent(next)
+}
+
+fn copular_ni_after_you(you: &Morpheme, next: &Morpheme) -> bool {
+    you.grammatical_you()
+        && next.token.surface == "に"
+        && next.pos(0) == "助動詞"
+        && next.pos(4) == "助動詞-ダ"
+        && next.pos(5) == "連用形-ニ"
+        && you.adjacent(next)
 }
 
 fn honorific_stem(prefix: &Morpheme, stem: &Morpheme, verb: &Morpheme) -> bool {
@@ -345,6 +356,8 @@ pub(super) fn join(
             standalone_grammar: matches!(head.pos(0), "助詞" | "助動詞"),
             compound_boundary_before: for_import
                 && previous.is_some_and(|previous| grammatical_you_after(previous, head)),
+            compound_continuation: for_import
+                && previous.is_some_and(|previous| copular_ni_after_you(previous, head)),
             inflected: lemma.conjugates()
                 && (grammatical > lemma_head
                     || !matches!(lemma.pos(5), "終止形-一般" | "連体形-一般")),
