@@ -1,0 +1,37 @@
+# Match the JNI exports and lookups in the generated BoltFFI jni_glue.c.
+-keep class app.yomoku.nativebridge.Native {
+    native <methods>;
+}
+
+-keep class app.yomoku.nativebridge.DictionaryProviderCallbacks {
+    static void free(long);
+    static long clone(long);
+    static long open_verified_dictionary(long);
+    static byte[] verified_word_dictionary_path(long);
+}
+
+-keep class app.yomoku.nativebridge.EffectsListenerCallbacks {
+    static void free(long);
+    static long clone(long);
+    static void on_effects(long, byte[]);
+    static void on_error(long, int);
+}
+
+-keep class app.yomoku.nativebridge.EpubAssetListenerCallbacks {
+    static void free(long);
+    static long clone(long);
+    static void on_asset(long, byte[], byte[]);
+    static void on_error(long, int);
+}
+
+-keep class app.yomoku.nativebridge.EpubCoverListenerCallbacks {
+    static void free(long);
+    static long clone(long);
+    static void on_cover(long, byte[], byte[], byte[]);
+    static void on_no_cover(long);
+    static void on_error(long, int);
+}
+
+-keep class app.yomoku.nativebridge.BoltFfiErrorBufferException {
+    <init>(byte[]);
+}

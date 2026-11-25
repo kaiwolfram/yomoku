@@ -102,6 +102,21 @@ android {
         ndk { abiFilters += listOf("arm64-v8a", "x86_64") }
     }
 
+    buildTypes {
+        release {
+            optimization { enable = true }
+        }
+    }
+
+    splits {
+        abi {
+            isEnable = true
+            reset()
+            include("arm64-v8a", "x86_64")
+            isUniversalApk = true
+        }
+    }
+
     sourceSets.named("main") {
         assets.directories += sudachiAssets.asFile.absolutePath
         assets.directories += dictionaryAssets.asFile.absolutePath
@@ -139,6 +154,27 @@ android {
         disable += "NewerVersionAvailable"
         disable += "AndroidGradlePluginVersion"
         disable += "GradleDependency"
+    }
+}
+
+androidComponents {
+    onVariants(selector().withBuildType("debug")) { variant ->
+        variant.outputs.forEach { output ->
+            if (output.filters.isEmpty()) {
+                output.outputFileName.set("app-debug.apk")
+            } else {
+                output.enabled.set(false)
+            }
+        }
+    }
+    onVariants(selector().withBuildType("release")) { variant ->
+        variant.outputs.forEach { output ->
+            if (output.filters.isEmpty()) {
+                output.outputFileName.set("app-release-unsigned.apk")
+            } else if (output.filters.any { it.identifier == "x86_64" }) {
+                output.enabled.set(false)
+            }
+        }
     }
 }
 

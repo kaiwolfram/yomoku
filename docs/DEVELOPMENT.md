@@ -114,16 +114,29 @@ and can invalidate an overlapping Rust/doc-test link.
 ```
 
 Omit `--offline` only when explicitly fetching initial Gradle dependencies.
-Both variants package arm64-v8a and x86_64. Debug automatically uses the Rust
-debug profile; release automatically passes `--release`. Outputs are separate:
+Debug automatically uses the Rust debug profile and builds one universal APK.
+Release automatically passes `--release` and enables R8 code optimization,
+obfuscation, and resource shrinking. Native outputs land in
 `target/generated/{debug,release}/{kotlin,native,android}`. Native tasks serialize,
 including debug probes, and share a cross-process lock. There is no manual native
 prebuild/task-exclusion recipe. Release excludes probe libraries and debug classes.
 
-APKs are under `android/app/build/outputs/apk/`. Release is unsigned; never commit
-signing keys and obtain approval before signed publishing. Inspect both ABI JNI
-libraries, ELF LOAD alignment and `zipalign -c -P 16 -v 4` on a release candidate.
-Verify no `libandroid_app_probe.so` or debug probe classes enter release.
+`:app:assembleRelease` builds two standalone unsigned APKs in
+`android/app/build/outputs/apk/release/`.
+
+| APK | ABIs |
+| --- | --- |
+| `app-release-unsigned.apk` | arm64-v8a, x86_64 |
+| `app-arm64-v8a-release-unsigned.apk` | arm64-v8a |
+
+Both have the same app ID, version, and full offline dictionaries. They share
+one Rust release build and one R8 mapping at
+`android/app/build/outputs/mapping/release/mapping.txt`. Debug packages both ABIs
+in `android/app/build/outputs/apk/debug/app-debug.apk`.
+
+Check JNI library ELF LOAD alignment and run `zipalign -c -P 16 -v 4` on each
+release APK. Verify that release excludes `libandroid_app_probe.so` and debug probe
+classes. Never commit signing keys and obtain approval before signed publishing.
 
 ## Android trials
 
