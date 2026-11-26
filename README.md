@@ -70,7 +70,7 @@ in the output filename.
 ```sh
 build_tools="$ANDROID_HOME/build-tools/36.0.0"
 apk_dir=android/app/build/outputs/apk/release
-version=0.1.0  # Use versionName from android/app/build.gradle.kts.
+version=1.0.0  # Use versionName from android/app/build.gradle.kts.
 unsigned_apk="$apk_dir/app-release-unsigned.apk"
 signed_apk=".local/apks/yomoku-$version-$(git rev-parse --short HEAD)-release-signed.apk"
 
