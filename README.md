@@ -54,37 +54,29 @@ JNI libraries in release mode and writes two unsigned APKs to
 
 | APK | Supported ABIs |
 | --- | --- |
-| `app-release-unsigned.apk` | ARM64 (`arm64-v8a`) and `x86_64` |
-| `app-arm64-v8a-release-unsigned.apk` | ARM64 only |
+| `yomoku-<version>-universal-unsigned.apk` | ARM64 (`arm64-v8a`) and `x86_64` |
+| `yomoku-<version>-arm64-v8a-unsigned.apk` | ARM64 only |
 
-### Sign and install an APK
+Gradle takes `<version>` from the app's `versionName`.
+
+### Sign and install the APKs
 
 Use the same release key for updates and keep the keystore outside the checkout.
 If you need a keystore, see the
 [Android command-line signing guide](https://developer.android.com/build/building-cmdline#sign_cmdline).
 
-This example signs the universal APK. For ARM64 only, use
-`app-arm64-v8a-release-unsigned.apk` and add `-arm64-v8a` before `-release-signed`
-in the output filename.
+The signing commands write `yomoku-<version>-arm64-v8a.apk` and
+`yomoku-<version>-universal.apk` to `.local/apks/`.
 
 ```sh
-build_tools="$ANDROID_HOME/build-tools/36.0.0"
-apk_dir=android/app/build/outputs/apk/release
-version=1.0.0  # Use versionName from android/app/build.gradle.kts.
-unsigned_apk="$apk_dir/app-release-unsigned.apk"
-signed_apk=".local/apks/yomoku-$version-$(git rev-parse --short HEAD)-release-signed.apk"
-
-mkdir -p .local/apks
-"$build_tools/zipalign" -c -P 16 4 "$unsigned_apk" &&
-  "$build_tools/apksigner" sign --ks /path/to/release-keystore.p12 \
-    --out "$signed_apk" "$unsigned_apk" &&
-  "$build_tools/apksigner" verify "$signed_apk"
+tools/sign-android-release.sh /path/to/release-keystore.p12
 ```
 
-After verification succeeds, install on a connected device or emulator.
+After verification succeeds, install the signed APK for your device or emulator.
+This example installs the 1.0.0 universal APK.
 
 ```sh
-"$ANDROID_HOME/platform-tools/adb" install -r "$signed_apk"
+"$ANDROID_HOME/platform-tools/adb" install -r .local/apks/yomoku-1.0.0-universal.apk
 ```
 
 ## Rust checks

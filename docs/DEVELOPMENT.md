@@ -126,13 +126,13 @@ prebuild/task-exclusion recipe. Release excludes probe libraries and debug class
 
 | APK | ABIs |
 | --- | --- |
-| `app-release-unsigned.apk` | arm64-v8a, x86_64 |
-| `app-arm64-v8a-release-unsigned.apk` | arm64-v8a |
+| `yomoku-<version>-universal-unsigned.apk` | arm64-v8a, x86_64 |
+| `yomoku-<version>-arm64-v8a-unsigned.apk` | arm64-v8a |
 
-Both have the same app ID, version, and full offline dictionaries. They share
-one Rust release build and one R8 mapping at
-`android/app/build/outputs/mapping/release/mapping.txt`. Debug packages both ABIs
-in `android/app/build/outputs/apk/debug/app-debug.apk`.
+Gradle uses `versionName` in both filenames. Both APKs have the same app ID,
+version, and full offline dictionaries. They share one Rust release build and the
+R8 mapping at `android/app/build/outputs/mapping/release/mapping.txt`. Debug
+packages both ABIs in `android/app/build/outputs/apk/debug/app-debug.apk`.
 
 Check JNI library ELF LOAD alignment and run `zipalign -c -P 16 -v 4` on each
 release APK. Verify that release excludes `libandroid_app_probe.so` and debug probe

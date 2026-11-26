@@ -169,10 +169,11 @@ androidComponents {
     }
     onVariants(selector().withBuildType("release")) { variant ->
         variant.outputs.forEach { output ->
-            if (output.filters.isEmpty()) {
-                output.outputFileName.set("app-release-unsigned.apk")
-            } else if (output.filters.any { it.identifier == "x86_64" }) {
+            val abi = output.filters.singleOrNull()?.identifier ?: "universal"
+            if (abi == "x86_64") {
                 output.enabled.set(false)
+            } else {
+                output.outputFileName.set(output.versionName.map { "yomoku-$it-$abi-unsigned.apk" })
             }
         }
     }
