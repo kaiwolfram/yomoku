@@ -14,8 +14,6 @@ Yomoku is an Android reader that keeps track of the Japanese words you come acro
 
 I like learning Japanese by reading. I found [Lute](https://github.com/LuteOrg/lute-v3) a hassle to set up, so I built Yomoku to bring the reading and vocabulary workflow I liked to my Android phone.
 
-[Nostr profile on Jumble](https://jumble.social/users/npub1tq8sx9kt0uq90qj7py2upgej3vsl4rlehhyyh6gudvylfzud060qtlr7q8) · [Yomoku repository on GitWorkshop](https://gitworkshop.dev/npub1tq8sx9kt0uq90qj7py2upgej3vsl4rlehhyyh6gudvylfzud060qtlr7q8/relay.ngit.dev/yomoku)
-
 ## Build the Android release
 
 Run these commands from the repository root.
@@ -90,6 +88,17 @@ cargo fmt --all -- --check
 cargo clippy --workspace --all-targets --all-features --locked --offline -- -D warnings
 ```
 
-[Development guide](docs/DEVELOPMENT.md) · [Architecture](docs/ARCHITECTURE.md) · [Product spec](docs/PRODUCT_SPEC.md)
+## Documentation
+
+- [Development guide](docs/DEVELOPMENT.md)
+- [Architecture](docs/ARCHITECTURE.md)
+- [Product spec](docs/PRODUCT_SPEC.md)
+
+## Nostr
+
+- [Profile on Jumble](https://jumble.social/users/npub1tq8sx9kt0uq90qj7py2upgej3vsl4rlehhyyh6gudvylfzud060qtlr7q8)
+- [Yomoku repository on GitWorkshop](https://gitworkshop.dev/npub1tq8sx9kt0uq90qj7py2upgej3vsl4rlehhyyh6gudvylfzud060qtlr7q8/relay.ngit.dev/yomoku)
+
+## License
 
 Yomoku’s code is available under the [MIT License](LICENSE).
