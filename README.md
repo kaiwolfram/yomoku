@@ -7,12 +7,8 @@
 <p align="center"><em>Learn Japanese by reading</em></p>
 
 <p align="center">
-  <a href="https://apps.obtainium.imranr.dev/redirect?r=obtainium://app/%7B%22id%22%3A%22app.yomoku%22%2C%22url%22%3A%22https%3A%2F%2Fgithub.com%2Fkaiwolfram%2Fyomoku%22%2C%22author%22%3A%22kaiwolfram%22%2C%22name%22%3A%22Yomoku%22%7D">
-    <img src="docs/images/badge-obtainium.png" height="71" align="middle" alt="Get Yomoku on Obtainium">
-  </a>
-  <a href="https://zapstore.dev/apps/app.yomoku">
-    <img src="docs/images/badge-zapstore.png" height="48" align="middle" alt="Get Yomoku on Zapstore">
-  </a>
+  <a href="https://zapstore.dev/apps/app.yomoku"><img src="docs/images/badge-zapstore.png" height="48" align="middle" alt="Get Yomoku on Zapstore"></a>
+  <a href="https://apps.obtainium.imranr.dev/redirect?r=obtainium://app/%7B%22id%22%3A%22app.yomoku%22%2C%22url%22%3A%22https%3A%2F%2Fgithub.com%2Fkaiwolfram%2Fyomoku%22%2C%22author%22%3A%22kaiwolfram%22%2C%22name%22%3A%22Yomoku%22%7D"><img src="docs/images/badge-obtainium.png" height="71" align="middle" alt="Get Yomoku on Obtainium"></a>
 </p>
 
 Yomoku is an Android reader that keeps track of the Japanese words you come across. Import EPUB books, plain-text files, and SRT subtitles, or paste Japanese text directly into the app.
