@@ -1,0 +1,18 @@
+repository: https://github.com/kaiwolfram/yomoku
+metadata_sources: [github]
+
+name: Yomoku
+summary: Learn Japanese by reading
+description: |
+  Yomoku is an Android reader for learning Japanese with your own books and text.
+  Import EPUB books, TXT files, or SRT subtitles, or paste Japanese text directly
+  into the app.
+
+  - Tap words to see their readings and English definitions in the built-in
+    offline dictionary.
+  - Mark words as learning or known and see how often you’ve encountered them.
+  - Track your reading and vocabulary progress over time.
+  - Optionally send words and their original sentences to AnkiDroid.
+license: MIT
+tags: [education, language-learning, japanese, reading]
+icon: ./android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.webp
