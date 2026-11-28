@@ -28,7 +28,7 @@ must not change without user approval.
 - **Only EPUB, TXT, SRT, and pasted text**. No WebVTT `.vtt`, no ASS/SSA `.ass`, no PDF, no NHK integration, and no Android Share-intent import in v1.
 - Nostr multi-device sync, Blossom cloud backups, and manual encrypted backup and restore are outside v1 scope.
 - No full-text book search, no bookmarks, no editing of imported content, no in-app audio/video players, no custom goals or streaks, and no calendar heatmap.
-- An online marketing site (possibly `yomoku.app`) is not part of the essential Android MVP. Concentrate on the app and tests first.
+- An online marketing site is not part of the essential Android MVP. Concentrate on the app and tests first.
 
 **Priority order:** dependable persistence / accurate reading and vocabulary semantics > robust imports / dictionary lookup > usable UI > charts > external integrations > release polishing. Do not start with Nostr, signing, or intricate UI styling before the local reader works.
 
